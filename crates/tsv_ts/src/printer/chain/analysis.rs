@@ -43,7 +43,7 @@ fn linearize_chain<'a>(expr: &'a Expression) -> Vec<ChainNode<'a>> {
     let mut nodes = Vec::new();
     let mut paren_gaps = Vec::new();
     linearize_recursive(expr, &mut nodes, &mut paren_gaps);
-    apply_paren_gaps(&mut nodes, &paren_gaps);
+    finalize_chain_nodes(&mut nodes, &paren_gaps);
     nodes
 }
 
@@ -51,13 +51,13 @@ fn linearize_chain<'a>(expr: &'a Expression) -> Vec<ChainNode<'a>> {
 pub fn linearize_chain_from_call<'a>(call: &'a internal::CallExpression) -> Vec<ChainNode<'a>> {
     let mut nodes = Vec::new();
     let mut paren_gaps = Vec::new();
-    linearize_recursive(&call.callee, &mut nodes, &mut paren_gaps);
+    linearize_call_callee(call, &mut nodes, &mut paren_gaps);
     if call.optional {
         nodes.push(ChainNode::call_optional(call));
     } else {
         nodes.push(ChainNode::call(call));
     }
-    apply_paren_gaps(&mut nodes, &paren_gaps);
+    finalize_chain_nodes(&mut nodes, &paren_gaps);
     nodes
 }
 
@@ -67,9 +67,9 @@ pub fn linearize_chain_from_member<'a>(
 ) -> Vec<ChainNode<'a>> {
     let mut nodes = Vec::new();
     let mut paren_gaps = Vec::new();
-    linearize_member_object(&member.object, &mut nodes, &mut paren_gaps);
+    linearize_member_object(member, &mut nodes, &mut paren_gaps);
     linearize_member_node(member, &mut nodes, &mut paren_gaps);
-    apply_paren_gaps(&mut nodes, &paren_gaps);
+    finalize_chain_nodes(&mut nodes, &paren_gaps);
     nodes
 }
 
@@ -81,7 +81,7 @@ pub fn linearize_chain_from_non_null<'a>(
     let mut paren_gaps = Vec::new();
     linearize_recursive(&non_null.expression, &mut nodes, &mut paren_gaps);
     nodes.push(ChainNode::non_null());
-    apply_paren_gaps(&mut nodes, &paren_gaps);
+    finalize_chain_nodes(&mut nodes, &paren_gaps);
     nodes
 }
 
@@ -107,6 +107,90 @@ fn apply_paren_gaps(nodes: &mut [ChainNode<'_>], paren_gaps: &[ParenGap]) {
 /// A deferred paren gap extension: (node_index, gap_start)
 type ParenGap = (usize, u32);
 
+/// Finalize a freshly-linearized chain: apply deferred comment paren-gap
+/// extensions, then re-evaluate the base node's parens for the callee case.
+/// Shared by every linearization entry point so the two post-passes never
+/// drift apart.
+fn finalize_chain_nodes(nodes: &mut [ChainNode<'_>], paren_gaps: &[ParenGap]) {
+    apply_paren_gaps(nodes, paren_gaps);
+    fix_callee_base_parens(nodes);
+}
+
+/// Re-evaluate the base node's parens under `Callee` context when it is the
+/// direct callee of the chain's first call.
+///
+/// The base node's parens were computed with `ChainBase` (member-object) rules
+/// during linearization. A base that is *immediately* followed by a `Call`
+/// node is actually that call's callee — e.g. `(() => 1)()` linearizes to
+/// `[Base, Call]`, whereas `a.b()` has a `Member` between the base and the call
+/// (`[Base, Member, Call]`), so its base stays a member object. A callee needs
+/// the `Callee` rules so a function/arrow IIFE keeps its parens when the result
+/// is member-accessed (`(function () {})().p`, `(() => 1)().p`), matching
+/// prettier and the bare-callee path in `call_formatting.rs`.
+fn fix_callee_base_parens(nodes: &mut [ChainNode<'_>]) {
+    if let [
+        ChainNode::Base {
+            expr,
+            needs_parens: np,
+        },
+        ChainNode::Call { .. },
+        ..,
+    ] = nodes
+    {
+        // A parenthesized optional-chain callee (`(a?.b)()`, `(a?.())()`) keeps its
+        // parens — they terminate the chain so the call isn't absorbed into it.
+        // The `Callee` rules don't model that boundary (it depends on the stripped
+        // grouping parens, only knowable from the span gap during linearization),
+        // so preserve the linearizer's decision instead of downgrading it. Such a
+        // base is only ever produced by `linearize_call_callee`'s boundary check.
+        if expr.has_optional_in_chain() {
+            return;
+        }
+        *np = needs_parens(expr, ParenContext::Callee);
+    }
+}
+
+/// True when `child` (a member's object or a call's callee) is an optional chain
+/// that source parens terminated, *and* the access applied to it is non-optional
+/// (`(a?.b).c`, `(a?.b)()`). The grouping parens are stripped, so the only signal
+/// is the span gap: the parent's span starts before the child's (it covers the
+/// `(`). Such a child must stay a parenthesized base node — flattening it into the
+/// chain would absorb the trailing access into the chain, dropping the
+/// semantically-required parens and moving the short-circuit boundary (`(a?.b).c`
+/// throws if `a` is null; `a?.b.c` short-circuits).
+///
+/// When the applied access is itself optional (`(a?.b)?.c`), the parens are
+/// redundant — both forms short-circuit identically — so prettier strips them and
+/// we let the chain flatten (`parent_optional` skips the boundary). The public-AST
+/// converter still preserves acorn's nested `ChainExpression` for that case; this
+/// is a printer-only normalization.
+fn child_stops_optional_chain(
+    parent_start: u32,
+    parent_optional: bool,
+    child: &Expression,
+) -> bool {
+    !parent_optional && parent_start < child.span().start && child.has_optional_in_chain()
+}
+
+/// Push a sealed parenthesized-optional-chain object/callee as a base node.
+///
+/// When the sealed child is a non-null assertion wrapping the chain (`(a?.b!).c`,
+/// `!` inside the parens), lift the `!` out: emit the bare chain as the
+/// parenthesized base, then a separate `NonNull` node. That renders `(a?.b)!.c` —
+/// prettier's canonical form, identical to the `!`-outside source `(a?.b)!.c`. The
+/// `!` is a type-only assertion, so its position relative to the grouping parens
+/// carries no runtime meaning, and both formatters normalize to the outside form.
+/// Any other sealed child (a bare optional chain, `(a?.b).c`) stays a single
+/// parenthesized base.
+fn push_sealed_chain_base<'a>(child: &'a Expression, nodes: &mut Vec<ChainNode<'a>>) {
+    if let Expression::TSNonNullExpression(non_null) = child {
+        nodes.push(ChainNode::base(&non_null.expression, true));
+        nodes.push(ChainNode::non_null());
+    } else {
+        nodes.push(ChainNode::base(child, true));
+    }
+}
+
 fn linearize_recursive<'a>(
     expr: &'a Expression,
     nodes: &mut Vec<ChainNode<'a>>,
@@ -115,7 +199,7 @@ fn linearize_recursive<'a>(
     match expr {
         // CallExpression: recurse into callee, then add Call node
         Expression::CallExpression(call) => {
-            linearize_recursive(&call.callee, nodes, paren_gaps);
+            linearize_call_callee(call, nodes, paren_gaps);
             if call.optional {
                 nodes.push(ChainNode::call_optional(call));
             } else {
@@ -125,7 +209,7 @@ fn linearize_recursive<'a>(
 
         // MemberExpression: recurse into object, then add Member node
         Expression::MemberExpression(member) => {
-            linearize_member_object(&member.object, nodes, paren_gaps);
+            linearize_member_object(member, nodes, paren_gaps);
             linearize_member_node(member, nodes, paren_gaps);
         }
 
@@ -136,7 +220,16 @@ fn linearize_recursive<'a>(
         // linearize_member_object. Untested because prettier's parser rejects the
         // syntax, so there's no canonical source for a fixture.
         Expression::TSNonNullExpression(non_null) => {
-            linearize_recursive(&non_null.expression, nodes, paren_gaps);
+            // A parenthesized optional chain sealed inside the non-null assertion
+            // (`(a?.b)!.c`) must keep its parens — the trailing access reached via this
+            // node's parent must not be absorbed. Emit the bare chain as a
+            // parenthesized base + `!` so it renders `(a?.b)!.c`, not `a?.b!.c`.
+            let inner = &non_null.expression;
+            if non_null.seals_optional_chain() {
+                nodes.push(ChainNode::base(inner, true));
+            } else {
+                linearize_recursive(inner, nodes, paren_gaps);
+            }
             nodes.push(ChainNode::non_null());
         }
 
@@ -159,21 +252,46 @@ fn linearize_recursive<'a>(
 
 /// Linearize a MemberExpression's object.
 ///
-/// A `TSInstantiationExpression` object must keep its type args and be
-/// parenthesized: `(A<T>).x`, not `A.x` (data loss) or `A<T>.x` (ambiguous).
-/// Prettier parenthesizes an instantiation only when it is the object of a
-/// member access, so it becomes a parenthesized base node here rather than
-/// being recursed transparently (which would drop the type args, since no Call
-/// node follows to recover them). All other objects recurse normally.
+/// Two objects must stay a parenthesized base node instead of recursing into the
+/// chain:
+/// - A parenthesized optional chain (`(a?.b).c`, `(a?.b!).c`) terminates the
+///   chain — see `child_stops_optional_chain`; the base is built via
+///   `push_sealed_chain_base` (which lifts an inner `!` out of the parens).
+/// - A `TSInstantiationExpression` must keep its type args and be parenthesized:
+///   `(A<T>).x`, not `A.x` (data loss) or `A<T>.x` (ambiguous). Prettier
+///   parenthesizes an instantiation only when it is the object of a member
+///   access, and no Call node follows here to recover dropped type args.
+///
+/// All other objects recurse normally.
 fn linearize_member_object<'a>(
-    object: &'a Expression,
+    member: &'a internal::MemberExpression,
     nodes: &mut Vec<ChainNode<'a>>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
-    if matches!(object, Expression::TSInstantiationExpression(_)) {
+    let object: &Expression = &member.object;
+    if child_stops_optional_chain(member.span.start, member.optional, object) {
+        push_sealed_chain_base(object, nodes);
+    } else if matches!(object, Expression::TSInstantiationExpression(_)) {
         nodes.push(ChainNode::base(object, true));
     } else {
         linearize_recursive(object, nodes, paren_gaps);
+    }
+}
+
+/// Linearize a CallExpression's callee.
+///
+/// A parenthesized optional chain callee (`(a?.b)()`) terminates the chain and
+/// must stay a parenthesized base node — see `child_stops_optional_chain`. All
+/// other callees recurse normally.
+fn linearize_call_callee<'a>(
+    call: &'a internal::CallExpression,
+    nodes: &mut Vec<ChainNode<'a>>,
+    paren_gaps: &mut Vec<ParenGap>,
+) {
+    if child_stops_optional_chain(call.span.start, call.optional, &call.callee) {
+        push_sealed_chain_base(&call.callee, nodes);
+    } else {
+        linearize_recursive(&call.callee, nodes, paren_gaps);
     }
 }
 

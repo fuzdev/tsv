@@ -105,6 +105,7 @@ impl FixturesAuditCommand {
             })
             .collect();
 
+        // serde_json serialization of these plain Value/output types is infallible
         #[allow(clippy::expect_used)]
         let json = serde_json::to_string_pretty(&output).expect("Failed to serialize JSON");
         println!("{json}");

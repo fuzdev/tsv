@@ -7,8 +7,10 @@
 
 use super::super::comments_in_range;
 use super::Printer;
-use super::helpers::unwrap_parenthesized;
-use crate::ast::internal::{TSIntersectionType, TSType, TSTypeElement, TSTypeLiteral, TSUnionType};
+use super::helpers::{immediate_union_paren, unwrap_parenthesized};
+use crate::ast::internal::{
+    TSIntersectionType, TSParenthesizedType, TSType, TSTypeElement, TSTypeLiteral, TSUnionType,
+};
 use tsv_lang::doc::arena::DocId;
 
 /// Mode for building type literal docs.
@@ -36,6 +38,7 @@ impl<'a> Printer<'a> {
         prev_end: u32,
         member_start: u32,
         is_first: bool,
+        delimiter_pull_pos: Option<u32>,
     ) -> Vec<DocId> {
         let d = self.d();
         let all_comments: Vec<_> =
@@ -47,7 +50,10 @@ impl<'a> Printer<'a> {
                 .copied()
                 .collect()
         } else {
-            all_comments
+            // First member: drop comments pulled onto the `{` line (emitted as
+            // the brace-line prefix by the caller). No-op when `delimiter_pull_pos`
+            // is `None` (the alignment caller).
+            self.first_member_leading_comments(all_comments, delimiter_pull_pos)
         };
 
         let has_blank = if !leading_comments.is_empty() {
@@ -129,12 +135,14 @@ impl<'a> Printer<'a> {
 
     /// Build type doc, wrapping in parentheses if the predicate returns true.
     ///
-    /// Uses `align_spaces(2, ...)` for proper Prettier-style alignment:
-    /// - Object properties get pure tabs (via double indent)
-    /// - Closing `})` gets 2-space alignment after tabs
+    /// Object-bearing members align via `build_aligned_object_literal_doc`:
+    /// properties are double-indented and the closing `})` is single-indented.
+    /// The plain default case only indents the inner type. (Prettier offsets
+    /// these closings by a 2-space sub-tab alignment; tsv uses whole tabs — see
+    /// `docs/conformance_prettier.md`.)
     ///
     /// Special case: intersection with trailing object type builds a custom doc
-    /// so that `})` can be aligned properly (at base indent + 2 spaces).
+    /// so that `})` can be aligned properly (one indent level past the base).
     pub(super) fn build_type_doc_maybe_parens(
         &self,
         ts_type: &TSType,
@@ -156,17 +164,29 @@ impl<'a> Printer<'a> {
 
             // Special case: parenthesized union type
             if let TSType::Union(union) = unwrap_parenthesized(ts_type) {
-                return self.build_parenthesized_union_doc(union);
+                return self.build_parenthesized_union_doc(
+                    union,
+                    immediate_union_paren(ts_type),
+                    false,
+                );
             }
 
-            // Default case: simple parenthesization
+            // Default case: parenthesize and indent the inner type. The closing
+            // `)` sits at the base indent; the object/intersection cases above
+            // handle their own aligned (one-level-deeper) closings.
             d.concat(&[
                 d.text("("),
-                d.align_spaces(2, d.indent(self.build_type_doc(ts_type))),
+                d.indent(self.build_type_doc(ts_type)),
                 d.text(")"),
             ])
         } else {
-            self.build_type_doc(ts_type)
+            // Type-operand positions (union/intersection members, conditional
+            // check/extends types, optional tuple elements) break the OUTERMOST
+            // generic first, matching Prettier's `printTypeParameters`. Use the
+            // wrapping type-args path so a nested non-huggable generic like
+            // `Outer<Inner<...>>` wraps the outer `Outer<>` instead of force-inlining
+            // the single arg and breaking only the inner `Inner<>`.
+            self.build_type_doc_with_wrapping_type_args(ts_type)
         }
     }
 
@@ -181,11 +201,69 @@ impl<'a> Printer<'a> {
     ///   | { b: string }
     /// )
     /// ```
-    pub(super) fn build_parenthesized_union_doc(&self, union: &TSUnionType) -> DocId {
+    ///
+    /// When `paren` is supplied (the union's parens are retained from source, not
+    /// synthetic), block comments the user wrote inside the parens are preserved in
+    /// place — a leading comment after `(` (`(/* c */ a | b)`) and a trailing comment
+    /// before `)` (`(a | b /* c */)`). Prettier hoists these out of the parens; tsv
+    /// keeps them with the parenthesized member. A trailing *line* comment before `)`
+    /// is preserved here too (forcing the group to break). A leading *line* comment
+    /// after `(` is normally pre-relocated by the union/intersection line-comment
+    /// paths, so it only reaches here when `emit_inner_leading_line_comments` is set —
+    /// the first-union-member case, which has no previous member to relocate onto.
+    pub(super) fn build_parenthesized_union_doc(
+        &self,
+        union: &TSUnionType,
+        paren: Option<&TSParenthesizedType>,
+        emit_inner_leading_line_comments: bool,
+    ) -> DocId {
         let d = self.d();
         let union_doc = self.build_union_type_doc(union, false);
-        let inner =
-            d.group(d.concat(&[d.indent(d.concat(&[d.softline(), union_doc])), d.softline()]));
+
+        let mut needs_break = false;
+        let mut indented = vec![d.softline()];
+        if let Some(p) = paren {
+            // Leading comments between `(` and the union. Block comments stay inline
+            // (`(/* c */ a | b)`). A leading *line* comment is normally relocated by
+            // the union/intersection line-comment paths (to trail the previous outer
+            // member), so it reaches here only for the FIRST union member — which has
+            // no previous member to relocate onto, so it is kept inside the parens
+            // leading the inner union. A line comment must end its line, so it forces
+            // the paren group to break.
+            for comment in comments_in_range(self.comments, p.span.start + 1, union.span.start) {
+                if comment.is_block {
+                    indented.push(self.build_comment_doc(comment));
+                    indented.push(d.text(" "));
+                } else if emit_inner_leading_line_comments {
+                    indented.push(self.build_comment_doc(comment));
+                    indented.push(d.hardline());
+                    needs_break = true;
+                }
+            }
+        }
+        indented.push(union_doc);
+        if let Some(p) = paren {
+            // Trailing comments between the union and `)`: a block comment stays
+            // inline (`(a | b /* c */)`); a line comment defers to end-of-line and
+            // forces the paren group to break — the inner union (built without its
+            // own group) inherits the break, expanding to one member per line.
+            for comment in comments_in_range(self.comments, union.span.end, p.span.end - 1) {
+                if comment.is_block {
+                    indented.push(d.text(" "));
+                    indented.push(self.build_comment_doc(comment));
+                } else {
+                    let suffix = d.concat(&[d.text(" "), self.build_comment_doc(comment)]);
+                    indented.push(d.line_suffix(suffix));
+                    needs_break = true;
+                }
+            }
+        }
+
+        let mut inner_parts = vec![d.indent(d.concat(&indented)), d.softline()];
+        if needs_break {
+            inner_parts.push(d.break_parent());
+        }
+        let inner = d.group(d.concat(&inner_parts));
         d.concat(&[d.text("("), inner, d.text(")")])
     }
 
@@ -195,7 +273,7 @@ impl<'a> Printer<'a> {
 
     /// Build doc for `(A & B & { members })` with proper alignment.
     ///
-    /// Prettier aligns `})` with the opening `(` using tabs + spaces when breaking:
+    /// Aligns `})` one indent level past the base when breaking:
     /// ```text
     /// | (A & {
     ///         prop: T;
@@ -206,8 +284,11 @@ impl<'a> Printer<'a> {
     ///
     /// This requires separating `{` and `}` from the TypeLiteral so we can:
     /// - Print `{` inline with `(A &`
-    /// - Print members with double indent (for proper 4-tab alignment)
-    /// - Print `})` at base indent + 2-space alignment (when breaking)
+    /// - Print members with double indent (4-tab alignment)
+    /// - Print `})` at base indent + one level (when breaking)
+    ///
+    /// (Prettier offsets `})` by a 2-space sub-tab alignment; tsv uses whole
+    /// tabs — see `docs/conformance_prettier.md`.)
     fn build_parenthesized_intersection_trailing_object_doc(
         &self,
         intersection: &TSIntersectionType,
@@ -252,6 +333,17 @@ impl<'a> Printer<'a> {
         let mut member_parts = vec![];
         let mut prev_end = t.span.start + 1; // after opening brace
 
+        // Emit the first member's leading block comments. The force_multiline
+        // branch handles them per-member via `build_multiline_member_prefix_doc`,
+        // but the width-aware branch below does not — without this a union-member
+        // object's interior leading comment is dropped (`{ /* c */ a: 1 } | B`).
+        // Mirrors the width-aware branch of `build_type_literal_doc_inner`.
+        if !force_multiline && let Some(first) = t.members.first() {
+            member_parts.extend(
+                self.build_type_literal_leading_comments_inline(t.span.start, first.span().start),
+            );
+        }
+
         for (i, m) in t.members.iter().enumerate() {
             let is_first = i == 0;
             let is_last = i == t.members.len() - 1;
@@ -259,11 +351,14 @@ impl<'a> Printer<'a> {
             let member_content_end = m.content_end(self.source);
 
             if force_multiline {
-                // Forced multiline: build with hardlines
+                // Forced multiline: build with hardlines. `None` keeps the
+                // delimiter-line comment relocating in this alignment path
+                // (union-member / intersection-trailing object literals).
                 member_parts.extend(self.build_multiline_member_prefix_doc(
                     prev_end,
                     m.span().start,
                     is_first,
+                    None,
                 ));
                 member_parts.push(self.build_type_member_doc_inner(m));
 
@@ -357,10 +452,11 @@ impl<'a> Printer<'a> {
 
     /// Build aligned object literal doc with custom opening/closing.
     ///
-    /// Used for object literals in union types and parenthesized intersections
-    /// where Prettier uses:
-    /// - Double indent for members (aligns with content after `{`)
-    /// - 2-space alignment for closing (aligns with `{`)
+    /// Used for object literals in union types and parenthesized intersections.
+    /// Members are double-indented (aligning with the content after `{`) and the
+    /// closing delimiter is single-indented (aligning with `{`). Prettier offsets
+    /// the closing by a 2-space sub-tab alignment instead; tsv renders that
+    /// half-step as a whole tab — see `docs/conformance_prettier.md`.
     fn build_aligned_object_literal_doc(
         &self,
         obj: &TSTypeLiteral,
@@ -381,18 +477,18 @@ impl<'a> Printer<'a> {
         d.group(d.concat(&[
             opening,
             d.indent(d.indent(members_doc)),
-            d.align_spaces(2, d.concat(&[line_doc, d.text(closing)])),
+            d.indent(d.concat(&[line_doc, d.text(closing)])),
         ]))
     }
 
     /// Build doc for object type literal when it's a direct union member.
     ///
-    /// Prettier aligns object content with the position after `| {`:
+    /// Aligns object content with the position after `| {`:
     /// ```text
     /// type T =
     ///   | {
     ///       prop: A;  // double indent (aligns with content after "{ ")
-    ///     }           // base indent + 2 spaces (aligns with "{")
+    ///     }           // single indent (aligns with "{")
     ///   | B;
     /// ```
     pub(super) fn build_union_member_object_literal_doc(&self, obj: &TSTypeLiteral) -> DocId {
@@ -446,6 +542,16 @@ impl<'a> Printer<'a> {
 
         let mut parts = vec![d.text("{")];
         if force_multiline {
+            // A comment trailing the opening `{` on its own line is kept on the
+            // `{` line (divergence from prettier, which relocates it to its own
+            // line as the first member's leading comment). A line/own-line
+            // comment is itself what forces this multiline branch. See
+            // conformance_prettier.md §Comment relocation (Type literal `{`).
+            let first_member_start = t.members[0].span().start;
+            let (brace_line_prefix, delimiter_pull_pos) =
+                self.delimiter_line_comment_prefix(t.span.start, first_member_start);
+            parts.push(d.concat(&brace_line_prefix));
+
             // Multi-line format (same for both modes)
             let mut member_parts = vec![];
             let mut prev_end = t.span.start + 1; // after opening brace
@@ -458,8 +564,17 @@ impl<'a> Printer<'a> {
                     prev_end,
                     m.span().start,
                     is_first,
+                    delimiter_pull_pos,
                 ));
-                member_parts.push(self.build_type_member_doc_inner(m));
+                // A preceding `// prettier-ignore` keeps the member's source
+                // verbatim (matches prettier). Use the content span (no trailing
+                // `;`); the loop's semicolon handling below re-adds the `;`.
+                let member_doc = if self.has_prettier_ignore_in_range(prev_end, m.span().start) {
+                    self.raw_source_range(m.span().start, member_content_end)
+                } else {
+                    self.build_type_member_doc_inner(m)
+                };
+                member_parts.push(member_doc);
 
                 // Handle trailing comments - preserve position relative to semicolon
                 let upper_bound = t
@@ -597,11 +712,66 @@ impl<'a> Printer<'a> {
     /// Object type literals are built without groups ("hugging") so the parent
     /// `<...>` group controls breaking, matching Prettier's behavior.
     pub(in crate::printer) fn build_type_doc_for_type_arg(&self, ts_type: &TSType) -> DocId {
+        let d = self.d();
         match ts_type {
             TSType::TypeLiteral(t) => self.build_type_literal_doc_hugging(t),
             TSType::Parenthesized(p) => {
-                // Unwrap parentheses and recurse
-                self.build_type_doc_for_type_arg(&p.type_annotation)
+                // Unwrap the parens (redundant in type-argument position — prettier
+                // strips them too) but preserve any comments the user wrote inside
+                // them (`Foo<(a | b /* c */)>` → `Foo<a | b /* c */>`). Without this
+                // the comment was dropped — a content-loss bug. A line comment defers
+                // to end-of-line and forces the type-argument list to break (via
+                // `break_parent`), matching prettier's expansion.
+                let inner = self.build_type_doc_for_type_arg(&p.type_annotation);
+                let inner_start = p.type_annotation.span().start;
+                let inner_end = p.type_annotation.span().end;
+                let has_leading = self.has_comments_between(p.span.start + 1, inner_start);
+                let has_trailing = self.has_comments_between(inner_end, p.span.end - 1);
+                if !has_leading && !has_trailing {
+                    return inner;
+                }
+                let leading: Vec<_> = if has_leading {
+                    comments_in_range(self.comments, p.span.start + 1, inner_start).collect()
+                } else {
+                    Vec::new()
+                };
+                let trailing: Vec<_> = if has_trailing {
+                    comments_in_range(self.comments, inner_end, p.span.end - 1).collect()
+                } else {
+                    Vec::new()
+                };
+                // A line comment forces the type-argument list to break. Emit
+                // `break_parent` FIRST so it sits behind the inner type's group in the
+                // forward `fits()` scan — otherwise it poisons that scan and needlessly
+                // expands an inner union (`Foo<(a | b // c)>` keeps `a | b` inline,
+                // matching prettier, rather than `| a | b`).
+                let needs_break = leading
+                    .iter()
+                    .chain(&trailing)
+                    .any(|comment| !comment.is_block);
+                let mut parts = Vec::new();
+                if needs_break {
+                    parts.push(d.break_parent());
+                }
+                for comment in &leading {
+                    parts.push(self.build_comment_doc(comment));
+                    if comment.is_block {
+                        parts.push(d.text(" "));
+                    } else {
+                        parts.push(d.hardline());
+                    }
+                }
+                parts.push(inner);
+                for comment in &trailing {
+                    if comment.is_block {
+                        parts.push(d.text(" "));
+                        parts.push(self.build_comment_doc(comment));
+                    } else {
+                        let suffix = d.concat(&[d.text(" "), self.build_comment_doc(comment)]);
+                        parts.push(d.line_suffix(suffix));
+                    }
+                }
+                d.concat(&parts)
             }
             _ => self.build_type_doc(ts_type),
         }

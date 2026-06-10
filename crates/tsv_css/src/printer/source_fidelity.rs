@@ -112,12 +112,16 @@ static CSS_UNITS: phf::Set<&'static str> = phf::phf_set! {
     "fr",
 };
 
-/// Normalize CSS numbers within a raw prelude string, mirroring prettier's
-/// `adjustNumbers`. Quoted strings, `/* */` comments and `#`-prefixed tokens
-/// (hex colors) are copied verbatim. A number is normalized only when it isn't
-/// part of an identifier (`min-width` is untouched) and its trailing unit is a
-/// known CSS unit or empty (so `1abc` is left alone). Unit casing is preserved.
-pub(crate) fn normalize_numbers_in_text(input: &str) -> String {
+/// Normalize CSS numbers and string quotes within a raw prelude string,
+/// mirroring prettier's `adjustNumbers(adjustStrings(...))` for at-rule preludes
+/// it parses as values (`@media`/`@supports`). `/* */` comments and `#`-prefixed
+/// tokens (hex colors) are copied verbatim. A number is normalized only when it
+/// isn't part of an identifier (`min-width` is untouched) and its trailing unit
+/// is a known CSS unit or empty (so `1abc` is left alone); unit casing is
+/// preserved. Quoted strings get prettier's quote normalization (prefer single,
+/// swapping only to minimize escaping) — `@container`, which isn't value-parsed,
+/// never reaches this function so its prelude stays raw.
+pub(crate) fn normalize_value_text(input: &str) -> String {
     let bytes = input.as_bytes();
     let mut out = String::with_capacity(input.len());
     let mut i = 0;
@@ -125,23 +129,32 @@ pub(crate) fn normalize_numbers_in_text(input: &str) -> String {
     while i < bytes.len() {
         let b = bytes[i];
 
-        // Copy quoted strings verbatim (handling backslash escapes).
+        // Normalize quoted-string quotes (handling backslash escapes). A properly
+        // closed string runs through prettier's quote chooser; an unterminated run
+        // (malformed input) is copied verbatim.
         if b == b'"' || b == b'\'' {
             let start = i;
             i += 1;
+            let mut closed = false;
             while i < bytes.len() {
                 if bytes[i] == b'\\' {
                     // Skip the backslash and the escaped byte (if any).
                     i += if i + 1 < bytes.len() { 2 } else { 1 };
                     continue;
                 }
-                let closed = bytes[i] == b;
+                closed = bytes[i] == b;
                 i += 1;
                 if closed {
                     break;
                 }
             }
-            out.push_str(&input[start..i]);
+            let literal = &input[start..i];
+            if closed {
+                let content = &literal[1..literal.len() - 1];
+                out.push_str(&format_string_value(content, b as char));
+            } else {
+                out.push_str(literal);
+            }
             continue;
         }
 
@@ -684,6 +697,17 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> String {
             }
             result.push(ch);
             pending_space = false;
+            continue;
+        }
+
+        // Comma - no space before, single space after (CSS never wants a space
+        // before a comma, e.g. a media-query list `projection, tv`).
+        if ch == ',' {
+            while result.ends_with(' ') {
+                result.pop();
+            }
+            result.push(ch);
+            pending_space = true;
             continue;
         }
 

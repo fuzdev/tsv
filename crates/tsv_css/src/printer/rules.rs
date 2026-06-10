@@ -22,20 +22,22 @@ impl<'a> Printer<'a> {
         // Format selector (uses selectors module)
         self.print_selector_list(&rule.selector);
 
-        // Check if first child is a comment between selector and opening brace
+        // Inline-print any comments between the selector and opening brace.
+        // block_span.start is the position of the opening brace, so a leading
+        // child whose span precedes it is a pre-brace comment.
         let mut start_index = 0;
-        if let Some(internal::CssBlockChild::Comment(comment)) = rule.declarations.first() {
-            // Check if comment is before the opening brace (between selector and {)
-            // block_span.start is the position of the opening brace
-            if comment.span.start < rule.block_span.start {
-                // Comment is between selector and brace - print inline
-                // Always add space before comment for readability (normalize)
-                // This is an intentional divergence from prettier (which preserves no-space)
-                self.write(" /*");
-                self.write(&comment.content);
-                self.write("*/");
-                start_index = 1; // Skip this comment when processing declarations
+        while let Some(internal::CssBlockChild::Comment(comment)) =
+            rule.declarations.get(start_index)
+        {
+            if comment.span.start >= rule.block_span.start {
+                break;
             }
+            // Always add space before comment for readability (normalize)
+            // This is an intentional divergence from prettier (which preserves no-space)
+            self.write(" /*");
+            self.write(&comment.content);
+            self.write("*/");
+            start_index += 1; // Skip this comment when processing declarations
         }
 
         self.write(" {\n");

@@ -30,6 +30,7 @@ pub enum TokenKind {
     Equals,           // =
     Percent,          // % (for percent-encoding in URLs like %20)
     Caret,            // ^ (for attribute selectors: ^=)
+    Question,         // ? (for query strings in unquoted url(), e.g. url(a.ttf?x=1))
     Dollar,           // $ (for attribute selectors: $=)
     Pipe,             // | (for attribute selectors: |=, namespace selectors)
     ColumnCombinator, // || (CSS Grid column combinator)
@@ -76,6 +77,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Equals => write!(f, "'='"),
             TokenKind::Percent => write!(f, "'%'"),
             TokenKind::Caret => write!(f, "'^'"),
+            TokenKind::Question => write!(f, "'?'"),
             TokenKind::Dollar => write!(f, "'$'"),
             TokenKind::Pipe => write!(f, "'|'"),
             TokenKind::ColumnCombinator => write!(f, "'||'"),

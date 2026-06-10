@@ -192,14 +192,14 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         }
         internal::Expression::CallExpression(call) => {
             let needs_chain = !in_chain && expr.has_optional_in_chain();
-            let converted = convert_call_expression(
-                call,
-                source,
-                loc,
-                interner,
-                offset,
-                needs_chain || in_chain,
+            let callee_in_chain = child_in_chain(
+                call.span.start,
+                call.callee.span().start,
+                needs_chain,
+                in_chain,
             );
+            let converted =
+                convert_call_expression(call, source, loc, interner, offset, callee_in_chain);
             maybe_wrap_chain(
                 public::Expression::CallExpression(converted),
                 call.span,
@@ -213,14 +213,14 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         ),
         internal::Expression::MemberExpression(member) => {
             let needs_chain = !in_chain && expr.has_optional_in_chain();
-            let converted = convert_member_expression(
-                member,
-                source,
-                loc,
-                interner,
-                offset,
-                needs_chain || in_chain,
+            let object_in_chain = child_in_chain(
+                member.span.start,
+                member.object.span().start,
+                needs_chain,
+                in_chain,
             );
+            let converted =
+                convert_member_expression(member, source, loc, interner, offset, object_in_chain);
             maybe_wrap_chain(
                 public::Expression::MemberExpression(converted),
                 member.span,
@@ -582,6 +582,19 @@ pub(in crate::ast::convert) fn convert_expression_inner(
             })
         }
     }
+}
+
+/// Whether a member's object / a call's callee should convert as part of the
+/// current optional chain.
+///
+/// A parenthesized object/callee seals its own chain (`(a?.b).c`, `(a?.b)()`):
+/// the span gap — parent starts before child, covering the stripped `(` — means
+/// the inner chain must convert as a fresh `in_chain = false` context so it gets
+/// its own `ChainExpression` (matching acorn), even when this node is itself
+/// inside an outer chain. Without parens the child stays in the enclosing chain.
+fn child_in_chain(parent_start: u32, child_start: u32, needs_chain: bool, in_chain: bool) -> bool {
+    let parenthesized = parent_start < child_start;
+    !parenthesized && (needs_chain || in_chain)
 }
 
 /// Conditionally wrap an expression in ChainExpression.

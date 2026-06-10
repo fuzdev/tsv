@@ -171,6 +171,10 @@ impl<'a> Lexer<'a> {
             '=' => single_char_token!(TokenKind::Equals),
             '%' => single_char_token!(TokenKind::Percent),
             '^' => single_char_token!(TokenKind::Caret),
+            // `?` is a query-string char in unquoted url() (e.g. `url(a.ttf?x=1)`).
+            // Per css-syntax-3 it's a valid <delim-token>; grammar enforces validity
+            // later, so the value reassembler emits it raw like other punctuation.
+            '?' => single_char_token!(TokenKind::Question),
             // `$`-prefixed identifier (SCSS variable / property name like `$foo`).
             // Svelte's parseCss treats it as a single identifier. A bare `$` (e.g.
             // the `$=` attribute selector) falls through to the Dollar token below.

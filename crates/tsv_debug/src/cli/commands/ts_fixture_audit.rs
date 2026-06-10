@@ -59,6 +59,10 @@ const INTENTIONAL_TS: &[(&str, &str)] = &[
         "typescript/types/function_type/open_paren_comment_prettier_divergence",
         "format-convertible, but the Svelte parser duplicates a function-type `(`-leading comment in Root.comments (lists the same span twice), so the embedded expected.json can't match without replicating that Svelte bug — kept .ts for clean acorn parity",
     ),
+    (
+        "typescript/syntax/unicode_offsets",
+        "pins byte→UTF-16 offset translation on the standalone tsv_ts JSON path (convert_ast_json_string's multibyte branch) — embedding in .svelte would route through tsv_svelte's convert instead",
+    ),
 ];
 
 /// Look up a fixture in `INTENTIONAL_TS` by relative-path suffix.

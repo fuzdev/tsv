@@ -45,17 +45,14 @@ const DEFAULT_EXCLUSIONS = [
 	// Prettier test fixtures that aren't representative of standard parsing:
 	// `_errors_/` contains intentionally-malformed inputs prettier tracks for
 	// error-recovery testing, `front-matter/` files embed YAML front-matter
-	// (a prettier feature, not a property of the host language), `cursor/`
+	// (a prettier feature, not a property of the host language), and `cursor/`
 	// files contain `<|>` markers for prettier's formatWithCursor() API tests
 	// (syntactically invalid for every parser; also triggers stderr noise from
-	// prettier-plugin-svelte's parser-fallback path), and `multiparser/` files
-	// test prettier's HTML routing of `<script type="text/X">` content to a
-	// matching language parser — prettier-plugin-svelte has no equivalent so
-	// markdown/unknown-language script content flows into babel and throws.
+	// prettier-plugin-svelte's parser-fallback path). The `multiparser*` family
+	// is excluded separately in `should_exclude` (segment-prefix match).
 	'/_errors_/',
 	'/front-matter/',
 	'/cursor/',
-	'/multiparser/',
 ];
 
 const DEFAULT_EXTENSIONS = ['svelte', 'ts', 'js', 'css'];
@@ -63,9 +60,28 @@ const DEFAULT_EXTENSIONS = ['svelte', 'ts', 'js', 'css'];
 /** Check if file should be excluded */
 function should_exclude(path: string): boolean {
 	const name = basename(path);
+	const segments = path.split('/');
+	// The `multiparser*` family — prettier's embedded-language tests. The bare
+	// `multiparser/` dir routes `<script type="text/X">` HTML content to a
+	// matching language parser (prettier-plugin-svelte has no equivalent, so
+	// markdown/unknown-language script content flows into babel and throws); the
+	// `js`/`typescript` suites' `multiparser-css` (CSS-in-JS/styled-components),
+	// `-graphql`, `-markdown`, `-html` (lit-html), `-comments` (language-hint
+	// comments), `-text`, and `-invalid` dirs reformat languages embedded in
+	// tagged/identified template literals. tsv preserves template-literal content
+	// verbatim — embedded-language reformatting is Out of Scope (see
+	// docs/checklist_css.md) — so these are divergences, not bugs; drop the whole
+	// family rather than counting it against conformance. Segment-prefix match so
+	// new `multiparser-*` dirs from a prettier upgrade are caught automatically.
+	if (segments.some((s) => s === 'multiparser' || s.startsWith('multiparser-'))) {
+		return true;
+	}
 	for (const pattern of DEFAULT_EXCLUSIONS) {
 		if (pattern.startsWith('/')) {
-			if (path.includes(pattern)) return true;
+			// Directory patterns (`/node_modules/`) anchor on path SEGMENTS, not raw
+			// substring — otherwise any absolute path that merely contains the text
+			// (e.g. a `.../svelte.dev/.../build.../` dir) would be over-excluded.
+			if (segments.includes(pattern.slice(1, -1))) return true;
 		} else {
 			if (name.includes(pattern)) return true;
 		}

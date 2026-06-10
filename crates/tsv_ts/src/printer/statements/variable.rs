@@ -5,11 +5,12 @@ use crate::ast::internal::{self, Expression};
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::{
     CommentFilter, CommentSpacing, ParenContext, analysis, conditional_should_break_after_op,
-    is_call_on_member_chain, is_curried_arrow_with_return_type, is_literal_member_chain,
-    is_module_path_fluid_call, is_multiline_string_literal, is_poorly_breakable_chain,
-    is_pure_property_chain, is_regex_root_chain, is_self_expanding_value, is_simple_self_expanding,
-    is_simple_value, is_single_call_on_member_chain, is_string_literal, is_type_assertion_call,
-    needs_parens, should_inline_logical_expression,
+    is_call_on_member_chain, is_curried_arrow_chain, is_curried_arrow_with_return_type,
+    is_literal_member_chain, is_module_path_fluid_call, is_multiline_string_literal,
+    is_poorly_breakable_chain, is_pure_property_chain, is_regex_root_chain,
+    is_self_expanding_value, is_simple_self_expanding, is_simple_value,
+    is_single_call_on_member_chain, is_string_literal, is_type_assertion_call, needs_parens,
+    should_inline_logical_expression,
 };
 use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
@@ -623,6 +624,29 @@ impl<'a> Printer<'a> {
                             init,
                         ),
                     ])));
+                } else if is_curried_arrow_chain(init) {
+                    // Untyped curried arrow chain: fluid break after `=`. The chain's
+                    // signature heads break only when they don't fit on the operator
+                    // line; a hugging body otherwise expands in place. The context tells
+                    // the arrow printer to use the assignment-RHS chain layout.
+                    let init_doc = self.build_with_arrow_chain_context(
+                        crate::printer::ArrowChainContext::AssignmentRhs,
+                        || {
+                            make_init_doc(wrap_init_doc(
+                                d,
+                                self.build_expression_doc_with_paren_comments(
+                                    init,
+                                    declarator.span.end,
+                                ),
+                                init,
+                            ))
+                        },
+                    );
+                    parts.push(build_fluid_assignment_doc(
+                        d,
+                        make_fluid_lhs(id_doc),
+                        init_doc,
+                    ));
                 } else if (has_complex_type_annotation
                     || has_complex_destructuring
                     || is_arrow_with_breakable_left)

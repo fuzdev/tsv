@@ -236,12 +236,18 @@ impl<'a> Printer<'a> {
         let body_doc = self.build_statement_doc(body);
 
         if !self.has_comments_between(paren_end, body_start) {
-            // Mirror Prettier's `adjustClause`: `indent([line, body])`. The
-            // enclosing for-in/for-of group (see `build_for_in/of_statement_with_body_doc`)
-            // breaks on overflow, dropping the body to its own indented line;
-            // when it fits, `line` is a space → `for (x of y) stmt;`.
             parts.push(d.text(")"));
-            parts.push(d.indent_line(body_doc));
+            if matches!(body, Statement::EmptyStatement(_)) {
+                // Prettier's `adjustClause` returns `";"` directly for an empty
+                // body (no leading `line`) → `for (x of y);`, not `for (x of y) ;`.
+                parts.push(body_doc);
+            } else {
+                // Mirror Prettier's `adjustClause`: `indent([line, body])`. The
+                // enclosing for-in/for-of group (see `build_for_in/of_statement_with_body_doc`)
+                // breaks on overflow, dropping the body to its own indented line;
+                // when it fits, `line` is a space → `for (x of y) stmt;`.
+                parts.push(d.indent_line(body_doc));
+            }
             return;
         }
 
@@ -2558,6 +2564,10 @@ impl<'a> Printer<'a> {
                 p.push(body_doc);
             }
             p
+        } else if matches!(stmt.body.as_ref(), Statement::EmptyStatement(_)) {
+            // Prettier's `adjustClause` returns `";"` directly for an empty body
+            // → `do;`, not `do ;`.
+            vec![d.text("do"), self.build_statement_doc(&stmt.body)]
         } else {
             vec![d.text("do "), self.build_statement_doc(&stmt.body)]
         };

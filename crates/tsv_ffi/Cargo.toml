@@ -13,7 +13,6 @@ crate-type = ["cdylib"]
 tsv_svelte = { workspace = true, features = ["convert"] }
 tsv_ts = { workspace = true, features = ["convert"] }
 tsv_css = { workspace = true, features = ["convert"] }
-serde.workspace = true
 serde_json.workspace = true
 
 # FFI requires unsafe code. Cargo replaces the whole [lints] table on

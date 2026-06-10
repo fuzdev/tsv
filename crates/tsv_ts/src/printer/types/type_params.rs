@@ -354,6 +354,18 @@ impl<'a> Printer<'a> {
         group_id: GroupId,
     ) {
         let d = self.d();
+        // Strip redundant comment-free parens so `(A | B)` / `(A & B)` constraints
+        // and defaults get the bare hanging layout (prettier strips them too).
+        let value_type = self.unwrap_redundant_parens(value_type);
+        if self.has_line_comments_between(keyword_end, value_start) {
+            // A line comment after the keyword forces the value onto its own line;
+            // the shared helper keeps a same-line comment trailing the keyword
+            // (line comment via `line_suffix`, so its width never force-breaks a
+            // preceding constraint union) and each own-line comment on its own line.
+            let value_doc = self.build_type_doc(value_type);
+            self.append_keyword_value_line_comments(parts, keyword_end, value_start, value_doc);
+            return;
+        }
         let comments = self.build_comments_between_filtered_opt(
             keyword_end,
             value_start,
@@ -362,10 +374,6 @@ impl<'a> Printer<'a> {
         );
         if let Some(c) = comments {
             parts.push(c);
-            if self.has_line_comments_between(keyword_end, value_start) {
-                parts.push(d.indent(d.concat(&[d.hardline(), self.build_type_doc(value_type)])));
-                return;
-            }
             // Block comment present: keep the value inline after it.
             parts.push(d.text(" "));
             parts.push(self.build_type_doc(value_type));
@@ -376,6 +384,12 @@ impl<'a> Printer<'a> {
         // parameter constraints and defaults).
         if let Some(hanging) = self.build_union_hanging_indent_doc(value_type) {
             parts.push(hanging);
+            return;
+        }
+        // Intersection: first member hugs the keyword, continuations indented.
+        if let TSType::Intersection(i) = value_type {
+            parts.push(d.text(" "));
+            parts.push(self.intersection_hanging_with_indent(i));
             return;
         }
         // Other types: break after the keyword and indent when the value would
@@ -420,8 +434,19 @@ impl<'a> Printer<'a> {
             return d.text("<>");
         }
 
-        // Check for comments that force expansion: line comments or own-line block comments
-        if self.has_line_comments_in_delimited_list(&inst.params, TSType::span, inst.span.end - 1)
+        // Check for comments that force expansion: line comments or own-line block
+        // comments. Also check for a line comment BETWEEN `<` and the first argument
+        // (e.g. `foo<// c\n A>(x)`); without this the comment falls through to the
+        // block-comment-only group path below and is dropped (content loss).
+        let has_leading_line_comment = inst.params.first().is_some_and(|first| {
+            self.has_line_comments_between(inst.span.start + 1, first.span().start)
+        });
+        if has_leading_line_comment
+            || self.has_line_comments_in_delimited_list(
+                &inst.params,
+                TSType::span,
+                inst.span.end - 1,
+            )
             || self.has_own_line_block_comments_in_bracket_list(
                 inst.span,
                 &inst.params,
@@ -502,6 +527,38 @@ impl<'a> Printer<'a> {
         inst: &internal::TSTypeParameterInstantiation,
     ) -> DocId {
         let d = self.d();
+
+        // Single-arg with only a leading line comment: hug `<` and `>`
+        // (`foo<// c\n A>(x)`) instead of full multiline — matches prettier.
+        if inst.params.len() == 1 {
+            let param = &inst.params[0];
+            let param_start = param.span().start;
+            let param_end = param.span().end;
+            let before_close = inst.span.end - 1;
+            let has_trailing =
+                tsv_lang::has_comments_in_range(self.comments, param_end, before_close);
+            if !has_trailing {
+                let leading =
+                    self.build_leading_comments_multiline(inst.span.start + 1, param_start);
+                if !leading.is_empty() {
+                    let mut parts = vec![d.text("<")];
+                    parts.extend(leading);
+                    parts.push(self.build_type_doc(param));
+                    parts.push(d.text(">"));
+                    return d.concat(&parts);
+                }
+            }
+        }
+
+        // A comment trailing the opening `<` on its own line is kept on the `<`
+        // line (divergence from prettier, which relocates it to its own line as
+        // the first argument's leading comment). Multi-argument path only — the
+        // single-argument leading-comment case hugs `<`/`>` above and matches
+        // prettier. See conformance_prettier.md §Comment relocation.
+        let first_param_start = inst.params[0].span().start;
+        let (angle_line_prefix, delimiter_pull_pos) =
+            self.delimiter_line_comment_prefix(inst.span.start, first_param_start);
+
         let mut inner_parts = Vec::new();
         let mut prev_end = inst.span.start + 1; // After the opening `<`
 
@@ -510,8 +567,20 @@ impl<'a> Printer<'a> {
             let param_end = param.span().end;
             let is_last = i == inst.params.len() - 1;
 
-            // Leading comments (after previous comma or `<`)
-            inner_parts.extend(self.build_leading_comments_multiline(prev_end, param_start));
+            // Leading comments (after previous comma or `<`). For the first arg,
+            // drop comments pulled onto the `<` line (emitted as the angle-line
+            // prefix below).
+            if i == 0
+                && let Some(delim) = delimiter_pull_pos
+            {
+                inner_parts.extend(self.build_leading_comments_multiline_after_delim(
+                    prev_end,
+                    param_start,
+                    delim,
+                ));
+            } else {
+                inner_parts.extend(self.build_leading_comments_multiline(prev_end, param_start));
+            }
 
             inner_parts.push(self.build_type_doc(param));
 
@@ -532,6 +601,7 @@ impl<'a> Printer<'a> {
 
         d.concat(&[
             d.text("<"),
+            d.concat(&angle_line_prefix),
             d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])),
             d.hardline(),
             d.text(">"),

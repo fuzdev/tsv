@@ -107,7 +107,7 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
                 stack.push((*inner, current_mode));
             }
 
-            DocNode::Align { contents, .. } | DocNode::AlignSpaces { contents, .. } => {
+            DocNode::Align { contents, .. } => {
                 stack.push((*contents, current_mode));
             }
 
@@ -252,7 +252,7 @@ pub(super) fn arena_fits_multi<R: TextResolver + ?Sized>(
                 stack.push((*inner, current_mode));
             }
 
-            DocNode::Align { contents, .. } | DocNode::AlignSpaces { contents, .. } => {
+            DocNode::Align { contents, .. } => {
                 stack.push((*contents, current_mode));
             }
 

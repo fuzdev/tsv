@@ -98,13 +98,7 @@ pub fn convert_ast_json(root: &Root, source: &str) -> serde_json::Value {
 
     // Attach comments to template expressions (outside <script> tags)
     // Must happen before byte→char translation since comment positions are byte-based
-    let mut script_spans: Vec<(u32, u32)> = Vec::new();
-    if let Some(ref script) = root.instance {
-        script_spans.push((script.content.span.start, script.content.span.end));
-    }
-    if let Some(ref script) = root.module {
-        script_spans.push((script.content.span.start, script.content.span.end));
-    }
+    let script_spans = script_content_spans(root);
     ast::convert::attach_template_expression_comments(
         &mut json,
         &root.comments,
@@ -116,6 +110,48 @@ pub fn convert_ast_json(root: &Root, source: &str) -> serde_json::Value {
     let tracker = tsv_lang::LocationTracker::new(source);
     tsv_ts::ast::convert::translate_byte_to_char_offsets(&mut json, &map, &tracker);
     json
+}
+
+/// Convert internal AST to a compact JSON string with character-based positions
+///
+/// Byte-identical to `serde_json::to_string(&convert_ast_json(...))`, but
+/// serializes the typed public AST directly — skipping the intermediate
+/// `serde_json::Value` — when the source is ASCII (byte→char translation is a
+/// no-op) **and** no comments fall outside `<script>` content spans (the
+/// template-comment attachment pass is a no-op). Otherwise takes the current
+/// `Value`-based path. This is the hot path for the FFI/WASM parse bindings
+/// and the CLI's compact output.
+#[cfg(feature = "convert")]
+#[allow(clippy::expect_used)]
+pub fn convert_ast_json_string(root: &Root, source: &str) -> String {
+    let script_spans = script_content_spans(root);
+    if source.is_ascii()
+        && !ast::convert::has_template_expression_comments(&root.comments, &script_spans)
+    {
+        let public_ast = ast::convert::convert_root(root, source);
+        serde_json::to_string(&public_ast).expect("AST types derive Serialize correctly")
+    } else {
+        serde_json::to_string(&convert_ast_json(root, source))
+            .expect("Value serialization cannot fail")
+    }
+}
+
+/// Byte spans of the instance/module `<script>` element contents.
+///
+/// Comments inside these spans belong to the embedded TS programs; comments
+/// outside them are template expression comments. Public so tooling can
+/// extract script contents as standalone TS (e.g. the fixture suite's
+/// typed-walk parity probes).
+#[cfg(feature = "convert")]
+pub fn script_content_spans(root: &Root) -> Vec<(u32, u32)> {
+    let mut script_spans: Vec<(u32, u32)> = Vec::new();
+    if let Some(ref script) = root.instance {
+        script_spans.push((script.content.span.start, script.content.span.end));
+    }
+    if let Some(ref script) = root.module {
+        script_spans.push((script.content.span.start, script.content.span.end));
+    }
+    script_spans
 }
 
 pub use ast::Root;

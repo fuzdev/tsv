@@ -2,7 +2,7 @@
  * Smoke test for all formatter and parser implementations.
  *
  * Catches "totally broken" implementations (throws, returns empty/null, not
- * idempotent) on trivial fixed inputs. Not a correctness gate — corpus_compare
+ * idempotent) on trivial fixed inputs. Not a correctness gate — corpus_compare_format
  * is the gate. This is a fast sanity check that the benchmark harness has
  * something real to measure.
  *

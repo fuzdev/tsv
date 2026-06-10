@@ -9,8 +9,8 @@ use commands::{
     fixtures_update_formatted::FixturesUpdateFormattedCommand,
     fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
-    line_width::LineWidthCommand, metrics::MetricsCommand, profile::ProfileCommand,
-    test262::Test262Command, ts_fixture_audit::TsFixtureAuditCommand,
+    json_profile::JsonProfileCommand, line_width::LineWidthCommand, metrics::MetricsCommand,
+    profile::ProfileCommand, test262::Test262Command, ts_fixture_audit::TsFixtureAuditCommand,
 };
 
 /// tsv_debug — internal debugging tools (fixtures, comparisons, conformance).
@@ -37,6 +37,7 @@ pub enum Subcommand {
     FixturesValidate(FixturesValidateCommand),
     FixturesAudit(FixturesAuditCommand),
     Profile(ProfileCommand),
+    JsonProfile(JsonProfileCommand),
     Metrics(MetricsCommand),
     Test262(Test262Command),
     TsFixtureAudit(TsFixtureAuditCommand),
@@ -59,6 +60,7 @@ impl TopLevel {
             Subcommand::FixturesValidate(c) => c.run(),
             Subcommand::FixturesAudit(c) => c.run(),
             Subcommand::Profile(c) => c.run(),
+            Subcommand::JsonProfile(c) => c.run(),
             Subcommand::Metrics(c) => c.run(),
             Subcommand::Test262(c) => c.run(),
             Subcommand::TsFixtureAudit(c) => c.run(),

@@ -857,7 +857,7 @@ impl<'a> Printer<'a> {
                     self.build_binary_chain_parts_with_continuation_indent(inner_binary);
                 return d.group(d.concat(&[d.text("("), inner_parts, d.text(")")]));
             }
-            let operand_doc = self.build_expression_doc(operand);
+            let operand_doc = self.build_chain_aware_operand_doc(operand);
             d.parens(operand_doc)
         } else if let Expression::BinaryExpression(inner_binary) = operand {
             // Nested binary sub-expressions use continuation indent.
@@ -866,6 +866,23 @@ impl<'a> Printer<'a> {
             // chain gets indent(rest). E.g., `0.5 * a(...) * b(...)` inside `... + 1.0`
             // indents the `*` continuation lines relative to `0.5`.
             self.build_binary_chain_doc_with_continuation_indent(inner_binary)
+        } else {
+            self.build_chain_aware_operand_doc(operand)
+        }
+    }
+
+    /// Build a binary operand's doc, routing a curried arrow-chain operand
+    /// (`cond ?? ((a) => (b) => …)`) through the progressive call-arg/binaryish
+    /// chain layout. Mirrors prettier's `isBinaryish(parent)` reaching
+    /// `printArrowFunctionSignatures`; `should_use_arrow_chain_layout` still gates
+    /// on untyped / comment-free chains, so a typed or comment-bearing operand
+    /// falls through to the default path.
+    fn build_chain_aware_operand_doc(&self, operand: &Expression) -> DocId {
+        if super::is_curried_arrow_chain(operand) {
+            self.build_with_arrow_chain_context(
+                super::ArrowChainContext::CallArgOrBinaryish,
+                || self.build_expression_doc(operand),
+            )
         } else {
             self.build_expression_doc(operand)
         }
@@ -955,29 +972,210 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a sequence expression
+    ///
+    /// Redundantly-parenthesized operand comments anchored to the sequence's
+    /// outer *edges* float OUT of the sequence parens, matching prettier's fixed
+    /// point: a leading comment on the first operand (`((/* c */ x), y)`) is
+    /// emitted before the opening `(` (`/* c */ (x, y)`) and a trailing comment
+    /// on the last operand (`(x, (y /* c */))`) after the closing `)`
+    /// (`(x, y) /* c */`). Each floated comment keeps its source line-treatment —
+    /// own-line (hardline) when a newline separates it from the operand, inline
+    /// (space) otherwise. Preserving the line-treatment is what makes the float
+    /// idempotent even when the sequence is nested inside surrounding comments (a
+    /// naive always-inline float re-collapses on the second pass).
+    /// See operand_edge_comment_prettier_divergence.
+    ///
+    /// Interior operand comments (between two operands) stay stripped + inline on
+    /// the comma-gap path below and match prettier — see operand_comments.
     pub(super) fn build_sequence_doc(&self, seq: &internal::SequenceExpression) -> DocId {
+        // Line comments inside the sequence need break handling (a forced-multiline
+        // layout) the inline comma-gap path below doesn't do; route those to the
+        // breaking layout so the comment isn't swallowed by the following comma/operand.
+        if tsv_lang::comments_in_range(self.comments, seq.span.start, seq.span.end)
+            .any(|c| !c.is_block)
+        {
+            return self.build_sequence_doc_with_line_comments(seq);
+        }
+
         let d = self.d();
-        let mut parts = Vec::new();
+        let n = seq.expressions.len();
+        let mut parts = Vec::with_capacity(n * 3 + 4);
+
+        // First operand's leading-edge comments float OUT, before the opening `(`.
+        let first_start = seq.expressions[0].span().start;
+        self.append_floated_leading_comments(&mut parts, seq.span.start, first_start);
+
         parts.push(d.text("("));
         for (i, expr) in seq.expressions.iter().enumerate() {
+            let is_last = i + 1 == n;
+            let expr_start = expr.span().start;
+            let expr_end = expr.span().end;
+
             if i > 0 {
                 parts.push(d.text(", "));
+                // Leading comments of this operand: the gap after the previous comma.
+                // Redundant operand parens are stripped, so a comment the user wrote
+                // inside them (`(/* c */ b)`) is preserved inline before the operand.
+                let prev_end = seq.expressions[i - 1].span().end;
+                if let Some(comma) = self.find_comma_after(prev_end) {
+                    parts.push(self.build_comments_between(
+                        comma + 1,
+                        expr_start,
+                        CommentSpacing::Trailing,
+                    ));
+                }
             }
-            // Boundary for paren comment detection: next expression start or sequence end
-            let boundary = seq
-                .expressions
-                .get(i + 1)
-                .map_or(seq.span.end, |next| next.span().start);
-            // Assignment expressions in sequences need individual parens
-            let expr_doc = self.build_expression_doc_with_paren_comments(expr, boundary);
-            let expr_doc = if matches!(expr, Expression::AssignmentExpression(_)) {
-                d.parens(expr_doc)
+
+            // Assignment expressions in sequences need individual parens.
+            let core = self.build_expression_doc(expr);
+            let inner = if matches!(expr, Expression::AssignmentExpression(_)) {
+                d.parens(core)
             } else {
-                expr_doc
+                core
             };
-            parts.push(expr_doc);
+            parts.push(inner);
+
+            // Trailing comments of this operand: the gap before the next comma.
+            if !is_last && let Some(comma) = self.find_comma_after(expr_end) {
+                parts.push(self.build_comments_between(expr_end, comma, CommentSpacing::Leading));
+            }
         }
         parts.push(d.text(")"));
+
+        // Last operand's trailing-edge comments float OUT, after the closing `)`.
+        // Same-line block comments stay inline (`(x, y) /* c */`); own-line block
+        // comments defer via `line_suffix` (`append_trailing_paren_comments`) so
+        // they land past the enclosing comma/semicolon — where they re-parse to,
+        // keeping the float idempotent. Line comments never reach this path (they
+        // route to the legacy layout above).
+        let last_end = seq.expressions[n - 1].span().end;
+        self.append_trailing_paren_comments(&mut parts, last_end, seq.span.end);
+
         d.concat(&parts)
+    }
+
+    /// Emit the first operand's leading-edge comments, floated out before the
+    /// sequence's opening `(`, preserving each comment's source line-treatment:
+    /// own-line (a newline before the operand) → hardline, inline → space. The
+    /// spacing follows each comment and is sized by the gap to the next token (the
+    /// following comment, else the operand at `operand_start`). On re-parse these
+    /// land in the enclosing context's leading-comment domain, which emits the
+    /// same own-line/inline treatment — so the float is idempotent.
+    fn append_floated_leading_comments(
+        &self,
+        parts: &mut Vec<DocId>,
+        start: u32,
+        operand_start: u32,
+    ) {
+        let d = self.d();
+        let comments: Vec<_> =
+            tsv_lang::comments_in_range(self.comments, start, operand_start).collect();
+        for (i, comment) in comments.iter().enumerate() {
+            parts.push(self.build_comment_doc(comment));
+            let next = comments.get(i + 1).map_or(operand_start, |c| c.span.start);
+            if self.has_newline_between(comment.span.end, next) {
+                parts.push(d.hardline());
+            } else {
+                parts.push(d.text(" "));
+            }
+        }
+    }
+
+    /// Sequence layout used when the sequence contains a line comment, which forces
+    /// a multiline break so the comment isn't swallowed by the following comma or
+    /// operand. Mirrors prettier's `group(join([",", line], parts))`: each comma gap
+    /// is partitioned by line — a comment with no newline before it *trails* the
+    /// preceding operand (a same-line block stays inline before the comma; a line
+    /// comment defers past the comma via `line_suffix`, rendering at end-of-line);
+    /// an own-line comment *leads* the next operand on its own line. A `break_parent`
+    /// forces the group (and any enclosing call/arg group) to break.
+    ///
+    /// The outer-edge comments — leading on the first operand, trailing on the last —
+    /// still float OUT of the parens via the same helpers as the block-comment path
+    /// (`append_floated_leading_comments` / `append_trailing_paren_comments`).
+    fn build_sequence_doc_with_line_comments(&self, seq: &internal::SequenceExpression) -> DocId {
+        let d = self.d();
+        let n = seq.expressions.len();
+
+        // First operand's leading-edge comments float OUT, before the opening `(`.
+        let mut outer = Vec::new();
+        let first_start = seq.expressions[0].span().start;
+        self.append_floated_leading_comments(&mut outer, seq.span.start, first_start);
+
+        // Build per-operand docs (own-line leading + core + same-line trailing),
+        // joined by `,` + line inside a group forced to break.
+        let mut inner = vec![d.break_parent()];
+        for (i, expr) in seq.expressions.iter().enumerate() {
+            let is_last = i + 1 == n;
+            let expr_start = expr.span().start;
+            let expr_end = expr.span().end;
+            let mut od = Vec::new();
+
+            // Own-line comments from the previous comma gap lead this operand.
+            // The same-line prefix of that gap trails the previous operand (emitted
+            // there), so skip it here; once a comment is own-line the rest follow.
+            if i > 0 {
+                let prev_end = seq.expressions[i - 1].span().end;
+                let mut pos = prev_end;
+                let mut in_trailing_run = true;
+                for comment in tsv_lang::comments_in_range(self.comments, prev_end, expr_start) {
+                    let own_line = self.has_newline_between(pos, comment.span.start);
+                    // Once a comment is own-line (or the trailing run already ended),
+                    // it and the rest lead the next operand.
+                    if !in_trailing_run || own_line {
+                        in_trailing_run = false;
+                        od.push(self.build_comment_doc(comment));
+                        od.push(d.hardline());
+                    }
+                    pos = comment.span.end;
+                }
+            }
+
+            // Assignment expressions in sequences need individual parens.
+            let core = self.build_expression_doc(expr);
+            od.push(if matches!(expr, Expression::AssignmentExpression(_)) {
+                d.parens(core)
+            } else {
+                core
+            });
+
+            // Same-line comments in the next comma gap trail this operand: a block
+            // stays inline before the comma; a line comment defers via `line_suffix`
+            // so it renders after the comma at end-of-line. Own-line comments belong
+            // to the next operand (handled above), so stop at the first one.
+            if !is_last {
+                let next_start = seq.expressions[i + 1].span().start;
+                let mut pos = expr_end;
+                for comment in tsv_lang::comments_in_range(self.comments, expr_end, next_start) {
+                    if self.has_newline_between(pos, comment.span.start) {
+                        break;
+                    }
+                    if comment.is_block {
+                        od.push(d.text(" "));
+                        od.push(self.build_comment_doc(comment));
+                    } else {
+                        let suffix = d.concat(&[d.text(" "), self.build_comment_doc(comment)]);
+                        od.push(d.line_suffix(suffix));
+                    }
+                    pos = comment.span.end;
+                }
+            }
+
+            if i > 0 {
+                inner.push(d.text(","));
+                inner.push(d.line());
+            }
+            inner.push(d.concat(&od));
+        }
+
+        outer.push(d.text("("));
+        outer.push(d.group(d.concat(&inner)));
+        outer.push(d.text(")"));
+
+        // Last operand's trailing-edge comments float OUT, after the closing `)`.
+        let last_end = seq.expressions[n - 1].span().end;
+        self.append_trailing_paren_comments(&mut outer, last_end, seq.span.end);
+
+        d.concat(&outer)
     }
 }

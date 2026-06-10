@@ -24,9 +24,15 @@ pub(crate) trait TextAnalysis {
 }
 
 impl TextAnalysis for str {
-    /// Check if string contains only whitespace
+    /// Check if string contains only collapsible (ASCII) whitespace
+    ///
+    /// Uses the ASCII whitespace class `[\t\n\f\r ]` — matching
+    /// prettier-plugin-svelte's text split (`splitTextToDocs`: `text.split(/[\t\n\f\r ]+/)`).
+    /// Non-breaking spaces (U+00A0 / U+202F) and other Unicode whitespace (NEL,
+    /// em-spaces, ideographic space, vertical tab) are content, not collapsible
+    /// whitespace, so a node made of only those is NOT whitespace-only.
     fn is_whitespace_only(&self) -> bool {
-        self.trim().is_empty()
+        self.bytes().all(|b| b.is_ascii_whitespace())
     }
 
     /// Count newlines in the string
@@ -39,15 +45,21 @@ impl TextAnalysis for str {
         self.count_newlines() >= 2
     }
 
-    /// Get the leading whitespace portion of the string
+    /// Get the leading (ASCII) whitespace portion of the string
+    ///
+    /// Stops at the first non-ASCII-whitespace byte, so a leading non-breaking
+    /// space counts as content, not whitespace (see `is_whitespace_only`).
     fn leading_whitespace(&self) -> &str {
-        let trimmed = self.trim_start();
+        let trimmed = self.trim_ascii_start();
         &self[..self.len() - trimmed.len()]
     }
 
-    /// Get the trailing whitespace portion of the string
+    /// Get the trailing (ASCII) whitespace portion of the string
+    ///
+    /// Stops at the last non-ASCII-whitespace byte, so a trailing non-breaking
+    /// space counts as content, not whitespace (see `is_whitespace_only`).
     fn trailing_whitespace(&self) -> &str {
-        let trimmed = self.trim_end();
+        let trimmed = self.trim_ascii_end();
         &self[trimmed.len()..]
     }
 
@@ -80,23 +92,28 @@ impl TextAnalysis for str {
 }
 
 impl<'a> Printer<'a> {
-    /// Check if text has leading whitespace
+    /// Check if text has leading ASCII whitespace
     ///
-    /// Returns true if the first character is whitespace.
+    /// Returns true if the first character is ASCII whitespace. Non-breaking
+    /// spaces (U+00A0 / U+202F) are content, not collapsible whitespace, matching
+    /// Prettier's `/[\t\n\f\r ]+/` whitespace class.
     fn has_leading_whitespace(text: &str) -> bool {
-        text.chars().next().is_some_and(char::is_whitespace)
+        text.starts_with(|c: char| c.is_ascii_whitespace())
     }
 
-    /// Check if text has trailing whitespace
+    /// Check if text has trailing ASCII whitespace
     ///
-    /// Returns true if the last character is whitespace.
+    /// Returns true if the last character is ASCII whitespace. Non-breaking spaces
+    /// are content, not collapsible whitespace.
     fn has_trailing_whitespace(text: &str) -> bool {
-        text.chars().last().is_some_and(char::is_whitespace)
+        text.ends_with(|c: char| c.is_ascii_whitespace())
     }
 
     /// Normalize whitespace in text content
     ///
-    /// Collapses consecutive whitespace (spaces, tabs, newlines) to a single space.
+    /// Collapses consecutive ASCII whitespace (spaces, tabs, newlines) to a single
+    /// space. Non-breaking spaces (U+00A0 / U+202F) are preserved verbatim — they
+    /// are content, not collapsible whitespace (matching Prettier's word split).
     ///
     /// # Parameters
     /// - `trim_completely`: If true, also trims leading/trailing whitespace (block context).
@@ -119,8 +136,9 @@ impl<'a> Printer<'a> {
         let has_leading_ws = Self::has_leading_whitespace(text);
         let has_trailing_ws = Self::has_trailing_whitespace(text);
 
-        // Fast path: whitespace-only text
-        if text.trim().is_empty() {
+        // Fast path: ASCII-whitespace-only text (a non-breaking space counts as
+        // content and falls through to the loop below, preserved verbatim).
+        if text.bytes().all(|b| b.is_ascii_whitespace()) {
             return if trim_completely || (!has_leading_ws && !has_trailing_ws) {
                 String::new()
             } else {
@@ -134,8 +152,10 @@ impl<'a> Printer<'a> {
         let mut has_content = false;
 
         for ch in text.chars() {
-            if ch.is_whitespace() {
-                // Only emit space if we have content and weren't already in whitespace
+            if ch.is_ascii_whitespace() {
+                // Only emit space if we have content and weren't already in whitespace.
+                // Non-breaking spaces are not ASCII whitespace, so they fall to the
+                // else branch and are preserved verbatim as content.
                 if has_content && !in_whitespace {
                     result.push(' ');
                 }

@@ -125,6 +125,36 @@ impl<'a> Printer<'a> {
     ) -> Option<DocId> {
         let d = self.d();
         let super_class = super_class?;
+        // A line comment after `extends`, before the super class, is kept
+        // trailing the keyword (preserve-in-place; prettier relocates it before
+        // `extends`) with the super class pushed onto the next line — the shared
+        // as/satisfies + type-param keyword→value mechanism.
+        if let Some(kw_start) = extends_keyword_start {
+            let kw_end = kw_start + 7; // "extends".len()
+            if self.has_line_comments_between(kw_end, super_class.span().start) {
+                let mut value_parts = vec![self.build_expression_doc(super_class)];
+                if let Some(type_args) = super_type_parameters {
+                    let gap_start = super_class.span().end;
+                    if let Some(doc) = self.build_name_to_type_params_comments_opt(
+                        gap_start,
+                        type_args.span.start,
+                        CommentSpacing::Trailing,
+                    ) {
+                        value_parts.push(doc);
+                    }
+                    value_parts.push(self.build_type_arguments_doc_wrapping(type_args));
+                }
+                let value_doc = d.concat(&value_parts);
+                let mut ext_parts = vec![d.text("extends")];
+                self.append_keyword_value_line_comments(
+                    &mut ext_parts,
+                    kw_end,
+                    super_class.span().start,
+                    value_doc,
+                );
+                return Some(d.concat(&ext_parts));
+            }
+        }
         let mut ext_parts = vec![d.text("extends ")];
         if let Some(kw_start) = extends_keyword_start {
             let kw_end = kw_start + 7; // "extends".len()
@@ -177,15 +207,23 @@ impl<'a> Printer<'a> {
     /// `emit_comments` gates the comment scan: the class-expression printer's
     /// bare name→body / anonymous→body paths emit their own comments, so it
     /// passes `false` when there is no heritage or type params.
-    fn build_class_pre_body_doc(
+    /// Emit the comments between a class/interface header (after the last
+    /// heritage item or type params) and the body `{`, plus the pre-`{` spacing.
+    /// Shared by the class-declaration non-group path and the interface printer.
+    /// Comments are preserved each on their own line via `build_pre_body_comments_doc`
+    /// (line comments don't absorb following comments); a line comment forces the
+    /// brace onto the next line, otherwise it hugs with a single space. Returns a
+    /// bare `" "` when there are no comments (or `emit_comments` is false).
+    pub(in crate::printer) fn build_header_pre_body_doc(
         &self,
         emit_comments: bool,
         header_end: u32,
         body_start: u32,
     ) -> DocId {
         let d = self.d();
-        if emit_comments && self.has_comments_between(header_end, body_start) {
-            let comments = self.build_inline_comments_between_doc(header_end, body_start);
+        if emit_comments
+            && let Some(comments) = self.build_pre_body_comments_doc(header_end, body_start)
+        {
             if self.has_line_comments_between(header_end, body_start) {
                 d.concat(&[comments, d.hardline()])
             } else {
@@ -234,7 +272,7 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(" "));
                 parts.push(impl_doc);
             }
-            parts.push(self.build_class_pre_body_doc(
+            parts.push(self.build_header_pre_body_doc(
                 emit_pre_body_comments,
                 header_end,
                 body_start,
@@ -285,8 +323,10 @@ impl<'a> Printer<'a> {
         // group breaks; an empty body always keeps ` {}` on the heritage line.
         let has_line_comment =
             emit_pre_body_comments && self.has_line_comments_between(header_end, body_start);
-        if emit_pre_body_comments && self.has_comments_between(header_end, body_start) {
-            parts.push(self.build_inline_comments_between_doc(header_end, body_start));
+        if emit_pre_body_comments
+            && let Some(comments) = self.build_pre_body_comments_doc(header_end, body_start)
+        {
+            parts.push(comments);
         }
         if has_line_comment {
             parts.push(d.hardline());

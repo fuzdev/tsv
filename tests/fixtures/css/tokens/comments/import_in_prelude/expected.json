@@ -1,0 +1,66 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 439,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 43,
+				"end": 72,
+				"name": "import",
+				"prelude": "url('a.css')",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 117,
+				"end": 141,
+				"name": "import",
+				"prelude": "'b.css'",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 188,
+				"end": 224,
+				"name": "import",
+				"prelude": "url('c.css')  screen",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 276,
+				"end": 336,
+				"name": "import",
+				"prelude": "url('d.css')  projection ,  tv",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 380,
+				"end": 430,
+				"name": "import",
+				"prelude": "url('e.css')  layer  screen",
+				"block": null
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 431,
+			"styles": "\n\t/* leading comment before url */\n\t@import /* a */ url('a.css');\n\n\t/* leading comment before bare string */\n\t@import /* b */ 'b.css';\n\n\t/* comment after url, before media type */\n\t@import url('c.css') /* c */ screen;\n\n\t/* comments around comma in media-query list */\n\t@import url('d.css') /* d */ projection /* e */, /* f */ tv;\n\n\t/* comment before bare layer keyword */\n\t@import url('e.css') /* g */ layer /* h */ screen;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 440,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -108,11 +108,30 @@ impl Expression {
     /// Returns true if this is a MemberExpression/CallExpression (or TSNonNullExpression
     /// wrapping one) that contains at least one `optional: true` node anywhere in
     /// the callee/object chain.
+    ///
+    /// The walk stops at a **parenthesized** object/callee/operand: source parens
+    /// terminate an optional chain (`(a?.b).c` — the `.c` is *not* part of the
+    /// chain; `(a?.b)!.c` — the chain seals at `a?.b`, with `!` and `.c` outside),
+    /// so the optionals inside the parens don't extend this node's chain. The
+    /// grouping parens are stripped, so the only signal is the span gap — the
+    /// parent's span starts before the child's (it covers the `(`). For the
+    /// non-null arm that means a parenthesized inner chain (`(a?.b)!`) seals here.
+    /// Without this, `(a?.b).c` / `(a?.b)!.c` would wrap the whole thing in
+    /// `ChainExpression`, diverging from acorn and dropping the
+    /// semantically-required parens.
     pub fn has_optional_in_chain(&self) -> bool {
         match self {
-            Expression::MemberExpression(m) => m.optional || m.object.has_optional_in_chain(),
-            Expression::CallExpression(c) => c.optional || c.callee.has_optional_in_chain(),
-            Expression::TSNonNullExpression(n) => n.expression.has_optional_in_chain(),
+            Expression::MemberExpression(m) => {
+                m.optional
+                    || (m.span.start >= m.object.span().start && m.object.has_optional_in_chain())
+            }
+            Expression::CallExpression(c) => {
+                c.optional
+                    || (c.span.start >= c.callee.span().start && c.callee.has_optional_in_chain())
+            }
+            Expression::TSNonNullExpression(n) => {
+                n.span.start >= n.expression.span().start && n.expression.has_optional_in_chain()
+            }
             _ => false,
         }
     }
@@ -746,6 +765,21 @@ pub struct TSNonNullExpression {
     /// The expression being asserted non-null
     pub expression: Box<Expression>,
     pub span: Span,
+}
+
+impl TSNonNullExpression {
+    /// True when this non-null assertion seals a **parenthesized** optional chain
+    /// (`(a?.b)!` — the `!` outside the source parens). The grouping parens are
+    /// stripped, so the only signal is the span gap: this node's span starts before
+    /// its inner expression's (covering the `(`) and the inner is an optional chain.
+    /// Such a chain is sealed — a trailing access reached through it (`(a?.b)!.c`),
+    /// or an always-required-parens position (`` (a?.b)!`x` ``, `new (a?.b)!()`),
+    /// must keep the parens. Complements [`Expression::has_optional_in_chain`]'s
+    /// non-null arm, which detects the opposite (`>=` — the chain *continues* through
+    /// the `!`, no sealing parens).
+    pub fn seals_optional_chain(&self) -> bool {
+        self.span.start < self.expression.span().start && self.expression.has_optional_in_chain()
+    }
 }
 
 /// Assignment expression: `x = value`, `obj.prop = value`, `{a, b} = obj`

@@ -18,8 +18,12 @@ import type { Language, TsvImplementation } from './types.ts';
 // (verified byte-for-byte from
 // Python ctypes, which passes immovable `bytes`); the bug is in Deno's buffer
 // path. ArrayBuffer backing stores are off-heap and not relocated by GC, so an
-// explicit `UnsafePointer.of` pointer is stable for the synchronous call as
-// long as the typed array stays alive (we keep references through the call).
+// explicit `UnsafePointer.of` pointer is stable for the synchronous call — but
+// only as long as the backing typed array stays reachable. `UnsafePointer.of`
+// returns an opaque `PointerValue` that does NOT keep the source array alive,
+// so V8 could otherwise collect it the moment the pointer is taken. `call_ffi`
+// pins `source_bytes` with an explicit liveness read after the native call
+// returns (`out_len_buffer` is already pinned by reading its result below).
 const symbols = {
 	tsv_parse_svelte: {
 		parameters: ['pointer', 'usize', 'pointer'],
@@ -74,7 +78,7 @@ type LibSymbols = Deno.DynamicLibrary<typeof symbols>['symbols'];
  * Uses TSV_FFI_PROFILE env var to select cargo profile (default: "release").
  * The corpus comparison task sets this to "corpus" for panic recovery.
  */
-function get_library_path(): string {
+export function get_library_path(): string {
 	const lib_name = Deno.build.os === 'linux'
 		? 'libtsv_ffi.so'
 		: Deno.build.os === 'darwin'
@@ -136,13 +140,24 @@ export class NativeImplementation implements TsvImplementation {
 		const out_len_buffer = new BigUint64Array(1);
 
 		// Pass explicit pointers (see the `symbols` comment for why). `source_bytes`
-		// and `out_len_buffer` must stay alive across the synchronous call — they're
-		// referenced again below, which keeps them reachable.
+		// and `out_len_buffer` must stay alive across the synchronous call.
+		// `Deno.UnsafePointer.of(...)` returns an opaque `PointerValue` that does NOT
+		// keep its backing typed array reachable, so we hold a named reference and add
+		// an explicit liveness read below to pin `source_bytes` past the call.
+		const source_ptr = Deno.UnsafePointer.of(source_bytes);
 		const result_ptr = fn(
-			Deno.UnsafePointer.of(source_bytes),
+			source_ptr,
 			source_bytes.length,
 			Deno.UnsafePointer.of(out_len_buffer),
 		);
+
+		// Keep `source_bytes` provably reachable until AFTER the native call returns.
+		// The condition is always false (a `Uint8Array`'s `byteLength` is never
+		// negative), but the optimizer cannot prove that without reading the array, so
+		// it forces `source_bytes` to stay live across the `fn(...)` call above — which
+		// is exactly what defeats the GC-collection class of corruption. `out_len_buffer`
+		// is pinned the same way by the result read below.
+		if (source_bytes.byteLength < 0) throw new Error('unreachable');
 
 		if (result_ptr === null) {
 			throw new Error('FFI function returned null pointer');

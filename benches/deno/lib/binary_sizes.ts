@@ -139,25 +139,25 @@ export async function collect_binary_sizes(
 		const prefix = Deno.build.os === 'windows' ? '' : 'lib';
 		await push_size(
 			staged,
-			'tsv (native)',
+			'tsv',
 			'native',
 			`${project_root}/target/release/${prefix}tsv_ffi.${ext}`,
 		);
 	}
 
 	// tsv WASM — two builds from one crate via the `ast` feature:
-	// pkg/deno (format-only, @fuzdev/tsv_fmt) and pkg/deno-parse
-	// (parse + format, @fuzdev/tsv_parse).
+	// pkg/deno (format-only, @fuzdev/tsv_format_wasm) and pkg/deno-parse
+	// (parse + format, @fuzdev/tsv_parse_wasm).
 	if (options?.has_wasm !== false) {
 		await push_size(
 			staged,
-			'tsv_fmt (wasm)',
+			'tsv_format_wasm',
 			'wasm',
 			`${project_root}/crates/tsv_wasm/pkg/deno/tsv_wasm_bg.wasm`,
 		);
 		await push_size(
 			staged,
-			'tsv_parse (wasm)',
+			'tsv_parse_wasm',
 			'wasm',
 			`${project_root}/crates/tsv_wasm/pkg/deno-parse/tsv_wasm_bg.wasm`,
 		);
@@ -249,8 +249,8 @@ function build_display_entries(sizes: BinarySize[]): {
 	wasm_entries: DisplayRow[];
 	native_entries: DisplayRow[];
 } {
-	const tsv_native = sizes.find((s) => s.label === 'tsv (native)');
-	const tsv_wasm = sizes.find((s) => s.label === 'tsv_fmt (wasm)');
+	const tsv_native = sizes.find((s) => s.label === 'tsv');
+	const tsv_wasm = sizes.find((s) => s.label === 'tsv_format_wasm');
 
 	const wasm_sizes = sizes.filter((s) => s.kind === 'wasm');
 	const native_sizes = sizes.filter((s) => s.kind === 'native');

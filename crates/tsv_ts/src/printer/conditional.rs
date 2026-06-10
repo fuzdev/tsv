@@ -108,13 +108,20 @@ impl<'a> Printer<'a> {
         } else {
             self.build_expression_doc(&cond.test)
         };
-        // Nullish coalescing, assignments, and await in test position need parens
-        // Prettier: needs-parens.js
+        // Several test-position expressions get parens (Prettier: needs-parentheses.js).
+        // For arrow/yield it is semantic: without parens the body absorbs the ternary
+        // (`() => 1 ? x : y` parses as `() => (1 ? x : y)`; `yield 1 ? x : y` as
+        // `yield (1 ? x : y)`). For `as`/`satisfies` it is clarity parens (same AST —
+        // they bind tighter than `?:`), matching the consequent/alternate arms below.
         let test = if is_nullish_coalescing(&cond.test)
             || matches!(
                 &*cond.test,
                 internal::Expression::AssignmentExpression(_)
                     | internal::Expression::AwaitExpression(_)
+                    | internal::Expression::ArrowFunctionExpression(_)
+                    | internal::Expression::YieldExpression(_)
+                    | internal::Expression::TSAsExpression(_)
+                    | internal::Expression::TSSatisfiesExpression(_)
             ) {
             d.parens(test)
         } else {
@@ -125,10 +132,13 @@ impl<'a> Printer<'a> {
         // grandparent is ReturnStatement/ThrowStatement/CallExpression/NewExpression,
         // shouldNotIndent = false → binary gets indent(rest) for continuation lines.
         // In assignment/variable contexts, shouldNotIndent = true → flat (no indent).
+        // Bound the consequent's own paren-comment scan at its end — the
+        // consequent-to-`:` comment is emitted by `comments_before_colon` below, so a
+        // wider boundary would double-emit it.
         let consequent = self.build_ternary_branch_expr_doc(
             &cond.consequent,
             indent_binary_test,
-            alternate_start,
+            consequent_end,
         );
 
         // Split comments around ? and : operators.

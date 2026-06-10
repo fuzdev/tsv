@@ -10,18 +10,15 @@ use super::super::utils::arrow_has_trailing_param_comments;
 use super::super::{has_newline_before_position, is_multiline_template_expression};
 use super::{ParenContext, Printer, needs_parens, unwrap_parenthesized};
 use crate::ast::internal;
+use crate::printer::ArrowChainContext;
 use crate::printer::analysis::find_char_skipping_comments;
 use crate::printer::layout::hang_after_operator;
+use crate::printer::needs_parens::leftmost_no_lookahead;
 use crate::printer::types::helpers::is_huggable_type;
 use crate::printer::{CommentFilter, CommentSpacing};
 use tsv_lang::comments_in_range;
+use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
-
-/// Check if an expression is directly an object literal (needs parentheses in arrow body)
-/// Only returns true for direct ObjectExpression - TSAsExpression etc. are handled separately
-fn is_object_expression(expr: &internal::Expression) -> bool {
-    matches!(expr, internal::Expression::ObjectExpression(_))
-}
 
 /// Check if an arrow body should stay on the same line as `=>` (no line break option).
 ///
@@ -56,31 +53,38 @@ fn is_template_on_same_line(source: &str, expr: &internal::Expression) -> bool {
         && !has_newline_before_position(source, expr.span().start)
 }
 
-/// Check if an expression has an ObjectExpression at its leftmost position.
-/// In arrow bodies, `{...}` at the start is ambiguous with a block statement and needs parens.
-/// Returns true for chains like: `{} as T`, `{}[name]`, `{}.prop`, `{} as A as B`, etc.
-fn has_leftmost_object_expression(expr: &internal::Expression) -> bool {
-    match expr {
-        internal::Expression::TSAsExpression(e) => {
-            is_object_expression(&e.expression) || has_leftmost_object_expression(&e.expression)
-        }
-        internal::Expression::TSSatisfiesExpression(e) => {
-            is_object_expression(&e.expression) || has_leftmost_object_expression(&e.expression)
-        }
-        internal::Expression::MemberExpression(e) => {
-            is_object_expression(&e.object) || has_leftmost_object_expression(&e.object)
-        }
-        internal::Expression::CallExpression(e) => {
-            is_object_expression(&e.callee) || has_leftmost_object_expression(&e.callee)
-        }
-        internal::Expression::TaggedTemplateExpression(e) => {
-            is_object_expression(&e.tag) || has_leftmost_object_expression(&e.tag)
-        }
-        internal::Expression::TSNonNullExpression(e) => {
-            is_object_expression(&e.expression) || has_leftmost_object_expression(&e.expression)
-        }
-        _ => false,
+/// Span of the ObjectExpression at an expression's leftmost (no-lookahead) position,
+/// or `None` if the leftmost token isn't an object literal.
+///
+/// In arrow bodies, `{...}` at the start is ambiguous with a block statement and needs
+/// parens around *just the object* — e.g. `{} as T`, `{}.prop`, `{} && a`, `{} ? a : b`,
+/// `{}.b++`. Delegates to the shared `leftmost_no_lookahead` walk (prettier's
+/// `startsWithNoLookaheadToken`, also used by the expression-statement paren path) and
+/// keeps the result only when it's an object. Assignment and sequence *bodies* are
+/// excluded — they get whole-body parens instead — matching prettier's
+/// needs-parentheses.js arrow-body carve-out (which still recurses through *nested*
+/// assignments/sequences, so the carve-out guards only the top-level body type).
+///
+/// Returns the object's span so the printer wraps exactly that node (keyed by span,
+/// robust to a chain rebuilding its base across conditional-group variants) and never
+/// a same-shaped object nested deeper.
+fn leftmost_object_span(expr: &internal::Expression) -> Option<tsv_lang::Span> {
+    if matches!(
+        expr,
+        internal::Expression::AssignmentExpression(_) | internal::Expression::SequenceExpression(_)
+    ) {
+        return None;
     }
+    match leftmost_no_lookahead(expr) {
+        internal::Expression::ObjectExpression(o) => Some(o.span),
+        _ => None,
+    }
+}
+
+/// Whether an expression has an ObjectExpression at its leftmost position.
+/// See [`leftmost_object_span`].
+fn has_leftmost_object_expression(expr: &internal::Expression) -> bool {
+    leftmost_object_span(expr).is_some()
 }
 
 /// Check if an expression is a huggable pattern for function parameters.
@@ -125,6 +129,22 @@ fn has_huggable_type_annotation(expr: &internal::Expression) -> bool {
 }
 
 impl<'a> Printer<'a> {
+    /// Build a doc with `context` active so the outermost curried arrow chain in
+    /// it picks the right flattened layout. The arrow printer consumes the
+    /// context at entry (`replace(None)`); restoring the prior value here keeps it
+    /// from leaking to a sibling argument / operand / RHS. Mirrors prettier
+    /// routing the parent context into `printArrowFunctionSignatures`.
+    pub(in crate::printer) fn build_with_arrow_chain_context(
+        &self,
+        context: ArrowChainContext,
+        build: impl FnOnce() -> DocId,
+    ) -> DocId {
+        let prev = self.arrow_chain_context.replace(context);
+        let doc = build();
+        self.arrow_chain_context.set(prev);
+        doc
+    }
+
     /// Print an arrow function expression using doc-based formatting with width-aware wrapping.
     ///
     /// Prettier behavior for arrow functions:
@@ -147,6 +167,14 @@ impl<'a> Printer<'a> {
     /// " " + body
     /// ```
     fn build_arrow_doc_wrapping(&self, arrow: &internal::ArrowFunctionExpression) -> DocId {
+        // Consume the chain context (set by the enclosing assignment / call-arg /
+        // binary-operand printer) so only the outermost chain arrow uses it;
+        // nested arrows in the chain reset to the default layout.
+        let chain_context = self.arrow_chain_context.replace(ArrowChainContext::None);
+        if self.should_use_arrow_chain_layout(arrow, chain_context) {
+            return self.build_arrow_chain_doc(arrow, chain_context);
+        }
+
         let d = self.d();
         let mut parts = Vec::new();
 
@@ -158,11 +186,10 @@ impl<'a> Printer<'a> {
         // Build signature parts (will be wrapped in a group)
         let mut sig_parts = Vec::new();
 
-        let has_params = !arrow.params.is_empty();
-
-        // Type parameters: group them independently only when function params exist
+        // Type parameters: always their own group so they break independently of
+        // the rest of the signature (Prettier's printTypeParameters semantics).
         if let Some(tp) = &arrow.type_parameters {
-            sig_parts.push(self.build_type_params_doc_for_arrow(tp, has_params));
+            sig_parts.push(self.build_type_params_doc_for_arrow(tp));
 
             // Comments between type_params `>` and `(` go after type_params
             if let Some(pp) = find_char_skipping_comments(
@@ -215,8 +242,17 @@ impl<'a> Printer<'a> {
             sig_parts.push(self.build_comment_doc(comment));
         }
 
-        // Wrap entire signature in a group
-        parts.push(d.group(d.concat(&sig_parts)));
+        // Wrap entire signature in a group. In expand-last-arg context, render the
+        // signature flat (remove_lines) so the params can't break — prettier's
+        // `expandLastArg` path prints params with `removeLines`, which is what lets a
+        // force-broken arrow keep its destructuring param inline and fall through to
+        // the all-args-broken-out layout instead of shattering the param.
+        let sig_doc = d.concat(&sig_parts);
+        if self.expand_last_arg_flat_params.get() {
+            parts.push(d.remove_lines(sig_doc));
+        } else {
+            parts.push(d.group(sig_doc));
+        }
 
         // " =>" outside the sig group so fits() look-ahead sees it as text
         // consuming remaining width. When sig + " =>" = print_width, the " =>"
@@ -247,7 +283,7 @@ impl<'a> Printer<'a> {
                             parts.push(d.text(" "));
                         }
                     }
-                    parts.push(self.build_expression_doc_with_paren_comments(expr, arrow.span.end));
+                    parts.push(self.build_expression_doc_keep_paren_comments(expr, arrow.span.end));
                     // Skip normal body handling — paren wrapping covers all cases
                 } else {
                     // Check for comments between `=>` and body start
@@ -439,11 +475,202 @@ impl<'a> Printer<'a> {
                 }
 
                 parts.push(d.text(" "));
+                // A block body terminates any curried-arrow chain — arrows nested
+                // inside it (callbacks, object-property arrows) are NOT part of the
+                // chain, so clear the flag so they aren't force-broken after `=>`.
+                // Mirrors the innermost expression-body case above.
+                let was_in_curried = self.in_curried_typed_arrow.replace(false);
                 parts.push(self.build_block_statement_doc(block));
+                self.in_curried_typed_arrow.set(was_in_curried);
             }
         }
 
         d.concat(&parts)
+    }
+
+    /// Whether to render an arrow as a flattened curried chain (prettier's
+    /// `printArrowFunctionSignatures`). Covers the untyped assignment-RHS and
+    /// call-arg/binaryish contexts: the body must be another arrow, the chain
+    /// must carry no return type / type params / non-identifier param (those
+    /// route through the existing break-after-operator path), and there must be
+    /// no comments in the heads region (which the existing path owns). A `None`
+    /// context (no enclosing chain site) or the call-arg expand-last-arg path
+    /// (`skip_arrow_chain`) routes to the default arrow layout.
+    fn should_use_arrow_chain_layout(
+        &self,
+        arrow: &internal::ArrowFunctionExpression,
+        context: ArrowChainContext,
+    ) -> bool {
+        if context == ArrowChainContext::None || self.skip_arrow_chain.get() {
+            return false;
+        }
+        let body_is_arrow = matches!(
+            &arrow.body,
+            internal::ArrowFunctionBody::Expression(b)
+                if matches!(b.as_ref(), internal::Expression::ArrowFunctionExpression(_))
+        );
+        if !body_is_arrow {
+            return false;
+        }
+        if crate::printer::arrow_chain_has_return_type(arrow) {
+            return false;
+        }
+        // Any comment anywhere in the chain (heads, between `=>`s, around the body,
+        // or trailing a stripped grouping paren) routes to the existing path, which
+        // owns the chain's comment handling.
+        !self.has_comments_between(arrow.span.start, arrow.span.end)
+    }
+
+    /// Build a flattened curried arrow chain: the signature heads
+    /// (`(a) => (b) => …`) form a breakable group keyed on `GroupId::ArrowChain`,
+    /// so they stay on one line when they fit and break otherwise. The terminal
+    /// arrow's `=>` is emitted after the group so the body hugs the last head; a
+    /// hugging body (object/array/template/block) stays inline, others hang on
+    /// the next line.
+    ///
+    /// Mirrors prettier's `printArrowFunction`. The heads' shape depends on the
+    /// parent context (`printArrowFunctionSignatures` branches):
+    /// - `AssignmentRhs`: all heads join in one group indented one level after
+    ///   `=` (the leading softline is the break-after-`=`); when they break, each
+    ///   head shares the same indent. The break-after-`=` decision is supplied by
+    ///   the enclosing fluid assignment layout (`choose_layout` routes untyped
+    ///   chains to `Fluid`).
+    /// - `CallArgOrBinaryish`: progressive indent — the first head stays on the
+    ///   line, the rest indent one level (`group([sig0, " =>", indent([line,
+    ///   join([" =>", line], rest)])])`).
+    fn build_arrow_chain_doc(
+        &self,
+        head: &internal::ArrowFunctionExpression,
+        context: ArrowChainContext,
+    ) -> DocId {
+        let d = self.d();
+
+        // Walk the chain, collecting each arrow's signature, until the terminal
+        // (non-arrow) body.
+        let mut sig_docs = Vec::new();
+        let mut current = head;
+        let terminal: &internal::ArrowFunctionBody = loop {
+            // Each signature is its own group so its params break independently of
+            // the chain (prettier wraps each `printArrowFunctionSignature` in a
+            // group): when the heads break onto separate lines, the params stay
+            // flat unless a single signature genuinely overflows.
+            sig_docs.push(d.group(self.build_arrow_signature_doc(current)));
+            match &current.body {
+                internal::ArrowFunctionBody::Expression(b) => {
+                    if let internal::Expression::ArrowFunctionExpression(inner) = b.as_ref() {
+                        current = inner;
+                    } else {
+                        break &current.body;
+                    }
+                }
+                internal::ArrowFunctionBody::BlockStatement(_) => break &current.body,
+            }
+        };
+
+        // The heads group is keyed on `GroupId::ArrowChain`; its shape depends on
+        // the parent context. Either way the terminal `=>` + body are emitted
+        // after the group (below), and `indent_if_break` ties the body's indent
+        // to this group's break decision.
+        let sep = d.concat(&[d.text(" =>"), d.line()]);
+        let heads = match context {
+            // Assignment-RHS: the inner group joins ALL heads with ` =>` + line so
+            // they stay on one line when they fit and each drop to their own line
+            // otherwise; the outer group wraps `indent([softline, inner])`, so
+            // when the chain doesn't fit on the `=` line its leading softline
+            // breaks (newline after `=`) and indents the heads one level. The
+            // enclosing fluid assignment marker stays flat — the break-after-`=`
+            // is this softline.
+            ArrowChainContext::AssignmentRhs => {
+                let inner = d.group(d.join_doc(sig_docs, sep));
+                d.group_with_id(
+                    d.indent(d.concat(&[d.softline(), inner])),
+                    GroupId::ArrowChain,
+                )
+            }
+            // Call-arg/binaryish: progressive indent. The first head stays on the
+            // current line; the rest indent one level and each drop to their own
+            // line when the group breaks. Mirrors prettier's
+            // `group([sig0, " =>", indent([line, join([" =>", line], rest)])])`.
+            // (`None` is unreachable — `should_use_arrow_chain_layout` gates it —
+            // but falls back to this progressive shape.)
+            ArrowChainContext::CallArgOrBinaryish | ArrowChainContext::None => {
+                // `split_first` is always `Some` here — a curried chain has ≥2
+                // heads — but matching avoids a panic path; the `None` arm falls
+                // back to the assignment-style joined group.
+                match sig_docs.split_first() {
+                    Some((&sig0, rest)) => {
+                        let rest_joined = d.join_doc(rest.to_vec(), sep);
+                        d.group_with_id(
+                            d.concat(&[
+                                sig0,
+                                d.text(" =>"),
+                                d.indent(d.concat(&[d.line(), rest_joined])),
+                            ]),
+                            GroupId::ArrowChain,
+                        )
+                    }
+                    None => d.group_with_id(d.join_doc(sig_docs, sep), GroupId::ArrowChain),
+                }
+            }
+        };
+
+        // The terminal body (`=> body`) is wrapped in `indent_if_break` keyed on
+        // the heads group: when the heads broke onto their own indented lines, the
+        // body sits at the heads' indent level too (so a block/object body's own
+        // content lands one level deeper); when the heads stayed on the `=` line,
+        // the body keeps the base indent. Mirrors prettier's
+        // `indentIfBreak(bodyDoc, { groupId: chainGroupId })`.
+        let body_part = match terminal {
+            internal::ArrowFunctionBody::Expression(b) => {
+                let expr = b.as_ref();
+                if should_hug_arrow_body(expr) || is_template_on_same_line(self.source, expr) {
+                    // Object/array/template body: hugs the last head, supplies its
+                    // own internal indent.
+                    d.concat(&[d.text(" "), self.build_arrow_body_doc(expr)])
+                } else if matches!(expr, internal::Expression::ConditionalExpression(_))
+                    && !has_leftmost_object_expression(expr)
+                {
+                    // Ternary body: parens when inline, none when broken
+                    // (prettier's shouldAddParensIfNotBreak).
+                    let body_doc = self.build_expression_doc(expr);
+                    if d.will_break(body_doc) {
+                        // No own group — the body's line is governed by the outer
+                        // chain group below (prettier's `indent([line, bodyDoc])`).
+                        d.indent_line(body_doc)
+                    } else {
+                        d.concat(&[
+                            d.text(" "),
+                            d.group(d.concat(&[
+                                d.if_break(d.empty(), d.text("(")),
+                                d.indent(d.concat(&[d.softline(), body_doc])),
+                                d.if_break(d.empty(), d.text(")")),
+                            ])),
+                        ])
+                    }
+                } else {
+                    // Other expression body: hang on the next line when the chain
+                    // breaks. No own group — the body's `line` is governed by the
+                    // outer chain group below, so the body hangs whenever the heads
+                    // break (matching prettier's `indent([line, bodyDoc])` inside
+                    // the outer `group([…])`), not on an independent fit check.
+                    d.indent_line(self.build_arrow_body_doc(expr))
+                }
+            }
+            internal::ArrowFunctionBody::BlockStatement(block) => {
+                d.concat(&[d.text(" "), self.build_block_statement_doc(block)])
+            }
+        };
+
+        // Outer group, mirroring prettier's `printArrowFunction` return
+        // (`group([group(signaturesDoc, {id}), " =>", indentIfBreak(bodyDoc)])`).
+        // The body's hanging `line` is governed by THIS group, so a non-hugging
+        // body hangs whenever the chain doesn't fit — even when the body itself is
+        // short — while the nested heads group makes its own break decision.
+        d.group(d.concat(&[
+            heads,
+            d.text(" =>"),
+            d.indent_if_break(body_part, GroupId::ArrowChain, false),
+        ]))
     }
 
     /// Build doc for return type annotation in arrow function context
@@ -485,14 +712,16 @@ impl<'a> Printer<'a> {
         ])
     }
 
-    /// Build doc for arrow function type params
+    /// Build doc for arrow function type params.
     ///
-    /// When `grouped` is true, wraps in its own group so type params can break independently.
-    /// When false, softlines break with the outer signature group.
+    /// The brackets are always wrapped in their own group so they break
+    /// independently of the rest of the signature — matching Prettier's
+    /// `printTypeParameters`, which always returns a `group([...])` (or an inline
+    /// form). This is what keeps `<T>` inline while only the return type expands,
+    /// regardless of whether the arrow has parameters.
     fn build_type_params_doc_for_arrow(
         &self,
         decl: &internal::TSTypeParameterDeclaration,
-        grouped: bool,
     ) -> DocId {
         let d = self.d();
         if decl.params.is_empty() {
@@ -505,7 +734,7 @@ impl<'a> Printer<'a> {
         // since the multiline form always emits one.
         if self.has_expanding_comments_in_type_param_declaration(decl) {
             let inner = self.build_type_parameter_declaration_doc_with_line_comments(decl);
-            return if grouped { d.group(inner) } else { inner };
+            return d.group(inner);
         }
 
         let param_docs: Vec<_> = decl
@@ -539,11 +768,7 @@ impl<'a> Printer<'a> {
             ])
         };
 
-        if grouped {
-            d.group(brackets_doc)
-        } else {
-            brackets_doc
-        }
+        d.group(brackets_doc)
     }
 
     /// Build doc for arrow params NOT in their own group (outer signature group controls breaking)
@@ -586,11 +811,10 @@ impl<'a> Printer<'a> {
             parts.push(d.text("async "));
         }
 
-        let has_params = !arrow.params.is_empty();
-
-        // Type parameters: group them independently only when function params exist
+        // Type parameters: always their own group so they break independently of
+        // the rest of the signature (Prettier's printTypeParameters semantics).
         if let Some(tp) = &arrow.type_parameters {
-            parts.push(self.build_type_params_doc_for_arrow(tp, has_params));
+            parts.push(self.build_type_params_doc_for_arrow(tp));
 
             // Comments between type_params `>` and `(` go after type_params
             if let Some(pp) = find_char_skipping_comments(
@@ -688,12 +912,15 @@ impl<'a> Printer<'a> {
     fn build_arrow_body_doc(&self, expr: &internal::Expression) -> DocId {
         let d = self.d();
         // Object at leftmost position in arrow body needs parens to avoid block ambiguity.
-        // Examples: `() => ({}) as T`, `() => ({})[name]`, `() => ({}).prop`
-        // The flag tells build_expression_doc to wrap the ObjectExpression in parens when reached.
-        if has_leftmost_object_expression(expr) {
-            self.arrow_body_object_needs_parens.set(true);
+        // Examples: `() => ({}) as T`, `() => ({}).prop`, `() => ({}) && a`, `() => ({}).b++`.
+        // The span target tells build_expression_doc to wrap exactly that ObjectExpression
+        // in parens when reached. Keyed by span (not a bool) so it survives a chain base
+        // being rebuilt across conditional-group variants, and never matches a same-shaped
+        // object nested deeper (e.g. a call argument). Saved/restored for nested arrows.
+        if let Some(obj_span) = leftmost_object_span(expr) {
+            let prev = self.arrow_body_object_parens_target.replace(Some(obj_span));
             let doc = self.build_expression_doc(expr);
-            self.arrow_body_object_needs_parens.set(false);
+            self.arrow_body_object_parens_target.set(prev);
             return doc;
         }
 

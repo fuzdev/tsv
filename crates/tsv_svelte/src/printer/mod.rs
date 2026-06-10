@@ -588,10 +588,17 @@ impl<'a> Printer<'a> {
     ) {
         let mut state = RootPrintState::default();
 
-        // Find first non-whitespace node index (excluding skipped indices)
+        // Find first non-whitespace node index (excluding skipped indices).
+        //
+        // This is the root-fragment leading boundary: prettier trims ALL leading
+        // whitespace here, non-breaking spaces included (the top-level output must
+        // not start with stray whitespace), mirroring the trailing line-rtrim. So
+        // a leading nbsp-only node is dropped here even though it counts as content
+        // mid-template — hence the Unicode `trim()` rather than the ASCII
+        // `is_whitespace_only` used for inter-element separators.
         let first_non_ws_idx = fragment.nodes.iter().enumerate().position(|(i, node)| {
             !skip_indices.contains(&i)
-                && !matches!(node, FragmentNode::Text(text) if text.raw.is_whitespace_only())
+                && !matches!(node, FragmentNode::Text(text) if text.raw.trim().is_empty())
         });
 
         let mut i = 0;

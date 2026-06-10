@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 464,
+	"end": 564,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -201,24 +201,72 @@
 					"column": 20
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " Two line comments after = stay on separate lines (not merged)",
+			"start": 456,
+			"end": 520,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 531,
+			"end": 536,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 10
+				},
+				"end": {
+					"line": 27,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 539,
+			"end": 544,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 2
+				},
+				"end": {
+					"line": 28,
+					"column": 7
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 463,
+		"end": 563,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 454,
+			"end": 554,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 25,
+					"line": 30,
 					"column": 9
 				}
 			},
@@ -880,6 +928,138 @@
 							"value": " Line comment after = with intersection",
 							"start": 382,
 							"end": 423
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 522,
+					"end": 553,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 8
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 527,
+						"end": 528,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 6
+							},
+							"end": {
+								"line": 27,
+								"column": 7
+							}
+						},
+						"name": "P"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 547,
+						"end": 552,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 2
+							},
+							"end": {
+								"line": 29,
+								"column": 7
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 547,
+								"end": 548,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 547,
+									"end": 548,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 2
+										},
+										"end": {
+											"line": 29,
+											"column": 3
+										}
+									},
+									"name": "Q"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 551,
+								"end": 552,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 6
+									},
+									"end": {
+										"line": 29,
+										"column": 7
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 551,
+									"end": 552,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 6
+										},
+										"end": {
+											"line": 29,
+											"column": 7
+										}
+									},
+									"name": "R"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 531,
+								"end": 536
+							},
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 539,
+								"end": 544
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Two line comments after = stay on separate lines (not merged)",
+							"start": 456,
+							"end": 520
 						}
 					]
 				}

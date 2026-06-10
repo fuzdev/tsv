@@ -1,0 +1,78 @@
+{
+	"type": "StyleSheetFile",
+	"start": 0,
+	"end": 203,
+	"children": [
+		{
+			"type": "Rule",
+			"prelude": {
+				"type": "SelectorList",
+				"start": 0,
+				"end": 5,
+				"children": [
+					{
+						"type": "ComplexSelector",
+						"start": 0,
+						"end": 5,
+						"children": [
+							{
+								"type": "RelativeSelector",
+								"combinator": null,
+								"selectors": [
+									{
+										"type": "PseudoClassSelector",
+										"name": "root",
+										"args": null,
+										"start": 0,
+										"end": 5
+									}
+								],
+								"start": 0,
+								"end": 5,
+								"metadata": {
+									"is_global": false,
+									"is_global_like": false,
+									"scoped": false
+								}
+							}
+						],
+						"metadata": {
+							"rule": null,
+							"is_global": false,
+							"used": false
+						}
+					}
+				]
+			},
+			"block": {
+				"type": "Block",
+				"start": 6,
+				"end": 202,
+				"children": [
+					{
+						"type": "Declaration",
+						"start": 93,
+						"end": 108,
+						"property": "--a",
+						"value": "!important"
+					},
+					{
+						"type": "Declaration",
+						"start": 180,
+						"end": 199,
+						"property": "--b",
+						"value": "red !important"
+					}
+				]
+			},
+			"start": 0,
+			"end": 202,
+			"metadata": {
+				"parent_rule": null,
+				"has_local_selectors": false,
+				"has_global_selectors": false,
+				"is_global_block": false
+			}
+		}
+	]
+}

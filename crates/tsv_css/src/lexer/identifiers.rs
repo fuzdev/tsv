@@ -1,20 +1,38 @@
 use super::token::{Token, TokenKind};
 use tsv_lang::ParseError;
 
+/// Whether `ch` is a non-ASCII CSS identifier code point.
+///
+/// Mirrors Svelte's `parseCss` (`read_identifier`: `codePointAt(0) >= 160`): any
+/// code point at or above U+00A0 is a valid identifier code point, so symbols and
+/// emoji (`♥`, `💩`) are accepted while the C1 control range U+0080–U+009F stays
+/// excluded. Single source for the threshold shared by `is_identifier_start` and
+/// the continuation guard in `read_identifier`.
+#[inline]
+fn is_non_ascii_identifier_codepoint(ch: char) -> bool {
+    ch as u32 >= 0xA0
+}
+
 /// Whether `ch` can begin a CSS identifier token in the lexer dispatch.
 ///
-/// Covers ASCII/Unicode letters (`is_alphabetic`), `-`, `_`, and the `\` escape
-/// introducer. Digits and a leading `$` have their own dispatch arms (numbers,
-/// and `$`-prefixed identifiers), so they're intentionally excluded here — but a
-/// `$` arm uses this to confirm the *next* char begins an identifier.
+/// Covers ASCII letters, non-ASCII identifier code points (see
+/// `is_non_ascii_identifier_codepoint`), `-`, `_`, and the `\` escape introducer.
+/// Digits and a leading `$` have their own dispatch arms (numbers, and `$`-prefixed
+/// identifiers), so they're intentionally excluded here — but a `$` arm uses this to
+/// confirm the *next* char begins an identifier.
 pub(crate) fn is_identifier_start(ch: char) -> bool {
-    ch.is_alphabetic() || ch == '-' || ch == '_' || ch == '\\'
+    ch.is_ascii_alphabetic()
+        || is_non_ascii_identifier_codepoint(ch)
+        || ch == '-'
+        || ch == '_'
+        || ch == '\\'
 }
 
 /// Read a CSS identifier
-/// CSS identifiers can contain unicode escapes and the characters a-z, A-Z, 0-9, -, _,
-/// plus an optional leading `$` (SCSS-style; the lexer dispatch only routes `$` here when
-/// it begins an identifier).
+/// CSS identifiers can contain unicode escapes; the characters a-z, A-Z, 0-9, -, _;
+/// any non-ASCII code point at or above U+00A0 (symbols and emoji, matching Svelte's
+/// `>= 160` rule); plus an optional leading `$` (SCSS-style; the lexer dispatch only
+/// routes `$` here when it begins an identifier).
 /// Per CSS Syntax Level 3 spec, escape sequences are decoded to their actual characters
 pub(crate) fn read_identifier(source: &str, pos: &mut usize) -> Result<Token, ParseError> {
     let start = *pos;
@@ -33,7 +51,15 @@ pub(crate) fn read_identifier(source: &str, pos: &mut usize) -> Result<Token, Pa
     loop {
         let current_char = source[*pos..].chars().next();
         match current_char {
-            Some(ch) if ch.is_alphanumeric() || ch == '-' || ch == '_' => {
+            // Continuation char: ASCII alphanumeric, a non-ASCII identifier code point,
+            // `-`, or `_` — the same predicate Svelte's `read_identifier` applies per
+            // char (`codePointAt(0) >= 160 || [a-zA-Z0-9_-]`).
+            Some(ch)
+                if ch.is_ascii_alphanumeric()
+                    || is_non_ascii_identifier_codepoint(ch)
+                    || ch == '-'
+                    || ch == '_' =>
+            {
                 decoded.push(ch);
                 *pos += ch.len_utf8();
             }

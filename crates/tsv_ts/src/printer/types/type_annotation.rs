@@ -6,7 +6,7 @@
 // - Return type annotations
 
 use super::helpers::{
-    find_separator_position, intersection_has_expanding_first_type,
+    find_separator_position, immediate_union_paren, intersection_has_expanding_first_type,
     intersection_has_huggable_last_type, should_hug_union_type,
     type_args_should_wrap_for_return_type, type_needs_parens_in_union_or_intersection,
     unwrap_parenthesized,
@@ -80,8 +80,10 @@ impl<'a> Printer<'a> {
             //
             // This pattern matches index signature type annotation handling.
             // For unions/intersections, wrap in group + indent + line so they break after `:`
-            // and inherit breaking from this context's group.
-            match annotation.type_annotation.as_ref() {
+            // and inherit breaking from this context's group. Redundant comment-free
+            // parens are stripped first so `(A | B)` / `(A & B)` get the bare layout
+            // (prettier strips them too); other parens keep the `_` fall-through.
+            match self.unwrap_redundant_parens(annotation.type_annotation.as_ref()) {
                 TSType::Union(u) => {
                     let type_doc = self.build_union_type_doc(u, false);
                     // Extract comments between `:` and the union type (e.g., `: /* c */ A | B`)
@@ -197,13 +199,20 @@ impl<'a> Printer<'a> {
             ]);
         }
 
+        // Strip redundant comment-free parens around a union / intersection so a
+        // `(A | B)` / `(A & B)` return type or member type gets the same break
+        // layout as the bare form (prettier strips them too). Other parenthesized
+        // types keep the existing fall-through below.
+        let value_type = self.unwrap_redundant_parens(annotation.type_annotation.as_ref());
+        let value_type_start = value_type.span().start;
+
         // Handle Union types - break after colon with indent when long
-        if let TSType::Union(u) = annotation.type_annotation.as_ref() {
+        if let TSType::Union(u) = value_type {
             let type_doc = self.build_union_type_doc(u, false);
 
             // Extract comments between `:` and the union type (e.g., `: /* c */ A | B`)
             let comments_doc =
-                self.build_comments_between(colon_end, type_start, CommentSpacing::Trailing);
+                self.build_comments_between(colon_end, value_type_start, CommentSpacing::Trailing);
 
             if should_hug_union_type(u) {
                 // Hugged unions (e.g., `null | { ... }`) use conditional_group to bypass
@@ -223,6 +232,11 @@ impl<'a> Printer<'a> {
 
             let union_group = hang_after_operator(d, d.concat(&[comments_doc, type_doc]));
             return d.concat(&[d.text(":"), union_group]);
+        }
+
+        // Handle Intersection types - first member hugs `:`, continuations indented.
+        if let TSType::Intersection(i) = value_type {
+            return self.build_intersection_type_annotation_doc(i, colon_end);
         }
 
         self.build_type_annotation_doc(annotation)
@@ -283,14 +297,7 @@ impl<'a> Printer<'a> {
             let first_type_start = intersection.types[0].span().start;
             let comments_doc =
                 self.build_comments_between(colon_end, first_type_start, CommentSpacing::Trailing);
-            let type_doc = self.build_intersection_type_doc(intersection, false);
-            let wrapped = if intersection_has_huggable_last_type(intersection)
-                || intersection_has_expanding_first_type(intersection)
-            {
-                type_doc
-            } else {
-                d.group(d.indent(type_doc))
-            };
+            let wrapped = self.intersection_hanging_with_indent(intersection);
             return d.concat(&[d.text(": "), comments_doc, wrapped]);
         }
 
@@ -411,7 +418,7 @@ impl<'a> Printer<'a> {
         if type_needs_parens_in_union_or_intersection(t) {
             // Special case: parenthesized union type
             if let TSType::Union(union) = unwrap_parenthesized(t) {
-                return self.build_parenthesized_union_doc(union);
+                return self.build_parenthesized_union_doc(union, immediate_union_paren(t), false);
             }
 
             d.concat(&[

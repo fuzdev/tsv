@@ -336,6 +336,15 @@ impl<'a> Printer<'a> {
             return self.build_empty_body_with_comments_doc(body.span);
         }
 
+        // A comment trailing the opening `{` on its own line is kept on the `{`
+        // line when the body expands (divergence from prettier, which relocates
+        // it to its own line as the first member's leading comment). Same
+        // mechanism as block/namespace bodies. See conformance_prettier.md
+        // §Comment relocation (Class/interface/enum body `{`).
+        let first_member_start = body.body[0].span().start;
+        let (brace_line_prefix, delimiter_pull_pos) =
+            self.delimiter_line_comment_prefix(body.span.start, first_member_start);
+
         // Build member docs with comments and blank line preservation
         let mut member_parts = Vec::new();
         let mut prev_end = body.span.start + 1; // Start after '{'
@@ -355,7 +364,9 @@ impl<'a> Printer<'a> {
                     .copied()
                     .collect()
             } else {
-                all_comments
+                // First member: drop comments pulled onto the `{` line (emitted
+                // as the brace-line prefix below).
+                self.first_member_leading_comments(all_comments, delimiter_pull_pos)
             };
 
             // For non-first members, determine if we need blank line preservation
@@ -377,7 +388,14 @@ impl<'a> Printer<'a> {
             member_parts
                 .extend(self.build_leading_comments_with_blank_lines(&comments, member_start));
 
-            member_parts.push(self.build_class_member_doc(member));
+            // A preceding `// prettier-ignore` keeps the member's source verbatim
+            // (matches prettier). The member span includes its trailing `;`.
+            let member_doc = if self.has_prettier_ignore_in_range(prev_end, member_start) {
+                self.raw_source_doc(member.span())
+            } else {
+                self.build_class_member_doc(member)
+            };
+            member_parts.push(member_doc);
 
             // Handle trailing inline comments on same line after member
             let upper_bound = body
@@ -399,6 +417,7 @@ impl<'a> Printer<'a> {
         // Wrap body content in indent
         d.concat(&[
             d.text("{"),
+            d.concat(&brace_line_prefix),
             d.indent(d.concat(&[d.hardline(), d.concat(&member_parts)])),
             d.hardline(),
             d.text("}"),
@@ -586,30 +605,27 @@ impl<'a> Printer<'a> {
                 parts.push(self.build_inline_comments_between_doc(before_eq, eq_pos));
             }
 
-            // Comments after `=` pass through assignment layout
-            let has_line_comment = self.has_line_comments_between(eq_pos + 1, value_start);
-            let rhs_comments = if has_line_comment {
-                // Line comments: build without trailing hardline — we add indent([hardline, ...])
-                self.build_inline_comments_between_doc_no_leading_space_opt(eq_pos + 1, value_start)
-            } else {
-                self.build_rhs_comments_opt(eq_pos + 1, value_start)
-            };
-
-            if has_line_comment {
-                if let Some(comments) = rhs_comments {
-                    // Line comment stays inline with `=`, expression indented on next line:
-                    // `= // comment\n      c`
-                    parts.push(d.text(" = "));
-                    let expr_doc = self.build_expression_doc(value);
-                    parts.push(comments);
-                    parts.push(d.indent(d.concat(&[d.hardline(), expr_doc])));
-                }
+            // Comments after `=`
+            if self.has_line_comments_between(eq_pos + 1, value_start) {
+                // A same-line comment stays inline with `=` (line comment via
+                // `line_suffix`, so its width never force-breaks a preceding type
+                // union); own-line comments stay on their own lines (not merged);
+                // the value is indented on the next line. `= // comment\n      c`.
+                parts.push(d.text(" ="));
+                let expr_doc = self.build_expression_doc(value);
+                self.append_keyword_value_line_comments(
+                    &mut parts,
+                    eq_pos + 1,
+                    value_start,
+                    expr_doc,
+                );
             } else {
                 // Use assignment layout for proper line-breaking (handles
                 // both no-comment and inline block comment cases).
                 // Inline block comments are passed as rhs_comments so
                 // choose_layout still applies (e.g., ternary with binaryish
                 // test → BreakAfterOperator).
+                let rhs_comments = self.build_rhs_comments_opt(eq_pos + 1, value_start);
                 let left_doc = d.concat(&parts);
                 let assignment_doc =
                     self.build_assignment_layout(left_doc, " =", value, false, rhs_comments);

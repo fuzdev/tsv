@@ -29,8 +29,14 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a new expression with argument wrapping
     pub(super) fn build_new_doc_with_wrapping(&self, new_expr: &internal::NewExpression) -> DocId {
         let d = self.d();
-        // Wrap callee in parens if needed (e.g., `new (a || b)()`, `new (a ? b : c)()`)
-        let callee = if needs_parens(&new_expr.callee, ParenContext::NewCallee) {
+        // Wrap callee in parens if needed (e.g., `new (a || b)()`, `new (a ? b : c)()`,
+        // an optional chain `new (a?.b)()` — a chain can't be a `new` callee per spec).
+        // A non-null assertion sealing a parenthesized chain (`new (a?.b)!()`) keeps the
+        // parens via the sealed-base rendering (checked first; the `!`-outside form is
+        // not stripped here even though the standalone path would).
+        let callee = if let Some(sealed) = self.build_sealed_non_null_paren_doc(&new_expr.callee) {
+            sealed
+        } else if needs_parens(&new_expr.callee, ParenContext::NewCallee) {
             // For binary expressions (including logical), use a group with softlines
             // so the parens can break independently when the content is too long:
             // new (

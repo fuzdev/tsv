@@ -1,5 +1,6 @@
 <script lang="ts">
-type A={/* block */
+type A={
+/* block */
 // line
 a:A;
 };

@@ -22,4 +22,9 @@
 	// Line comment after = with intersection
 	type M =// comment
 	N & O;
+
+	// Two line comments after = stay on separate lines (not merged)
+	type P =// c1
+	// c2
+	Q | R;
 </script>

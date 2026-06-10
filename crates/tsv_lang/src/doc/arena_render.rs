@@ -78,7 +78,6 @@ fn render_line_break(
     kind: LineKind,
     mode: Mode,
     indent_level: usize,
-    align_spaces: usize,
     base_indent_override: Option<usize>,
     output: &mut String,
     pos: &mut usize,
@@ -96,14 +95,8 @@ fn render_line_break(
             // (matches Prettier's trim() call before non-literal newlines)
             trim_trailing_whitespace(output);
             output.push('\n');
-            write_indentation(output, indent_level, align_spaces, render, embed);
-            *pos = line_start_column(
-                indent_level,
-                align_spaces,
-                render,
-                embed,
-                base_indent_override,
-            );
+            write_indentation(output, indent_level, render, embed);
+            *pos = line_start_column(indent_level, render, embed, base_indent_override);
         }
         true
     } else if kind == LineKind::Normal {
@@ -367,7 +360,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
         mode: Mode::Break,
         doc,
         base_indent_override: None,
-        align_spaces: 0,
     }];
 
     let mut line_suffix: Vec<ArenaCommand> = Vec::new();
@@ -405,7 +397,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                     kind,
                     cmd.mode,
                     cmd.indent,
-                    cmd.align_spaces,
                     cmd.base_indent_override,
                     output,
                     pos,
@@ -428,12 +419,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 let n = *n;
                 let contents = *contents;
                 commands.push(cmd.with_indent(n, contents));
-            }
-
-            DocNode::AlignSpaces { spaces, contents } => {
-                let spaces = *spaces;
-                let contents = *contents;
-                commands.push(cmd.with_align_spaces(spaces, contents));
             }
 
             DocNode::Group {
@@ -734,11 +719,11 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
         if offset + 1 >= parts.len() {
             if !content_fits {
                 let line_start_pos =
-                    line_start_column(indent_level, 0, render, embed, context.base_indent_override);
+                    line_start_column(indent_level, render, embed, context.base_indent_override);
                 if *pos != line_start_pos {
                     trim_trailing_whitespace(output);
                     output.push('\n');
-                    write_indentation(output, indent_level, 0, render, embed);
+                    write_indentation(output, indent_level, render, embed);
                     *pos = line_start_pos;
                 }
             }
@@ -857,7 +842,7 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
             );
         } else {
             let line_start_pos =
-                line_start_column(indent_level, 0, render, embed, context.base_indent_override);
+                line_start_column(indent_level, render, embed, context.base_indent_override);
             let at_line_start = *pos == line_start_pos;
 
             if !at_line_start {
@@ -875,7 +860,7 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
 
                 trim_trailing_whitespace(output);
                 output.push('\n');
-                write_indentation(output, indent_level, 0, render, embed);
+                write_indentation(output, indent_level, render, embed);
                 *pos = line_start_pos;
 
                 if content_fits_at_start {
@@ -1020,7 +1005,6 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
         mode,
         doc,
         base_indent_override,
-        align_spaces: 0,
     }];
 
     let tracking_suffix = suffix_buffer.is_some();
@@ -1053,7 +1037,6 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                     kind,
                     cmd.mode,
                     cmd.indent,
-                    cmd.align_spaces,
                     cmd.base_indent_override,
                     output,
                     pos,
@@ -1076,12 +1059,6 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                 let n = *n;
                 let contents = *contents;
                 commands.push(cmd.with_indent(n, contents));
-            }
-
-            DocNode::AlignSpaces { spaces, contents } => {
-                let spaces = *spaces;
-                let contents = *contents;
-                commands.push(cmd.with_align_spaces(spaces, contents));
             }
 
             DocNode::Group {
@@ -1302,7 +1279,6 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
 fn write_indentation(
     output: &mut String,
     level: usize,
-    align_spaces: usize,
     render: &RenderConfig,
     embed: &EmbedContext,
 ) {
@@ -1314,9 +1290,6 @@ fn write_indentation(
     for _ in 0..(level + extra) {
         output.push_str(render.indent);
     }
-    for _ in 0..align_spaces {
-        output.push(' ');
-    }
 }
 
 fn indent_width(level: usize, render: &RenderConfig) -> usize {
@@ -1325,13 +1298,12 @@ fn indent_width(level: usize, render: &RenderConfig) -> usize {
 
 fn line_start_column(
     indent_level: usize,
-    align_spaces: usize,
     render: &RenderConfig,
     embed: &EmbedContext,
     base_override: Option<usize>,
 ) -> usize {
     let base = base_override.unwrap_or(embed.base_indent_offset);
-    indent_width(indent_level, render) + base * render.tab_width + align_spaces
+    indent_width(indent_level, render) + base * render.tab_width
 }
 
 fn indent_str_width(indent: &str, tab_width: usize) -> usize {

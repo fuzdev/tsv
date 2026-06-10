@@ -1,0 +1,84 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 39,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 38,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 29,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "DoWhileStatement",
+					"start": 10,
+					"end": 28,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 14
+						}
+					},
+					"body": {
+						"type": "EmptyStatement",
+						"start": 12,
+						"end": 13,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 3
+							},
+							"end": {
+								"line": 2,
+								"column": 4
+							}
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 22,
+						"end": 26,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 8
+							},
+							"end": {
+								"line": 3,
+								"column": 12
+							}
+						},
+						"name": "cond"
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

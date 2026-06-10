@@ -4,7 +4,12 @@
  * Uses the same approach as tsv_debug's Deno sidecar for consistency.
  */
 
-import { type Language, LANGUAGE_PRETTIER_PARSERS, type TsvImplementation } from './types.ts';
+import {
+	type Language,
+	LANGUAGE_EXTENSIONS,
+	LANGUAGE_PRETTIER_PARSERS,
+	type TsvImplementation,
+} from './types.ts';
 import type { CanonicalVersions } from './versions.ts';
 
 /** Prettier module */
@@ -146,8 +151,14 @@ export class CanonicalImplementation implements TsvImplementation {
 
 		const plugins = language === 'svelte' ? [this.#prettier_svelte] : [];
 
+		// Pass a filepath so prettier applies extension-specific heuristics, matching how a
+		// real on-disk file is formatted (and how the tsv_debug sidecar invokes prettier). Without
+		// it, prettier can't tell a `.ts` file from `.tsx` and force-adds the JSX-disambiguating
+		// trailing comma to single-type-param arrows (`<T,>`) that a real `.ts` run never emits —
+		// see prettier's `shouldForceTrailingComma` in src/language-js/print/type-parameters.js.
 		return await this.#prettier_checked.format(source, {
 			parser: LANGUAGE_PRETTIER_PARSERS[language],
+			filepath: `file${LANGUAGE_EXTENSIONS[language]}`,
 			plugins,
 			...this.#prettier_config,
 		});

@@ -443,9 +443,13 @@ impl<'a> Printer<'a> {
         let d = self.d();
         *handle_whitespace_of_prev_text = false;
 
-        let has_leading_ws = raw.starts_with(char::is_whitespace);
-        let has_trailing_ws = raw.ends_with(char::is_whitespace);
-        let trimmed = raw.trim();
+        // ASCII whitespace class `[\t\n\f\r ]`, matching prettier-plugin-svelte's
+        // text split (`splitTextToDocs`). A leading/trailing non-breaking space (or
+        // any non-ASCII whitespace) is content, so a node made only of those is not
+        // whitespace-only and is preserved verbatim.
+        let has_leading_ws = raw.starts_with(|c: char| c.is_ascii_whitespace());
+        let has_trailing_ws = raw.ends_with(|c: char| c.is_ascii_whitespace());
+        let trimmed = raw.trim_ascii();
 
         let is_first = position.is_first();
         let is_last = position.is_last();
@@ -1156,11 +1160,19 @@ impl<'a> Printer<'a> {
         trailing_line: bool,
     ) -> Option<DocId> {
         let d = self.d();
-        let has_leading_ws = raw.starts_with(char::is_whitespace);
-        let has_trailing_ws = raw.ends_with(char::is_whitespace);
+        // ASCII whitespace only (matching the word split below): a boundary space
+        // is emitted only when the split consumed an ASCII-whitespace run. A
+        // boundary non-breaking space (U+00A0 / U+202F) stays attached to its word
+        // and must not get a spurious regular space prepended/appended.
+        let has_leading_ws = raw.starts_with(|c: char| c.is_ascii_whitespace());
+        let has_trailing_ws = raw.ends_with(|c: char| c.is_ascii_whitespace());
 
-        // Split on whitespace and collect non-empty words
-        let words: Vec<&str> = raw.split_whitespace().collect();
+        // Split on ASCII whitespace only and collect non-empty words. Prettier's
+        // splitTextToDocs splits on `/[\t\n\f\r ]+/`, so non-breaking spaces
+        // (U+00A0) and narrow non-breaking spaces (U+202F) stay attached to their
+        // words — they are not break points and are preserved verbatim. Rust's
+        // `split_whitespace` is Unicode-aware and would split (and thus drop) them.
+        let words: Vec<&str> = raw.split_ascii_whitespace().collect();
         if words.is_empty() {
             return None;
         }

@@ -445,7 +445,15 @@ fn acorn_child_key_order(node_type: &str) -> Option<&'static [&'static str]> {
         // typeAnnotation is inserted by acorn-typescript before value, so comments
         // between type annotation and `=` attach as typeAnnotation.trailingComments
         "PropertyDefinition" => Some(&["key", "typeAnnotation", "value", "decorators"]),
-        "MethodDefinition" => Some(&["key", "value", "decorators"]),
+        // acorn-typescript sets a method's typeParameters between key and value, so a
+        // comment trailing the method type-param `<` walks onto the first type parameter
+        // (not the `value` FunctionExpression, whose span starts after the comment).
+        "MethodDefinition" => Some(&["key", "typeParameters", "value", "decorators"]),
+        // acorn-typescript `parseNew` sets callee, then typeArguments, then arguments,
+        // so a comment trailing the type-arg `<` walks onto the first type argument
+        // (not the call argument). CallExpression needs no entry: `parseSubscript`
+        // keeps arguments before typeArguments, which matches our default Map order.
+        "NewExpression" => Some(&["callee", "typeArguments", "arguments"]),
         _ => None,
     }
 }
@@ -715,6 +723,25 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
     }
 }
 
+/// Whether a comment lies outside every `<script>` content span — i.e., it's a
+/// template expression comment that `attach_template_expression_comments` may
+/// move into the JSON tree.
+fn is_template_comment(comment: &Comment, script_spans: &[(u32, u32)]) -> bool {
+    !script_spans
+        .iter()
+        .any(|&(s, e)| comment.span.start >= s && comment.span.end <= e)
+}
+
+/// Whether any comment falls outside the `<script>` content spans.
+///
+/// When false, `attach_template_expression_comments` is a no-op — used to gate
+/// the direct-serialization fast path in `convert_ast_json_string`.
+pub fn has_template_expression_comments(comments: &[Comment], script_spans: &[(u32, u32)]) -> bool {
+    comments
+        .iter()
+        .any(|c| is_template_comment(c, script_spans))
+}
+
 /// Attach comments to template expressions in a converted Root JSON AST
 ///
 /// Template expression comments are those in `root.comments` that fall outside `<script>` tags.
@@ -731,11 +758,7 @@ pub fn attach_template_expression_comments(
     // Filter to comments outside script content spans (these are template expression comments)
     let template_comments: Vec<&Comment> = comments
         .iter()
-        .filter(|c| {
-            !script_spans
-                .iter()
-                .any(|&(s, e)| c.span.start >= s && c.span.end <= e)
-        })
+        .filter(|c| is_template_comment(c, script_spans))
         .collect();
 
     if template_comments.is_empty() {
@@ -1208,4 +1231,106 @@ fn scan_past_trailing_comments(source: &str, start: u32, limit: u32) -> u32 {
     }
 
     last_comment_end
+}
+
+#[cfg(all(test, feature = "convert"))]
+mod tests {
+    use serde_json::Value;
+
+    /// Parse a `<script lang="ts">` body and return the public JSON AST.
+    fn convert_ts(body: &str) -> Value {
+        let source = format!("<script lang=\"ts\">\n{body}\n</script>");
+        let root = crate::parse(&source).expect("parse");
+        crate::convert_ast_json(&root, &source)
+    }
+
+    /// The first statement's expression in the instance `<script>`.
+    fn first_expression(ast: &Value) -> &Value {
+        &ast["instance"]["content"]["body"][0]["expression"]
+    }
+
+    /// The single leading comment value on a node, if any.
+    fn leading_comment(node: &Value) -> Option<&str> {
+        node.get("leadingComments")?
+            .as_array()?
+            .first()?
+            .get("value")?
+            .as_str()
+    }
+
+    // For `new Foo< // c\n A, B>(x)`, acorn (`parseNew` sets `callee`,
+    // `typeArguments`, then `arguments`) walks the type arguments before the call
+    // arguments, so the `<`-trailing line comment attaches as a leadingComment of
+    // the FIRST type argument — never the call argument.
+    #[test]
+    fn new_expression_type_arg_open_angle_comment_attaches_to_first_type_arg() {
+        let ast = convert_ts("new Foo< // c\n\tA,\n\tB\n>(x);");
+        let expr = first_expression(&ast);
+        assert_eq!(expr["type"], "NewExpression");
+
+        let first_type_arg = &expr["typeArguments"]["params"][0];
+        assert_eq!(first_type_arg["typeName"]["name"], "A");
+        assert_eq!(
+            leading_comment(first_type_arg),
+            Some(" c"),
+            "comment trailing `<` should attach to the first type argument"
+        );
+        assert_eq!(
+            leading_comment(&expr["arguments"][0]),
+            None,
+            "comment must not land on the call argument for a `new` expression"
+        );
+    }
+
+    // Sibling parity (already correct): for a CALL expression, acorn (`parseSubscript`
+    // sets `callee`, `arguments`, then `typeArguments`) walks the call arguments first,
+    // so the same comment attaches to the call ARGUMENT, not the type argument.
+    #[test]
+    fn call_expression_type_arg_open_angle_comment_attaches_to_call_arg() {
+        let ast = convert_ts("foo< // c\n\tA,\n\tB\n>(x);");
+        let expr = first_expression(&ast);
+        assert_eq!(expr["type"], "CallExpression");
+
+        assert_eq!(leading_comment(&expr["arguments"][0]), Some(" c"));
+        assert_eq!(leading_comment(&expr["typeArguments"]["params"][0]), None);
+    }
+
+    // For a class method `m< // c\n T>(p) {}`, acorn-typescript sets the
+    // MethodDefinition's `key`, then `typeParameters`, then `value`, so the
+    // `<`-trailing line comment walks onto the first type PARAMETER — not the
+    // method's `value` FunctionExpression (whose span begins after the comment).
+    #[test]
+    fn class_method_type_param_open_angle_comment_attaches_to_first_type_param() {
+        let ast = convert_ts("class C {\n\tm< // c\n\t\tT\n\t>(p: T) {}\n}");
+        let method = &ast["instance"]["content"]["body"][0]["body"]["body"][0];
+        assert_eq!(method["type"], "MethodDefinition");
+
+        let first_type_param = &method["typeParameters"]["params"][0];
+        assert_eq!(first_type_param["name"], "T");
+        assert_eq!(
+            leading_comment(first_type_param),
+            Some(" c"),
+            "comment trailing the method type-param `<` should attach to the first type parameter"
+        );
+        assert_eq!(
+            leading_comment(&method["value"]),
+            None,
+            "comment must not land on the method's FunctionExpression value"
+        );
+    }
+
+    // Sibling parity (already correct): an interface method is a TSMethodSignature
+    // whose `typeParameters` already precede the rest, so the same comment attaches
+    // to the first type parameter — confirming the class-method gap is localized to
+    // MethodDefinition's child-walk order, not the type-parameter path itself.
+    #[test]
+    fn interface_method_type_param_open_angle_comment_attaches_to_first_type_param() {
+        let ast = convert_ts("interface I {\n\tm< // c\n\t\tT\n\t>(p: T): void;\n}");
+        let sig = &ast["instance"]["content"]["body"][0]["body"]["body"][0];
+        assert_eq!(sig["type"], "TSMethodSignature");
+        assert_eq!(
+            leading_comment(&sig["typeParameters"]["params"][0]),
+            Some(" c")
+        );
+    }
 }

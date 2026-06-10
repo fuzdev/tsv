@@ -148,6 +148,17 @@ impl<'a> Printer<'a> {
         tsv_lang::write_indent(&mut self.buffer, self.indent_level, tsv_lang::INDENT);
     }
 
+    /// Write indentation at the current level plus `extra` additional levels.
+    ///
+    /// For continuation lines in wrapped at-rule preludes / media queries, which
+    /// indent one or two levels past the statement. The caller writes the preceding
+    /// newline; this only emits the (deeper) indentation.
+    pub(crate) fn write_indent_extra(&mut self, extra: usize) {
+        self.indent_level += extra;
+        self.write_indent();
+        self.indent_level -= extra;
+    }
+
     /// Remove trailing newline from buffer (for inline comment handling)
     pub(crate) fn buffer_remove_trailing_newline(&mut self) {
         self.buffer.pop_if_ends_with('\n');
@@ -354,6 +365,17 @@ impl<'a> Printer<'a> {
 
         while *comment_idx < self.comments.len() {
             let comment = &self.comments[*comment_idx];
+
+            // Skip comments inside the node's span (e.g. at-rule prelude comments,
+            // block-interior comments). These are emitted by the node's own printing
+            // logic via comments_in_range(); without this guard the loop would break on
+            // an interior comment (its start precedes node_end, so is_same_line reverses
+            // to false) and the genuine trailing comment after `;`/`}` would be dropped.
+            if comment.span.end <= node_end {
+                *comment_idx += 1;
+                continue;
+            }
+
             if !self.is_same_line(last_end, comment.span.start) {
                 break;
             }
@@ -427,47 +449,6 @@ impl<'a> Printer<'a> {
 
     /// Normalize comment spacing in raw strings
     ///
-    /// Ensures spaces around comment delimiters:
-    /// - Add space before `/*` if there isn't one (unless at start)
-    /// - Add space after `*/` if there isn't one (unless at end)
-    ///
-    /// Examples:
-    /// - `"foo/* comment */bar"` → `"foo /* comment */ bar"`
-    /// - `"/* comment */bar"` → `"/* comment */ bar"`
-    /// - `"foo/* comment */"` → `"foo /* comment */"`
-    pub(crate) fn normalize_comment_spacing(&self, s: &str) -> String {
-        let mut result = String::with_capacity(s.len() + 10);
-        let mut chars = s.char_indices().peekable();
-
-        while let Some((i, ch)) = chars.next() {
-            if ch == '/' && chars.peek().map(|(_, c)| c) == Some(&'*') {
-                // Found start of comment
-                // Add space before /* if not at start and previous char isn't whitespace
-                if i > 0 && !result.ends_with(char::is_whitespace) {
-                    result.push(' ');
-                }
-                result.push('/');
-                chars.next(); // consume the '*'
-                result.push('*');
-            } else if ch == '*' && chars.peek().map(|(_, c)| c) == Some(&'/') {
-                // Found end of comment
-                result.push('*');
-                chars.next(); // consume the '/'
-                result.push('/');
-                // Add space after */ if next char exists and isn't whitespace
-                if let Some((_, next_ch)) = chars.peek()
-                    && !next_ch.is_whitespace()
-                {
-                    result.push(' ');
-                }
-            } else {
-                result.push(ch);
-            }
-        }
-
-        result
-    }
-
     /// Print a single CSS node
     fn print_css_node(&mut self, node: &CssNode) {
         match node {

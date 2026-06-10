@@ -16,14 +16,14 @@ crate-type = ["cdylib", "rlib"]
 wasm-opt = ['-O3', '--enable-bulk-memory', '--enable-nontrapping-float-to-int']
 
 [features]
-# Default build: format-only (@fuzdev/tsv_fmt).
+# Default build: format-only (@fuzdev/tsv_format_wasm).
 default = []
-# `--features ast`: adds parse_* + convert layer (@fuzdev/tsv_parse).
+# `--features ast`: adds parse_* + convert layer (@fuzdev/tsv_parse_wasm).
 ast = [
     "tsv_ts/convert",
     "tsv_css/convert",
     "tsv_svelte/convert",
-    "dep:serde-wasm-bindgen",
+    "dep:js-sys",
 ]
 
 [dependencies]
@@ -31,7 +31,10 @@ tsv_svelte.workspace = true
 tsv_ts.workspace = true
 tsv_css.workspace = true
 wasm-bindgen = "0.2"
-serde-wasm-bindgen = { version = "0.6", optional = true }
+# Engine-native JSON.parse for the parse_* exports: the AST crosses the
+# boundary as one JSON string instead of a serde_wasm_bindgen-built object
+# graph (measurably faster materialization).
+js-sys = { version = "0.3", optional = true }
 
 [lints]
 workspace = true

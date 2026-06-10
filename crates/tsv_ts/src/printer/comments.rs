@@ -232,6 +232,37 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Emit the comments in `[start, end)` between a class/interface header
+    /// (after the last heritage item or type params) and the body `{`, preserving
+    /// each comment on its own line. A line comment ends its line, so any comment
+    /// following one is pushed to its own line via `hardline` — otherwise it would
+    /// be absorbed into the line comment's text (`// c1 // c2` reparses as a single
+    /// comment, a content/boundary loss). The first comment, and a block following a
+    /// block, keep a leading space, matching the single-comment heritage form
+    /// `J // c`.
+    ///
+    /// Returns `None` when the range has no comments. The caller appends the pre-`{`
+    /// separator itself (`hardline` for a line comment, space/`line` otherwise).
+    pub(crate) fn build_pre_body_comments_doc(&self, start: u32, end: u32) -> Option<DocId> {
+        let d = self.d();
+        let mut parts = Vec::new();
+        let mut prev_is_line = false;
+        for comment in comments_in_range(self.comments, start, end) {
+            if prev_is_line {
+                parts.push(d.hardline());
+            } else {
+                parts.push(d.text(" "));
+            }
+            parts.push(self.build_comment_doc(comment));
+            prev_is_line = !comment.is_block;
+        }
+        if parts.is_empty() {
+            None
+        } else {
+            Some(d.concat(&parts))
+        }
+    }
+
     /// Build a Doc for inline comments, returning None if no comments.
     ///
     /// Use this instead of `has_comments_between` + `build_inline_comments_between_doc`
@@ -508,6 +539,26 @@ impl<'a> Printer<'a> {
                 )
             })
             .unwrap_or_else(|| d.empty());
+
+        // A line comment between the keyword and the first item is kept trailing
+        // the keyword (preserve-in-place; prettier relocates it before the
+        // keyword), with the items pushed onto the next line — mirroring the
+        // as/satisfies + type-param keyword→value handling. The keyword stays
+        // inline; only the items are pushed down (no whole-heritage break).
+        if let Some(kw_start) = keyword_start {
+            let kw_end = kw_start + keyword.len() as u32;
+            if self.has_line_comments_between(kw_end, items[0].span.start) {
+                let value_doc = d.join(item_docs, ", ");
+                let mut parts = vec![d.text(keyword)];
+                self.append_keyword_value_line_comments(
+                    &mut parts,
+                    kw_end,
+                    items[0].span.start,
+                    value_doc,
+                );
+                return d.concat(&parts);
+            }
+        }
 
         if group_mode {
             if has_any_item_line_comments {
@@ -788,14 +839,50 @@ impl<'a> Printer<'a> {
             .any(|b| b == b')')
     }
 
-    /// Build expression doc preserving trailing comments from stripped grouping parens.
+    /// Build expression doc, stripping a redundant grouping paren around a trailing
+    /// comment and keeping the comment inline after the expression.
     ///
     /// When the parser strips parens from `(expr /* c */)`, comments between
-    /// `expr.span().end` and `boundary_end` are lost. This re-adds parens when
-    /// trailing comments exist, producing `(expr /* c */)` or `(\n\texpr // c\n)`.
+    /// `expr.span().end` and `boundary_end` would be lost. For an inline same-line
+    /// block comment we keep it trailing the expression (`expr /* c */`), matching
+    /// prettier — stripping the redundant parens does not move the comment. Line /
+    /// own-line comments need the parens (a bare line comment would swallow the
+    /// following token), so those defer to `build_expression_doc_keep_paren_comments`.
     ///
-    /// Used for variable init, assignment RHS, ternary branches, and sequence members.
+    /// Used for variable init, assignment RHS, and ternary branches.
     pub(crate) fn build_expression_doc_with_paren_comments(
+        &self,
+        expr: &internal::Expression,
+        boundary_end: u32,
+    ) -> DocId {
+        let expr_end = expr.span().end;
+
+        if !self.has_trailing_paren_comments(expr_end, boundary_end) {
+            return self.build_expression_doc(expr);
+        }
+
+        // Line / own-line comments need the paren wrapping (a bare line comment
+        // would swallow the following `;`); defer those to the keep variant.
+        let has_multiline = comments_in_range(self.comments, expr_end, boundary_end)
+            .any(|c| !c.is_block || self.has_newline_between(expr_end, c.span.start));
+        if has_multiline {
+            return self.build_expression_doc_keep_paren_comments(expr, boundary_end);
+        }
+
+        let d = self.d();
+        let inner = self.build_expression_doc(expr);
+        let comments = self.build_comments_between(expr_end, boundary_end, CommentSpacing::Leading);
+        d.concat(&[inner, comments])
+    }
+
+    /// Build expression doc re-adding the stripped grouping parens around trailing
+    /// comments, producing `(expr /* c */)` or `(\n\texpr // c\n)`.
+    ///
+    /// Used where stripping the parens would relocate the comment: arrow bodies
+    /// (prettier moves the comment into the params) and sequence operands (prettier
+    /// floats it out of the sequence). Keeping the parens preserves the comment where
+    /// the user wrote it.
+    pub(crate) fn build_expression_doc_keep_paren_comments(
         &self,
         expr: &internal::Expression,
         boundary_end: u32,
@@ -957,17 +1044,7 @@ impl<'a> Printer<'a> {
     ///
     /// Used when expanding comments force multiline formatting (unions, tuples, etc.)
     pub(crate) fn build_leading_comments_multiline(&self, start: u32, end: u32) -> Vec<DocId> {
-        let d = self.d();
-        let mut parts = Vec::new();
-        for comment in comments_in_range(self.comments, start, end) {
-            parts.push(self.build_comment_doc(comment));
-            if comment.is_block && self.is_same_line(comment.span.end, end) {
-                parts.push(d.text(" "));
-            } else {
-                parts.push(d.hardline());
-            }
-        }
-        parts
+        self.build_leading_comments_multiline_opt(start, end, None)
     }
 
     /// Like `build_leading_comments_multiline`, but skips comments on the same
@@ -983,10 +1060,22 @@ impl<'a> Printer<'a> {
         end: u32,
         delim_pos: u32,
     ) -> Vec<DocId> {
+        self.build_leading_comments_multiline_opt(start, end, Some(delim_pos))
+    }
+
+    /// Shared body for `build_leading_comments_multiline` and its `_after_delim`
+    /// variant. When `skip_delim` is `Some(pos)`, comments sharing `pos`'s source
+    /// line are skipped (already emitted as the delimiter-line prefix).
+    fn build_leading_comments_multiline_opt(
+        &self,
+        start: u32,
+        end: u32,
+        skip_delim: Option<u32>,
+    ) -> Vec<DocId> {
         let d = self.d();
         let mut parts = Vec::new();
         for comment in comments_in_range(self.comments, start, end) {
-            if self.comment_on_delimiter_line(delim_pos, comment) {
+            if skip_delim.is_some_and(|pos| self.comment_on_delimiter_line(pos, comment)) {
                 continue; // pulled onto the delimiter line
             }
             parts.push(self.build_comment_doc(comment));
@@ -1346,6 +1435,28 @@ impl<'a> Printer<'a> {
         self.is_same_line(delim_pos, comment.span.start)
     }
 
+    /// A first element/member's leading comments with the delimiter-line
+    /// comments removed.
+    ///
+    /// `delimiter_line_comment_prefix` emits the comments sharing the opening
+    /// delimiter's line as a prefix on that line, so every member-loop consumer
+    /// must drop the same comments from the first element's leading set to avoid
+    /// emitting them twice (see `comment_on_delimiter_line`). Returns `comments`
+    /// unchanged when `delimiter_pull_pos` is `None` (nothing was pulled).
+    pub(in crate::printer) fn first_member_leading_comments<'c>(
+        &self,
+        comments: Vec<&'c internal::Comment>,
+        delimiter_pull_pos: Option<u32>,
+    ) -> Vec<&'c internal::Comment> {
+        match delimiter_pull_pos {
+            Some(dpos) => comments
+                .into_iter()
+                .filter(|c| !self.comment_on_delimiter_line(dpos, c))
+                .collect(),
+            None => comments,
+        }
+    }
+
     /// Build a Doc for a single comment
     ///
     /// For multi-line block comments:
@@ -1355,52 +1466,13 @@ impl<'a> Printer<'a> {
         let d = self.d();
         if comment.is_block {
             // Block comment: /* content */
-            if comment.content.contains('\n') {
-                // Multi-line block comment - strip original indentation
-                let stripped = printing::strip_comment_indentation(
-                    self.source,
-                    &comment.content,
-                    comment.span.start,
-                );
-
-                // JSDoc comments (start with *) always get context indent
-                // Other comments: use hardline if indentation was stripped, literalline otherwise
-                let is_jsdoc = comment.content.starts_with('*');
-                let had_indentation = stripped.len() != comment.content.len();
-                let use_context_indent = is_jsdoc || had_indentation;
-
-                let lines: Vec<&str> = stripped.split('\n').collect();
-                let mut line_docs = Vec::new();
-                for (i, line) in lines.iter().enumerate() {
-                    let is_last = i == lines.len() - 1;
-                    if i > 0 {
-                        // Blank lines inside comments should be truly empty (no indentation)
-                        // But the closing line (last line before */) needs context indent
-                        if line.is_empty() && !is_last {
-                            line_docs.push(d.literalline());
-                        } else if use_context_indent {
-                            // Apply context indent for content lines and closing line
-                            line_docs.push(d.hardline());
-                        } else {
-                            // Preserve at column 0
-                            line_docs.push(d.literalline());
-                        }
-                    }
-                    if i == 0 {
-                        line_docs.push(d.text_owned(format!("/*{}", line.trim_end())));
-                    } else if is_last {
-                        // Preserve last line content (space before */)
-                        line_docs.push(d.text_owned((*line).to_string()));
-                    } else {
-                        // Strip trailing whitespace from middle lines (matches prettier)
-                        line_docs.push(d.text_owned(line.trim_end().to_string()));
-                    }
-                }
-                line_docs.push(d.text("*/"));
-                d.concat(&line_docs)
-            } else {
+            if !comment.content.contains('\n') {
                 // Single-line block comment
                 d.text_owned(format!("/*{}*/", comment.content))
+            } else if printing::is_indentable_block_comment(&comment.content) {
+                self.build_indentable_block_comment_doc(&comment.content)
+            } else {
+                self.build_preserved_block_comment_doc(comment)
             }
         } else if comment.span.start == 0 && comment.content.starts_with("#!") {
             // Hashbang comment: #!/usr/bin/env node (no // prefix)
@@ -1410,6 +1482,91 @@ impl<'a> Printer<'a> {
             // Line comment: // content
             d.text_owned(format!("//{}", comment.content))
         }
+    }
+
+    /// Frame a multi-line block comment's continuation docs (`inner`) with the
+    /// `/*<first_line>` opener and the `*/` closer. `first_line` is the content
+    /// of the line right after `/*` (trailing whitespace trimmed).
+    fn frame_block_comment_doc(&self, first_line: &str, inner: Vec<DocId>) -> DocId {
+        let d = self.d();
+        let mut docs = Vec::with_capacity(inner.len() + 2);
+        docs.push(d.text_owned(format!("/*{}", first_line.trim_end())));
+        docs.extend(inner);
+        docs.push(d.text("*/"));
+        d.concat(&docs)
+    }
+
+    /// Build a multi-line *indentable* block comment (JSDoc `/** … */` and
+    /// `*`-aligned `/* … */`, where every line begins with `*`).
+    ///
+    /// Continuation lines are reindented to a single leading space before the
+    /// `*` — the context indent is supplied by the `hardline`, and content after
+    /// the `*` is untouched. Mirrors prettier's `printIndentableBlockComment`.
+    fn build_indentable_block_comment_doc(&self, content: &str) -> DocId {
+        let d = self.d();
+        // ≥2 lines: `build_comment_doc` only routes newline-containing content here.
+        let lines: Vec<&str> = content.split('\n').collect();
+        let [first, middle @ .., last] = lines.as_slice() else {
+            unreachable!("multi-line comment");
+        };
+
+        let mut inner = Vec::with_capacity((middle.len() + 1) * 2);
+        for line in middle {
+            inner.push(d.hardline());
+            inner.push(d.text_owned(format!(" {}", line.trim())));
+        }
+        // The last line (before `*/`) keeps trailing content via `trim_start`.
+        inner.push(d.hardline());
+        inner.push(d.text_owned(format!(" {}", last.trim_start())));
+
+        self.frame_block_comment_doc(first, inner)
+    }
+
+    /// Build a multi-line *non-indentable* block comment (at least one line does
+    /// not begin with `*`) — preserved with its original interior layout rather
+    /// than reindented.
+    ///
+    /// The comment's own leading indentation is stripped, then re-applied via
+    /// `hardline` for `/**`-prefixed comments or comments whose lines were
+    /// indented; other comments preserve their lines at column 0 (`literalline`).
+    fn build_preserved_block_comment_doc(&self, comment: &internal::Comment) -> DocId {
+        let d = self.d();
+        let stripped =
+            printing::strip_comment_indentation(self.source, &comment.content, comment.span.start);
+
+        // A `/**`-prefixed comment that reached here is only partially starred
+        // (some line lacks `*`); it still gets context indent. Otherwise use
+        // context indent only when the comment's lines were indented.
+        let use_context_indent =
+            comment.content.starts_with('*') || stripped.len() != comment.content.len();
+
+        // ≥2 lines: `build_comment_doc` only routes newline-containing content here.
+        let lines: Vec<&str> = stripped.split('\n').collect();
+        let [first, middle @ .., last] = lines.as_slice() else {
+            unreachable!("multi-line comment");
+        };
+
+        let mut inner = Vec::with_capacity((middle.len() + 1) * 2);
+        for line in middle {
+            // Blank lines stay truly empty (column 0); otherwise apply context
+            // indent. Trailing whitespace is trimmed (matches prettier).
+            inner.push(if line.is_empty() || !use_context_indent {
+                d.literalline()
+            } else {
+                d.hardline()
+            });
+            inner.push(d.text_owned(line.trim_end().to_string()));
+        }
+        // Closing line gets context indent; its content (the space before `*/`)
+        // is preserved verbatim.
+        inner.push(if use_context_indent {
+            d.hardline()
+        } else {
+            d.literalline()
+        });
+        inner.push(d.text_owned((*last).to_string()));
+
+        self.frame_block_comment_doc(first, inner)
     }
 
     /// Append comments between type params `>` and `(` to parts.
@@ -1442,6 +1599,49 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_trailing_line_comment_doc(&self, comment: &internal::Comment) -> DocId {
         let d = self.d();
         d.line_suffix(d.concat(&[d.text(" "), self.build_comment_doc(comment)]))
+    }
+
+    /// Emit leading comments in `[keyword_end, value_start)` followed by
+    /// `value_doc` broken onto its own indented line. Use when at least one line
+    /// comment sits in the gap (a line comment forces the value down). The caller
+    /// pushes the keyword/operator itself first, **without** a trailing space.
+    ///
+    /// A comment on the **same source line** as `keyword_end` trails the keyword
+    /// inline — a block as ` /* c */`, a line comment via `line_suffix` (zero
+    /// width, so a long trailing comment never forces a *preceding* group, e.g. a
+    /// constraint/annotation union, to break — matching prettier's `lineSuffix`).
+    /// Each **own-line** comment goes on its own line before the value; they are
+    /// never joined onto one line (which would make a following `//` stop being a
+    /// delimiter — a boundary loss). Shared by type-parameter constraint/default
+    /// values (`= `/`extends`) and class-property initializers (`= `).
+    pub(crate) fn append_keyword_value_line_comments(
+        &self,
+        parts: &mut Vec<DocId>,
+        keyword_end: u32,
+        value_start: u32,
+        value_doc: DocId,
+    ) {
+        let d = self.d();
+        let mut value_block = vec![d.hardline()];
+        let mut on_own_line = false;
+        for comment in comments_in_range(self.comments, keyword_end, value_start) {
+            let same_line = !on_own_line && self.is_same_line(keyword_end, comment.span.start);
+            if same_line {
+                if comment.is_block {
+                    parts.push(d.text(" "));
+                    parts.push(self.build_comment_doc(comment));
+                } else {
+                    parts.push(self.build_trailing_line_comment_doc(comment));
+                    on_own_line = true; // a line comment ends its line
+                }
+            } else {
+                on_own_line = true;
+                value_block.push(self.build_comment_doc(comment));
+                value_block.push(d.hardline());
+            }
+        }
+        value_block.push(value_doc);
+        parts.push(d.indent(d.concat(&value_block)));
     }
 
     /// Build a line_suffix doc for all comments between two positions

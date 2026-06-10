@@ -1,0 +1,282 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 847,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 81,
+				"data": " Normal spaces are break points: long inline text fill-wraps across lines "
+			},
+			{
+				"type": "Text",
+				"start": 81,
+				"end": 82,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 82,
+				"end": 215,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 83
+					},
+					"end": {
+						"line": 2,
+						"column": 5,
+						"character": 87
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 90,
+							"end": 207,
+							"raw": "word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15\n\tword16 word17 word18",
+							"data": "word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15\n\tword16 word17 word18"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 215,
+				"end": 217,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 217,
+				"end": 304,
+				"data": " Non-breaking spaces (U+00A0) are not break points: long text stays on one line "
+			},
+			{
+				"type": "Text",
+				"start": 304,
+				"end": 305,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 305,
+				"end": 437,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 306
+					},
+					"end": {
+						"line": 8,
+						"column": 5,
+						"character": 310
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 313,
+							"end": 429,
+							"raw": "word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15 word16 word17 word18",
+							"data": "word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15 word16 word17 word18"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 437,
+				"end": 439,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 439,
+				"end": 504,
+				"data": " Narrow non-breaking space (U+202F) is preserved verbatim "
+			},
+			{
+				"type": "Text",
+				"start": 504,
+				"end": 505,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 505,
+				"end": 529,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 506
+					},
+					"end": {
+						"line": 13,
+						"column": 5,
+						"character": 510
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 511,
+							"end": 522,
+							"raw": "Prix : 32 €",
+							"data": "Prix : 32 €"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 529,
+				"end": 531,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 531,
+				"end": 612,
+				"data": " Leading non-breaking space is preserved, not turned into a regular space "
+			},
+			{
+				"type": "Text",
+				"start": 612,
+				"end": 613,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 613,
+				"end": 638,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 16,
+						"column": 1,
+						"character": 614
+					},
+					"end": {
+						"line": 16,
+						"column": 5,
+						"character": 618
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 619,
+							"end": 631,
+							"raw": " word1 word2",
+							"data": " word1 word2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 638,
+				"end": 640,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 640,
+				"end": 722,
+				"data": " Trailing non-breaking space is preserved, not turned into a regular space "
+			},
+			{
+				"type": "Text",
+				"start": 722,
+				"end": 723,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 723,
+				"end": 748,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 19,
+						"column": 1,
+						"character": 724
+					},
+					"end": {
+						"line": 19,
+						"column": 5,
+						"character": 728
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 729,
+							"end": 741,
+							"raw": "word1 word2 ",
+							"data": "word1 word2 "
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 748,
+				"end": 750,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 750,
+				"end": 830,
+				"data": " Root-level text: non-breaking spaces preserved, regular spaces collapse "
+			},
+			{
+				"type": "Text",
+				"start": 830,
+				"end": 846,
+				"raw": "\nfoo bar baz qux",
+				"data": "\nfoo bar baz qux"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

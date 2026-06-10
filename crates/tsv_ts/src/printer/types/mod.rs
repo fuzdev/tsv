@@ -27,10 +27,7 @@ mod type_params;
 mod union_intersection;
 
 // Re-export public items from helpers
-pub use helpers::{
-    intersection_has_expanding_first_type, intersection_has_huggable_last_type,
-    should_hug_union_type, unwrap_parenthesized,
-};
+pub use helpers::{should_hug_union_type, unwrap_parenthesized};
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`
 pub(super) use super::{CommentFilter, CommentSpacing, Printer};
@@ -38,6 +35,7 @@ pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{TSImportType, TSParenthesizedType, TSType};
 use crate::printer::analysis::find_char_skipping_comments;
 use crate::printer::calls::PartitionedComments;
+use crate::printer::layout::hang_after_operator;
 use helpers::type_needs_parens_for_indexed_access_object;
 use helpers::type_needs_parens_for_optional_element;
 use helpers::type_needs_parens_for_prefix_operator;
@@ -130,15 +128,51 @@ impl<'a> Printer<'a> {
                         b'i',
                     )
                     .map(|i_pos| (i_pos + 2) as u32); // skip past "is"
-                    parts.push(d.text(" is "));
-                    if let Some(is_end) = is_end {
-                        parts.push(self.build_comments_between(
-                            is_end,
-                            type_start,
-                            CommentSpacing::Trailing,
-                        ));
+                    // A line comment after `is` stays trailing it, with the
+                    // predicate type on the next line (preserve-in-place; prettier
+                    // relocates the comment to trail the body `{`).
+                    if let Some(is_end) = is_end
+                        && self.has_line_comments_between(is_end, type_start)
+                    {
+                        let value_doc = self.build_type_doc(type_ann);
+                        parts.push(d.text(" is"));
+                        self.append_keyword_value_line_comments(
+                            &mut parts, is_end, type_start, value_doc,
+                        );
+                    } else {
+                        let comments_doc = is_end.map_or_else(
+                            || d.empty(),
+                            |is_end| {
+                                self.build_comments_between(
+                                    is_end,
+                                    type_start,
+                                    CommentSpacing::Trailing,
+                                )
+                            },
+                        );
+                        // A long union/intersection hangs after `is` (redundant parens
+                        // stripped first); everything else stays inline after `is `.
+                        match self.unwrap_redundant_parens(type_ann) {
+                            TSType::Union(u) => {
+                                let type_doc = self.build_union_type_doc(u, false);
+                                parts.push(d.text(" is"));
+                                parts.push(hang_after_operator(
+                                    d,
+                                    d.concat(&[comments_doc, type_doc]),
+                                ));
+                            }
+                            TSType::Intersection(i) => {
+                                parts.push(d.text(" is "));
+                                parts.push(comments_doc);
+                                parts.push(self.intersection_hanging_with_indent(i));
+                            }
+                            _ => {
+                                parts.push(d.text(" is "));
+                                parts.push(comments_doc);
+                                parts.push(self.build_type_doc(type_ann));
+                            }
+                        }
                     }
-                    parts.push(self.build_type_doc(type_ann));
                 }
                 d.concat(&parts)
             }
@@ -157,10 +191,28 @@ impl<'a> Printer<'a> {
             TSType::Mapped(m) => self.build_mapped_type_doc(m),
             TSType::TypeOperator(o) => {
                 let needs_parens = type_needs_parens_for_prefix_operator(&o.type_annotation);
-                let operand_doc = self.build_type_doc(&o.type_annotation);
                 // Comments between keyword and operand type
                 let keyword_end = o.span.start + o.operator.as_str().len() as u32;
                 let operand_start = o.type_annotation.span().start;
+                // A line comment after the operator stays trailing it, with the
+                // operand on the next line (matches prettier).
+                if self.has_line_comments_between(keyword_end, operand_start) {
+                    let operand_doc = self.build_type_doc(&o.type_annotation);
+                    let value_doc = if needs_parens {
+                        d.concat(&[d.text("("), operand_doc, d.text(")")])
+                    } else {
+                        operand_doc
+                    };
+                    let mut parts = vec![d.text(o.operator.as_str())];
+                    self.append_keyword_value_line_comments(
+                        &mut parts,
+                        keyword_end,
+                        operand_start,
+                        value_doc,
+                    );
+                    return d.concat(&parts);
+                }
+                let operand_doc = self.build_type_doc(&o.type_annotation);
                 let comments_doc = self.build_comments_between(
                     keyword_end,
                     operand_start,
@@ -186,10 +238,32 @@ impl<'a> Printer<'a> {
             }
             TSType::Import(i) => self.build_import_type_doc(i),
             TSType::TypeQuery(q) => {
-                let mut parts = vec![d.text("typeof ")];
                 // Comments between `typeof` and the expression
                 let typeof_end = q.span.start + 6; // "typeof".len()
                 let expr_start = q.expr_name.span().start;
+                // A line comment after `typeof` stays trailing it, with the
+                // expression on the next line (matches prettier).
+                if self.has_line_comments_between(typeof_end, expr_start) {
+                    let mut value_parts = vec![self.build_type_query_expr_name_doc(&q.expr_name)];
+                    if let Some(type_args) = &q.type_arguments {
+                        let gap_start = q.expr_name.span().end;
+                        if let Some(doc) = self.build_name_to_type_params_comments_opt(
+                            gap_start,
+                            type_args.span.start,
+                            CommentSpacing::Trailing,
+                        ) {
+                            value_parts.push(doc);
+                        }
+                        value_parts.push(self.build_type_arguments_doc(type_args));
+                    }
+                    let value_doc = d.concat(&value_parts);
+                    let mut parts = vec![d.text("typeof")];
+                    self.append_keyword_value_line_comments(
+                        &mut parts, typeof_end, expr_start, value_doc,
+                    );
+                    return d.concat(&parts);
+                }
+                let mut parts = vec![d.text("typeof ")];
                 parts.push(self.build_comments_between(
                     typeof_end,
                     expr_start,
@@ -271,15 +345,35 @@ impl<'a> Printer<'a> {
                     b':',
                 )
                 .map(|p| (p + 1) as u32); // +1 for after `:`
-                parts.push(d.text(": "));
-                if let Some(after_colon) = after_colon {
-                    parts.push(self.build_comments_between(
-                        after_colon,
-                        type_start,
-                        CommentSpacing::Trailing,
-                    ));
+                let comments_doc = after_colon.map_or_else(
+                    || d.empty(),
+                    |after_colon| {
+                        self.build_comments_between(
+                            after_colon,
+                            type_start,
+                            CommentSpacing::Trailing,
+                        )
+                    },
+                );
+                // A long union/intersection element hangs after `:` (redundant parens
+                // stripped first); everything else stays inline after `: `.
+                match self.unwrap_redundant_parens(&n.element_type) {
+                    TSType::Union(u) => {
+                        let type_doc = self.build_union_type_doc(u, false);
+                        parts.push(d.text(":"));
+                        parts.push(hang_after_operator(d, d.concat(&[comments_doc, type_doc])));
+                    }
+                    TSType::Intersection(i) => {
+                        parts.push(d.text(": "));
+                        parts.push(comments_doc);
+                        parts.push(self.intersection_hanging_with_indent(i));
+                    }
+                    _ => {
+                        parts.push(d.text(": "));
+                        parts.push(comments_doc);
+                        parts.push(self.build_type_doc(&n.element_type));
+                    }
                 }
-                parts.push(self.build_type_doc(&n.element_type));
                 d.concat(&parts)
             }
             TSType::Infer(i) => {
@@ -433,6 +527,39 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Whether a `TSParenthesizedType` carries comments inside its parens, as
+    /// `(has_leading, has_trailing)` flags — leading = between `(` and the inner
+    /// type, trailing = between the inner type and `)`. Used both to decide
+    /// whether redundant parens can be stripped and to emit the comments in place
+    /// when they can't.
+    pub(in crate::printer) fn paren_inner_comment_flags(
+        &self,
+        p: &TSParenthesizedType,
+    ) -> (bool, bool) {
+        let inner = p.type_annotation.span();
+        (
+            self.has_comments_between(p.span.start, inner.start),
+            self.has_comments_between(inner.end, p.span.end),
+        )
+    }
+
+    /// Unwrap redundant, comment-free `TSParenthesizedType` layers to find the
+    /// effective inner type for a layout decision. Parens around a union /
+    /// intersection in type-alias-RHS, cast (`as` / `satisfies`), return-type,
+    /// and type-member positions are redundant — prettier strips them — so a
+    /// `(union)` / `(intersection)` should get the same break layout as the bare
+    /// form (leading `| ` for unions, hanging indent for intersections) rather
+    /// than hanging inline. Stops at a paren that carries comments — those are
+    /// preserved in place by `build_parenthesized_type_unwrap_doc`.
+    pub(in crate::printer) fn unwrap_redundant_parens<'t>(&self, ty: &'t TSType) -> &'t TSType {
+        match ty {
+            TSType::Parenthesized(p) if self.paren_inner_comment_flags(p) == (false, false) => {
+                self.unwrap_redundant_parens(p.type_annotation.as_ref())
+            }
+            other => other,
+        }
+    }
+
     /// Unwrap a parenthesized type, preserving any comments inside the parens.
     ///
     /// Block comments are emitted inline: `(/* c */ a)` → `/* c */ a`
@@ -446,8 +573,7 @@ impl<'a> Printer<'a> {
         let inner_start = p.type_annotation.span().start;
         let inner_end = p.type_annotation.span().end;
         let paren_close = p.span.end;
-        let has_leading = self.has_comments_between(paren_open, inner_start);
-        let has_trailing = self.has_comments_between(inner_end, paren_close);
+        let (has_leading, has_trailing) = self.paren_inner_comment_flags(p);
         if !has_leading && !has_trailing {
             return self.build_type_doc(&p.type_annotation);
         }

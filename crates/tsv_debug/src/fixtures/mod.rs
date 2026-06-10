@@ -16,7 +16,6 @@ use tsv_cli::json_utils::to_json_with_tabs;
 /// when Svelte's parser fails to parse the input.
 pub const EXPECTED_SVELTE_ERROR_JSON: &str = "{\"error\": \"failed to parse\"}\n";
 
-/// A test fixture with its input file
 /// Type of input file for a fixture
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InputType {
@@ -31,6 +30,26 @@ pub enum InputType {
 }
 
 impl InputType {
+    /// Determine the input type from a file path by extension.
+    ///
+    /// The single extension-dispatch chain — every filepath→type decision
+    /// goes through here so the `.svelte.ts`-before-`.ts` ordering exists
+    /// once. Returns `None` for unknown extensions so callers fail loudly
+    /// instead of silently misclassifying.
+    pub fn from_filepath(filepath: &str) -> Option<Self> {
+        if filepath.ends_with(".svelte.ts") {
+            Some(InputType::SvelteTs)
+        } else if filepath.ends_with(".ts") {
+            Some(InputType::TypeScript)
+        } else if filepath.ends_with(".svelte") {
+            Some(InputType::Svelte)
+        } else if filepath.ends_with(".css") {
+            Some(InputType::Css)
+        } else {
+            None
+        }
+    }
+
     /// Get the file extension for this input type
     pub const fn extension(self) -> &'static str {
         match self {
@@ -53,6 +72,7 @@ impl InputType {
     }
 }
 
+/// A test fixture with its input file
 #[derive(Debug, Clone)]
 pub struct Fixture {
     /// Full path to the fixture directory
@@ -70,16 +90,10 @@ pub struct Fixture {
 impl Fixture {
     /// Get the input type for this fixture
     pub fn input_type(&self) -> InputType {
-        // Check .svelte.ts before .ts (more specific match first)
-        if self.input_file.ends_with(".svelte.ts") {
-            InputType::SvelteTs
-        } else if self.input_file.ends_with(".ts") {
-            InputType::TypeScript
-        } else if self.input_file.ends_with(".css") {
-            InputType::Css
-        } else {
-            InputType::Svelte
-        }
+        // SAFETY: input_file comes from find_input_file's closed set of
+        // known input filenames
+        #[allow(clippy::expect_used)]
+        InputType::from_filepath(&self.input_file).expect("known fixture input filename")
     }
 
     /// Get the full path to the input file
@@ -292,19 +306,25 @@ fn walk_fixtures_recursive(
     Ok(())
 }
 
-/// Discover unformatted_* variant files in a fixture directory
-/// (excludes unformatted_ours_* files, which are handled separately)
+/// Discover fixture files matching `prefix` (and not any of
+/// `exclude_prefixes`) with the given extension, sorted by name.
 ///
-/// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
-pub fn discover_unformatted_variants(fixture_dir: &Path, ext: &str) -> Vec<String> {
+/// Shared body of every `discover_*_variants` function. The exclusions
+/// exist because some variant prefixes are prefixes of more specific
+/// sibling prefixes (`unformatted_` vs `unformatted_ours_`).
+fn discover_prefixed_files(
+    fixture_dir: &Path,
+    ext: &str,
+    prefix: &str,
+    exclude_prefixes: &[&str],
+) -> Vec<String> {
     let mut variants = Vec::new();
 
     if let Ok(entries) = fs::read_dir(fixture_dir) {
         for entry in entries.flatten() {
             if let Some(filename) = entry.file_name().to_str()
-                && filename.starts_with("unformatted_")
-                && !filename.starts_with("unformatted_ours_")
-                && !filename.starts_with("unformatted_prettier_")
+                && filename.starts_with(prefix)
+                && !exclude_prefixes.iter().any(|p| filename.starts_with(p))
                 && filename.ends_with(ext)
             {
                 variants.push(filename.to_string());
@@ -316,6 +336,19 @@ pub fn discover_unformatted_variants(fixture_dir: &Path, ext: &str) -> Vec<Strin
     variants
 }
 
+/// Discover unformatted_* variant files in a fixture directory
+/// (excludes unformatted_ours_* files, which are handled separately)
+///
+/// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
+pub fn discover_unformatted_variants(fixture_dir: &Path, ext: &str) -> Vec<String> {
+    discover_prefixed_files(
+        fixture_dir,
+        ext,
+        "unformatted_",
+        &["unformatted_ours_", "unformatted_prettier_"],
+    )
+}
+
 /// Discover prettier_variant_* variant files in a fixture directory
 ///
 /// These files document Prettier's stable variants - inputs that Prettier preserves
@@ -323,21 +356,7 @@ pub fn discover_unformatted_variants(fixture_dir: &Path, ext: &str) -> Vec<Strin
 ///
 /// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
 pub fn discover_prettier_variant_variants(fixture_dir: &Path, ext: &str) -> Vec<String> {
-    let mut variants = Vec::new();
-
-    if let Ok(entries) = fs::read_dir(fixture_dir) {
-        for entry in entries.flatten() {
-            if let Some(filename) = entry.file_name().to_str()
-                && filename.starts_with("prettier_variant_")
-                && filename.ends_with(ext)
-            {
-                variants.push(filename.to_string());
-            }
-        }
-    }
-
-    variants.sort();
-    variants
+    discover_prefixed_files(fixture_dir, ext, "prettier_variant_", &[])
 }
 
 /// Discover variant_* variant files in a fixture directory
@@ -349,21 +368,7 @@ pub fn discover_prettier_variant_variants(fixture_dir: &Path, ext: &str) -> Vec<
 ///
 /// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
 pub fn discover_variant_variants(fixture_dir: &Path, ext: &str) -> Vec<String> {
-    let mut variants = Vec::new();
-
-    if let Ok(entries) = fs::read_dir(fixture_dir) {
-        for entry in entries.flatten() {
-            if let Some(filename) = entry.file_name().to_str()
-                && filename.starts_with("variant_")
-                && filename.ends_with(ext)
-            {
-                variants.push(filename.to_string());
-            }
-        }
-    }
-
-    variants.sort();
-    variants
+    discover_prefixed_files(fixture_dir, ext, "variant_", &[])
 }
 
 /// Discover unformatted_ours_* variant files in a fixture directory
@@ -372,21 +377,7 @@ pub fn discover_variant_variants(fixture_dir: &Path, ext: &str) -> Vec<String> {
 ///
 /// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
 pub fn discover_unformatted_ours_variants(fixture_dir: &Path, ext: &str) -> Vec<String> {
-    let mut variants = Vec::new();
-
-    if let Ok(entries) = fs::read_dir(fixture_dir) {
-        for entry in entries.flatten() {
-            if let Some(filename) = entry.file_name().to_str()
-                && filename.starts_with("unformatted_ours_")
-                && filename.ends_with(ext)
-            {
-                variants.push(filename.to_string());
-            }
-        }
-    }
-
-    variants.sort();
-    variants
+    discover_prefixed_files(fixture_dir, ext, "unformatted_ours_", &[])
 }
 
 /// Discover unformatted_prettier_* variant files in a fixture directory
@@ -400,21 +391,7 @@ pub fn discover_unformatted_ours_variants(fixture_dir: &Path, ext: &str) -> Vec<
 ///
 /// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
 pub fn discover_unformatted_prettier_variants(fixture_dir: &Path, ext: &str) -> Vec<String> {
-    let mut variants = Vec::new();
-
-    if let Ok(entries) = fs::read_dir(fixture_dir) {
-        for entry in entries.flatten() {
-            if let Some(filename) = entry.file_name().to_str()
-                && filename.starts_with("unformatted_prettier_")
-                && filename.ends_with(ext)
-            {
-                variants.push(filename.to_string());
-            }
-        }
-    }
-
-    variants.sort();
-    variants
+    discover_prefixed_files(fixture_dir, ext, "unformatted_prettier_", &[])
 }
 
 /// Discover prettier_intermediate_* files in a fixture directory
@@ -429,22 +406,12 @@ pub fn discover_unformatted_prettier_variants(fixture_dir: &Path, ext: &str) -> 
 ///
 /// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
 pub fn discover_prettier_intermediate_variants(fixture_dir: &Path, ext: &str) -> Vec<String> {
-    let mut variants = Vec::new();
-
-    if let Ok(entries) = fs::read_dir(fixture_dir) {
-        for entry in entries.flatten() {
-            if let Some(filename) = entry.file_name().to_str()
-                && filename.starts_with("prettier_intermediate_")
-                && !filename.starts_with("prettier_intermediate_to_variant_")
-                && filename.ends_with(ext)
-            {
-                variants.push(filename.to_string());
-            }
-        }
-    }
-
-    variants.sort();
-    variants
+    discover_prefixed_files(
+        fixture_dir,
+        ext,
+        "prettier_intermediate_",
+        &["prettier_intermediate_to_variant_"],
+    )
 }
 
 /// Discover prettier_intermediate_to_variant_* files in a fixture directory
@@ -463,21 +430,7 @@ pub fn discover_prettier_intermediate_to_variant_variants(
     fixture_dir: &Path,
     ext: &str,
 ) -> Vec<String> {
-    let mut variants = Vec::new();
-
-    if let Ok(entries) = fs::read_dir(fixture_dir) {
-        for entry in entries.flatten() {
-            if let Some(filename) = entry.file_name().to_str()
-                && filename.starts_with("prettier_intermediate_to_variant_")
-                && filename.ends_with(ext)
-            {
-                variants.push(filename.to_string());
-            }
-        }
-    }
-
-    variants.sort();
-    variants
+    discover_prefixed_files(fixture_dir, ext, "prettier_intermediate_to_variant_", &[])
 }
 
 /// Discover input_invalid_* files in a fixture directory
@@ -487,21 +440,7 @@ pub fn discover_prettier_intermediate_to_variant_variants(
 ///
 /// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
 pub fn discover_invalid_variants(fixture_dir: &Path, ext: &str) -> Vec<String> {
-    let mut variants = Vec::new();
-
-    if let Ok(entries) = fs::read_dir(fixture_dir) {
-        for entry in entries.flatten() {
-            if let Some(filename) = entry.file_name().to_str()
-                && filename.starts_with("input_invalid_")
-                && filename.ends_with(ext)
-            {
-                variants.push(filename.to_string());
-            }
-        }
-    }
-
-    variants.sort();
-    variants
+    discover_prefixed_files(fixture_dir, ext, "input_invalid_", &[])
 }
 
 /// Discover unknown files in a fixture directory
@@ -1229,48 +1168,202 @@ pub fn delete_file_if_exists(path: &Path) -> Result<(), String> {
 /// Determines file type from filepath extension and calls the appropriate formatter.
 /// Supports .svelte, .svelte.ts, .ts, and .css files.
 pub fn format_with_our_formatter(content: &str, filepath: &str) -> Result<String, String> {
-    if filepath.ends_with(".svelte") && !filepath.ends_with(".svelte.ts") {
-        let ast = tsv_svelte::parse(content).map_err(|e| format!("Format error (parse): {e:?}"))?;
-        Ok(tsv_svelte::format(&ast, content))
-    } else if filepath.ends_with(".svelte.ts") || filepath.ends_with(".ts") {
-        let ast = tsv_ts::parse(content).map_err(|e| format!("Format error (parse): {e:?}"))?;
-        Ok(tsv_ts::format(&ast, content))
-    } else if filepath.ends_with(".css") {
-        let ast = tsv_css::parse(content).map_err(|e| format!("Format error (parse): {e:?}"))?;
-        Ok(tsv_css::format(&ast, content))
-    } else {
-        Err(format!("Unsupported file type for formatting: {filepath}"))
+    match InputType::from_filepath(filepath) {
+        Some(InputType::Svelte) => {
+            let ast =
+                tsv_svelte::parse(content).map_err(|e| format!("Format error (parse): {e:?}"))?;
+            Ok(tsv_svelte::format(&ast, content))
+        }
+        Some(InputType::SvelteTs | InputType::TypeScript) => {
+            let ast = tsv_ts::parse(content).map_err(|e| format!("Format error (parse): {e:?}"))?;
+            Ok(tsv_ts::format(&ast, content))
+        }
+        Some(InputType::Css) => {
+            let ast =
+                tsv_css::parse(content).map_err(|e| format!("Format error (parse): {e:?}"))?;
+            Ok(tsv_css::format(&ast, content))
+        }
+        None => Err(format!("Unsupported file type for formatting: {filepath}")),
     }
 }
 
-/// Parse content using our parser and return JSON string with tab indentation
+/// A fixture input parsed once with our parser.
 ///
-/// This matches the format used by fixtures_update_parsed, ensuring string-level
-/// comparison catches both semantic and formatting differences.
-/// Supports .svelte, .svelte.ts, and .ts files.
-pub fn parse_with_our_parser_to_string(content: &str, filepath: &str) -> Result<String, String> {
-    if filepath.ends_with(".svelte") && !filepath.ends_with(".svelte.ts") {
-        let ast = tsv_svelte::parse(content).map_err(|e| format!("Parse error: {e:?}"))?;
-        let json_value = tsv_svelte::convert_ast_json(&ast, content);
-        let json = to_json_with_tabs(&json_value)
-            .map_err(|e| format!("Failed to serialize AST to JSON: {e}"))?;
-        // Add trailing newline to match fixtures_update_parsed format
-        Ok(format!("{json}\n"))
-    } else if filepath.ends_with(".svelte.ts") || filepath.ends_with(".ts") {
-        let ast = tsv_ts::parse(content).map_err(|e| format!("Parse error: {e:?}"))?;
-        let json_value = tsv_ts::convert_ast_json(&ast, content);
-        let json = to_json_with_tabs(&json_value)
-            .map_err(|e| format!("Failed to serialize AST to JSON: {e}"))?;
-        // Add trailing newline to match fixtures_update_parsed format
-        Ok(format!("{json}\n"))
-    } else if filepath.ends_with(".css") {
-        let ast = tsv_css::parse(content).map_err(|e| format!("Parse error: {e:?}"))?;
-        let json_value = tsv_css::convert_ast_json(&ast, content);
-        let json = to_json_with_tabs(&json_value)
-            .map_err(|e| format!("Failed to serialize AST to JSON: {e}"))?;
-        // Add trailing newline to match fixtures_update_parsed format
-        Ok(format!("{json}\n"))
-    } else {
-        Err(format!("Unsupported file type for parsing: {filepath}"))
+/// The parser-side validation phases (expected.json comparison, wire-path
+/// identity, typed-walk parity probes) all need the same AST — sharing one
+/// parse keeps `fixtures_validate` from re-parsing every fixture per phase.
+pub enum ParsedInput {
+    Svelte(tsv_svelte::Root),
+    Ts(tsv_ts::Program),
+    Css(tsv_css::CssStyleSheet),
+}
+
+/// Parse fixture content once for the parser-side validation phases.
+pub fn parse_input(content: &str, input_type: InputType) -> Result<ParsedInput, String> {
+    match input_type {
+        InputType::Svelte => tsv_svelte::parse(content)
+            .map(ParsedInput::Svelte)
+            .map_err(|e| format!("Parse error: {e:?}")),
+        InputType::SvelteTs | InputType::TypeScript => tsv_ts::parse(content)
+            .map(ParsedInput::Ts)
+            .map_err(|e| format!("Parse error: {e:?}")),
+        InputType::Css => tsv_css::parse(content)
+            .map(ParsedInput::Css)
+            .map_err(|e| format!("Parse error: {e:?}")),
     }
+}
+
+/// Both JSON-AST outputs derived from one `convert_ast_json` call.
+pub struct InputAstPaths {
+    /// `convert_ast_json`'s `Value` (for semantic comparison against
+    /// `expected.json`, ignoring key-order differences).
+    pub ast_json: serde_json::Value,
+    /// The same `Value` serialized with tabs + trailing newline — the exact
+    /// bytes `expected*.json` files store (matches `fixtures_update_parsed`).
+    pub ast_json_tabs: String,
+    /// Whether the compact wire path (`convert_ast_json_string` — what
+    /// FFI/WASM/CLI-compact ship, with its own fast-path eligibility gates
+    /// and multibyte offset translation) is byte-identical to the `Value`
+    /// path. The expected.json comparisons go through `convert_ast_json`,
+    /// so without this check the shipped path would be fixture-blind.
+    pub wire_path_matches: bool,
+}
+
+/// Compute the `Value`-path AST and the wire-path identity check from an
+/// already-parsed input, materializing `convert_ast_json` once.
+#[allow(clippy::expect_used)] // Value serialization cannot fail
+pub fn input_ast_paths(parsed: &ParsedInput, content: &str) -> Result<InputAstPaths, String> {
+    let (ast_json, wire) = match parsed {
+        ParsedInput::Svelte(ast) => (
+            tsv_svelte::convert_ast_json(ast, content),
+            tsv_svelte::convert_ast_json_string(ast, content),
+        ),
+        ParsedInput::Ts(ast) => (
+            tsv_ts::convert_ast_json(ast, content),
+            tsv_ts::convert_ast_json_string(ast, content),
+        ),
+        ParsedInput::Css(ast) => (
+            tsv_css::convert_ast_json(ast, content),
+            tsv_css::convert_ast_json_string(ast, content),
+        ),
+    };
+    let tabs = to_json_with_tabs(&ast_json)
+        .map_err(|e| format!("Failed to serialize AST to JSON: {e}"))?;
+    let value_compact = serde_json::to_string(&ast_json).expect("Value serialization cannot fail");
+    Ok(InputAstPaths {
+        ast_json,
+        // Trailing newline matches the fixtures_update_parsed format
+        ast_json_tabs: format!("{tabs}\n"),
+        wire_path_matches: wire == value_compact,
+    })
+}
+
+/// Multibyte comment prepended to synthesize probe variants — shifts every
+/// downstream byte offset away from its UTF-16 offset, so the typed
+/// offset-translation walk is exercised on the whole AST shape.
+const TYPED_WALK_SYNTH_PREFIX: &str = "// 中文😀\n";
+
+/// How a typed-walk parity probe failed.
+#[derive(Debug)]
+pub enum TypedWalkParityFailure {
+    /// The probe content failed to parse. This is an error (not a skip): a
+    /// silently dropped probe would reopen the coverage hole the probes exist
+    /// to close.
+    Parse(String),
+    /// `convert_ast_json_string` differs from the `Value` path.
+    Diverged,
+}
+
+/// Outcome of the typed-walk parity probes for one fixture input.
+#[derive(Debug, Default)]
+pub struct TypedWalkParity {
+    /// Probes that ran and matched.
+    pub checked: usize,
+    /// Failed probes: (probe description, failure).
+    pub failures: Vec<(String, TypedWalkParityFailure)>,
+}
+
+/// Probe `tsv_ts`'s typed offset-translation walk for parity with the `Value`
+/// walk, beyond what the fixture's own content exercises.
+///
+/// The typed walk (`translate_byte_to_char_offsets_typed`) enumerates struct
+/// fields manually, so a position-bearing field missing from it stays green on
+/// every ASCII fixture (translation is a no-op on both paths) and on every
+/// multibyte `.svelte` fixture (Svelte's gate routes those to the `Value`
+/// fallback). These probes close that hole:
+///
+/// - `.ts` / `.svelte.ts` inputs get a synthesized multibyte variant (a
+///   prepended multibyte comment shifts all downstream offsets). Inputs with
+///   byte-0 features (hashbang, BOM) are skipped — prepending would change
+///   their semantics.
+/// - `.svelte` inputs have their `<script>` contents extracted and run
+///   through `tsv_ts`'s two paths as standalone TS — as-is when already
+///   multibyte, plus a synthesized multibyte variant — so every AST shape in
+///   the corpus gets typed-walk coverage, not just the few standalone-TS
+///   fixtures.
+///
+/// Each probe asserts `convert_ast_json_string` is byte-identical to
+/// `serde_json::to_string(&convert_ast_json(..))`. Probes are independent of
+/// `expected.json`, so they don't affect parser conformance. Returns an empty
+/// result for `.css` (no typed pipeline). Takes the already-parsed input so
+/// `.svelte` script-span extraction reuses the fixture's one parse.
+#[allow(clippy::expect_used)] // Value serialization cannot fail
+pub fn typed_walk_parity_probes(content: &str, parsed: &ParsedInput) -> TypedWalkParity {
+    let mut parity = TypedWalkParity::default();
+
+    let mut probe = |ts_content: &str, description: &str| match tsv_ts::parse(ts_content) {
+        Ok(ast) => {
+            let string_path = tsv_ts::convert_ast_json_string(&ast, ts_content);
+            let value_path = serde_json::to_string(&tsv_ts::convert_ast_json(&ast, ts_content))
+                .expect("Value serialization cannot fail");
+            if string_path == value_path {
+                parity.checked += 1;
+            } else {
+                parity
+                    .failures
+                    .push((description.to_string(), TypedWalkParityFailure::Diverged));
+            }
+        }
+        Err(e) => {
+            parity.failures.push((
+                description.to_string(),
+                TypedWalkParityFailure::Parse(format!("{e:?}")),
+            ));
+        }
+    };
+
+    match parsed {
+        ParsedInput::Ts(_) => {
+            // Byte-0 features (hashbang, BOM) can't take a prepended comment
+            if content.starts_with("#!") || content.starts_with('\u{feff}') {
+                return parity;
+            }
+            // The as-is input is already covered by the string-path identity
+            // check; only the synthesized multibyte variant is new coverage.
+            let synthesized = format!("{TYPED_WALK_SYNTH_PREFIX}{content}");
+            probe(&synthesized, "synthesized multibyte input");
+        }
+        ParsedInput::Svelte(root) => {
+            for (i, (start, end)) in tsv_svelte::script_content_spans(root)
+                .into_iter()
+                .enumerate()
+            {
+                let script = &content[start as usize..end as usize];
+                if !script.is_ascii() {
+                    // Multibyte .svelte inputs take the Value fallback in
+                    // tsv_svelte, so this standalone-TS run is the only
+                    // typed-walk coverage their script content gets
+                    probe(script, &format!("extracted script {i} (as-is)"));
+                }
+                let synthesized = format!("{TYPED_WALK_SYNTH_PREFIX}{script}");
+                probe(
+                    &synthesized,
+                    &format!("extracted script {i} (synthesized multibyte)"),
+                );
+            }
+        }
+        ParsedInput::Css(_) => {} // no typed pipeline for CSS
+    }
+
+    parity
 }

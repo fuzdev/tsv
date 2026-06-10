@@ -14,6 +14,22 @@ use tsv_lang::{ParseError, Span};
 ///
 /// For selectors that CAN start with combinators, use `parse_relative_selector_list()` instead.
 /// See: CSS Selectors Level 4 - <<complex-selector-list>> vs <<relative-selector-list>>
+/// Skip comment(s) sitting between a complex selector and its `,` separator (comments are
+/// inter-token whitespace per css-syntax-3) — but only when a comma actually follows, so a
+/// trailing comment before `{` is left for `parse_rule` (it sits outside the list span and is
+/// inline-printed as a pre-brace comment). The lookahead is non-destructive.
+///
+/// Not needed by `parse_forgiving_selector_list`, whose terminator is `)` (not `{`); it can
+/// skip comments unconditionally before its comma check.
+fn skip_comments_before_comma(parser: &mut CssParser) -> Result<(), ParseError> {
+    if matches!(&parser.current_kind, TokenKind::Comment)
+        && parser.peek_past_whitespace()? == TokenKind::Comma
+    {
+        parser.skip_whitespace_and_comments()?;
+    }
+    Ok(())
+}
+
 pub(crate) fn parse_complex_selector_list(
     parser: &mut CssParser,
 ) -> Result<SelectorList, ParseError> {
@@ -26,7 +42,11 @@ pub(crate) fn parse_complex_selector_list(
     selectors.push(first);
 
     // Parse additional selectors separated by commas
-    while parser.check(TokenKind::Comma) {
+    loop {
+        skip_comments_before_comma(parser)?;
+        if !parser.check(TokenKind::Comma) {
+            break;
+        }
         parser.advance()?; // consume comma
         parser.skip_whitespace_and_comments()?; // Skip whitespace and comments
         let sel = parse_complex_selector(parser)?;
@@ -219,7 +239,11 @@ pub(crate) fn parse_relative_selector_list(
     selectors.push(first);
 
     // Parse additional selectors separated by commas
-    while parser.check(TokenKind::Comma) {
+    loop {
+        skip_comments_before_comma(parser)?;
+        if !parser.check(TokenKind::Comma) {
+            break;
+        }
         parser.advance()?; // consume comma
         parser.skip_whitespace_and_comments()?; // Skip whitespace and comments
         let sel = parse_relative_complex_selector(parser)?;

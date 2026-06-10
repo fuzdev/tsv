@@ -1,0 +1,141 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 135,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 15,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 15,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class",
+											"start": 9,
+											"end": 15
+										}
+									],
+									"start": 9,
+									"end": 15
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 16,
+					"end": 126,
+					"children": [
+						{
+							"type": "Atrule",
+							"start": 20,
+							"end": 123,
+							"name": "media",
+							"prelude": "(min-width: 768px)",
+							"block": {
+								"type": "Block",
+								"start": 46,
+								"end": 123,
+								"children": [
+									{
+										"type": "Atrule",
+										"start": 51,
+										"end": 119,
+										"name": "supports",
+										"prelude": "(display: grid)",
+										"block": {
+											"type": "Block",
+											"start": 77,
+											"end": 119,
+											"children": [
+												{
+													"type": "Rule",
+													"prelude": {
+														"type": "SelectorList",
+														"start": 83,
+														"end": 89,
+														"children": [
+															{
+																"type": "ComplexSelector",
+																"start": 83,
+																"end": 89,
+																"children": [
+																	{
+																		"type": "RelativeSelector",
+																		"combinator": null,
+																		"selectors": [
+																			{
+																				"type": "ClassSelector",
+																				"name": "child",
+																				"start": 83,
+																				"end": 89
+																			}
+																		],
+																		"start": 83,
+																		"end": 89
+																	}
+																]
+															}
+														]
+													},
+													"block": {
+														"type": "Block",
+														"start": 90,
+														"end": 114,
+														"children": [
+															{
+																"type": "Declaration",
+																"start": 97,
+																"end": 107,
+																"property": "color",
+																"value": "red"
+															}
+														]
+													},
+													"start": 83,
+													"end": 114
+												}
+											]
+										}
+									}
+								]
+							}
+						}
+					]
+				},
+				"start": 9,
+				"end": 126
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 127,
+			"styles": "\n\t.class {\n\t\t@media (min-width: 768px) {\n\t\t\t@supports (display: grid) {\n\t\t\t\t.child {\n\t\t\t\t\tcolor: red;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 136,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

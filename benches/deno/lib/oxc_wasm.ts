@@ -64,7 +64,15 @@ export class OxcWasmImplementation implements TsvImplementation {
 			throw new Error(`Parse errors: ${JSON.stringify(result.errors)}`);
 		}
 
-		return result.program;
+		// Unlike the native `oxc-parser` package (whose `index.js` `wrap()` runs
+		// `JSON.parse` on `.program` access), the WASI binding hands back `program`
+		// as the raw JSON string the Rust side serialized — it never deserializes.
+		// Parse it so `oxc-parser-wasm` materializes a full JS AST, matching what
+		// native `oxc-parser` and `tsv_wasm-json` both do (apples-to-apples timing).
+		// The string is `{"node": <program>, "fixes": [...]}` (see oxc-parser
+		// `src-js/wrap.js`); `.node` is the program.
+		const program = result.program;
+		return typeof program === 'string' ? JSON.parse(program).node : program;
 	}
 
 	format(_source: string, _language: Language): string {

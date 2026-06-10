@@ -13,6 +13,7 @@
 //
 // - prettier/src/language-js/print/assignment.js
 
+use super::ArrowChainContext;
 use super::Printer;
 use super::analysis::conditional_should_break_after_op;
 use super::expressions::format_string_literal_from_ast;
@@ -66,6 +67,17 @@ pub fn choose_layout(
     print_width: usize,
     comments: &[Comment],
 ) -> AssignmentLayout {
+    // Untyped curried arrow chains (`(a) => (b) => …`) use fluid layout: break
+    // after `=` only when the signature heads don't fit on the operator line,
+    // letting a hugging body (object/array/block) expand in place otherwise.
+    // Typed chains (any arrow has a return type with params, type parameters, or
+    // a non-identifier param) instead force the break via break-after-operator
+    // (handled by `is_curried_arrow_with_return_type` below), so the heads always
+    // drop onto their own lines.
+    if is_curried_arrow_chain(right_expr) && !is_curried_arrow_with_return_type(right_expr) {
+        return AssignmentLayout::Fluid;
+    }
+
     // Objects, arrays, functions, classes, and calls handle their own expansion
     // The value expands internally: `key: { ... }` not `key:\n{ ... }`
     //
@@ -190,19 +202,23 @@ pub fn should_inline_logical_expression(binary: &internal::BinaryExpression) -> 
 /// Examples that stay inline:
 ///   const f = (x: T) => (y) => expr       // neither has return type
 pub fn is_curried_arrow_with_return_type(expr: &Expression) -> bool {
+    // A curried chain (body is another arrow) where ANY arrow carries a
+    // return type / type params / non-identifier param.
+    is_curried_arrow_chain(expr)
+        && matches!(expr, Expression::ArrowFunctionExpression(arrow) if arrow_chain_has_return_type(arrow))
+}
+
+/// Check if an expression is a curried arrow function (its body is another
+/// arrow). The terminal body may be an expression or a block. Used to route the
+/// assignment RHS through the arrow-chain layout regardless of whether the chain
+/// carries a return type.
+pub fn is_curried_arrow_chain(expr: &Expression) -> bool {
     if let Expression::ArrowFunctionExpression(arrow) = expr {
-        // Must be a curried arrow (body is another arrow)
-        let is_curried = matches!(
+        matches!(
             &arrow.body,
-            internal::ArrowFunctionBody::Expression(body) if matches!(&**body, Expression::ArrowFunctionExpression(_))
-        );
-
-        if !is_curried {
-            return false;
-        }
-
-        // Check if ANY arrow in the chain has return type (with params)
-        arrow_chain_has_return_type(arrow)
+            internal::ArrowFunctionBody::Expression(body)
+                if matches!(&**body, Expression::ArrowFunctionExpression(_))
+        )
     } else {
         false
     }
@@ -854,11 +870,20 @@ impl<'a> Printer<'a> {
             layout = AssignmentLayout::NeverBreakAfterOperator;
         }
 
-        let right_doc = if let Some(boundary) = right_boundary {
-            self.build_expression_doc_with_paren_comments(right_expr, boundary)
+        // Signal the arrow printer that a curried arrow-chain RHS should use the
+        // assignment-RHS chain layout.
+        let chain_context = if is_curried_arrow_chain(right_expr) {
+            ArrowChainContext::AssignmentRhs
         } else {
-            self.build_expression_doc(right_expr)
+            ArrowChainContext::None
         };
+        let right_doc = self.build_with_arrow_chain_context(chain_context, || {
+            if let Some(boundary) = right_boundary {
+                self.build_expression_doc_with_paren_comments(right_expr, boundary)
+            } else {
+                self.build_expression_doc(right_expr)
+            }
+        });
 
         // Validate static heuristic: if is_poorly_breakable_chain classified this
         // expression as poorly breakable (no good internal break points), the printed

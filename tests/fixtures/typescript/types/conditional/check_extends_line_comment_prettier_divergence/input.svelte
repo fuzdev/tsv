@@ -1,0 +1,7 @@
+<script lang="ts">
+	// Conditional check: comment after `extends`, check type on the next line
+	type C = T extends // c
+		U
+		? X
+		: Y;
+</script>

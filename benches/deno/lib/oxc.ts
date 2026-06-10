@@ -80,6 +80,13 @@ export class OxcImplementation implements TsvImplementation {
 			throw new Error(`Parse errors: ${JSON.stringify(result.errors)}`);
 		}
 
+		// Accessing `.program` runs the package's `wrap()` getter, which `JSON.parse`s
+		// the Rust-serialized AST — a full eager materialization (matching `tsv-json`,
+		// so the `oxc-parser` row is apples-to-apples with it). There is deliberately no
+		// lazy variant: oxc's `experimentalLazy` raw transfer is setup-dominated
+		// (~1.7ms/call on Node, ~2.1ms on Deno, vs ~0.7ms eager + ~0.16ms parse-only) —
+		// it eagerly copies the whole AST transfer buffer, so it measures buffer setup,
+		// not parse speed, in any runtime. See `benches/deno/CLAUDE.md` → Fairness Caveats.
 		return result.program;
 	}
 

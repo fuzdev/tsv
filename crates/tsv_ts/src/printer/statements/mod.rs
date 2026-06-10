@@ -17,10 +17,10 @@ mod variable;
 
 // Re-export for submodules to use `super::Printer` instead of `super::super::Printer`
 pub(super) use super::{
-    Printer, build_entity_name_doc, intersection_has_expanding_first_type,
-    intersection_has_huggable_last_type, should_hug_union_type, unwrap_parenthesized,
+    Printer, build_entity_name_doc, should_hug_union_type, unwrap_parenthesized,
 };
 
+use super::expressions::format_directive;
 use super::needs_parens::leftmost_no_lookahead;
 use super::{ParenContext, needs_parens};
 use crate::ast::internal::{self, Expression, LiteralValue, Statement};
@@ -82,10 +82,11 @@ impl<'a> Printer<'a> {
         let mut parts = Vec::new();
 
         if stmt.is_directive {
-            // Directives print verbatim from source: Prettier preserves the
-            // original quote style and escapes rather than re-normalizing the
-            // string literal. Directives are never parenthesized.
-            parts.push(d.text_owned(stmt.expression.span().extract(self.source).to_string()));
+            // Directives are exact code-unit sequences; `format_directive` mirrors
+            // Prettier's `printDirective` (swap the outer quote to single only when
+            // the content has no quote, else verbatim). Never parenthesized.
+            let raw = stmt.expression.span().extract(self.source);
+            parts.push(d.text_owned(format_directive(raw)));
         } else {
             // Parens required for correctness (object expressions, object pattern assignments)
             // OR preserved from source for string literals (matches Prettier behavior)
@@ -118,9 +119,8 @@ impl<'a> Printer<'a> {
             parts.push(self.build_expression_doc(&stmt.expression));
             self.in_top_level_assignment.set(false);
             self.is_expression_statement.set(false);
-            // Defensively clear in case the target node was printed via a path that
-            // bypasses the consuming arms (should not happen, but avoids leaking
-            // the target into a sibling statement).
+            // Clear the (non-consuming, span-matched) target so it can't leak into a
+            // sibling statement.
             self.expr_stmt_paren_target.set(None);
 
             if needs_parens {

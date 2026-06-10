@@ -622,7 +622,10 @@ fn parse_import_prelude(parser: &mut CssParser) -> Result<(Vec<CssValue>, Span),
     let start = parser.base_offset() + parser.current_start;
     let mut values = Vec::new();
 
-    parser.skip_whitespace()?;
+    // Register a leading comment between `@import` and the url()/string (e.g.
+    // `@import /* c */ url(...)`). Svelte strips it from the prelude; the printer
+    // reconstructs it from `self.comments`.
+    parser.skip_whitespace_registering_comments()?;
 
     // Parse first value: url() function or bare string
     let is_function = parser.check(TokenKind::Identifier) && {
@@ -653,7 +656,7 @@ fn parse_import_prelude(parser: &mut CssParser) -> Result<(Vec<CssValue>, Span),
         return Err(parser.error_msg("@import expects url() or string"));
     }
 
-    parser.skip_whitespace()?;
+    parser.skip_whitespace_registering_comments()?;
 
     // Parse optional layer(), supports() functions and other conditions
     while !parser.check(TokenKind::Semicolon) && !parser.check(TokenKind::Eof) {
@@ -665,7 +668,7 @@ fn parse_import_prelude(parser: &mut CssParser) -> Result<(Vec<CssValue>, Span),
         if is_function {
             // layer() or supports() function
             values.push(parse_function_value(parser)?);
-            parser.skip_whitespace()?;
+            parser.skip_whitespace_registering_comments()?;
         } else if parser.check(TokenKind::Identifier) {
             // Check for bare "layer" keyword or media query
             let ident = parser
@@ -685,7 +688,7 @@ fn parse_import_prelude(parser: &mut CssParser) -> Result<(Vec<CssValue>, Span),
                     },
                 });
                 parser.advance()?;
-                parser.skip_whitespace()?;
+                parser.skip_whitespace_registering_comments()?;
             } else {
                 // Media query - preserve original whitespace from source
                 let media_local_start = parser.current_start;
@@ -773,8 +776,15 @@ fn parse_function_value(parser: &mut CssParser) -> Result<CssValue, ParseError> 
                 },
             });
             parser.advance()?;
+            parser.skip_whitespace()?;
+        } else {
+            // Unquoted bare URL (`url(a.css)`, `url(a.css?x=1)`): an opaque token run
+            // up to ')'. Leave args empty — both the public-AST conversion and the
+            // printer reconstruct the `url(...)` verbatim from the function span.
+            while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
+                parser.advance()?;
+            }
         }
-        parser.skip_whitespace()?;
     } else if name == "layer" {
         // layer(name) - parse the layer name as identifier
         parser.skip_whitespace()?;
@@ -968,12 +978,21 @@ pub(crate) fn parse_atrule(
     } else if name == "media" {
         // Parse @media as raw string to preserve comments
         // Wrapping is handled in the printer by finding and/or boundaries
-        // See TODO_AST_ARCHITECTURE.md for discussion of moving to CST
-        let (content, span) = parse_raw_prelude_content(parser, false)?;
+        // Fully structuring preludes is a deferred design option — see
+        // docs/architecture.md § "Red-Green Trees (Deferred)"
+        let (content, span) = parse_raw_prelude_content(parser, false, true)?;
         PreludeValue::Media { content, span }
     } else {
-        // Parse as raw string for other at-rules (@keyframes, etc.)
-        let (content, span) = parse_raw_prelude_content(parser, false)?;
+        // Parse as raw string for other at-rules (@keyframes, @layer, @page, etc.).
+        // Most have no `property: value` / media-query grammar, so prettier keeps the
+        // prelude verbatim (outer-trimmed; only `url()` inner whitespace is trimmed) —
+        // preserve internal whitespace (`@layer a , b` must not become `a, b`).
+        // `@namespace` is the exception: prettier re-parses its prelude as a value (see
+        // postcss `parser-postcss.js`), normalizing whitespace to single spaces, so it
+        // takes the normalizing path. The public AST stays source-verbatim either way
+        // (the printer-facing `content` is what differs); see `convert.rs`.
+        let normalize_whitespace = name == "namespace";
+        let (content, span) = parse_raw_prelude_content(parser, false, normalize_whitespace)?;
         PreludeValue::Raw { content, span }
     };
 
@@ -1010,11 +1029,16 @@ pub(crate) fn parse_atrule(
     })
 }
 
-/// Parse raw prelude content with normalization
-/// Returns (content, span)
+/// Build the raw at-rule prelude string (used for both the printer and, for `@media`,
+/// the formatter's wrapping). `normalize_whitespace = true` (`@media`) collapses internal
+/// whitespace and applies `property: value` / boolean-operator spacing; `false` (every
+/// other raw at-rule — `@layer`, `@namespace`, `@keyframes`, …) preserves internal
+/// whitespace verbatim, matching prettier and Svelte. `url()` inner whitespace is trimmed
+/// in both modes (a spec-mandated `<url-token>` normalization).
 fn parse_raw_prelude_content(
     parser: &mut CssParser,
     is_selector_list_prelude: bool,
+    normalize_whitespace: bool,
 ) -> Result<(String, Span), ParseError> {
     // Add spaces around boolean operators (and, or, not) and after ':' for prettier compatibility
     let prelude_start = parser.base_offset() + parser.current_start;
@@ -1034,6 +1058,15 @@ fn parse_raw_prelude_content(
         && !parser.check(TokenKind::Eof)
     {
         if parser.check(TokenKind::Whitespace) {
+            // Verbatim mode (non-@media raw at-rules): preserve the source whitespace
+            // exactly — prettier and Svelte keep it (`@layer a  ,  b` stays `a  ,  b`).
+            if !normalize_whitespace {
+                let ws = parser.current_value().to_string();
+                parser.advance()?;
+                prelude_parts.push(ws);
+                prev_token_kind = Some(TokenKind::Whitespace);
+                continue;
+            }
             // Skip whitespace in selector list preludes (inside parentheses for @scope):
             // - After '(' or before ')'
             // - After ':' (pseudo-classes like :hover) - only for selector list preludes
@@ -1065,12 +1098,69 @@ fn parse_raw_prelude_content(
             continue;
         }
 
+        // `url(...)` in a raw prelude (e.g. `@namespace url(http://…)`): the content is
+        // an opaque `<url-token>`, not a `property: value` query, so raw-extract it
+        // verbatim. Otherwise the property-colon normalization below inserts a space
+        // after the `:` in `http://`, corrupting it to `http: //`. Shares the
+        // declaration-path's `url::trim_url_raw` (and matches prettier's
+        // `printer-postcss.js`) — only the whitespace just inside the parens is trimmed.
+        // Quoted `url('…')` is preserved verbatim too (unchanged).
+        // Detect `url` on the raw source slice, not the decoded identifier: `advance()`
+        // drops the decoded value when a token arrives via the peek cache (which the
+        // whitespace branch above populates), so `current_identifier()` is unreliable
+        // here. A `url(` function token requires the literal `url`, so the raw slice is
+        // also the correct thing to match. Match case-insensitively (so the opaque
+        // content is raw-extracted, dodging the property-colon corruption, for `URL(`
+        // too) but only *trim* the inner whitespace for the lowercase spelling: per
+        // css-syntax-3 a `<url-token>` is matched ASCII-case-insensitively, yet prettier
+        // (postcss) only canonicalizes the lowercase `url(`, preserving `URL(  …  )`
+        // verbatim — so trimming uppercase would diverge from prettier.
+        if matches!(parser.current_kind, TokenKind::Identifier)
+            && parser.current_value().eq_ignore_ascii_case("url")
+            && matches!(parser.peek(), Ok(TokenKind::LeftParen))
+        {
+            let is_lowercase_url = parser.current_value() == "url";
+            let url_start = parser.current_start;
+            parser.advance()?; // consume `url`
+            // Consume the balanced parens, tracking depth so a nested `(` can't end it early.
+            let mut depth: u32 = 0;
+            let mut url_end;
+            loop {
+                match parser.current_kind {
+                    TokenKind::LeftParen => depth += 1,
+                    TokenKind::RightParen => depth = depth.saturating_sub(1),
+                    TokenKind::Eof => {
+                        url_end = parser.current_start;
+                        break;
+                    }
+                    _ => {}
+                }
+                let is_close = depth == 0 && matches!(parser.current_kind, TokenKind::RightParen);
+                url_end = parser.current_end;
+                parser.advance()?;
+                if is_close {
+                    break;
+                }
+            }
+            let raw = &parser.source()[url_start..url_end];
+            let part = if is_lowercase_url {
+                crate::url::trim_url_raw(raw).unwrap_or_else(|| raw.to_string())
+            } else {
+                raw.to_string()
+            };
+            prelude_parts.push(part);
+            prev_token_kind = Some(TokenKind::RightParen);
+            last_non_whitespace_kind = Some(TokenKind::RightParen);
+            continue;
+        }
+
         let part = match &parser.current_kind {
-            // Internal AST: use decoded value (spec-compliant)
-            TokenKind::Identifier => parser
-                .current_identifier()
-                .unwrap_or_else(|| parser.current_value())
-                .to_string(),
+            // Use the raw source slice, not the decoded identifier: an at-rule prelude
+            // is serialized verbatim (Svelte stores the raw string, prettier preserves
+            // it), so escapes must survive — `@keyframes \@mymove` must not collapse to
+            // `@keyframes @mymove` (which would re-parse as an at-rule) and `\31 23` must
+            // not collapse to `123`.
+            TokenKind::Identifier => parser.current_value().to_string(),
             TokenKind::String { quote } => {
                 let content = &parser.source()[parser.current_start + 1..parser.current_end - 1];
                 format!("{quote}{content}{quote}")
@@ -1090,18 +1180,22 @@ fn parse_raw_prelude_content(
         let is_bool_op = is_boolean_operator(parser);
         let is_comment = matches!(parser.current_kind, TokenKind::Comment);
 
-        // Check if we already have a trailing space (from programmatic insertion or whitespace token)
-        let has_trailing_space = prelude_parts.last().is_some_and(|s| s == " ");
+        // Whitespace-rewriting (property/boolean/comma spacing) applies only to the
+        // normalized `@media` path; verbatim raw at-rules keep the source spacing.
+        if normalize_whitespace {
+            // Check if we already have a trailing space (from programmatic insertion or whitespace token)
+            let has_trailing_space = prelude_parts.last().is_some_and(|s| s == " ");
 
-        // Add space before comments or boolean operators if not already preceded by space
-        if (is_comment || is_bool_op) && !has_trailing_space {
-            prelude_parts.push(" ".to_string());
-        }
+            // Add space before comments or boolean operators if not already preceded by space
+            if (is_comment || is_bool_op) && !has_trailing_space {
+                prelude_parts.push(" ".to_string());
+            }
 
-        // Remove trailing whitespace before ':' or ',' (CSS convention: no space before these)
-        if matches!(parser.current_kind, TokenKind::Colon | TokenKind::Comma) {
-            while prelude_parts.last().is_some_and(|s| s == " ") {
-                prelude_parts.pop();
+            // Remove trailing whitespace before ':' or ',' (CSS convention: no space before these)
+            if matches!(parser.current_kind, TokenKind::Colon | TokenKind::Comma) {
+                while prelude_parts.last().is_some_and(|s| s == " ") {
+                    prelude_parts.pop();
+                }
             }
         }
 
@@ -1120,7 +1214,7 @@ fn parse_raw_prelude_content(
 
         // Add space after boolean operators, comments, commas, or ':' if not followed by whitespace
         // Note: @scope preludes are now parsed structurally, so they don't go through this code
-        if !parser.check(TokenKind::Whitespace) {
+        if normalize_whitespace && !parser.check(TokenKind::Whitespace) {
             if is_bool_op {
                 prelude_parts.push(" ".to_string());
             } else if is_comment {
@@ -1170,7 +1264,6 @@ fn parse_raw_prelude_content(
 
     Ok((content, span))
 }
-
 /// Parse an at-rule block: `{ ... }`
 /// Block contents depend on at-rule type and nesting context:
 /// - @media, @supports, @layer: contain rules (top-level) or declarations (nested)
@@ -1228,8 +1321,11 @@ fn parse_atrule_block(
 
         // Handle nested at-rules
         if parser.check(TokenKind::AtSign) {
-            // Nested at-rules inside at-rules are not "nested in rule" context
-            let atrule = parse_atrule(parser, false)?;
+            // Propagate the nesting context: an at-rule nested inside a conditional
+            // group at-rule that is itself inside a style rule is still in a nesting
+            // context, so its block holds declarations (per CSS Nesting). Outside a
+            // rule, `nested_in_rule` is false and this stays a normal at-rule block.
+            let atrule = parse_atrule(parser, nested_in_rule)?;
             children.push(CssBlockChild::Atrule(atrule));
             parser.skip_whitespace()?;
             continue;

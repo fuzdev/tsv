@@ -184,6 +184,27 @@ impl<'a> CssParser<'a> {
         Ok(())
     }
 
+    /// Skip whitespace and **register** any comments encountered into `self.comments`.
+    ///
+    /// Used by structured preludes (e.g. `@import`) where comments are valid between
+    /// the parsed tokens and must survive for the printer to reconstruct, even though
+    /// they're stripped from the public-AST prelude string (matching Svelte). Unlike
+    /// `skip_whitespace_and_comments`, this preserves the comments rather than dropping
+    /// them.
+    pub(crate) fn skip_whitespace_registering_comments(&mut self) -> Result<(), ParseError> {
+        loop {
+            if self.check(TokenKind::Whitespace) {
+                self.advance()?;
+            } else if matches!(&self.current_kind, TokenKind::Comment) {
+                self.register_current_comment();
+                self.advance()?;
+            } else {
+                break;
+            }
+        }
+        Ok(())
+    }
+
     /// Get the current token's value from source (for most tokens)
     pub(crate) fn current_value(&self) -> &str {
         &self.source[self.current_start..self.current_end]

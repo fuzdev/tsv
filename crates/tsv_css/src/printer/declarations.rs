@@ -350,6 +350,15 @@ impl<'a> Printer<'a> {
         } else {
             self.write(": ");
         }
+        // Empty custom-property value carrying !important (`--a: !important;`): the `: `
+        // separator already supplies the single space, so emit `!important` without the
+        // extra leading space `write_declaration_end` adds — avoids `--a:  !important;`.
+        if decl.is_important()
+            && matches!(&decl.value, CssValue::Identifier { name, .. } if name.is_empty())
+        {
+            self.write("!important;\n");
+            return;
+        }
         self.print_css_value(&decl.value);
         self.write_declaration_end(decl.is_important());
     }

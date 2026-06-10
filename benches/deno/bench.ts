@@ -17,6 +17,7 @@
  *   --markdown          Output results as Markdown
  *   --save-baseline     Also save results as baseline for regression detection
  *   --compare-baseline  Compare against saved baseline
+ *   --save-report       Overwrite the canonical report.{json,md} even on a limited run
  *   --verbose           Include per-file skip detail (paths + errors + failure sets)
  *
  * Results are always saved to benches/deno/results/<timestamp>_<commit>.{json,md}.
@@ -27,6 +28,8 @@
  *   BENCH_FILTER        Filter files by path pattern (default: none)
  *   BENCH_DURATION      Duration per benchmark in ms (default: 5000)
  *   BENCH_WARMUP        Warmup iterations (default: 3)
+ *   BENCH_STALE_OK      Set to 1 to run despite stale artifacts (default: off;
+ *                       see lib/check_artifact_freshness.ts)
  */
 
 // Type declaration for V8's gc function (available with --expose-gc)
@@ -73,6 +76,8 @@ import {
 	generate_binary_size_report,
 } from './lib/binary_sizes.ts';
 import { type Language, LANGUAGES, type SourceFile } from './lib/types.ts';
+import { check_artifact_freshness, wasm_artifact_path } from './lib/check_artifact_freshness.ts';
+import { get_library_path } from './lib/ffi.ts';
 
 //
 // CLI Arguments
@@ -174,10 +179,12 @@ console.error = (...args: unknown[]): void => {
 // Configuration
 //
 
-/** Parse optional integer from env var */
+/** Parse optional non-negative integer from env var; malformed values fall back to undefined. */
 const env_int = (name: string): number | undefined => {
 	const val = Deno.env.get(name);
-	return val ? parseInt(val) : undefined;
+	if (!val) return undefined;
+	const n = parseInt(val, 10);
+	return Number.isFinite(n) && n >= 0 ? n : undefined;
 };
 
 /** Limit files per language (default: all) */
@@ -315,6 +322,24 @@ log(
 );
 log(`  Total:       ${String(total_files).padEnd(11)} files (${fmt_bytes(total_bytes)})`);
 log();
+
+// Refuse to measure stale binaries (bench:run skips the rebuild). See
+// lib/check_artifact_freshness.ts; override with BENCH_STALE_OK=1.
+const ffi_profile = Deno.env.get('TSV_FFI_PROFILE') ?? 'release';
+await check_artifact_freshness([
+	{
+		label: `FFI (${ffi_profile})`,
+		path: get_library_path(),
+		binding_crates: ['tsv_ffi'],
+		rebuild: 'deno task build:ffi',
+	},
+	{
+		label: 'WASM (deno-parse)',
+		path: wasm_artifact_path('deno-parse'),
+		binding_crates: ['tsv_wasm'],
+		rebuild: 'deno task build:wasm:parse:deno',
+	},
+]);
 
 // Initialize implementations
 const impls = await init_implementations({ logger: log });
@@ -576,7 +601,12 @@ async function run_benchmark_group(
 			// what it would have done on the full corpus.
 			const tracking_key = task_tracking.get(result.name);
 			const effective_bytes = tracking_key ? effective_corpus_bytes.get(tracking_key) ?? 0 : 0;
-			const throughput = format_throughput(result.stats.ops_per_second * effective_bytes);
+			// Mirror the report-path guard (`generate_group_throughput_markdown`):
+			// with an empty intersection the MB/s figure is a misleading `0.0 MB/s`
+			// while ops/sec is real, so print `—` instead of a fake throughput.
+			const throughput = effective_bytes === 0
+				? '—'
+				: format_throughput(result.stats.ops_per_second * effective_bytes);
 			log(`  [${index + 1}/${total}] ${result.name}: ${ops_per_sec} ops/sec (${throughput})`);
 		},
 	});
@@ -619,7 +649,7 @@ async function run_benchmark_group(
 
 // Two-phase run: pre-flight every group up front (so the coverage picture
 // lands before any 5s+ timed run starts), then time every group.
-log('Pre-flight (discover coverage before timing):');
+log('Pre-flight (discover coverage + exclude failing files before timing):');
 for (const lang of LANGUAGES) {
 	await run_preflight_group('parse', lang);
 	await run_preflight_group('format', lang);
@@ -650,6 +680,25 @@ interface BaselineEntry {
 	cv: number;
 	ops_per_second: number;
 	sample_size: number;
+	/**
+	 * Files this impl successfully processed during preflight / the language's
+	 * total discovered files — the per-impl `Coverage:` line in the markdown
+	 * report, surfaced here so consumers can see which libs support which parts
+	 * of the corpus without parsing prose. `null` when tracking is unavailable
+	 * (e.g. a result with no resolvable tracking_key). Note: this is preflight
+	 * support, not the timed set — in `intersection` mode the timed file count
+	 * is the smaller per-group intersection.
+	 */
+	files_processed: number | null;
+	files_total: number | null;
+	/**
+	 * Files this impl was actually timed on — the per-group `Files (intersection):`
+	 * set in default mode (uniform across a group), or the impl's own preflight
+	 * success set under `BENCH_MODE=union`. Distinct from `files_processed`
+	 * (preflight support): this is what the `ops_per_second`/throughput numbers
+	 * reflect. `null` when tracking is unavailable.
+	 */
+	files_iterated: number | null;
 }
 
 /** Package versions used in the benchmark run */
@@ -676,6 +725,14 @@ interface Baseline {
 	versions: BaselineVersions;
 	binary_sizes: BinarySize[];
 	entries: BaselineEntry[];
+	/**
+	 * Counts of stderr noise from third-party impls that the harness silenced
+	 * during the run, keyed by message pattern (e.g. `oxfmt::textToDoc`). Surfaced
+	 * machine-readably so silenced upstream crashes don't vanish; not rendered in
+	 * the markdown report (counts are run-variant and would churn the committed
+	 * report). Empty `{}` when nothing was suppressed.
+	 */
+	suppressed_noise: Record<string, number>;
 }
 
 /** Get current git commit hash */
@@ -705,7 +762,13 @@ async function build_results_data(
 ): Promise<Baseline> {
 	const entries: BaselineEntry[] = [];
 	for (const group of groups) {
+		// Resolve per-impl preflight coverage (the markdown `Coverage:` line) via
+		// the same display-name → tracking_key map the report uses.
+		const tracking = task_tracking_by_group.get(group.name);
 		for (const result of group.results) {
+			const tracking_key = tracking?.get(result.name);
+			const coverage = tracking_key ? effective_corpus_size.get(tracking_key) : undefined;
+			const iterated = tracking_key ? iterated_file_count.get(tracking_key) : undefined;
 			entries.push({
 				name: result.name,
 				group: group.name,
@@ -721,18 +784,22 @@ async function build_results_data(
 				cv: result.stats.cv,
 				ops_per_second: result.stats.ops_per_second,
 				sample_size: result.stats.sample_size,
+				files_processed: coverage?.processed ?? null,
+				files_total: coverage?.total ?? null,
+				files_iterated: iterated ?? null,
 			});
 		}
 	}
 
 	return {
-		version: 2,
+		version: 4,
 		timestamp: new Date().toISOString(),
 		git_commit: await get_git_commit(),
 		corpus,
 		versions,
 		binary_sizes: binary_sizes,
 		entries,
+		suppressed_noise: Object.fromEntries(suppressed_noise),
 	};
 }
 
@@ -782,6 +849,12 @@ function generate_markdown_report(
 	if (versions.oxfmt) version_parts.push(`oxfmt@${versions.oxfmt}`);
 	if (versions.biome) version_parts.push(`@biomejs/wasm-bundler@${versions.biome}`);
 	lines.push(`**Versions:** ${version_parts.join(', ')}\n`);
+
+	lines.push(
+		'**Methodology:** Single-threaded — every implementation formats/parses one file at a time, ' +
+			'measured sequentially with no cross-file parallelism. The numbers are per-file, single-core ' +
+			'latency/throughput, not the multi-core batch throughput a CLI gets formatting many files at once.\n',
+	);
 
 	for (const group of groups) {
 		if (group.results.length === 0) continue;

@@ -181,7 +181,6 @@ fn extract_inline_field(line: &str, field: &str) -> Option<String> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

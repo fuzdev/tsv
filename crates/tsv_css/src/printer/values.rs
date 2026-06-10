@@ -127,10 +127,26 @@ impl<'a> Printer<'a> {
 
     /// Build a doc for a string value
     ///
-    /// Always uses semantic formatting to normalize quotes (double → single).
-    /// Prettier prefers single quotes in CSS strings for consistency.
-    fn build_string_doc(&self, content: &str, quote: char, _span: Span) -> DocId {
-        // Use semantic formatting which normalizes quotes (prefers single quotes)
+    /// Source-extracts the raw string so escape sequences are preserved verbatim
+    /// (`\a`, `\41`, `\\`, line continuations), normalizing only the quote char
+    /// (`"` → `'`) to match prettier. The internal `content` is fully *decoded*
+    /// (`parse_string_literal`), so re-serializing it would corrupt escapes — e.g.
+    /// emit `\a` as a literal newline (content loss). Mirrors `build_identifier_doc`
+    /// and the plain-declaration-value path (`extract_string_value`); the decoded
+    /// `content` is only the fallback when the span is unavailable.
+    fn build_string_doc(&self, content: &str, quote: char, span: Span) -> DocId {
+        if span.end_usize() <= self.source.len() {
+            let raw = span.extract(self.source);
+            // The span covers the full literal including quotes (see
+            // `parse_string_literal`); strip them and re-emit with quote normalization.
+            if raw.len() >= 2 && (raw.starts_with('\'') || raw.starts_with('"')) {
+                let inner = &raw[1..raw.len() - 1];
+                return self
+                    .d()
+                    .text_owned(source_fidelity::format_string_value(inner, quote));
+            }
+        }
+        // Fallback: semantic formatting from decoded content (span unavailable)
         let formatted = source_fidelity::format_string_value(content, quote);
         self.d().text_owned(formatted)
     }
@@ -166,18 +182,60 @@ impl<'a> Printer<'a> {
         // For functions with no parsed args (like supports()), extract from source
         if args.is_empty() && span.end_usize() <= self.source.len() {
             let raw = span.extract(self.source);
+            // An unparsed `url(...)` reaches here when the prelude path leaves its opaque
+            // content unparsed (e.g. `@import url(a.css)`). Trim only the whitespace inside
+            // the parens to match prettier, exactly like the parsed-args url path below.
+            // Other empty-args functions (`supports(...)`) stay verbatim.
+            if name.eq_ignore_ascii_case("url")
+                && let Some(trimmed) = crate::url::trim_url_raw(raw)
+            {
+                return d.text_owned(trimmed);
+            }
             return d.text_owned(raw.to_string());
         }
 
-        // WORKAROUND: url() data URIs contain commas that our parser incorrectly treats as
-        // argument separators. Use no space after commas to preserve data URI format.
-        // url() also never wraps since it has no natural break points.
         if name == "url" {
+            // Quoted url() — a single string arg. Print it through the normal string
+            // path so the quote is normalized (`"x"` → `'x'`), matching prettier.
+            if let [arg @ CssValue::String { .. }] = args {
+                let name_doc = d.text_owned(name.to_string());
+                let open = d.text("(");
+                let args_doc = self.build_css_value_doc(arg);
+                let close = d.text(")");
+                return d.concat(&[name_doc, open, args_doc, close]);
+            }
+            // Unquoted url() — the content is opaque. Emit the raw source verbatim,
+            // stripping only the whitespace right after `url(` and right before `)`
+            // (prettier's `printer-postcss.js` url handling). Rejoining parsed args
+            // would drop empty/trailing comma segments (`url(a,b,)` → `url(a,b)`),
+            // silently changing the URL — the comma is part of the resource ref.
+            if span.end_usize() <= self.source.len()
+                && let Some(raw) = crate::url::trim_url_raw(span.extract(self.source))
+            {
+                return d.text_owned(raw);
+            }
+            // Fallback (span unavailable): rejoin args with no space after commas.
             let name_doc = d.text_owned(name.to_string());
             let open = d.text("(");
             let args_doc = d.join(args.iter().map(|arg| self.build_css_value_doc(arg)), ",");
             let close = d.text(")");
             return d.concat(&[name_doc, open, args_doc, close]);
+        }
+
+        // var() empty fallback: `var(--a,)` — the trailing comma is kept with no space
+        // after it. The empty fallback is the final empty-identifier arg (see the parser's
+        // var-specific handling). `var(--a, red)` keeps the normal `, ` separator.
+        if name.eq_ignore_ascii_case("var")
+            && args.len() >= 2
+            && matches!(args.last(), Some(CssValue::Identifier { name: n, .. }) if n.is_empty())
+        {
+            let name_doc = d.text_owned(name.to_string());
+            let open = d.text("(");
+            let real = &args[..args.len() - 1];
+            let args_doc = d.join(real.iter().map(|arg| self.build_css_value_doc(arg)), ", ");
+            let comma = d.text(",");
+            let close = d.text(")");
+            return d.concat(&[name_doc, open, args_doc, comma, close]);
         }
 
         if !has_wrappable_args(args) {

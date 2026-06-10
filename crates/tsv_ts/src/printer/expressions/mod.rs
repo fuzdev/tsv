@@ -19,7 +19,7 @@ mod functions;
 pub(crate) mod literals;
 mod patterns;
 
-pub(super) use literals::format_string_literal_from_ast;
+pub(super) use literals::{format_directive, format_string_literal_from_ast};
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`
 use super::chain;
@@ -44,10 +44,12 @@ impl<'a> Printer<'a> {
     /// via `leftmost_no_lookahead`). Consumes the target so it fires exactly once:
     /// `(class {}).foo` wraps the class, not the whole member expression.
     fn maybe_wrap_expr_stmt_paren(&self, span: tsv_lang::Span, doc: DocId) -> DocId {
+        // Matched by span, not consumed: a chain may rebuild its base across
+        // conditional-group variants (`({a: 1}).b().c()`), so consuming the target on
+        // the first (possibly discarded) build would leave the selected variant
+        // unwrapped. The target is cleared once per statement in build_expression_statement.
         if self.expr_stmt_paren_target.get() == Some(span) {
-            self.expr_stmt_paren_target.set(None);
-            let d = self.d();
-            d.concat(&[d.text("("), doc, d.text(")")])
+            self.d().parens(doc)
         } else {
             doc
         }
@@ -68,14 +70,15 @@ impl<'a> Printer<'a> {
             Expression::Identifier(id) => self.build_identifier_doc(id),
             Expression::PrivateIdentifier(pid) => self.build_private_identifier_doc(pid),
             Expression::ObjectExpression(obj) => {
-                // Consume flag BEFORE building — build_object_doc recurses into
-                // property values which may contain nested ObjectExpressions that
-                // would incorrectly consume the flag if we checked it after.
-                let needs_arrow_parens = self.arrow_body_object_needs_parens.replace(false);
+                // Wrap in parens when this is the leftmost object of an arrow body
+                // (`() => ({}) && a`). Matched by span (not consumed): a chain may rebuild
+                // its base across conditional-group variants, and a nested call-argument
+                // object has a different span so it never matches.
+                let needs_arrow_parens =
+                    self.arrow_body_object_parens_target.get() == Some(obj.span);
                 let doc = self.build_object_doc(obj);
                 let doc = if needs_arrow_parens {
-                    let d = self.d();
-                    d.concat(&[d.text("("), doc, d.text(")")])
+                    self.d().parens(doc)
                 } else {
                     doc
                 };
@@ -309,14 +312,47 @@ impl<'a> Printer<'a> {
         let type_start = type_annotation.span().start;
         let keyword_pos = self.find_keyword_in_range(expr_end, type_start, keyword);
 
+        // `as const`: prettier relocates comments after `const` (cannot apply to
+        // `satisfies` — `satisfies const` is invalid TypeScript).
+        let is_as_const = is_as
+            && &self.source[type_start as usize..type_annotation.span().end as usize] == "const";
+
         // Comments between expression and keyword → place before the keyword
         if let Some(kw_pos) = keyword_pos {
             parts.push(self.build_inline_comments_between_doc(expr_end, kw_pos));
         }
 
+        // A line comment between the keyword and the type would otherwise be
+        // emitted inline and swallow the type (`x as // c A`, a content/structure
+        // loss). Keep it trailing the keyword (line_suffix) with the type on the
+        // next line. (`as const` relocates the comment instead — handled below.)
+        if let Some(kw_pos) = keyword_pos {
+            let kw_end = kw_pos + keyword.len() as u32;
+            if !is_as_const && self.has_line_comments_between(kw_end, type_start) {
+                parts.push(d.text(" "));
+                parts.push(d.text(keyword));
+                let type_doc = self.build_type_doc_with_wrapping_type_args(type_annotation);
+                self.append_keyword_value_line_comments(&mut parts, kw_end, type_start, type_doc);
+                return d.concat(&parts);
+            }
+        }
+
+        // Strip redundant comment-free parens so `(A | B)` / `(A & B)` cast types
+        // get the same hanging layout as the bare form (prettier strips them too).
+        let value_type = self.unwrap_redundant_parens(type_annotation);
+
         // Union cast types break after the keyword with a hanging indent.
         if let Some(tail) =
-            self.cast_union_hanging_tail(keyword, keyword_pos, type_annotation, type_start)
+            self.cast_union_hanging_tail(keyword, keyword_pos, value_type, type_start)
+        {
+            parts.push(tail);
+            return d.concat(&parts);
+        }
+
+        // Intersection cast types: the first member hugs the keyword, continuations
+        // wrap with a hanging indent (mirrors the type-alias / annotation layout).
+        if let Some(tail) =
+            self.cast_intersection_hanging_tail(keyword, keyword_pos, value_type, type_start)
         {
             parts.push(tail);
             return d.concat(&parts);
@@ -329,10 +365,6 @@ impl<'a> Printer<'a> {
         // Comments between keyword and type
         if let Some(kw_pos) = keyword_pos {
             let kw_end = kw_pos + keyword.len() as u32;
-            // `as const`: prettier moves comments after `const`; otherwise keep in place.
-            let is_as_const = is_as
-                && &self.source[type_start as usize..type_annotation.span().end as usize]
-                    == "const";
             if is_as_const {
                 parts.push(self.build_type_doc_with_wrapping_type_args(type_annotation));
                 parts.push(self.build_inline_comments_between_doc(kw_end, type_start));
@@ -378,6 +410,33 @@ impl<'a> Printer<'a> {
         let hanging = self.build_union_hanging_indent_doc(type_annotation)?;
         let d = self.d();
         Some(d.concat(&[d.text(" "), d.text(keyword), hanging]))
+    }
+
+    /// The keyword-plus-type tail for an `as`/`satisfies` cast when the cast type
+    /// is an intersection: the first member hugs the keyword, continuation members
+    /// wrap with a hanging indent (via the shared `intersection_hanging_with_indent`,
+    /// the same layout the type-alias RHS arm uses).
+    ///
+    /// Returns `None` to fall through to the caller's inline layout — for
+    /// non-intersection types, or when a comment sits between the keyword and the
+    /// type.
+    fn cast_intersection_hanging_tail(
+        &self,
+        keyword: &'static str,
+        keyword_pos: Option<u32>,
+        type_annotation: &TSType,
+        type_start: u32,
+    ) -> Option<DocId> {
+        let keyword_len = keyword.len() as u32;
+        if keyword_pos.is_some_and(|pos| self.has_comments_between(pos + keyword_len, type_start)) {
+            return None;
+        }
+        let TSType::Intersection(i) = type_annotation else {
+            return None;
+        };
+        let d = self.d();
+        let body = self.intersection_hanging_with_indent(i);
+        Some(d.concat(&[d.text(" "), d.text(keyword), d.text(" "), body]))
     }
 
     /// Build a Doc for a TypeScript instantiation expression
@@ -456,6 +515,30 @@ impl<'a> Printer<'a> {
             } else {
                 d.concat(&[inner_doc, d.text("!")])
             }
+        }
+    }
+
+    /// When `expr` is a non-null assertion sealing a parenthesized optional chain
+    /// (`(a?.b)!` / `(a?.())!` — the `!` outside the source parens, detected via the
+    /// span gap), render it as `(chain)!` with the parens kept. Returns `None` for
+    /// any other expression.
+    ///
+    /// Used in always-required-parens positions (`new` callee, tagged-template tag)
+    /// where an optional chain may not appear unsealed (`` a?.b!`x` `` /
+    /// `new a?.b!()` are syntax errors). The standalone non-null path strips the
+    /// now-redundant parens (`(a?.b)!` → `a?.b!`), so they are restored per-context
+    /// here. Normalizes to the `!`-outside form, matching the Sprint-2 sealed-base
+    /// rendering (`push_sealed_chain_base` / the chain linearizer's non-null arm).
+    pub(crate) fn build_sealed_non_null_paren_doc(&self, expr: &Expression) -> Option<DocId> {
+        let Expression::TSNonNullExpression(non_null) = expr else {
+            return None;
+        };
+        if non_null.seals_optional_chain() {
+            let d = self.d();
+            let inner_doc = self.build_expression_doc_with_indent_on_break(&non_null.expression);
+            Some(d.concat(&[d.text("("), inner_doc, d.text(")!")]))
+        } else {
+            None
         }
     }
 
@@ -1003,14 +1086,18 @@ impl<'a> Printer<'a> {
         tagged: &crate::ast::internal::TaggedTemplateExpression,
     ) -> DocId {
         let d = self.d();
-        let tag_doc = self.build_expression_doc(&tagged.tag);
 
-        // Wrap tag in parens if needed (e.g., ternary: `(a ? b : c)`template``)
-        // This must happen BEFORE adding removed-paren comments so comments stay outside
-        let tag_doc = if needs_parens(&tagged.tag, ParenContext::Callee) {
-            d.parens(tag_doc)
+        // Wrap tag in parens if needed (e.g., ternary: `(a ? b : c)`template``, or an
+        // optional chain: `` (a?.b)`x` `` — a chain can't be a tag per spec). A
+        // non-null assertion that seals a parenthesized chain (`` (a?.b)!`x` ``) keeps
+        // the parens via the sealed-base rendering. This must happen BEFORE adding
+        // removed-paren comments so comments stay outside.
+        let tag_doc = if let Some(sealed) = self.build_sealed_non_null_paren_doc(&tagged.tag) {
+            sealed
+        } else if needs_parens(&tagged.tag, ParenContext::TaggedTemplateTag) {
+            d.parens(self.build_expression_doc(&tagged.tag))
         } else {
-            tag_doc
+            self.build_expression_doc(&tagged.tag)
         };
 
         // Check for comments between removed parentheses and tag

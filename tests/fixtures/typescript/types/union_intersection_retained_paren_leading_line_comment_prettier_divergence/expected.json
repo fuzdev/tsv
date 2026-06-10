@@ -1,0 +1,628 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 619,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " first union member is a parenthesized union with a leading line comment inside",
+			"start": 20,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the parens - tsv keeps the comment inside the member (prettier moves it out, before",
+			"start": 103,
+			"end": 189,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the member); the line comment forces the inner union to break one member per line",
+			"start": 191,
+			"end": 275,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 300,
+			"end": 304,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 4
+				},
+				"end": {
+					"line": 7,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a leading line comment inside a LATER member's parens relocates to trail the",
+			"start": 335,
+			"end": 414,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " previous member (both formatters agree); only the first member - with no previous",
+			"start": 416,
+			"end": 500,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " member to relocate onto - keeps the comment inside the parens",
+			"start": 502,
+			"end": 566,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 585,
+			"end": 589,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 6
+				},
+				"end": {
+					"line": 17,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 618,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 609,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 20,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 277,
+					"end": 332,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 282,
+						"end": 287,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 6
+							},
+							"end": {
+								"line": 5,
+								"column": 11
+							}
+						},
+						"name": "First"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 292,
+						"end": 331,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 2
+							},
+							"end": {
+								"line": 11,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSParenthesizedType",
+								"start": 294,
+								"end": 325,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 4
+									},
+									"end": {
+										"line": 10,
+										"column": 4
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSUnionType",
+									"start": 309,
+									"end": 320,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 4
+										},
+										"end": {
+											"line": 9,
+											"column": 7
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 311,
+											"end": 312,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 6
+												},
+												"end": {
+													"line": 8,
+													"column": 7
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 311,
+												"end": 312,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 6
+													},
+													"end": {
+														"line": 8,
+														"column": 7
+													}
+												},
+												"name": "A"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 319,
+											"end": 320,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 6
+												},
+												"end": {
+													"line": 9,
+													"column": 7
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 319,
+												"end": 320,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 6
+													},
+													"end": {
+														"line": 9,
+														"column": 7
+													}
+												},
+												"name": "B"
+											}
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 300,
+											"end": 304
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 330,
+								"end": 331,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 4
+									},
+									"end": {
+										"line": 11,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 330,
+									"end": 331,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 4
+										},
+										"end": {
+											"line": 11,
+											"column": 5
+										}
+									},
+									"name": "C"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " first union member is a parenthesized union with a leading line comment inside",
+							"start": 20,
+							"end": 101
+						},
+						{
+							"type": "Line",
+							"value": " the parens - tsv keeps the comment inside the member (prettier moves it out, before",
+							"start": 103,
+							"end": 189
+						},
+						{
+							"type": "Line",
+							"value": " the member); the line comment forces the inner union to break one member per line",
+							"start": 191,
+							"end": 275
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 568,
+					"end": 608,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 573,
+						"end": 576,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 6
+							},
+							"end": {
+								"line": 16,
+								"column": 9
+							}
+						},
+						"name": "Mid"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 581,
+						"end": 607,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 2
+							},
+							"end": {
+								"line": 19,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 583,
+								"end": 584,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 4
+									},
+									"end": {
+										"line": 17,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 583,
+									"end": 584,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 4
+										},
+										"end": {
+											"line": 17,
+											"column": 5
+										}
+									},
+									"name": "A"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 585,
+										"end": 589
+									}
+								]
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 594,
+								"end": 601,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 4
+									},
+									"end": {
+										"line": 18,
+										"column": 11
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSUnionType",
+									"start": 595,
+									"end": 600,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 5
+										},
+										"end": {
+											"line": 18,
+											"column": 10
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 595,
+											"end": 596,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 5
+												},
+												"end": {
+													"line": 18,
+													"column": 6
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 595,
+												"end": 596,
+												"loc": {
+													"start": {
+														"line": 18,
+														"column": 5
+													},
+													"end": {
+														"line": 18,
+														"column": 6
+													}
+												},
+												"name": "B"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 599,
+											"end": 600,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 9
+												},
+												"end": {
+													"line": 18,
+													"column": 10
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 599,
+												"end": 600,
+												"loc": {
+													"start": {
+														"line": 18,
+														"column": 9
+													},
+													"end": {
+														"line": 18,
+														"column": 10
+													}
+												},
+												"name": "C"
+											}
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 606,
+								"end": 607,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 4
+									},
+									"end": {
+										"line": 19,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 606,
+									"end": 607,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 4
+										},
+										"end": {
+											"line": 19,
+											"column": 5
+										}
+									},
+									"name": "D"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a leading line comment inside a LATER member's parens relocates to trail the",
+							"start": 335,
+							"end": 414
+						},
+						{
+							"type": "Line",
+							"value": " previous member (both formatters agree); only the first member - with no previous",
+							"start": 416,
+							"end": 500
+						},
+						{
+							"type": "Line",
+							"value": " member to relocate onto - keeps the comment inside the parens",
+							"start": 502,
+							"end": 566
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

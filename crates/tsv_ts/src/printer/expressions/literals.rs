@@ -31,6 +31,27 @@ pub(crate) fn format_string_literal_from_ast(literal: &internal::Literal, source
     format_string_literal(raw_content, quote, StringFormatOptions::default())
 }
 
+/// Format a directive prologue string (`'use strict'`) for printing.
+///
+/// Mirrors Prettier's `printDirective` (`language-js/print/literal.js`), which is
+/// deliberately distinct from `printString`: a directive is an exact code-unit
+/// sequence, so its escapes are never re-encoded. Only the *outer* quote is
+/// swapped to the preferred style (single) — and only when the content holds no
+/// quote of either kind. If the content contains a `'` or `"`, the raw literal is
+/// preserved verbatim (swapping would force re-escaping, changing the directive;
+/// see prettier#1555).
+///
+/// `raw` is the literal *with* its surrounding quotes (the source slice).
+pub(crate) fn format_directive(raw: &str) -> String {
+    let content = &raw[1..raw.len() - 1];
+    if content.contains('\'') || content.contains('"') {
+        raw.to_string()
+    } else {
+        // Preferred quote is single (matches `StringFormatOptions::default`).
+        format!("'{content}'")
+    }
+}
+
 /// Normalize a number literal to match Prettier's output format.
 ///
 /// Mirrors Prettier's `printNumber` (`src/utilities/print-number.js`) so that
@@ -348,7 +369,11 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let needs_parens =
             super::needs_parens(&spread.argument, super::ParenContext::SpreadArgument);
-        let arg_doc = self.build_expression_doc(&spread.argument);
+        // A binaryish spread argument indents its continuation when it breaks
+        // (`...(a &&\n\tb && {…})`), matching Prettier — a `SpreadElement` parent is
+        // not in binaryish.js's `shouldNotIndent` set, so the logical/binary chain
+        // gets the continuation indent. Non-binary arguments are unaffected.
+        let arg_doc = self.build_expression_doc_with_indent_on_break(&spread.argument);
 
         // Check for comments between `...` and the argument (e.g., `.../* comment */ arr`)
         // The `...` is 3 chars, so comment region starts at span.start + 3
@@ -384,7 +409,28 @@ impl<'a> Printer<'a> {
 
 #[cfg(test)]
 mod tests {
+    use super::format_directive as fd;
     use super::normalize_number_literal as norm;
+
+    #[test]
+    fn directive_swaps_outer_quote_to_single() {
+        // Non-preferred (double) quote normalizes to single...
+        assert_eq!(fd("\"use strict\""), "'use strict'");
+        assert_eq!(fd("\"use asm\""), "'use asm'");
+        // ...and a single-quoted directive is already canonical.
+        assert_eq!(fd("'use strict'"), "'use strict'");
+        // Inner escapes are preserved exactly — only the outer quote swaps.
+        assert_eq!(fd("\"a\\nb\""), "'a\\nb'");
+    }
+
+    #[test]
+    fn directive_kept_verbatim_when_content_has_a_quote() {
+        // Content holds a `"`/`'` → verbatim (swapping would require re-escaping,
+        // which would change an exact code-unit sequence).
+        assert_eq!(fd("\"\\\"\""), "\"\\\"\""); // "\"" stays double
+        assert_eq!(fd("'\\''"), "'\\''"); // '\'' stays single
+        assert_eq!(fd("'a\"b'"), "'a\"b'"); // single-quoted, inner " → no swap
+    }
 
     #[test]
     fn keeps_single_char_and_simple() {

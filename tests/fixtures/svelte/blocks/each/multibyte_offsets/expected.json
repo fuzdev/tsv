@@ -1,0 +1,405 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 324,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 217,
+				"data": " Multibyte before the context on the same line: the simple identifier's injected\n     loc character/column and the destructure pattern's +1 read-pattern columns must\n     translate from byte to UTF-16 offsets. "
+			},
+			{
+				"type": "Text",
+				"start": 217,
+				"end": 218,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 218,
+				"end": 267,
+				"expression": {
+					"type": "ArrayExpression",
+					"start": 225,
+					"end": 231,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 7
+						},
+						"end": {
+							"line": 4,
+							"column": 13
+						}
+					},
+					"elements": [
+						{
+							"type": "Literal",
+							"start": 226,
+							"end": 230,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 8
+								},
+								"end": {
+									"line": 4,
+									"column": 12
+								}
+							},
+							"value": "中文",
+							"raw": "'中文'"
+						}
+					]
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 240,
+							"end": 242,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 242,
+							"end": 259,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 2,
+									"character": 243
+								},
+								"end": {
+									"line": 5,
+									"column": 5,
+									"character": 246
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 247,
+										"end": 253,
+										"expression": {
+											"type": "Identifier",
+											"start": 248,
+											"end": 252,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 7
+												},
+												"end": {
+													"line": 5,
+													"column": 11
+												}
+											},
+											"name": "item"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 259,
+							"end": 260,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 235,
+					"end": 239,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 17,
+							"character": 235
+						},
+						"end": {
+							"line": 4,
+							"column": 21,
+							"character": 239
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 267,
+				"end": 269,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 269,
+				"end": 323,
+				"expression": {
+					"type": "ArrayExpression",
+					"start": 276,
+					"end": 282,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 7
+						},
+						"end": {
+							"line": 8,
+							"column": 13
+						}
+					},
+					"elements": [
+						{
+							"type": "Literal",
+							"start": 277,
+							"end": 281,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 8
+								},
+								"end": {
+									"line": 8,
+									"column": 12
+								}
+							},
+							"value": "😀",
+							"raw": "'😀'"
+						}
+					]
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 295,
+							"end": 297,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 297,
+							"end": 315,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 9,
+									"column": 2,
+									"character": 298
+								},
+								"end": {
+									"line": 9,
+									"column": 5,
+									"character": 301
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 302,
+										"end": 305,
+										"expression": {
+											"type": "Identifier",
+											"start": 303,
+											"end": 304,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 7
+												},
+												"end": {
+													"line": 9,
+													"column": 8
+												}
+											},
+											"name": "a"
+										}
+									},
+									{
+										"type": "Text",
+										"start": 305,
+										"end": 306,
+										"raw": " ",
+										"data": " "
+									},
+									{
+										"type": "ExpressionTag",
+										"start": 306,
+										"end": 309,
+										"expression": {
+											"type": "Identifier",
+											"start": 307,
+											"end": 308,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 11
+												},
+												"end": {
+													"line": 9,
+													"column": 12
+												}
+											},
+											"name": "b"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 315,
+							"end": 316,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "ObjectPattern",
+					"start": 286,
+					"end": 294,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 18
+						},
+						"end": {
+							"line": 8,
+							"column": 26
+						}
+					},
+					"properties": [
+						{
+							"type": "Property",
+							"start": 288,
+							"end": 289,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 20
+								},
+								"end": {
+									"line": 8,
+									"column": 21
+								}
+							},
+							"method": false,
+							"shorthand": true,
+							"computed": false,
+							"key": {
+								"type": "Identifier",
+								"start": 288,
+								"end": 289,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 20
+									},
+									"end": {
+										"line": 8,
+										"column": 21
+									}
+								},
+								"name": "a"
+							},
+							"value": {
+								"type": "Identifier",
+								"start": 288,
+								"end": 289,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 20
+									},
+									"end": {
+										"line": 8,
+										"column": 21
+									}
+								},
+								"name": "a"
+							},
+							"kind": "init"
+						},
+						{
+							"type": "Property",
+							"start": 291,
+							"end": 292,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 23
+								},
+								"end": {
+									"line": 8,
+									"column": 24
+								}
+							},
+							"method": false,
+							"shorthand": true,
+							"computed": false,
+							"key": {
+								"type": "Identifier",
+								"start": 291,
+								"end": 292,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 23
+									},
+									"end": {
+										"line": 8,
+										"column": 24
+									}
+								},
+								"name": "b"
+							},
+							"value": {
+								"type": "Identifier",
+								"start": 291,
+								"end": 292,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 23
+									},
+									"end": {
+										"line": 8,
+										"column": 24
+									}
+								},
+								"name": "b"
+							},
+							"kind": "init"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

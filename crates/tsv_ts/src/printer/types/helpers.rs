@@ -77,6 +77,23 @@ pub fn unwrap_parenthesized(ts_type: &TSType) -> &TSType {
     }
 }
 
+/// Find the `TSParenthesizedType` that directly wraps a union, walking through any
+/// redundant nested parens. Returns `None` when `ts_type` is a bare union (the parens
+/// are synthetic, added by the printer for precedence — no source comments to preserve).
+///
+/// Used to recover the paren span so `build_parenthesized_union_doc` can emit comments
+/// the user wrote inside retained parens (`(/* c */ a | b)`, `(a | b /* c */)`).
+pub(super) fn immediate_union_paren(ts_type: &TSType) -> Option<&internal::TSParenthesizedType> {
+    match ts_type {
+        TSType::Parenthesized(p) => match p.type_annotation.as_ref() {
+            TSType::Union(_) => Some(p),
+            inner @ TSType::Parenthesized(_) => immediate_union_paren(inner),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 /// Check if a type is "huggable" - brace-delimited types that expand internally.
 ///
 /// TypeLiteral (`{ a: T }`) and Mapped (`{ [K in T]: V }`) types are huggable:

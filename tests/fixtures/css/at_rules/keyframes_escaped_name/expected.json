@@ -1,0 +1,209 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 349,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 83,
+				"end": 131,
+				"name": "keyframes",
+				"prelude": "\\@mymove",
+				"block": {
+					"type": "Block",
+					"start": 103,
+					"end": 131,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 107,
+								"end": 111,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 107,
+										"end": 111,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "from",
+														"start": 107,
+														"end": 111
+													}
+												],
+												"start": 107,
+												"end": 111
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 112,
+								"end": 128,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 117,
+										"end": 123,
+										"property": "top",
+										"value": "0"
+									}
+								]
+							},
+							"start": 107,
+							"end": 128
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 176,
+				"end": 220,
+				"name": "keyframes",
+				"prelude": "a\\@b",
+				"block": {
+					"type": "Block",
+					"start": 192,
+					"end": 220,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 196,
+								"end": 200,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 196,
+										"end": 200,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "from",
+														"start": 196,
+														"end": 200
+													}
+												],
+												"start": 196,
+												"end": 200
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 201,
+								"end": 217,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 206,
+										"end": 212,
+										"property": "top",
+										"value": "0"
+									}
+								]
+							},
+							"start": 196,
+							"end": 217
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 294,
+				"end": 340,
+				"name": "keyframes",
+				"prelude": "\\31 23",
+				"block": {
+					"type": "Block",
+					"start": 312,
+					"end": 340,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 316,
+								"end": 320,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 316,
+										"end": 320,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "from",
+														"start": 316,
+														"end": 320
+													}
+												],
+												"start": 316,
+												"end": 320
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 321,
+								"end": 337,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 326,
+										"end": 332,
+										"property": "top",
+										"value": "0"
+									}
+								]
+							},
+							"start": 316,
+							"end": 337
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 341,
+			"styles": "\n\t/* escaped @ keeps its backslash (a bare @ would start an at-keyword) */\n\t@keyframes \\@mymove {\n\t\tfrom {\n\t\t\ttop: 0;\n\t\t}\n\t}\n\n\t/* escape mid-identifier is preserved */\n\t@keyframes a\\@b {\n\t\tfrom {\n\t\t\ttop: 0;\n\t\t}\n\t}\n\n\t/* hex escape with space terminator lets a name start with a digit */\n\t@keyframes \\31 23 {\n\t\tfrom {\n\t\t\ttop: 0;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 350,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -96,8 +96,17 @@ impl<'a> Printer<'a> {
     /// => Type1 &
     ///     Type2
     /// ```
-    fn build_function_type_return_doc(&self, return_type: &internal::TSTypeAnnotation) -> DocId {
+    /// Build the ` => ReturnType` tail. `leading_space` controls the space before
+    /// `=>`: normally `true` (` => T`), but `false` when a line comment in the
+    /// `)`→`=>` gap has forced a hardline before `=>` (the caller emits the comment
+    /// + hardline, so `=>` starts the next line flush — `() // c\n=> void`).
+    fn build_function_type_return_doc(
+        &self,
+        return_type: &internal::TSTypeAnnotation,
+        leading_space: bool,
+    ) -> DocId {
         let d = self.d();
+        let sp = if leading_space { " " } else { "" };
         // Comments between `=>` and the return type (e.g., `() => /* c */ string`)
         // For function types, the annotation span starts at `=` in `=>`
         let arrow_end = return_type.span.start + 2; // after `=>`
@@ -105,20 +114,28 @@ impl<'a> Printer<'a> {
         // Use break-for-line variant: line comments must force a hardline before
         // the return type so they don't swallow it (`=> // c\nT`, not `=> // c T`).
         let comments_doc = self.build_trailing_comments_break_for_line(arrow_end, type_start);
+        // Strip redundant comment-free parens so `($A | $B)` / `($A & $B)` return
+        // types get the same hanging layout as the bare form (prettier strips them
+        // too). Only union/intersection are unwrapped; other parenthesized types
+        // keep the match-on-original fall-through below.
+        let value_type = self.unwrap_redundant_parens(return_type.type_annotation.as_ref());
+        if let TSType::Union(u) = value_type {
+            let type_doc = self.build_union_type_doc(u, false);
+            return d.concat(&[
+                d.text_owned(format!("{sp}=>")),
+                hang_after_operator(d, d.concat(&[comments_doc, type_doc])),
+            ]);
+        }
+        if let TSType::Intersection(i) = value_type {
+            // Intersections use trailing `&` - first type NOT indented, continuations indented
+            let type_doc = self.build_intersection_type_doc(i, false);
+            return d.concat(&[
+                d.text_owned(format!("{sp}=> ")),
+                comments_doc,
+                d.group(d.indent(type_doc)),
+            ]);
+        }
         match return_type.type_annotation.as_ref() {
-            TSType::Union(u) => {
-                let type_doc = self.build_union_type_doc(u, false);
-                d.concat(&[
-                    d.text(" =>"),
-                    hang_after_operator(d, d.concat(&[comments_doc, type_doc])),
-                ])
-            }
-            TSType::Intersection(i) => {
-                // Intersections use trailing `&` - first type NOT indented, continuations indented
-                // The intersection doc handles this internally, we just need proper grouping
-                let type_doc = self.build_intersection_type_doc(i, false);
-                d.concat(&[d.text(" => "), comments_doc, d.group(d.indent(type_doc))])
-            }
             // TypeReference with complex type args (like Promise<Result<...>>):
             // Build with wrapping type args so it can break inside the <...>
             TSType::TypeReference(r)
@@ -129,10 +146,10 @@ impl<'a> Printer<'a> {
                 // Use build_type_doc_inner with wrap_type_args=true to enable
                 // wrapping inside the type reference's type arguments
                 let type_doc = self.build_type_doc_inner(&return_type.type_annotation, true);
-                d.concat(&[d.text(" => "), comments_doc, type_doc])
+                d.concat(&[d.text_owned(format!("{sp}=> ")), comments_doc, type_doc])
             }
             _ => d.concat(&[
-                d.text(" => "),
+                d.text_owned(format!("{sp}=> ")),
                 comments_doc,
                 self.build_type_doc(&return_type.type_annotation),
             ]),
@@ -259,29 +276,37 @@ impl<'a> Printer<'a> {
     ) -> [DocId; 2] {
         let d = self.d();
 
-        // Build return type first so we can check will_break for grouping
-        let return_type_doc = self.build_function_type_return_doc(return_type);
-
         // Comments between the close paren and `=>` (e.g. `() /* c */ => void`).
         // Without this they are dropped — the params doc ends at `)` and the
         // return doc begins at `=>`, so nothing else covers the gap.
         let arrow_start = return_type.span.start;
-        let pre_arrow_doc = find_char_skipping_comments(
+        let after_close = find_char_skipping_comments(
             self.source.as_bytes(),
             paren_search_start as usize,
             self.source.len(),
             b'(',
         )
         .and_then(|open| self.find_closing_paren(open as u32, arrow_start))
-        .filter(|&after_close| self.has_comments_between(after_close, arrow_start))
-        .map_or_else(
-            || d.empty(),
-            |after_close| {
-                self.build_comments_between(after_close, arrow_start, CommentSpacing::Leading)
-            },
-        );
+        .filter(|&after_close| self.has_comments_between(after_close, arrow_start));
 
-        let return_type_doc = d.concat(&[pre_arrow_doc, return_type_doc]);
+        // A line comment in the `)`→`=>` gap can't stay inline — it would swallow
+        // `=> void` (`() // c => void`). Keep it trailing `)` and force `=>` onto
+        // the next line flush (`() // c\n=> void`), matching prettier. A block
+        // comment stays inline (`() /* c */ => void`).
+        let pre_arrow_line_close =
+            after_close.filter(|&ac| self.has_line_comments_between(ac, arrow_start));
+        let return_type_doc =
+            self.build_function_type_return_doc(return_type, pre_arrow_line_close.is_none());
+        let return_type_doc = if let Some(ac) = pre_arrow_line_close {
+            let pre = self.build_trailing_comments_break_for_line(ac, arrow_start);
+            d.concat(&[d.text(" "), pre, return_type_doc])
+        } else {
+            let pre_arrow_doc = after_close.map_or_else(
+                || d.empty(),
+                |ac| self.build_comments_between(ac, arrow_start, CommentSpacing::Leading),
+            );
+            d.concat(&[pre_arrow_doc, return_type_doc])
+        };
 
         let params_doc = d.concat(&self.build_function_params_doc(params, paren_search_start));
         let params_doc = if params.len() == 1
@@ -312,6 +337,30 @@ impl<'a> Printer<'a> {
             && let Some(close_pos) = self.matching_close_paren(paren_pos)
             && self.has_comments_between(paren_pos + 1, close_pos)
         {
+            // A line comment can't stay inline inside `()` — it would swallow the
+            // `)`. Keep it trailing the `(` (open-delimiter divergence: prettier
+            // floats it out after `)`) and drop `)` to the next line. Block
+            // comments stay inline, matching prettier.
+            if self.has_line_comments_between(paren_pos + 1, close_pos) {
+                let (prefix, pull_pos) = self.delimiter_line_comment_prefix(paren_pos, close_pos);
+                let mut parts = vec![d.text("(")];
+                parts.extend(prefix);
+                // Comments not pulled onto the `(` line (own-line) keep their lines.
+                let mut inner = Vec::new();
+                for comment in comments_in_range(self.comments, paren_pos + 1, close_pos) {
+                    if pull_pos.is_some_and(|p| self.comment_on_delimiter_line(p, comment)) {
+                        continue;
+                    }
+                    inner.push(d.hardline());
+                    inner.push(self.build_comment_doc(comment));
+                }
+                if !inner.is_empty() {
+                    parts.push(d.indent(d.concat(&inner)));
+                }
+                parts.push(d.hardline());
+                parts.push(d.text(")"));
+                return d.concat(&parts);
+            }
             let mut parts = vec![d.text("(")];
             for comment in comments_in_range(self.comments, paren_pos + 1, close_pos) {
                 parts.push(self.build_comment_doc(comment));
@@ -405,13 +454,27 @@ impl<'a> Printer<'a> {
         let close_paren_pos = paren_pos.and_then(|p| self.matching_close_paren(p));
         let end_boundary =
             close_paren_pos.unwrap_or_else(|| params.last().map_or(0, |p| p.span().end));
+        // A line comment trailing `(` (`(// c\n p`), or an own-line block comment
+        // in the `(`→first-param gap, forces multiline. Without this it falls to
+        // the inline path below, where a line comment swallows the following tokens
+        // (`(// c p: T)`). Mirrors `build_function_params_doc`'s leading-gap check.
+        let has_leading_gap_forcing = paren_pos.is_some_and(|p| {
+            let first_start = params[0].span().start;
+            self.has_line_comments_between(p + 1, first_start)
+                || self.has_own_line_block_comment_after(p, p + 1, first_start)
+        });
         let has_forcing_comments = self.has_line_comments_in_delimited_list(
             params,
             internal::Expression::span,
             end_boundary,
-        ) || params.last().is_some_and(|last| {
-            self.has_own_line_block_comment_after(last.span().end, last.span().end, end_boundary)
-        });
+        ) || has_leading_gap_forcing
+            || params.last().is_some_and(|last| {
+                self.has_own_line_block_comment_after(
+                    last.span().end,
+                    last.span().end,
+                    end_boundary,
+                )
+            });
 
         if has_forcing_comments {
             // Multiline path with hardlines (same as build_function_params_doc_with_line_comments)
@@ -419,13 +482,32 @@ impl<'a> Printer<'a> {
             let open_paren = paren_pos.unwrap_or(0);
             let mut prev_end = open_paren + 1;
 
+            // A line comment trailing `(` is kept on the `(` line. For a method
+            // signature prettier also keeps it there (match); for call/construct
+            // signatures prettier relocates it to its own line (divergence). tsv
+            // applies the open-delimiter rule uniformly. Same mechanism as the
+            // function/constructor-type params path.
+            let (paren_prefix, paren_pull_pos) = paren_pos.map_or_else(
+                || (Vec::new(), None),
+                |open| self.delimiter_line_comment_prefix(open, params[0].span().start),
+            );
+
             for (i, p) in params.iter().enumerate() {
                 let param_start = p.span().start;
                 let param_end = p.span().end;
                 let is_last = i == params.len() - 1;
                 let is_rest = matches!(p, internal::Expression::RestElement(_));
 
-                inner_parts.extend(self.build_leading_comments_multiline(prev_end, param_start));
+                if i == 0 && paren_pull_pos.is_some() {
+                    inner_parts.extend(self.build_leading_comments_multiline_after_delim(
+                        prev_end,
+                        param_start,
+                        open_paren,
+                    ));
+                } else {
+                    inner_parts
+                        .extend(self.build_leading_comments_multiline(prev_end, param_start));
+                }
                 inner_parts.push(self.build_function_type_param_expression_doc(p));
 
                 if !is_last {
@@ -445,6 +527,7 @@ impl<'a> Printer<'a> {
             }
 
             let mut parts = vec![d.text("(")];
+            parts.push(d.concat(&paren_prefix));
             parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])));
             parts.push(d.hardline());
             parts.push(d.text(")"));

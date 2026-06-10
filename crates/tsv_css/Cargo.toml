@@ -6,7 +6,7 @@ description = "CSS parsing and formatting library"
 
 [features]
 default = ["convert"]
-# Public AST + JSON serialization layer. Off in the @fuzdev/tsv_fmt WASM
+# Public AST + JSON serialization layer. Off in the @fuzdev/tsv_format_wasm
 # build; on for every other consumer.
 convert = ["dep:serde", "dep:serde_json"]
 

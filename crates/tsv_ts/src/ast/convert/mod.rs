@@ -37,9 +37,11 @@ mod functions;
 mod modules;
 mod patterns;
 mod statements;
+mod translate_typed;
 mod types;
 
 pub use acorn_comments::{build_comments_with_duplicates, collect_acorn_type_reparse_ranges};
+pub use translate_typed::translate_byte_to_char_offsets_typed;
 
 // Re-export conversion functions (pub(in crate::ast) for internal use)
 pub(in crate::ast) use control_flow::*;
@@ -53,14 +55,14 @@ pub(in crate::ast) use types::*;
 // Public API exports
 pub use expressions::convert_expression;
 
-/// Translate all byte-based positions in a JSON AST to character-based positions
+/// Translate all byte-based positions in a JSON AST to UTF-16 code-unit positions
 ///
-/// JavaScript (acorn/Svelte) uses Unicode character (codepoint) offsets, while Rust
-/// strings are byte-indexed. This function post-processes a serialized JSON AST to
-/// convert all `start`, `end`, `loc.*.column`, `character`, and `name_loc` positions
-/// from byte offsets to character offsets.
+/// JavaScript (acorn/Svelte) uses UTF-16 code-unit offsets (JS string indices),
+/// while Rust strings are byte-indexed. This function post-processes a serialized
+/// JSON AST to convert all `start`, `end`, `loc.*.column`, `character`, and
+/// `name_loc` positions from byte offsets to UTF-16 code-unit offsets.
 ///
-/// For ASCII-only sources, this is a no-op (byte == char offset).
+/// For ASCII-only sources, this is a no-op (byte == code-unit offset).
 pub fn translate_byte_to_char_offsets(
     value: &mut serde_json::Value,
     map: &tsv_lang::ByteToCharMap,
@@ -179,6 +181,20 @@ fn translate_positions_recursive(
                 {
                     translate_loc_position(end_pos, char_byte, map, tracker);
                 }
+            }
+
+            // Translate extra.trailingComma (TSTypeParameterDeclaration `<T,>`):
+            // a byte offset that acorn emits in UTF-16 code units
+            if let Some(serde_json::Value::Object(extra)) = obj.get_mut("extra")
+                && let Some(trailing_comma) = extra
+                    .get("trailingComma")
+                    .and_then(serde_json::Value::as_u64)
+                    .map(|v| v as u32)
+            {
+                extra.insert(
+                    "trailingComma".to_string(),
+                    serde_json::Value::Number(map.byte_to_char(trailing_comma).into()),
+                );
             }
 
             // Recurse into all values (skip loc/name_loc which we already handled)

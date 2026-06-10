@@ -1,0 +1,94 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 136,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 127,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 41,
+							"property": "background",
+							"value": "url('a\\a b')"
+						},
+						{
+							"type": "Declaration",
+							"start": 45,
+							"end": 76,
+							"property": "background-image",
+							"value": "url('a\\41 b')"
+						},
+						{
+							"type": "Declaration",
+							"start": 80,
+							"end": 103,
+							"property": "mask-image",
+							"value": "url('a\\\\b')"
+						},
+						{
+							"type": "Declaration",
+							"start": 107,
+							"end": 123,
+							"property": "content",
+							"value": "'a\\a b'"
+						}
+					]
+				},
+				"start": 9,
+				"end": 127
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 128,
+			"styles": "\n\tdiv {\n\t\tbackground: url('a\\a b');\n\t\tbackground-image: url('a\\41 b');\n\t\tmask-image: url('a\\\\b');\n\t\tcontent: 'a\\a b';\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 137,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

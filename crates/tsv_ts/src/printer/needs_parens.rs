@@ -42,6 +42,13 @@ pub enum ParenContext {
     /// New expression callee: `new <expr>()`
     NewCallee,
 
+    /// Tagged template tag: `` <expr>`template` ``
+    ///
+    /// Same precedence rules as `Callee`, plus an optional chain always needs
+    /// parens here — an optional chain can't be a template tag per spec
+    /// (`` a?.b`x` `` is a syntax error), so the parens seal it.
+    TaggedTemplateTag,
+
     /// Base of member/call chain: `<expr>.method()`
     ChainBase,
 
@@ -115,41 +122,75 @@ pub fn needs_parens(expr: &Expression, ctx: ParenContext) -> bool {
         }
 
         // Callee: `(a ? b : c)()`, `(a + b)()`, `(() => {})()`, `(x as T)()`, `(<T>x)()`, etc.
-        // Also used for tagged template tags: `(x as T)`template``
+        // TaggedTemplateTag (`(x as T)`template``) shares these precedence rules; both it
+        // and NewCallee add the optional-chain rule below.
         // Note: SequenceExpression already adds its own parens in build_sequence_doc
         // Note: ClassExpression needs parens only in NewCallee: `class {}()` is valid but `new class {}()` is not
-        ParenContext::Callee | ParenContext::NewCallee => {
-            // ClassExpression only needs parens in `new` context
-            if matches!(ctx, ParenContext::NewCallee)
-                && matches!(expr, Expression::ClassExpression(_))
+        ParenContext::Callee | ParenContext::NewCallee | ParenContext::TaggedTemplateTag => {
+            if matches!(ctx, ParenContext::NewCallee) {
+                // ClassExpression only needs parens in `new` context
+                if matches!(expr, Expression::ClassExpression(_)) {
+                    return true;
+                }
+                // A `new` callee containing a call needs parens so the arguments
+                // bind to the `new`, not to the inner call: `new (f())()`,
+                // `new (a.b())()`, `new (f().C)()`, `new (a?.b())()`. Without them
+                // `new f()()` parses as `(new f())()` — different semantics.
+                if new_callee_has_call(expr) {
+                    return true;
+                }
+            }
+            // A `new` callee or template tag may NOT be an (unsealed) optional chain
+            // per spec — `new a?.b()` / `` a?.b`x` `` are syntax errors. So the parens
+            // are *always* required (unlike the boundary-dependent member/call/non-null
+            // cases, which depend on what follows the chain). The plain call `Callee`
+            // context is excluded: `(a?.b)()` strips to the valid `a?.b()`. A non-null
+            // assertion that seals the chain (`(a?.b)!`) is handled by the sealed-base
+            // rendering, not here (`has_optional_in_chain` returns false for it).
+            if matches!(
+                ctx,
+                ParenContext::NewCallee | ParenContext::TaggedTemplateTag
+            ) && expr.has_optional_in_chain()
             {
                 return true;
             }
             is_await_or_yield(expr)
                 || is_type_assertion(expr)
                 || is_function_like(expr)
+                || is_unary_or_update(expr)
                 || matches!(
                     expr,
                     Expression::ConditionalExpression(_)
                         | Expression::BinaryExpression(_)
                         | Expression::AssignmentExpression(_)
-                        | Expression::UnaryExpression(_)
-                        | Expression::UpdateExpression(_)
                 )
         }
 
         // Chain base: `(a + b).method()`, `(await x).method()`, `(yield x).method()`, etc.
         // Numeric literals need parens for `.method()` calls: `0.toString()` is invalid syntax.
         // Prettier normalizes `0..toString()` to `(0).toString()`.
-        ParenContext::ChainBase => is_lower_precedence(expr) || is_numeric_literal(expr),
+        //
+        // Update/unary expressions and arrow functions as a member-access object
+        // also need parens: `(++c).p`, `(-a).p`, `(!a).p`, `(typeof a).p`,
+        // `(() => 1).p`. Without them the prefix operator binds to the member
+        // access (`-a.p` is `-(a.p)`) or the arrow body absorbs it (`() => 1.p` is
+        // an arrow returning `1.p`). Function/class/object expressions do NOT need
+        // them — their brace-delimited bodies make the parens redundant, and
+        // prettier strips them (`(function () {}).p` → `function () {}.p`).
+        ParenContext::ChainBase => {
+            is_lower_precedence(expr)
+                || is_numeric_literal(expr)
+                || is_unary_or_update(expr)
+                || matches!(expr, Expression::ArrowFunctionExpression(_))
+        }
 
         // Spread argument: `...(a || b)`, `...(a ? b : c)`, `...(await x)`, `...(x as T)`
         ParenContext::SpreadArgument => is_lower_precedence(expr),
 
-        // Non-null: `(a + b)!`, `(!x)!`, `(a ? b : c)!`, `(yield x)!`, etc.
-        ParenContext::NonNull => {
-            is_lower_precedence(expr) || matches!(expr, Expression::UnaryExpression(_))
-        }
+        // Non-null: `(a + b)!`, `(!x)!`, `(a ? b : c)!`, `(yield x)!`, `(++x)!`, etc.
+        // UpdateExpression needs parens too: `(++x)!` is `NonNull(++x)`, but `++x!`
+        // parses as `++(x!)` (`Update(NonNull)`) — a different AST.
+        ParenContext::NonNull => is_lower_precedence(expr) || is_unary_or_update(expr),
 
         // Type assertion (as/satisfies): `(a + b) as T`, `(await x) as T`, `(<U>x) as T`
         // Arrow functions need parens because `(...args) => x as T` parses as `(...args) => (x as T)`
@@ -283,6 +324,37 @@ fn is_function_like(expr: &Expression) -> bool {
         expr,
         Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_)
     )
+}
+
+/// Prefix/postfix unary or update expression (`-x`, `!x`, `typeof x`, `void x`,
+/// `delete x`, `++x`, `x--`). These bind looser than member access, call, and
+/// the postfix `!` non-null operator, so they need parens as a member-access
+/// object (`(-x).p`), a chain callee (`(-x)()`), or a non-null operand (`(++x)!`)
+/// — without them the operator captures the wrong operand (`-x.p` is `-(x.p)`;
+/// `++x!` is `++(x!)`). `UpdateExpression` is easy to omit when adding such a
+/// context (it was missed for `ChainBase` and `NonNull`); routing every
+/// postfix/access-precedence arm through this predicate keeps them in lockstep.
+fn is_unary_or_update(expr: &Expression) -> bool {
+    matches!(
+        expr,
+        Expression::UnaryExpression(_) | Expression::UpdateExpression(_)
+    )
+}
+
+/// Whether a `new` callee contains a call expression in its leftmost
+/// member/non-null chain. Prettier parenthesizes such a callee so the `new`
+/// arguments bind to the `new` rather than the inner call: `new (f())()`,
+/// `new (a.b())()`, `new (f().C)()`, `new (a?.b())()`. Mirrors prettier's
+/// `NewExpression` callee rule (needs-parens.js). Member access walks the
+/// object (the call must be to the left of `new`'s argument list to be
+/// captured), so `new a[b]()` — no inner call — stays unparenthesized.
+fn new_callee_has_call(expr: &Expression) -> bool {
+    match expr {
+        Expression::CallExpression(_) => true,
+        Expression::MemberExpression(member) => new_callee_has_call(&member.object),
+        Expression::TSNonNullExpression(non_null) => new_callee_has_call(&non_null.expression),
+        _ => false,
+    }
 }
 
 /// Numeric literal - needs parens in chain base context because `0.toString()` is invalid.

@@ -1,0 +1,435 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 405,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A non-null assertion sealing a parenthesized optional chain keeps the parens as a",
+			"start": 20,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " tagged-template tag: `(a?.b)!`tpl`` tags the asserted result. The bare form",
+			"start": 106,
+			"end": 184,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `a?.b!`tpl`` is a syntax error (an optional chain can't be a template tag), so the",
+			"start": 186,
+			"end": 271,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " parens are required. (The non-`!` tag cases are in optional_paren_new_tagged_boundary.)",
+			"start": 273,
+			"end": 363,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 91
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 404,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 395,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 365,
+					"end": 378,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 14
+						}
+					},
+					"expression": {
+						"type": "TaggedTemplateExpression",
+						"start": 365,
+						"end": 377,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 13
+							}
+						},
+						"tag": {
+							"type": "TSNonNullExpression",
+							"start": 365,
+							"end": 372,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 1
+								},
+								"end": {
+									"line": 6,
+									"column": 8
+								}
+							},
+							"expression": {
+								"type": "ChainExpression",
+								"start": 366,
+								"end": 370,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "MemberExpression",
+									"start": 366,
+									"end": 370,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 6
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 366,
+										"end": 367,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 369,
+										"end": 370,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 5
+											},
+											"end": {
+												"line": 6,
+												"column": 6
+											}
+										},
+										"name": "b"
+									},
+									"computed": false,
+									"optional": true
+								}
+							}
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 372,
+							"end": 377,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 8
+								},
+								"end": {
+									"line": 6,
+									"column": 13
+								}
+							},
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 373,
+									"end": 376,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 9
+										},
+										"end": {
+											"line": 6,
+											"column": 12
+										}
+									},
+									"value": {
+										"raw": "tpl",
+										"cooked": "tpl"
+									},
+									"tail": true
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A non-null assertion sealing a parenthesized optional chain keeps the parens as a",
+							"start": 20,
+							"end": 104
+						},
+						{
+							"type": "Line",
+							"value": " tagged-template tag: `(a?.b)!`tpl`` tags the asserted result. The bare form",
+							"start": 106,
+							"end": 184
+						},
+						{
+							"type": "Line",
+							"value": " `a?.b!`tpl`` is a syntax error (an optional chain can't be a template tag), so the",
+							"start": 186,
+							"end": 271
+						},
+						{
+							"type": "Line",
+							"value": " parens are required. (The non-`!` tag cases are in optional_paren_new_tagged_boundary.)",
+							"start": 273,
+							"end": 363
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 380,
+					"end": 394,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "TaggedTemplateExpression",
+						"start": 380,
+						"end": 393,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 14
+							}
+						},
+						"tag": {
+							"type": "TSNonNullExpression",
+							"start": 380,
+							"end": 388,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 1
+								},
+								"end": {
+									"line": 7,
+									"column": 9
+								}
+							},
+							"expression": {
+								"type": "ChainExpression",
+								"start": 381,
+								"end": 386,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 381,
+									"end": 386,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 7
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 381,
+										"end": 382,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 2
+											},
+											"end": {
+												"line": 7,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"arguments": [],
+									"optional": true
+								}
+							}
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 388,
+							"end": 393,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 9
+								},
+								"end": {
+									"line": 7,
+									"column": 14
+								}
+							},
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 389,
+									"end": 392,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 10
+										},
+										"end": {
+											"line": 7,
+											"column": 13
+										}
+									},
+									"value": {
+										"raw": "tpl",
+										"cooked": "tpl"
+									},
+									"tail": true
+								}
+							]
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

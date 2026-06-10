@@ -1,0 +1,836 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 476,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An optional chain can't be the callee of `new` or the tag of a tagged template",
+			"start": 10,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (per spec), so these parens are required: stripping them is a syntax error.",
+			"start": 93,
+			"end": 171,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (The boundary-dependent member/call/computed cases are in optional_paren_boundary.)",
+			"start": 173,
+			"end": 259,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `new` callee — optional chain base needs parens",
+			"start": 262,
+			"end": 312,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " tagged template tag — optional chain base needs parens",
+			"start": 363,
+			"end": 420,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 58
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 475,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 466,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 314,
+					"end": 327,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 14
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 314,
+						"end": 326,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 13
+							}
+						},
+						"callee": {
+							"type": "ChainExpression",
+							"start": 319,
+							"end": 323,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 6
+								},
+								"end": {
+									"line": 7,
+									"column": 10
+								}
+							},
+							"expression": {
+								"type": "MemberExpression",
+								"start": 319,
+								"end": 323,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 6
+									},
+									"end": {
+										"line": 7,
+										"column": 10
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 319,
+									"end": 320,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 6
+										},
+										"end": {
+											"line": 7,
+											"column": 7
+										}
+									},
+									"name": "a"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 322,
+									"end": 323,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 9
+										},
+										"end": {
+											"line": 7,
+											"column": 10
+										}
+									},
+									"name": "b"
+								},
+								"computed": false,
+								"optional": true
+							}
+						},
+						"arguments": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An optional chain can't be the callee of `new` or the tag of a tagged template",
+							"start": 10,
+							"end": 91
+						},
+						{
+							"type": "Line",
+							"value": " (per spec), so these parens are required: stripping them is a syntax error.",
+							"start": 93,
+							"end": 171
+						},
+						{
+							"type": "Line",
+							"value": " (The boundary-dependent member/call/computed cases are in optional_paren_boundary.)",
+							"start": 173,
+							"end": 259
+						},
+						{
+							"type": "Line",
+							"value": " `new` callee — optional chain base needs parens",
+							"start": 262,
+							"end": 312
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 329,
+					"end": 344,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 16
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 329,
+						"end": 343,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 15
+							}
+						},
+						"callee": {
+							"type": "ChainExpression",
+							"start": 334,
+							"end": 340,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 6
+								},
+								"end": {
+									"line": 8,
+									"column": 12
+								}
+							},
+							"expression": {
+								"type": "CallExpression",
+								"start": 334,
+								"end": 340,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 6
+									},
+									"end": {
+										"line": 8,
+										"column": 12
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 334,
+									"end": 338,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 6
+										},
+										"end": {
+											"line": 8,
+											"column": 10
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 334,
+										"end": 335,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 6
+											},
+											"end": {
+												"line": 8,
+												"column": 7
+											}
+										},
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 337,
+										"end": 338,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 9
+											},
+											"end": {
+												"line": 8,
+												"column": 10
+											}
+										},
+										"name": "b"
+									},
+									"computed": false,
+									"optional": true
+								},
+								"arguments": [],
+								"optional": false
+							}
+						},
+						"arguments": []
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 346,
+					"end": 360,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 346,
+						"end": 359,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 14
+							}
+						},
+						"callee": {
+							"type": "ChainExpression",
+							"start": 351,
+							"end": 356,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 6
+								},
+								"end": {
+									"line": 9,
+									"column": 11
+								}
+							},
+							"expression": {
+								"type": "CallExpression",
+								"start": 351,
+								"end": 356,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 6
+									},
+									"end": {
+										"line": 9,
+										"column": 11
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 351,
+									"end": 352,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 6
+										},
+										"end": {
+											"line": 9,
+											"column": 7
+										}
+									},
+									"name": "a"
+								},
+								"arguments": [],
+								"optional": true
+							}
+						},
+						"arguments": []
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 422,
+					"end": 434,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 13
+						}
+					},
+					"expression": {
+						"type": "TaggedTemplateExpression",
+						"start": 422,
+						"end": 433,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 1
+							},
+							"end": {
+								"line": 12,
+								"column": 12
+							}
+						},
+						"tag": {
+							"type": "ChainExpression",
+							"start": 423,
+							"end": 427,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 2
+								},
+								"end": {
+									"line": 12,
+									"column": 6
+								}
+							},
+							"expression": {
+								"type": "MemberExpression",
+								"start": 423,
+								"end": 427,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 6
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 423,
+									"end": 424,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 426,
+									"end": 427,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 5
+										},
+										"end": {
+											"line": 12,
+											"column": 6
+										}
+									},
+									"name": "b"
+								},
+								"computed": false,
+								"optional": true
+							}
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 428,
+							"end": 433,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 12
+								}
+							},
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 429,
+									"end": 432,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 8
+										},
+										"end": {
+											"line": 12,
+											"column": 11
+										}
+									},
+									"value": {
+										"raw": "tpl",
+										"cooked": "tpl"
+									},
+									"tail": true
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " tagged template tag — optional chain base needs parens",
+							"start": 363,
+							"end": 420
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 436,
+					"end": 450,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "TaggedTemplateExpression",
+						"start": 436,
+						"end": 449,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 1
+							},
+							"end": {
+								"line": 13,
+								"column": 14
+							}
+						},
+						"tag": {
+							"type": "ChainExpression",
+							"start": 437,
+							"end": 443,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 2
+								},
+								"end": {
+									"line": 13,
+									"column": 8
+								}
+							},
+							"expression": {
+								"type": "CallExpression",
+								"start": 437,
+								"end": 443,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 8
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 437,
+									"end": 441,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 2
+										},
+										"end": {
+											"line": 13,
+											"column": 6
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 437,
+										"end": 438,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 2
+											},
+											"end": {
+												"line": 13,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 440,
+										"end": 441,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 5
+											},
+											"end": {
+												"line": 13,
+												"column": 6
+											}
+										},
+										"name": "b"
+									},
+									"computed": false,
+									"optional": true
+								},
+								"arguments": [],
+								"optional": false
+							}
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 444,
+							"end": 449,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 9
+								},
+								"end": {
+									"line": 13,
+									"column": 14
+								}
+							},
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 445,
+									"end": 448,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 10
+										},
+										"end": {
+											"line": 13,
+											"column": 13
+										}
+									},
+									"value": {
+										"raw": "tpl",
+										"cooked": "tpl"
+									},
+									"tail": true
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 452,
+					"end": 465,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 14
+						}
+					},
+					"expression": {
+						"type": "TaggedTemplateExpression",
+						"start": 452,
+						"end": 464,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 13
+							}
+						},
+						"tag": {
+							"type": "ChainExpression",
+							"start": 453,
+							"end": 458,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 2
+								},
+								"end": {
+									"line": 14,
+									"column": 7
+								}
+							},
+							"expression": {
+								"type": "CallExpression",
+								"start": 453,
+								"end": 458,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 7
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 453,
+									"end": 454,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 2
+										},
+										"end": {
+											"line": 14,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"arguments": [],
+								"optional": true
+							}
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 459,
+							"end": 464,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 8
+								},
+								"end": {
+									"line": 14,
+									"column": 13
+								}
+							},
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 460,
+									"end": 463,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 9
+										},
+										"end": {
+											"line": 14,
+											"column": 12
+										}
+									},
+									"value": {
+										"raw": "tpl",
+										"cooked": "tpl"
+									},
+									"tail": true
+								}
+							]
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

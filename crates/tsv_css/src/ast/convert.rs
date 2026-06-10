@@ -352,15 +352,22 @@ fn convert_css_atrule(atrule: &internal::CssAtrule, source: &str) -> serde_json:
 /// `Values` is built from parsed tokens that never contained comments.
 fn convert_prelude_to_string(prelude: &internal::PreludeValue, source: &str) -> String {
     match prelude {
-        internal::PreludeValue::Values { values, .. } => {
-            // Convert structured values back to string representation
-            values
-                .iter()
-                .map(|value| value_to_string(value, source))
-                .collect::<Vec<_>>()
-                .join(" ")
+        internal::PreludeValue::Values { span, .. } => {
+            // Extract the prelude verbatim from source and strip comments, matching
+            // Svelte (which removes `/* ... */` from the `@import` prelude string while
+            // preserving the surrounding whitespace, then trims). Extracting from the
+            // span (rather than rejoining the structured values) keeps the public AST
+            // byte-for-byte with Svelte even when comments sit between the url/string and
+            // the media query — the structured values exist for the printer's quote
+            // normalization and media-query wrapping.
+            strip_css_comments(span.extract(source))
         }
-        internal::PreludeValue::Raw { content, .. } => strip_css_comments(content),
+        // Extract verbatim from source (comments stripped, outer-trimmed) so the public
+        // AST matches Svelte, which stores the raw prelude — e.g. `@layer a , b` → `a , b`
+        // and `@namespace url(  x  )` → `url(  x  )`. The internal `content` string is a
+        // normalized (printer-facing) form; the AST must stay source-faithful, like the
+        // `Media`/`Supports`/`Container`/`Values` branches.
+        internal::PreludeValue::Raw { span, .. } => strip_css_comments(span.extract(source)),
         internal::PreludeValue::Selectors {
             root: _,
             limit: _,
@@ -373,37 +380,6 @@ fn convert_prelude_to_string(prelude: &internal::PreludeValue, source: &str) -> 
         internal::PreludeValue::Supports { span, .. } => strip_css_comments(span.extract(source)),
         internal::PreludeValue::Container { span, .. } => strip_css_comments(span.extract(source)),
         internal::PreludeValue::Media { span, .. } => strip_css_comments(span.extract(source)),
-    }
-}
-
-/// Convert a CssValue to its string representation (for prelude conversion)
-fn value_to_string(value: &internal::CssValue, source: &str) -> String {
-    match value {
-        internal::CssValue::String { span, .. } => {
-            // Extract from source to preserve quotes
-            span.extract(source).to_string()
-        }
-        internal::CssValue::Identifier { name, .. } => name.clone(),
-        internal::CssValue::Function { name, args, span } => {
-            // For functions with args, reconstruct from args
-            // For functions without args (like supports with complex conditions), extract from source
-            if args.is_empty() {
-                // Extract from source (includes the function name and parentheses)
-                span.extract(source).to_string()
-            } else {
-                // Reconstruct function call from args
-                let args_str = args
-                    .iter()
-                    .map(|arg| value_to_string(arg, source))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                format!("{name}({args_str})")
-            }
-        }
-        _ => {
-            // For other types, extract from source
-            value.span().extract(source).to_string()
-        }
     }
 }
 

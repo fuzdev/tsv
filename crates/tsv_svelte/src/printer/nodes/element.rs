@@ -33,7 +33,11 @@ impl<'a> Printer<'a> {
     ///
     /// Matches Prettier's shouldHugStart: returns false (don't hug) if:
     /// - Element is a block element
-    /// - First child is text starting with ANY whitespace (space, tab, newline)
+    /// - First child is text starting with collapsible (ASCII) whitespace
+    ///
+    /// Non-breaking spaces (U+00A0 / U+202F) are content, not collapsible
+    /// whitespace, so a leading nbsp still hugs (matching prettier-plugin-svelte's
+    /// `STARTS_WITH_HTML_COLLAPSE_WHITESPACE_RE = /^[\t\n\f\r ]/`).
     pub(crate) fn should_hug_start(&self, element: &internal::Element, is_block: bool) -> bool {
         if is_block {
             return false;
@@ -42,10 +46,7 @@ impl<'a> Printer<'a> {
             return true;
         }
         match &element.fragment.nodes[0] {
-            FragmentNode::Text(text) => {
-                // Match Prettier: don't hug if text starts with ANY whitespace
-                !text.raw.starts_with(char::is_whitespace)
-            }
+            FragmentNode::Text(text) => !text.raw.starts_with(|c: char| c.is_ascii_whitespace()),
             _ => true,
         }
     }
@@ -54,7 +55,10 @@ impl<'a> Printer<'a> {
     ///
     /// Matches Prettier's shouldHugEnd: returns false (don't hug) if:
     /// - Element is a block element
-    /// - Last child is text ending with ANY whitespace (space, tab, newline)
+    /// - Last child is text ending with collapsible (ASCII) whitespace
+    ///
+    /// Non-breaking spaces are content, so a trailing nbsp still hugs (matching
+    /// `ENDS_WITH_HTML_COLLAPSE_WHITESPACE_RE = /[\t\n\f\r ]$/`).
     pub(crate) fn should_hug_end(&self, element: &internal::Element, is_block: bool) -> bool {
         if is_block {
             return false;
@@ -64,8 +68,7 @@ impl<'a> Printer<'a> {
         }
         match element.fragment.nodes.last() {
             Some(FragmentNode::Text(text)) => {
-                // Match Prettier: don't hug if text ends with ANY whitespace
-                !text.raw.ends_with(char::is_whitespace)
+                !text.raw.ends_with(|c: char| c.is_ascii_whitespace())
             }
             _ => true,
         }

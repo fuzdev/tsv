@@ -27,7 +27,7 @@ use member_only::build_member_only_chain_doc;
 use super::analysis::should_merge_first_groups;
 use super::printing::{
     ChainPrinter, has_inside_bracket_comments, print_group, print_group_expanded,
-    print_group_standard_expanded,
+    print_group_standard_expanded, print_node,
 };
 use super::types::{ChainGroup, ChainNode};
 use crate::ast::internal::{ArrowFunctionBody, Expression};
@@ -263,6 +263,16 @@ fn build_short_chain_doc<'a, P: ChainPrinter>(
         return d.group(first_doc);
     }
 
+    // `base_call(args).a.b...` — a plain base call followed by ONLY trailing member
+    // accesses. Prettier prints this via member.js (printMemberExpression), NOT the
+    // member chain: the call's args group and each trailing member are independent
+    // sibling groups, so the args break only when the call itself overflows and
+    // otherwise the trailing members break individually. The chain conditionalGroup
+    // would instead expand the call args even when the call fits inline.
+    if is_base_call_then_only_members(first_groups, rest_groups, printer) {
+        return build_base_call_then_members_doc(first_groups, rest_groups, printer);
+    }
+
     // Check if first groups contain calls with multiple args that might need expansion
     let first_has_multiarg_calls = first_groups.iter().flat_map(|g| g.nodes.iter()).any(|n| {
         matches!(
@@ -321,7 +331,18 @@ fn build_short_chain_doc<'a, P: ChainPrinter>(
         // group boundaries rather than inside the parenthesized expression.
         // When there ARE calls, the inner group breaks naturally via group(oneLine).
         if first_has_parens && !has_calls {
-            // Build expanded with hardlines between ALL groups (don't skip trailing member)
+            // A single trailing member on a parenthesized base hugs the base's
+            // closing `)` when it fits after the base's last line, and drops to
+            // its own indented line otherwise — Prettier's `printMemberExpression`
+            // (`[objectDoc, group(indent([softline, lookup]))]`, member.js). The
+            // base breaks on its own (parens hang-break or inner call args), so we
+            // must not force the member onto its own line just because the base is
+            // multi-line; the softline lets it hug the `)`.
+            if rest_docs.len() == 1 {
+                let member = d.group(d.indent(d.concat(&[d.softline(), rest_docs[0]])));
+                return d.concat(&[first_doc, member]);
+            }
+            // Multiple trailing members: expand with hardlines between ALL groups.
             let mut rest_parts = Vec::with_capacity(rest_docs.len() * 2);
             for &rest_doc in &rest_docs {
                 rest_parts.push(d.hardline());
@@ -359,6 +380,84 @@ fn build_short_chain_doc<'a, P: ChainPrinter>(
     let state_first_expanded = d.concat(&state_first_expanded_parts);
 
     d.conditional_group(&[on_line, state_last_expanded, state_first_expanded])
+}
+
+/// Whether the chain is `base_call(args).a.b...` — a bare base call followed by ONLY
+/// plain `.prop` member accesses (no further calls, no computed/private/non-null
+/// nodes, no inter-element comments). This is prettier's `printMemberExpression`
+/// (member.js) territory, not the member chain; other shapes fall back to the chain
+/// conditionalGroup.
+fn is_base_call_then_only_members<'a, P: ChainPrinter>(
+    first_groups: &[ChainGroup<'a>],
+    rest_groups: &[ChainGroup<'a>],
+    printer: &P,
+) -> bool {
+    let all_nodes: Vec<&ChainNode<'a>> = first_groups
+        .iter()
+        .chain(rest_groups.iter())
+        .flat_map(|g| g.nodes.iter())
+        .collect();
+    // Need base + one call + at least one trailing member.
+    if all_nodes.len() < 3 {
+        return false;
+    }
+    // Base must be a bare (non-parenthesized) expression directly followed by the call.
+    if !matches!(
+        all_nodes[0],
+        ChainNode::Base {
+            needs_parens: false,
+            ..
+        }
+    ) || !all_nodes[1].is_call()
+    {
+        return false;
+    }
+    // Exactly one call in the whole chain (the base call).
+    if all_nodes.iter().filter(|n| n.is_call()).count() != 1 {
+        return false;
+    }
+    // Everything after the base call must be a plain `.prop` member — computed,
+    // private, and non-null nodes have their own break structure.
+    if !all_nodes[2..]
+        .iter()
+        .all(|n| matches!(n, ChainNode::Member { .. }))
+    {
+        return false;
+    }
+    // No inter-element comments (those need the comment-aware chain path).
+    all_nodes[1..].iter().all(|n| {
+        n.comment_range()
+            .is_none_or(|(start, end)| !printer.has_comments_between(start, end))
+    })
+}
+
+/// Build the member.js sibling-group doc for `base_call(args).a.b...`: the base call
+/// prints inline (its args group breaks only if the call itself overflows) and each
+/// trailing member is `group(indent([softline, .prop]))`, so the overflowing member
+/// drops to its own indented line while earlier members hug the call's `)`.
+fn build_base_call_then_members_doc<'a, P: ChainPrinter>(
+    first_groups: &[ChainGroup<'a>],
+    rest_groups: &[ChainGroup<'a>],
+    printer: &P,
+) -> DocId {
+    let d = printer.arena();
+    let all_nodes: Vec<&ChainNode<'a>> = first_groups
+        .iter()
+        .chain(rest_groups.iter())
+        .flat_map(|g| g.nodes.iter())
+        .collect();
+    // The leading non-member nodes are the base call; the rest are trailing members.
+    let first_member_idx = all_nodes.iter().take_while(|n| !n.is_member()).count();
+    let prefix_docs: Vec<DocId> = all_nodes[..first_member_idx]
+        .iter()
+        .map(|n| print_node(n, printer))
+        .collect();
+    let mut parts = vec![d.concat(&prefix_docs)];
+    for node in &all_nodes[first_member_idx..] {
+        let member = print_node(node, printer);
+        parts.push(d.group(d.indent(d.concat(&[d.softline(), member]))));
+    }
+    d.concat(&parts)
 }
 
 /// Build doc for short chains with multi-arg calls in first groups
@@ -512,16 +611,19 @@ fn build_member_ending_chain_doc<'a, P: ChainPrinter>(
     d.conditional_group(&[on_line_doc, args_expanded_doc, expanded])
 }
 
-/// Build doc for chains where last call has a breaking object/array argument
+/// Build doc for chains where the last call has a single breaking argument that
+/// prettier keeps flat-chained (oneLine) rather than expanding the chain.
 fn build_breaking_object_chain_doc<'a, P: ChainPrinter>(
     first_groups: &[ChainGroup<'a>],
     rest_groups: &[ChainGroup<'a>],
     printer: &P,
 ) -> Option<DocId> {
     let d = printer.arena();
-    // Check if the last call has a single object/array argument that will break
-    // Note: We use a simpler check here (direct object/array only, no arrow functions)
-    // because this is specifically for the last call's object literal expansion
+    // The last call's single argument breaks and is one prettier keeps on the flat
+    // chain: a direct object/array literal, OR a `new`/call expression wrapping one
+    // (e.g. `new Response(body, {…})`). Callbacks (function/arrow args) are excluded —
+    // for those, prettier expands the chain when other calls also take function args
+    // (member-chain.js `lastGroupWillBreakAndOtherCallsHaveFunctionArguments`).
     let last_group_will_break_object = rest_groups.last().is_some_and(|g| {
         g.nodes
             .iter()
@@ -531,7 +633,10 @@ fn build_breaking_object_chain_doc<'a, P: ChainPrinter>(
                 call.arguments.len() == 1
                     && matches!(
                         &call.arguments[0],
-                        Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
+                        Expression::ObjectExpression(_)
+                            | Expression::ArrayExpression(_)
+                            | Expression::NewExpression(_)
+                            | Expression::CallExpression(_)
                     )
                     && {
                         let arg_doc = printer.print_expression(&call.arguments[0]);
@@ -544,26 +649,24 @@ fn build_breaking_object_chain_doc<'a, P: ChainPrinter>(
         return None;
     }
 
-    // First groups stay flat
-    let first_docs = build_groups_flat_docs(first_groups, printer);
-    // Rest groups: all but last stay flat, last is expanded
+    // First groups and all but the last rest group stay flat. Keeping the chain
+    // prefix flat-measurable is load-bearing: arena_fits must see the prefix's true
+    // width so the conditional_group falls through to the fully-expanded chain when
+    // the prefix itself overflows. Wrapping the WHOLE chain in group_break instead
+    // makes fits() inherit Break mode into the prefix's inner call-arg groups and
+    // early-return at their softlines, wrongly selecting this state (and breaking an
+    // earlier call's args) even when the prefix doesn't fit.
     let rest_len = rest_groups.len();
-    let rest_docs: Vec<DocId> = rest_groups
-        .iter()
-        .enumerate()
-        .map(|(i, g)| {
-            if i == rest_len - 1 {
-                print_group_expanded(g, printer)
-            } else {
-                print_group(g, printer)
-            }
-        })
-        .collect();
-
-    let mut all_parts = first_docs;
-    all_parts.extend(rest_docs);
-    // Wrap in group_break for same reason as build_member_ending_chain_doc:
-    // conditional_group may select this in Flat mode, but nested groups need
-    // Break mode for correct fits() evaluation.
-    Some(d.group_break(d.concat(&all_parts)))
+    let mut all_parts = build_groups_flat_docs(first_groups, printer);
+    for (i, g) in rest_groups.iter().enumerate() {
+        if i == rest_len - 1 {
+            // Only the last group is force-broken: when this state is selected in
+            // Flat mode, its expanded call args still render in Break mode (so nested
+            // groups, e.g. arrow sigs, evaluate fits() against Break-mode rest commands).
+            all_parts.push(d.group_break(print_group_expanded(g, printer)));
+        } else {
+            all_parts.push(print_group(g, printer));
+        }
+    }
+    Some(d.concat(&all_parts))
 }

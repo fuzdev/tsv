@@ -169,6 +169,14 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
                             d.softline(),
                         ]))
                     }
+                    Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_) => {
+                        // IIFE / function callee or arrow member-object: the parens
+                        // hug the function — its own body drives breaking, prettier
+                        // never breaks after the `(` here. `(() => {...})().catch()`,
+                        // `(function () {})().p`. Matches the bare-callee path
+                        // (`call_formatting.rs`), which wraps with hugging parens.
+                        inner
+                    }
                     _ => {
                         // All other expressions: same indent-on-break as await
                         // so chain conditionalGroup can try flat first

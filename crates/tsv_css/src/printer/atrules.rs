@@ -23,6 +23,44 @@ fn connector_str(conn: internal::SupportsConnector) -> &'static str {
     }
 }
 
+/// How a media-query prelude wraps when it exceeds print width.
+#[derive(Clone, Copy)]
+enum MediaWrap {
+    /// `@media` — a comma-separated media-query list; break at every top-level
+    /// comma (one query per line). A single `and`-joined query still falls back
+    /// to `AndOr` wrapping.
+    CommaList,
+    /// `@import` media conditions — wrap only at the last fitting `and`/`or`.
+    AndOr,
+}
+
+/// A `@supports`/`@container` condition prelude. The two differ only in that
+/// `@supports` is value-parsed by prettier (so its numbers/strings normalize)
+/// while `@container` is kept raw, and that `@container` carries a name. Pairing
+/// them in one enum keeps those two facts in lockstep (no `name`-without-raw or
+/// raw-without-name combinations).
+#[derive(Clone, Copy)]
+enum ConditionQuery<'a> {
+    Supports,
+    Container { name: Option<&'a str> },
+}
+
+impl<'a> ConditionQuery<'a> {
+    /// `@supports` values are normalized (numbers + string quotes); `@container`
+    /// preludes are emitted verbatim, matching prettier.
+    fn normalizes(self) -> bool {
+        matches!(self, ConditionQuery::Supports)
+    }
+
+    /// The optional container name prefix (`@container sidebar (...)`).
+    fn name(self) -> Option<&'a str> {
+        match self {
+            ConditionQuery::Container { name } => name,
+            ConditionQuery::Supports => None,
+        }
+    }
+}
+
 impl<'a> Printer<'a> {
     /// Format a CSS at-rule (@media, @keyframes, @supports, etc.)
     pub(super) fn print_css_atrule(&mut self, atrule: &internal::CssAtrule) {
@@ -31,47 +69,72 @@ impl<'a> Printer<'a> {
 
         // Print prelude based on type
         match &atrule.prelude {
-            internal::PreludeValue::Values { values, .. } if !values.is_empty() => {
+            internal::PreludeValue::Values { values, span } if !values.is_empty() => {
                 self.write(" ");
                 // Special handling for @import with media query (last value may need wrapping)
                 let is_import = atrule.name == "import";
+                // Track the source position after the previous value so comments in the
+                // gaps (before the first value, between values) can be reconstructed.
+                // Svelte strips these from the prelude string; prettier preserves them
+                // with single-space padding, so we interleave them here.
+                let mut prev_end = span.start;
                 for (i, value) in values.iter().enumerate() {
-                    if i > 0 {
-                        self.write(" ");
-                    }
+                    self.write_import_gap_comments(prev_end, value.span().start, i > 0);
                     // Check if this is the media query part of @import that needs wrapping
                     if is_import
                         && i == values.len() - 1
-                        && let internal::CssValue::Identifier { name, .. } = value
+                        && let internal::CssValue::Identifier {
+                            span: value_span, ..
+                        } = value
                     {
-                        // Normalize whitespace (parser preserves original for AST fidelity)
-                        let normalized: String =
-                            name.split_whitespace().collect::<Vec<_>>().join(" ");
-                        // Check if it's a media query (contains "and" or "or")
-                        if normalized.contains(" and ") || normalized.contains(" or ") {
+                        // Normalize from source (comment-aware) so embedded comments and
+                        // their spacing survive (`screen /* c */ and (...)`).
+                        let normalized = source_fidelity::normalize_css_whitespace(
+                            value_span.extract(self.source),
+                        );
+                        // Route a wrappable media condition through the line-wrapping
+                        // path: an `and`/`or`-joined query, or a comma-separated query
+                        // *list* (prettier value-parses `@import` and fills the whole
+                        // list). A comma-only list with comments stays on the
+                        // comment-aware value path below — the fill splits on whitespace
+                        // and would shatter `/* … */` comments (the `and`/`or` path keeps
+                        // its existing comment handling).
+                        if normalized.contains(" and ")
+                            || normalized.contains(" or ")
+                            || (normalized.contains(',') && !normalized.contains("/*"))
+                        {
                             self.print_import_media_query(&normalized);
+                            prev_end = value.span().end;
                             continue;
                         }
                     }
                     // Use doc-based formatting to normalize quotes and spacing
                     self.print_nested_value(value);
+                    prev_end = value.span().end;
+                }
+                // Trailing comments between the last value and the `;` (e.g.
+                // `@import 'a.css' /* c */;`).
+                for comment in comments_in_range(self.comments, prev_end, atrule.span.end) {
+                    self.write(" ");
+                    self.print_css_comment(comment);
                 }
             }
             internal::PreludeValue::Raw { content, .. } if !content.is_empty() => {
+                // `content` is already verbatim (internal whitespace + comments preserved,
+                // outer-trimmed, `url()` inner-trimmed) from the parser's non-normalized
+                // raw path, so it matches prettier as-is — no comment-spacing rewrite.
                 self.write(" ");
-                let normalized = self.normalize_comment_spacing(content);
-                self.write(&normalized);
+                self.write(content);
             }
             internal::PreludeValue::Supports { condition, span } => {
                 self.write(" ");
                 // @supports conditions are declarations, so prettier normalizes
                 // their values (e.g. numbers); @container queries are left raw.
                 self.print_condition_query(
-                    None,
+                    ConditionQuery::Supports,
                     condition,
                     atrule.block.is_some(),
                     Some(*span),
-                    true,
                 );
             }
             internal::PreludeValue::Container {
@@ -81,11 +144,12 @@ impl<'a> Printer<'a> {
             } => {
                 self.write(" ");
                 self.print_condition_query(
-                    name.as_deref(),
+                    ConditionQuery::Container {
+                        name: name.as_deref(),
+                    },
                     condition,
                     atrule.block.is_some(),
                     Some(*span),
-                    false,
                 );
             }
             internal::PreludeValue::Media { content, .. } => {
@@ -182,12 +246,16 @@ impl<'a> Printer<'a> {
 
             self.indent_level -= 1;
 
-            // Only write newline if the last child wasn't a declaration
-            // (declarations end with \n already)
-            if !matches!(
-                block.children.last(),
-                Some(internal::CssBlockChild::Declaration(_))
-            ) {
+            // Write the newline before `}` only when the last child didn't already
+            // end one. Declarations end with `\n`; an empty block has no children at
+            // all, so the `{\n` already opened the line — prettier renders empty
+            // at-rule blocks as `{\n}` (no blank line inside).
+            if !block.children.is_empty()
+                && !matches!(
+                    block.children.last(),
+                    Some(internal::CssBlockChild::Declaration(_))
+                )
+            {
                 self.write("\n");
             }
             self.write_indent();
@@ -340,7 +408,10 @@ impl<'a> Printer<'a> {
     /// ```
     fn print_media_prelude(&mut self, content: &str, has_block: bool) {
         let suffix_len = if has_block { " {".len() } else { 0 };
-        self.print_media_query_with_wrapping(content, suffix_len);
+        // A `@media` prelude is a comma-separated media-query list (Media Queries 4
+        // §"media query list"); prettier breaks it at the commas (one query per
+        // line) when it exceeds print width, so we do too.
+        self.print_media_query_with_wrapping(content, suffix_len, MediaWrap::CommaList);
     }
 
     /// Format @supports/@container condition with line-width wrapping at `and`/`or` boundaries
@@ -353,14 +424,13 @@ impl<'a> Printer<'a> {
     /// ```
     fn print_condition_query(
         &mut self,
-        name: Option<&str>,
+        kind: ConditionQuery<'_>,
         condition: &internal::SupportsCondition,
         has_block: bool,
         prelude_span: Option<tsv_lang::Span>,
-        normalize_numbers: bool,
     ) {
         // Print optional name prefix (for @container)
-        let name_end_pos = if let Some(n) = name {
+        let name_end_pos = if let Some(n) = kind.name() {
             self.write(n);
             self.write(" ");
             // Find where the name ends in source (name length from prelude start)
@@ -377,8 +447,8 @@ impl<'a> Printer<'a> {
             .iter()
             .map(|p| internal::SupportsPart {
                 connector: p.connector,
-                content: if normalize_numbers {
-                    source_fidelity::normalize_numbers_in_text(&p.content)
+                content: if kind.normalizes() {
+                    source_fidelity::normalize_value_text(&p.content)
                 } else {
                     p.content.clone()
                 },
@@ -466,9 +536,7 @@ impl<'a> Printer<'a> {
 
                 // Print continuation line
                 self.write("\n");
-                self.indent_level += 1;
-                self.write_indent();
-                self.indent_level -= 1;
+                self.write_indent_extra(1);
 
                 // Comments after connector go on the new line
                 if !after_conn.is_empty() {
@@ -684,23 +752,169 @@ impl<'a> Printer<'a> {
         d.concat(&docs)
     }
 
-    /// Format @import media query with line-width wrapping at `and`/`or` boundaries
+    /// Reconstruct comments sitting in an `@import` prelude gap (before a value).
     ///
-    /// Similar to `print_media_prelude` but for the media query part of @import.
-    /// Wraps at >100 chars (Prettier waits until >102).
-    fn print_import_media_query(&mut self, content: &str) {
-        // @import has no block, suffix is just the semicolon
-        self.print_media_query_with_wrapping(content, 1);
+    /// Svelte strips comments from the `@import` prelude string but the printer
+    /// preserves them with single-space padding, matching prettier
+    /// (`@import /* c */ url('a.css')`, `url('a.css') /* c */ screen`). When the gap
+    /// holds no comment, only the inter-value separator space is emitted (when
+    /// `needs_separator`, i.e. this isn't the first value — the leading `@import `
+    /// space is already written).
+    fn write_import_gap_comments(&mut self, start: u32, end: u32, needs_separator: bool) {
+        let comments: Vec<_> = comments_in_range(self.comments, start, end).collect();
+        if comments.is_empty() {
+            if needs_separator {
+                self.write(" ");
+            }
+            return;
+        }
+        if needs_separator {
+            self.write(" ");
+        }
+        for (i, comment) in comments.iter().enumerate() {
+            if i > 0 {
+                self.write(" ");
+            }
+            self.print_css_comment(comment);
+        }
+        self.write(" ");
     }
 
-    /// Shared helper for media query wrapping at `and`/`or` boundaries
+    /// Format an @import media query with line-width wrapping.
     ///
-    /// Used by both @media prelude and @import media conditions.
-    /// `suffix_len` accounts for trailing content (` {` for @media, `;` for @import).
-    fn print_media_query_with_wrapping(&mut self, content: &str, suffix_len: usize) {
-        // Normalize numbers in the raw prelude (`.5px` → `0.5px`), matching the
-        // declaration-value path. Comments and strings are preserved.
-        let content = source_fidelity::normalize_numbers_in_text(content);
+    /// Prettier value-parses `@import` preludes (`isModuleRuleName`) and emits the
+    /// media condition as `group(indent(fill(...)))`. A single query wraps only at
+    /// the last fitting `and`/`or` (`print_media_query_with_wrapping`); a
+    /// comma-separated query *list* packs greedily — see
+    /// `print_import_media_query_fill`. The trailing `;` is the only suffix (1).
+    fn print_import_media_query(&mut self, content: &str) {
+        let normalized = source_fidelity::normalize_value_text(content);
+        // Fits inline (counting the trailing `;`) — emit verbatim.
+        let total_width = self.current_column() + normalized.len() + 1;
+        if total_width <= tsv_lang::PRINT_WIDTH {
+            self.write(&normalized);
+            return;
+        }
+        // Comment-bearing conditions keep the comment-aware `and`/`or` wrapping — the
+        // fill splits on whitespace and would shatter `/* … */` comments. (Comment-only
+        // comma lists never reach here; the caller routes them to the value path.)
+        if normalized.contains("/*") {
+            self.print_media_query_with_wrapping(&normalized, 1, MediaWrap::AndOr);
+            return;
+        }
+        let queries: Vec<&str> = source_fidelity::split_args_by_comma(&normalized)
+            .into_iter()
+            .map(str::trim)
+            .filter(|q| !q.is_empty())
+            .collect();
+        if queries.len() <= 1 {
+            // Single query: wrap at the last fitting `and`/`or`.
+            self.print_media_query_with_wrapping(&normalized, 1, MediaWrap::AndOr);
+            return;
+        }
+        self.print_import_media_query_fill(&queries);
+    }
+
+    /// Greedy two-level fill for a comma-separated `@import` media-query list.
+    ///
+    /// Mirrors prettier's nested `group(indent(fill(...)))` — an outer fill over the
+    /// comma-separated queries, each query an inner fill over its space-separated
+    /// tokens:
+    /// - queries pack greedily; a comma break indents one level (`+1`);
+    /// - a query that overflows its line breaks at its `and`/space boundaries two
+    ///   levels in (`+2`);
+    /// - prettier's outer fill measures each query's *full flat width*, so an
+    ///   overflowing query forces its trailing comma onto the next line while
+    ///   consecutive short queries keep packing.
+    ///
+    /// (`split_by_space_preserving_parens` keeps the tokens atomic — no token has an
+    /// internal break — so naive greedy line-packing is equivalent to prettier's
+    /// pairwise `fill`.) The trailing `;`/`,` (1 wide) rides each query's last line.
+    fn print_import_media_query_fill(&mut self, queries: &[&str]) {
+        let width = tsv_lang::PRINT_WIDTH;
+        let base = self.effective_indent();
+        let indent1 = (base + 1) * tsv_lang::TAB_WIDTH; // comma-break column
+        let indent2 = (base + 2) * tsv_lang::TAB_WIDTH; // within-query break column
+
+        let mut col = self.current_column();
+        let n = queries.len();
+        for (qi, query) in queries.iter().enumerate() {
+            let is_last = qi == n - 1;
+            let query_start = col;
+            col = self.emit_import_query(query, query_start, indent2, width);
+            if is_last {
+                continue;
+            }
+            self.write(",");
+            col += 1;
+            // Outer-fill separator: prettier glues each comma to its query and
+            // measures `[query_i ",", " ", query_{i+1} ","]` from this query's start
+            // (the trailing comma counts; the final `;` lives outside the fill, so the
+            // *last* query carries no comma here). A query whose flat width overflowed
+            // forces the comma to break; otherwise the next query packs inline if it fits.
+            let next = queries[qi + 1];
+            let next_comma = usize::from(qi + 1 != n - 1);
+            if query_start + query.len() + next.len() + 2 + next_comma <= width {
+                self.write(" ");
+                col += 1;
+            } else {
+                self.write("\n");
+                self.write_indent_extra(1);
+                col = indent1;
+            }
+        }
+    }
+
+    /// Emit one media query, greedy-filling its space-separated tokens; internal
+    /// breaks land at `indent2`. Returns the ending visual column.
+    fn emit_import_query(
+        &mut self,
+        query: &str,
+        start_col: usize,
+        indent2: usize,
+        width: usize,
+    ) -> usize {
+        let atoms = source_fidelity::split_by_space_preserving_parens(query);
+        let last = atoms.len().saturating_sub(1);
+        let mut col = start_col;
+        for (ai, &atom) in atoms.iter().enumerate() {
+            if ai == 0 {
+                self.write(atom);
+                col += atom.len();
+                continue;
+            }
+            // The final token carries the trailing `,`/`;` (1 wide); reserve for it.
+            let reserve = usize::from(ai == last);
+            if col + 1 + atom.len() + reserve <= width {
+                self.write(" ");
+                self.write(atom);
+                col += 1 + atom.len();
+            } else {
+                self.write("\n");
+                self.write_indent_extra(2);
+                self.write(atom);
+                col = indent2 + atom.len();
+            }
+        }
+        col
+    }
+
+    /// Shared helper for media query wrapping.
+    ///
+    /// Used by both @media prelude and @import media conditions. `suffix_len`
+    /// accounts for trailing content (` {` for @media, `;` for @import). For
+    /// `MediaWrap::CommaList` (the `@media` query-list case) an overflowing prelude
+    /// breaks each top-level comma-separated query onto its own line; otherwise
+    /// (and for a single query) we wrap at the last fitting `and`/`or`.
+    fn print_media_query_with_wrapping(
+        &mut self,
+        content: &str,
+        suffix_len: usize,
+        wrap: MediaWrap,
+    ) {
+        // Normalize numbers and string quotes in the raw prelude (`.5px` → `0.5px`,
+        // `"x"` → `'x'`), matching the declaration-value path. Comments preserved.
+        let content = source_fidelity::normalize_value_text(content);
         let content = content.as_str();
 
         let current_col = self.current_column();
@@ -709,6 +923,29 @@ impl<'a> Printer<'a> {
         if total_width <= tsv_lang::PRINT_WIDTH {
             self.write(content);
             return;
+        }
+
+        // Comma-separated media-query list: break at every top-level comma, one
+        // query per line (prettier's `group(indent(join(line, …)))`). A single
+        // query (no top-level comma) falls through to `and`/`or` wrapping below.
+        if matches!(wrap, MediaWrap::CommaList) {
+            let queries: Vec<&str> = source_fidelity::split_args_by_comma(content)
+                .into_iter()
+                .map(str::trim)
+                .filter(|q| !q.is_empty())
+                .collect();
+            if queries.len() > 1 {
+                for (i, query) in queries.iter().enumerate() {
+                    if i > 0 {
+                        self.write_indent_extra(1);
+                    }
+                    self.write(query);
+                    if i + 1 < queries.len() {
+                        self.write(",\n");
+                    }
+                }
+                return;
+            }
         }
 
         // Find the last `and`/`or` break point that keeps first line under print_width
@@ -733,9 +970,7 @@ impl<'a> Printer<'a> {
         if let Some(break_pos) = best_break {
             self.write(&content[..break_pos]);
             self.write("\n");
-            self.indent_level += 1;
-            self.write_indent();
-            self.indent_level -= 1;
+            self.write_indent_extra(1);
             self.write(content[break_pos..].trim_start());
         } else {
             self.write(content);

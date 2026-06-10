@@ -778,7 +778,12 @@ fn build_call_args_doc_for_chain_impl(
                 && !arrow_has_type_reference_return(arrow)
                 && !last_arg_has_comments(&call.arguments, printer, call.span.end, paren_open)
             {
+                // Render the arrow with flat params (prettier's expandLastArg
+                // `removeLines`) so the force-broken state breaks the body, not the
+                // destructuring param — letting it fall through to all-args-broken-out.
+                printer.expand_last_arg_flat_params.set(true);
                 let arrow_doc = printer.build_arg_expression_doc(arg);
+                printer.expand_last_arg_flat_params.set(false);
                 let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
 
                 // State 0: hugged flat — (arrow_doc)

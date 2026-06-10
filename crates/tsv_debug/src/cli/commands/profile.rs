@@ -23,34 +23,11 @@ pub struct ProfileCommand {
 
 impl ProfileCommand {
     pub fn run(self) {
-        if self.paths.is_empty() {
-            eprintln!("Error: No files provided. Use file paths, directories, or glob patterns.");
-            std::process::exit(1);
-        }
-
-        let files = match resolve_files(&self.paths) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                std::process::exit(1);
-            }
-        };
-        if files.is_empty() {
-            eprintln!("Error: No supported files found (.ts, .svelte, .css)");
-            std::process::exit(1);
-        }
+        let (files, skipped) = resolve_profile_files(&self.paths, |_| false);
 
         let mut results = Vec::new();
-        let mut skipped = 0usize;
 
         for path in &files {
-            // Skip input_invalid_* files — they're expected to fail parsing
-            if let Some(name) = path.file_name().and_then(|n| n.to_str())
-                && name.starts_with("input_invalid")
-            {
-                skipped += 1;
-                continue;
-            }
             match profile_file(path, self.iterations) {
                 Ok(result) => results.push(result),
                 Err(err) => {
@@ -158,7 +135,7 @@ fn profile_once(source: &str, parser_type: ParserType) -> Result<(Duration, Dura
     }
 }
 
-fn median_us(durations: &[Duration]) -> f64 {
+pub(crate) fn median_us(durations: &[Duration]) -> f64 {
     let len = durations.len();
     if len == 0 {
         return 0.0;
@@ -176,7 +153,7 @@ fn duration_to_us(d: Duration) -> f64 {
     d.as_secs_f64() * 1_000_000.0
 }
 
-fn format_duration(us: f64) -> String {
+pub(crate) fn format_duration(us: f64) -> String {
     if us >= 1000.0 {
         format!("{:.2}ms", us / 1000.0)
     } else {
@@ -185,7 +162,7 @@ fn format_duration(us: f64) -> String {
 }
 
 #[allow(clippy::cast_precision_loss)]
-fn format_size(bytes: usize) -> String {
+pub(crate) fn format_size(bytes: usize) -> String {
     if bytes >= 1024 {
         format!("{:.1}KB", bytes as f64 / 1024.0)
     } else {
@@ -193,7 +170,7 @@ fn format_size(bytes: usize) -> String {
     }
 }
 
-fn lang_label(parser_type: ParserType) -> &'static str {
+pub(crate) fn lang_label(parser_type: ParserType) -> &'static str {
     match parser_type {
         ParserType::TypeScript => "ts",
         ParserType::Svelte => "svelte",
@@ -322,8 +299,43 @@ fn display_path(path: &Path) -> String {
     format!(".../{}", last_3.display())
 }
 
+/// Resolve CLI path args to profileable files, exiting with a user-facing
+/// message when nothing matches. `excluded` files are dropped after
+/// resolution; `input_invalid_*` fixtures (expected to fail parsing) are
+/// filtered out and returned as a skip count. Shared preamble of the
+/// `profile` and `json_profile` commands.
+pub(crate) fn resolve_profile_files(
+    paths: &[String],
+    excluded: impl Fn(&Path) -> bool,
+) -> (Vec<PathBuf>, usize) {
+    if paths.is_empty() {
+        eprintln!("Error: No files provided. Use file paths, directories, or glob patterns.");
+        std::process::exit(1);
+    }
+    let mut files = match resolve_files(paths) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("Error: {e}");
+            std::process::exit(1);
+        }
+    };
+    files.retain(|p| !excluded(p));
+    if files.is_empty() {
+        eprintln!("Error: No supported files found (.ts, .svelte, .css)");
+        std::process::exit(1);
+    }
+    let total = files.len();
+    files.retain(|p| {
+        !p.file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n.starts_with("input_invalid"))
+    });
+    let skipped = total - files.len();
+    (files, skipped)
+}
+
 /// Resolve paths to files, expanding directories
-fn resolve_files(paths: &[String]) -> Result<Vec<PathBuf>, String> {
+pub(crate) fn resolve_files(paths: &[String]) -> Result<Vec<PathBuf>, String> {
     let mut files = Vec::new();
     for path_str in paths {
         let path = PathBuf::from(path_str);

@@ -9,6 +9,7 @@ mod lexer;
 mod number;
 mod parser;
 mod printer;
+mod url;
 
 // Re-export commonly used types
 pub use ast::{CssDeclaration, CssNode, CssRule, CssStyleSheet};
@@ -141,4 +142,17 @@ pub fn convert_ast_json(stylesheet: &CssStyleSheet, source: &str) -> serde_json:
     let map = tsv_lang::ByteToCharMap::new(source);
     ast::convert::translate_byte_to_char_offsets(&mut json, &map);
     json
+}
+
+/// Like `convert_ast_json`, serialized to a compact JSON string
+///
+/// CSS conversion builds the `Value` directly (no typed public-AST tree), so
+/// unlike `tsv_ts`/`tsv_svelte` there is no direct-serialization fast path
+/// here. This exists so the FFI/WASM bindings have one uniform
+/// string-returning entry point per language.
+#[cfg(feature = "convert")]
+#[allow(clippy::expect_used)]
+pub fn convert_ast_json_string(stylesheet: &CssStyleSheet, source: &str) -> String {
+    serde_json::to_string(&convert_ast_json(stylesheet, source))
+        .expect("Value serialization cannot fail")
 }

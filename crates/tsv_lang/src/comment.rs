@@ -14,10 +14,10 @@ pub struct Comment {
     /// shape; cleared for comments inside `<script>`/expressions/CSS that
     /// follow the standard Svelte/acorn shape.
     //
-    // TODO: this serializer flag is a stopgap for the v0.1 detached-comment
-    // model. Once an LSP/linter consumer arrives, promote to a structural
-    // attachment (parallel collection on `tsv_svelte::Root` per Phase 5
-    // Option A, or per-element attachment if a richer model is needed).
+    // TODO: this serializer flag is a stopgap for the detached-comment model.
+    // Once an LSP/linter consumer arrives, promote to a structural attachment
+    // (a parallel comment collection on the language root, or per-element
+    // attachment if a richer model is needed).
     pub emit_character_field: bool,
 }
 

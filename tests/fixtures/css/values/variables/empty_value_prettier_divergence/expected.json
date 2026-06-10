@@ -1,0 +1,81 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 270,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 14,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 14,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "root",
+											"args": null,
+											"start": 9,
+											"end": 14
+										}
+									],
+									"start": 9,
+									"end": 14
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 15,
+					"end": 261,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 187,
+							"end": 192,
+							"property": "--a",
+							"value": ""
+						},
+						{
+							"type": "Declaration",
+							"start": 244,
+							"end": 257,
+							"property": "--normal",
+							"value": "red"
+						}
+					]
+				},
+				"start": 9,
+				"end": 261
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 262,
+			"styles": "\n\t:root {\n\t\t/* Empty custom-property value: declaration-value whitespace is trimmed, */\n\t\t/* so the value is empty regardless of source spacing — normalized to a single space */\n\t\t--a: ;\n\t\t/* Non-empty custom property is unaffected */\n\t\t--normal: red;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 271,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

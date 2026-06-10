@@ -166,7 +166,6 @@ pub async fn check() -> Result<VersionInfo, DenoError> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

@@ -245,7 +245,11 @@ export function get_benchmark_tasks(
 			});
 		}
 
-		// OXC parser (TypeScript/JS only)
+		// OXC parser (TypeScript/JS only) — default mode: serializes to JSON in Rust
+		// then JSON.parses in JS, eagerly materializing the full AST (the like-for-like
+		// opponent to tsv-json). There is intentionally no `oxc-parser-lazy` row: oxc's
+		// `experimentalLazy` raw transfer is setup-dominated in every runtime (measures
+		// buffer copy, not parse speed) — see `lib/oxc.ts` and CLAUDE.md → Fairness Caveats.
 		if (impls.oxc?.supports_parse_language(language)) {
 			tasks.push({
 				name: 'oxc-parser',

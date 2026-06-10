@@ -1,8 +1,14 @@
 //! WebAssembly bindings for tsv.
 //!
-//! Default build (`@fuzdev/tsv_fmt`): `format_*` exports only.
-//! `--features ast` (`@fuzdev/tsv_parse`): adds `parse_*` and
-//! `parse_internal_*` plus the convert layer that serializes ASTs to JS.
+//! Default build (`@fuzdev/tsv_format_wasm`): `format_*` exports only.
+//! `--features ast` (`@fuzdev/tsv_parse_wasm`): adds `parse_*`, `parse_*_json`,
+//! and `parse_internal_*` plus the convert layer that serializes ASTs to JS.
+//!
+//! The AST crosses the JS boundary as a single JSON string: `parse_*` calls
+//! the engine's native `JSON.parse` on it (via `js_sys`) and returns the
+//! typed object; `parse_*_json` returns the string itself for consumers that
+//! forward the wire format without materializing. Building the JS object
+//! graph node-by-node with `serde_wasm_bindgen` is measurably slower.
 
 use wasm_bindgen::prelude::*;
 
@@ -11,8 +17,8 @@ fn err(e: impl ToString) -> JsError {
 }
 
 /// Re-export every type from the bundled `./tsv_ast` declaration file
-/// so consumers of `@fuzdev/tsv_parse` can `import type { Program } from
-/// '@fuzdev/tsv_parse'` without reaching into the bundled `.d.ts`.
+/// so consumers of `@fuzdev/tsv_parse_wasm` can `import type { Program } from
+/// '@fuzdev/tsv_parse_wasm'` without reaching into the bundled `.d.ts`.
 #[cfg(feature = "ast")]
 #[wasm_bindgen(typescript_custom_section)]
 const TS_AST_REEXPORT: &'static str = r#"
@@ -36,27 +42,38 @@ extern "C" {
     pub type SvelteRoot;
 }
 
-/// Generate `parse_<lang>` / `parse_internal_<lang>` / `format_<lang>` WASM
-/// functions for one language module. `parse_*` and `parse_internal_*` are
-/// gated on `ast` so the format-only build excludes the convert layer.
-/// `$parse_ret` is the extern type from the block above whose
-/// `typescript_type` attribute names the matching interface in
-/// `tsv_ast.d.ts`.
+/// Generate `parse_<lang>` / `parse_<lang>_json` / `parse_internal_<lang>` /
+/// `format_<lang>` WASM functions for one language module. `parse_*`,
+/// `parse_*_json`, and `parse_internal_*` are gated on `ast` so the
+/// format-only build excludes the convert layer. `$parse_ret` is the extern
+/// type from the block above whose `typescript_type` attribute names the
+/// matching interface in `tsv_ast.d.ts`.
 macro_rules! lang_bindings {
     (
         $parse_fn:ident,
+        $parse_json_fn:ident,
         $parse_internal_fn:ident,
         $format_fn:ident,
         $lang:ident,
         $parse_ret:ident $(,)?
     ) => {
+        /// Parse source into the typed JSON AST.
         #[cfg(feature = "ast")]
         #[wasm_bindgen]
         pub fn $parse_fn(source: &str) -> Result<$parse_ret, JsError> {
-            let ast = $lang::parse(source).map_err(err)?;
-            let json_value = $lang::convert_ast_json(&ast, source);
-            let js_value = serde_wasm_bindgen::to_value(&json_value).map_err(err)?;
+            let json = $parse_json_fn(source)?;
+            let js_value = js_sys::JSON::parse(&json)
+                .map_err(|_| err("internal error: AST serialized to invalid JSON"))?;
             Ok(js_value.unchecked_into::<$parse_ret>())
+        }
+
+        /// Parse source into the JSON AST as a compact JSON string, skipping
+        /// JS object materialization (for consumers forwarding the wire format).
+        #[cfg(feature = "ast")]
+        #[wasm_bindgen]
+        pub fn $parse_json_fn(source: &str) -> Result<String, JsError> {
+            let ast = $lang::parse(source).map_err(err)?;
+            Ok($lang::convert_ast_json_string(&ast, source))
         }
 
         #[cfg(feature = "ast")]
@@ -77,6 +94,7 @@ macro_rules! lang_bindings {
 
 lang_bindings!(
     parse_svelte,
+    parse_svelte_json,
     parse_internal_svelte,
     format_svelte,
     tsv_svelte,
@@ -84,6 +102,7 @@ lang_bindings!(
 );
 lang_bindings!(
     parse_typescript,
+    parse_typescript_json,
     parse_internal_typescript,
     format_typescript,
     tsv_ts,
@@ -91,6 +110,7 @@ lang_bindings!(
 );
 lang_bindings!(
     parse_css,
+    parse_css_json,
     parse_internal_css,
     format_css,
     tsv_css,

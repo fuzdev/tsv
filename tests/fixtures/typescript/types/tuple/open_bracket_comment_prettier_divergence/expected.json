@@ -1,0 +1,437 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 327,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " line comment trailing tuple `[` - single element",
+			"start": 20,
+			"end": 71,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 84,
+			"end": 89,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 12
+				},
+				"end": {
+					"line": 3,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment trailing tuple `[` - multiple elements",
+			"start": 106,
+			"end": 160,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 173,
+			"end": 178,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 12
+				},
+				"end": {
+					"line": 8,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment trailing `[`, then own-line leading comment",
+			"start": 205,
+			"end": 265,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " bracket ",
+			"start": 278,
+			"end": 291,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 12
+				},
+				"end": {
+					"line": 14,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " lead",
+			"start": 294,
+			"end": 301,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 326,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 317,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 18,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 73,
+					"end": 103,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 78,
+						"end": 79,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 82,
+						"end": 102,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSStringKeyword",
+								"start": 92,
+								"end": 98,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 84,
+										"end": 89
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment trailing tuple `[` - single element",
+							"start": 20,
+							"end": 71
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 162,
+					"end": 202,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 167,
+						"end": 168,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 6
+							},
+							"end": {
+								"line": 8,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 171,
+						"end": 201,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 10
+							},
+							"end": {
+								"line": 11,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSStringKeyword",
+								"start": 181,
+								"end": 187,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 173,
+										"end": 178
+									}
+								]
+							},
+							{
+								"type": "TSNumberKeyword",
+								"start": 191,
+								"end": 197,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment trailing tuple `[` - multiple elements",
+							"start": 106,
+							"end": 160
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 267,
+					"end": 316,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 272,
+						"end": 273,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 6
+							},
+							"end": {
+								"line": 14,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 276,
+						"end": 315,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 10
+							},
+							"end": {
+								"line": 17,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSBooleanKeyword",
+								"start": 304,
+								"end": 311,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 9
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " bracket ",
+										"start": 278,
+										"end": 291
+									},
+									{
+										"type": "Line",
+										"value": " lead",
+										"start": 294,
+										"end": 301
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment trailing `[`, then own-line leading comment",
+							"start": 205,
+							"end": 265
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

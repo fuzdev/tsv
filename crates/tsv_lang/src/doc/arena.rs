@@ -75,9 +75,6 @@ pub enum DocNode {
     /// Set absolute indentation level for nested content
     Align { n: usize, contents: DocId },
 
-    /// Add alignment spaces after tabs (Prettier-style alignment)
-    AlignSpaces { spaces: usize, contents: DocId },
-
     /// Try to fit content on one line; if doesn't fit, break ALL lines in group.
     ///
     /// When `expanded_states` is non-empty, this is a "conditional group" that tries
@@ -131,7 +128,6 @@ pub struct ArenaCommand {
     pub mode: Mode,
     pub doc: DocId,
     pub base_indent_override: Option<usize>,
-    pub align_spaces: usize,
 }
 
 impl ArenaCommand {
@@ -146,7 +142,6 @@ impl ArenaCommand {
     pub fn indented(&self, doc: DocId) -> Self {
         Self {
             indent: self.indent + 1,
-            align_spaces: 0,
             doc,
             ..*self
         }
@@ -184,16 +179,6 @@ impl ArenaCommand {
         Self {
             doc,
             base_indent_override,
-            ..*self
-        }
-    }
-
-    /// Create a command with additional alignment spaces.
-    #[inline]
-    pub fn with_align_spaces(&self, spaces: usize, doc: DocId) -> Self {
-        Self {
-            doc,
-            align_spaces: self.align_spaces + spaces,
             ..*self
         }
     }
@@ -405,14 +390,6 @@ impl DocArena {
     /// Set absolute indentation level for doc.
     pub fn align(&self, n: usize, doc: DocId) -> DocId {
         self.alloc(DocNode::Align { n, contents: doc })
-    }
-
-    /// Add alignment spaces after tabs (Prettier-style alignment).
-    pub fn align_spaces(&self, spaces: usize, doc: DocId) -> DocId {
-        self.alloc(DocNode::AlignSpaces {
-            spaces,
-            contents: doc,
-        })
     }
 
     /// Conditional rendering based on parent group breaking.
@@ -675,9 +652,7 @@ impl DocArena {
             DocNode::Text(_) => false,
             DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
             DocNode::Indent(inner) | DocNode::Dedent(inner) => self.will_break_inner(*inner, nodes),
-            DocNode::Align { contents, .. } | DocNode::AlignSpaces { contents, .. } => {
-                self.will_break_inner(*contents, nodes)
-            }
+            DocNode::Align { contents, .. } => self.will_break_inner(*contents, nodes),
             DocNode::IndentIfBreak { contents, .. } => self.will_break_inner(*contents, nodes),
             DocNode::Group {
                 contents,
@@ -716,9 +691,7 @@ impl DocArena {
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
                 self.will_break_deep_inner(*inner, nodes)
             }
-            DocNode::Align { contents, .. } | DocNode::AlignSpaces { contents, .. } => {
-                self.will_break_deep_inner(*contents, nodes)
-            }
+            DocNode::Align { contents, .. } => self.will_break_deep_inner(*contents, nodes),
             DocNode::IndentIfBreak { contents, .. } => self.will_break_deep_inner(*contents, nodes),
             DocNode::Group {
                 contents,
@@ -752,9 +725,7 @@ impl DocArena {
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
                 self.has_forced_break_inner(*inner, nodes)
             }
-            DocNode::Align { contents, .. } | DocNode::AlignSpaces { contents, .. } => {
-                self.has_forced_break_inner(*contents, nodes)
-            }
+            DocNode::Align { contents, .. } => self.has_forced_break_inner(*contents, nodes),
             DocNode::IndentIfBreak { contents, .. } => {
                 self.has_forced_break_inner(*contents, nodes)
             }
@@ -784,9 +755,7 @@ impl DocArena {
         match &nodes[id.index()] {
             DocNode::Line(_) => true,
             DocNode::Indent(inner) | DocNode::Dedent(inner) => self.can_break_inner(*inner, nodes),
-            DocNode::Align { contents, .. } | DocNode::AlignSpaces { contents, .. } => {
-                self.can_break_inner(*contents, nodes)
-            }
+            DocNode::Align { contents, .. } => self.can_break_inner(*contents, nodes),
             DocNode::IndentIfBreak { contents, .. } => self.can_break_inner(*contents, nodes),
             DocNode::Group {
                 contents,
@@ -833,7 +802,6 @@ impl DocArena {
             Indent(DocId),
             Dedent(DocId),
             Align(usize, DocId),
-            AlignSpaces(usize, DocId),
             Group {
                 contents: DocId,
                 expanded_states: ChildRange,
@@ -858,7 +826,6 @@ impl DocArena {
                 DocNode::Indent(inner) => Info::Indent(*inner),
                 DocNode::Dedent(inner) => Info::Dedent(*inner),
                 DocNode::Align { n, contents } => Info::Align(*n, *contents),
-                DocNode::AlignSpaces { spaces, contents } => Info::AlignSpaces(*spaces, *contents),
                 DocNode::Group {
                     contents,
                     expanded_states,
@@ -904,10 +871,6 @@ impl DocArena {
             Info::Align(n, contents) => {
                 let new_contents = self.remove_lines(contents);
                 self.align(n, new_contents)
-            }
-            Info::AlignSpaces(spaces, contents) => {
-                let new_contents = self.remove_lines(contents);
-                self.align_spaces(spaces, new_contents)
             }
             Info::Group {
                 contents,

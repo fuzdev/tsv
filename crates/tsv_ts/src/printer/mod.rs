@@ -50,17 +50,14 @@ pub(crate) use analysis::{
     template_literal_has_newlines,
 };
 pub(crate) use assignment::{
-    arrow_chain_has_return_type, is_call_on_member_chain, is_curried_arrow_with_return_type,
-    is_literal_member_chain, is_poorly_breakable_chain, is_regex_root_chain,
-    is_self_expanding_value, is_simple_self_expanding, is_simple_value,
+    arrow_chain_has_return_type, is_call_on_member_chain, is_curried_arrow_chain,
+    is_curried_arrow_with_return_type, is_literal_member_chain, is_poorly_breakable_chain,
+    is_regex_root_chain, is_self_expanding_value, is_simple_self_expanding, is_simple_value,
     is_single_call_on_member_chain, is_type_assertion_call, should_inline_logical_expression,
 };
 pub(crate) use comments::{CommentFilter, CommentSpacing};
 pub(crate) use needs_parens::{ParenContext, needs_parens};
-pub(crate) use types::{
-    intersection_has_expanding_first_type, intersection_has_huggable_last_type,
-    should_hug_union_type, unwrap_parenthesized,
-};
+pub(crate) use types::{should_hug_union_type, unwrap_parenthesized};
 
 use crate::ast::internal;
 use crate::config::TsConfig;
@@ -74,6 +71,30 @@ use tsv_lang::{
     },
     has_comments_in_range, has_line_comments_in_range, printing,
 };
+
+/// The parent context that routes a curried arrow chain (`(a) => (b) => …`)
+/// through a flattened chain layout, mirroring prettier's
+/// `printArrowFunctionSignatures` parent-context branches. Set by the enclosing
+/// printer (assignment chokepoint, call-argument printer, binary-operand
+/// printer) just before the chain's RHS / argument / operand is built; the
+/// outermost chain arrow reads and clears it at entry (`replace(None)`) so
+/// nested arrows in the chain don't inherit it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum ArrowChainContext {
+    /// No chain context — arrows use the default break-after-operator path.
+    #[default]
+    None,
+    /// Assignment RHS (`const f = (a) => (b) => …`). The heads join into one
+    /// breakable group indented one level after `=` (a leading softline is the
+    /// break-after-`=`); all heads share the same indent when they break.
+    AssignmentRhs,
+    /// Call argument or binaryish operand (`fn((a) => (b) => …)`,
+    /// `x ?? ((a) => (b) => …)`) — prettier handles both in one
+    /// `printArrowFunctionSignatures` branch. Progressive indent: the first head
+    /// stays on the line, the rest indent one level
+    /// (`group([sig0, " =>", indent([line, join([" =>", line], rest)])])`).
+    CallArgOrBinaryish,
+}
 
 /// Printer state for building output
 pub struct Printer<'a> {
@@ -123,16 +144,38 @@ pub struct Printer<'a> {
     /// Set when formatting arrows in call arg expand-last context, matching
     /// prettier's `!args.expandLastArg` in shouldPrintAsChain.
     pub(crate) skip_arrow_chain: Cell<bool>,
-    /// Whether the next ObjectExpression should be wrapped in parens.
-    /// Set when printing arrow body with chained as/satisfies wrapping an object:
-    /// `() => ({}) as unknown as Logger` — parens go around inner object only.
-    pub(crate) arrow_body_object_needs_parens: Cell<bool>,
+    /// Whether to render arrow parameters flat (no break points) — mirrors
+    /// prettier's `expandLastArg`/`expandFirstArg` path, which prints the
+    /// signature with `removeLines` so an expanded last-arg arrow keeps its
+    /// params on one line and only the body breaks. Without this, a force-broken
+    /// arrow could shatter a destructuring param (`([a, b])`) instead of falling
+    /// through to the all-args-broken-out layout. Set around the arrow-doc build
+    /// in the expand-last-arg call-argument states.
+    pub(crate) expand_last_arg_flat_params: Cell<bool>,
+    /// Span of the ObjectExpression at the leftmost position of an arrow body that must
+    /// be wrapped in parens to avoid block ambiguity — `() => ({}) as Logger`,
+    /// `() => ({}).prop`, `() => ({}) && a`, `() => ({}).b++`. Matches prettier's
+    /// `startsWithNoLookaheadToken` traversal. Keyed by span (not consumed) so a chain
+    /// rebuilding its base across conditional-group variants wraps consistently, and a
+    /// same-shaped object nested deeper (a call argument) never matches.
+    pub(crate) arrow_body_object_parens_target: Cell<Option<tsv_lang::Span>>,
     /// Span of the object/function/class node that starts an expression statement
     /// and must be wrapped in parens, even when nested as the leftmost token of a
-    /// member/binary/etc. chain: `(class {}).foo`, `({}).foo`, `(class {}) + 1`.
-    /// Matches prettier's `startsWithNoLookaheadToken` traversal. Consumed (cleared)
-    /// by the matching node's doc builder so it wraps exactly once.
+    /// member/binary/etc. chain: `(class {}).foo`, `({}).foo`, `(class {}) + 1`,
+    /// `({a: 1}).b().c()`. Matches prettier's `startsWithNoLookaheadToken` traversal.
+    /// Keyed by span (not consumed, like `arrow_body_object_parens_target`) so a chain
+    /// rebuilding its base across conditional-group variants wraps consistently; cleared
+    /// once per statement in `build_expression_statement`.
     pub(crate) expr_stmt_paren_target: Cell<Option<tsv_lang::Span>>,
+    /// The parent context for a curried arrow-chain value, set by the enclosing
+    /// printer (assignment chokepoint, call-argument printer, binary-operand
+    /// printer) just before the chain is built. The arrow printer reads and
+    /// clears it at entry so the outermost chain arrow picks the right flattened
+    /// layout (assignment-RHS vs progressive call-arg/binaryish) while nested
+    /// arrows don't inherit it. Mirrors prettier routing the parent context
+    /// (`args.assignmentLayout`, `isCallLikeExpression(parent)`,
+    /// `isBinaryish(parent)`) into `printArrowFunctionSignatures`.
+    pub(crate) arrow_chain_context: Cell<ArrowChainContext>,
 }
 
 impl<'a> Printer<'a> {
@@ -166,8 +209,10 @@ impl<'a> Printer<'a> {
             force_chain_expand: Cell::new(false),
             in_curried_typed_arrow: Cell::new(false),
             skip_arrow_chain: Cell::new(false),
-            arrow_body_object_needs_parens: Cell::new(false),
+            expand_last_arg_flat_params: Cell::new(false),
+            arrow_body_object_parens_target: Cell::new(None),
             expr_stmt_paren_target: Cell::new(None),
+            arrow_chain_context: Cell::new(ArrowChainContext::None),
         }
     }
 
@@ -1020,9 +1065,26 @@ impl<'a> Printer<'a> {
 
     /// Emit a node's source span verbatim. Used to round-trip the source of a
     /// `// prettier-ignore`d node (statement, block statement, object/pattern
-    /// property) instead of reformatting it.
+    /// property, class/enum/interface/type-literal member) instead of
+    /// reformatting it.
+    /// Trailing whitespace is trimmed: a node's significant tokens never end in
+    /// whitespace, and prettier never preserves it — some spans (e.g. a
+    /// `TSConstructSignatureDeclaration`'s) over-extend to the next line's start.
     fn raw_source_doc(&self, span: tsv_lang::Span) -> DocId {
-        self.d().text_owned(span.extract(self.source).to_string())
+        self.d()
+            .text_owned(span.extract(self.source).trim_end().to_string())
+    }
+
+    /// Emit `[start, end)` of the source verbatim. Like `raw_source_doc` but for a
+    /// `// prettier-ignore`d member whose verbatim slice must exclude a separator
+    /// the surrounding loop emits itself (e.g. a type-literal member's `;`), so
+    /// the terminator isn't duplicated.
+    fn raw_source_range(&self, start: u32, end: u32) -> DocId {
+        self.d().text_owned(
+            self.source[start as usize..end as usize]
+                .trim_end()
+                .to_string(),
+        )
     }
 }
 

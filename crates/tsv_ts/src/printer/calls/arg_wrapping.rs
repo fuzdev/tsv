@@ -5,7 +5,7 @@
 // - Call expression wrapping with soft/hard breaks
 // - Building argument lists split into head/last patterns
 
-use super::super::Printer;
+use super::super::{ArrowChainContext, Printer, is_curried_arrow_chain};
 use super::arg_comments::{
     PartitionedComments, emit_first_arg_leading_comments, find_comma_pos, is_comment_after_comma,
     is_comment_before_comma, is_inline_block_after_comma, is_inline_block_before_comma,
@@ -379,10 +379,26 @@ pub(crate) fn build_args_split_last(
 ) -> (Vec<DocId>, DocId, DocId) {
     let d = printer.d();
     // Build all args (using build_huggable_expression_doc for proper parens on assignments
-    // and isolated_group wrapping for templates)
+    // and isolated_group wrapping for templates).
+    //
+    // A curried arrow-chain argument (`fn(x, (a) => (b) => …)`) routes through the
+    // progressive call-arg chain layout: set the context so the outermost chain
+    // arrow flattens its heads (`should_use_arrow_chain_layout` still gates on
+    // untyped / comment-free, and `skip_arrow_chain` keeps the expand-last-arg hug
+    // states on the default path). Mirrors prettier's `isCallLikeExpression(parent)`
+    // reaching `printArrowFunctionSignatures`.
     let arg_docs: Vec<_> = arguments
         .iter()
-        .map(|arg| printer.build_huggable_expression_doc(arg))
+        .map(|arg| {
+            if is_curried_arrow_chain(arg) {
+                printer
+                    .build_with_arrow_chain_context(ArrowChainContext::CallArgOrBinaryish, || {
+                        printer.build_huggable_expression_doc(arg)
+                    })
+            } else {
+                printer.build_huggable_expression_doc(arg)
+            }
+        })
         .collect();
 
     // Leading comments between `(` and the first argument (e.g., /** @type {T} */).

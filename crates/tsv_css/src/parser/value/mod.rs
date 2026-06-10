@@ -109,9 +109,24 @@ pub(crate) fn parse_single_value(s: &str, span: Span) -> Option<CssValue> {
             start: span.start + args_start as u32,
             end: span.start + args_start as u32 + args.len() as u32,
         };
+        let mut parsed_args = parse_function_arguments(&args, args_span);
+        // var()'s empty fallback (`var(--a,)`) is significant: per css-variables-1 the
+        // trailing comma with an empty `<declaration-value>` substitutes nothing when the
+        // variable is unset, distinct from `var(--a)`. The generic comma parser drops empty
+        // elements, so restore the empty trailing fallback for var() specifically — other
+        // functions (`rgb(0,0,0,)`, `min(1px,)`) correctly drop it, matching prettier.
+        if name.eq_ignore_ascii_case("var") && args.trim_end().ends_with(',') {
+            parsed_args.push(CssValue::Identifier {
+                name: String::new(),
+                span: Span {
+                    start: args_span.end,
+                    end: args_span.end,
+                },
+            });
+        }
         return Some(CssValue::Function {
             name,
-            args: parse_function_arguments(&args, args_span),
+            args: parsed_args,
             span,
         });
     }

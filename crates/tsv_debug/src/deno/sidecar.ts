@@ -8,9 +8,9 @@
 const VERSIONS = {
 	prettier: '3.8.3',
 	'prettier-plugin-svelte': '3.5.2',
-	svelte: '5.55.7',
+	svelte: '5.56.1',
 	acorn: '8.16.0',
-	'@sveltejs/acorn-typescript': '1.0.9',
+	'@sveltejs/acorn-typescript': '1.0.10',
 } as const;
 
 // TODO verify there's not a better solution to use deno.json here, see the above NOTE too
@@ -20,11 +20,11 @@ import * as prettier from 'npm:prettier@3.8.3';
 // deno-lint-ignore no-import-prefix
 import prettierPluginSvelte from 'npm:prettier-plugin-svelte@3.5.2';
 // deno-lint-ignore no-import-prefix
-import { parse as svelteParse, parseCss } from 'npm:svelte@5.55.7/compiler';
+import { parse as svelteParse, parseCss } from 'npm:svelte@5.56.1/compiler';
 // deno-lint-ignore no-import-prefix
 import * as acorn from 'npm:acorn@8.16.0';
 // deno-lint-ignore no-import-prefix
-import { tsPlugin } from 'npm:@sveltejs/acorn-typescript@1.0.9';
+import { tsPlugin } from 'npm:@sveltejs/acorn-typescript@1.0.10';
 // deno-lint-ignore no-import-prefix
 import { TextLineStream } from 'jsr:@std/streams@1/text-line-stream';
 

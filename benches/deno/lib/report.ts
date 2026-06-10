@@ -14,6 +14,16 @@ export interface GroupResults {
 	results: BenchmarkResult[];
 }
 
+/**
+ * Coverage percentage, floored (never rounded). Floor — not `.toFixed(0)` —
+ * so 99.85% renders as `99%`, never `100%`: a rounded `(100%)` next to a
+ * non-full file count (e.g. `659/660`) would read as self-contradictory.
+ * A genuinely full set returns exactly 100.
+ */
+function coverage_pct(processed: number, total: number): number {
+	return processed === total ? 100 : Math.floor((processed / total) * 100);
+}
+
 /** Create a visual bar for comparison (based on time - slower = longer bar) */
 function create_bar(value: number, max: number, width = 40): string {
 	const filled = Math.round((value / max) * width);
@@ -422,15 +432,23 @@ export function generate_group_bench_table_markdown(
 	const unit = time_unit_detect_best(mean_times);
 	const unit_str = TIME_UNIT_DISPLAY[unit];
 
-	let baseline_ops: number;
+	// Track the baseline by row index, not by ops/sec value. A value-equality
+	// check (`r.ops === baseline_ops`) mislabels every row that ties the max
+	// in the no-named-baseline branch; pinning the index labels exactly one.
+	let baseline_index: number;
 	let vs_header: string;
-	if (baseline !== undefined && results.some((r) => r.name === baseline)) {
-		baseline_ops = results.find((r) => r.name === baseline)!.stats.ops_per_second;
+	const named_index = baseline !== undefined ? results.findIndex((r) => r.name === baseline) : -1;
+	if (named_index !== -1) {
+		baseline_index = named_index;
 		vs_header = `vs ${baseline} (speedup)`;
 	} else {
-		baseline_ops = Math.max(...results.map((r) => r.stats.ops_per_second));
+		// First row achieving the max ops/sec is the baseline; later ties are
+		// labeled with their speedup (`1.00x`), not a second `baseline`.
+		const max_ops = Math.max(...results.map((r) => r.stats.ops_per_second));
+		baseline_index = results.findIndex((r) => r.stats.ops_per_second === max_ops);
 		vs_header = 'vs Best (speedup)';
 	}
+	const baseline_ops = results[baseline_index].stats.ops_per_second;
 
 	const rows: string[][] = [];
 	rows.push([
@@ -447,9 +465,10 @@ export function generate_group_bench_table_markdown(
 		vs_header,
 	]);
 
-	for (const r of results) {
+	for (let row_index = 0; row_index < results.length; row_index++) {
+		const r = results[row_index];
 		const fmt = (ns: number) => time_format(ns, unit, 2).replace(unit_str, '').trim();
-		const is_baseline = r.stats.ops_per_second === baseline_ops;
+		const is_baseline = row_index === baseline_index;
 		const speedup = r.stats.ops_per_second / baseline_ops;
 		const vs_cell = is_baseline ? 'baseline' : format_ratio(speedup);
 		// p95/p99 from <10 samples is essentially `max` (R-7 interpolation
@@ -556,7 +575,7 @@ function build_comparison_data(
 	}
 
 	if (native_rows.length > 0) {
-		sections.push({ label: 'tsv (native)', rows: native_rows });
+		sections.push({ label: 'tsv', rows: native_rows });
 	}
 
 	// WASM comparisons
@@ -664,7 +683,7 @@ export function generate_comparison_summary(
 
 	// Fairness notes (only shown when oxc-parser data is present)
 	const has_native_oxc = sections.some((s) =>
-		s.label === 'tsv (native)' &&
+		s.label === 'tsv' &&
 		s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser'))
 	);
 	const has_wasm_oxc = sections.some((s) =>
@@ -677,16 +696,16 @@ export function generate_comparison_summary(
 	lines.push('  (parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts)');
 	if (has_native_oxc || has_wasm_oxc) {
 		lines.push(
-			'  (oxc-parser returns a lazy proxy backed by raw buffer; tsv-json eagerly',
+			'  (oxc-parser — native and wasm — serializes the AST to JSON in Rust and',
 		);
 		lines.push(
-			'   materializes the full JS AST tree — comparison is not apples-to-apples)',
+			'   deserializes in JS, the same eager materialization as tsv-json — apples-to-apples)',
 		);
 		lines.push(
-			'  (oxc-parser-wasm can outpace oxc-parser native here: NAPI marshalling adds',
+			'  (tsv-internal/tsv_wasm-internal are parse-only, no JS materialization;',
 		);
 		lines.push(
-			'   per-call cost that wasm-bindgen avoids — not a WASM-vs-native verdict)',
+			'   oxc has no comparably cheap mode, so they have no oxc counterpart)',
 		);
 	}
 	lines.push('  (format groups include parse time — each formatter parses internally)');
@@ -735,7 +754,7 @@ export function generate_comparison_markdown(
 
 	// Fairness notes (only shown when oxc-parser data is present)
 	const has_native_oxc = sections.some((s) =>
-		s.label === 'tsv (native)' &&
+		s.label === 'tsv' &&
 		s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser'))
 	);
 	const has_wasm_oxc = sections.some((s) =>
@@ -750,10 +769,10 @@ export function generate_comparison_markdown(
 	];
 	if (has_native_oxc || has_wasm_oxc) {
 		notes.push(
-			'oxc-parser returns a lazy proxy backed by raw buffer; tsv-json eagerly materializes the full JS AST tree — comparison is not apples-to-apples',
+			'oxc-parser (native and wasm) serializes the AST to JSON in Rust and deserializes it in JS — the same eager materialization as tsv-json/tsv_wasm-json, so these parse rows are apples-to-apples',
 		);
 		notes.push(
-			'oxc-parser-wasm can outpace oxc-parser native here: NAPI marshalling adds per-call cost that wasm-bindgen avoids — not a WASM-vs-native verdict',
+			'tsv-internal/tsv_wasm-internal are parse-only (no JS materialization) and have no oxc counterpart — oxc exposes no comparably cheap mode (its JS API always serializes; experimentalLazy is setup-dominated)',
 		);
 	}
 	notes.push('Format groups include parse time — each formatter parses internally');
@@ -836,9 +855,7 @@ export function generate_group_coverage_markdown(
 	// Section presence already signals "some impl skipped"; per-row ⚠ added
 	// no signal when every row was sub-100% (the common case).
 	const parts = entries.map((e) => {
-		// Floor (not round) so 99.85% doesn't render as "(100%)" — which
-		// would look self-contradictory next to a non-100% count.
-		const pct = e.processed === e.total ? 100 : Math.floor((e.processed / e.total) * 100);
+		const pct = coverage_pct(e.processed, e.total);
 		return `${e.name} ${e.processed}/${e.total} (${pct}%)`;
 	});
 	return `**Coverage:** ${parts.join(', ')}`;
@@ -855,6 +872,10 @@ export function generate_group_coverage_markdown(
  * the direction.
  */
 export function generate_json_overhead_note(results: BenchmarkResult[]): string | null {
+	// Each pair is [non-materializing parse, full-JS-tree parse]; the ratio is the
+	// cost of materializing the AST into JS. tsv-only: oxc has no comparably cheap
+	// parse-only mode (its JS API always serializes to cross into JS; experimentalLazy
+	// is setup-dominated — see oxc.ts), so there's no oxc pair to show here.
 	const pairs = [
 		['tsv-internal', 'tsv-json'],
 		['tsv_wasm-internal', 'tsv_wasm-json'],
@@ -1126,7 +1147,7 @@ export function generate_effective_corpus_report(
 
 		lines.push(`  ${group_name}:`);
 		for (const [label, entry] of entries) {
-			const pct = ((entry.processed / entry.total) * 100).toFixed(0);
+			const pct = coverage_pct(entry.processed, entry.total);
 			lines.push(
 				`    ${label.padEnd(max_label_len)} ${entry.processed}/${entry.total} files (${pct}%)`,
 			);

@@ -107,12 +107,13 @@ pub(crate) fn parse_rule(parser: &mut CssParser, nested: bool) -> Result<CssRule
         super::selectors::parse_complex_selector_list(parser)?
     };
 
-    // Capture any comment after selector (before {)
+    // Capture any comments after selector (before {)
     let mut declarations = Vec::new();
     parser.skip_whitespace()?;
-    if matches!(&parser.current_kind, TokenKind::Comment) {
+    while matches!(&parser.current_kind, TokenKind::Comment) {
         let comment = parser.parse_block_comment()?;
         declarations.push(CssBlockChild::Comment(comment));
+        parser.skip_whitespace()?;
     }
 
     // Expect { and capture its start
@@ -320,8 +321,13 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
     };
 
     // Allow empty value_str if we have comments (e.g., `color: /* comment */;`)
-    // Svelte treats the comment as the value in this case
-    if value_str.is_empty() && !has_value_comment {
+    // Svelte treats the comment as the value in this case.
+    // Also allow an empty custom-property value (`--a:;`): css-variables-1 makes the
+    // value optional (`<declaration-value>?`), and css-syntax-3 trims leading/trailing
+    // whitespace, so the value is empty regardless of spacing. The empty value parses to
+    // an empty identifier and prints as a single space (`--a: ;`), the form
+    // css-variables-1 mandates for serialization. Non-custom empty values stay an error.
+    if value_str.is_empty() && !has_value_comment && !property.starts_with("--") {
         return Err(parser.error_msg_at("Empty CSS value", start));
     }
 

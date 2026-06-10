@@ -6,7 +6,7 @@
  *   - crates/tsv_css/src/ast/public.rs
  *   - crates/tsv_svelte/src/ast/public.rs
  *
- * Bundled inside `@fuzdev/tsv_parse`. Any change to a `pub` field in the
+ * Bundled inside `@fuzdev/tsv_parse_wasm`. Any change to a `pub` field in the
  * Rust sources must be mirrored here — see `crates/tsv_wasm/CLAUDE.md`
  * for the maintenance checklist.
  *

@@ -18,6 +18,11 @@ pub enum GroupId {
     /// Type parameter `=` default: `<T = Long>` breaks after `=` and indents
     /// the default when it overflows.
     TypeParameterDefault,
+    /// Curried arrow-function chain: the joined signature heads
+    /// (`(a) => (b) => …`) break as a unit when they don't fit, and the
+    /// terminal body's `indent_if_break` keys on this group so it indents only
+    /// when the heads broke.
+    ArrowChain,
 }
 
 /// Context for doc rendering - provides hints about trailing punctuation,

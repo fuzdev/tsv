@@ -1,9 +1,6 @@
 // Type-related statement printing for TypeScript
 
-use super::{
-    Printer, build_entity_name_doc, intersection_has_expanding_first_type,
-    intersection_has_huggable_last_type, should_hug_union_type, unwrap_parenthesized,
-};
+use super::{Printer, build_entity_name_doc, should_hug_union_type, unwrap_parenthesized};
 use crate::ast::internal::{self, TSType};
 use crate::printer::analysis::{find_char_skipping_comments, skip_identifier_at};
 use crate::printer::layout::hang_after_operator;
@@ -191,6 +188,26 @@ impl<'a> Printer<'a> {
     /// between `=` and the value. `lead_space` controls the leading space before
     /// `=` (true for the inline `... =` form, false when the caller has already
     /// emitted a hardline, e.g. after an own-line pre-`=` comment).
+    /// A prefix type operator (`keyof` / `typeof`) whose keyword→operand gap holds
+    /// a line comment. Such a value carries a comment-forced hardline, so the
+    /// type-alias RHS keeps the operator on the `=` line (the operand hangs on the
+    /// next line via the operator's own layout) instead of breaking after `=` —
+    /// matching prettier and the conditional / internal-breaking arms. A long
+    /// *comment-free* operator still breaks after `=` (the hanging-indent arm).
+    fn type_operator_has_leading_line_comment(&self, ty: &TSType) -> bool {
+        match ty {
+            TSType::TypeOperator(o) => {
+                let kw_end = o.span.start + o.operator.as_str().len() as u32;
+                self.has_line_comments_between(kw_end, o.type_annotation.span().start)
+            }
+            TSType::TypeQuery(q) => {
+                let kw_end = q.span.start + 6; // "typeof".len()
+                self.has_line_comments_between(kw_end, q.expr_name.span().start)
+            }
+            _ => false,
+        }
+    }
+
     fn build_type_alias_eq_value_doc(
         &self,
         decl: &internal::TSTypeAliasDeclaration,
@@ -212,14 +229,21 @@ impl<'a> Printer<'a> {
             let mut inline_parts = Vec::new();
             let mut indent_comment_parts = Vec::new();
 
+            // Only the first single-line comment hugs the `=` line; multiline
+            // blocks (any position) and every subsequent comment go on their own
+            // line in the indent. Two line comments must not merge onto one line —
+            // the second `//` would stop being a delimiter (a boundary loss).
+            let mut first = true;
             for comment in comments_in_range(self.comments, eq_pos + 1, type_start) {
-                if comment.is_block && self.is_multiline_comment(comment) {
-                    indent_comment_parts.push(self.build_comment_doc(comment));
-                    indent_comment_parts.push(d.hardline());
-                } else {
+                let multiline_block = comment.is_block && self.is_multiline_comment(comment);
+                if first && !multiline_block {
                     inline_parts.push(d.text(" "));
                     inline_parts.push(self.build_comment_doc(comment));
+                } else {
+                    indent_comment_parts.push(self.build_comment_doc(comment));
+                    indent_comment_parts.push(d.hardline());
                 }
+                first = false;
             }
 
             parts.extend(inline_parts);
@@ -242,10 +266,16 @@ impl<'a> Printer<'a> {
                 parts.push(comment_doc); // " /* comment */"
             }
 
-            // Check the type kind for different formatting rules
+            // Check the type kind for different formatting rules. Redundant
+            // comment-free parens around the RHS are stripped (prettier does the
+            // same), so a `(union)` / `(intersection)` gets the same break layout
+            // as the bare form instead of hanging inline. The doc is built from the
+            // unwrapped type — safe, since we only unwrap when no comments are inside
+            // the parens (commented parens stay on the preserve-in-place path).
+            let value_type = self.unwrap_redundant_parens(&decl.type_annotation);
             // For union/intersection types, build without their own group so they inherit
             // breaking from this context's group.
-            if let TSType::Union(u) = &decl.type_annotation {
+            if let TSType::Union(u) = value_type {
                 let type_doc = self.build_union_type_doc(u, false);
                 if should_hug_union_type(u) {
                     // Hugged unions (e.g., `{ ... } | null`): the object type handles its own
@@ -256,34 +286,25 @@ impl<'a> Printer<'a> {
                     // Normal unions: break after `=` with leading `| `
                     parts.push(hang_after_operator(d, type_doc));
                 }
-            } else if let TSType::Intersection(i) = &decl.type_annotation {
-                // Intersection types: first element stays inline, subsequent wrap with indent
-                // Special cases where indent is skipped:
-                // - Last type is huggable (TypeLiteral/Mapped): it handles its own expansion
-                // - First type is expanding (TypeLiteral/Mapped): outer indent would incorrectly
-                //   indent the object literal's members; the intersection handles indent internally
-                let type_doc = self.build_intersection_type_doc(i, false);
+            } else if let TSType::Intersection(i) = value_type {
+                // Intersection types: first element stays inline, continuation types
+                // wrap with a hanging indent (skipped when a boundary TypeLiteral/Mapped
+                // owns its own expansion — see `intersection_hanging_with_indent`).
                 parts.push(d.text(" "));
-                if intersection_has_huggable_last_type(i)
-                    || intersection_has_expanding_first_type(i)
-                {
-                    parts.push(type_doc);
-                } else {
-                    parts.push(d.group(d.indent(type_doc)));
-                }
-            } else if let TSType::Conditional(cond) = &decl.type_annotation {
+                parts.push(self.intersection_hanging_with_indent(i));
+            } else if let TSType::Conditional(cond) = value_type {
                 // Conditional types: break after `=` only if check/extends has type parameters
-                let type_doc = self.build_type_doc(&decl.type_annotation);
+                let type_doc = self.build_type_doc(value_type);
                 if should_break_before_conditional_type(cond) {
                     parts.push(hang_after_operator(d, type_doc));
                 } else {
                     parts.push(d.text(" "));
                     parts.push(type_doc);
                 }
-            } else if type_has_internal_breaking(&decl.type_annotation) {
+            } else if type_has_internal_breaking(value_type) {
                 // Types with internal breaking (braces, brackets, parens, angle brackets) stay hugged
                 // Use wrapping version so TypeReference type args break internally when too long
-                let type_doc = self.build_type_doc_with_wrapping_type_args(&decl.type_annotation);
+                let type_doc = self.build_type_doc_with_wrapping_type_args(value_type);
                 parts.push(d.text(" "));
                 parts.push(type_doc);
             } else if has_complex_params {
@@ -295,12 +316,19 @@ impl<'a> Printer<'a> {
                 //     T extends string,
                 //     U = number,
                 //   > = SomeLongType;
-                let type_doc = self.build_type_doc(&decl.type_annotation);
+                let type_doc = self.build_type_doc(value_type);
+                parts.push(d.text(" "));
+                parts.push(type_doc);
+            } else if self.type_operator_has_leading_line_comment(value_type) {
+                // keyof/typeof with a line comment after the operator: keep the
+                // operator on the `=` line; its operand hangs on the next line
+                // (consistent with the conditional / internal-breaking arms).
+                let type_doc = self.build_type_doc(value_type);
                 parts.push(d.text(" "));
                 parts.push(type_doc);
             } else {
                 // Other types: break after `=` with a hanging indent when too long
-                let type_doc = self.build_type_doc(&decl.type_annotation);
+                let type_doc = self.build_type_doc(value_type);
                 parts.push(hang_after_operator(d, type_doc));
             }
         }
@@ -433,31 +461,33 @@ impl<'a> Printer<'a> {
             decl.id.span.end
         };
         let body_start = decl.body.span.start;
-        let has_head_body_comments = self.has_comments_between(header_end, body_start);
-        let has_head_body_line_comment = self.has_line_comments_between(header_end, body_start);
-        let head_body_comment = if has_head_body_comments {
-            self.build_inline_comments_between_doc(header_end, body_start)
-        } else {
-            d.empty()
-        };
-
-        // Build body separately (outside the header group)
-        // Line comments get a hardline to prevent absorbing the brace
-        let pre_brace = if has_head_body_line_comment {
-            d.hardline()
-        } else {
-            d.text(" ")
-        };
-        let mut parts = vec![header_doc, head_body_comment, pre_brace];
+        // Comments between the header and body `{`, plus the pre-brace spacing.
+        // Shared with the class printer: each comment is kept on its own line (a
+        // line comment doesn't absorb a following one), and a line comment forces
+        // the brace onto the next line. See heritage_last_item_line_comment.
+        let mut parts = vec![
+            header_doc,
+            self.build_header_pre_body_doc(true, header_end, body_start),
+        ];
 
         if decl.body.body.is_empty() {
             parts.push(self.build_empty_body_with_comments_doc(decl.body.span));
         } else {
+            // A comment trailing the opening `{` on its own line is kept on the
+            // `{` line when the body expands (divergence from prettier, which
+            // relocates it to its own line as the first member's leading
+            // comment). See conformance_prettier.md §Comment relocation
+            // (Class/interface/enum body `{`).
+            let first_member_start = decl.body.body[0].span().start;
+            let (brace_line_prefix, delimiter_pull_pos) =
+                self.delimiter_line_comment_prefix(decl.body.span.start, first_member_start);
             parts.push(d.text("{"));
+            parts.push(d.concat(&brace_line_prefix));
             parts.push(d.indent(d.concat(&[self.build_type_elements_doc(
                 &decl.body.body,
                 decl.body.span.start,
                 decl.body.span.end,
+                delimiter_pull_pos,
             )])));
             parts.push(d.hardline());
             parts.push(d.text("}"));
@@ -829,6 +859,16 @@ impl<'a> Printer<'a> {
             }
         }
 
+        // A comment trailing the opening `<` on its own line is kept on the `<`
+        // line (divergence from prettier, which relocates it to its own line as
+        // the first argument's leading comment). Multi-argument path only — the
+        // single-argument leading-comment case hugs `<`/`>` above and matches
+        // prettier. See conformance_prettier.md §Comment relocation
+        // (Type-argument `<`).
+        let first_param_start = args.params[0].span().start;
+        let (angle_line_prefix, delimiter_pull_pos) =
+            self.delimiter_line_comment_prefix(args.span.start, first_param_start);
+
         let mut inner_parts = Vec::new();
         let mut prev_end = args.span.start + 1; // After the opening `<`
 
@@ -837,8 +877,20 @@ impl<'a> Printer<'a> {
             let param_end = param.span().end;
             let is_last = i == args.params.len() - 1;
 
-            // Leading comments (after previous comma or `<`)
-            inner_parts.extend(self.build_leading_comments_multiline(prev_end, param_start));
+            // Leading comments (after previous comma or `<`). For the first arg,
+            // drop comments pulled onto the `<` line (emitted as the angle-line
+            // prefix below).
+            if i == 0
+                && let Some(delim) = delimiter_pull_pos
+            {
+                inner_parts.extend(self.build_leading_comments_multiline_after_delim(
+                    prev_end,
+                    param_start,
+                    delim,
+                ));
+            } else {
+                inner_parts.extend(self.build_leading_comments_multiline(prev_end, param_start));
+            }
 
             inner_parts.push(self.build_type_arg_doc(param, args.params.len() > 1));
 
@@ -859,6 +911,7 @@ impl<'a> Printer<'a> {
 
         d.concat(&[
             d.text("<"),
+            d.concat(&angle_line_prefix),
             d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])),
             d.hardline(),
             d.text(">"),
@@ -866,11 +919,17 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for type elements with comment handling
+    ///
+    /// `delimiter_pull_pos`, when `Some(pos)`, drops the first member's leading
+    /// comments that share a source line with `pos` (the opening `{`) — the
+    /// caller emits those as a prefix on the `{` line instead (the open-brace
+    /// trailing-comment divergence). Pass `None` to keep the default behavior.
     fn build_type_elements_doc(
         &self,
         members: &[internal::TSTypeElement],
         body_start: u32,
         body_end: u32,
+        delimiter_pull_pos: Option<u32>,
     ) -> DocId {
         let d = self.d();
         let mut parts = Vec::new();
@@ -899,7 +958,9 @@ impl<'a> Printer<'a> {
                     .copied()
                     .collect()
             } else {
-                all_comments
+                // First member: drop comments pulled onto the `{` line (emitted
+                // as the brace-line prefix by the caller).
+                self.first_member_leading_comments(all_comments, delimiter_pull_pos)
             };
 
             // Add separator before this member
@@ -923,7 +984,14 @@ impl<'a> Printer<'a> {
                 self.build_leading_comments_with_blank_lines(&leading_comments, member_start),
             );
 
-            parts.push(self.build_type_element_doc(member));
+            // A preceding `// prettier-ignore` keeps the member's source verbatim
+            // (matches prettier). The member span includes its trailing `;`.
+            let member_doc = if self.has_prettier_ignore_in_range(prev_end, member_start) {
+                self.raw_source_doc(member.span())
+            } else {
+                self.build_type_element_doc(member)
+            };
+            parts.push(member_doc);
 
             // Handle trailing inline comments on same line after member
             // Skip multi-line block comments - they should be leading comments for the next element
@@ -1315,7 +1383,17 @@ impl<'a> Printer<'a> {
             // Empty enum body - handle comments inside
             parts.push(self.build_empty_body_with_comments_doc(body_span));
         } else {
+            // A comment trailing the opening `{` on its own line is kept on the
+            // `{` line when the body expands (divergence from prettier, which
+            // relocates it to its own line as the first member's leading
+            // comment). See conformance_prettier.md §Comment relocation
+            // (Class/interface/enum body `{`). `body_start - 1` is the `{`.
+            let first_member_start = decl.members[0].span.start;
+            let (brace_line_prefix, delimiter_pull_pos) =
+                self.delimiter_line_comment_prefix(body_start - 1, first_member_start);
+
             parts.push(d.text("{"));
+            parts.push(d.concat(&brace_line_prefix));
             // Build member docs with comment handling
             let mut member_parts = Vec::new();
             let mut prev_end = body_start;
@@ -1324,9 +1402,18 @@ impl<'a> Printer<'a> {
                 let member_start = member.span.start;
                 let is_first = i == 0;
 
-                // Check for comments between previous position and this member
+                // Check for comments between previous position and this member.
+                // First member: drop comments pulled onto the `{` line (emitted
+                // as the brace-line prefix above).
                 let comments: Vec<_> = comments_in_range(self.comments, prev_end, member_start)
-                    .filter(|c| is_first || !self.is_same_line(prev_end, c.span.start))
+                    .filter(|c| {
+                        if is_first {
+                            !delimiter_pull_pos
+                                .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c))
+                        } else {
+                            !self.is_same_line(prev_end, c.span.start)
+                        }
+                    })
                     .collect();
 
                 // Check for blank lines
@@ -1353,7 +1440,15 @@ impl<'a> Printer<'a> {
                     }
                 }
 
-                member_parts.push(self.build_enum_member_doc(member));
+                // A preceding `// prettier-ignore` keeps the member's source
+                // verbatim (matches prettier). The member span excludes the
+                // trailing `,`, which the loop still appends below.
+                let member_doc = if self.has_prettier_ignore_in_range(prev_end, member_start) {
+                    self.raw_source_doc(member.span)
+                } else {
+                    self.build_enum_member_doc(member)
+                };
+                member_parts.push(member_doc);
 
                 let member_end = member.span.end;
                 let upper_bound = decl
@@ -1542,7 +1637,18 @@ impl<'a> Printer<'a> {
                     // Empty namespace body - handle comments inside
                     parts.push(self.build_empty_body_with_comments_doc(block.span));
                 } else {
+                    // A comment trailing the opening `{` on its own line is kept on
+                    // the `{` line when the body expands (divergence from prettier,
+                    // which relocates it to its own line as the body's leading
+                    // comment). Same mechanism as block-statement bodies. See
+                    // conformance_prettier.md §Comment relocation (Namespace/module
+                    // body `{`).
+                    let first_stmt_start = block.body[0].span().start;
+                    let (brace_line_prefix, delimiter_pull_pos) =
+                        self.delimiter_line_comment_prefix(block.span.start, first_stmt_start);
+
                     parts.push(d.text("{"));
+                    parts.push(d.concat(&brace_line_prefix));
 
                     // Shared per-statement walk (leading comments, blank-line
                     // separators, prettier-ignore, trailing same-line comments) —
@@ -1555,7 +1661,7 @@ impl<'a> Printer<'a> {
                             body_start,
                             body_end,
                             Vec::new(),
-                            None,
+                            delimiter_pull_pos,
                         );
 
                     // Handle own-line trailing comments after the last statement

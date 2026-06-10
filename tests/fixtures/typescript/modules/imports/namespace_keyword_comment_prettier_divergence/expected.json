@@ -1,0 +1,637 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 469,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " comment between import and namespace star",
+			"start": 20,
+			"end": 64,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 73,
+			"end": 81,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 8
+				},
+				"end": {
+					"line": 3,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment between import and type keyword",
+			"start": 105,
+			"end": 147,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 43
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 156,
+			"end": 164,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 8
+				},
+				"end": {
+					"line": 6,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment between type keyword and namespace star",
+			"start": 193,
+			"end": 243,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 257,
+			"end": 265,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 13
+				},
+				"end": {
+					"line": 9,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment between import and type keyword",
+			"start": 289,
+			"end": 336,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 345,
+			"end": 350,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 8
+				},
+				"end": {
+					"line": 12,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment between namespace star and as",
+			"start": 380,
+			"end": 420,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 431,
+			"end": 439,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 10
+				},
+				"end": {
+					"line": 16,
+					"column": 18
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 468,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 459,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 66,
+					"end": 102,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 37
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportNamespaceSpecifier",
+							"start": 82,
+							"end": 90,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 17
+								},
+								"end": {
+									"line": 3,
+									"column": 25
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 87,
+								"end": 90,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 22
+									},
+									"end": {
+										"line": 3,
+										"column": 25
+									}
+								},
+								"name": "ns1"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 73,
+									"end": 81
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 96,
+						"end": 101,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 31
+							},
+							"end": {
+								"line": 3,
+								"column": 36
+							}
+						},
+						"value": "./a",
+						"raw": "'./a'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " comment between import and namespace star",
+							"start": 20,
+							"end": 64
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 149,
+					"end": 190,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 42
+						}
+					},
+					"importKind": "type",
+					"specifiers": [
+						{
+							"type": "ImportNamespaceSpecifier",
+							"start": 170,
+							"end": 178,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 22
+								},
+								"end": {
+									"line": 6,
+									"column": 30
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 175,
+								"end": 178,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 27
+									},
+									"end": {
+										"line": 6,
+										"column": 30
+									}
+								},
+								"name": "ns2"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c2 ",
+									"start": 156,
+									"end": 164
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 184,
+						"end": 189,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 36
+							},
+							"end": {
+								"line": 6,
+								"column": 41
+							}
+						},
+						"value": "./b",
+						"raw": "'./b'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " comment between import and type keyword",
+							"start": 105,
+							"end": 147
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 245,
+					"end": 286,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 42
+						}
+					},
+					"importKind": "type",
+					"specifiers": [
+						{
+							"type": "ImportNamespaceSpecifier",
+							"start": 266,
+							"end": 274,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 22
+								},
+								"end": {
+									"line": 9,
+									"column": 30
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 271,
+								"end": 274,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 27
+									},
+									"end": {
+										"line": 9,
+										"column": 30
+									}
+								},
+								"name": "ns3"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c3 ",
+									"start": 257,
+									"end": 265
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 280,
+						"end": 285,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 36
+							},
+							"end": {
+								"line": 9,
+								"column": 41
+							}
+						},
+						"value": "./c",
+						"raw": "'./c'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " comment between type keyword and namespace star",
+							"start": 193,
+							"end": 243
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 338,
+					"end": 377,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 26
+						}
+					},
+					"importKind": "type",
+					"specifiers": [
+						{
+							"type": "ImportNamespaceSpecifier",
+							"start": 357,
+							"end": 365,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 6
+								},
+								"end": {
+									"line": 13,
+									"column": 14
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 362,
+								"end": 365,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 11
+									},
+									"end": {
+										"line": 13,
+										"column": 14
+									}
+								},
+								"name": "ns4"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c4",
+									"start": 345,
+									"end": 350
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 371,
+						"end": 376,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 20
+							},
+							"end": {
+								"line": 13,
+								"column": 25
+							}
+						},
+						"value": "./d",
+						"raw": "'./d'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment between import and type keyword",
+							"start": 289,
+							"end": 336
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 422,
+					"end": 458,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 37
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportNamespaceSpecifier",
+							"start": 429,
+							"end": 446,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 8
+								},
+								"end": {
+									"line": 16,
+									"column": 25
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 443,
+								"end": 446,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 22
+									},
+									"end": {
+										"line": 16,
+										"column": 25
+									}
+								},
+								"name": "ns5",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c5 ",
+										"start": 431,
+										"end": 439
+									}
+								]
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 452,
+						"end": 457,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 31
+							},
+							"end": {
+								"line": 16,
+								"column": 36
+							}
+						},
+						"value": "./e",
+						"raw": "'./e'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " comment between namespace star and as",
+							"start": 380,
+							"end": 420
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

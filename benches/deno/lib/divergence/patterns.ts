@@ -112,6 +112,31 @@ function ours_lines_in_hunk(ours_lines: string[], hunk: DiffHunk): string[] {
 }
 
 /**
+ * The recurring long-line divergence shape: a print-width-driven re-wrap.
+ *
+ * A hunk matches when prettier has a line satisfying `line_predicate` that
+ * exceeds `min_width`, AND ours genuinely re-wrapped it — more added lines than
+ * removed. The re-wrap evidence is the load-bearing guard: matching solely on a
+ * wide prettier line (with no proof OURS broke it into the benign divergent
+ * form) is exactly the over-match class that lets a real bug — or worse, a
+ * data-loss reclassified as `known_divergence` — slip through. Centralizing the
+ * shape here makes the missing-guard mistake structurally hard to reintroduce.
+ */
+function long_line_rewrapped(
+	hunk: DiffHunk,
+	prettier_lines: string[],
+	options: { min_width?: number; line_predicate: (line: string) => boolean },
+): boolean {
+	const min_width = options.min_width ?? 100;
+	const p_lines = prettier_lines_in_hunk(prettier_lines, hunk);
+	const has_long_match = p_lines.some(
+		(l) => options.line_predicate(l) && visual_width(l) > min_width,
+	);
+	if (!has_long_match) return false;
+	return hunk.added_lines.length > hunk.removed_lines.length;
+}
+
+/**
  * Compute <style> block line ranges from an array of lines.
  * Returns an array of { start, end } (inclusive line indices).
  */
@@ -182,21 +207,35 @@ function is_in_css_context(hunk: DiffHunk, ctx: DetectionContext): boolean {
 
 /**
  * Extract comment text content from a line (strip delimiters and whitespace).
- * Returns the text inside the comment, ignoring surrounding code.
+ * Returns only the comment token's text, stripping any code that precedes the
+ * comment delimiter. Returns `''` when the line has no comment delimiter — the
+ * whole code line must never be treated as comment content (that would let
+ * comment-position matching key off arbitrary code text).
  */
 function extract_comment_content(line: string): string {
-	// Line comment: extract text after //
-	const line_comment = line.match(/\/\/\s*(.*)/);
-	if (line_comment) return line_comment[1].trim();
-	// Block comment: extract text inside /* */
-	const block_comment = line.match(/\/\*\s*(.*?)\s*\*\//);
-	if (block_comment) return block_comment[1].trim();
-	// Partial block comment (opening or closing only)
-	const block_open = line.match(/\/\*\s*(.*)/);
-	if (block_open) return block_open[1].trim();
-	const block_close = line.match(/(.*?)\s*\*\//);
-	if (block_close) return block_close[1].trim();
-	return line.trim();
+	// Line comment: take everything after the FIRST `//`, dropping the code
+	// before it (e.g. `foo(); // bar` → `bar`).
+	const line_comment_at = line.indexOf('//');
+	if (line_comment_at !== -1) {
+		return line.slice(line_comment_at + 2).trim();
+	}
+	// Block comment: take the text after the FIRST `/*`, then strip a trailing
+	// `*/` and anything after it (e.g. `foo(); /* a */ bar()` → `a`). When the
+	// `*/` is absent (opening-only fragment) keep the remainder of the line.
+	const block_open_at = line.indexOf('/*');
+	if (block_open_at !== -1) {
+		let inner = line.slice(block_open_at + 2);
+		const close_at = inner.indexOf('*/');
+		if (close_at !== -1) inner = inner.slice(0, close_at);
+		return inner.trim();
+	}
+	// Closing-only fragment: text before the `*/` is the comment continuation.
+	const block_close_at = line.indexOf('*/');
+	if (block_close_at !== -1) {
+		return line.slice(0, block_close_at).trim();
+	}
+	// No comment delimiter on this line — not comment content.
+	return '';
 }
 
 /**
@@ -208,6 +247,89 @@ function comment_exists_in_output(output: string, text: string): boolean {
 	return output.includes(`// ${text}`) ||
 		output.includes(`/* ${text}`) ||
 		output.includes(` * ${text}`);
+}
+
+/**
+ * Check if `text` appears as a WHOLE comment line in `output` — i.e. some line
+ * whose only comment content (after delimiter stripping) is exactly `text`.
+ * Stricter than `comment_exists_in_output`: the prefix-substring form there can
+ * match `// ${text}` embedded in a string literal, a longer comment, or a JSDoc
+ * ` * ` continuation that merely starts with `text`. Requiring the extracted
+ * comment content to equal `text` rejects those — the relocated comment must
+ * land as its own comment, not as a fragment of unrelated code or comment text.
+ */
+function comment_line_exists_in_output(output: string, text: string): boolean {
+	return output.split('\n').some((line) => extract_comment_content(line) === text);
+}
+
+/**
+ * Whole-comment-line contents of the lines immediately bordering a hunk's change
+ * range (the line just before its start and just after its end) on one side.
+ * Returns the extracted comment content for each border line that is a whole
+ * comment line, dropping non-comment / empty borders.
+ *
+ * Used by `comment_position` Case 3: some sanctioned comment-relocation
+ * divergences move a comment that the diff aligns as a CONTEXT (same) line —
+ * because the comment text is byte-identical in both outputs — while the
+ * surrounding structure (the discriminant parens of an empty `switch`, the
+ * `} else {` split, a member chain's break) reshapes into the change hunk. The
+ * comment then never appears inside the hunk's own added/removed lines; it sits
+ * on the hunk's immediate border. Looking only at the IMMEDIATE border (not a
+ * wide window) keeps the comment tied to THIS structural change.
+ */
+function border_comment_contents(
+	lines: string[],
+	range: { start: number; end: number } | null,
+): string[] {
+	if (!range) return [];
+	const out: string[] = [];
+	for (const idx of [range.start - 1, range.end + 1]) {
+		const line = lines[idx];
+		if (line === undefined) continue;
+		const text = extract_comment_content(line);
+		if (text.length > 0) out.push(text);
+	}
+	return out;
+}
+
+/**
+ * The immediate previous/next lines around the first whole-comment-line in
+ * `lines` whose content equals `text`, or `null` when no such comment line
+ * exists. Beginning/end of file are reported as sentinels so they compare
+ * unequal to any real line.
+ *
+ * Used by `comment_position` Case 3 to prove a bordering comment actually
+ * RELOCATED rather than merely sitting beside a re-wrap: a genuinely relocated
+ * comment lands in a different syntactic container, so BOTH its neighbors differ
+ * between the two outputs. A stable comment that just happens to precede (or
+ * follow) a width re-wrap keeps one neighbor identical — which this lets the
+ * detector reject.
+ */
+function comment_line_neighbors(
+	lines: string[],
+	text: string,
+): { prev: string; next: string } | null {
+	for (let i = 0; i < lines.length; i++) {
+		if (extract_comment_content(lines[i]) === text) {
+			return { prev: (lines[i - 1] ?? '~bof').trim(), next: (lines[i + 1] ?? '~eof').trim() };
+		}
+	}
+	return null;
+}
+
+/**
+ * Whether two trimmed lines begin the SAME element — one is a (non-trivial)
+ * prefix of the other. Rejects a FALSE relocation signal: when a stable comment
+ * borders a width re-wrap, the element it precedes stays the same but its tail
+ * wraps onto extra lines, so the comment's neighbor in one output is a prefix of
+ * the neighbor in the other (`e: '${ssss` is a prefix of `e: '${ssss.aaa()}',`).
+ * A genuine relocation lands the comment among entirely different tokens, where
+ * neither neighbor begins the same element as its counterpart.
+ */
+function lines_begin_same_element(a: string, b: string): boolean {
+	if (a === b) return true;
+	const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+	return short.length >= 3 && long.startsWith(short);
 }
 
 // ─── Pattern Detectors ──────────────────────────────────────────────────────
@@ -228,12 +350,20 @@ const bom_strip: DivergencePattern = {
 		'typescript/syntax/whitespace/bom_prettier_divergence',
 	],
 	detect(ctx) {
+		// Use the `﻿` escape rather than a literal BOM glyph in source — a raw
+		// BOM byte in this file is an editing hazard (invisible, easily mangled).
+		const BOM = '﻿';
 		// Source starts with BOM, our output doesn't
-		if (ctx.source.startsWith('﻿') && !ctx.ours.startsWith('﻿')) {
+		if (ctx.source.startsWith(BOM) && !ctx.ours.startsWith(BOM)) {
 			// Verify prettier keeps BOM
-			if (ctx.prettier.startsWith('﻿')) {
-				// BOM difference is always in hunk 0 (first line)
-				const hunk_indices = ctx.hunks.length > 0 ? [0] : [];
+			if (ctx.prettier.startsWith(BOM)) {
+				// Find the hunk covering the BOM rather than assuming it is hunk 0:
+				// the hunk whose prettier (removed) range starts at source line 0, or
+				// failing that whose removed line still carries the BOM.
+				const bom_hunk = ctx.hunks.find((h) =>
+					h.prettier_range?.start === 0 || h.removed_lines.some((l) => l.startsWith(BOM))
+				);
+				const hunk_indices = bom_hunk ? [bom_hunk.index] : [];
 				return {
 					pattern: 'bom_strip',
 					confidence: 'certain',
@@ -465,16 +595,10 @@ const css_atrule_long_wrap: DivergencePattern = {
 
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			if (!is_in_css_context(hunk, ctx)) return false;
-
-			// Prettier's removed lines have a long at-rule that exceeds 100 chars
-			const p_lines = prettier_lines_in_hunk(prettier_lines, hunk);
-			const has_long_atrule = p_lines.some(
-				(l) => atrule_pattern.test(l) && visual_width(l) > 100,
-			);
-			if (!has_long_atrule) return false;
-
-			// We have more lines (we wrapped)
-			return hunk.added_lines.length > hunk.removed_lines.length;
+			// Prettier has a long at-rule line (> 100 chars) that ours wrapped.
+			return long_line_rewrapped(hunk, prettier_lines, {
+				line_predicate: (l) => atrule_pattern.test(l),
+			});
 		});
 
 		if (hunk_indices.length > 0) {
@@ -495,7 +619,6 @@ const css_atrule_stable_quirk: DivergencePattern = {
 	languages: ['css', 'svelte'],
 	conformance_sections: ['CSS: At-Rules'],
 	fixtures: [
-		'css/at_rules/layer_list_prettier_divergence',
 		'css/at_rules/scope_complex_prettier_divergence',
 		'css/at_rules/scope_selector_prettier_divergence',
 	],
@@ -538,6 +661,53 @@ const css_atrule_stable_quirk: DivergencePattern = {
 				confidence: 'likely',
 				hunk_indices,
 				reason: 'CSS at-rule stable quirk (Prettier preserves multiple forms, we normalize)',
+			};
+		}
+		return null;
+	},
+};
+
+const css_scss_directive_number: DivergencePattern = {
+	id: 'css_scss_directive_number',
+	description: 'SCSS-directive at-rule prelude numbers preserved verbatim (prettier normalizes)',
+	languages: ['css', 'svelte'],
+	conformance_sections: ['CSS: At-Rules'],
+	fixtures: ['css/at_rules/scss_directive_number_preserved_prettier_divergence'],
+	detect(ctx) {
+		if (ctx.language !== 'css' && ctx.language !== 'svelte') return null;
+
+		// SCSS/Sass directives prettier value-parses (and thus number-normalizes);
+		// tsv treats their prelude as an opaque token stream and preserves it.
+		const scss_directive =
+			/@(?:include|mixin|if|else|for|each|while|debug|function|return|content|define-mixin|add-mixin)\b/;
+		// The non-numeric skeleton (strip whitespace + number-format chars) must be
+		// identical on both sides AND the numeric-token COUNT must match. The old
+		// guard stripped digits/dots before comparing, which made the very thing it
+		// was meant to protect — dropped numeric content — invisible (e.g.
+		// `width: 100px` vs `width: px` compared skeleton-equal). Counting numeric
+		// tokens on each side ensures a dropped (or added) number is caught: the
+		// SCSS-number divergence only ever re-spells the SAME count of numbers
+		// (`.5`→`0.5`, `1.50`→`1.5`), never drops one.
+		const skeleton = (lines: string[]) => lines.join('\n').replace(/[\s\d.]/g, '');
+		const number_token = /\d*\.\d+|\d+/g;
+		const count_numbers = (lines: string[]) => (lines.join('\n').match(number_token) ?? []).length;
+
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			if (!is_in_css_context(hunk, ctx)) return false;
+			if (hunk.removed_lines.length === 0 || hunk.added_lines.length === 0) return false;
+			const joined = `${hunk.removed_lines.join('\n')}\n${hunk.added_lines.join('\n')}`;
+			if (!scss_directive.test(joined)) return false;
+			if (skeleton(hunk.removed_lines) !== skeleton(hunk.added_lines)) return false;
+			// Numeric content may be re-spelled but never dropped/added.
+			return count_numbers(hunk.removed_lines) === count_numbers(hunk.added_lines);
+		});
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'css_scss_directive_number',
+				confidence: 'likely',
+				hunk_indices,
+				reason: 'SCSS-directive at-rule prelude preserved verbatim; prettier number-normalizes',
 			};
 		}
 		return null;
@@ -606,7 +776,6 @@ const css_comment_stable_quirk: DivergencePattern = {
 	fixtures: [
 		'css/tokens/comments/atrule_before_opening_brace_prettier_divergence',
 		'css/tokens/comments/atrule_in_prelude_prettier_divergence',
-		'css/tokens/comments/keyframes_before_opening_brace_prettier_divergence',
 		'css/tokens/comments/in_property_value_after_colon_prettier_divergence',
 		'css/tokens/comments/in_property_value_before_colon_prettier_divergence',
 		'css/tokens/comments/media_list_prettier_divergence',
@@ -717,6 +886,14 @@ const template_literal_width: DivergencePattern = {
 		// These are expressions Prettier atomizes (pre-renders at infinite width).
 		const simple_expr_line = /^\t+(\w+(?:[.?]+\w+)*)\s*$/;
 
+		// Nested-template shape: an interpolation `${` that opens a template or
+		// array literal (a backtick appears before the interpolation closes), e.g.
+		// `${[` … `` ` `` …  or `` ${` ``. Prettier keeps the whole nested construct
+		// inline (overflowing print width); ours breaks the inner bracket. This is
+		// NOT a plain `${expr}` (where no backtick precedes the closing `}`), so it
+		// does not match the end-of-line `${` / `}`` break markers Case 1/2 key on.
+		const nested_template_interpolation = /\$\{[^`}]*`/;
+
 		const prettier_lines = ctx.prettier_lines!;
 
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
@@ -765,6 +942,22 @@ const template_literal_width: DivergencePattern = {
 				}
 			}
 
+			// Case 3: Nested template / array inside an interpolation. Prettier keeps
+			// the nested `${[`…`]}` (or `` ${`…` `` ) construct inline past print
+			// width; ours breaks the inner bracket. The end-of-line `${` / `}`` markers
+			// never appear here, so reuse the shared `long_line_rewrapped` shape —
+			// which carries the ours-side re-wrap guard (more added than removed
+			// lines) — keyed on a prettier line exhibiting the nested-template
+			// interpolation. Without the re-wrap guard, a bug that mangled a wide
+			// nested-template line in place would be claimed purely from its width.
+			if (
+				long_line_rewrapped(hunk, prettier_lines, {
+					line_predicate: (l) => nested_template_interpolation.test(l),
+				})
+			) {
+				return true;
+			}
+
 			return false;
 		});
 
@@ -786,12 +979,7 @@ const block_expression_logical: DivergencePattern = {
 	languages: ['svelte'],
 	conformance_sections: ['Svelte: Blocks'],
 	fixtures: [
-		'svelte/blocks/each/long_prettier_divergence',
-		'svelte/blocks/await/long_prettier_divergence',
-		'svelte/blocks/key/long_prettier_divergence',
-		'svelte/blocks/if/long_prettier_divergence',
 		'svelte/blocks/if/last_block_prettier_divergence',
-		'svelte/blocks/if/in_inline_element_long_prettier_divergence',
 	],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
@@ -824,13 +1012,24 @@ const single_specifier_import: DivergencePattern = {
 	conformance_sections: ['TypeScript'],
 	fixtures: ['typescript/modules/imports/single_specifier_long_prettier_divergence'],
 	detect(ctx) {
-		// Check hunks for import statement differences
+		// Imports are tab-indented when inside a Svelte `<script>` block, so allow
+		// leading tabs. The keyword form may carry `type` (`import type { … }`), so
+		// match `import` + any non-brace prefix before the opening `{`.
+		// Ours (broken) opens the specifier braces and ends the line on `{`; the
+		// specifier moves to the next line.
+		const import_open = /^\t*import\b[^{}]*\{\s*$/;
+		// Prettier (inline) keeps the whole single-specifier import on one line:
+		// `import { … } from '…';` — both braces present on the same line.
+		const import_inline = /^\t*import\b[^{}]*\{[^{}]*\}/;
+
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
-			// Added lines show multiline import (we break)
-			const added_has_import = hunk.added_lines.some((l) => /^import \{/.test(l));
-			// Removed lines show single-line import (prettier keeps inline)
+			// Added lines show multiline import (we break) — the broken opener.
+			const added_has_import = hunk.added_lines.some((l) => import_open.test(l));
+			// Removed lines show the single-line import (prettier keeps inline)
+			// exceeding print width — the ours-side re-wrap evidence is that OUR
+			// output broke this long line into the `import_open` opener above.
 			const removed_has_long_import = hunk.removed_lines.some(
-				(l) => /^import \{/.test(l) && visual_width(l) > 100,
+				(l) => import_inline.test(l) && visual_width(l) > 100,
 			);
 			return added_has_import && removed_has_long_import;
 		});
@@ -858,10 +1057,19 @@ const member_expression_call: DivergencePattern = {
 
 		if (!module_patterns.test(ctx.source)) return null;
 
-		// Map to specific hunks that contain the module pattern
+		// Ours-side evidence guard. The documented divergence is: ours expands the
+		// call args (extra lines) while prettier breaks at the member chain. Bare
+		// substring presence is NOT enough — a real bug on a line that merely
+		// contains `require.resolve(` would otherwise be claimed. Require:
+		//   1. The module pattern appears in OURS' added lines — the divergent break
+		//      is in our output, not merely somewhere in the prettier side.
+		//   2. Ours genuinely re-wrapped (more added than removed lines). A hunk
+		//      where ours collapsed onto fewer lines, or where the pattern only
+		//      shows up on prettier's removed side, is not this divergence.
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
-			return hunk.added_lines.some((l) => module_patterns.test(l)) ||
-				hunk.removed_lines.some((l) => module_patterns.test(l));
+			const ours_has_module_break = hunk.added_lines.some((l) => module_patterns.test(l));
+			if (!ours_has_module_break) return false;
+			return hunk.added_lines.length > hunk.removed_lines.length;
 		});
 
 		if (hunk_indices.length > 0) {
@@ -888,20 +1096,16 @@ const return_type_generic_union: DivergencePattern = {
 		const prettier_lines = ctx.prettier_lines!;
 
 		// Look for generic types with union (| null, | void, | undefined) in hunks
-		// where prettier's line exceeds 100 chars
+		// where prettier's line exceeds 100 chars and ours re-wrapped it.
 		const union_in_generic = /[<>].*\|\s*(?:null|void|undefined)/;
 
-		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
-			const p_lines = prettier_lines_in_hunk(prettier_lines, hunk);
-			// Prettier has a long line with generic union
-			const has_long_generic_union = p_lines.some(
-				(l) => union_in_generic.test(l) && visual_width(l) > 100,
-			);
-			if (!has_long_generic_union) return false;
-
-			// We break (more lines in our version)
-			return hunk.added_lines.length > hunk.removed_lines.length;
-		});
+		const hunk_indices = find_matching_hunks(
+			ctx.hunks,
+			(hunk) =>
+				long_line_rewrapped(hunk, prettier_lines, {
+					line_predicate: (l) => union_in_generic.test(l),
+				}),
+		);
 
 		if (hunk_indices.length > 0) {
 			return {
@@ -909,6 +1113,41 @@ const return_type_generic_union: DivergencePattern = {
 				confidence: 'likely',
 				hunk_indices,
 				reason: 'Return type generic with union wraps at print width',
+			};
+		}
+		return null;
+	},
+};
+
+const non_null_paren_base: DivergencePattern = {
+	id: 'non_null_paren_base',
+	description:
+		'Non-null assertion on a parenthesized base: tsv hangs the outer parens, prettier hugs the inner call',
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['TypeScript'],
+	fixtures: ['typescript/expressions/member/non_null_paren_base_long_prettier_divergence'],
+	detect(ctx) {
+		// Prettier hugs the inner call under a non-null assertion: the base's two
+		// closing parens collapse onto one line right before `!`, e.g. `))!.ok`.
+		const prettier_hugs = /\)\)!\??\./;
+		// tsv hangs the outer parens: the inner `)` lands on its own line, then a
+		// line that begins with `)!.member` (single close, then the non-null member).
+		const ours_hangs = /^\s*\)!\??\./;
+
+		const hunk_indices = find_matching_hunks(
+			ctx.hunks,
+			(hunk) =>
+				hunk.removed_lines.some((l) => prettier_hugs.test(l)) &&
+				hunk.added_lines.some((l) => ours_hangs.test(l)),
+		);
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'non_null_paren_base',
+				confidence: 'likely',
+				hunk_indices,
+				reason:
+					'Non-null assertion on a parenthesized base: tsv hangs the outer parens, prettier hugs the inner call',
 			};
 		}
 		return null;
@@ -1014,10 +1253,15 @@ const fill_after_inline: DivergencePattern = {
 	description: 'Text after inline element breaks at print width',
 	languages: ['svelte'],
 	conformance_sections: ['Svelte/HTML'],
-	fixtures: [
-		'svelte/elements/fill_after_inline_prettier_divergence',
-		'svelte/elements/fill_multiple_expr_long_prettier_divergence',
-	],
+	// The committed fill-after-inline fixtures carry the trailing text (and the
+	// over-width line) AFTER the inline element's closing tag, with the close tag
+	// itself on a separate line — so the long re-wrapped line never contains an
+	// inline close tag. That generic "prettier fills past print width, we break"
+	// shape is owned by `fill_101_boundary` (which detects them). This detector
+	// keys on an inline close tag ON the long line; keeping that predicate intact
+	// is what distinguishes it from the broad boundary case, so those fixtures
+	// belong to `fill_101_boundary`.
+	fixtures: [],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
 
@@ -1025,11 +1269,19 @@ const fill_after_inline: DivergencePattern = {
 		const inline_close_tag =
 			/<\/(?:span|a|strong|em|code|b|i|small|abbr|sub|sup|mark|cite|q|time|data|kbd|samp|var|dfn|ins|del|u|s)>/;
 
-		// Check each hunk for prettier lines with long inline element lines
-		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
-			const p_lines = prettier_lines_in_hunk(prettier_lines, hunk);
-			return p_lines.some((l) => inline_close_tag.test(l) && visual_width(l) > 100);
-		});
+		// Check each hunk for prettier lines with long inline element lines.
+		// Ours-side evidence guard (shared shape): a long prettier line with an
+		// inline close tag is not enough — require that ours actually re-wrapped it
+		// (more added than removed lines). Without this, a bug where ours emits the
+		// same long line (no legitimate fill break) would be claimed solely from
+		// prettier's width.
+		const hunk_indices = find_matching_hunks(
+			ctx.hunks,
+			(hunk) =>
+				long_line_rewrapped(hunk, prettier_lines, {
+					line_predicate: (l) => inline_close_tag.test(l),
+				}),
+		);
 
 		if (hunk_indices.length > 0) {
 			return {
@@ -1048,7 +1300,15 @@ const block_multiline_attrs_hug: DivergencePattern = {
 	description: 'Block element with multiline attrs, we break >',
 	languages: ['svelte'],
 	conformance_sections: ['Svelte/HTML'],
-	fixtures: ['svelte/elements/block_multiline_attrs_content_hug_prettier_divergence'],
+	// The committed fixture (`<pre>` with multiline attrs) hugs `">{expr}</pre>`
+	// on the attr line in prettier while ours breaks the `>` — but the `>` is not
+	// alone on a line (it carries `{expr}</pre>`), and the `<pre` open tag is a
+	// context line that falls OUTSIDE the single change hunk's range, so neither
+	// the `>`-alone predicate nor the whitespace-sensitive-element context check
+	// this detector keys on can fire. The conformance doc bins this fixture with
+	// the fill-boundary family (prettier fills past print width, we break), which
+	// `fill_101_boundary` detects — so the fixture is claimed there.
+	fixtures: [],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
 
@@ -1094,19 +1354,31 @@ const short_expr_100: DivergencePattern = {
 	description: 'Short expression in block exceeds 100 chars, we break',
 	languages: ['svelte'],
 	conformance_sections: ['Svelte: Blocks'],
-	fixtures: ['svelte/blocks/if/in_inline_element_long_prettier_divergence'],
+	fixtures: [
+		'svelte/blocks/each/long_prettier_divergence',
+		'svelte/blocks/await/long_prettier_divergence',
+		'svelte/blocks/key/long_prettier_divergence',
+		'svelte/blocks/if/long_prettier_divergence',
+		'svelte/blocks/if/in_inline_element_long_prettier_divergence',
+	],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
 
 		const prettier_lines = ctx.prettier_lines!;
 		const block_expr_pattern = /\{#(?:if|each|await|key)/;
 
-		// Check each hunk for block expressions that exceed 100 chars in prettier range
+		// Check each hunk for block expressions that exceed 100 chars in prettier range.
+		// Ours-side evidence guard: a 101-110 wide prettier block line is not enough —
+		// require that ours actually broke it (more added than removed lines). Without
+		// this, a bug somewhere in the 101-110 band gets claimed purely from prettier's
+		// width even though ours did not legitimately re-break the block condition.
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			const p_lines = prettier_lines_in_hunk(prettier_lines, hunk);
-			return p_lines.some(
+			const has_short_overflow_block = p_lines.some(
 				(l) => block_expr_pattern.test(l) && visual_width(l) > 100 && visual_width(l) <= 110,
 			);
+			if (!has_short_overflow_block) return false;
+			return hunk.added_lines.length > hunk.removed_lines.length;
 		});
 
 		if (hunk_indices.length > 0) {
@@ -1139,13 +1411,9 @@ const css_value_wrap: DivergencePattern = {
 		// AND verify we actually wrapped (more lines than prettier)
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			if (!is_in_css_context(hunk, ctx)) return false;
-			const p_lines = prettier_lines_in_hunk(prettier_lines, hunk);
-			const has_long_property = p_lines.some(
-				(l) => /^\t+[\w-]+:\s*.+/.test(l) && visual_width(l) > 100,
-			);
-			if (!has_long_property) return false;
-			// We must have more lines (we wrapped the long value)
-			return hunk.added_lines.length > hunk.removed_lines.length;
+			return long_line_rewrapped(hunk, prettier_lines, {
+				line_predicate: (l) => /^\t+[\w-]+:\s*.+/.test(l),
+			});
 		});
 
 		if (hunk_indices.length > 0) {
@@ -1171,6 +1439,9 @@ const fill_101_boundary: DivergencePattern = {
 		'svelte/elements/inline_element_fill_long_prettier_divergence',
 		'svelte/elements/inline_component_fill_long_prettier_divergence',
 		'svelte/elements/fill_expr_break_boundary_long_prettier_divergence',
+		'svelte/elements/fill_after_inline_prettier_divergence',
+		'svelte/elements/fill_multiple_expr_long_prettier_divergence',
+		'svelte/elements/block_multiline_attrs_content_hug_prettier_divergence',
 		'svelte/attributes/multiline_value_inline_long_prettier_divergence',
 	],
 	detect(ctx) {
@@ -1190,8 +1461,12 @@ const fill_101_boundary: DivergencePattern = {
 
 			// Case 1: We have more lines (we broke prettier's long line)
 			const we_break_more = hunk.added_lines.length > hunk.removed_lines.length;
-			// Case 2: Same or fewer lines, but all our lines fit within print width
-			const ours_all_fit = hunk.added_lines.every((l) => visual_width(l) <= 100);
+			// Case 2: Same or fewer lines, but all our lines fit within print width.
+			// Require at least one added line — `every` is vacuously true for a
+			// removal-only hunk (empty added_lines), which would otherwise claim a
+			// prettier line we simply DELETED as a print-width rewrap.
+			const ours_all_fit = hunk.added_lines.length > 0 &&
+				hunk.added_lines.every((l) => visual_width(l) <= 100);
 			if (!we_break_more && !ours_all_fit) return false;
 
 			for (const l of p_lines) {
@@ -1251,37 +1526,129 @@ const comment_position: DivergencePattern = {
 		// Object/array destructuring pattern open-delimiter trailing comment kept on the delimiter line
 		'typescript/expressions/destructuring/object_open_brace_comment_prettier_divergence',
 		'typescript/expressions/destructuring/array_open_bracket_comment_prettier_divergence',
+		// Namespace/module body open-delimiter trailing comment kept on the delimiter line
+		'typescript/declarations/namespace/open_brace_comment_prettier_divergence',
+		// Class/interface/enum body open-delimiter trailing comment kept on the delimiter line
+		'typescript/statements/class/open_brace_comment_prettier_divergence',
+		'typescript/statements/interface/open_brace_comment_prettier_divergence',
+		'typescript/declarations/enum/open_brace_comment_prettier_divergence',
+		// Type literal open-delimiter trailing comment kept on the delimiter line
+		'typescript/types/type_literal_open_brace_comment_prettier_divergence',
+		// Import/export specifier braces open-delimiter trailing comment kept on the delimiter line
+		'typescript/modules/imports/open_brace_comment_prettier_divergence',
+		'typescript/modules/exports/open_brace_comment_prettier_divergence',
+		// Tuple type open-delimiter trailing comment kept on the delimiter line
+		'typescript/types/tuple/open_bracket_comment_prettier_divergence',
+		// Type-argument list open-delimiter trailing comment kept on the delimiter line (multi-arg)
+		'typescript/types/type_argument_open_angle_comment_prettier_divergence',
+		// Call/`new`-expression type-argument list open-delimiter trailing comment kept on the delimiter line (multi-arg)
+		'typescript/expressions/calls/type_args_open_angle_comment_prettier_divergence',
+		// Retained parenthesized union member: block comment kept inside the parens
+		'typescript/types/union_intersection_retained_paren_comment_prettier_divergence',
+		// Retained parenthesized union member: line comment kept inside (forces expansion)
+		'typescript/types/union_intersection_retained_paren_line_comment_prettier_divergence',
+		// Retained parenthesized union FIRST member: leading line comment kept inside the parens
+		'typescript/types/union_intersection_retained_paren_leading_line_comment_prettier_divergence',
+		// Retained parenthesized intersection member: block comment kept inside the parens
+		'typescript/types/retained_paren_intersection_member_comment_prettier_divergence',
 		// Import/export keyword-to-braces comments
 		'typescript/modules/imports/empty_keyword_comment_prettier_divergence',
 		'typescript/modules/exports/empty_keyword_comment_prettier_divergence',
-		// Svelte comments
-		'svelte/syntax/comments/expr_trailing_prettier_divergence',
-		'svelte/tags/debug/debug_comment_prettier_divergence',
+		'typescript/modules/imports/empty_type_keyword_comment_prettier_divergence',
+		'typescript/modules/exports/empty_type_keyword_comment_prettier_divergence',
+		'typescript/modules/imports/type_keyword_comment_prettier_divergence',
+		'typescript/modules/exports/type_keyword_comment_prettier_divergence',
+		'typescript/modules/imports/default_keyword_comment_prettier_divergence',
+		'typescript/modules/imports/namespace_keyword_comment_prettier_divergence',
+		'typescript/modules/exports/all_keyword_comment_prettier_divergence',
+		'typescript/modules/exports/all_namespace_keyword_comment_prettier_divergence',
+		// Binding/specifiers-to-`from` gap comments
+		'typescript/modules/imports/from_comment_prettier_divergence',
+		'typescript/modules/exports/from_comment_prettier_divergence',
+		// Import-attributes header (source-to-`with`, `with`-to-`{`) gap comments
+		'typescript/modules/imports/with_keyword_comment_prettier_divergence',
+		// Sequence operand outer-edge comments float out of the sequence parens
+		// (call context matches prettier's fixed point; statement context keeps the
+		// trailing comment before `;`)
+		'typescript/expressions/sequence/operand_edge_comment_prettier_divergence',
+		'typescript/expressions/sequence/operand_edge_comment_stmt_prettier_divergence',
+		// NOTE: the Svelte `expr_trailing` / `debug_comment` fixtures are NOT
+		// claimed here. Prettier DROPS those comments, so they fail this pattern's
+		// "comment exists as a whole line in BOTH outputs" content guard by design
+		// (loosening it would let a dropped comment be masked as `known` — see the
+		// safety reclassification in corpus_compare_format.ts). They are an uncovered
+		// "we preserve, Prettier drops" divergence, not a relocation, and surface
+		// in `divergence:audit` as uncovered rather than being falsely claimed.
 	],
 	detect(ctx) {
 		const js_comment_pattern = /\/\/|\/\*|\*\//;
+		const ours_lines = ctx.ours_lines!;
+		const prettier_lines = ctx.prettier_lines!;
 
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			const added_comment_lines = hunk.added_lines.filter((l) => js_comment_pattern.test(l));
 			const removed_comment_lines = hunk.removed_lines.filter((l) => js_comment_pattern.test(l));
 
-			// At least one side must have comments
-			if (added_comment_lines.length === 0 && removed_comment_lines.length === 0) return false;
+			// Case 3: Comment-driven STRUCTURAL relocation. Some sanctioned
+			// comment-position divergences relocate a comment whose text is identical
+			// in both outputs, so the diff aligns it as a CONTEXT (same) line and the
+			// hunk carries only the structural reshape it triggered (empty-`switch`
+			// discriminant parens, the `} else {` split, a member chain breaking
+			// before a trailing-member comment). The comment is then NOT inside the
+			// hunk — it borders it.
+			//
+			// Claim such a hunk only when a whole-comment-line is the IMMEDIATE border
+			// of the hunk in BOTH outputs, that comment text exists as a whole comment
+			// line in BOTH (the content guard: a comment prettier or ours DROPPED can
+			// never satisfy "exists as a whole line in both", so a data-loss is never
+			// masked — the same guarantee Case 1/2 rely on), AND the comment genuinely
+			// RELOCATED: both its immediate neighbors differ between the two outputs.
+			// The relocation check is what separates a true position divergence (the
+			// comment landed in a different syntactic container — empty-`switch`
+			// parens vs body, before vs after `else`, mid-chain vs after `=`) from a
+			// STABLE comment that merely borders a width re-wrap (where one neighbor —
+			// e.g. a blank line or the unchanged statement above — stays identical).
+			if (added_comment_lines.length === 0 && removed_comment_lines.length === 0) {
+				const ours_border = border_comment_contents(ours_lines, hunk.ours_range);
+				const prettier_border = border_comment_contents(prettier_lines, hunk.prettier_range);
+				if (ours_border.length === 0 || prettier_border.length === 0) return false;
+				const prettier_border_set = new Set(prettier_border);
+				return ours_border.some((text) => {
+					if (text.length < 3 || !prettier_border_set.has(text)) return false;
+					if (
+						!comment_line_exists_in_output(ctx.ours, text) ||
+						!comment_line_exists_in_output(ctx.prettier, text)
+					) return false;
+					// Relocation evidence: both neighbors of the comment differ AND
+					// neither neighbor merely BEGINS THE SAME ELEMENT as its counterpart
+					// (which would be a stable comment bordering a width re-wrap of the
+					// element it precedes, not a relocation). A genuine relocation lands
+					// the comment among entirely different tokens on both sides.
+					const o = comment_line_neighbors(ours_lines, text);
+					const p = comment_line_neighbors(prettier_lines, text);
+					return o !== null && p !== null &&
+						o.prev !== p.prev && o.next !== p.next &&
+						!lines_begin_same_element(o.prev, p.prev) &&
+						!lines_begin_same_element(o.next, p.next);
+				});
+			}
 
-			// Case 1: Comment on one side only — verify it was MOVED (exists in
-			// other side's full output), not incidentally included by reformatting.
+			// Case 1: Comment on one side only — verify it was MOVED (appears as a
+			// WHOLE comment line in the other side's output), not incidentally
+			// included by reformatting. Whole-comment matching (not the looser
+			// prefix-substring form) keeps the text from matching inside a string
+			// literal, a longer comment, or a JSDoc continuation — which directly
+			// feeds the safety reclassification, so it must not over-match.
 			if (added_comment_lines.length > 0 && removed_comment_lines.length === 0) {
 				return added_comment_lines.some((l) => {
 					const text = extract_comment_content(l);
-					// Require minimum length and search with comment delimiters
-					// to avoid matching bare text in code (e.g., "map" in arr.map())
-					return text.length >= 3 && comment_exists_in_output(ctx.prettier, text);
+					return text.length >= 3 && comment_line_exists_in_output(ctx.prettier, text);
 				});
 			}
 			if (removed_comment_lines.length > 0 && added_comment_lines.length === 0) {
 				return removed_comment_lines.some((l) => {
 					const text = extract_comment_content(l);
-					return text.length >= 3 && comment_exists_in_output(ctx.ours, text);
+					return text.length >= 3 && comment_line_exists_in_output(ctx.ours, text);
 				});
 			}
 
@@ -1336,6 +1703,31 @@ const comment_position: DivergencePattern = {
 			if (
 				normalized_added.length <= 100 &&
 				normalized_added === normalized_removed
+			) {
+				return true;
+			}
+
+			// Fallback: a preserved line comment inside a parenthesized
+			// union/intersection member forces that member to expand to its broken
+			// leading-`|`/`&` form (the retained-paren-union-line-comment
+			// divergence), while Prettier keeps it inline and relocates the comment.
+			// The expansion keeps the parens and only rearranges the inner
+			// separator layout — strip comments, separators (`|`/`&`), and
+			// whitespace from both sides (KEEP parens, so a genuine paren-wrapping
+			// reformat with incidental comments is not equalized). If the remaining
+			// content is identical AND ours did not DROP a separator (ours `|`/`&`
+			// count >= prettier's — the expansion only ever ADDS them), the hunk is
+			// purely comment-driven union/intersection layout. The separator-count
+			// guard keeps a genuine dropped-`|`/`&` (content loss) from being masked.
+			const strip_layout = (lines: string[]) =>
+				lines.map(strip_comments).join('').replace(/[|&\s]/g, '');
+			const count_separators = (lines: string[]) =>
+				lines.map(strip_comments).join('').match(/[|&]/g)?.length ?? 0;
+			const layout_added = strip_layout(hunk.added_lines);
+			if (
+				layout_added.length > 0 &&
+				layout_added === strip_layout(hunk.removed_lines) &&
+				count_separators(hunk.added_lines) >= count_separators(hunk.removed_lines)
 			) {
 				return true;
 			}
@@ -1506,6 +1898,62 @@ const jsdoc_type_cast_parens: DivergencePattern = {
 	},
 };
 
+/**
+ * Tabs-only alignment: tsv renders Prettier's sub-tab alignment (a closing
+ * delimiter at `tabs + 2 spaces`) as a whole tab instead. Same visual width at
+ * `tab_width = 2`, so each changed line pairs a prettier `\t+ +X` (tabs then
+ * spaces) with an identical-content ours `\t+X` (pure tabs). Surfaces wherever
+ * Prettier's `align(2, …)` lands a delimiter at the alignment column — union
+ * members with breaking object/generic types, parenthesized intersections, etc.
+ */
+const tabs_only_alignment: DivergencePattern = {
+	id: 'tabs_only_alignment',
+	description: 'Sub-tab alignment rendered as whole tabs (no tabs+spaces mix)',
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['Tabs-Only Alignment (No Sub-Tab Spaces)'],
+	fixtures: [
+		'typescript/types/union_object_member_prettier_divergence',
+		'typescript/types/union_hug_object_prettier_divergence',
+		'typescript/types/union_parens_object_prettier_divergence',
+		'typescript/types/union_intersection_object_long_prettier_divergence',
+		'typescript/types/nested_generic_member_long_prettier_divergence',
+		'typescript/types/union_fn_type_member_long_prettier_divergence',
+		'typescript/types/union_paren_union_member_long_prettier_divergence',
+		'typescript/types/comments/union_member_long_line_comment_prettier_divergence',
+		'typescript/types/comments/union_paren_member_long_line_comment_prettier_divergence',
+	],
+	detect(ctx) {
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			// Whole hunk must be reindent-only: each prettier (removed) line pairs
+			// 1:1 with an ours (added) line of identical trailing content, where
+			// prettier's indent is tabs-then-spaces and ours is pure tabs of equal
+			// visual width. Requiring every pair avoids claiming mixed hunks.
+			if (
+				hunk.removed_lines.length === 0 ||
+				hunk.removed_lines.length !== hunk.added_lines.length
+			) {
+				return false;
+			}
+			return hunk.removed_lines.every((removed, i) => {
+				const added = hunk.added_lines[i];
+				if (removed.trimStart() !== added.trimStart()) return false;
+				const removed_lead = removed.slice(0, removed.length - removed.trimStart().length);
+				const added_lead = added.slice(0, added.length - added.trimStart().length);
+				// prettier: tabs then ≥1 space; ours: pure tabs (≥1)
+				if (!/^\t+ +$/.test(removed_lead) || !/^\t+$/.test(added_lead)) return false;
+				return visual_width(removed_lead) === visual_width(added_lead);
+			});
+		});
+		if (hunk_indices.length === 0) return null;
+		return {
+			pattern: 'tabs_only_alignment',
+			confidence: 'certain',
+			hunk_indices,
+			reason: 'Prettier sub-tab alignment (tabs + spaces) rendered as whole tabs',
+		};
+	},
+};
+
 // ─── Pattern Registry ───────────────────────────────────────────────────────
 //
 // Ordered: specific → broad. Specific patterns run first for best explanations.
@@ -1522,6 +1970,7 @@ export const PATTERNS: DivergencePattern[] = [
 	css_atrule_spec_spacing,
 	css_atrule_long_wrap,
 	css_atrule_stable_quirk,
+	css_scss_directive_number,
 	css_selector_divergence,
 	css_comment_stable_quirk,
 
@@ -1531,6 +1980,8 @@ export const PATTERNS: DivergencePattern[] = [
 	single_specifier_import,
 	member_expression_call,
 	return_type_generic_union,
+	non_null_paren_base,
+	tabs_only_alignment,
 
 	// 4. Svelte-specific patterns
 	menu_block,

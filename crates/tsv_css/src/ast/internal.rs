@@ -507,8 +507,13 @@ pub enum PreludeValue {
     /// Example: `url('styles.css') layer(base)` → [Function(url), Function(layer)]
     Values { values: Vec<CssValue>, span: Span },
 
-    /// Raw string (for @media, @keyframes, etc.)
-    /// Example: `screen and (min-width: 768px)`
+    /// Raw prelude (for `@keyframes`, `@layer`, `@namespace`, `@page`, … — at-rules with
+    /// no `property: value` / media-query grammar). `content` is the **printer-facing**
+    /// string: verbatim source with internal whitespace + comments preserved and only
+    /// `url()` inner whitespace trimmed (`@namespace` is the exception — its prelude is
+    /// whitespace-normalized to match postcss). The public AST is reproduced separately
+    /// from `span` (source-verbatim), so `content` never feeds the AST.
+    /// Example: `@layer` → `a , b`; `@keyframes` → `my-anim`.
     Raw { content: String, span: Span },
 
     /// Selector lists (for @scope)
@@ -542,7 +547,8 @@ pub enum PreludeValue {
     /// raw string parsing to preserve comments. Wrapping is handled in the
     /// printer by finding `and`/`or` boundaries in the raw string.
     ///
-    /// See TODO_AST_ARCHITECTURE.md for discussion of moving to CST-based parsing.
+    /// Fully structuring preludes (vs. this raw form) is a deferred design option
+    /// — see docs/architecture.md § "Red-Green Trees (Deferred)".
     Media { content: String, span: Span },
 }
 

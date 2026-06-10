@@ -1,0 +1,455 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 233,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Line comment after a parameter's `=` default stays after `=`.",
+			"start": 20,
+			"end": 84,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 105,
+			"end": 109,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 6
+				},
+				"end": {
+					"line": 4,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Same with a type annotation; the union stays inline.",
+			"start": 123,
+			"end": 178,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 207,
+			"end": 211,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 13
+				},
+				"end": {
+					"line": 10,
+					"column": 17
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 232,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 223,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 86,
+					"end": 120,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 95,
+						"end": 97,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 3,
+								"column": 12
+							}
+						},
+						"name": "fn"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "AssignmentPattern",
+							"start": 101,
+							"end": 113,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 2
+								},
+								"end": {
+									"line": 5,
+									"column": 3
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 101,
+								"end": 102,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 3
+									}
+								},
+								"name": "p"
+							},
+							"right": {
+								"type": "Identifier",
+								"start": 112,
+								"end": 113,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 3
+									}
+								},
+								"name": "v",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 105,
+										"end": 109
+									}
+								]
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 118,
+						"end": 120,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 3
+							},
+							"end": {
+								"line": 6,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment after a parameter's `=` default stays after `=`.",
+							"start": 20,
+							"end": 84
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 180,
+					"end": 222,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 189,
+						"end": 192,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 10
+							},
+							"end": {
+								"line": 9,
+								"column": 13
+							}
+						},
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "AssignmentPattern",
+							"start": 196,
+							"end": 215,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 2
+								},
+								"end": {
+									"line": 11,
+									"column": 3
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 196,
+								"end": 204,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 10
+									}
+								},
+								"name": "p",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 197,
+									"end": 204,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 3
+										},
+										"end": {
+											"line": 10,
+											"column": 10
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 199,
+										"end": 204,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 5
+											},
+											"end": {
+												"line": 10,
+												"column": 10
+											}
+										},
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 199,
+												"end": 200,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 5
+													},
+													"end": {
+														"line": 10,
+														"column": 6
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 199,
+													"end": 200,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 5
+														},
+														"end": {
+															"line": 10,
+															"column": 6
+														}
+													},
+													"name": "A"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 203,
+												"end": 204,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 9
+													},
+													"end": {
+														"line": 10,
+														"column": 10
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 203,
+													"end": 204,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 9
+														},
+														"end": {
+															"line": 10,
+															"column": 10
+														}
+													},
+													"name": "B"
+												}
+											}
+										]
+									}
+								}
+							},
+							"right": {
+								"type": "Identifier",
+								"start": 214,
+								"end": 215,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 3
+									}
+								},
+								"name": "v",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 207,
+										"end": 211
+									}
+								]
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 220,
+						"end": 222,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 3
+							},
+							"end": {
+								"line": 12,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Same with a type annotation; the union stays inline.",
+							"start": 123,
+							"end": 178
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

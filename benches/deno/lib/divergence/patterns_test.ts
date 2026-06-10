@@ -157,6 +157,37 @@ Deno.test('template_literal_width: positive - atomization divergence (prettier b
 	assertEquals(match!.pattern, 'template_literal_width');
 });
 
+Deno.test('template_literal_width: positive - nested template/array in interpolation breaks', () => {
+	// Prettier keeps the nested `${[`…`]}` construct inline past print width; ours
+	// breaks the inner array bracket. The end-of-line `${` / `}`` markers never
+	// appear — Case 3 (nested-template shape + re-wrap guard) claims it.
+	const e = 'e'.repeat(64);
+	const prettier = `\t\t\t\t\t\t\t\t\t\t\t\t\te: '\${[\`\${${e}}\`]}',`;
+	const ours =
+		`\t\t\t\t\t\t\t\t\t\t\t\t\te: '\${[\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\`\${${e}}\`,\n\t\t\t\t\t\t\t\t\t\t\t\t\t]}',`;
+	const ctx = make_context(ours, prettier, 'typescript');
+	ctx.source = `e: '\${[\`\${${e}}\`]}',`;
+	const vw = visual_width(prettier);
+	assertEquals(vw > 100, true, `Expected prettier line > 100, got ${vw}`);
+	const match = run_pattern('template_literal_width', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'template_literal_width');
+});
+
+Deno.test('template_literal_width: negative - nested template line, ours did NOT re-wrap', () => {
+	// A wide nested-template interpolation line, but ours emitted the same long
+	// line (a different in-place edit — no legitimate break). The re-wrap guard in
+	// Case 3 (more added than removed lines) must reject — claiming would mask a
+	// formatting bug purely from prettier's width.
+	const e = 'e'.repeat(64);
+	const prettier = `\t\t\t\t\t\t\t\t\t\t\t\t\te: '\${[\`\${${e}}\`]}',`;
+	const ours = `\t\t\t\t\t\t\t\t\t\t\t\t\tE: '\${[\`\${${e}}\`]}',`;
+	const ctx = make_context(ours, prettier, 'typescript');
+	ctx.source = `e: '\${[\`\${${e}}\`]}',`;
+	const match = run_pattern('template_literal_width', ctx);
+	assertEquals(match, null);
+});
+
 Deno.test('template_literal_width: negative - both sides break same complex expr', () => {
 	// Both sides break at ${} but with complex expressions (not atomizable)
 	// — not a template atomization divergence
@@ -317,6 +348,42 @@ Deno.test('single_specifier_import: positive - long import wraps', () => {
 Deno.test('single_specifier_import: negative - import under 100 chars', () => {
 	const prettier = 'import { foo } from "./bar";';
 	const ours = 'import {\n\tfoo,\n} from "./bar";';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('single_specifier_import', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('single_specifier_import: positive - tab-indented import in <script> wraps', () => {
+	// Imports inside a Svelte <script> are tab-indented; the leading-tab allowance
+	// lets the detector see the broken opener and the long inline import.
+	const longSpec = 'a'.repeat(80);
+	const prettier = `\timport {${longSpec}} from './mod';`;
+	const ours = `\timport {\n\t\t${longSpec},\n\t} from './mod';`;
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('single_specifier_import', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'single_specifier_import');
+});
+
+Deno.test('single_specifier_import: negative - long non-import line (no import opener)', () => {
+	// A long line over 100 chars that is NOT an import, broken by ours. The
+	// import-specific opener/inline regexes must not claim it.
+	const longCall = 'a'.repeat(80);
+	const prettier = `\tconst x = someFunction(${longCall});`;
+	const ours = `\tconst x = someFunction(\n\t\t${longCall},\n\t);`;
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('single_specifier_import', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('single_specifier_import: negative - long import ours did NOT re-wrap', () => {
+	// Prettier's import is long (> 100), but ours did NOT break it into the
+	// multiline opener form — it edited the line in place (e.g. renamed the
+	// source). Without an `import {`-on-its-own-line opener in our added lines,
+	// the divergence (ours wraps) is not present → reject.
+	const longSpec = 'a'.repeat(74);
+	const prettier = `import {${longSpec}} from './mod';`;
+	const ours = `import {${longSpec}} from './other';`;
 	const ctx = make_context(ours, prettier, 'typescript');
 	const match = run_pattern('single_specifier_import', ctx);
 	assertEquals(match, null);
@@ -550,6 +617,54 @@ Deno.test('comment_position: positive - comment absorbed into catch parens', () 
 	const ctx = make_context(ours, prettier, 'typescript');
 	const match = run_pattern('comment_position', ctx);
 	assertNotEquals(match, null);
+});
+
+Deno.test('comment_position: positive - Case 3 structural relocation around bordering comment', () => {
+	// Empty-switch shape: the `// note` comment is byte-identical in both outputs,
+	// so the diff aligns it as a CONTEXT line; the hunk carries only the
+	// discriminant-paren reshape (`switch (x) {` ↔ `switch (\n\tx\n) {`). The
+	// comment borders the hunk in BOTH outputs and exists in both → Case 3 claims.
+	const prettier = '\tswitch (\n\t\tx\n\t\t// note\n\t) {\n\t}';
+	const ours = '\tswitch (x) {\n\t\t// note\n\t}';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('comment_position', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'comment_position');
+});
+
+Deno.test('comment_position: negative - Case 3 bordering comment DROPPED by prettier', () => {
+	// Same structural reshape, but prettier DROPPED the `// note` comment entirely
+	// (a content loss). The "exists as a whole comment line in BOTH outputs" guard
+	// must reject — claiming would mask the drop as a known divergence and, in
+	// corpus_compare_format, downgrade a real SAFETY data-loss to `known`.
+	const prettier = '\tswitch (\n\t\tx\n\t) {\n\t}';
+	const ours = '\tswitch (x) {\n\t\t// note\n\t}';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('comment_position', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('comment_position: negative - Case 3 bordering comment CHANGED, not relocated', () => {
+	// The comment bordering the hunk differs between the two outputs (`// note` vs
+	// `// other`) — the comment text was altered, not merely repositioned. The
+	// border-text-must-match-in-both guard must reject.
+	const prettier = '\tswitch (\n\t\tx\n\t\t// other\n\t) {\n\t}';
+	const ours = '\tswitch (x) {\n\t\t// note\n\t}';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('comment_position', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('comment_position: negative - Case 3 preserved comment not bordering the hunk', () => {
+	// A preserved comment exists in both outputs but is NOT the immediate border of
+	// the structural hunk (a blank line and other code separate them). Case 3 must
+	// not claim a structural reshape just because some preserved comment lives
+	// elsewhere in the file.
+	const prettier = '\t// faraway\n\tconst z = 1;\n\n\tswitch (\n\t\tx\n\t) {\n\t}';
+	const ours = '\t// faraway\n\tconst z = 1;\n\n\tswitch (x) {\n\t}';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('comment_position', ctx);
+	assertEquals(match, null);
 });
 
 // ─── block_multiline_attrs_hug ──────────────────────────────────────────────
@@ -796,6 +911,32 @@ Deno.test('return_type_generic_union: negative - generic without union', () => {
 	assertEquals(match, null);
 });
 
+// ─── non_null_paren_base ────────────────────────────────────────────────────
+
+Deno.test('non_null_paren_base: positive - tsv hangs parens, prettier hugs ))!.', () => {
+	// Prettier hugs the inner call: `))!.ok` collapses on one line.
+	const prettier =
+		'\tconst ok = (await call(\n\t\tapplicationObjectLong,\n\t\tspecificationObjectLong,\n\t\thh,\n\t))!.ok;';
+	// tsv hangs the outer parens: `)` on its own line, then `)!.ok;`.
+	const ours =
+		'\tconst ok = (\n\t\tawait call(\n\t\t\tapplicationObjectLong,\n\t\t\tspecificationObjectLong,\n\t\t\thh,\n\t\t)\n\t)!.ok;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('non_null_paren_base', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'non_null_paren_base');
+});
+
+Deno.test('non_null_paren_base: negative - no `!` (plain trailing member matches prettier)', () => {
+	// Without the non-null `!`, prettier has no `))!.` hug and tsv emits `).ok` —
+	// the detector must not claim a plain trailing-member break.
+	const prettier =
+		'\tconst ok = (await call(\n\t\tapplicationObjectLong,\n\t\tspecificationObjectLong,\n\t\thh,\n\t)).ok;';
+	const ours = '\tconst ok = (await call(\n\t\tapplicationObjectLong,\n\t\thh,\n\t))\n\t\t.ok;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('non_null_paren_base', ctx);
+	assertEquals(match, null);
+});
+
 // ─── instantiation_parens ─────────────────────────────────────────────────
 
 Deno.test('instantiation_parens: positive - ternary parens stripped', () => {
@@ -1019,6 +1160,29 @@ Deno.test('comment_position: negative - comment text in code but not as comment'
 	assertEquals(match, null);
 });
 
+Deno.test('comment_position: positive - retained-paren-union line-comment expansion', () => {
+	// A preserved line comment inside a parenthesized union forces tsv to expand
+	// the member to its broken leading-`|` form; Prettier keeps it inline and
+	// relocates the comment. Only separator/paren layout differs (same members,
+	// same comment text) — claim it via the union-layout fallback.
+	const prettier = 'type T =\n\t| (A | B) // comment 1\n\t| D;';
+	const ours = 'type T =\n\t| (\n\t\t| A\n\t\t| B // comment 1\n\t)\n\t| D;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('comment_position', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('comment_position: negative - dropped union separator not masked by layout strip', () => {
+	// Same identifiers and same comment, but ours DROPS a union `|` (a real
+	// content loss). The separator-count guard (ours `|` count < prettier's) must
+	// reject so the union-layout fallback never masks a dropped separator.
+	const prettier = 'type T = A | B; // comment';
+	const ours = 'type T = A B; // comment';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('comment_position', ctx);
+	assertEquals(match, null);
+});
+
 // ─── css_comment_stable_quirk (additional) ────────────────────────────────
 
 Deno.test('css_comment_stable_quirk: negative - one-sided comment not in other output', () => {
@@ -1055,4 +1219,103 @@ Deno.test('jsdoc_type_cast_parens: positive - arrow callback body', () => {
 	const match = run_pattern('jsdoc_type_cast_parens', ctx);
 	assertNotEquals(match, null);
 	assertEquals(match!.pattern, 'jsdoc_type_cast_parens');
+});
+
+// ─── Overmatch-rejection negative tests (ours-side evidence guards) ─────────
+//
+// Each of these is a real formatting BUG (or content loss) on a line that
+// looks like a known divergence. The ours-side guard added to the detector
+// must REJECT it — claiming would mask a bug, and in corpus_compare_format can mask a
+// data-loss safety violation by reclassifying it as known_divergence.
+
+Deno.test('member_expression_call: negative - bug collapses what prettier expanded (no re-wrap)', () => {
+	// `require.resolve(` is present, but ours COLLAPSED the call onto one line
+	// while prettier kept it expanded — the opposite of the documented divergence
+	// (ours expands). added_lines.length is not > removed_lines.length → reject.
+	const prettier = 'const p = require.resolve(\n\t"x",\n);';
+	const ours = 'const p = require.resolve("x");';
+	const ctx = make_context(ours, prettier, 'typescript');
+	ctx.source = 'const p = require.resolve("x");';
+	const match = run_pattern('member_expression_call', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('member_expression_call: negative - module pattern only on prettier side', () => {
+	// The module pattern appears only in prettier's removed lines; ours rewrote
+	// the expression to something else (e.g. dropped `require.resolve`). The
+	// divergent break must be in OUR output to claim — reject.
+	const prettier = 'const p = require.resolve(\n\t"x",\n);';
+	const ours = 'const p = foo(\n\t"x",\n\t"y",\n);';
+	const ctx = make_context(ours, prettier, 'typescript');
+	ctx.source = 'const p = require.resolve("x");';
+	const match = run_pattern('member_expression_call', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('short_expr_100: negative - bug in 101-110 band without legitimate break', () => {
+	// Prettier's `{#if` line is in the 101-110 band, but ours did NOT break the
+	// block condition — it mangled the line in place (same line count). Claiming
+	// purely from the prettier width would mask this bug → reject.
+	const expr = 'a'.repeat(65);
+	const prettier = `{#if typeof ${expr} === 'string'}content{/if}`;
+	const ours = `{#if typeof ${expr} === "string"}content{/if}`;
+	const ctx = make_context(ours, prettier, 'svelte');
+	const vw = visual_width(prettier);
+	assertEquals(vw > 100 && vw <= 110, true, `Expected width 101-110, got ${vw}`);
+	const match = run_pattern('short_expr_100', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('fill_after_inline: negative - long inline-close line, ours did not re-wrap', () => {
+	// Prettier's line has a long inline close tag (> 100), but ours emitted the
+	// same long line (no legitimate fill break — a different edit on it). Without
+	// the re-wrap guard this would be claimed purely from prettier's width.
+	const longContent = 'x'.repeat(90);
+	const prettier = `\t<p>Some text <span>${longContent}</span> more</p>`;
+	const ours = `\t<p>Some text <span>${longContent}</span> MORE</p>`;
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('fill_after_inline', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('fill_101_boundary: negative - removal-only hunk (empty added_lines)', () => {
+	// A prettier line >= 100 chars that we simply DELETED (no added lines). The
+	// Case-2 `added_lines.every(...)` guard is vacuously true for empty arrays —
+	// requiring added_lines.length > 0 keeps a deleted long line from being
+	// claimed as a print-width rewrap.
+	const longLine = '\t' + 'x'.repeat(103); // visual width 105
+	const prettier = `before\n${longLine}\nafter`;
+	const ours = 'before\nafter';
+	const ctx = make_context(ours, prettier, 'svelte');
+	// Confirm the hunk really is removal-only.
+	assertEquals(ctx.hunks.length, 1);
+	assertEquals(ctx.hunks[0].added_lines.length, 0);
+	const match = run_pattern('fill_101_boundary', ctx);
+	assertEquals(match, null);
+});
+
+// ─── css_scss_directive_number (positive + negative) ───────────────────────
+
+Deno.test('css_scss_directive_number: positive - @include number normalization divergence', () => {
+	// Prettier value-parses SCSS @include and number-normalizes (.5s → 0.5s,
+	// 1.50 → 1.5); tsv preserves the prelude verbatim. Same numeric-token count,
+	// identical non-numeric skeleton → claim.
+	const prettier = '<style>\n\t@include foo(transform, 0.5s ease);\n\t@include baz(1.5);\n</style>';
+	const ours = '<style>\n\t@include foo(transform, .5s ease);\n\t@include baz(1.50);\n</style>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('css_scss_directive_number', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'css_scss_directive_number');
+});
+
+Deno.test('css_scss_directive_number: negative - dropped numeric value not claimed', () => {
+	// Ours DROPS a numeric value (`100px` → `px`) inside an @include. The old
+	// skeleton stripped digits/dots, so this compared skeleton-equal and was
+	// masked. The numeric-token-count check (prettier has 1 number, ours has 0)
+	// rejects this real content loss.
+	const prettier = '<style>\n\t@include foo(width: 100px);\n</style>';
+	const ours = '<style>\n\t@include foo(width: px);\n</style>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('css_scss_directive_number', ctx);
+	assertEquals(match, null);
 });

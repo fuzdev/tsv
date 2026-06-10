@@ -3,7 +3,7 @@
  *
  * Also copies the variant-specific README into the package root,
  * overwriting any README wasm-pack may have emitted. The crate has no
- * `README.md` at its root — `README_fmt.md` and `README_parse.md` are
+ * `README.md` at its root — `README_format.md` and `README_parse.md` are
  * the canonical sources and ship as the package's `README.md`.
  *
  * For the `parse` variant, also copies `crates/tsv_wasm/types/tsv_ast.d.ts`
@@ -11,26 +11,26 @@
  * wasm-bindgen `typescript_type = "import('./tsv_ast').*"` extern types
  * resolve against this bundled file at consumer compile time.
  *
- * Usage:  publish_patch_npm.ts <fmt|parse>
+ * Usage:  publish_patch_npm.ts <format|parse>
  *
- *   fmt   → crates/tsv_wasm/pkg/npm-fmt/    → @fuzdev/tsv_fmt
- *   parse → crates/tsv_wasm/pkg/npm-parse/  → @fuzdev/tsv_parse
+ *   format → crates/tsv_wasm/pkg/npm-format/  → @fuzdev/tsv_format_wasm
+ *   parse  → crates/tsv_wasm/pkg/npm-parse/   → @fuzdev/tsv_parse_wasm
  */
 
 const variant = Deno.args[0];
-if (variant !== 'fmt' && variant !== 'parse') {
-	console.error(`Usage: publish_patch_npm.ts <fmt|parse>`);
+if (variant !== 'format' && variant !== 'parse') {
+	console.error(`Usage: publish_patch_npm.ts <format|parse>`);
 	Deno.exit(1);
 }
 
-const target_name = variant === 'fmt' ? '@fuzdev/tsv_fmt' : '@fuzdev/tsv_parse';
-const pkg_dir = variant === 'fmt' ? 'npm-fmt' : 'npm-parse';
+const target_name = variant === 'format' ? '@fuzdev/tsv_format_wasm' : '@fuzdev/tsv_parse_wasm';
+const pkg_dir = variant === 'format' ? 'npm-format' : 'npm-parse';
 const pkg_root = `crates/tsv_wasm/pkg/${pkg_dir}`;
 const pkg_path = `${pkg_root}/package.json`;
 
 const pkg = JSON.parse(Deno.readTextFileSync(pkg_path));
 pkg.name = target_name;
-pkg.description = variant === 'fmt'
+pkg.description = variant === 'format'
 	? 'formatter for TypeScript, Svelte, and CSS'
 	: 'parser for TypeScript, Svelte, and CSS';
 

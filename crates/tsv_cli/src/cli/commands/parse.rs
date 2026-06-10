@@ -55,25 +55,24 @@ impl ParseCommand {
 }
 
 fn parse_to_json(source: &str, pretty: bool, parser_type: ParserType) -> Result<String, String> {
-    let json_value = match parser_type {
-        ParserType::Svelte => {
-            let ast = tsv_svelte::parse(source).map_err(|e| e.to_string())?;
-            tsv_svelte::convert_ast_json(&ast, source)
-        }
-        ParserType::Css => {
-            let ast = tsv_css::parse(source).map_err(|e| e.to_string())?;
-            tsv_css::convert_ast_json(&ast, source)
-        }
-        ParserType::TypeScript => {
-            let ast = tsv_ts::parse(source).map_err(|e| e.to_string())?;
-            tsv_ts::convert_ast_json(&ast, source)
-        }
-    };
+    // Compact output uses the convert_ast_json_string hot path (skips the
+    // intermediate serde_json::Value when eligible); pretty-printing needs
+    // the Value for tab-indented serialization.
+    macro_rules! emit {
+        ($lang:ident) => {{
+            let ast = $lang::parse(source).map_err(|e| e.to_string())?;
+            if pretty {
+                to_json_with_tabs(&$lang::convert_ast_json(&ast, source))
+                    .map_err(|e| format!("JSON serialization failed: {e}"))?
+            } else {
+                $lang::convert_ast_json_string(&ast, source)
+            }
+        }};
+    }
 
-    let json = if pretty {
-        to_json_with_tabs(&json_value)
-    } else {
-        serde_json::to_string(&json_value)
-    };
-    json.map_err(|e| format!("JSON serialization failed: {e}"))
+    Ok(match parser_type {
+        ParserType::Svelte => emit!(tsv_svelte),
+        ParserType::Css => emit!(tsv_css),
+        ParserType::TypeScript => emit!(tsv_ts),
+    })
 }

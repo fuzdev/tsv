@@ -80,3 +80,25 @@ Deno.test('vs_prettier: loss shared with prettier (e.g. trailing-zero strip) can
 	const prettier = '.a {\n\tflex: 1;\n}\n';
 	assertEquals(check_safety_vs_prettier(source, ours, prettier), []);
 });
+
+Deno.test('vs_prettier: prettier-empty output never fabricates a violation', () => {
+	// The prettier Deno sidecar can return '' for a file under load. The check
+	// iterates the chars OURS deviates on and uses prettier only as a subtrahend,
+	// so an empty prettier (prettier_excess = the whole source) can only CANCEL
+	// deltas — never invent one. Such a file surfaces as a large unknown diff, not
+	// SAFETY. Pins the false-positive direction of the prettier-sidecar heisenbug.
+	const source = 'const x = abc;\n';
+	assertEquals(check_safety_vs_prettier(source, source, ''), []); // ours == source
+	assertEquals(check_safety_vs_prettier(source, 'const x = abc;\n', ''), []); // ours formatted
+});
+
+Deno.test('vs_prettier: prettier-empty MASKS a real loss (false negative — caller must guard)', () => {
+	// The flip side: when prettier is empty AND ours genuinely drops a char, the
+	// differential subtracts the loss away (prettier "dropped" it too) and reports
+	// nothing. The primitive cannot tell real loss from a sidecar miss once
+	// prettier is gone — which is why `corpus_compare_format.ts` errors out on
+	// `prettier === '' && source non-empty` instead of trusting this verdict.
+	const source = 'const x = abc;\n';
+	const ours = 'const x = ab;\n'; // ours dropped the `c`
+	assertEquals(check_safety_vs_prettier(source, ours, ''), []); // masked — NOT flagged
+});

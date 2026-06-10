@@ -1,0 +1,575 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 377,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " line comment trailing type-argument `<` - two arguments",
+			"start": 20,
+			"end": 78,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 94,
+			"end": 99,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 15
+				},
+				"end": {
+					"line": 3,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment trailing type-argument `<` - three arguments",
+			"start": 125,
+			"end": 185,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 204,
+			"end": 209,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 18
+				},
+				"end": {
+					"line": 9,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment trailing `<`, then own-line leading comment",
+			"start": 246,
+			"end": 306,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " angle ",
+			"start": 322,
+			"end": 333,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 15
+				},
+				"end": {
+					"line": 16,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " lead",
+			"start": 336,
+			"end": 343,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 376,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 367,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 21,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 80,
+					"end": 122,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 85,
+						"end": 86,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 89,
+						"end": 121,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 89,
+							"end": 92,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 10
+								},
+								"end": {
+									"line": 3,
+									"column": 13
+								}
+							},
+							"name": "Map"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 92,
+							"end": 121,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 13
+								},
+								"end": {
+									"line": 6,
+									"column": 2
+								}
+							},
+							"params": [
+								{
+									"type": "TSStringKeyword",
+									"start": 102,
+									"end": 108,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 8
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 94,
+											"end": 99
+										}
+									]
+								},
+								{
+									"type": "TSNumberKeyword",
+									"start": 112,
+									"end": 118,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 8
+										}
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment trailing type-argument `<` - two arguments",
+							"start": 20,
+							"end": 78
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 187,
+					"end": 243,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 192,
+						"end": 193,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 6
+							},
+							"end": {
+								"line": 9,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 196,
+						"end": 242,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 10
+							},
+							"end": {
+								"line": 13,
+								"column": 2
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 196,
+							"end": 202,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 10
+								},
+								"end": {
+									"line": 9,
+									"column": 16
+								}
+							},
+							"name": "Triple"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 202,
+							"end": 242,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 16
+								},
+								"end": {
+									"line": 13,
+									"column": 2
+								}
+							},
+							"params": [
+								{
+									"type": "TSStringKeyword",
+									"start": 212,
+									"end": 218,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 8
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c2",
+											"start": 204,
+											"end": 209
+										}
+									]
+								},
+								{
+									"type": "TSNumberKeyword",
+									"start": 222,
+									"end": 228,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 8
+										}
+									}
+								},
+								{
+									"type": "TSBooleanKeyword",
+									"start": 232,
+									"end": 239,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 9
+										}
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment trailing type-argument `<` - three arguments",
+							"start": 125,
+							"end": 185
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 308,
+					"end": 366,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 313,
+						"end": 314,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 6
+							},
+							"end": {
+								"line": 16,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 317,
+						"end": 365,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 10
+							},
+							"end": {
+								"line": 20,
+								"column": 2
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 317,
+							"end": 320,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 10
+								},
+								"end": {
+									"line": 16,
+									"column": 13
+								}
+							},
+							"name": "Map"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 320,
+							"end": 365,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 13
+								},
+								"end": {
+									"line": 20,
+									"column": 2
+								}
+							},
+							"params": [
+								{
+									"type": "TSStringKeyword",
+									"start": 346,
+									"end": 352,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 8
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " angle ",
+											"start": 322,
+											"end": 333
+										},
+										{
+											"type": "Line",
+											"value": " lead",
+											"start": 336,
+											"end": 343
+										}
+									]
+								},
+								{
+									"type": "TSNumberKeyword",
+									"start": 356,
+									"end": 362,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 2
+										},
+										"end": {
+											"line": 19,
+											"column": 8
+										}
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment trailing `<`, then own-line leading comment",
+							"start": 246,
+							"end": 306
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

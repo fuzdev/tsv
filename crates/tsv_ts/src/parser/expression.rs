@@ -542,7 +542,31 @@ impl<'a> Parser<'a> {
     /// Parse postfix expressions: member access (`.`, `[`), call expressions (`()`)
     ///
     /// Handles chained expressions like `obj.prop`, `arr[0]`, `foo()`, `obj.method().prop`
+    /// Wrap `expr` in a `TSNonNullExpression`, consuming the current `!` token. The
+    /// span starts at `expr.actual_start` so it covers any grouping parens (`(a?.b)!`),
+    /// which `TSNonNullExpression::seals_optional_chain` relies on. Callers gate on
+    /// `Bang` + `!had_line_terminator` (ASI: a line terminator before `!` makes it a
+    /// prefix `!` on the next statement instead).
+    fn wrap_non_null_assertion(&mut self, expr: ParsedExpr) -> Result<ParsedExpr, ParseError> {
+        let (_, op_end) = self.current_pos();
+        self.advance()?; // consume '!'
+        let span = Span::new(expr.actual_start as u32, op_end as u32);
+        Ok(ParsedExpr::with_end(
+            Expression::TSNonNullExpression(TSNonNullExpression {
+                expression: Box::new(expr.expr),
+                span,
+            }),
+            op_end,
+        ))
+    }
+
     fn parse_postfix_expression(&mut self, mut left: ParsedExpr) -> Result<ParsedExpr, ParseError> {
+        // Tracks whether an optional `?.` was consumed in THIS subscript chain (not
+        // inside a parenthesized sub-expression — those are parsed as their own
+        // primary with a fresh flag). An optional chain may not be the tag of a
+        // tagged template (`a?.b`x`` is a syntax error); a parenthesized chain
+        // (`(a?.b)`x``) seals it and is valid. Mirrors acorn's `optionalChained`.
+        let mut optional_chained = false;
         loop {
             match self.current_kind() {
                 TokenKind::Dot => {
@@ -586,6 +610,7 @@ impl<'a> Parser<'a> {
                 TokenKind::QuestionDot => {
                     // Optional chaining: obj?.prop, obj?.#private, obj?.[expr], obj?.()
                     self.advance()?; // consume '?.'
+                    optional_chained = true;
 
                     match self.current_kind() {
                         TokenKind::Hash => {
@@ -727,6 +752,15 @@ impl<'a> Parser<'a> {
                     let quasi = self.parse_template_literal()?;
                     let quasi_span = quasi.span();
                     if let Expression::TemplateLiteral(template) = quasi {
+                        // An optional chain can't be a template tag (per spec): `a?.b`x``
+                        // is a syntax error. A parenthesized chain (`(a?.b)`x``) seals the
+                        // chain (consumed as its own primary, so `optional_chained` is
+                        // false here) and is valid.
+                        if optional_chained {
+                            return Err(self.error_msg(
+                                "Optional chaining cannot appear in the tag of tagged template expressions",
+                            ));
+                        }
                         let span = Span::new(left.actual_start as u32, quasi_span.end);
                         // When tag is TSInstantiationExpression (e.g., tag<T>), flatten:
                         // TSInstantiationExpression + TaggedTemplate → TaggedTemplate with typeArguments
@@ -785,20 +819,8 @@ impl<'a> Parser<'a> {
                     }
                 }
                 TokenKind::Bang if !self.had_line_terminator => {
-                    // TypeScript non-null assertion: expr!
-                    // ASI Rule: If there's a line terminator before !, ASI fires
-                    // and the ! becomes a unary NOT operator on the next statement.
-                    let (_, op_end) = self.current_pos();
-                    self.advance()?;
-
-                    let span = Span::new(left.actual_start as u32, op_end as u32);
-                    left = ParsedExpr::with_end(
-                        Expression::TSNonNullExpression(TSNonNullExpression {
-                            expression: Box::new(left.expr),
-                            span,
-                        }),
-                        op_end,
-                    );
+                    // TypeScript non-null assertion: `expr!`.
+                    left = self.wrap_non_null_assertion(left)?;
                 }
                 _ => break,
             }
@@ -1493,7 +1515,10 @@ impl<'a> Parser<'a> {
                 self.advance()?; // consume '...'
                 // Use assignment_expression because comma separates properties
                 let argument = self.parse_assignment_expression()?;
-                let prop_end = argument.span().end_usize();
+                // Use prev_token_end() to include the closing paren when the argument
+                // is parenthesized (`{...(a && b)}`), matching the array-spread and
+                // object-value paths (acorn includes the `)` in the SpreadElement span).
+                let prop_end = self.prev_token_end();
                 properties.push(ObjectProperty::SpreadElement(SpreadElement {
                     argument: Box::new(argument),
                     span: Span::new(prop_start as u32, prop_end as u32),
@@ -2106,6 +2131,19 @@ impl<'a> Parser<'a> {
                         }),
                         bracket_end,
                     );
+                }
+                TokenKind::QuestionDot => {
+                    // An optional chain can't be a `new` callee (per spec): `new a?.b()`
+                    // is a syntax error. A parenthesized chain (`new (a?.b)()`) seals it
+                    // and is valid — its `?.` is consumed inside the primary, never here.
+                    return Err(self.error_msg(
+                        "Optional chaining cannot appear in the callee of new expressions",
+                    ));
+                }
+                TokenKind::Bang if !self.had_line_terminator => {
+                    // Non-null assertion on the callee: `new (a?.b)!()`. The trailing `(`
+                    // then binds as the `new` argument list, not a call on the callee.
+                    callee = self.wrap_non_null_assertion(callee)?;
                 }
                 _ => break,
             }

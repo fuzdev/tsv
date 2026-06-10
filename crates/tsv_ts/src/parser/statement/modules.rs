@@ -574,8 +574,10 @@ impl<'a> Parser<'a> {
             && self.current_value() == "type"
         {
             // Look ahead to see if this is `import type { ... }` or `import type X from ...`
-            // vs `import type from "y"` (importing a default export named "type")
-            let next_kind = self.peek_kind();
+            // vs `import type from "y"` (importing a default export named "type").
+            // Skip comments so `import type /* c */ {}` isn't misread as a default
+            // import named `type` (the comment is collected for the printer).
+            let next_kind = self.peek_non_comment_kind();
             if matches!(
                 next_kind,
                 TokenKind::BraceOpen | TokenKind::Star | TokenKind::Identifier

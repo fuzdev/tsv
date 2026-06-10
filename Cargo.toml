@@ -27,7 +27,7 @@ tsv_html = { path = "crates/tsv_html" }
 # Language implementations
 # Default-features off ships parse + format only; consumers opt into the
 # public AST + JSON layer with `features = ["convert"]`. Only the
-# @fuzdev/tsv_fmt WASM build leaves it off.
+# @fuzdev/tsv_format_wasm build leaves it off.
 tsv_ts = { path = "crates/tsv_ts", default-features = false }
 tsv_css = { path = "crates/tsv_css", default-features = false }
 tsv_svelte = { path = "crates/tsv_svelte", default-features = false }

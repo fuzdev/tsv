@@ -628,6 +628,44 @@ pub fn strip_comment_indentation(source: &str, content: &str, comment_start: u32
     result
 }
 
+/// Returns `true` if a multi-line block comment is *indentable* in prettier's
+/// sense: every line — with the `*` from the `/*` opener restored to the front
+/// of the first line and the `*` from the `*/` closer restored to the end of
+/// the last line — begins with `*` after trimming leading whitespace.
+///
+/// These are JSDoc (`/** … */`) and `*`-aligned (`/* … */`) block comments.
+/// Their continuation lines get reindented to a single leading space (the
+/// context indent is supplied separately by the layout). Non-indentable block
+/// comments are preserved verbatim instead.
+///
+/// `content` is the comment body *without* the `/*` / `*/` delimiters. Returns
+/// `false` for single-line content. Mirrors prettier's `isIndentableBlockComment`.
+///
+/// # Example
+/// ```
+/// use tsv_lang::printing::is_indentable_block_comment;
+///
+/// assert!(is_indentable_block_comment("*\n * text\n "));     // /** … */
+/// assert!(is_indentable_block_comment("\n * text\n "));      // /* * … */
+/// assert!(is_indentable_block_comment("*\n *\n * text\n ")); // blank `*` line
+/// assert!(!is_indentable_block_comment(" a\n   b ")); // a line lacks `*`
+/// assert!(!is_indentable_block_comment(" single line "));    // single-line
+/// ```
+pub fn is_indentable_block_comment(content: &str) -> bool {
+    let lines: Vec<&str> = content.split('\n').collect();
+    // The `*` of the `/*` opener attaches to the first line and the `*` of the
+    // `*/` closer attaches to the last line, so the first line always qualifies
+    // and an all-whitespace last line qualifies. Every other line must start
+    // with `*`. (Pattern fails for single-line content → `false`.)
+    let [_first, middle @ .., last] = lines.as_slice() else {
+        return false;
+    };
+    middle.iter().all(|line| line.trim_start().starts_with('*')) && {
+        let last = last.trim_start();
+        last.is_empty() || last.starts_with('*')
+    }
+}
+
 /// Calculate the visual width of a string, treating tabs as `tab_width` columns.
 ///
 /// Uses grapheme cluster segmentation to match Prettier's width calculation:

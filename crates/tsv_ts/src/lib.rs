@@ -166,6 +166,29 @@ pub fn convert_ast_json(program: &Program, source: &str) -> serde_json::Value {
     json
 }
 
+/// Convert internal AST to a compact JSON string with character-based positions
+///
+/// Byte-identical to `serde_json::to_string(&convert_ast_json(...))`, but
+/// serializes the typed public AST directly, skipping the intermediate
+/// `serde_json::Value` (`serde_json`'s `preserve_order` keeps struct-field key
+/// order). For ASCII sources byte offsets already equal char offsets; multibyte
+/// sources get the typed offset-translation walk
+/// (`translate_byte_to_char_offsets_typed`) before serialization. This is the
+/// hot path for the FFI/WASM parse bindings and the CLI's compact output.
+#[cfg(feature = "convert")]
+#[allow(clippy::expect_used)]
+pub fn convert_ast_json_string(program: &Program, source: &str) -> String {
+    let tracker = tsv_lang::LocationTracker::new(source);
+    let mut public_ast =
+        ast::convert::convert_program(program, source, &tracker, ast::convert::Schema::Acorn);
+    // No ASCII gate: `ByteToCharMap::new` short-circuits to an empty map for
+    // ASCII sources and the typed walk early-returns on it, so gating here
+    // would just scan the source a second time.
+    let map = tsv_lang::ByteToCharMap::new(source);
+    ast::convert::translate_byte_to_char_offsets_typed(&mut public_ast, &map, &tracker);
+    serde_json::to_string(&public_ast).expect("AST types derive Serialize correctly")
+}
+
 /// Parse TypeScript with a shared string interner and base offset
 ///
 /// This is used when parsing embedded TypeScript in Svelte files.

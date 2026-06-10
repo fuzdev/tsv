@@ -18,7 +18,7 @@
 		"typecheck": "cargo check --workspace",
 		"test": "cargo test --workspace",
 		"lint": "cargo clippy --workspace",
-		"check": "deno task typecheck && deno task test && deno task lint && deno task conformance:audit && deno fmt --check && deno task check:ast-types",
+		"check": "deno task typecheck && deno task test && deno task test:deno && deno task lint && deno task conformance:audit && deno fmt --check && deno task check:ast-types",
 		"check:ast-types": "deno run --allow-read --allow-write=scripts --allow-run=cargo,deno scripts/check_ast_types.ts",
 		"format": "cargo fmt && deno fmt",
 
@@ -31,28 +31,26 @@
 		"fixtures:audit": "cargo run -p tsv_debug --quiet fixtures_audit",
 		"fixtures:ts-audit": "cargo run -p tsv_debug --quiet ts_fixture_audit",
 		"conformance:audit": "cargo run -p tsv_debug --quiet conformance_audit",
+		"metrics": "cargo run -p tsv_debug --quiet metrics",
 
 		"bench": "deno task build:ffi && deno task build:wasm:deno && deno task build:wasm:parse:deno && deno task bench:run",
 		"bench:run": "deno run --v8-flags=--expose-gc --allow-ffi --allow-read --allow-write=benches/deno/results --allow-run=git,gzip --allow-env --allow-net --allow-sys benches/deno/bench.ts",
 		"bench:clean": "rm -f benches/deno/results/baseline.json benches/deno/results/[0-9]*.json benches/deno/results/[0-9]*.md",
 		"smoke": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/smoke.ts",
-
 		"build:ffi:corpus": "cargo build -p tsv_ffi --profile corpus",
-		"corpus:compare": "deno task build:ffi:corpus && TSV_FFI_PROFILE=corpus deno task corpus:compare:run",
-		"corpus:compare:run": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/corpus_compare.ts",
-
-		"metrics": "cargo run -p tsv_debug --quiet metrics",
-
+		"corpus:compare:format": "deno task build:ffi:corpus && TSV_FFI_PROFILE=corpus deno task corpus:compare:format:run",
+		"corpus:compare:format:run": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/corpus_compare_format.ts",
+		"corpus:compare:parse": "deno task build:ffi:corpus && TSV_FFI_PROFILE=corpus deno task corpus:compare:parse:run",
+		"corpus:compare:parse:run": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/corpus_compare_parse.ts",
 		"divergence:audit": "deno run --allow-read benches/deno/divergence_audit.ts",
+		"test:deno": "deno test --config benches/deno/deno.json --allow-read --allow-env --allow-net --allow-sys benches/deno/lib/",
 
-		"test:divergence": "deno test --config benches/deno/deno.json benches/deno/lib/divergence/",
-
-		"publish:npm:build:fmt": "wasm-pack build crates/tsv_wasm --target bundler --release --scope fuzdev --out-dir pkg/npm-fmt && deno run --allow-read --allow-write=crates/tsv_wasm/pkg/npm-fmt --allow-run=gzip scripts/publish_patch_npm.ts fmt",
+		"publish:npm:build:format": "wasm-pack build crates/tsv_wasm --target bundler --release --scope fuzdev --out-dir pkg/npm-format && deno run --allow-read --allow-write=crates/tsv_wasm/pkg/npm-format --allow-run=gzip scripts/publish_patch_npm.ts format",
 		"publish:npm:build:parse": "wasm-pack build crates/tsv_wasm --target bundler --release --scope fuzdev --out-dir pkg/npm-parse -- --features ast && deno run --allow-read --allow-write=crates/tsv_wasm/pkg/npm-parse --allow-run=gzip scripts/publish_patch_npm.ts parse",
-		"publish:npm:build": "deno task publish:npm:build:fmt && deno task publish:npm:build:parse",
-		"publish:npm:fmt": "deno task publish:npm:build:fmt && cd crates/tsv_wasm/pkg/npm-fmt && npm publish --access public",
+		"publish:npm:build": "deno task publish:npm:build:format && deno task publish:npm:build:parse",
+		"publish:npm:format": "deno task publish:npm:build:format && cd crates/tsv_wasm/pkg/npm-format && npm publish --access public",
 		"publish:npm:parse": "deno task publish:npm:build:parse && cd crates/tsv_wasm/pkg/npm-parse && npm publish --access public",
-		"publish:npm": "deno task publish:npm:fmt && deno task publish:npm:parse"
+		"publish:npm": "deno task publish:npm:format && deno task publish:npm:parse"
 	},
 	"fmt": {
 		"useTabs": true,

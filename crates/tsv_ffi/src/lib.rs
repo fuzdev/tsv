@@ -47,47 +47,13 @@ fn format_panic(payload: &(dyn std::any::Any + Send)) -> String {
     }
 }
 
-/// Helper to convert source pointer to &str and run a closure, returning serialized JSON.
+/// Helper to convert source pointer to &str and run a closure returning the
+/// output string verbatim (formatted source, or already-serialized JSON).
 /// Catches panics (when built with `panic = "unwind"`) and returns them as error JSON.
 ///
 /// # Safety
 /// Caller must ensure `source_ptr` points to valid UTF-8 of `source_len` bytes.
-unsafe fn with_source<F, T>(
-    source_ptr: *const u8,
-    source_len: usize,
-    out_len: *mut usize,
-    f: F,
-) -> *mut u8
-where
-    F: FnOnce(&str) -> Result<T, String> + panic::UnwindSafe,
-    T: serde::Serialize,
-{
-    let source = match unsafe { extract_source(source_ptr, source_len, out_len) } {
-        Ok(s) => s,
-        Err(ptr) => return ptr,
-    };
-
-    match panic::catch_unwind(|| f(source)) {
-        Ok(Ok(result)) => {
-            let json = match serde_json::to_string(&result) {
-                Ok(j) => j,
-                Err(e) => {
-                    return error_result(&format!("JSON serialization error: {e}"), out_len);
-                }
-            };
-            string_to_ptr(json, out_len)
-        }
-        Ok(Err(e)) => error_result(&e, out_len),
-        Err(payload) => error_result(&format_panic(&*payload), out_len),
-    }
-}
-
-/// Helper to convert source pointer to &str and run a formatter.
-/// Catches panics (when built with `panic = "unwind"`) and returns them as error JSON.
-///
-/// # Safety
-/// Caller must ensure `source_ptr` points to valid UTF-8 of `source_len` bytes.
-unsafe fn with_source_format<F>(
+unsafe fn with_source_string<F>(
     source_ptr: *const u8,
     source_len: usize,
     out_len: *mut usize,
@@ -178,9 +144,9 @@ macro_rules! lang_bindings {
             out_len: *mut usize,
         ) -> *mut u8 {
             unsafe {
-                with_source(source_ptr, source_len, out_len, |source| {
+                with_source_string(source_ptr, source_len, out_len, |source| {
                     let ast = $lang::parse(source).map_err(|e| e.to_string())?;
-                    Ok($lang::convert_ast_json(&ast, source))
+                    Ok($lang::convert_ast_json_string(&ast, source))
                 })
             }
         }
@@ -214,7 +180,7 @@ macro_rules! lang_bindings {
             out_len: *mut usize,
         ) -> *mut u8 {
             unsafe {
-                with_source_format(source_ptr, source_len, out_len, |source| {
+                with_source_string(source_ptr, source_len, out_len, |source| {
                     let ast = $lang::parse(source).map_err(|e| e.to_string())?;
                     Ok($lang::format(&ast, source))
                 })

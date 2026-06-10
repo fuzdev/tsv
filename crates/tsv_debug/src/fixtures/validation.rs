@@ -60,6 +60,12 @@ pub enum ValidationError {
     ParserExpectedSvelteOutdated,
     #[error("our parser output differs from expected.json")]
     ParserOursDiffersFromExpected,
+    #[error("convert_ast_json_string output differs from the Value path (convert_ast_json)")]
+    ParserJsonStringPathDiverges,
+    #[error("typed-walk parity diverges on {0}")]
+    ParserTypedWalkParityDiverges(String),
+    #[error("typed-walk parity probe {0} failed to parse: {1}")]
+    ParserTypedWalkProbeUnparseable(String, String),
     #[error("Parser error: {0}")]
     ParserError(String),
     #[error("Parser error (svelte_divergence): {0}")]
@@ -198,6 +204,15 @@ impl ValidationError {
             | Self::ParserExpectedOursOutdated
             | Self::ParserExpectedSvelteOutdated => {
                 "Run: deno task fixtures:update:parsed <pattern>"
+            }
+            Self::ParserJsonStringPathDiverges => {
+                "Fix convert_ast_json_string (fast-path eligibility gate or typed offset translation) to stay byte-identical to convert_ast_json"
+            }
+            Self::ParserTypedWalkParityDiverges(_) => {
+                "Fix translate_byte_to_char_offsets_typed (translate_typed.rs) — a position-bearing field is likely missing from the typed walk's manual field enumeration"
+            }
+            Self::ParserTypedWalkProbeUnparseable(_, _) => {
+                "The probe content must parse as standalone TS; investigate why prepending a multibyte comment or extracting <script> content broke parsing"
             }
             Self::ParserError(_) => "Verify input is valid syntax; if valid, fix the parser",
             Self::ParserErrorInDivergence(_) => {
@@ -345,6 +360,9 @@ impl ValidationError {
             Self::StructureValidationFailed(_) => "Structure",
 
             Self::ParserOursDiffersFromExpected
+            | Self::ParserJsonStringPathDiverges
+            | Self::ParserTypedWalkParityDiverges(_)
+            | Self::ParserTypedWalkProbeUnparseable(_, _)
             | Self::ParserExpectedJsonOutdated
             | Self::ParserExpectedOursOutdated
             | Self::ParserExpectedSvelteOutdated
@@ -407,6 +425,8 @@ pub enum ValidationSuccess {
     ParserExpectedJsonMatches,
     ParserExpectedOursMatches,
     ParserOursMatchesExpected,
+    ParserJsonStringPathMatches,
+    ParserTypedWalkParityOk(usize), // number of parity probes passed
     ParserExpectedSvelteMatches,
     FormatterInputIdempotent,
     FormatterMatchesPrettier,
@@ -424,6 +444,12 @@ impl fmt::Display for ValidationSuccess {
             Self::ParserExpectedOursMatches => write!(f, "expected_ours.json matches our parser"),
             Self::ParserOursMatchesExpected => {
                 write!(f, "our parser output matches expected.json")
+            }
+            Self::ParserJsonStringPathMatches => {
+                write!(f, "convert_ast_json_string matches the Value path")
+            }
+            Self::ParserTypedWalkParityOk(n) => {
+                write!(f, "{n} typed-walk parity probes passed")
             }
             Self::ParserExpectedSvelteMatches => {
                 write!(f, "expected_svelte.json matches Svelte parser")
@@ -584,11 +610,43 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
 
     // Phases 2-4: Our parser/formatter validation (skip in prettier_only mode)
     if !prettier_only {
-        // Phase 2: Our Parser validation - P2 (pure Rust)
-        validate_parser_ours(&mut result, fixture, &input);
+        // Phases 2/2b/2c/2d share one parse of the input (and one
+        // convert_ast_json materialization for 2/2b/2c)
+        match fixtures::parse_input(&input, input_type) {
+            Ok(parsed) => {
+                match fixtures::input_ast_paths(&parsed, &input) {
+                    Ok(paths) => {
+                        // Phase 2: Our Parser validation - P2 (pure Rust)
+                        validate_parser_ours(&mut result, fixture, &paths);
 
-        // Phase 2b: Our parser matches expected.json (non-divergence only, pure Rust)
-        validate_parser_ours_matches_expected(&mut result, fixture, &input);
+                        // Phase 2b: Our parser matches expected.json
+                        // (non-divergence only, pure Rust)
+                        validate_parser_ours_matches_expected(&mut result, fixture, &paths);
+
+                        // Phase 2c: Compact wire path matches the Value path (pure Rust)
+                        if paths.wire_path_matches {
+                            result.add_success(ValidationSuccess::ParserJsonStringPathMatches);
+                        } else {
+                            result.add_error(ValidationError::ParserJsonStringPathDiverges);
+                        }
+                    }
+                    Err(e) => result.add_error(ValidationError::ParserError(e)),
+                }
+
+                // Phase 2d: Typed-walk parity probes — synthesized multibyte
+                // variants and extracted <script> contents (pure Rust)
+                validate_typed_walk_parity(&mut result, &input, &parsed);
+            }
+            Err(e) => {
+                // One parse failure, one error — context-aware for
+                // svelte_divergence fixtures (matches the pre-merge phases)
+                if fixture.is_svelte_divergence() {
+                    result.add_error(ValidationError::ParserErrorInDivergence(e));
+                } else {
+                    result.add_error(ValidationError::ParserError(e));
+                }
+            }
+        }
 
         // Phase 3: Our Formatter validation - F1 (pure Rust)
         let format_ok = validate_formatter_idempotent(&mut result, fixture, &input);
@@ -624,7 +682,11 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
 }
 
 /// P2: Validate expected_ours.json matches our parser output
-fn validate_parser_ours(result: &mut FixtureValidation, fixture: &Fixture, input: &str) {
+fn validate_parser_ours(
+    result: &mut FixtureValidation,
+    fixture: &Fixture,
+    paths: &fixtures::InputAstPaths,
+) {
     let expected_ours_path = fixture.expected_ours_path();
     if !expected_ours_path.exists() {
         return;
@@ -640,22 +702,10 @@ fn validate_parser_ours(result: &mut FixtureValidation, fixture: &Fixture, input
         }
     };
 
-    match fixtures::parse_with_our_parser_to_string(input, &fixture.input_file) {
-        Ok(actual) => {
-            if actual != expected {
-                result.add_error(ValidationError::ParserExpectedOursOutdated);
-            } else {
-                result.add_success(ValidationSuccess::ParserExpectedOursMatches);
-            }
-        }
-        Err(e) => {
-            // Use context-aware error for svelte_divergence fixtures
-            if fixture.is_svelte_divergence() {
-                result.add_error(ValidationError::ParserErrorInDivergence(e));
-            } else {
-                result.add_error(ValidationError::ParserError(e));
-            }
-        }
+    if paths.ast_json_tabs == expected {
+        result.add_success(ValidationSuccess::ParserExpectedOursMatches);
+    } else {
+        result.add_error(ValidationError::ParserExpectedOursOutdated);
     }
 }
 
@@ -667,7 +717,7 @@ fn validate_parser_ours(result: &mut FixtureValidation, fixture: &Fixture, input
 fn validate_parser_ours_matches_expected(
     result: &mut FixtureValidation,
     fixture: &Fixture,
-    input: &str,
+    paths: &fixtures::InputAstPaths,
 ) {
     // Only for non-divergence fixtures that have expected.json but not expected_ours.json
     if fixture.expected_ours_path().exists() {
@@ -698,27 +748,41 @@ fn validate_parser_ours_matches_expected(
         }
     };
 
-    match fixtures::parse_with_our_parser_to_string(input, &fixture.input_file) {
-        Ok(actual_str) => {
-            let actual_json: serde_json::Value = match serde_json::from_str(&actual_str) {
-                Ok(v) => v,
-                Err(e) => {
-                    result.add_error(ValidationError::ParserError(format!(
-                        "Failed to parse our parser output as JSON: {e}"
-                    )));
-                    return;
-                }
-            };
+    // Semantic (Value) comparison — ignores key-order differences between
+    // our parser and the canonical parser
+    if paths.ast_json == expected_json {
+        result.add_success(ValidationSuccess::ParserOursMatchesExpected);
+    } else {
+        result.add_error(ValidationError::ParserOursDiffersFromExpected);
+    }
+}
 
-            if actual_json == expected_json {
-                result.add_success(ValidationSuccess::ParserOursMatchesExpected);
-            } else {
-                result.add_error(ValidationError::ParserOursDiffersFromExpected);
+/// Validate typed-walk parity on synthesized and extracted probes
+///
+/// The fixture's own content only exercises the typed offset-translation walk
+/// when it's multibyte standalone TS — a handful of files. These probes give
+/// every fixture's AST shapes typed-walk parity coverage: a synthesized
+/// multibyte variant for `.ts`/`.svelte.ts` inputs, and the extracted
+/// `<script>` contents (as-is when multibyte, plus a synthesized variant) for
+/// `.svelte` inputs. See `fixtures::typed_walk_parity_probes`.
+fn validate_typed_walk_parity(
+    result: &mut FixtureValidation,
+    input: &str,
+    parsed: &fixtures::ParsedInput,
+) {
+    let parity = fixtures::typed_walk_parity_probes(input, parsed);
+    for (probe, failure) in parity.failures {
+        match failure {
+            fixtures::TypedWalkParityFailure::Diverged => {
+                result.add_error(ValidationError::ParserTypedWalkParityDiverges(probe));
+            }
+            fixtures::TypedWalkParityFailure::Parse(e) => {
+                result.add_error(ValidationError::ParserTypedWalkProbeUnparseable(probe, e));
             }
         }
-        Err(e) => {
-            result.add_error(ValidationError::ParserError(e));
-        }
+    }
+    if parity.checked > 0 {
+        result.add_success(ValidationSuccess::ParserTypedWalkParityOk(parity.checked));
     }
 }
 

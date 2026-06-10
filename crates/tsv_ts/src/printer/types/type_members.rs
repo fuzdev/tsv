@@ -10,7 +10,7 @@
 use super::super::comments_in_range;
 use super::CommentSpacing;
 use super::Printer;
-use super::helpers::{intersection_has_expanding_first_type, intersection_has_huggable_last_type};
+use super::helpers::intersection_has_huggable_last_type;
 use crate::ast::internal::{self, TSType, TSTypeElement};
 use crate::printer::analysis::{find_char_skipping_comments, skip_identifier_at};
 use crate::printer::layout::hang_after_operator;
@@ -343,8 +343,11 @@ impl<'a> Printer<'a> {
             ));
             parts.push(self.build_type_doc(&idx.type_annotation.type_annotation));
         } else {
-            // No bracket-colon comment: use normal type annotation handling
-            match idx.type_annotation.type_annotation.as_ref() {
+            // No bracket-colon comment: use normal type annotation handling.
+            // Strip redundant comment-free parens so `($A | $B)` / `($A & $B)`
+            // value types get the same hanging layout as the bare form (prettier
+            // strips them too); other parenthesized types keep the `_` fall-through.
+            match self.unwrap_redundant_parens(idx.type_annotation.type_annotation.as_ref()) {
                 TSType::Union(u) => {
                     let type_doc = self.build_union_type_doc(u, false);
                     let comments_doc = self.build_comments_between(
@@ -356,7 +359,6 @@ impl<'a> Printer<'a> {
                     parts.push(hang_after_operator(d, d.concat(&[comments_doc, type_doc])));
                 }
                 TSType::Intersection(i) => {
-                    let type_doc = self.build_intersection_type_doc(i, false);
                     let comments_doc = self.build_comments_between(
                         val_colon_end,
                         val_type_start,
@@ -369,24 +371,17 @@ impl<'a> Printer<'a> {
                         // Keep the first type inline after `:` (prettier does too); the
                         // continuation is indented. `hang_after_operator` would instead
                         // break after `:` because the line comment's forced hardline
-                        // turns its leading `line` into a break. Mirrors the line-comment
-                        // branch of `build_intersection_type_annotation_doc`.
-                        let wrapped = if intersection_has_huggable_last_type(i)
-                            || intersection_has_expanding_first_type(i)
-                        {
-                            type_doc
-                        } else {
-                            d.group(d.indent(type_doc))
-                        };
+                        // turns its leading `line` into a break.
                         parts.push(d.text(": "));
                         parts.push(comments_doc);
-                        parts.push(wrapped);
+                        parts.push(self.intersection_hanging_with_indent(i));
                     } else if intersection_has_huggable_last_type(i) {
                         // No indent/line - keep `: Type & {` hugged
                         parts.push(d.text(": "));
                         parts.push(comments_doc);
-                        parts.push(type_doc);
+                        parts.push(self.build_intersection_type_doc(i, false));
                     } else {
+                        let type_doc = self.build_intersection_type_doc(i, false);
                         parts.push(d.text(":"));
                         parts.push(hang_after_operator(d, d.concat(&[comments_doc, type_doc])));
                     }

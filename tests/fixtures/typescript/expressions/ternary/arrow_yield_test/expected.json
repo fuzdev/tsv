@@ -1,0 +1,559 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 351,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Arrow in test position — needs parens (the arrow body would otherwise",
+			"start": 10,
+			"end": 82,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " absorb the ternary as `() => (1 ? x : y)`)",
+			"start": 84,
+			"end": 129,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Yield in test position — needs parens",
+			"start": 162,
+			"end": 202,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Short control — a non-arrow/yield test needs no parens",
+			"start": 258,
+			"end": 315,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 58
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 350,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 341,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 131,
+					"end": 159,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 29
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 137,
+							"end": 158,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 28
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 137,
+								"end": 138,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 141,
+								"end": 158,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 11
+									},
+									"end": {
+										"line": 4,
+										"column": 28
+									}
+								},
+								"test": {
+									"type": "ArrowFunctionExpression",
+									"start": 142,
+									"end": 149,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 12
+										},
+										"end": {
+											"line": 4,
+											"column": 19
+										}
+									},
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "Literal",
+										"start": 148,
+										"end": 149,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 18
+											},
+											"end": {
+												"line": 4,
+												"column": 19
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 153,
+									"end": 154,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 23
+										},
+										"end": {
+											"line": 4,
+											"column": 24
+										}
+									},
+									"name": "x"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 157,
+									"end": 158,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 27
+										},
+										"end": {
+											"line": 4,
+											"column": 28
+										}
+									},
+									"name": "y"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Arrow in test position — needs parens (the arrow body would otherwise",
+							"start": 10,
+							"end": 82
+						},
+						{
+							"type": "Line",
+							"value": " absorb the ternary as `() => (1 ? x : y)`)",
+							"start": 84,
+							"end": 129
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 204,
+					"end": 255,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 214,
+						"end": 217,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 11
+							},
+							"end": {
+								"line": 7,
+								"column": 14
+							}
+						},
+						"name": "gen"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 220,
+						"end": 255,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 17
+							},
+							"end": {
+								"line": 9,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "VariableDeclaration",
+								"start": 224,
+								"end": 252,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 30
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 230,
+										"end": 251,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 8
+											},
+											"end": {
+												"line": 8,
+												"column": 29
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 230,
+											"end": 231,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 8
+												},
+												"end": {
+													"line": 8,
+													"column": 9
+												}
+											},
+											"name": "b"
+										},
+										"init": {
+											"type": "ConditionalExpression",
+											"start": 234,
+											"end": 251,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 12
+												},
+												"end": {
+													"line": 8,
+													"column": 29
+												}
+											},
+											"test": {
+												"type": "YieldExpression",
+												"start": 235,
+												"end": 242,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 13
+													},
+													"end": {
+														"line": 8,
+														"column": 20
+													}
+												},
+												"delegate": false,
+												"argument": {
+													"type": "Literal",
+													"start": 241,
+													"end": 242,
+													"loc": {
+														"start": {
+															"line": 8,
+															"column": 19
+														},
+														"end": {
+															"line": 8,
+															"column": 20
+														}
+													},
+													"value": 1,
+													"raw": "1"
+												}
+											},
+											"consequent": {
+												"type": "Identifier",
+												"start": 246,
+												"end": 247,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 24
+													},
+													"end": {
+														"line": 8,
+														"column": 25
+													}
+												},
+												"name": "x"
+											},
+											"alternate": {
+												"type": "Identifier",
+												"start": 250,
+												"end": 251,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 28
+													},
+													"end": {
+														"line": 8,
+														"column": 29
+													}
+												},
+												"name": "y"
+											}
+										}
+									}
+								],
+								"kind": "const"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Yield in test position — needs parens",
+							"start": 162,
+							"end": 202
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 317,
+					"end": 340,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 24
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 323,
+							"end": 339,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 23
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 323,
+								"end": 324,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 327,
+								"end": 339,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 11
+									},
+									"end": {
+										"line": 12,
+										"column": 23
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 327,
+									"end": 331,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 11
+										},
+										"end": {
+											"line": 12,
+											"column": 15
+										}
+									},
+									"name": "cond"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 334,
+									"end": 335,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 18
+										},
+										"end": {
+											"line": 12,
+											"column": 19
+										}
+									},
+									"name": "x"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 338,
+									"end": 339,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 22
+										},
+										"end": {
+											"line": 12,
+											"column": 23
+										}
+									},
+									"name": "y"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Short control — a non-arrow/yield test needs no parens",
+							"start": 258,
+							"end": 315
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
