@@ -153,6 +153,8 @@ pub fn convert_ast_json(stylesheet: &CssStyleSheet, source: &str) -> serde_json:
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
 pub fn convert_ast_json_string(stylesheet: &CssStyleSheet, source: &str) -> String {
-    serde_json::to_string(&convert_ast_json(stylesheet, source))
-        .expect("Value serialization cannot fail")
+    let mut buf = Vec::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
+    serde_json::to_writer(&mut buf, &convert_ast_json(stylesheet, source))
+        .expect("Value serialization cannot fail");
+    String::from_utf8(buf).expect("serde_json emits valid UTF-8")
 }

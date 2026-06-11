@@ -35,6 +35,20 @@ const samples: Sample[] = [
 		type: 'Program',
 	},
 	{
+		name: 'ts_optional_and_predicate_methods',
+		source: [
+			'abstract class A {',
+			'	abstract m?(): void;',
+			'}',
+			'declare class C {',
+			'	isA?(x: unknown): x is A;',
+			'	g<T>(x: T): T;',
+			'}',
+		].join('\n'),
+		parser: 'typescript',
+		type: 'Program',
+	},
+	{
 		name: 'ts_function_class_import',
 		source: [
 			'import { foo } from "./bar";',

@@ -16,13 +16,14 @@ pub(crate) fn read_line_comment(source: &str, pos: &mut usize) -> Result<Token, 
 
     let mut content = String::new();
 
-    // Read until newline or EOF
+    // Read until line terminator or EOF — U+2028/U+2029 terminate line
+    // comments like LF/CR per the spec
     loop {
         let current_char = source[*pos..].chars().next();
         match current_char {
-            None | Some('\n') | Some('\r') => {
+            None | Some('\n' | '\r' | '\u{2028}' | '\u{2029}') => {
                 // End of line comment
-                // Don't consume the newline - it's whitespace for the next token
+                // Don't consume the line terminator - it's whitespace for the next token
                 break;
             }
             Some(ch) => {

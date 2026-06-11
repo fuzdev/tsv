@@ -155,7 +155,7 @@ impl<'a> SvelteParser<'a> {
             if name == "context"
                 && let Some(values) = &attr.value
                 && let Some(AttributeValue::Text(text)) = values.first()
-                && text.data == "module"
+                && text.data() == "module"
             {
                 return ScriptContext::Module;
             }

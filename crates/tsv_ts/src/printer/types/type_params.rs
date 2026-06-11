@@ -107,7 +107,7 @@ impl<'a> Printer<'a> {
                 inner_parts.extend(self.build_leading_comments_multiline(prev_end, param_start));
             }
 
-            inner_parts.push(self.build_type_parameter_doc(param));
+            inner_parts.push(self.build_type_parameter_doc(param, false));
 
             if !is_last {
                 let next_start = decl.params[i + 1].span.start;
@@ -186,7 +186,7 @@ impl<'a> Printer<'a> {
                     CommentSpacing::Trailing,
                     CommentFilter::BlockOnly,
                 ));
-                parts.push(self.build_type_parameter_doc(param));
+                parts.push(self.build_type_parameter_doc(param, false));
 
                 if i + 1 < decl.params.len() {
                     // Find comma between this param and next
@@ -239,7 +239,18 @@ impl<'a> Printer<'a> {
 
     /// Build doc for a single type parameter
     /// With optional modifiers: `const T`, `in T`, `out T`, `in out T`
-    pub(in crate::printer) fn build_type_parameter_doc(&self, param: &TSTypeParameter) -> DocId {
+    ///
+    /// `infer_constraint` is set only when this parameter is an `infer`'s type
+    /// parameter (`infer U extends C`). An infer is always nested in a
+    /// conditional's extends-type, so a *conditional* constraint must keep its
+    /// parens — without them the enclosing `? :` rebinds and the result fails to
+    /// parse. A regular `<T extends (A ? B : C)>` declaration strips them (the
+    /// `>` terminates it), so the flag is off there.
+    pub(in crate::printer) fn build_type_parameter_doc(
+        &self,
+        param: &TSTypeParameter,
+        infer_constraint: bool,
+    ) -> DocId {
         let d = self.d();
         let mut parts = Vec::new();
 
@@ -297,6 +308,7 @@ impl<'a> Printer<'a> {
                 value_search_end,
                 value_type,
                 GroupId::TypeParameterConstraint,
+                infer_constraint,
             );
             prev_end = constraint.span().end;
         }
@@ -324,6 +336,8 @@ impl<'a> Printer<'a> {
                 default.span().start,
                 default.as_ref(),
                 GroupId::TypeParameterDefault,
+                // a default value is never an infer constraint
+                false,
             );
             prev_end = default.span().end;
         }
@@ -352,11 +366,27 @@ impl<'a> Printer<'a> {
         value_start: u32,
         value_type: &TSType,
         group_id: GroupId,
+        infer_constraint: bool,
     ) {
         let d = self.d();
         // Strip redundant comment-free parens so `(A | B)` / `(A & B)` constraints
         // and defaults get the bare hanging layout (prettier strips them too).
         let value_type = self.unwrap_redundant_parens(value_type);
+        // An infer's *conditional* constraint is the exception: the parens are
+        // required (the enclosing conditional's `? :` rebinds without them), so
+        // re-add them around the stripped inner type. Prettier drops them,
+        // producing unparseable output — documented divergence.
+        if infer_constraint && matches!(value_type, TSType::Conditional(_)) {
+            let comments =
+                self.build_comments_between(keyword_end, value_start, CommentSpacing::Leading);
+            parts.push(d.concat(&[
+                d.text(" ("),
+                comments,
+                self.build_type_doc(value_type),
+                d.text(")"),
+            ]));
+            return;
+        }
         if self.has_line_comments_between(keyword_end, value_start) {
             // A line comment after the keyword forces the value onto its own line;
             // the shared helper keeps a same-line comment trailing the keyword

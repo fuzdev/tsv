@@ -1032,6 +1032,13 @@ impl<'a> Printer<'a> {
         let inline_comments = self.build_rhs_comments_opt(eq_pos + 1, rhs_start);
 
         let rhs_doc = self.build_expression_doc(&pattern.right);
+        let rhs_doc =
+            if super::super::needs_parens(&pattern.right, super::super::ParenContext::DefaultValue)
+            {
+                d.concat(&[d.text("("), rhs_doc, d.text(")")])
+            } else {
+                rhs_doc
+            };
         let value_doc = if let Some(comments_doc) = inline_comments {
             d.concat(&[comments_doc, rhs_doc])
         } else {

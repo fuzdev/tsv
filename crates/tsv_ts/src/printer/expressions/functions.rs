@@ -740,7 +740,7 @@ impl<'a> Printer<'a> {
         let param_docs: Vec<_> = decl
             .params
             .iter()
-            .map(|param| self.build_type_parameter_doc(param))
+            .map(|param| self.build_type_parameter_doc(param, false))
             .collect();
 
         // Svelte disambiguation: single param without constraint needs trailing comma

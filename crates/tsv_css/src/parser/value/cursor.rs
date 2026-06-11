@@ -3,8 +3,6 @@
 // Enables accurate span calculation for nested values (lists, function args)
 // by tracking byte position during parsing. This allows the printer to extract
 // from source and preserve formatting quirks like leading zeros.
-//
-// See: TODO_VALUE_CURSOR.md for implementation plan and design decisions.
 
 use tsv_lang::Span;
 

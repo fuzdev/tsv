@@ -39,7 +39,9 @@ tokio = { version = "1" }
 futures-util = "0.3"
 phf = { version = "0.13", features = ["macros"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["preserve_order"] }
+# float_roundtrip: exact f64 parsing so big literal values (e.g. integral
+# doubles beyond u64) survive the expected.json round-trip byte-faithfully
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 smallvec = "1.11"
 string-interner = "0.20"
 thiserror = "2"

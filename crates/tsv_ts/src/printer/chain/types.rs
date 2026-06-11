@@ -2,10 +2,16 @@
 //
 // This module defines the core data types used throughout chain formatting:
 // - ChainNode: Individual elements in a linearized chain
+// - ChainNodeVec: Stack-friendly buffer for a linearized chain
 // - ChainGroup: Groups of nodes that stay together on the same line
 
 use crate::ast::internal::{self, LiteralValue};
+use smallvec::SmallVec;
 use string_interner::DefaultSymbol;
+
+/// Buffer for a linearized chain — chains are measured-short, so small chains
+/// (the common case) stay on the stack. `ChainNode` is `Copy` and ~24 bytes.
+pub type ChainNodeVec<'a> = SmallVec<[ChainNode<'a>; 8]>;
 
 /// A node in a linearized chain
 ///
@@ -196,14 +202,19 @@ impl<'a> ChainNode<'a> {
 }
 
 /// A group of chain nodes that stay on the same line
+///
+/// Groups are measured-short, so the nodes buffer holds up to 4 entries inline
+/// without heap allocation.
 #[derive(Debug, Clone)]
 pub struct ChainGroup<'a> {
-    pub nodes: Vec<ChainNode<'a>>,
+    pub nodes: SmallVec<[ChainNode<'a>; 4]>,
 }
 
 impl<'a> ChainGroup<'a> {
     pub fn new() -> Self {
-        Self { nodes: Vec::new() }
+        Self {
+            nodes: SmallVec::new(),
+        }
     }
 
     pub fn push(&mut self, node: ChainNode<'a>) {

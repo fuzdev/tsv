@@ -3,6 +3,8 @@
 // Internal representation optimized for manipulation and formatting.
 // Uses string interning for efficient storage and comparison of identifiers.
 
+use std::borrow::Cow;
+
 use string_interner::DefaultSymbol;
 use tsv_css::ast::internal::CssStyleSheet;
 pub use tsv_lang::{Comment, SharedInterner, Span};
@@ -732,14 +734,10 @@ pub enum AttributeValue {
 /// Represents static text in the template or attribute values.
 /// In attribute values, this represents the unquoted string content.
 ///
-/// The `raw` field contains the original text with HTML entities (`&lt;`, `&#65;`),
-/// while `data` contains the decoded text (`<`, `A`). Both fields are necessary:
-/// - `raw` preserves the original source for accurate formatting/roundtrips
-/// - `data` provides the decoded text for rendering and semantic analysis
-///
-/// TODO(performance): Text nodes store duplicate data (raw + data fields).
-/// When raw has no entities, both fields are identical (~50% memory waste).
-/// Possible optimization: store only raw, compute data on-demand when entities present.
+/// Stores only `raw` (the original text with HTML entities: `&lt;`, `&#65;`);
+/// the decoded form (`<`, `A`) is computed lazily via `Text::data`. The vast
+/// majority of real-world text nodes contain no entities, so `data()` borrows
+/// `raw` without allocating on that fast path.
 ///
 /// TODO(performance): Printer repeatedly calls is_whitespace_only() on text nodes in
 /// hot loops (multiline children, inline run detection). Could cache this as a bool field
@@ -747,9 +745,46 @@ pub enum AttributeValue {
 /// node vs repeated string scans. Profile before optimizing.
 #[derive(Debug, Clone)]
 pub struct Text {
-    pub raw: String,  // Raw text with HTML entities: "&lt;", "&#65;"
-    pub data: String, // Decoded text: "<", "A"
+    pub raw: String, // Raw text with HTML entities: "&lt;", "&#65;"
+    /// Which entity decode `data()` applies, fixed at parse time by context.
+    pub decoding: TextDecoding,
     pub span: Span,
+}
+
+/// Entity-decode context for a `Text` node, mirroring the decode the canonical
+/// Svelte parser applies when it materializes `data` from `raw`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextDecoding {
+    /// Fragment/template text — decode with text-content rules.
+    Fragment,
+    /// Quoted attribute value — decode with attribute-context rules
+    /// (stricter semicolon handling for named entities).
+    AttributeValue,
+    /// No decode — `data` is identical to `raw` (raw-content element text;
+    /// also unquoted attribute values, see the TODO at the construction site).
+    Raw,
+}
+
+impl Text {
+    /// Decoded text (`&lt;` → `<`, `&#65;` → `A`), computed lazily from `raw`.
+    ///
+    /// Borrows `raw` when no `&` is present (no entity possible, decode is
+    /// identity) or when the node's context applies no decode.
+    pub fn data(&self) -> Cow<'_, str> {
+        let is_attribute_value = match self.decoding {
+            TextDecoding::Raw => return Cow::Borrowed(&self.raw),
+            TextDecoding::Fragment => false,
+            TextDecoding::AttributeValue => true,
+        };
+        if self.raw.contains('&') {
+            Cow::Owned(tsv_html::decode_character_references(
+                &self.raw,
+                is_attribute_value,
+            ))
+        } else {
+            Cow::Borrowed(&self.raw)
+        }
+    }
 }
 
 /// Svelte ExpressionTag - {expression} in template

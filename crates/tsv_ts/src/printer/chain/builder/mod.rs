@@ -120,15 +120,12 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
         return print_group(&groups[0], printer);
     }
 
-    // Collect all call nodes in the chain for the 3+ calls rule
-    let call_nodes: Vec<&ChainNode<'a>> = groups
+    // Check force expansion early — iterate lazily, the common short-chain path
+    // must not materialize a call-node Vec
+    let has_calls = groups
         .iter()
         .flat_map(|g| g.nodes.iter())
-        .filter(|n| n.is_call())
-        .collect();
-
-    // Check force expansion early
-    let has_calls = !call_nodes.is_empty();
+        .any(ChainNode::is_call);
 
     // Prettier's logic (member-chain.js:351-359):
     // If groups.length <= cutoff && !nodeHasComment:
@@ -201,7 +198,7 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
     }
 
     // Long chains: force expand conditions (Prettier member-chain.js:400-407)
-    let force_expand = has_calls && should_force_chain_expand(groups, &call_nodes, printer);
+    let force_expand = has_calls && should_force_chain_expand(groups, printer);
     build_long_chain_doc(
         groups,
         first_groups,
@@ -213,11 +210,15 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
 }
 
 /// Check if chain expansion should be forced
-fn should_force_chain_expand<'a, P: ChainPrinter>(
-    groups: &[ChainGroup<'a>],
-    call_nodes: &[&ChainNode<'a>],
-    printer: &P,
-) -> bool {
+fn should_force_chain_expand<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> bool {
+    // Iterate call nodes in place — no materialized Vec
+    let call_nodes = || {
+        groups
+            .iter()
+            .flat_map(|g| g.nodes.iter())
+            .filter(|n| n.is_call())
+    };
+
     // Prettier's chain expansion rules (member-chain.js:400-408):
     // 1. Blank lines BETWEEN methods (not just before first) force expansion
     // 2. 3+ calls with complex args force expansion
@@ -225,18 +226,19 @@ fn should_force_chain_expand<'a, P: ChainPrinter>(
     // 4. Inside template expressions with original breaks force expansion
     let has_blank_lines_between = has_blank_lines_between_methods(groups, printer);
 
-    // Single pass: count callbacks and check if any breaks
+    // Single pass: count calls and callbacks, and check if any callback breaks
     let line_breaks = printer.get_line_breaks();
-    let (calls_with_callbacks, any_callback_breaks) =
-        call_nodes
-            .iter()
-            .fold((0usize, false), |(count, any_breaks), node| {
-                let status = call_callback_status(node, line_breaks);
-                (
-                    count + usize::from(status.has_callback),
-                    any_breaks || status.will_break,
-                )
-            });
+    let (call_count, calls_with_callbacks, any_callback_breaks) = call_nodes().fold(
+        (0usize, 0usize, false),
+        |(calls, count, any_breaks), node| {
+            let status = call_callback_status(node, line_breaks);
+            (
+                calls + 1,
+                count + usize::from(status.has_callback),
+                any_breaks || status.will_break,
+            )
+        },
+    );
 
     // Comments between chain segments force expansion, EXCEPT for comments before
     // trailing members (which are handled specially by add_group_no_break)
@@ -244,7 +246,7 @@ fn should_force_chain_expand<'a, P: ChainPrinter>(
 
     has_blank_lines_between
         || has_forcing_comments
-        || (call_nodes.len() > 2 && call_nodes.iter().any(|n| call_has_complex_args(n)))
+        || (call_count > 2 && call_nodes().any(call_has_complex_args))
         || (calls_with_callbacks >= 2 && any_callback_breaks)
         || printer.should_force_expand()
 }
@@ -392,6 +394,10 @@ fn is_base_call_then_only_members<'a, P: ChainPrinter>(
     rest_groups: &[ChainGroup<'a>],
     printer: &P,
 ) -> bool {
+    // TODO: this collect (and the twin in build_base_call_then_members_doc) runs on
+    // every short chain with rest groups — same materialized-Vec shape the
+    // call_nodes collect in build_chain_doc avoided; could iterate lazily or share
+    // one SmallVec between predicate and builder
     let all_nodes: Vec<&ChainNode<'a>> = first_groups
         .iter()
         .chain(rest_groups.iter())

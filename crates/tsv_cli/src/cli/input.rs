@@ -42,6 +42,16 @@ pub enum ParserType {
 }
 
 impl ParserType {
+    /// Canonical lowercase name — the `--parser` value and the
+    /// `tsv_debug` sidecar tool key.
+    pub const fn name(self) -> &'static str {
+        match self {
+            ParserType::Svelte => "svelte",
+            ParserType::TypeScript => "typescript",
+            ParserType::Css => "css",
+        }
+    }
+
     pub fn from_extension(path: &str) -> Self {
         if path.ends_with(".svelte") {
             ParserType::Svelte

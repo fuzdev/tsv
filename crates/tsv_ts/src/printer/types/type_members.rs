@@ -184,6 +184,15 @@ impl<'a> Printer<'a> {
                 let mut parts = vec![d.text("new ")];
                 // Print type parameters if present: `<T>` or `<T, U>`
                 if let Some(type_params) = &ctor.type_parameters {
+                    // Comments between `new` and `<T>`: `new /* c */ <T>(...)`
+                    let new_end = ctor.span.start + 3;
+                    if let Some(doc) = self.build_name_to_type_params_comments_opt(
+                        new_end,
+                        type_params.span.start,
+                        CommentSpacing::Trailing,
+                    ) {
+                        parts.push(doc);
+                    }
                     parts.push(self.build_type_parameter_declaration_doc(type_params));
                 }
 
@@ -205,6 +214,24 @@ impl<'a> Printer<'a> {
                     (ctor.type_parameters.as_ref().map(|t| t.span.end), paren_pos)
                 {
                     self.append_type_params_to_paren_comments(&mut parts, tp, pp);
+                }
+
+                // Without type params, comments between `new` and `(` stay in
+                // place: `new /* c */ (a: number)` (prettier relocates them
+                // into the parens). The "new " text already carries the
+                // leading space, so blocks get only a trailing space and line
+                // comments a hardline.
+                if ctor.type_parameters.is_none()
+                    && let Some(pp) = paren_pos
+                {
+                    for comment in comments_in_range(self.comments, ctor.span.start + 3, pp) {
+                        parts.push(self.build_comment_doc(comment));
+                        if comment.is_block {
+                            parts.push(d.text(" "));
+                        } else {
+                            parts.push(d.hardline());
+                        }
+                    }
                 }
 
                 parts.push(self.build_signature_params_doc(&ctor.params, paren_pos));

@@ -94,7 +94,20 @@ pub(super) fn convert_style_directive(
         internal::StyleDirectiveValue::True => serde_json::Value::Bool(true),
         internal::StyleDirectiveValue::ExpressionTag(tag) => {
             let expr_tag = convert_expression_tag(tag, source, loc, interner);
-            to_json_value(&expr_tag)
+            // A quoted expression (`style:color="{expr}"`) serializes as an array like
+            // any quoted sequence; only the bare form (`style:color={expr}`) is a plain
+            // object. The byte before the tag's `{` discriminates (matching Svelte).
+            let quoted = matches!(
+                (tag.span.start as usize)
+                    .checked_sub(1)
+                    .and_then(|i| source.as_bytes().get(i)),
+                Some(b'"' | b'\'')
+            );
+            if quoted {
+                to_json_value(&vec![expr_tag])
+            } else {
+                to_json_value(&expr_tag)
+            }
         }
         internal::StyleDirectiveValue::Parts(parts) => {
             let converted: Vec<_> = parts

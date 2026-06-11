@@ -136,19 +136,30 @@ pub(in crate::ast) fn convert_call_expression(
     offset: usize,
     in_chain: bool,
 ) -> public::CallExpression {
+    let mut callee =
+        convert_expression_inner(&call.callee, source, loc, interner, offset, in_chain);
+    // acorn-typescript's `?.<T>(...)` path marks the callee node itself optional
+    // (its parseSubscript sets `base.optional = true` before parsing the type args)
+    if call.optional && call.type_arguments.is_some() {
+        match &mut callee {
+            public::Expression::Identifier(id) => id.optional = true,
+            public::Expression::MemberExpression(member) => member.optional = Some(true),
+            public::Expression::CallExpression(inner) => inner.optional = Some(true),
+            _ => {}
+        }
+    }
+    // acorn-typescript omits `optional` on a typeArguments call unless the call is
+    // part of an optional chain (parseSubscript only sets it when `_optionalChained`);
+    // the chain test is the call's own left segment, so a trailing `?.` after the
+    // call (`a.fn<T>()?.b`) doesn't count, and parens seal the segment
+    let in_optional_chain = call.optional
+        || (call.span.start >= call.callee.span().start && call.callee.has_optional_in_chain());
     public::CallExpression {
         node_type: "CallExpression".to_string(),
         start: call.span.start,
         end: call.span.end,
         loc: create_location(call.span, loc, offset),
-        callee: Box::new(convert_expression_inner(
-            &call.callee,
-            source,
-            loc,
-            interner,
-            offset,
-            in_chain,
-        )),
+        callee: Box::new(callee),
         type_arguments: call
             .type_arguments
             .as_ref()
@@ -158,8 +169,7 @@ pub(in crate::ast) fn convert_call_expression(
             .iter()
             .map(|arg| convert_expression(arg, source, loc, interner, offset))
             .collect(),
-        // acorn-typescript omits `optional` when typeArguments is present
-        optional: if call.type_arguments.is_some() {
+        optional: if call.type_arguments.is_some() && !in_optional_chain {
             None
         } else {
             Some(call.optional)

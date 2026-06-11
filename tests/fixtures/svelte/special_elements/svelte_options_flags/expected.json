@@ -1,0 +1,166 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 93,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 79,
+				"end": 81,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 81,
+				"end": 92,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 82
+					},
+					"end": {
+						"line": 3,
+						"column": 2,
+						"character": 83
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 84,
+							"end": 88,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": {
+		"start": 0,
+		"end": 79,
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 16,
+				"end": 32,
+				"name": "immutable",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 16,
+						"character": 16
+					},
+					"end": {
+						"line": 1,
+						"column": 25,
+						"character": 25
+					}
+				},
+				"value": {
+					"type": "ExpressionTag",
+					"start": 26,
+					"end": 32,
+					"expression": {
+						"type": "Literal",
+						"start": 27,
+						"end": 31,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 27
+							},
+							"end": {
+								"line": 1,
+								"column": 31
+							}
+						},
+						"value": true,
+						"raw": "true"
+					}
+				}
+			},
+			{
+				"type": "Attribute",
+				"start": 33,
+				"end": 47,
+				"name": "css",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 33,
+						"character": 33
+					},
+					"end": {
+						"line": 1,
+						"column": 36,
+						"character": 36
+					}
+				},
+				"value": [
+					{
+						"start": 38,
+						"end": 46,
+						"type": "Text",
+						"raw": "injected",
+						"data": "injected"
+					}
+				]
+			},
+			{
+				"type": "Attribute",
+				"start": 48,
+				"end": 57,
+				"name": "accessors",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 48,
+						"character": 48
+					},
+					"end": {
+						"line": 1,
+						"column": 57,
+						"character": 57
+					}
+				},
+				"value": true
+			},
+			{
+				"type": "Attribute",
+				"start": 58,
+				"end": 76,
+				"name": "preserveWhitespace",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 58,
+						"character": 58
+					},
+					"end": {
+						"line": 1,
+						"column": 76,
+						"character": 76
+					}
+				},
+				"value": true
+			}
+		],
+		"immutable": true,
+		"css": "injected",
+		"accessors": true,
+		"preserveWhitespace": true
+	},
+	"comments": []
+}

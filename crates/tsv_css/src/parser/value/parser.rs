@@ -2,8 +2,6 @@
 //
 // Maintains ONE source string throughout entire parse tree to avoid position drift.
 // Tracks (start, end) ranges within that source instead of creating substrings.
-//
-// See: TODO_VALUE_PARSER.md for architecture and design decisions.
 
 use crate::ast::internal::CssValue;
 use crate::parser::value::cursor::ValueCursor;

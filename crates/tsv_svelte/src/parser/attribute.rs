@@ -200,8 +200,10 @@ impl<'a> SvelteParser<'a> {
         };
 
         // Calculate end position
+        // For the quoted mustache form ("{expr}") the tag span ends at `}` but the
+        // directive includes the closing quote (matching Svelte)
         let end = if let Some(tag_span) = &expression_tag_span {
-            tag_span.end as usize
+            self.end_past_optional_quote(tag_span.end as usize)
         } else {
             name_end
         };
@@ -477,7 +479,7 @@ impl<'a> SvelteParser<'a> {
         }
 
         // Calculate the offset of the expression in the source
-        let expr_offset = content_start + content.find(expr_str).unwrap_or(0);
+        let expr_offset = content_start + super::subslice_offset(content, expr_str);
 
         // Parse the expression using the TypeScript parser
         let expression = self.parse_ts_expression(expr_str, expr_offset)?;
@@ -769,10 +771,9 @@ impl<'a> SvelteParser<'a> {
         // For script/style tag attributes, don't parse expressions - treat as literal text
         if !parse_expressions {
             let text_content = self.source[content_start..content_end].to_string();
-            let decoded = tsv_html::decode_character_references(&text_content, true);
             parts.push(AttributeValue::Text(Text {
                 raw: text_content,
-                data: decoded,
+                decoding: TextDecoding::AttributeValue,
                 span: Span {
                     start: content_start as u32,
                     end: content_end as u32,
@@ -796,10 +797,9 @@ impl<'a> SvelteParser<'a> {
             // If we found text before the expression tag (or we're at the end), create a text part
             if pos > text_start {
                 let text_content = self.source[text_start..pos].to_string();
-                let decoded = tsv_html::decode_character_references(&text_content, true);
                 parts.push(AttributeValue::Text(Text {
                     raw: text_content,
-                    data: decoded,
+                    decoding: TextDecoding::AttributeValue,
                     span: Span {
                         start: text_start as u32,
                         end: pos as u32,
@@ -904,7 +904,7 @@ impl<'a> SvelteParser<'a> {
         if parts.is_empty() {
             parts.push(AttributeValue::Text(Text {
                 raw: String::new(),
-                data: String::new(),
+                decoding: TextDecoding::AttributeValue,
                 span: Span {
                     start: content_start as u32,
                     end: content_end as u32,
@@ -940,10 +940,14 @@ impl<'a> SvelteParser<'a> {
             return Err(self.error_msg("Expected attribute value"));
         }
 
+        // TODO: Svelte decodes unquoted attribute values with attribute-context
+        // rules (element.js read_attribute_value decodes the unquoted match too);
+        // tsv has never decoded here, so `data` keeps entities (e.g. `a&amp;b`).
+        // Latent public-AST divergence, unpinned by any fixture — fix fixture-first.
         let text_content = self.source[start..pos].to_string();
         let text = Text {
-            raw: text_content.clone(),
-            data: text_content,
+            raw: text_content,
+            decoding: TextDecoding::Raw,
             span: Span {
                 start: start as u32,
                 end: pos as u32,

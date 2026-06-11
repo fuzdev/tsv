@@ -12,11 +12,8 @@ use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{ClassifiedComments, Comment};
 
 impl<'a> SymbolLookup for Printer<'a> {
-    fn lookup(&self, symbol: DefaultSymbol) -> Option<String> {
-        self.interner
-            .borrow()
-            .resolve(symbol)
-            .map(ToString::to_string)
+    fn with_name<R>(&self, symbol: DefaultSymbol, f: impl FnOnce(&str) -> R) -> Option<R> {
+        self.interner.borrow().resolve(symbol).map(f)
     }
 }
 

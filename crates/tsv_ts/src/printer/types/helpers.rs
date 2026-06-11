@@ -251,11 +251,44 @@ pub(super) fn type_needs_parens_for_conditional_check(ts_type: &TSType) -> bool 
 }
 
 /// Check if a type needs parentheses when used as the extends type of a conditional
-/// (`T extends U ? ...`). A nested conditional keeps its parens
-/// (`A extends (B extends C ? D : E) ? ...`); without them the trailing `? :` rebinds.
+/// (`T extends U ? ...`). Two cases keep their parens; without them the trailing
+/// `? :` rebinds or the canonical parser rejects the form:
+/// - a nested conditional (`A extends (B extends C ? D : E) ? ...`);
+/// - a function/constructor type whose return type — unwrapping a `p is X` type
+///   predicate — is a *constrained* infer (`M extends (() => infer U extends C) ? ...`,
+///   `M extends ((x) => x is infer U extends C) ? ...`). The infer's `extends C` and
+///   the conditional's `?` are otherwise ambiguous. A bare `infer U` return (no
+///   constraint) and ordinary return types strip.
+///
 /// Matches Prettier's `extendsType` rule (`needs-parentheses.js`).
 pub(super) fn type_needs_parens_for_conditional_extends(ts_type: &TSType) -> bool {
-    matches!(unwrap_parenthesized(ts_type), TSType::Conditional(_))
+    match unwrap_parenthesized(ts_type) {
+        TSType::Conditional(_) => true,
+        TSType::Function(f) => return_type_is_constrained_infer(&f.return_type),
+        TSType::Constructor(c) => return_type_is_constrained_infer(&c.return_type),
+        _ => false,
+    }
+}
+
+/// True when a function/constructor return type — descending through a `p is X`
+/// type predicate and through further nested function/constructor returns — is a
+/// `TSInferType` carrying an `extends` constraint. The nesting matters:
+/// `() => () => infer U extends C` trails the same trailing-`?` ambiguity through
+/// every arrow, so the outermost function type still needs parens.
+fn return_type_is_constrained_infer(return_type: &internal::TSTypeAnnotation) -> bool {
+    let mut ty = return_type.type_annotation.as_ref();
+    if let TSType::TypePredicate(pred) = ty {
+        match pred.type_annotation.as_deref() {
+            Some(inner) => ty = inner,
+            None => return false,
+        }
+    }
+    match ty {
+        TSType::Infer(i) => i.type_parameter.constraint.is_some(),
+        TSType::Function(f) => return_type_is_constrained_infer(&f.return_type),
+        TSType::Constructor(c) => return_type_is_constrained_infer(&c.return_type),
+        _ => false,
+    }
 }
 
 /// Check if a type needs parentheses when used as the operand of a prefix type operator

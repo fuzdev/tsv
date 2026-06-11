@@ -256,8 +256,21 @@ pub(super) fn is_function_type_start(bytes: &[u8], pos: usize) -> bool {
     // `(identifier:` or `(identifier?:` → function type parameter
     if is_identifier_start(bytes[after_paren]) {
         let after_id = skip_whitespace_and_comments(bytes, skip_identifier(bytes, after_paren));
-        if after_id < bytes.len() && matches!(bytes[after_id], b':' | b'?') {
-            return true;
+        if after_id < bytes.len() {
+            match bytes[after_id] {
+                // `(b: T)` typed parameter
+                b':' => return true,
+                // `(b?: T)` optional parameter — the `?` must be followed by `:`.
+                // Otherwise it's a ternary operand `(b ? c : d)`, i.e. a comparison
+                // `x < (b ? c : d)`, not a function type.
+                b'?' => {
+                    let after_q = skip_whitespace_and_comments(bytes, after_id + 1);
+                    if after_q < bytes.len() && bytes[after_q] == b':' {
+                        return true;
+                    }
+                }
+                _ => {}
+            }
         }
     }
 
@@ -295,7 +308,12 @@ pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], mut pos: usize) -> bo
     while pos < bytes.len() {
         match bytes[pos] {
             b'<' if is_less_equal_op(bytes, pos) => pos += 1,
-            b'<' => angle_depth += 1,
+            // Angle depth only tracks at delimiter depth 0 — `<`/`>` inside a
+            // balanced `(…)`, `[…]`, or `{…}` (e.g. `<[T<A>]>`) pair up within
+            // that delimiter and must not leak into the outer angle count.
+            b'<' if paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 => {
+                angle_depth += 1;
+            }
             b'>' if paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 => {
                 if is_arrow_close(bytes, pos) {
                     // `=>` arrow operator, not a closing angle bracket
@@ -304,11 +322,21 @@ pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], mut pos: usize) -> bo
                 } else {
                     angle_depth -= 1;
                     if angle_depth == 0 {
-                        // After closing `>` in type args, the next token is never
-                        // a bare identifier (it would be `(`, `.`, `[`, `,`, etc.).
-                        // An identifier means this `>` is a comparison operator.
+                        // After closing `>` in type args, the next token is `(`
+                        // (a call), a template literal (a tagged template), or a
+                        // non-expression token (`;`, `,`, `)`, an operator…).
+                        // Any other expression-starting token — identifier,
+                        // number, string, `[`, `{`, or a prefix operator — means
+                        // this `>` is a comparison operator instead — but only
+                        // on the same line: across a line break the token starts
+                        // a new statement via ASI and the `<…>` is an
+                        // instantiation (acorn bails to relational on
+                        // `tokenCanStartExpression && !hasPrecedingLineBreak`).
                         let after = skip_whitespace_and_comments(bytes, pos + 1);
-                        if after < bytes.len() && is_identifier_start(bytes[after]) {
+                        if after < bytes.len()
+                            && starts_expression_after_type_args(bytes, after)
+                            && !has_line_terminator_between(bytes, pos + 1, after)
+                        {
                             return false;
                         }
                         return true;
@@ -336,7 +364,9 @@ pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], mut pos: usize) -> bo
                     return false; // Unbalanced - hit block end
                 }
             }
-            b';' => return false, // Statement end
+            // Statement end — but only at the top level. Inside a balanced `{…}` a `;`
+            // is an object-type member separator (`<{ a: number; b: string }>`).
+            b';' if paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 => return false,
             // Skip comments to avoid false matches on `>` inside them
             b'/' if pos + 1 < bytes.len() => match bytes[pos + 1] {
                 b'/' => {
@@ -353,6 +383,41 @@ pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], mut pos: usize) -> bo
             b'"' | b'\'' | b'`' => {
                 pos = skip_string_literal(bytes, pos);
                 continue;
+            }
+            _ => {}
+        }
+        pos += 1;
+    }
+    false
+}
+
+/// Whether the token starting at `pos` can begin an expression and therefore
+/// turns a would-be type-argument `<…>` into a relational chain (acorn's
+/// `tokenCanStartExpression` bail): identifier (covers keyword operands like
+/// `typeof`), numeric literal (including `.5`), string, `[`, `{`, or a prefix
+/// operator. `(` (call) and `` ` `` (tagged template) continue the
+/// instantiation instead and are deliberately excluded; regex is excluded
+/// because acorn also rejects `x < y > /a/`.
+fn starts_expression_after_type_args(bytes: &[u8], pos: usize) -> bool {
+    let b = bytes[pos];
+    is_identifier_start(b)
+        || b.is_ascii_digit()
+        || matches!(b, b'\'' | b'"' | b'[' | b'{' | b'!' | b'~' | b'+' | b'-')
+        || (b == b'.' && pos + 1 < bytes.len() && bytes[pos + 1].is_ascii_digit())
+}
+
+/// Whether the byte range contains an ECMAScript line terminator (LF, CR,
+/// U+2028, U+2029 — the latter two as UTF-8 `e2 80 a8`/`a9`).
+fn has_line_terminator_between(bytes: &[u8], from: usize, to: usize) -> bool {
+    let mut pos = from;
+    while pos < to && pos < bytes.len() {
+        match bytes[pos] {
+            b'\n' | b'\r' => return true,
+            0xe2 if pos + 2 < bytes.len()
+                && bytes[pos + 1] == 0x80
+                && (bytes[pos + 2] == 0xa8 || bytes[pos + 2] == 0xa9) =>
+            {
+                return true;
             }
             _ => {}
         }

@@ -510,6 +510,16 @@ impl<'a> Parser<'a> {
             _ => self.parse_primary_expression_with_end()?,
         };
 
+        // An unparenthesized arrow function is a complete AssignmentExpression —
+        // no subscripts can follow (`() => {}()` is invalid JS; a `(` on the next
+        // line starts a new statement via ASI). A parenthesized arrow
+        // (`(() => {})()`, detected by the span gap) is a callable primary.
+        if matches!(parsed.expr, Expression::ArrowFunctionExpression(_))
+            && parsed.actual_start == parsed.expr.span().start_usize()
+        {
+            return Ok(parsed);
+        }
+
         // Parse any postfix operations (member access, call expressions)
         self.parse_postfix_expression(parsed)
     }
@@ -685,6 +695,31 @@ impl<'a> Parser<'a> {
                                 Expression::CallExpression(CallExpression {
                                     callee: Box::new(left.expr),
                                     type_arguments: None,
+                                    arguments,
+                                    optional: true,
+                                    span,
+                                }),
+                                paren_end,
+                            );
+                        }
+                        TokenKind::LessThan if self.is_type_arguments_start() => {
+                            // obj?.<T>(args) - optional call with explicit type arguments;
+                            // only a call may follow (`a?.<T>` without `(` is a syntax error)
+                            let type_args = self.parse_type_parameter_instantiation()?;
+                            if *self.current_kind() != TokenKind::ParenOpen {
+                                return Err(self.error_expected_after(
+                                    "'('",
+                                    "type arguments in optional call",
+                                ));
+                            }
+                            self.advance()?; // consume '('
+                            let (arguments, paren_end) = self.parse_call_arguments()?;
+
+                            let span = Span::new(left.actual_start as u32, paren_end as u32);
+                            left = ParsedExpr::with_end(
+                                Expression::CallExpression(CallExpression {
+                                    callee: Box::new(left.expr),
+                                    type_arguments: Some(type_args),
                                     arguments,
                                     optional: true,
                                     span,
@@ -980,15 +1015,20 @@ impl<'a> Parser<'a> {
                 let decoded = regex_token.decoded.as_deref().unwrap_or("\0");
                 let (pattern, flags) = decoded.split_once('\0').unwrap_or((decoded, ""));
 
-                // Advance past the regex token by reading the next token
-                // We need to update parser state manually since lexer was resynced by read_regex_literal
+                // Advance past the regex token by reading the next token. The regex relex
+                // bypasses advance_inner() (the lexer was resynced by read_regex_literal), so
+                // mirror the bookkeeping we need by hand: record the regex token's end as
+                // prev_end (so prev_token_end() covers the regex — object Property/SpreadElement
+                // spans read it), set the current token, refresh the ASI line-terminator flag,
+                // and absorb any comments that land right after the regex (`{a: /re/ /*c*/}`) the
+                // same way advance_inner() does — without this the comment stays as the current
+                // token and the next consumer rejects it.
+                self.prev_end = lexer_end;
                 let next_token = self.lexer.next_token()?;
-                self.current_kind = next_token.kind;
-                self.current_start = next_token.start;
-                self.current_end = next_token.end;
-                self.current_decoded = next_token.decoded;
+                self.update_current(next_token);
                 // Update ASI state - line terminators after regex enable semicolon insertion
                 self.had_line_terminator = self.lexer.had_line_terminator();
+                self.collect_comments()?;
 
                 Ok(ParsedExpr::with_end(
                     Expression::RegexLiteral(RegexLiteral {
@@ -1251,7 +1291,10 @@ impl<'a> Parser<'a> {
                         return false;
                     }
                 }
-                true
+                // A keyword can also be a value (`null`, `true`, `undefined`, or a variable
+                // named `string`, etc.), so `x < null` is a comparison. Confirm a closing
+                // `>` follows before committing to type arguments.
+                scan_for_closing_angle_bracket(bytes, pos)
             }
 
             // Identifier: type reference like `<T>` or `<Ns.Type>`
@@ -1262,12 +1305,17 @@ impl<'a> Parser<'a> {
             // Function type: `<(x: T) => R>` or `<() => R>`
             b'(' => is_function_type_start(bytes, pos),
 
-            // Object type `{`, tuple type `[`, string/template literal types
-            b'{' | b'[' | b'\'' | b'"' | b'`' => true,
+            // Object/tuple/string/template literal types — but the same tokens start
+            // object, array, string, and template *value* literals, so `x < 'b'` and
+            // `x < {a: 1}` are comparisons. Confirm a closing `>` follows (the scan skips
+            // string contents and balances braces/brackets) before committing to type args.
+            b'{' | b'[' | b'\'' | b'"' | b'`' => scan_for_closing_angle_bracket(bytes, pos),
 
-            // Numeric literal types: `<42>`, `<-1>`
-            // Must check what follows the number to distinguish from `x < 42`
-            b'0'..=b'9' | b'-' => self.check_numeric_type_arg_pattern(bytes, pos),
+            // Numeric literal types: `<42>`, `<-1>` — but `x < 42` is a comparison, so
+            // confirm a closing `>` follows. The scan treats every numeric-literal byte
+            // (digits, `.`, hex/exponent chars, `_`, `n`) as neutral, gliding over the
+            // whole literal to its follow-token.
+            b'0'..=b'9' | b'-' => scan_for_closing_angle_bracket(bytes, pos),
 
             // Not a recognized type argument start
             _ => false,
@@ -1304,16 +1352,15 @@ impl<'a> Parser<'a> {
         }
 
         match bytes[pos] {
-            // Definitely type args
-            b'>' | b'<' => true,
-
-            // `||` and `&&` are logical operators, NOT type operators
+            // `||` and `&&` are logical operators, NOT type operators (`a || b`, not args)
             b'|' | b'&' if pos + 1 < bytes.len() && bytes[pos + 1] == bytes[pos] => false,
 
-            // Union/intersection/comma: scan for matching `>` to confirm
-            b',' | b'|' | b'&' => {
-                scan_for_closing_angle_bracket(bytes, skip_whitespace_and_comments(bytes, pos + 1))
-            }
+            // After the (qualified) type name: `>` closes the list, `<` opens a nested
+            // one (`<A<B>>`), and `,` `|` `&` separate args. Each is confirmed by scanning
+            // for the matching `>` — which rejects a trailing identifier, so `a < b > c`
+            // and `a < b < c` stay comparisons. (`,` `|` `&` are neutral to the scan, so
+            // starting at `pos` is equivalent to starting past the separator.)
+            b'>' | b'<' | b',' | b'|' | b'&' => scan_for_closing_angle_bracket(bytes, pos),
 
             // Indexed type vs array access: `T[K]` vs `arr[0]`
             b'[' => self.check_indexed_type_pattern(bytes, pos),
@@ -1379,61 +1426,6 @@ impl<'a> Parser<'a> {
 
         // Unknown pattern — default to NOT type args (safer for JS expressions)
         false
-    }
-
-    /// Check if numeric literal at `pos` is a type argument, not a comparison.
-    ///
-    /// - `fn<42>()`: after `42` we see `>` → type args
-    /// - `x < 42`: after `42` we see `;` or operator → comparison
-    fn check_numeric_type_arg_pattern(&self, bytes: &[u8], mut pos: usize) -> bool {
-        // Skip optional minus sign
-        if pos < bytes.len() && bytes[pos] == b'-' {
-            pos += 1;
-            pos = skip_whitespace_and_comments(bytes, pos);
-        }
-
-        // Must have at least one digit
-        if pos >= bytes.len() || !bytes[pos].is_ascii_digit() {
-            return false;
-        }
-
-        // Skip the numeric literal (simplified: just skip digits, dots, hex chars, etc.)
-        while pos < bytes.len() {
-            match bytes[pos] {
-                b'0'..=b'9' | b'.' | b'x' | b'X' | b'a'..=b'f' | b'A'..=b'F' | b'_' | b'n' => {
-                    pos += 1;
-                    // Handle exponent sign: after 'e' or 'E', skip optional +/-
-                    if matches!(bytes[pos - 1], b'e' | b'E')
-                        && pos < bytes.len()
-                        && matches!(bytes[pos], b'+' | b'-')
-                    {
-                        pos += 1;
-                    }
-                }
-                _ => break,
-            }
-        }
-
-        pos = skip_whitespace_and_comments(bytes, pos);
-        if pos >= bytes.len() {
-            return false;
-        }
-
-        // Check what follows the number
-        match bytes[pos] {
-            // Definitely type args
-            b'>' => true,
-            // More type params
-            b',' => {
-                scan_for_closing_angle_bracket(bytes, skip_whitespace_and_comments(bytes, pos + 1))
-            }
-            // Union/intersection (but not || or &&)
-            b'|' | b'&' if pos + 1 < bytes.len() && bytes[pos + 1] != bytes[pos] => {
-                scan_for_closing_angle_bracket(bytes, skip_whitespace_and_comments(bytes, pos + 1))
-            }
-            // Anything else (semicolon, operators, etc.) - not type args
-            _ => false,
-        }
     }
 
     /// Check if position points to a TypeScript type keyword
@@ -1628,18 +1620,11 @@ impl<'a> Parser<'a> {
                     )
                 }
                 TokenKind::Number => {
-                    // Number literal key: {0: value, 1: value}
-                    let (key_start, key_end) = self.current_pos();
-                    let value = self.current_value().parse::<f64>().unwrap_or(f64::NAN);
+                    // Number literal key: {0: value, 0xb_b: value, 1n: value} —
+                    // shares the full numeric decode (radix, separators, bigint)
+                    let literal = self.parse_number_or_bigint_literal()?;
                     self.advance()?;
-                    (
-                        Expression::Literal(Literal {
-                            value: LiteralValue::Number(value),
-                            span: Span::new(key_start as u32, key_end as u32),
-                        }),
-                        false,
-                        false,
-                    )
+                    (Expression::Literal(literal), false, false)
                 }
                 _ => {
                     return Err(self.error_expected_found_at("property key", prop_start));
@@ -1691,7 +1676,8 @@ impl<'a> Parser<'a> {
                 }
                 self.advance()?; // consume '='
                 let default_value = self.parse_assignment_expression()?;
-                let assign_end = default_value.span().end;
+                // prev_token_end covers a parenthesized default's closing `)`
+                let assign_end = self.prev_token_end() as u32;
                 (
                     PropertyKind::Init,
                     Expression::AssignmentExpression(AssignmentExpression {
@@ -2099,7 +2085,8 @@ impl<'a> Parser<'a> {
                     let name = self.intern(self.current_property_name());
                     self.advance()?;
 
-                    let span = Span::new(callee.expr.span().start, prop_end as u32);
+                    // actual_start covers a parenthesized callee's `(` (`new (a()).b`)
+                    let span = Span::new(callee.actual_start as u32, prop_end as u32);
                     callee = ParsedExpr::with_end(
                         Expression::MemberExpression(MemberExpression {
                             object: Box::new(callee.expr),
@@ -2120,7 +2107,7 @@ impl<'a> Parser<'a> {
                     let (_, bracket_end) = self.current_pos();
                     self.expect(&TokenKind::BracketClose)?;
 
-                    let span = Span::new(callee.expr.span().start, bracket_end as u32);
+                    let span = Span::new(callee.actual_start as u32, bracket_end as u32);
                     callee = ParsedExpr::with_end(
                         Expression::MemberExpression(MemberExpression {
                             object: Box::new(callee.expr),
@@ -2177,8 +2164,12 @@ impl<'a> Parser<'a> {
             self.expect(&TokenKind::ParenClose)?;
             (args, paren_end as u32)
         } else {
-            // new Date without parens - valid JS
-            (Vec::new(), callee.actual_end as u32)
+            // new Date without parens - valid JS; bare instantiation type args
+            // (`new A<T>`) extend the span past the callee
+            let end = type_arguments
+                .as_ref()
+                .map_or(callee.actual_end as u32, |ta| ta.span.end);
+            (Vec::new(), end)
         };
 
         Ok(Expression::NewExpression(NewExpression {

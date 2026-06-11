@@ -166,7 +166,7 @@ impl<'a> SvelteParser<'a> {
         // root.start: First fragment node (whitespace-only text → skip, content/element/comment → include)
         if let Some(first_node) = fragment.nodes.first() {
             root_start = Some(match first_node {
-                FragmentNode::Text(text) if text.data.trim().is_empty() => {
+                FragmentNode::Text(text) if text.data().trim().is_empty() => {
                     // Whitespace-only: skip it (start after the whitespace)
                     text.span.end_usize()
                 }
@@ -178,7 +178,7 @@ impl<'a> SvelteParser<'a> {
         // root.end: Last fragment node (whitespace-only text → exclude, content/element/comment → include)
         let end = if let Some(last_node) = fragment.nodes.last() {
             match last_node {
-                FragmentNode::Text(text) if text.data.trim().is_empty() => {
+                FragmentNode::Text(text) if text.data().trim().is_empty() => {
                     // Whitespace-only: exclude it (end before the whitespace)
                     text.span.start
                 }
@@ -287,4 +287,19 @@ impl<'a> SvelteParser<'a> {
             },
         })
     }
+}
+
+/// Byte offset of `inner` within `outer`, derived from pointer identity.
+///
+/// `inner` MUST be a subslice of `outer` (the product of `trim`, `strip_prefix`, or
+/// range slicing — all zero-copy). Searching by content (`str::find`) misattributes
+/// the position whenever the text also occurs earlier in `outer` — `{@html html}`
+/// resolved the expression to the `html` inside the keyword.
+pub(crate) fn subslice_offset(outer: &str, inner: &str) -> usize {
+    debug_assert!(
+        (inner.as_ptr() as usize) >= (outer.as_ptr() as usize)
+            && (inner.as_ptr() as usize) + inner.len() <= (outer.as_ptr() as usize) + outer.len(),
+        "inner is not a subslice of outer"
+    );
+    (inner.as_ptr() as usize) - (outer.as_ptr() as usize)
 }

@@ -627,8 +627,21 @@ impl<'a> Printer<'a> {
                 // test → BreakAfterOperator).
                 let rhs_comments = self.build_rhs_comments_opt(eq_pos + 1, value_start);
                 let left_doc = d.concat(&parts);
+                // An assignment value keeps its parens (`a = (this.a = b);`) —
+                // built manually like object property values, since the layout
+                // chooser takes the bare expression
                 let assignment_doc =
-                    self.build_assignment_layout(left_doc, " =", value, false, rhs_comments);
+                    if super::needs_parens(value, super::ParenContext::DefaultValue) {
+                        let value_doc =
+                            d.concat(&[d.text("("), self.build_expression_doc(value), d.text(")")]);
+                        let value_doc = match rhs_comments {
+                            Some(comments_doc) => d.concat(&[comments_doc, value_doc]),
+                            None => value_doc,
+                        };
+                        d.concat(&[left_doc, d.text(" = "), value_doc])
+                    } else {
+                        self.build_assignment_layout(left_doc, " =", value, false, rhs_comments)
+                    };
                 parts = vec![assignment_doc];
             }
         }
@@ -723,6 +736,11 @@ impl<'a> Printer<'a> {
         } else {
             key_region_end = method.key.span().end;
             parts.push(self.build_expression_doc(&method.key));
+        }
+
+        // Optional marker: `m?()` (abstract / ambient / interface methods)
+        if method.optional {
+            parts.push(d.text("?"));
         }
 
         // Comments between key and next token: [x] /* c */() or method /* c */ <T>()

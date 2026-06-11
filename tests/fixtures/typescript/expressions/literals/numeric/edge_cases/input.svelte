@@ -23,6 +23,11 @@
 	const hexMax32 = 0xffffffff;
 	const hexMax64 = 0xffffffffffffffffn;
 
+	// Beyond 2^53 radix literals decode by digit-by-digit double accumulation,
+	// which can land one ulp below the correctly rounded integer value
+	const hexBeyondSafe = 0x47874750d3a412a2;
+	const octBeyondSafe = 0o75415030007726607105367;
+
 	// Binary edge cases
 	const bin8 = 0b11111111;
 	const bin32 = 0b11111111111111111111111111111111;

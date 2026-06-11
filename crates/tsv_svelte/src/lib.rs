@@ -125,15 +125,17 @@ pub fn convert_ast_json(root: &Root, source: &str) -> serde_json::Value {
 #[allow(clippy::expect_used)]
 pub fn convert_ast_json_string(root: &Root, source: &str) -> String {
     let script_spans = script_content_spans(root);
+    let mut buf = Vec::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
     if source.is_ascii()
         && !ast::convert::has_template_expression_comments(&root.comments, &script_spans)
     {
         let public_ast = ast::convert::convert_root(root, source);
-        serde_json::to_string(&public_ast).expect("AST types derive Serialize correctly")
+        serde_json::to_writer(&mut buf, &public_ast).expect("AST types derive Serialize correctly");
     } else {
-        serde_json::to_string(&convert_ast_json(root, source))
-            .expect("Value serialization cannot fail")
+        serde_json::to_writer(&mut buf, &convert_ast_json(root, source))
+            .expect("Value serialization cannot fail");
     }
+    String::from_utf8(buf).expect("serde_json emits valid UTF-8")
 }
 
 /// Byte spans of the instance/module `<script>` element contents.

@@ -55,13 +55,29 @@ export interface AuditReport {
 }
 
 /**
+ * Fixture link anchor: `[name](../tests/fixtures/path/)`.
+ *
+ * The fixture-name class excludes `|` and backtick so a `[` inside a
+ * backticked feature cell (e.g. "Array literal `[` trailing") can't start
+ * a spurious match that swallows the cell up to the real link's `]`.
+ */
+const FIXTURE_LINK_RE = /\[([^\]|`]+)\]\(\.\.\/tests\/fixtures\/([^)]+?)\/?\)/g;
+
+/**
  * Parse conformance_prettier.md to extract all documented divergences.
  *
- * Parses markdown tables with format:
- * | Feature | Reason | Fixture |
- * | feature_name | reason_category | [fixture_name](../tests/fixtures/path/) |
+ * The doc anchors divergences with fixture links in three formats:
  *
- * Handles edge cases like escaped pipes in feature names (e.g., `||`).
+ * - table rows — `| feature | reason | [name](../tests/fixtures/path/) |`
+ *   (handles escaped pipes in backticked feature names, e.g. `||`)
+ * - list items — `- feature — [name](../tests/fixtures/path/)`
+ * - prose paragraphs — `**Feature**: … [name](../tests/fixtures/path/) …`
+ *
+ * All fixture links on a line are extracted (prose lines often cite several).
+ * Only `*_prettier_divergence`-suffixed paths (including
+ * `_svelte_prettier_divergence`) count as documented divergences — other
+ * fixture links are match/contrast anchors ("where tsv matches"), not
+ * divergence claims.
  */
 export function parse_conformance_prettier_md(content: string): DocumentedDivergence[] {
 	const divergences: DocumentedDivergence[] = [];
@@ -72,53 +88,62 @@ export function parse_conformance_prettier_md(content: string): DocumentedDiverg
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
 
-		// Track section headings (### level)
-		if (line.startsWith('### ')) {
-			current_section = line.slice(4).trim();
+		// Track section headings (### and #### levels; most recent wins)
+		const heading_match = line.match(/^#{3,4}\s+(.+)/);
+		if (heading_match) {
+			current_section = heading_match[1].trim();
 			continue;
 		}
 
-		// Skip non-table lines and header/separator rows
-		if (!line.startsWith('|')) continue;
-		if (line.includes('---')) continue;
+		const is_table_row = line.startsWith('|');
+		if (is_table_row && line.includes('---')) continue; // separator row
 
-		// Find fixture link in the line - this is the most reliable anchor.
-		// The fixture-name class excludes `|` and backtick so a `[` inside a
-		// backticked feature cell (e.g. "Array literal `[` trailing") can't start
-		// a spurious match that swallows the cell up to the real link's `]`.
-		const fixture_match = line.match(/\[([^\]|`]+)\]\(\.\.\/tests\/fixtures\/([^)]+)\/?(?:\)|\s)/);
-		if (!fixture_match) continue;
+		for (const fixture_match of line.matchAll(FIXTURE_LINK_RE)) {
+			const fixture_name = fixture_match[1].trim();
+			const fixture_path = fixture_match[2].trim().replace(/\/$/, '');
 
-		const [, fixture_name, fixture_path] = fixture_match;
+			// Skip header rows (fixture column would be "Fixture")
+			if (fixture_name.toLowerCase() === 'fixture') continue;
 
-		// Skip header rows (fixture column would be "Fixture")
-		if (fixture_name.toLowerCase() === 'fixture') continue;
+			// Only divergence-suffixed fixtures are documented divergences
+			const last_segment = fixture_path.split('/').pop() ?? '';
+			if (!last_segment.endsWith('_prettier_divergence')) continue;
 
-		// Extract reason by finding the cell before the fixture link
-		// Split by | but be careful of escaped pipes in backticks
-		const before_fixture = line.slice(0, line.indexOf(fixture_match[0]));
-		const cells = split_table_row(before_fixture);
+			let feature = '';
+			let reason = '';
 
-		// cells should be: ['', feature, reason, ''] or similar
-		// We want the second-to-last non-empty cell as the reason
-		const non_empty_cells = cells.filter((c) => c.trim());
-		const reason = non_empty_cells.length >= 2
-			? non_empty_cells[non_empty_cells.length - 1].trim()
-			: '';
-		const feature = non_empty_cells.length >= 2
-			? non_empty_cells[non_empty_cells.length - 2].trim()
-			: '';
+			if (is_table_row) {
+				// Extract feature + reason from the cells before the fixture link
+				const before_fixture = line.slice(0, fixture_match.index);
+				const non_empty_cells = split_table_row(before_fixture).filter((c) => c.trim());
+				if (non_empty_cells.length >= 2) {
+					feature = non_empty_cells[non_empty_cells.length - 2].trim();
+					reason = non_empty_cells[non_empty_cells.length - 1].trim();
+				}
+				// Skip if we couldn't extract valid data
+				if (!feature || feature.toLowerCase() === 'feature') continue;
+			} else if (/^\s*[-*]\s/.test(line)) {
+				// List item: feature is the text between the bullet and the
+				// em-dash before the link (falls back to the fixture name)
+				const before_fixture = line.slice(0, fixture_match.index);
+				feature = before_fixture
+					.replace(/^\s*[-*]\s*/, '')
+					.replace(/\s*[—–]\s*$/, '')
+					.trim() || fixture_name;
+			} else {
+				// Prose paragraph: use the bold prefix when present
+				const bold_match = line.match(/^\*\*([^*]+)\*\*/);
+				feature = bold_match ? bold_match[1].replace(/:$/, '').trim() : fixture_name;
+			}
 
-		// Skip if we couldn't extract valid data
-		if (!feature || feature.toLowerCase() === 'feature') continue;
-
-		divergences.push({
-			section: current_section,
-			feature,
-			reason,
-			fixture_name: fixture_name.trim(),
-			fixture_path: fixture_path.trim().replace(/\/$/, ''), // Remove trailing slash
-		});
+			divergences.push({
+				section: current_section,
+				feature,
+				reason,
+				fixture_name,
+				fixture_path,
+			});
+		}
 	}
 
 	return divergences;
@@ -274,7 +299,7 @@ export function format_audit_report(report: AuditReport): string {
 		for (const [section, fixtures] of by_section) {
 			lines.push(`\n  ${section}:`);
 			for (const f of fixtures) {
-				lines.push(`    - ${f.fixture_name} (${f.reason})`);
+				lines.push(`    - ${f.fixture_name}${f.reason ? ` (${f.reason})` : ''}`);
 				lines.push(`      ${f.fixture_path}`);
 			}
 		}

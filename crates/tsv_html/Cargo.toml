@@ -2,7 +2,7 @@
 name = "tsv_html"
 version.workspace = true
 edition.workspace = true
-description = "HTML-specific classification and whitespace rules for TSV"
+description = "HTML-specific classification and whitespace rules for tsv"
 
 [dependencies]
 phf.workspace = true

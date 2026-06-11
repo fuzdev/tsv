@@ -305,9 +305,18 @@ fn build_call_args_doc_for_chain_impl(
         || all_args_are_arrows
         || is_function_composition_args(&call.arguments);
 
-    let prefix = if optional { "?.(" } else { "(" };
+    // `?.` precedes explicit type arguments (`a.fn?.<T>(b)`), so it only fuses
+    // with the paren when there are none
+    let prefix = if optional && type_args.is_none() {
+        "?.("
+    } else {
+        "("
+    };
 
     let mut parts = Vec::new();
+    if optional && type_args.is_some() {
+        parts.push(d.text("?."));
+    }
     // Emit comments between callee and type args: `obj.fn/* c */ <string>()`
     // Uses build_name_to_type_params_comments for safe line comment handling
     if let Some(ta) = type_args {

@@ -117,15 +117,28 @@ fn convert_attribute(
                 .iter()
                 .any(|v| matches!(v, internal::AttributeValue::Text(_)));
 
-            if has_text {
-                // Has text content: always serialize as array (even if single Text value)
+            // A quoted single expression (`value="{expr}"`) serializes as an array like
+            // any quoted sequence; only the bare form (`value={expr}`) is a plain object.
+            // The value region directly abuts the opening quote, so the byte before the
+            // tag's `{` discriminates the two forms.
+            let quoted = values.len() == 1
+                && matches!(&values[0], internal::AttributeValue::ExpressionTag(tag)
+                if matches!(
+                    (tag.span.start as usize)
+                        .checked_sub(1)
+                        .and_then(|i| source.as_bytes().get(i)),
+                    Some(b'"' | b'\'')
+                ));
+
+            if has_text || quoted {
+                // Text content or quoted expression: always serialize as array
                 let converted: Vec<_> = values
                     .iter()
                     .map(|v| convert_attribute_value(v, source, loc, interner))
                     .collect();
                 Some(to_json_value(&converted))
             } else if values.len() == 1 {
-                // Single expression only: serialize as object
+                // Single bare expression: serialize as object
                 let mut converted = convert_attribute_value(&values[0], source, loc, interner);
 
                 // Shorthand attributes ({name}): Svelte's parser creates the Identifier via
@@ -184,6 +197,6 @@ fn convert_attribute_text(text: &internal::Text) -> public::AttributeText {
         end: text.span.end,
         node_type: "Text".to_string(),
         raw: text.raw.clone(),
-        data: text.data.clone(),
+        data: text.data().into_owned(),
     }
 }

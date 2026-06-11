@@ -18,11 +18,14 @@ pub(super) fn convert_decorator(
     offset: usize,
 ) -> public::Decorator {
     let mut expression = convert_expression(&decorator.expression, source, loc, interner, offset);
-    // acorn-typescript omits `optional` on CallExpressions/MemberExpressions inside decorators
-    match &mut expression {
-        public::Expression::CallExpression(call) => call.optional = None,
-        public::Expression::MemberExpression(member) => member.optional = None,
-        _ => {}
+    // acorn-typescript omits `optional` on the call/member spine of an
+    // unparenthesized decorator (its restricted ident/member/call parse never sets
+    // it); a parenthesized `@(expr)` rides the full expression parser, which does.
+    // Parens are stripped from the expression, so the only signal is the span gap —
+    // the decorator span covers the closing `)` past the expression's end.
+    let parenthesized = decorator.span.end > decorator.expression.span().end;
+    if !parenthesized {
+        strip_decorator_spine_optional(&mut expression);
     }
     public::Decorator {
         node_type: "Decorator".to_string(),
@@ -30,6 +33,26 @@ pub(super) fn convert_decorator(
         end: decorator.span.end,
         loc: create_location(decorator.span, loc, offset),
         expression,
+    }
+}
+
+/// Remove `optional` along an unparenthesized decorator's call/member spine
+/// (`@a.b.c()` — the top call and every member down to the base identifier);
+/// call arguments are parsed by the full grammar and keep theirs.
+fn strip_decorator_spine_optional(expression: &mut public::Expression) {
+    let mut node = expression;
+    loop {
+        match node {
+            public::Expression::CallExpression(call) => {
+                call.optional = None;
+                node = &mut call.callee;
+            }
+            public::Expression::MemberExpression(member) => {
+                member.optional = None;
+                node = &mut member.object;
+            }
+            _ => break,
+        }
     }
 }
 
@@ -483,6 +506,7 @@ fn convert_method_definition(
         is_abstract: method.r#abstract.then_some(true),
         is_static: method.is_static,
         is_override: method.r#override,
+        optional: method.optional.then_some(true),
         computed: method.computed,
         key: Box::new(convert_expression(
             &method.key,
@@ -563,7 +587,7 @@ pub(in crate::ast) fn convert_type_parameter_declaration(
 }
 
 /// Convert single type parameter: `T extends U = V`
-fn convert_type_parameter(
+pub(in crate::ast) fn convert_type_parameter(
     param: &internal::TSTypeParameter,
     source: &str,
     loc: &LocationTracker,

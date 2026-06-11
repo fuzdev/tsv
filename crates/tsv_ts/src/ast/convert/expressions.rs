@@ -483,6 +483,15 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         }
         internal::Expression::TSNonNullExpression(non_null_expr) => {
             let needs_chain = !in_chain && expr.has_optional_in_chain();
+            // A parenthesized inner chain seals at the parens (`(a?.b())!?.()` —
+            // the inner chain wraps itself inside the NonNull), so the paren-aware
+            // child check applies here like it does for calls and members
+            let inner_in_chain = child_in_chain(
+                non_null_expr.span.start,
+                non_null_expr.expression.span().start,
+                needs_chain,
+                in_chain,
+            );
             let converted = public::TSNonNullExpression {
                 node_type: "TSNonNullExpression".to_string(),
                 start: non_null_expr.span.start,
@@ -494,7 +503,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                     loc,
                     interner,
                     offset,
-                    needs_chain || in_chain,
+                    inner_in_chain,
                 )),
             };
             maybe_wrap_chain(

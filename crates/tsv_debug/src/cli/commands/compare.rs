@@ -1,7 +1,8 @@
+use crate::deno;
 use crate::diff::{Color, ColorChoice, DiffOptions, diff_to_string};
 use crate::error;
-use crate::{deno, subprocess};
 use argh::FromArgs;
+use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 
 /// Compare our printer output with prettier (shows diff).
@@ -85,11 +86,6 @@ async fn run(
     color_choice: Option<ColorChoice>,
 ) -> i32 {
     let content = input.content();
-    let parser_name = match parser_type {
-        ParserType::Svelte => "svelte",
-        ParserType::TypeScript => "typescript",
-        ParserType::Css => "css",
-    };
 
     if verbose {
         println!("=== Input ===");
@@ -98,7 +94,7 @@ async fn run(
     }
 
     // Run our formatter
-    let our_output = match run_our_formatter(content, parser_name) {
+    let our_output = match format_source(content, parser_type) {
         Ok(output) => {
             if verbose {
                 println!("=== Our Formatter ===");
@@ -120,7 +116,7 @@ async fn run(
     };
 
     // Run prettier
-    let prettier_output = match run_prettier(content, parser_name).await {
+    let prettier_output = match run_prettier(content, parser_type.name()).await {
         Ok(output) => {
             if verbose {
                 println!("=== Prettier ===");
@@ -148,11 +144,15 @@ async fn run(
     // Show diff if both succeeded
     if let (Some(our), Some(prettier)) = (our_output, prettier_output) {
         let outputs_match = our == prettier;
+        let input_stable_ours = eq_ignoring_trailing_newline(&our, content);
+        let input_stable_prettier = eq_ignoring_trailing_newline(&prettier, content);
 
         if json_output {
             // JSON output mode
             let result = serde_json::json!({
                 "match": outputs_match,
+                "input_stable_ours": input_stable_ours,
+                "input_stable_prettier": input_stable_prettier,
                 "our_output": our,
                 "prettier_output": prettier,
             });
@@ -163,13 +163,14 @@ async fn run(
             return if outputs_match { 0 } else { 1 };
         }
 
+        let mut options = DiffOptions::compare();
+        if let Some(choice) = color_choice {
+            options = options.with_color_choice(choice);
+        }
+
         if quiet {
             // In quiet mode, only show output if there's a difference
             if !outputs_match {
-                let mut options = DiffOptions::compare();
-                if let Some(choice) = color_choice {
-                    options = options.with_color_choice(choice);
-                }
                 print_comparison_with_options(
                     "=== Diff: Ours vs Prettier ===",
                     &our,
@@ -182,18 +183,29 @@ async fn run(
         }
 
         // Default mode: always show the comparison result (diff only)
-        let mut options = DiffOptions::compare();
-        if let Some(choice) = color_choice {
-            options = options.with_color_choice(choice);
-        }
         print_comparison_with_options("=== Diff: Ours vs Prettier ===", &our, &prettier, &options);
+        // "Outputs match" only says ours and prettier agree on where the input
+        // goes — when the input is not already there, surface it (a fixture
+        // input in this state passes compare but fails validation's F1).
+        if outputs_match && !input_stable_ours {
+            println!(
+                "note: input is not format-stable — both formatters reformat it \
+                 (a fixture input in this state fails F1 idempotency)"
+            );
+            let mut idem_options = DiffOptions::idempotency();
+            if let Some(choice) = color_choice {
+                idem_options = idem_options.with_color_choice(choice);
+            }
+            println!("=== Diff: Input vs Formatted ===");
+            print!("{}", diff_to_string(&our, content, &idem_options));
+        }
         return if outputs_match { 0 } else { 1 };
     }
 
     1
 }
 
-/// Print comparison with custom options (variant of diff::print_comparison)
+/// Print the match/differ verdict line, plus the diff when outputs differ.
 fn print_comparison_with_options(
     label: &str,
     our_output: &str,
@@ -219,8 +231,11 @@ fn print_comparison_with_options(
     }
 }
 
-fn run_our_formatter(content: &str, parser: &str) -> error::Result<String> {
-    subprocess::run_tsv_format(content, parser)
+/// Equality modulo a trailing newline. `--content "$(cat file)"` strips the
+/// file's trailing newline while the formatters re-add it, so a strict check
+/// would flag every such invocation as unstable.
+fn eq_ignoring_trailing_newline(a: &str, b: &str) -> bool {
+    a.strip_suffix('\n').unwrap_or(a) == b.strip_suffix('\n').unwrap_or(b)
 }
 
 async fn run_prettier(content: &str, parser: &str) -> error::Result<String> {

@@ -11,11 +11,42 @@ use crate::ast::internal::{self, CssValue};
 use tsv_lang::doc::{self, DocContext, Mode, arena::DocId};
 
 impl<'a> Printer<'a> {
-    /// Write the declaration ending: optional !important and semicolon with newline
-    #[inline]
-    fn write_declaration_end(&mut self, important: bool) {
-        if important {
-            self.write(" !important");
+    /// Write the declaration ending: optional `!important` tail and the semicolon with newline.
+    ///
+    /// The value span ends before the `!important` region, so that region — and any
+    /// comments around it (`blue /* a */ !important /* b */;`) — is invisible to the
+    /// value printers. Re-emit it from source here with comments preserved in place
+    /// (like prettier) and `!`/`important` normalized to a single ` !important`.
+    fn write_declaration_end(&mut self, decl: &internal::CssDeclaration) {
+        if decl.is_important() {
+            let bytes = self.source.as_bytes();
+            let mut i = decl.span.end_usize();
+            let mut out = String::new();
+            while i < bytes.len() {
+                match bytes[i] {
+                    b';' | b'}' => break,
+                    b'/' if bytes.get(i + 1) == Some(&b'*') => {
+                        let end = self.source[i + 2..]
+                            .find("*/")
+                            .map_or(bytes.len(), |rel| i + 2 + rel + 2);
+                        out.push(' ');
+                        out.push_str(&self.source[i..end]);
+                        i = end;
+                    }
+                    b'!' => {
+                        out.push_str(" !important");
+                        i += 1;
+                    }
+                    c if c.is_ascii_alphabetic() => {
+                        // the `important` keyword itself — already emitted at the `!`
+                        while i < bytes.len() && bytes[i].is_ascii_alphabetic() {
+                            i += 1;
+                        }
+                    }
+                    _ => i += 1,
+                }
+            }
+            self.write(&out);
         }
         self.write(";\n");
     }
@@ -194,7 +225,7 @@ impl<'a> Printer<'a> {
         self.indent_level += 1;
         self.print_css_value_multiline(&decl.value);
         self.indent_level -= 1;
-        self.write_declaration_end(decl.is_important());
+        self.write_declaration_end(decl);
     }
 
     /// Print declaration with width-based wrapping
@@ -212,7 +243,7 @@ impl<'a> Printer<'a> {
             self.print_space_list_wrapped(&decl.value);
             self.indent_level -= 1;
         }
-        self.write_declaration_end(decl.is_important());
+        self.write_declaration_end(decl);
     }
 
     /// Print declaration with function value
@@ -232,7 +263,7 @@ impl<'a> Printer<'a> {
         } else {
             self.print_inline_function(decl_source, has_comments, &decl.value);
         }
-        self.write_declaration_end(decl.is_important());
+        self.write_declaration_end(decl);
     }
 
     /// Check if a function needs wrapping
@@ -321,7 +352,7 @@ impl<'a> Printer<'a> {
         } else {
             self.write(decl_source);
         }
-        self.write_declaration_end(decl.is_important());
+        self.write_declaration_end(decl);
     }
 
     /// Print declaration with string value
@@ -338,7 +369,7 @@ impl<'a> Printer<'a> {
             let formatted = source_fidelity::format_string_value("", quote);
             self.write(&formatted);
         }
-        self.write_declaration_end(decl.is_important());
+        self.write_declaration_end(decl);
     }
 
     /// Print declaration with default formatting
@@ -360,7 +391,7 @@ impl<'a> Printer<'a> {
             return;
         }
         self.print_css_value(&decl.value);
-        self.write_declaration_end(decl.is_important());
+        self.write_declaration_end(decl);
     }
 
     /// Check if this is a grid property with multiple row string values
@@ -413,7 +444,7 @@ impl<'a> Printer<'a> {
             }
             self.indent_level -= 1;
         }
-        self.write_declaration_end(decl.is_important());
+        self.write_declaration_end(decl);
     }
 
     /// Format a CSS value on multiple lines with greedy packing

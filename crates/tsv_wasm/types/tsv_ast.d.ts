@@ -773,6 +773,8 @@ export interface MethodDefinition {
 	static: boolean;
 	/** Omitted from JSON when false. */
 	override?: boolean;
+	/** Optional method (`m?()`); omitted from JSON when false. */
+	optional?: boolean;
 	computed: boolean;
 	key: Expression;
 	kind: string;
@@ -1796,6 +1798,10 @@ export interface SvelteOptions {
 	end: number;
 	attributes: AttributeNode[];
 	runes?: boolean;
+	immutable?: boolean;
+	accessors?: boolean;
+	preserveWhitespace?: boolean;
+	css?: string;
 	namespace?: string;
 	customElement?: unknown;
 }

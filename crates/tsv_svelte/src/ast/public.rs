@@ -135,6 +135,18 @@ pub struct SvelteOptions {
     /// Parsed from `runes={true/false}` attribute
     #[serde(skip_serializing_if = "Option::is_none")]
     pub runes: Option<bool>,
+    /// Parsed from `immutable` / `immutable={true/false}` attribute
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub immutable: Option<bool>,
+    /// Parsed from `accessors` / `accessors={true/false}` attribute
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub accessors: Option<bool>,
+    /// Parsed from `preserveWhitespace` / `preserveWhitespace={true/false}` attribute
+    #[serde(rename = "preserveWhitespace", skip_serializing_if = "Option::is_none")]
+    pub preserve_whitespace: Option<bool>,
+    /// Parsed from `css="injected"` attribute
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub css: Option<String>,
     /// Parsed from `namespace="svg"` attribute
     #[serde(skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,

@@ -7,7 +7,7 @@
 // - SymbolLookup trait for identifier resolution
 
 use super::printing::ChainPrinter;
-use super::types::{ChainGroup, ChainNode};
+use super::types::{ChainGroup, ChainNode, ChainNodeVec};
 use crate::ast::internal::{self, Expression};
 use crate::printer::{ParenContext, needs_parens};
 use string_interner::DefaultSymbol;
@@ -18,7 +18,12 @@ use string_interner::DefaultSymbol;
 
 /// Trait for looking up symbols (abstraction over interner)
 pub trait SymbolLookup {
-    fn lookup(&self, symbol: DefaultSymbol) -> Option<String>;
+    /// Resolve `symbol` and apply `f` to the name without materializing a `String`.
+    ///
+    /// Callback style keeps the interner borrow inside the call, so implementations
+    /// backed by `Rc<RefCell<…>>` don't need an owned copy to outlive the borrow.
+    /// Returns `None` when the symbol is unknown to the interner.
+    fn with_name<R>(&self, symbol: DefaultSymbol, f: impl FnOnce(&str) -> R) -> Option<R>;
 }
 
 //
@@ -39,8 +44,8 @@ pub trait SymbolLookup {
 /// for member-only chains.
 /// General-purpose entry point (used by tests; production code uses typed entry points)
 #[cfg(test)]
-fn linearize_chain<'a>(expr: &'a Expression) -> Vec<ChainNode<'a>> {
-    let mut nodes = Vec::new();
+fn linearize_chain<'a>(expr: &'a Expression) -> ChainNodeVec<'a> {
+    let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
     linearize_recursive(expr, &mut nodes, &mut paren_gaps);
     finalize_chain_nodes(&mut nodes, &paren_gaps);
@@ -48,8 +53,8 @@ fn linearize_chain<'a>(expr: &'a Expression) -> Vec<ChainNode<'a>> {
 }
 
 /// Linearize starting from a CallExpression (avoids cloning to wrap in Expression)
-pub fn linearize_chain_from_call<'a>(call: &'a internal::CallExpression) -> Vec<ChainNode<'a>> {
-    let mut nodes = Vec::new();
+pub fn linearize_chain_from_call<'a>(call: &'a internal::CallExpression) -> ChainNodeVec<'a> {
+    let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
     linearize_call_callee(call, &mut nodes, &mut paren_gaps);
     if call.optional {
@@ -62,10 +67,8 @@ pub fn linearize_chain_from_call<'a>(call: &'a internal::CallExpression) -> Vec<
 }
 
 /// Linearize starting from a MemberExpression (avoids cloning to wrap in Expression)
-pub fn linearize_chain_from_member<'a>(
-    member: &'a internal::MemberExpression,
-) -> Vec<ChainNode<'a>> {
-    let mut nodes = Vec::new();
+pub fn linearize_chain_from_member<'a>(member: &'a internal::MemberExpression) -> ChainNodeVec<'a> {
+    let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
     linearize_member_object(member, &mut nodes, &mut paren_gaps);
     linearize_member_node(member, &mut nodes, &mut paren_gaps);
@@ -76,8 +79,8 @@ pub fn linearize_chain_from_member<'a>(
 /// Linearize starting from a TSNonNullExpression (avoids cloning to wrap in Expression)
 pub fn linearize_chain_from_non_null<'a>(
     non_null: &'a internal::TSNonNullExpression,
-) -> Vec<ChainNode<'a>> {
-    let mut nodes = Vec::new();
+) -> ChainNodeVec<'a> {
+    let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
     linearize_recursive(&non_null.expression, &mut nodes, &mut paren_gaps);
     nodes.push(ChainNode::non_null());
@@ -182,7 +185,7 @@ fn child_stops_optional_chain(
 /// carries no runtime meaning, and both formatters normalize to the outside form.
 /// Any other sealed child (a bare optional chain, `(a?.b).c`) stays a single
 /// parenthesized base.
-fn push_sealed_chain_base<'a>(child: &'a Expression, nodes: &mut Vec<ChainNode<'a>>) {
+fn push_sealed_chain_base<'a>(child: &'a Expression, nodes: &mut ChainNodeVec<'a>) {
     if let Expression::TSNonNullExpression(non_null) = child {
         nodes.push(ChainNode::base(&non_null.expression, true));
         nodes.push(ChainNode::non_null());
@@ -193,7 +196,7 @@ fn push_sealed_chain_base<'a>(child: &'a Expression, nodes: &mut Vec<ChainNode<'
 
 fn linearize_recursive<'a>(
     expr: &'a Expression,
-    nodes: &mut Vec<ChainNode<'a>>,
+    nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
     match expr {
@@ -265,7 +268,7 @@ fn linearize_recursive<'a>(
 /// All other objects recurse normally.
 fn linearize_member_object<'a>(
     member: &'a internal::MemberExpression,
-    nodes: &mut Vec<ChainNode<'a>>,
+    nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
     let object: &Expression = &member.object;
@@ -285,7 +288,7 @@ fn linearize_member_object<'a>(
 /// other callees recurse normally.
 fn linearize_call_callee<'a>(
     call: &'a internal::CallExpression,
-    nodes: &mut Vec<ChainNode<'a>>,
+    nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
     if child_stops_optional_chain(call.span.start, call.optional, &call.callee) {
@@ -300,7 +303,7 @@ fn linearize_call_callee<'a>(
 /// Extracted from `linearize_recursive` so it can be shared with `linearize_chain_from_member`.
 fn linearize_member_node<'a>(
     member: &'a internal::MemberExpression,
-    nodes: &mut Vec<ChainNode<'a>>,
+    nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
     // When grouping parens are stripped (e.g., `/* comment */ (a).b` → `/* comment */ a.b`),
@@ -368,11 +371,14 @@ fn linearize_member_node<'a>(
 /// Follows prettier's grouping algorithm:
 /// 1. First group: base + calls + non-null + numeric accessors + consecutive members
 /// 2. Remaining groups: members* + calls*, break when seeing memberish after call
-pub fn group_chain_nodes<'a>(nodes: Vec<ChainNode<'a>>) -> Vec<ChainGroup<'a>> {
+pub fn group_chain_nodes<'a>(nodes: &[ChainNode<'a>]) -> Vec<ChainGroup<'a>> {
     if nodes.is_empty() {
         return vec![];
     }
 
+    // TODO: this Vec grows from empty per chain and is the cluster's remaining
+    // allocation site (~33k on the zzz corpus); a SmallVec<[ChainGroup; N]> or
+    // with_capacity estimate would collapse it, at ~112 inline bytes per group
     let mut groups: Vec<ChainGroup<'a>> = Vec::new();
     let mut current = ChainGroup::new();
     let mut i = 0;
@@ -515,10 +521,9 @@ pub fn should_not_wrap<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
 /// Prettier ref: `isShort` in print/member-chain.js:284
 /// Uses `name.length <= options.tabWidth` (JS .length, ASCII-only in practice)
 fn is_short_name(symbol: DefaultSymbol, interner: &impl SymbolLookup, tab_width: usize) -> bool {
-    let Some(name) = interner.lookup(symbol) else {
-        return false;
-    };
-    name.len() <= tab_width
+    interner
+        .with_name(symbol, |name| name.len() <= tab_width)
+        .unwrap_or(false)
 }
 
 /// Check if an identifier name is a factory pattern.
@@ -528,11 +533,12 @@ fn is_short_name(symbol: DefaultSymbol, interner: &impl SymbolLookup, tab_width:
 /// - Starts with uppercase: `Object`, `React`, `Observable`
 /// - Pure `$`/`_` identifiers: `$`, `_`, `$_`, `$__` (lodash-style)
 fn is_factory_name(symbol: DefaultSymbol, interner: &impl SymbolLookup) -> bool {
-    let Some(name) = interner.lookup(symbol) else {
-        return false;
-    };
-    name.chars().next().is_some_and(char::is_uppercase)
-        || (!name.is_empty() && name.chars().all(|c| c == '$' || c == '_'))
+    interner
+        .with_name(symbol, |name| {
+            name.chars().next().is_some_and(char::is_uppercase)
+                || (!name.is_empty() && name.chars().all(|c| c == '$' || c == '_'))
+        })
+        .unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -653,7 +659,7 @@ mod tests {
         let abcd = make_member(&mut interner, abc, "d", 5);
 
         let nodes = linearize_chain(&abcd);
-        let groups = group_chain_nodes(nodes);
+        let groups = group_chain_nodes(&nodes);
 
         // For member-only chains, Prettier puts almost everything in first group
         // (all consecutive members except the last one if followed by more members)
@@ -679,7 +685,7 @@ mod tests {
         let abc = make_member(&mut interner, ab_call, "c", 7);
 
         let nodes = linearize_chain(&abc);
-        let groups = group_chain_nodes(nodes);
+        let groups = group_chain_nodes(&nodes);
 
         // Grouping should break at member after call
         // Expected: [Base(a), Call()] [Member(.b), Call()] [Member(.c)]
@@ -697,8 +703,7 @@ mod tests {
 
     #[test]
     fn test_group_empty_input() {
-        let nodes: Vec<ChainNode> = vec![];
-        let groups = group_chain_nodes(nodes);
+        let groups = group_chain_nodes(&[]);
         assert!(groups.is_empty());
     }
 }

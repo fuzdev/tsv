@@ -1,10 +1,4 @@
 // TypeScript parser - main entry point and coordination
-//
-// TODO(parser): Expand TypeScript support to unblock comment tests
-// Currently blocking comment tests:
-// - around_braces, mixed_positions: Need object literal support `{ prop: value }`
-// - More generally: Need full expression parsing (arrays, objects, etc.)
-// See TODO_COMMENTS.md "Issue 3" for impact on comment tests.
 
 use crate::ast::internal::*;
 use crate::lexer::{KeywordKind, Lexer, TokenKind};
@@ -152,7 +146,14 @@ impl<'a> Parser<'a> {
             self.had_line_terminator = self.lexer.had_line_terminator();
         }
 
-        // Collect comment tokens into comments Vec
+        self.collect_comments()
+    }
+
+    /// Drain consecutive `Comment` tokens starting at the current token into `self.comments`,
+    /// leaving the current token at the first non-comment token. Shared by `advance_inner` and
+    /// the regex relex path (`parse_primary_expression`), both of which land on a fresh token and
+    /// must absorb any comments before the next consumer reads the current token.
+    pub(super) fn collect_comments(&mut self) -> Result<(), ParseError> {
         while let TokenKind::Comment { content, is_block } = &self.current_kind {
             // ECMAScript spec: if a MultiLineComment contains one or more line terminators,
             // then it is replaced by a single line terminator for ASI purposes.
@@ -171,10 +172,7 @@ impl<'a> Parser<'a> {
                 emit_character_field: false,
             });
             let token = self.lexer.next_token()?;
-            self.current_kind = token.kind;
-            self.current_start = token.start;
-            self.current_end = token.end;
-            self.current_decoded = token.decoded;
+            self.update_current(token);
             // Also check line terminator in whitespace after comment
             if self.lexer.had_line_terminator() {
                 self.had_line_terminator = true;
@@ -208,7 +206,11 @@ impl<'a> Parser<'a> {
         &self.current_kind
     }
 
-    /// Update current token state from a new token (for template continuation)
+    /// Overwrite the current token's kind/start/end/decoded from a freshly lexed token, without
+    /// the surrounding bookkeeping (`prev_end`, the line-terminator flag, comment collection).
+    /// Used by `collect_comments` and by callers that resync the lexer themselves before reading —
+    /// template continuation and the regex relex.
+    #[inline]
     pub(super) fn update_current(&mut self, token: crate::lexer::Token) {
         self.current_kind = token.kind;
         self.current_start = token.start;
@@ -314,6 +316,18 @@ impl<'a> Parser<'a> {
             TokenKind::Keyword(kw) if kw.can_be_binding_name() => Some(self.intern(kw.as_str())),
             _ => None,
         }
+    }
+
+    /// Like `try_intern_binding_name`, but also accepts the `this` keyword as the
+    /// TypeScript `this` parameter (`function f(this: T)`, `(this: T) => U`).
+    pub(super) fn try_intern_param_name(&self) -> Option<DefaultSymbol> {
+        self.try_intern_binding_name().or_else(|| {
+            if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::This)) {
+                Some(self.intern("this"))
+            } else {
+                None
+            }
+        })
     }
 
     /// Intern the current token as a module export name, accepting ANY keyword.
@@ -517,6 +531,32 @@ impl<'a> Parser<'a> {
         self.peek_cache.as_ref().map_or(0, |p| p.start)
     }
 
+    /// Whether a line terminator separates the current token from the peeked one.
+    ///
+    /// Scans the raw inter-token slice, so a comment containing a newline counts
+    /// as a line terminator (per ASI rules). Used for `[no LineTerminator here]`
+    /// restrictions like `using [no LineTerminator here] BindingIdentifier`.
+    pub(super) fn peek_preceded_by_line_terminator(&mut self) -> bool {
+        self.peek_kind(); // populate the cache
+        let to = self.peek_start();
+        let from = self.current_end.min(to);
+        self.source[from..to].contains(['\n', '\r', '\u{2028}', '\u{2029}'])
+    }
+
+    /// Whether the peeked token is followed on the same line by an identifier.
+    ///
+    /// Used for `await using [no LineTerminator here] BindingIdentifier`, where
+    /// the binding sits one token past the peek horizon.
+    pub(super) fn peek_followed_by_same_line_identifier(&mut self) -> bool {
+        self.peek_kind(); // populate the cache
+        let after_peek = self.peek_cache.as_ref().map_or(0, |p| p.end);
+        let bytes = self.source.as_bytes();
+        let pos = scan::skip_whitespace_and_comments(bytes, after_peek);
+        pos < bytes.len()
+            && scan::is_identifier_start(bytes[pos])
+            && !self.source[after_peek..pos].contains(['\n', '\r', '\u{2028}', '\u{2029}'])
+    }
+
     /// Check if peek token could be a property name (identifier, keyword, string, or computed key)
     ///
     /// Used to detect getter/setter syntax where `get` and `set` are contextual keywords:
@@ -636,6 +676,7 @@ impl<'a> Parser<'a> {
             TokenKind::Identifier
                 | TokenKind::BracketOpen
                 | TokenKind::String
+                | TokenKind::Number
                 | TokenKind::Keyword(_)
                 | TokenKind::Hash
         )
@@ -891,21 +932,19 @@ impl<'a> Parser<'a> {
     /// Does NOT handle parameter property modifiers (`public`, `private`, `readonly`).
     fn parse_simple_param(&mut self) -> Result<Expression, ParseError> {
         let (param_start, param_end) = self.current_pos();
-        // Accept `this` keyword as a parameter name (TypeScript `this` parameter)
         let symbol = self
-            .try_intern_binding_name()
-            .or_else(|| {
-                if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::This)) {
-                    Some(self.intern("this"))
-                } else {
-                    None
-                }
-            })
+            .try_intern_param_name()
             .ok_or_else(|| self.error_expected("parameter name or destructuring pattern"))?;
         self.advance()?;
 
         // Check for optional marker: param?
         let optional = self.eat(TokenKind::Question);
+        // The `?` extends the identifier span when no type annotation follows
+        let param_end = if optional {
+            self.prev_token_end()
+        } else {
+            param_end
+        };
 
         // Check for type annotation: param: type
         let (type_annotation, id_end) = if self.check(&TokenKind::Colon) {
@@ -928,7 +967,8 @@ impl<'a> Parser<'a> {
         if self.check(&TokenKind::Equals) {
             self.advance()?; // consume '='
             let default_value = self.parse_assignment_expression()?;
-            let assign_end = default_value.span().end;
+            // prev_token_end covers a parenthesized default's closing `)`
+            let assign_end = self.prev_token_end() as u32;
             param = Expression::AssignmentPattern(AssignmentPattern {
                 left: Box::new(param),
                 right: Box::new(default_value),
@@ -958,10 +998,11 @@ impl<'a> Parser<'a> {
                             let start = self.current_pos().0;
                             self.advance()?; // consume '@'
                             let expression = self.parse_assignment_expression()?;
-                            let end = expression.span().end;
+                            // Covers a parenthesized expression's closing `)` (`@(expr)`)
+                            let end = self.prev_token_end();
                             decorators.push(Decorator {
                                 expression,
-                                span: Span::new(start as u32, end),
+                                span: Span::new(start as u32, end as u32),
                             });
                         }
                         // After decorators, parse parameter and attach decorators
@@ -1040,7 +1081,8 @@ impl<'a> Parser<'a> {
                             let pattern_start = pattern.span().start;
                             self.advance()?; // consume '='
                             let default_value = self.parse_assignment_expression()?;
-                            let assign_end = default_value.span().end;
+                            // prev_token_end covers a parenthesized default's closing `)`
+                            let assign_end = self.prev_token_end() as u32;
                             Expression::AssignmentPattern(AssignmentPattern {
                                 left: Box::new(pattern),
                                 right: Box::new(default_value),
@@ -1071,7 +1113,8 @@ impl<'a> Parser<'a> {
                             let pattern_start = pattern.span().start;
                             self.advance()?; // consume '='
                             let default_value = self.parse_assignment_expression()?;
-                            let assign_end = default_value.span().end;
+                            // prev_token_end covers a parenthesized default's closing `)`
+                            let assign_end = self.prev_token_end() as u32;
                             Expression::AssignmentPattern(AssignmentPattern {
                                 left: Box::new(pattern),
                                 right: Box::new(default_value),

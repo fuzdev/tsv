@@ -382,10 +382,14 @@ impl<'a> Printer<'a> {
                 let name_start = i.type_parameter.name.span.start;
                 let comments_doc =
                     self.build_comments_between(infer_end, name_start, CommentSpacing::Trailing);
+                // Delegate the name + optional `extends C` constraint to the shared
+                // type-parameter doc builder — prettier's `printInferType` is
+                // `["infer ", print("typeParameter")]`, so an infer constraint lays
+                // out identically to a `<T extends C>` declaration constraint.
                 d.concat(&[
                     d.text("infer "),
                     comments_doc,
-                    d.symbol(i.type_parameter.name.name.to_u32()),
+                    self.build_type_parameter_doc(&i.type_parameter, true),
                 ])
             }
             TSType::ThisType(_) => d.text("this"),

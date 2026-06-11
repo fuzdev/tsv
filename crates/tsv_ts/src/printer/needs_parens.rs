@@ -82,6 +82,10 @@ pub enum ParenContext {
     /// Object property value: `{key: <expr>}`
     ObjectPropertyValue,
 
+    /// Default value of a parameter/pattern (`(a = <expr>) =>`) or a class
+    /// property value (`a = <expr>;`)
+    DefaultValue,
+
     /// Spread element argument: `...<expr>`
     SpreadArgument,
 
@@ -266,6 +270,10 @@ pub fn needs_parens(expr: &Expression, ctx: ParenContext) -> bool {
         // Object property value: `{key: (a = b)}`
         // Assignment expressions need parens in object literals (not in ObjectPattern)
         ParenContext::ObjectPropertyValue => matches!(expr, Expression::AssignmentExpression(_)),
+
+        // Assignment as a default/class-property value keeps its parens:
+        // `(a = (b = c)) =>`, `a = (this.a = b);`
+        ParenContext::DefaultValue => matches!(expr, Expression::AssignmentExpression(_)),
 
         // These contexts all need parens around assignment expressions for clarity:
         // - Call/array/new argument: `fn((a = b))`, `[(a = b)]`, `new Fn((a = b))`

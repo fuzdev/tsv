@@ -214,9 +214,11 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
     let mut value_parts = Vec::new();
     let mut has_value_comment = false;
     let mut value_end = value_start;
-    // Track recent end positions for !important stripping (stores ends for last 2 tokens)
-    let mut prev_value_end = value_start;
-    let mut prev_prev_value_end = value_start;
+    // Per-part end bookkeeping for !important stripping, aligned with value_parts:
+    // (value_end before this part was pushed, this part's token end). Comments are not
+    // parts but do advance value_end, so a simple prev/prev-prev pair would roll back
+    // to the wrong position when comments sit next to `!important`.
+    let mut part_ends: Vec<(usize, usize)> = Vec::new();
     let mut paren_depth: i32 = 0;
     let mut brace_depth: i32 = 0;
     let mut bracket_depth: i32 = 0;
@@ -262,8 +264,6 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
                 // Track that we have a comment (for allowing comment-only values)
                 has_value_comment = true;
                 // Update value_end to include the comment in the declaration span
-                prev_prev_value_end = prev_value_end;
-                prev_value_end = value_end;
                 value_end = parser.base_offset() + parser.current_end;
                 parser.advance()?;
                 continue;
@@ -275,10 +275,10 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
             }
         };
 
+        let token_end = parser.base_offset() + parser.current_end;
+        part_ends.push((value_end, token_end));
         value_parts.push(value_str);
-        prev_prev_value_end = prev_value_end;
-        prev_value_end = value_end;
-        value_end = parser.base_offset() + parser.current_end;
+        value_end = token_end;
         parser.advance()?;
     }
 
@@ -287,11 +287,13 @@ pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration
         let last = value_parts.last().map(String::as_str);
         let second_last = value_parts.get(value_parts.len() - 2).map(String::as_str);
         if second_last == Some("!") && last.is_some_and(|s| s.eq_ignore_ascii_case("important")) {
-            // Save end position including !important before shrinking value_end
-            let end_with_important = value_end;
+            // End of the `important` token itself (a trailing comment may have advanced
+            // value_end past it); roll the value span back to just before the `!` was
+            // pushed, which keeps any comments between the value and the `!`.
+            let end_with_important = part_ends[value_parts.len() - 1].1;
+            value_end = part_ends[value_parts.len() - 2].0;
             value_parts.pop();
             value_parts.pop();
-            value_end = prev_prev_value_end;
             Some(end_with_important as u32)
         } else {
             None

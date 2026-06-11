@@ -132,6 +132,9 @@ pub struct MethodDefinition {
     /// Whether this method overrides a base class method
     #[serde(rename = "override", skip_serializing_if = "super::is_false")]
     pub is_override: bool,
+    /// Whether this is an optional method (`m?()`); emitted only when true
+    #[serde(rename = "optional", skip_serializing_if = "Option::is_none")]
+    pub optional: Option<bool>,
     pub computed: bool,
     pub key: Box<Expression>,
     pub kind: String,

@@ -140,7 +140,7 @@ impl<'a> SvelteParser<'a> {
         };
 
         // Parse the test expression (with comments)
-        let expr_offset = tag_content_start + expr_content.find(expr_str).unwrap_or(0);
+        let expr_offset = tag_content_start + super::subslice_offset(expr_content, expr_str);
 
         let test = self.parse_ts_expression(expr_str, expr_offset)?;
 
@@ -738,7 +738,8 @@ impl<'a> SvelteParser<'a> {
             .trim();
 
         let error = if !error_str.is_empty() {
-            let error_offset = catch_tag_start + catch_tag_content.find(error_str).unwrap_or(0);
+            let error_offset =
+                catch_tag_start + super::subslice_offset(catch_tag_content, error_str);
             Some(self.parse_ts_pattern(error_str, error_offset)?)
         } else {
             None
@@ -763,7 +764,7 @@ impl<'a> SvelteParser<'a> {
             .trim();
 
         let value = if !value_str.is_empty() {
-            let value_offset = then_tag_start + then_tag_content.find(value_str).unwrap_or(0);
+            let value_offset = then_tag_start + super::subslice_offset(then_tag_content, value_str);
             Some(self.parse_ts_pattern(value_str, value_offset)?)
         } else {
             None
@@ -800,7 +801,7 @@ impl<'a> SvelteParser<'a> {
             .unwrap_or(tag_content)
             .trim();
 
-        let expr_offset = tag_content_start + tag_content.find(expr_str).unwrap_or(0);
+        let expr_offset = tag_content_start + super::subslice_offset(tag_content, expr_str);
         let expression = self.parse_ts_expression(expr_str, expr_offset)?;
 
         // Opening tag span is from start to content_start (includes the closing })
@@ -869,7 +870,7 @@ impl<'a> SvelteParser<'a> {
         };
 
         let name_str = content[..name_end].trim();
-        let name_offset = tag_content_start + tag_content.find(name_str).unwrap_or(0);
+        let name_offset = tag_content_start + super::subslice_offset(tag_content, name_str);
         let expression = self.parse_ts_expression(name_str, name_offset)?;
 
         // Opening tag span is from start to content_start (includes the closing })
@@ -886,10 +887,8 @@ impl<'a> SvelteParser<'a> {
             let params_str = &content[paren_pos + 1..close_paren];
             if !params_str.trim().is_empty() {
                 // Compute params_offset (shared by both branches)
-                let paren_in_tag = tag_content.find('(').map_or(0, |p| p + 1);
-                let params_offset = tag_content_start
-                    + paren_in_tag
-                    + tag_content[paren_in_tag..].find(params_str).unwrap_or(0);
+                let params_offset =
+                    tag_content_start + super::subslice_offset(tag_content, params_str);
 
                 if params_str.contains(':') {
                     // Parse typed parameters by wrapping as a function signature
@@ -1040,7 +1039,7 @@ impl<'a> SvelteParser<'a> {
             .unwrap_or(tag_content)
             .trim();
 
-        let expr_offset = tag_content_start + tag_content.find(expr_str).unwrap_or(0);
+        let expr_offset = tag_content_start + super::subslice_offset(tag_content, expr_str);
         let expression = self.parse_ts_expression(expr_str, expr_offset)?;
 
         // End is right after the closing }
@@ -1066,7 +1065,7 @@ impl<'a> SvelteParser<'a> {
             .unwrap_or(tag_content)
             .trim();
 
-        let decl_offset = tag_content_start + tag_content.find(decl_str).unwrap_or(0);
+        let decl_offset = tag_content_start + super::subslice_offset(tag_content, decl_str);
 
         // Find the = sign (accounting for destructuring patterns with nested =)
         // We need to find the top-level = that separates id from init
@@ -1075,7 +1074,7 @@ impl<'a> SvelteParser<'a> {
         let id_str = decl_str[..eq_pos].trim();
         let init_str = decl_str[eq_pos + 1..].trim();
 
-        let id_offset = decl_offset + decl_str.find(id_str).unwrap_or(0);
+        let id_offset = decl_offset + super::subslice_offset(decl_str, id_str);
         let init_offset =
             decl_offset + eq_pos + 1 + (decl_str[eq_pos + 1..].len() - init_str.len());
 
@@ -1168,7 +1167,7 @@ impl<'a> SvelteParser<'a> {
                 let trimmed = chunk.trim();
                 if !trimmed.is_empty() {
                     // Find where trimmed content starts within this chunk
-                    let trim_offset = chunk.find(trimmed).unwrap_or(0);
+                    let trim_offset = super::subslice_offset(chunk, trimmed);
                     let ident_offset = idents_offset + pos + trim_offset;
                     let expr = self.parse_ts_expression(trimmed, ident_offset)?;
                     identifiers.push(expr);
@@ -1199,7 +1198,7 @@ impl<'a> SvelteParser<'a> {
             .unwrap_or(tag_content)
             .trim();
 
-        let expr_offset = tag_content_start + tag_content.find(expr_str).unwrap_or(0);
+        let expr_offset = tag_content_start + super::subslice_offset(tag_content, expr_str);
         let expression = self.parse_ts_expression(expr_str, expr_offset)?;
 
         let end = after_close;

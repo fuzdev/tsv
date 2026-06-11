@@ -2,7 +2,7 @@
 name = "tsv_lang"
 version.workspace = true
 edition.workspace = true
-description = "Language-agnostic foundation primitives for TSV"
+description = "Language-agnostic foundation primitives for tsv"
 
 [dependencies]
 smallvec.workspace = true

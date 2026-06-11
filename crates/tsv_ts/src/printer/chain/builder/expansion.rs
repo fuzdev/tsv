@@ -174,7 +174,10 @@ pub(super) fn call_callback_status<'a>(
 ///
 /// Used to enable the intermediate state where callback args expand but chain stays inline.
 /// Skips trailing NonNull assertions - `.length!` counts as ending with member.
-pub(super) fn ends_with_member(rest_groups: &[ChainGroup], first_groups: &[ChainGroup]) -> bool {
+pub(super) fn ends_with_member<'a>(
+    rest_groups: &[ChainGroup<'a>],
+    first_groups: &[ChainGroup<'a>],
+) -> bool {
     rest_groups
         .last()
         .or_else(|| first_groups.last())

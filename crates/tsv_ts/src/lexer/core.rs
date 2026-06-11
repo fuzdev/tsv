@@ -103,10 +103,16 @@ impl<'a> Lexer<'a> {
     /// Seek to a specific position and re-lex from there.
     /// Used when splitting compound tokens like `>=` into `>` + `=`.
     pub fn seek_and_next_token(&mut self, position: usize) -> Result<Token, ParseError> {
+        self.set_position(position);
+        self.next_token()
+    }
+
+    /// Reset the char cursor to an absolute byte position (must be a char boundary).
+    #[inline]
+    fn set_position(&mut self, position: usize) {
         self.position = position;
         self.chars = self.source[position..].chars();
         self.current = self.chars.next();
-        self.next_token()
     }
 
     #[inline]
@@ -146,15 +152,18 @@ impl<'a> Lexer<'a> {
     ///
     /// The decoded name is returned in the token's `decoded` field when escapes are present.
     /// Prettier normalizes these to their decoded form.
+    ///
+    /// Escape-free identifiers (the overwhelmingly common case) take a byte-level
+    /// ASCII fast path and never allocate: `decoded` materializes lazily on the
+    /// first escape, recovering the literal prefix from the source slice.
     fn scan_identifier_with_escapes(&mut self, first_char: char) -> Result<Token, ParseError> {
         let start = self.position;
-        let mut decoded = String::new();
-        let mut has_escapes = false;
+        // None until an actual escape is decoded; `decoded.is_some()` ⇔ has-escapes.
+        let mut decoded: Option<String> = None;
 
         // Handle first character (already validated as valid identifier start)
         if first_char == '\\' {
             // First char is a unicode escape
-            has_escapes = true;
             if let Some((ch, len)) = try_decode_unicode_escape(self.source, self.position) {
                 if !is_id_start(ch) {
                     return Err(ParseError::InvalidSyntax {
@@ -165,7 +174,7 @@ impl<'a> Lexer<'a> {
                         context: None,
                     });
                 }
-                decoded.push(ch);
+                decoded = Some(String::from(ch));
                 // Advance by the escape sequence length
                 for _ in 0..len {
                     self.advance();
@@ -178,15 +187,36 @@ impl<'a> Lexer<'a> {
                 });
             }
         } else {
-            decoded.push(first_char);
             self.advance();
+
+            // ASCII fast path: tight byte loop over `[a-zA-Z0-9_$]` (the ASCII
+            // subset of IdentifierPart), then resync the char cursor once.
+            // Bails to the general loop on the first non-ASCII byte or `\`.
+            if first_char.is_ascii() {
+                let bytes = self.source.as_bytes();
+                let mut pos = self.position;
+                while pos < bytes.len()
+                    && (bytes[pos].is_ascii_alphanumeric()
+                        || bytes[pos] == b'_'
+                        || bytes[pos] == b'$')
+                {
+                    pos += 1;
+                }
+                if pos != self.position {
+                    self.set_position(pos);
+                }
+            }
         }
 
-        // Continue scanning identifier characters (including escapes)
+        // Continue scanning identifier characters (including escapes). After the
+        // fast path this also serves as the terminator check — the first iteration
+        // breaks unless the identifier continues with a non-ASCII char or escape.
         loop {
             match self.current {
                 Some(ch) if is_id_continue(ch) => {
-                    decoded.push(ch);
+                    if let Some(d) = &mut decoded {
+                        d.push(ch);
+                    }
                     self.advance();
                 }
                 Some('\\') => {
@@ -196,8 +226,10 @@ impl<'a> Lexer<'a> {
                             // Not a valid identifier continue char, stop here
                             break;
                         }
-                        has_escapes = true;
-                        decoded.push(ch);
+                        // First escape: everything consumed so far was literal.
+                        decoded
+                            .get_or_insert_with(|| self.source[start..self.position].to_string())
+                            .push(ch);
                         for _ in 0..len {
                             self.advance();
                         }
@@ -210,9 +242,10 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        // Check if it's a keyword (only if no escapes - escaped keywords are identifiers)
-        let kind = if !has_escapes {
-            if let Some(kw) = keyword_kind(&decoded) {
+        // Check if it's a keyword (only if no escapes - escaped keywords are identifiers;
+        // without escapes the source slice IS the name, so no decoded buffer is needed)
+        let kind = if decoded.is_none() {
+            if let Some(kw) = keyword_kind(&self.source[start..self.position]) {
                 TokenKind::Keyword(kw)
             } else {
                 TokenKind::Identifier
@@ -226,7 +259,7 @@ impl<'a> Lexer<'a> {
             kind,
             start,
             end: self.position,
-            decoded: if has_escapes { Some(decoded) } else { None },
+            decoded,
         })
     }
 
@@ -585,20 +618,14 @@ impl<'a> Lexer<'a> {
                         // Line comment
                         let mut pos = self.position;
                         let token = comments::read_line_comment(self.source, &mut pos)?;
-                        // Update lexer state
-                        self.position = pos;
-                        self.chars = self.source[pos..].chars();
-                        self.current = self.chars.next();
+                        self.set_position(pos);
                         Ok(token)
                     }
                     Some('*') => {
                         // Block comment
                         let mut pos = self.position;
                         let token = comments::read_block_comment(self.source, &mut pos)?;
-                        // Update lexer state
-                        self.position = pos;
-                        self.chars = self.source[pos..].chars();
-                        self.current = self.chars.next();
+                        self.set_position(pos);
                         Ok(token)
                     }
                     Some('=') => {
@@ -912,9 +939,7 @@ impl<'a> Lexer<'a> {
     /// Pattern and flags are stored in token.decoded as "pattern\0flags" (null-separated).
     pub fn read_regex_literal(&mut self, slash_start: usize) -> Result<Token, ParseError> {
         // Sync to just after the opening /
-        self.position = slash_start + 1;
-        self.chars = self.source[self.position..].chars();
-        self.current = self.chars.next();
+        self.set_position(slash_start + 1);
 
         let pattern_start = self.position;
         let mut in_class = false; // Inside character class [...]
@@ -1026,9 +1051,7 @@ impl<'a> Lexer<'a> {
 
         // Sync lexer position to just after the }
         // brace_end is where template content starts
-        self.position = brace_end;
-        self.chars = self.source[brace_end..].chars();
-        self.current = self.chars.next();
+        self.set_position(brace_end);
 
         let content_start = brace_end;
         let brace_start = brace_end - 1; // for span tracking, } is 1 char before

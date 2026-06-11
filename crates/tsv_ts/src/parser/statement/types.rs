@@ -367,17 +367,34 @@ impl<'a> Parser<'a> {
 
         let name = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
 
+        // Optional constraint: `infer U extends C`. Parse the constraint as a
+        // union type (not a full type) so a trailing `? T : F` binds to the
+        // enclosing conditional rather than being swallowed as a nested
+        // conditional — TS's rule that the constraint's `extends` can't itself
+        // start a conditional. Parens re-enable it (`infer U extends (A ? B : C)`),
+        // since the parenthesized-type parser recurses into the full type grammar.
+        // Mirrors how a conditional's `extends_type` is parsed (`parse_type_inner`).
+        let mut end = id_end as u32;
+        let constraint = if self.check(&TokenKind::Keyword(KeywordKind::Extends)) {
+            self.advance()?; // consume 'extends'
+            let constraint_type = self.parse_union_type()?;
+            end = constraint_type.span().end;
+            Some(Box::new(constraint_type))
+        } else {
+            None
+        };
+
         Ok(TSType::Infer(TSInferType {
             type_parameter: TSTypeParameter {
                 name,
-                constraint: None,
+                constraint,
                 default: None,
                 is_const: false,
                 is_in: false,
                 is_out: false,
-                span: Span::new(id_start as u32, id_end as u32),
+                span: Span::new(id_start as u32, end),
             },
-            span: Span::new(start as u32, id_end as u32),
+            span: Span::new(start as u32, end),
         }))
     }
 
@@ -531,8 +548,11 @@ impl<'a> Parser<'a> {
             TSTypeQueryExprName::EntityName(entity_name)
         };
 
-        // Parse optional type arguments: typeof Array<string>
-        let type_arguments = if self.check(&TokenKind::LessThan) {
+        // Parse optional type arguments: typeof Array<string>.
+        // A line break before `<` ends the query (acorn's tsParseTypeQuery
+        // checks hasPrecedingLineBreak) — `typeof a` ⏎ `<T>(): void` in an
+        // interface is two members, not an instantiation.
+        let type_arguments = if self.check(&TokenKind::LessThan) && !self.had_line_terminator {
             Some(self.parse_type_arguments()?)
         } else {
             None
@@ -865,14 +885,21 @@ impl<'a> Parser<'a> {
 
         let (id_start, id_end) = self.current_pos();
 
-        // Accept identifiers and contextual keywords (e.g., `from`, `as`) as parameter names
+        // Accept identifiers and contextual keywords (e.g., `from`, `as`) as parameter
+        // names, plus the `this` keyword (TypeScript `this` parameter: `(this: T) => U`).
         let symbol = self
-            .try_intern_binding_name()
+            .try_intern_param_name()
             .ok_or_else(|| self.error_expected("parameter name"))?;
         self.advance()?;
 
         // Check for optional: ?
         let optional = self.eat(TokenKind::Question);
+        // The `?` extends the identifier span when no type annotation follows
+        let id_end = if optional {
+            self.prev_token_end()
+        } else {
+            id_end
+        };
 
         // Check for type annotation: : T
         let type_annotation = if self.check(&TokenKind::Colon) {
@@ -1725,14 +1752,7 @@ impl<'a> Parser<'a> {
                 None
             };
             let params = self.parse_parameter_list()?;
-            let return_type = if self.check(&TokenKind::Colon) {
-                Some(self.parse_type_annotation()?)
-            } else {
-                None
-            };
-            let end = return_type
-                .as_ref()
-                .map_or_else(|| self.current_pos().0 as u32, |rt| rt.span.end);
+            let (return_type, end) = self.parse_signature_return_type(true)?;
             return Ok(TSTypeElement::CallSignature(TSCallSignatureDeclaration {
                 type_parameters,
                 params,
@@ -1745,9 +1765,13 @@ impl<'a> Parser<'a> {
         // But NOT when `new` is used as a property name: `{ new: string }`
         if self.check(&TokenKind::Keyword(KeywordKind::New)) {
             // Peek ahead to distinguish construct signature from property named 'new'
-            // Construct signature: new() or new<T>()
+            // Construct signature: new() or new<T>() — skipping comments, so
+            // `new /* c */ (): T` stays a construct signature
             // Property: new: or new?
-            if matches!(self.peek_kind(), TokenKind::ParenOpen | TokenKind::LessThan) {
+            if matches!(
+                self.peek_non_comment_kind(),
+                TokenKind::ParenOpen | TokenKind::LessThan
+            ) {
                 self.advance()?;
                 // Parse optional type parameters: <T>
                 let type_parameters = if self.check(&TokenKind::LessThan) {
@@ -1756,14 +1780,7 @@ impl<'a> Parser<'a> {
                     None
                 };
                 let params = self.parse_parameter_list()?;
-                let return_type = if self.check(&TokenKind::Colon) {
-                    Some(self.parse_type_annotation()?)
-                } else {
-                    None
-                };
-                let end = return_type
-                    .as_ref()
-                    .map_or_else(|| self.current_pos().0 as u32, |rt| rt.span.end);
+                let (return_type, end) = self.parse_signature_return_type(false)?;
                 return Ok(TSTypeElement::ConstructSignature(
                     TSConstructSignatureDeclaration {
                         type_parameters,
@@ -1878,14 +1895,7 @@ impl<'a> Parser<'a> {
             };
 
             let params = self.parse_parameter_list()?;
-            let return_type = if self.check(&TokenKind::Colon) {
-                Some(self.parse_type_annotation()?)
-            } else {
-                None
-            };
-            let end = return_type
-                .as_ref()
-                .map_or_else(|| self.current_pos().0 as u32, |rt| rt.span.end);
+            let (return_type, end) = self.parse_signature_return_type(true)?;
 
             return Ok(TSTypeElement::MethodSignature(TSMethodSignature {
                 key,
@@ -2165,276 +2175,50 @@ impl<'a> Parser<'a> {
         })
     }
 
+    /// Parse an optional `: ReturnType` for a signature member, returning the
+    /// return type (when a `:` is present) and the member's end offset (the
+    /// return type's end, or the current position when there's no annotation).
+    ///
+    /// Call and method signatures allow type predicates (`x is T`, `asserts x`);
+    /// construct signatures pass `allow_type_predicate = false` since `new` can't
+    /// assert.
+    fn parse_signature_return_type(
+        &mut self,
+        allow_type_predicate: bool,
+    ) -> Result<(Option<TSTypeAnnotation>, u32), ParseError> {
+        let return_type = if self.check(&TokenKind::Colon) {
+            Some(if allow_type_predicate {
+                self.parse_return_type_annotation()?
+            } else {
+                self.parse_type_annotation()?
+            })
+        } else {
+            None
+        };
+        // Without a return type the signature ends at the params' `)` — the next
+        // token's start would overshoot past trailing comments or onto the next
+        // line when no separator follows (`bar(/* c */) // c2`)
+        let end = return_type
+            .as_ref()
+            .map_or_else(|| self.prev_token_end() as u32, |rt| rt.span.end);
+        Ok((return_type, end))
+    }
+
     /// Parse declare class: `declare class Foo { ... }` or `declare abstract class Foo { ... }`
+    ///
+    /// Parses through the shared `parse_class_declaration_inner_with_start` with
+    /// the `declare` flag set, so the header (name, type parameters, heritage,
+    /// `implements`) and the ambient body are handled by the same code as a
+    /// concrete class — no parallel parser to drift. The caller has already
+    /// consumed `declare` (and `abstract`); the current token is `class`.
     fn parse_declare_class(
         &mut self,
         start: usize,
         is_abstract: bool,
     ) -> Result<Statement, ParseError> {
-        // Consume 'class' keyword
-        self.advance()?;
-
-        // Parse class name
-        if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(self.error_expected_after("class name", "declare class"));
-        }
-
-        let (id_start, id_end) = self.current_pos();
-        let symbol = self.intern_identifier();
-        self.advance()?;
-
-        let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
-
-        // Parse type parameters if present (e.g., <T> in `class Foo<T>`)
-        let type_parameters = if self.check(&TokenKind::LessThan) {
-            Some(self.parse_type_parameters()?)
-        } else {
-            None
-        };
-
-        // Parse optional extends clause (identifier with optional type arguments)
-        let (super_class, super_type_parameters) =
-            if self.check(&TokenKind::Keyword(KeywordKind::Extends)) {
-                self.advance()?;
-
-                // Parse the superclass identifier
-                if !matches!(self.current_kind(), TokenKind::Identifier) {
-                    return Err(self.error_expected_after("class name", "extends"));
-                }
-
-                let (id_start, id_end) = self.current_pos();
-                let super_symbol = self.intern_identifier();
-                self.advance()?;
-
-                let super_id = Expression::Identifier(Identifier::simple(
-                    super_symbol,
-                    Span::new(id_start as u32, id_end as u32),
-                ));
-
-                // Parse optional type arguments: <T, U>
-                let type_args = if self.check(&TokenKind::LessThan) {
-                    Some(self.parse_type_arguments()?)
-                } else {
-                    None
-                };
-
-                (Some(Box::new(super_id)), type_args)
-            } else {
-                (None, None)
-            };
-
-        // Parse optional implements clause
-        let implements = if self.eat_contextual_keyword("implements") {
-            self.parse_interface_heritage_list()?
-        } else {
-            Vec::new()
-        };
-
-        // Parse class body (for declare class, members are signatures only)
-        let body = self.parse_declare_class_body()?;
-        let end = body.span.end;
-
-        Ok(Statement::ClassDeclaration(ClassDeclaration {
-            decorators: None,
-            id: Some(id),
-            super_class,
-            super_type_parameters,
-            implements,
-            body,
-            declare: true,
-            r#abstract: is_abstract,
-            type_parameters,
-            span: Span::new(start as u32, end),
-        }))
-    }
-
-    /// Parse declare class body: `{ constructor(); method(): T; prop: T; }`
-    fn parse_declare_class_body(&mut self) -> Result<ClassBody, ParseError> {
-        let start = self.current_pos().0;
-        self.expect(&TokenKind::BraceOpen)?;
-
-        let mut body = Vec::new();
-        while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-            body.push(self.parse_declare_class_member()?);
-        }
-
-        let (_, end) = self.current_pos();
-        self.expect(&TokenKind::BraceClose)?;
-
-        Ok(ClassBody {
-            body,
-            span: Span::new(start as u32, end as u32),
-        })
-    }
-
-    /// Parse declare class member (property or method signature)
-    fn parse_declare_class_member(&mut self) -> Result<ClassMember, ParseError> {
-        let start = self.current_pos().0;
-
-        // Handle accessibility modifiers (public, private, protected)
-        let accessibility = if self.eat_contextual_keyword("public") {
-            Some(Accessibility::Public)
-        } else if self.eat_contextual_keyword("private") {
-            Some(Accessibility::Private)
-        } else if self.eat_contextual_keyword("protected") {
-            Some(Accessibility::Protected)
-        } else {
-            None
-        };
-
-        // Handle modifiers: static, abstract, override, readonly
-        let is_static = self.eat_contextual_keyword("static");
-        let is_abstract = self.eat_contextual_keyword("abstract");
-        let is_override = self.eat_contextual_keyword("override");
-        let readonly = self.eat_contextual_keyword("readonly");
-
-        // Handle 'get' and 'set' contextual keywords for getters/setters
-        let accessor_kind = if matches!(self.current_kind(), TokenKind::Identifier) {
-            let kind = match self.current_value() {
-                "get" => Some(MethodKind::Get),
-                "set" => Some(MethodKind::Set),
-                _ => None,
-            };
-            if kind.is_some() && self.peek_is_class_member_name() {
-                self.advance().ok();
-                kind
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        // Check for index signature: [key: Type]: ValueType
-        if self.is_index_signature_start() {
-            return self.parse_class_index_signature(start, is_static, readonly);
-        }
-
-        // Parse member name or constructor
-        let (computed, key, is_constructor) = if self.check(&TokenKind::BracketOpen) {
-            self.advance()?;
-            let expr = self.parse_expression()?;
-            self.expect(&TokenKind::BracketClose)?;
-            (true, expr, false)
-        } else if matches!(self.current_kind(), TokenKind::Identifier) {
-            let name = self.current_value().to_string();
-            let (key_start, key_end) = self.current_pos();
-            let symbol = self.intern(&name);
-            self.advance()?;
-            (
-                false,
-                Expression::Identifier(Identifier::simple(
-                    symbol,
-                    Span::new(key_start as u32, key_end as u32),
-                )),
-                name == "constructor",
-            )
-        } else {
-            return Err(self.error_expected("class member name"));
-        };
-
-        // Check if it's a method (has parentheses)
-        if self.check(&TokenKind::ParenOpen) {
-            // Capture paren position before parsing params (for comment detection)
-            let (params_start, _) = self.current_pos();
-            let params = self.parse_parameter_list()?;
-            let return_type = if self.check(&TokenKind::Colon) {
-                Some(self.parse_type_annotation()?)
-            } else {
-                None
-            };
-
-            let body_end = return_type
-                .as_ref()
-                .map_or_else(|| self.current_pos().0 as u32, |rt| rt.span.end);
-
-            // Consume optional semicolon, including it in the span
-            let end = if self.eat(TokenKind::Semicolon) {
-                self.prev_token_end() as u32
-            } else {
-                body_end
-            };
-
-            let kind = if is_constructor {
-                MethodKind::Constructor
-            } else if let Some(ak) = accessor_kind {
-                ak
-            } else {
-                MethodKind::Method
-            };
-
-            // Create a FunctionExpression with empty body for declare class methods
-            let value = FunctionExpression {
-                id: None,
-                type_parameters: None, // TODO: parse type parameters for declare class methods
-                params,
-                return_type,
-                body: BlockStatement {
-                    body: Vec::new(),
-                    span: Span::new(body_end, body_end),
-                },
-                generator: false,
-                r#async: false,
-                params_start: params_start as u32,
-                span: Span::new(start as u32, end),
-            };
-
-            Ok(ClassMember::MethodDefinition(MethodDefinition {
-                decorators: None,
-                key,
-                value,
-                kind,
-                accessibility,
-                is_static,
-                r#override: is_override,
-                r#abstract: is_abstract,
-                computed,
-                span: Span::new(start as u32, end),
-            }))
-        } else {
-            // Property declaration
-
-            // Check for optional marker (`?`) or definite assignment assertion (`!`)
-            let modifier = if self.eat(TokenKind::Question) {
-                PropertyModifier::Optional
-            } else if self.eat(TokenKind::Bang) {
-                PropertyModifier::Definite
-            } else {
-                PropertyModifier::None
-            };
-
-            let type_annotation = if self.check(&TokenKind::Colon) {
-                Some(self.parse_type_annotation()?)
-            } else {
-                None
-            };
-
-            let mut end = type_annotation
-                .as_ref()
-                .map_or_else(|| key.span().end, |ta| ta.span.end);
-
-            // Consume optional semicolon, including it in the span
-            if self.eat(TokenKind::Semicolon) {
-                end = self.prev_token_end() as u32;
-            }
-
-            Ok(ClassMember::PropertyDefinition(PropertyDefinition {
-                decorators: None,
-                key,
-                type_annotation,
-                value: None,
-                accessibility,
-                is_static,
-                declare: false,
-                r#abstract: is_abstract,
-                r#override: is_override,
-                readonly,
-                computed,
-                accessor: false,
-                modifier,
-                span: Span::new(start as u32, end),
-            }))
-        }
+        let class =
+            self.parse_class_declaration_inner_with_start(true, is_abstract, start, true)?;
+        Ok(Statement::ClassDeclaration(class))
     }
 
     /// Parse type parameters: `<T, U extends V = W>`

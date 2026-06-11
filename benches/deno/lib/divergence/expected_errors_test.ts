@@ -7,7 +7,7 @@
  *    lenient PostCSS-family parsers).
  *  - Genuine standard-CSS parser gaps (Bucket A — empty custom-property values,
  *    `url()` special chars, namespace `*|*`, …) do NOT classify, so they keep
- *    surfacing as `error`s. See TODO_CSS_COVERAGE.md.
+ *    surfacing as `error`s.
  *
  * Plus language-scoping: a CSS marker must never fire on broken TS/Svelte.
  */

@@ -161,10 +161,9 @@ pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
                     }
                 }
 
-                // Line continuation: backslash followed by newline
-                Some('\n') => {
-                    // Line continuation - consume the newline, add nothing
-                }
+                // Line continuation: backslash followed by a line terminator
+                // (LF, CR, CRLF, U+2028, U+2029) — consumed, contributes nothing
+                Some('\n' | '\u{2028}' | '\u{2029}') => {}
                 Some('\r') => {
                     // Line continuation - consume \r and optional \n
                     if chars.peek() == Some(&'\n') {

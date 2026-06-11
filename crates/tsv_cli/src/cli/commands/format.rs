@@ -1,4 +1,5 @@
 use crate::cli::discover::discover_files;
+use crate::cli::format_source::format_source;
 use crate::cli::input::{InputArgs, ParserType};
 use argh::FromArgs;
 use std::fs;
@@ -171,20 +172,6 @@ impl FormatCommand {
         if self.check && changed > 0 {
             process::exit(1);
         }
-    }
-}
-
-fn format_source(source: &str, parser_type: ParserType) -> Result<String, String> {
-    match parser_type {
-        ParserType::Svelte => tsv_svelte::parse(source)
-            .map(|ast| tsv_svelte::format(&ast, source))
-            .map_err(|e| e.to_string()),
-        ParserType::Css => tsv_css::parse(source)
-            .map(|ast| tsv_css::format(&ast, source))
-            .map_err(|e| e.to_string()),
-        ParserType::TypeScript => tsv_ts::parse(source)
-            .map(|ast| tsv_ts::format(&ast, source))
-            .map_err(|e| e.to_string()),
     }
 }
 

@@ -1,4 +1,4 @@
-//! Language-agnostic foundation primitives for TSV
+//! Language-agnostic foundation primitives for tsv
 //!
 //! This crate provides core types shared across all language implementations:
 //! - `Span` - source code location tracking
@@ -12,6 +12,7 @@
 //! - `printing` - shared printing utilities for printers
 //! - `parser` - shared parser utilities
 //! - `interner` - string interner utilities for printers
+//! - `json` - sizing heuristic for public-AST JSON output buffers
 
 mod comment;
 mod config;
@@ -19,6 +20,7 @@ pub mod doc;
 mod error;
 mod escapes;
 mod interner;
+mod json;
 mod location;
 mod output;
 mod parser;
@@ -35,6 +37,7 @@ pub use comment::{
 pub use config::{EmbedContext, INDENT, LayoutMode, PRINT_WIDTH, PrintConfig, TAB_WIDTH};
 pub use error::{ErrorContext, ParseError, Result};
 pub use interner::{InfallibleResolve, SharedInterner, SymbolResolver, SymbolToU32};
+pub use json::estimated_json_capacity;
 pub use location::{ByteToCharMap, LocationTracker, Position, SourceLocation};
 pub use output::{OutputBuffer, write_indent};
 pub use parser::PeekData;

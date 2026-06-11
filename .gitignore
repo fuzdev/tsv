@@ -14,6 +14,9 @@ node_modules
 # WASM build output
 /crates/tsv_wasm/pkg
 
+# Publish retry sentinel (scripts/publish.ts)
+/.publish-in-progress
+
 # Drift-check generated file (left on failure for inspection)
 /scripts/.drift_check.gen.ts
 

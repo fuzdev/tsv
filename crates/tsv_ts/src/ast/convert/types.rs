@@ -1,6 +1,7 @@
 // TypeScript type conversions
 
 use super::super::{internal, public};
+use super::declarations::convert_type_parameter;
 use super::{bigint_to_decimal, convert_expression, create_location};
 use internal::TSKeywordKind;
 use string_interner::DefaultStringInterner;
@@ -395,20 +396,16 @@ pub(in crate::ast) fn convert_type(
             start: i.span.start,
             end: i.span.end,
             loc: create_location(i.span, loc, offset),
-            type_parameter: public::TSTypeParameter {
-                node_type: "TSTypeParameter".to_string(),
-                start: i.type_parameter.span.start,
-                end: i.type_parameter.span.end,
-                loc: create_location(i.type_parameter.span, loc, offset),
-                is_const: false, // infer doesn't have modifiers
-                is_in: false,
-                is_out: false,
-                name: interner
-                    .resolve_infallible(i.type_parameter.name.name)
-                    .to_string(),
-                constraint: None, // infer doesn't have constraints
-                default: None,    // infer doesn't have defaults
-            },
+            // `infer U` / `infer U extends C` — its `type_parameter` is a regular
+            // type parameter (modifiers always absent, no default), so reuse the
+            // shared converter rather than rebuilding it inline.
+            type_parameter: convert_type_parameter(
+                &i.type_parameter,
+                source,
+                loc,
+                interner,
+                offset,
+            ),
         }),
         internal::TSType::ThisType(t) => public::TSType::TSThisType(public::TSThisType {
             node_type: "TSThisType".to_string(),

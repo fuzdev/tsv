@@ -88,20 +88,34 @@ pub(crate) fn is_false(b: &bool) -> bool {
     !*b
 }
 
-/// Serialize numbers as integers if they have no fractional part and fit in i64
+/// Serialize integral numbers the way JS's `JSON.stringify` does.
+///
+/// JS prints an integral double below 1e21 as the expanded form of its
+/// shortest round-trip representation (`5154166711022522368.0` prints as
+/// `5154166711022522000`). Rust's `f64` `Display` is the same shortest
+/// representation, so parsing it back yields the integer JS denotes; emit
+/// that when it fits i64/u64 so the JSON Number variant matches the canonical
+/// parser's output. Beyond u64 the value stays f64 — the text form diverges
+/// from JS (`5.674724124163433e20` vs `567472412416343300000`) but denotes
+/// the same double, and fixture comparison is value-level (exact under
+/// serde_json's `float_roundtrip` feature).
+// TODO: emit JS-style expanded text for integral doubles beyond u64 too
+// (custom Formatter over write_f64) if byte-level output parity ever matters
 fn serialize_literal_value<S>(value: &serde_json::Value, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
-    // For numbers, ensure integers are serialized without decimals
-    // Only if the value fits safely in i64 (within ±2^53 for exact representation)
     if let Some(f) = value.as_f64()
         && f.fract() == 0.0
         && f.is_finite()
-        && f.abs() <= 9_007_199_254_740_992.0
-    // 2^53, exactly representable as f64
     {
-        return serializer.serialize_i64(f as i64);
+        let shortest = format!("{f}");
+        if let Ok(n) = shortest.parse::<i64>() {
+            return serializer.serialize_i64(n);
+        }
+        if let Ok(n) = shortest.parse::<u64>() {
+            return serializer.serialize_u64(n);
+        }
     }
     value.serialize(serializer)
 }

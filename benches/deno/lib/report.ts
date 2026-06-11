@@ -52,7 +52,7 @@ const DISPLAY_ORDER = [
 	'svelte/compiler',
 	'acorn-typescript',
 	'prettier',
-	// TSV variants
+	// tsv variants
 	'tsv-json',
 	'tsv_wasm-json',
 	'tsv',

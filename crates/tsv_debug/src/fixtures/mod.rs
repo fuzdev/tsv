@@ -8,6 +8,8 @@ pub use audit_signature::{AUDIT_SIGNATURE_FILENAME, AuditSignature};
 use crate::deno::PrettierParser;
 use std::fs;
 use std::path::{Path, PathBuf};
+use tsv_cli::cli::format_source::format_source;
+use tsv_cli::cli::input::ParserType;
 use tsv_cli::json_utils::to_json_with_tabs;
 
 /// Canonical error JSON format for expected_svelte.json files
@@ -68,6 +70,16 @@ impl InputType {
             InputType::SvelteTs => PrettierParser::Filepath("file.svelte.ts"),
             InputType::TypeScript => PrettierParser::Parser("typescript"),
             InputType::Css => PrettierParser::Parser("css"),
+        }
+    }
+
+    /// The `ParserType` our parser/formatter handles this input type as
+    /// (`.svelte.ts` rune modules are plain TypeScript to tsv).
+    pub const fn parser_type(self) -> ParserType {
+        match self {
+            InputType::Svelte => ParserType::Svelte,
+            InputType::SvelteTs | InputType::TypeScript => ParserType::TypeScript,
+            InputType::Css => ParserType::Css,
         }
     }
 }
@@ -1168,23 +1180,11 @@ pub fn delete_file_if_exists(path: &Path) -> Result<(), String> {
 /// Determines file type from filepath extension and calls the appropriate formatter.
 /// Supports .svelte, .svelte.ts, .ts, and .css files.
 pub fn format_with_our_formatter(content: &str, filepath: &str) -> Result<String, String> {
-    match InputType::from_filepath(filepath) {
-        Some(InputType::Svelte) => {
-            let ast =
-                tsv_svelte::parse(content).map_err(|e| format!("Format error (parse): {e:?}"))?;
-            Ok(tsv_svelte::format(&ast, content))
-        }
-        Some(InputType::SvelteTs | InputType::TypeScript) => {
-            let ast = tsv_ts::parse(content).map_err(|e| format!("Format error (parse): {e:?}"))?;
-            Ok(tsv_ts::format(&ast, content))
-        }
-        Some(InputType::Css) => {
-            let ast =
-                tsv_css::parse(content).map_err(|e| format!("Format error (parse): {e:?}"))?;
-            Ok(tsv_css::format(&ast, content))
-        }
-        None => Err(format!("Unsupported file type for formatting: {filepath}")),
-    }
+    let Some(input_type) = InputType::from_filepath(filepath) else {
+        return Err(format!("Unsupported file type for formatting: {filepath}"));
+    };
+    format_source(content, input_type.parser_type())
+        .map_err(|e| format!("Format error (parse): {e}"))
 }
 
 /// A fixture input parsed once with our parser.

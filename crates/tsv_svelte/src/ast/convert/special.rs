@@ -30,7 +30,7 @@ fn script_has_lang_ts(script: &internal::Script, interner: &DefaultStringInterne
         if name == "lang"
             && let Some(values) = &attr.value
             && let Some(internal::AttributeValue::Text(text)) = values.first()
-            && text.data == "ts"
+            && text.data() == "ts"
         {
             return true;
         }
@@ -184,23 +184,22 @@ fn find_option_values<'a>(
 fn text_value(values: &[internal::AttributeValue]) -> Option<String> {
     values.iter().find_map(|v| {
         if let internal::AttributeValue::Text(text) = v {
-            Some(text.data.clone())
+            Some(text.data().into_owned())
         } else {
             None
         }
     })
 }
 
-pub(super) fn convert_svelte_options(
-    options: &internal::SvelteOptions,
-    source: &str,
-    loc: &LocationTracker,
+/// Find a boolean option — shorthand (`name`) or explicit (`name={true/false}`).
+fn bool_option(
+    attrs: &[internal::AttributeNode],
+    name: &str,
     interner: &DefaultStringInterner,
-) -> public::SvelteOptions {
-    // `runes` — boolean shorthand (`runes`) or explicit (`runes={true}`)
-    let runes = options.attributes.iter().find_map(|attr| {
+) -> Option<bool> {
+    attrs.iter().find_map(|attr| {
         if let internal::AttributeNode::Attribute(attr) = attr
-            && interner.resolve_infallible(attr.name) == "runes"
+            && interner.resolve_infallible(attr.name) == name
         {
             match &attr.value {
                 None => Some(true),
@@ -218,7 +217,22 @@ pub(super) fn convert_svelte_options(
         } else {
             None
         }
-    });
+    })
+}
+
+pub(super) fn convert_svelte_options(
+    options: &internal::SvelteOptions,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+) -> public::SvelteOptions {
+    let runes = bool_option(&options.attributes, "runes", interner);
+    let immutable = bool_option(&options.attributes, "immutable", interner);
+    let accessors = bool_option(&options.attributes, "accessors", interner);
+    let preserve_whitespace = bool_option(&options.attributes, "preserveWhitespace", interner);
+
+    // `css` — plain text value (`css="injected"`)
+    let css = find_option_values(&options.attributes, "css", interner).and_then(|v| text_value(v));
 
     // `namespace` — plain text value
     let namespace =
@@ -256,7 +270,7 @@ pub(super) fn convert_svelte_options(
                 }
                 // Plain text or string literal: customElement="tag-name"
                 let tag_str = match v {
-                    internal::AttributeValue::Text(text) => Some(text.data.clone()),
+                    internal::AttributeValue::Text(text) => Some(text.data().into_owned()),
                     internal::AttributeValue::ExpressionTag(expr) => {
                         if let tsv_ts::ast::internal::Expression::Literal(lit) = &expr.expression
                             && let tsv_ts::ast::internal::LiteralValue::String { content, .. } =
@@ -281,6 +295,10 @@ pub(super) fn convert_svelte_options(
             .map(|attr| convert_attribute_node(attr, source, loc, interner))
             .collect(),
         runes,
+        immutable,
+        accessors,
+        preserve_whitespace,
+        css,
         namespace,
         custom_element,
     }

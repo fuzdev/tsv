@@ -106,11 +106,37 @@ pub struct LocationTracker {
 }
 
 impl LocationTracker {
+    /// Line starts at LF only — Svelte's `locate-character` convention, used
+    /// for Svelte template and CSS locations.
     pub fn new(source: &str) -> Self {
         let mut line_starts = vec![0];
         for (i, ch) in source.char_indices() {
             if ch == '\n' {
                 line_starts.push(i + 1);
+            }
+        }
+        Self { line_starts }
+    }
+
+    /// Line starts per the ECMAScript LineTerminator set (LF, CR, CRLF,
+    /// U+2028, U+2029) — acorn's rule, applied everywhere including inside
+    /// string literals. Used for standalone TypeScript locations.
+    pub fn new_ecmascript(source: &str) -> Self {
+        let mut line_starts = vec![0];
+        let mut chars = source.char_indices().peekable();
+        while let Some((i, ch)) = chars.next() {
+            match ch {
+                '\n' | '\u{2028}' | '\u{2029}' => line_starts.push(i + ch.len_utf8()),
+                '\r' => {
+                    // CRLF counts as a single line terminator
+                    if let Some(&(j, '\n')) = chars.peek() {
+                        chars.next();
+                        line_starts.push(j + 1);
+                    } else {
+                        line_starts.push(i + 1);
+                    }
+                }
+                _ => {}
             }
         }
         Self { line_starts }
@@ -207,5 +233,67 @@ impl LocationTracker {
             Err(idx) => idx.saturating_sub(1),
         };
         self.line_starts[line_idx]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_counts_lf_only() {
+        // Svelte's locate-character convention: CR, U+2028, and U+2029 are not
+        // line starts, only LF
+        let tracker = LocationTracker::new("a\rb\u{2028}c\nd");
+        assert_eq!(tracker.get_line_column(0), (1, 0)); // a
+        assert_eq!(tracker.get_line_column(2), (1, 2)); // b
+        assert_eq!(tracker.get_line_column(6), (1, 6)); // c (U+2028 is 3 bytes)
+        assert_eq!(tracker.get_line_column(8), (2, 0)); // d
+    }
+
+    #[test]
+    fn test_new_ecmascript_lf() {
+        let tracker = LocationTracker::new_ecmascript("a\nb\nc");
+        assert_eq!(tracker.get_line_column(0), (1, 0)); // a
+        assert_eq!(tracker.get_line_column(2), (2, 0)); // b
+        assert_eq!(tracker.get_line_column(4), (3, 0)); // c
+    }
+
+    #[test]
+    fn test_new_ecmascript_crlf_is_one_terminator() {
+        let tracker = LocationTracker::new_ecmascript("a\r\nb\r\nc");
+        assert_eq!(tracker.get_line_column(0), (1, 0)); // a
+        assert_eq!(tracker.get_line_column(1), (1, 1)); // \r
+        assert_eq!(tracker.get_line_column(3), (2, 0)); // b
+        assert_eq!(tracker.get_line_column(6), (3, 0)); // c
+    }
+
+    #[test]
+    fn test_new_ecmascript_lone_cr() {
+        let tracker = LocationTracker::new_ecmascript("a\rb\rc");
+        assert_eq!(tracker.get_line_column(2), (2, 0)); // b
+        assert_eq!(tracker.get_line_column(4), (3, 0)); // c
+    }
+
+    #[test]
+    fn test_new_ecmascript_cr_at_eof() {
+        let tracker = LocationTracker::new_ecmascript("a\r");
+        assert_eq!(tracker.get_line_column(2), (2, 0)); // EOF on line 2
+    }
+
+    #[test]
+    fn test_new_ecmascript_unicode_separators() {
+        // U+2028 and U+2029 are 3-byte UTF-8 sequences
+        let tracker = LocationTracker::new_ecmascript("a\u{2028}b\u{2029}c");
+        assert_eq!(tracker.get_line_column(0), (1, 0)); // a
+        assert_eq!(tracker.get_line_column(4), (2, 0)); // b
+        assert_eq!(tracker.get_line_column(8), (3, 0)); // c
+    }
+
+    #[test]
+    fn test_new_ecmascript_cr_then_separator() {
+        // \r followed by U+2028 is two terminators (only \r\n fuses)
+        let tracker = LocationTracker::new_ecmascript("a\r\u{2028}b");
+        assert_eq!(tracker.get_line_column(5), (3, 0)); // b
     }
 }

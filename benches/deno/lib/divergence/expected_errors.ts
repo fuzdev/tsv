@@ -58,7 +58,7 @@ export interface ExpectedErrorResult {
  * Each pattern identifies file content that is not standard, tsv-supported
  * syntax. Add new patterns here as they're discovered.
  *
- * CSS pattern discipline (see TODO_CSS_COVERAGE.md): sniff on **content
+ * CSS pattern discipline: sniff on **content
  * markers that are unambiguously non-standard**, never on directory names —
  * a future real standard-CSS gap must not hide behind a path. Markers are
  * anchored tightly (e.g. SCSS `$x:` declarations, `#{}`/`$()` interpolation,

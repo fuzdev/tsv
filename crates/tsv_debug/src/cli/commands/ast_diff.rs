@@ -1,8 +1,9 @@
+use crate::deno;
 use crate::diff::{DiffOptions, diff_to_string};
 use crate::error;
 use crate::fixtures;
-use crate::{deno, subprocess};
 use argh::FromArgs;
+use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 
 /// Compare ASTs to verify semantic equivalence (round-trip or two-file).
@@ -157,13 +158,7 @@ async fn parse_to_value(
 
 /// Format content using our Rust printer
 fn format_content(content: &str, parser_type: ParserType) -> error::Result<String> {
-    let parser_name = match parser_type {
-        ParserType::Svelte => "svelte",
-        ParserType::TypeScript => "typescript",
-        ParserType::Css => "css",
-    };
-
-    subprocess::run_tsv_format(content, parser_name)
+    format_source(content, parser_type).map_err(error::DebugError::Command)
 }
 
 /// Compare two ASTs (ignoring spans/locations)

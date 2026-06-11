@@ -876,7 +876,7 @@ impl<'a> Printer<'a> {
 
         // Get raw content from the single Text child
         let content = element.fragment.nodes.first().and_then(|node| match node {
-            FragmentNode::Text(text) => Some(text.data.as_str()),
+            FragmentNode::Text(text) => Some(text.data()),
             _ => None,
         });
 
@@ -888,13 +888,13 @@ impl<'a> Printer<'a> {
         // Parse and format content based on tag type
         // Using base_indent_offset of 0 because we'll handle indentation in the doc structure
         let formatted = if tag_name == "style" {
-            tsv_css::parse(content)
+            tsv_css::parse(&content)
                 .ok()
-                .map(|ast| tsv_css::format(&ast, content))
+                .map(|ast| tsv_css::format(&ast, &content))
         } else {
-            tsv_ts::parse(content)
+            tsv_ts::parse(&content)
                 .ok()
-                .map(|ast| tsv_ts::format(&ast, content))
+                .map(|ast| tsv_ts::format(&ast, &content))
         };
 
         match formatted {

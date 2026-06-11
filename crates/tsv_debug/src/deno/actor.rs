@@ -77,6 +77,12 @@ impl DenoActor {
             ])
             .arg(format!("--config={}", config_file.path().display()))
             .arg(script_file.path())
+            // Without this, prettier-plugin-svelte silently emits the whole
+            // <script>/<style> block verbatim when the embedded formatter
+            // throws — fake "prettier-stable" output that poisons fixture
+            // baselines and comparisons. PRETTIER_DEBUG makes the plugin and
+            // prettier-core rethrow, so the failure surfaces as a tool error.
+            .env("PRETTIER_DEBUG", "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

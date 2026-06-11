@@ -19,7 +19,7 @@ export interface BinarySize {
 	/**
 	 * Gzipped size in bytes (approximates wire size for npm tarballs).
 	 * `null` if `gzip` wasn't available on PATH or the file couldn't be read.
-	 * Uses `gzip -c` (system default level), matching `scripts/publish_patch_npm.ts`.
+	 * Uses `gzip -c` (system default level), matching `scripts/patch_npm_package.ts`.
 	 */
 	gzip_bytes: number | null;
 	/** Binary kind for grouping comparisons */
@@ -56,7 +56,7 @@ async function file_size(path: string): Promise<number | null> {
 /**
  * Return the gzipped size of a file, or `null` if gzip isn't available or
  * the file can't be read. Shells out to `gzip -c` (system default level) so
- * the number matches what `publish_patch_npm.ts` reports — Deno's
+ * the number matches what `patch_npm_package.ts` reports — Deno's
  * CompressionStream uses a different default level and runs ~2% high.
  */
 async function gzip_size(path: string): Promise<number | null> {
@@ -146,20 +146,20 @@ export async function collect_binary_sizes(
 	}
 
 	// tsv WASM — two builds from one crate via the `ast` feature:
-	// pkg/deno (format-only, @fuzdev/tsv_format_wasm) and pkg/deno-parse
+	// pkg/format/deno (format-only, @fuzdev/tsv_format_wasm) and pkg/parse/deno
 	// (parse + format, @fuzdev/tsv_parse_wasm).
 	if (options?.has_wasm !== false) {
 		await push_size(
 			staged,
 			'tsv_format_wasm',
 			'wasm',
-			`${project_root}/crates/tsv_wasm/pkg/deno/tsv_wasm_bg.wasm`,
+			`${project_root}/crates/tsv_wasm/pkg/format/deno/tsv_wasm_bg.wasm`,
 		);
 		await push_size(
 			staged,
 			'tsv_parse_wasm',
 			'wasm',
-			`${project_root}/crates/tsv_wasm/pkg/deno-parse/tsv_wasm_bg.wasm`,
+			`${project_root}/crates/tsv_wasm/pkg/parse/deno/tsv_wasm_bg.wasm`,
 		);
 	}
 

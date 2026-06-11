@@ -3,7 +3,6 @@ mod deno;
 mod diff;
 mod error;
 mod fixtures;
-mod subprocess;
 mod test262;
 
 fn main() {

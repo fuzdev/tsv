@@ -65,8 +65,14 @@ impl<'a> Parser<'a> {
                     }
                 }
                 KeywordKind::Await => {
-                    // Check for `await using` declaration (ES2024 Explicit Resource Management)
-                    if self.peek_is_identifier() && self.peek_value() == "using" {
+                    // Check for `await using` declaration (ES2024 Explicit Resource Management);
+                    // both gaps carry [no LineTerminator here] — a break before `using` or
+                    // before the binding makes this an `await using` expression statement
+                    if self.peek_is_identifier()
+                        && self.peek_value() == "using"
+                        && !self.peek_preceded_by_line_terminator()
+                        && self.peek_followed_by_same_line_identifier()
+                    {
                         return self.parse_await_using_declaration();
                     }
                     // Regular await expression
@@ -126,8 +132,13 @@ impl<'a> Parser<'a> {
                 }
             },
             TokenKind::Identifier => {
-                // Check for contextual keyword 'using' followed by identifier (ES2024 Explicit Resource Management)
-                if self.current_value() == "using" && self.peek_is_identifier() {
+                // Check for contextual keyword 'using' followed by identifier (ES2024
+                // Explicit Resource Management); `using [no LineTerminator here]
+                // BindingIdentifier` — a break makes `using` an identifier statement
+                if self.current_value() == "using"
+                    && self.peek_is_identifier()
+                    && !self.peek_preceded_by_line_terminator()
+                {
                     return self.parse_using_declaration();
                 }
                 // Check for contextual keyword 'type' followed by identifier (type alias declaration)
@@ -149,9 +160,12 @@ impl<'a> Parser<'a> {
                     return self.parse_declare_statement();
                 }
                 // Check for contextual keyword 'abstract' followed by class
-                // Use peek_non_comment_kind to skip comments: `abstract /* c */ class A {}`
+                // Use peek_non_comment_kind to skip comments: `abstract /* c */ class A {}`.
+                // `abstract [no LineTerminator here] class` — a break makes `abstract`
+                // an identifier statement and the class a plain declaration (tsc + acorn)
                 if self.current_value() == "abstract"
                     && self.peek_non_comment_kind() == TokenKind::Keyword(KeywordKind::Class)
+                    && !self.peek_preceded_by_line_terminator()
                 {
                     return self.parse_abstract_class();
                 }

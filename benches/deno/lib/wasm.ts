@@ -72,7 +72,7 @@ export class WasmImplementation implements TsvImplementation {
 
 	async init(): Promise<void> {
 		const wasm_path = new URL(
-			'../../../crates/tsv_wasm/pkg/deno-parse/tsv_wasm.js',
+			'../../../crates/tsv_wasm/pkg/parse/deno/tsv_wasm.js',
 			import.meta.url,
 		).pathname;
 

@@ -173,6 +173,9 @@ pub struct MethodDefinition {
     pub r#abstract: bool,
     /// Whether the key is computed (`[expr]()`)
     pub computed: bool,
+    /// Whether this is an optional method (`m?()`) — valid in interfaces,
+    /// abstract classes, and ambient (`declare`) classes
+    pub optional: bool,
     pub span: Span,
 }
 

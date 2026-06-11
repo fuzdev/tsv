@@ -165,6 +165,29 @@ function value_type(v: unknown): ValueType {
 // When triage confirms a new group is a documented divergence, add a matcher
 // here AND ensure the divergence is cataloged in conformance_svelte.md.
 
+/** Per-file context available to matchers (some divergences are file-level, e.g. BOM). */
+interface MatchContext {
+	source: string;
+	/** Root of the canonical AST — lets matchers resolve ancestors from the entry path. */
+	canonical_root: unknown;
+}
+
+/** Resolve a node by concrete diff path (`fragment.nodes[3].expression`). */
+function get_at_path(root: unknown, path: string): unknown {
+	let node = root;
+	for (const seg of path.split('.')) {
+		if (node == null) return null;
+		const m = seg.match(/^([^[]+)((?:\[\d+\])*)$/);
+		if (!m) return null;
+		node = (node as Record<string, unknown>)[m[1]];
+		for (const idx of m[2].matchAll(/\[(\d+)\]/g)) {
+			if (!Array.isArray(node)) return null;
+			node = node[Number(idx[1])];
+		}
+	}
+	return node;
+}
+
 interface DocumentedMatcher {
 	name: string;
 	/** docs/conformance_svelte.md section the divergence is cataloged under */
@@ -172,6 +195,7 @@ interface DocumentedMatcher {
 	matches: (
 		entry: Omit<DiffEntry, 'documented' | 'signature'>,
 		canonical_parent: unknown,
+		ctx: MatchContext,
 	) => boolean;
 }
 
@@ -199,14 +223,171 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 			return parent?.async === true && parent?.typeParameters != null;
 		},
 	},
+	{
+		// Svelte's parseCss/parse call remove_bom before parsing, so every canonical
+		// offset in a BOM-prefixed file is 1 (UTF-16 unit) lower than the real file
+		// position; tsv deliberately keeps file-true offsets (its lexer skips the BOM
+		// but never shifts positions — acorn agrees on the TS side).
+		name: 'bom_offset',
+		conformance_section: 'CSS Parser Corrections (corpus-enforced) — BOM offset shift',
+		matches: (entry, _canonical_parent, ctx) =>
+			ctx.source.charCodeAt(0) === 0xfeff &&
+			entry.kind === 'value_mismatch' &&
+			typeof entry.ours === 'number' &&
+			typeof entry.canonical === 'number' &&
+			entry.ours === entry.canonical + 1,
+	},
+	{
+		// Under lang="ts", Svelte parses `{#each expr as binding}` by letting the TS
+		// parser read `expr as binding` as an as-expression, then unwraps it — patching
+		// the expression's `end` OFFSET back to the real expression but leaving
+		// `loc.end` at the as-expression's end (after the binding). tsv's loc agrees
+		// with the corrected offset. Scoped to EachBlock expressions; the offsets and
+		// loc.start are not absorbed, so a real loc bug still surfaces undocumented.
+		name: 'each_as_stale_loc',
+		conformance_section: 'Svelte Template Corrections (corpus-enforced) — each-as stale loc.end',
+		matches: (entry, _canonical_parent, ctx) => {
+			const m = entry.path.match(/^(.*)\.expression\.loc\.end\.(line|column)$/);
+			if (!m) return false;
+			const owner = get_at_path(ctx.canonical_root, m[1]) as { type?: unknown } | null;
+			return owner?.type === 'EachBlock';
+		},
+	},
+	{
+		// acorn-typescript ends a typed RestElement at the binding, excluding the
+		// type annotation (`(...args: Array<any>)` → end after `args`) — inconsistent
+		// with its own Identifier params, and with babel/TS-ESLint, which include
+		// the annotation like tsv does.
+		name: 'rest_param_type_end',
+		conformance_section:
+			'TypeScript Parser Corrections (corpus-enforced) — Rest param type-annotation end',
+		matches: (entry, _canonical_parent, ctx) => {
+			const m = entry.path.match(/^(.*)\.(?:end|loc\.end\.(?:line|column))$/);
+			if (!m) return false;
+			const owner = get_at_path(ctx.canonical_root, m[1]) as {
+				type?: unknown;
+				typeAnnotation?: unknown;
+			} | null;
+			return owner?.type === 'RestElement' && owner.typeAnnotation != null;
+		},
+	},
+	{
+		// `static` newline `static` in a class body: tsc reads modifier + member (a
+		// static field named `static`); acorn ASI-splits every bare `static` into its
+		// own value-less field. tsv follows tsc. Scoped to class bodies whose
+		// canonical AST contains a value-less, non-computed property literally named
+		// `static` — the ladder pattern.
+		name: 'static_member_ladder',
+		conformance_section: 'TypeScript Parser Corrections (corpus-enforced) — static member ladder',
+		matches: (entry, _canonical_parent, ctx) => {
+			const segments = entry.path.split('.');
+			for (let i = segments.length - 1; i > 0; i--) {
+				const node = get_at_path(ctx.canonical_root, segments.slice(0, i).join('.')) as {
+					type?: unknown;
+					body?: unknown;
+				} | null;
+				if (node?.type !== 'ClassBody' || !Array.isArray(node.body)) continue;
+				return node.body.some(
+					(member: {
+						type?: unknown;
+						computed?: unknown;
+						value?: unknown;
+						key?: { name?: unknown };
+					}) =>
+						member?.type === 'PropertyDefinition' &&
+						member.computed === false &&
+						member.value === null &&
+						member.key?.name === 'static',
+				);
+			}
+			return false;
+		},
+	},
+	{
+		// acorn-typescript leaves a class heritage with type args as a
+		// `TSInstantiationExpression` superClass when a line break precedes the next
+		// clause (`extends Base<T>` newline `implements I` — its instantiation bail
+		// checks hasPrecedingLineBreak); the same-line form yields
+		// `superClass: Identifier` + `superTypeParameters`. tsv emits the same-line
+		// shape uniformly.
+		name: 'extends_instantiation_linebreak',
+		conformance_section:
+			'TypeScript Parser Corrections (corpus-enforced) — extends instantiation line-break shape',
+		matches: (entry, _canonical_parent, ctx) => {
+			const m = entry.path.match(/^(.*)\.(?:superClass(?:\..*)?|superTypeParameters)$/);
+			if (!m) return false;
+			const cls = get_at_path(ctx.canonical_root, m[1]) as {
+				superClass?: { type?: unknown } | null;
+			} | null;
+			return cls?.superClass?.type === 'TSInstantiationExpression';
+		},
+	},
+	{
+		// A lone UTF-16 surrogate in a string value (`"\ud800"`) is unrepresentable
+		// in tsv's Rust strings — the decoded value carries U+FFFD where acorn keeps
+		// the WTF-16 lone surrogate. Matches when replacing canonical's lone
+		// surrogates with U+FFFD yields ours.
+		name: 'lone_surrogate_value',
+		conformance_section:
+			'TypeScript Parser Corrections (corpus-enforced) — Lone surrogates in string values',
+		matches: (entry) => {
+			if (entry.kind !== 'value_mismatch') return false;
+			if (typeof entry.ours !== 'string' || typeof entry.canonical !== 'string') return false;
+			const replaced = entry.canonical.replace(
+				/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/gu,
+				'\u{FFFD}',
+			);
+			return replaced !== entry.canonical && replaced === entry.ours;
+		},
+	},
+	{
+		// acorn-typescript starts the call/member nodes built on a parenthesized
+		// decorator expression after the opening paren (`@(a)() p` → start at the
+		// inner `a`) — inconsistent with its own non-decorator parse of `(a)()`
+		// and with babel, which start at the `(` like tsv does.
+		name: 'decorator_paren_subscript_start',
+		conformance_section:
+			'TypeScript Parser Corrections (corpus-enforced) — Parenthesized decorator subscript start',
+		matches: (entry, _canonical_parent, ctx) => {
+			const m = entry.path.match(
+				/^(.*\.decorators\[\d+\]\.expression)(?:\.(?:callee|object|expression))*\.(?:start|loc\.start\.(?:line|column))$/,
+			);
+			if (!m) return false;
+			const expr = get_at_path(ctx.canonical_root, m[1]) as { type?: unknown } | null;
+			return expr?.type === 'CallExpression' || expr?.type === 'MemberExpression';
+		},
+	},
+	{
+		// Svelte's read_declaration tokenizes garbage when a stray `;` or an adjacent
+		// comment touches the property name: `border-box;;` yields a declaration with
+		// property ";" that swallows the next declaration into its value, and
+		// `color/* c */:` yields property "color/*" with the comment tail leaking into
+		// the value (read_until stops at the first whitespace, which sits INSIDE the
+		// comment). tsv parses per spec (skips empty declarations, tokenizes comments).
+		name: 'css_declaration_tokenization',
+		conformance_section:
+			'CSS Parser Corrections (corpus-enforced) — Declaration tokenization garbage',
+		matches: (_entry, canonical_parent) => {
+			const parent = canonical_parent as
+				| { type?: unknown; property?: unknown }
+				| null
+				| undefined;
+			return (
+				parent?.type === 'Declaration' &&
+				typeof parent.property === 'string' &&
+				(parent.property.startsWith(';') || parent.property.includes('/*'))
+			);
+		},
+	},
 ];
 
 function classify(
 	entry: Omit<DiffEntry, 'documented' | 'signature'>,
 	canonical_parent: unknown,
+	ctx: MatchContext,
 ): string | null {
 	for (const matcher of DOCUMENTED_MATCHERS) {
-		if (matcher.matches(entry, canonical_parent)) return matcher.name;
+		if (matcher.matches(entry, canonical_parent, ctx)) return matcher.name;
 	}
 	return null;
 }
@@ -223,7 +404,11 @@ function path_signature(path: string): string {
  * entries. Arrays with differing lengths report one length_mismatch and still
  * recurse the shared prefix so positional drift inside is visible.
  */
-function diff_asts(ours: unknown, canonical: unknown): { diffs: DiffEntry[]; truncated: boolean } {
+function diff_asts(
+	ours: unknown,
+	canonical: unknown,
+	ctx: MatchContext,
+): { diffs: DiffEntry[]; truncated: boolean } {
 	const diffs: DiffEntry[] = [];
 	let truncated = false;
 
@@ -242,7 +427,7 @@ function diff_asts(ours: unknown, canonical: unknown): { diffs: DiffEntry[]; tru
 		diffs.push({
 			...base,
 			signature: `${kind}:${path_signature(path)}`,
-			documented: classify(base, canonical_parent),
+			documented: classify(base, canonical_parent, ctx),
 		});
 	};
 
@@ -553,7 +738,10 @@ async function main(): Promise<void> {
 		lang_stats.compared++;
 		if (multibyte) lang_stats.multibyte++;
 
-		const { diffs, truncated } = diff_asts(ours, canonical_ast);
+		const { diffs, truncated } = diff_asts(ours, canonical_ast, {
+			source: file.content,
+			canonical_root: canonical_ast,
+		});
 		if (diffs.length === 0) {
 			lang_stats.match++;
 			continue; // exact matches are counted, not stored

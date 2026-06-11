@@ -1,5 +1,5 @@
 /**
- * TSV Benchmark Suite
+ * tsv benchmark suite
  *
  * Compares parsing and formatting performance across implementations.
  * All benchmarks are single-threaded: files processed sequentially, no parallelism.
@@ -334,8 +334,8 @@ await check_artifact_freshness([
 		rebuild: 'deno task build:ffi',
 	},
 	{
-		label: 'WASM (deno-parse)',
-		path: wasm_artifact_path('deno-parse'),
+		label: 'WASM (parse/deno)',
+		path: wasm_artifact_path('parse'),
 		binding_crates: ['tsv_wasm'],
 		rebuild: 'deno task build:wasm:parse:deno',
 	},
@@ -824,7 +824,7 @@ function generate_markdown_report(
 	skipped: Map<string, Map<string, string>>,
 ): string {
 	const lines: string[] = [];
-	lines.push('# TSV Benchmark Results\n');
+	lines.push('# tsv benchmark results\n');
 	const commit_str = git_commit ? ` (${git_commit})` : '';
 	lines.push(`**Date:** ${timestamp}${commit_str}\n`);
 

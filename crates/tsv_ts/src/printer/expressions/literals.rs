@@ -277,7 +277,7 @@ impl<'a> Printer<'a> {
         if let Some(decorators) = &id.decorators {
             for decorator in decorators {
                 parts.push(d.text("@"));
-                parts.push(self.build_expression_doc(&decorator.expression));
+                parts.push(self.build_decorator_expression_doc(decorator));
                 parts.push(d.text(" "));
             }
         }

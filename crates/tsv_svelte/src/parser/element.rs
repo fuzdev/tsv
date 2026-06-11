@@ -304,7 +304,7 @@ impl<'a> SvelteParser<'a> {
                                     tag_expr = Some(tsv_ts::ast::internal::Expression::Literal(
                                         tsv_ts::ast::internal::Literal {
                                             value: tsv_ts::ast::internal::LiteralValue::String {
-                                                content: t.data.clone(),
+                                                content: t.data().into_owned(),
                                                 quote: '"',
                                             },
                                             span: t.span,
@@ -468,8 +468,8 @@ impl<'a> SvelteParser<'a> {
         // Create a Text node (Svelte always emits one, even if empty)
         let raw_content = &self.source[content_start..content_end];
         Ok(vec![FragmentNode::Text(Text {
-            data: raw_content.to_string(),
             raw: raw_content.to_string(),
+            decoding: TextDecoding::Raw,
             span: Span {
                 start: content_start as u32,
                 end: content_end as u32,

@@ -18,8 +18,16 @@ pub(super) fn skip_whitespace(bytes: &[u8], mut pos: usize) -> usize {
 pub(super) fn skip_line_comment(bytes: &[u8], mut pos: usize) -> usize {
     // Skip //
     pos += 2;
-    // Read until newline or EOF
+    // Read until line terminator or EOF — U+2028/U+2029 (UTF-8 e2 80 a8/a9)
+    // terminate line comments like LF/CR per the spec
     while pos < bytes.len() && bytes[pos] != b'\n' && bytes[pos] != b'\r' {
+        if bytes[pos] == 0xe2
+            && pos + 2 < bytes.len()
+            && bytes[pos + 1] == 0x80
+            && (bytes[pos + 2] == 0xa8 || bytes[pos + 2] == 0xa9)
+        {
+            break;
+        }
         pos += 1;
     }
     pos
@@ -128,22 +136,35 @@ pub(crate) fn parse_number_literal(raw: &str) -> Result<f64, std::num::ParseFloa
         let prefix = &clean[..2];
         let digits = &clean[2..];
         match prefix {
-            "0x" | "0X" => {
-                // Hex: 0xff
-                return Ok(i64::from_str_radix(digits, 16).unwrap_or(0) as f64);
-            }
-            "0b" | "0B" => {
-                // Binary: 0b1010
-                return Ok(i64::from_str_radix(digits, 2).unwrap_or(0) as f64);
-            }
-            "0o" | "0O" => {
-                // Octal: 0o77
-                return Ok(i64::from_str_radix(digits, 8).unwrap_or(0) as f64);
-            }
+            // Hex: 0xff
+            "0x" | "0X" => return Ok(parse_radix_f64(digits, 16)),
+            // Binary: 0b1010
+            "0b" | "0B" => return Ok(parse_radix_f64(digits, 2)),
+            // Octal: 0o77
+            "0o" | "0O" => return Ok(parse_radix_f64(digits, 8)),
             _ => {}
         }
     }
 
     // Regular decimal (including scientific notation)
     clean.parse::<f64>()
+}
+
+/// Fold radix digits into an `f64`, rounding at each digit — exactly acorn's
+/// `readInt` accumulation, which past 2^53 can land one ulp below the
+/// correctly rounded value (e.g. `0x47874750d3a412a2`); matching acorn is the
+/// conformance target, so don't "fix" this with a u128 cast. An integer-typed
+/// accumulator would also overflow to 0 on long literals like
+/// `0x123abcdef456ABCDEF`.
+fn parse_radix_f64(digits: &str, radix: u32) -> f64 {
+    digits.chars().fold(0f64, |acc, c| {
+        // These radixes are all powers of two, so `acc * radix` only rescales the
+        // exponent and is exact — making this byte-identical to `mul_add`. Keep the
+        // explicit multiply-and-add as a faithful transcription of acorn's
+        // `total = total * radix + val` rather than fusing it.
+        #[allow(clippy::suboptimal_flops)]
+        {
+            acc * f64::from(radix) + f64::from(c.to_digit(radix).unwrap_or(0))
+        }
+    })
 }

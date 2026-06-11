@@ -148,6 +148,6 @@ pub(super) fn convert_text(text: &internal::Text) -> public::Text {
         start: text.span.start,
         end: text.span.end,
         raw: text.raw.clone(),
-        data: text.data.clone(),
+        data: text.data().into_owned(),
     }
 }

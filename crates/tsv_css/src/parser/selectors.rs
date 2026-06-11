@@ -427,10 +427,10 @@ pub(crate) fn parse_combinator(
         TokenKind::Tilde => Some(Combinator::SubsequentSibling),
         TokenKind::ColumnCombinator => Some(Combinator::Column),
         _ => {
-            // Check if we had whitespace before (descendant combinator)
-            // For now, peek ahead to see if there's another selector coming
-            if is_selector_start(parser) {
-                // Descendant combinator - use a single space span at current position
+            // Descendant requires actual whitespace between the selectors — an adjacent
+            // selector token is part of the same compound (handled by the
+            // is_simple_selector_chain loop) and must never fabricate a zero-width combinator
+            if combinator_start > whitespace_start && is_selector_start(parser) {
                 Some(Combinator::Descendant)
             } else {
                 None
@@ -520,11 +520,22 @@ fn parse_relative_selector(
     })
 }
 
-/// Check if another simple selector follows in the chain (e.g., `div.class#id`)
+/// Check if another simple selector follows in the chain (e.g., `div.class#id`, `&__a`, `div&`)
+///
+/// Whitespace is tokenized, so a directly-adjacent `Identifier`/`Asterisk`/`Ampersand` can only
+/// appear mid-compound (`&__a`, `div&`, `&&`, `*&`) — a space yields a `Whitespace` token and ends
+/// the chain. Type-not-first compounds (`&div`, `a&b`) are grammar-invalid per Selectors 4 but
+/// parsed for parity with Svelte's `parseCss` (validity is the future diagnostics layer's job).
 fn is_simple_selector_chain(parser: &CssParser) -> bool {
     matches!(
         parser.current_kind,
-        TokenKind::Dot | TokenKind::Hash | TokenKind::Colon | TokenKind::LeftBracket
+        TokenKind::Dot
+            | TokenKind::Hash
+            | TokenKind::Colon
+            | TokenKind::LeftBracket
+            | TokenKind::Identifier
+            | TokenKind::Asterisk
+            | TokenKind::Ampersand
     )
 }
 

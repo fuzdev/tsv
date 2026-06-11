@@ -866,6 +866,23 @@ impl<'a> Printer<'a> {
         None
     }
 
+    /// Build a Doc for a decorator's expression, parenthesizing when the bare
+    /// decorator grammar doesn't cover it.
+    ///
+    /// Bare form: an identifier / non-computed non-optional member chain, or one
+    /// non-optional call on such a chain — anything else (`@(fn().fn1())`,
+    /// `@(a?.b)`, `@(a[b])`) keeps parens. Prettier ref:
+    /// `canDecoratorExpressionUnparenthesized` in parentheses/parent-needs-parentheses.js.
+    pub(crate) fn build_decorator_expression_doc(&self, decorator: &internal::Decorator) -> DocId {
+        let d = self.d();
+        let expr_doc = self.build_expression_doc(&decorator.expression);
+        if can_decorator_expression_unparenthesized(&decorator.expression) {
+            expr_doc
+        } else {
+            d.concat(&[d.text("("), expr_doc, d.text(")")])
+        }
+    }
+
     /// Build a Doc for a list of decorators, each on its own line
     ///
     /// Returns None if there are no decorators.
@@ -884,7 +901,7 @@ impl<'a> Printer<'a> {
         let mut parts = Vec::new();
         for (i, decorator) in decorators.iter().enumerate() {
             parts.push(d.text("@"));
-            parts.push(self.build_expression_doc(&decorator.expression));
+            parts.push(self.build_decorator_expression_doc(decorator));
             // Check for trailing comments after decorator: `@expr /* c */`
             // Boundary is next decorator's start, or next_token_start for the last one
             let boundary = decorators
@@ -963,7 +980,7 @@ impl<'a> Printer<'a> {
                 dec_parts.push(d.text(" "));
             }
             dec_parts.push(d.text("@"));
-            dec_parts.push(self.build_expression_doc(&decorator.expression));
+            dec_parts.push(self.build_decorator_expression_doc(decorator));
 
             // Handle comments between this decorator and the next boundary.
             // Comments between two decorators: ALL treated as leading on the next
@@ -1408,5 +1425,31 @@ impl<'a> Printer<'a> {
 impl<'a> SymbolResolver for Printer<'a> {
     fn interner(&self) -> &SharedInterner {
         &self.interner
+    }
+}
+
+/// Whether `expr` is a bare-decorator member chain: an identifier, or a
+/// non-computed, non-optional member chain of identifiers down to one.
+fn is_decorator_member_expression(expr: &internal::Expression) -> bool {
+    match expr {
+        internal::Expression::Identifier(_) => true,
+        internal::Expression::MemberExpression(member) => {
+            !member.computed
+                && !member.optional
+                && matches!(&*member.property, internal::Expression::Identifier(_))
+                && is_decorator_member_expression(&member.object)
+        }
+        _ => false,
+    }
+}
+
+/// Whether a decorator expression is valid without parens (see
+/// `Printer::build_decorator_expression_doc`).
+fn can_decorator_expression_unparenthesized(expr: &internal::Expression) -> bool {
+    match expr {
+        internal::Expression::CallExpression(call) => {
+            !call.optional && is_decorator_member_expression(&call.callee)
+        }
+        _ => is_decorator_member_expression(expr),
     }
 }
