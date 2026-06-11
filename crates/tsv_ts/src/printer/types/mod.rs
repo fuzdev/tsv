@@ -331,20 +331,30 @@ impl<'a> Printer<'a> {
             }
             TSType::NamedTupleMember(n) => {
                 let mut parts = vec![d.symbol(n.label.name.to_u32())];
-                if n.optional {
-                    parts.push(d.text("?"));
-                }
-                // Comments between `:` and the element type
                 let label_end = n.label.span.end;
                 let type_start = n.element_type.span().start;
-                // Find `:` between label and type, skipping comments
+                // Comments between label and `?` (e.g., `[a /* c */?: T]`)
+                let after_modifier = if n.optional {
+                    self.push_modifier_marker_doc(&mut parts, label_end, b'?')
+                } else {
+                    label_end
+                };
+                // Find `:` between label/`?` and type, skipping comments
                 let after_colon = find_char_skipping_comments(
                     self.source.as_bytes(),
-                    label_end as usize,
+                    after_modifier as usize,
                     type_start as usize,
                     b':',
                 )
                 .map(|p| (p + 1) as u32); // +1 for after `:`
+                // Comments between label/`?` and `:` (e.g., `[b /* c */: T]`)
+                if let Some(after_colon) = after_colon
+                    && self.has_comments_between(after_modifier, after_colon - 1)
+                {
+                    parts.push(
+                        self.build_inline_comments_between_doc(after_modifier, after_colon - 1),
+                    );
+                }
                 let comments_doc = after_colon.map_or_else(
                     || d.empty(),
                     |after_colon| {

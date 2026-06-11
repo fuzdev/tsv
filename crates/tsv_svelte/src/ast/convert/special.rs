@@ -10,10 +10,10 @@ use crate::ast::{internal, public};
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
 
-use super::{
-    CommentAttachmentContext, attach_comments_recursively, comment_to_json, convert_attribute_node,
-    convert_fragment, span_to_name_loc, to_json_value,
+use super::comment_attachment::{
+    CommentAttachmentContext, attach_comments_recursively, comment_to_json,
 };
+use super::{convert_attribute_node, convert_fragment, span_to_name_loc, to_json_value};
 
 /// Detect if a script tag has `lang="ts"` attribute.
 ///

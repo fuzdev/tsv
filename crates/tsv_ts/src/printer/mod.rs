@@ -4,16 +4,17 @@
 //
 // This module is organized by concern to support future expansion:
 //
-// - **mod.rs** (this file): Core Printer struct and program printing orchestration
+// - **mod.rs** (this file): Core Printer struct, constructors, and source/comment utilities
 // - **analysis.rs**: Pure AST analysis functions (no Printer state needed)
 // - **comments.rs**: Comment handling (printing, doc building, filtering)
+// - **program.rs**: Program-level printing orchestration (statements, blank lines, comments)
+// - **decorators.rs**: Decorator printing (class-level and class-member)
 // - **statements/**: Statement printing (declarations, control flow, modules, etc.)
-// - **expressions/**: Expression printing (dispatchers, literals, functions, patterns, templates)
-// - **types.rs**: Type annotation printing (TypeScript-specific type syntax)
-// - **objects.rs**: Object expression printing
-// - **arrays.rs**: Array expression printing
-// - **operators.rs**: Unary and binary expression printing
-// - **calls.rs**: Call, member, and conditional expression printing
+// - **expressions/**: Expression printing (dispatch, literals, functions, patterns, templates,
+//   objects, arrays, operators, assignment, conditionals)
+// - **types/**: Type annotation printing (TypeScript-specific type syntax)
+// - **calls/**: Call and `new` expression formatting (argument wrapping, expand patterns)
+// - **chain/**: Member/call chain linearization, grouping, and rendering
 // - **class_common.rs**: Shared class-header layout for declaration + expression printers
 //
 // ## Design Principles
@@ -23,23 +24,17 @@
 // 3. **Modularity**: Each module has single responsibility for future maintainability
 
 mod analysis;
-mod arrays;
-mod assignment;
 mod calls;
 mod chain;
 mod class_common;
 mod comments;
-mod conditional;
-mod expression_stringifier;
+mod decorators;
 mod expressions;
 mod layout;
 mod needs_parens;
-mod new_expression;
-mod objects;
-mod operators;
+mod program;
 mod statements;
 mod types;
-mod utils;
 
 use analysis::needs_isolation_for_hugging;
 pub(crate) use analysis::{
@@ -49,13 +44,13 @@ pub(crate) use analysis::{
     is_pure_property_chain, is_string_literal, object_pattern_should_expand,
     template_literal_has_newlines,
 };
-pub(crate) use assignment::{
+pub(crate) use comments::{CommentFilter, CommentSpacing};
+pub(crate) use expressions::assignment::{
     arrow_chain_has_return_type, is_call_on_member_chain, is_curried_arrow_chain,
     is_curried_arrow_with_return_type, is_literal_member_chain, is_poorly_breakable_chain,
     is_regex_root_chain, is_self_expanding_value, is_simple_self_expanding, is_simple_value,
     is_single_call_on_member_chain, is_type_assertion_call, should_inline_logical_expression,
 };
-pub(crate) use comments::{CommentFilter, CommentSpacing};
 pub(crate) use needs_parens::{ParenContext, needs_parens};
 pub(crate) use types::{should_hug_union_type, unwrap_parenthesized};
 
@@ -63,8 +58,7 @@ use crate::ast::internal;
 use crate::config::TsConfig;
 use std::cell::Cell;
 use tsv_lang::{
-    CommentPosition, EmbedContext, OutputBuffer, PrintConfig, SharedInterner, SymbolResolver,
-    classify_comment, classify_comment_fast, comments_after, comments_in_range,
+    EmbedContext, OutputBuffer, PrintConfig, SharedInterner, SymbolResolver, comments_in_range,
     doc::{
         self,
         arena::{DocArena, DocId},
@@ -866,214 +860,6 @@ impl<'a> Printer<'a> {
         None
     }
 
-    /// Build a Doc for a decorator's expression, parenthesizing when the bare
-    /// decorator grammar doesn't cover it.
-    ///
-    /// Bare form: an identifier / non-computed non-optional member chain, or one
-    /// non-optional call on such a chain — anything else (`@(fn().fn1())`,
-    /// `@(a?.b)`, `@(a[b])`) keeps parens. Prettier ref:
-    /// `canDecoratorExpressionUnparenthesized` in parentheses/parent-needs-parentheses.js.
-    pub(crate) fn build_decorator_expression_doc(&self, decorator: &internal::Decorator) -> DocId {
-        let d = self.d();
-        let expr_doc = self.build_expression_doc(&decorator.expression);
-        if can_decorator_expression_unparenthesized(&decorator.expression) {
-            expr_doc
-        } else {
-            d.concat(&[d.text("("), expr_doc, d.text(")")])
-        }
-    }
-
-    /// Build a Doc for a list of decorators, each on its own line
-    ///
-    /// Returns None if there are no decorators.
-    /// Each decorator is formatted as `@expression` followed by hardline.
-    /// Used for class-level decorators which always go on their own line.
-    pub(crate) fn build_decorators_doc(
-        &self,
-        decorators: Option<&[internal::Decorator]>,
-        next_token_start: u32,
-    ) -> Option<DocId> {
-        let decorators = decorators?;
-        if decorators.is_empty() {
-            return None;
-        }
-        let d = self.d();
-        let mut parts = Vec::new();
-        for (i, decorator) in decorators.iter().enumerate() {
-            parts.push(d.text("@"));
-            parts.push(self.build_decorator_expression_doc(decorator));
-            // Check for trailing comments after decorator: `@expr /* c */`
-            // Boundary is next decorator's start, or next_token_start for the last one
-            let boundary = decorators
-                .get(i + 1)
-                .map_or(next_token_start, |next| next.span.start);
-            if self.has_comments_between(decorator.span.end, boundary) {
-                let comment_doc =
-                    self.build_inline_comments_between_doc(decorator.span.end, boundary);
-                parts.push(comment_doc);
-            }
-            parts.push(d.hardline());
-        }
-        Some(d.concat(&parts))
-    }
-
-    /// Build a Doc for class member decorators (properties and methods)
-    ///
-    /// Returns None if there are no decorators.
-    /// Prettier preserves the original formatting: if any decorator has a newline
-    /// after it in the source, all decorators go on their own lines. Otherwise,
-    /// decorators stay inline (separated by spaces).
-    ///
-    /// Comments between decorators and between the last decorator and the member
-    /// are handled here. Classification determines placement:
-    /// - Trailing (same line as decorator): emitted inline after decorator
-    /// - LeadingInline (same line as next token): emitted inline before next decorator
-    /// - LeadingOwnLine: emitted as a separate line item
-    ///
-    /// Prettier ref: `printClassMemberDecorators` in print/decorators.js
-    /// uses `hasNewlineBetweenOrAfterDecorators` to decide `hardline` vs `line`.
-    pub(crate) fn build_class_member_decorators_doc(
-        &self,
-        decorators: Option<&[internal::Decorator]>,
-        next_token_start: u32,
-    ) -> Option<DocId> {
-        let decorators = decorators?;
-        if decorators.is_empty() {
-            return None;
-        }
-        let d = self.d();
-
-        // Check if any decorator has a newline between it and the next token.
-        // Mirrors prettier's hasNewlineBetweenOrAfterDecorators: skip spaces/tabs
-        // from locEnd(decorator), check if the next non-space char is a newline.
-        // Comments between decorator and newline do NOT count — prettier only skips
-        // spaces/tabs, so a comment like `@fn /* c */\nb` makes the first non-space
-        // char '/' (not '\n'), resulting in false.
-        let has_newline_after = decorators.iter().any(|dec| {
-            let end = dec.span.end as usize;
-            self.source[end..]
-                .bytes()
-                .find(|&b| b != b' ' && b != b'\t')
-                .is_some_and(|b| b == b'\n' || b == b'\r')
-        });
-
-        // Track whether any line comment exists — line comments force the group
-        // to break regardless of has_newline_after (the line comment takes up the
-        // rest of the line, making flat mode impossible).
-        let mut has_line_comment = false;
-
-        // Build items for join(line, items).
-        // Each item is a decorator doc (possibly with trailing/leading inline comments).
-        // Own-line comments become separate items.
-        let mut items: Vec<DocId> = Vec::new();
-        let mut pending_leading: Vec<DocId> = Vec::new();
-
-        for (i, decorator) in decorators.iter().enumerate() {
-            let boundary = decorators
-                .get(i + 1)
-                .map_or(next_token_start, |next| next.span.start);
-
-            // Build decorator doc with any pending leading inline comments
-            let mut dec_parts: Vec<DocId> = Vec::new();
-            for leading in std::mem::take(&mut pending_leading) {
-                dec_parts.push(leading);
-                dec_parts.push(d.text(" "));
-            }
-            dec_parts.push(d.text("@"));
-            dec_parts.push(self.build_decorator_expression_doc(decorator));
-
-            // Handle comments between this decorator and the next boundary.
-            // Comments between two decorators: ALL treated as leading on the next
-            // decorator (matches prettier's comment attachment which visits `key`
-            // before `decorators` in the tree walk).
-            // Comments between the last decorator and the member: use classify_comment
-            // to determine position (trailing stays inline, own-line gets own line).
-            let is_last = i == decorators.len() - 1;
-            let mut own_line_comments: Vec<DocId> = Vec::new();
-            for comment in comments_in_range(self.comments, decorator.span.end, boundary) {
-                if !comment.is_block {
-                    has_line_comment = true;
-                }
-                if !is_last {
-                    // Between decorators: line comments stay trailing on the
-                    // current decorator (they take the rest of the line).
-                    // Block comments: if on the same line as the next decorator,
-                    // they're leading inline; otherwise, on their own line.
-                    if !comment.is_block {
-                        // Line comment: trailing on current decorator
-                        dec_parts.push(d.text(" "));
-                        dec_parts.push(self.build_comment_doc(comment));
-                    } else if self.is_same_line(comment.span.end, boundary) {
-                        pending_leading.push(self.build_comment_doc(comment));
-                    } else {
-                        own_line_comments.push(self.build_comment_doc(comment));
-                    }
-                } else {
-                    // Last decorator: classify comment position
-                    let position =
-                        classify_comment(comment, decorator.span.end, boundary, self.source);
-                    match position {
-                        CommentPosition::Trailing => {
-                            dec_parts.push(d.text(" "));
-                            dec_parts.push(self.build_comment_doc(comment));
-                        }
-                        CommentPosition::LeadingInline => {
-                            pending_leading.push(self.build_comment_doc(comment));
-                        }
-                        CommentPosition::LeadingOwnLine => {
-                            own_line_comments.push(self.build_comment_doc(comment));
-                        }
-                    }
-                }
-            }
-
-            items.push(d.concat(&dec_parts));
-            items.extend(own_line_comments);
-        }
-
-        // Handle remaining leading inline comments (leading on the member)
-        if !pending_leading.is_empty() {
-            let mut parts: Vec<DocId> = Vec::new();
-            for (j, leading) in pending_leading.into_iter().enumerate() {
-                if j > 0 {
-                    parts.push(d.text(" "));
-                }
-                parts.push(leading);
-            }
-            items.push(d.concat(&parts));
-        }
-
-        // group([join(line, items), hardline_or_line])
-        // Between items: `line` (space in flat, newline in break)
-        // After last item: `hardline` if source has newlines (forces group
-        // to break), `line` otherwise (stays flat if group fits)
-        let trailing = if has_newline_after {
-            d.hardline()
-        } else {
-            d.line()
-        };
-        // Line comments and own-line block comments force the group to break.
-        // Line comments take the rest of the line, making flat mode impossible.
-        // Own-line block comments produce extra items in the join list.
-        let needs_break = has_line_comment || items.len() > decorators.len();
-        let joined = d.join_doc(items, d.line());
-        let mut group_parts = vec![joined, trailing];
-        if needs_break {
-            group_parts.push(d.break_parent());
-        }
-        Some(d.group(d.concat(&group_parts)))
-    }
-
-    /// Print a TypeScript program
-    ///
-    /// Delegates to `build_program_doc` to build the doc tree, then renders it.
-    /// This is the same path used by Svelte's `<script>` formatting, ensuring
-    /// consistent behavior (e.g., trailing whitespace trimming in comments).
-    pub(crate) fn print_program(&mut self, program: &internal::Program) {
-        let doc = self.build_program_doc(program);
-        self.write_arena_doc(doc);
-    }
-
     /// Check if any comment in the range has content "prettier-ignore".
     /// Used to emit the next node as raw source text instead of formatting.
     fn has_prettier_ignore_in_range(&self, start: u32, end: u32) -> bool {
@@ -1105,351 +891,9 @@ impl<'a> Printer<'a> {
     }
 }
 
-impl<'a> Printer<'a> {
-    /// Build a DocId tree for a TypeScript program
-    ///
-    /// Returns a DocId that can be wrapped with `indent()` and rendered.
-    /// Used both for standalone TS/JS formatting (via `print_program`) and
-    /// when embedding TypeScript in other formats like Svelte's `<script>`.
-    ///
-    /// The Doc structure preserves:
-    /// - Statement separation with hardline
-    /// - Blank line preservation between statements using literalline
-    /// - Leading comments with proper spacing
-    /// - Trailing same-line comments using line_suffix
-    /// - Program trailing comments after the last statement
-    pub(crate) fn build_program_doc(&self, program: &internal::Program) -> DocId {
-        let d = self.d();
-        let mut parts = Vec::new();
-        let mut prev_end = 0u32;
-        let mut has_output = false;
-
-        for (stmt_idx, statement) in program.body.iter().enumerate() {
-            // Skip standalone EmptyStatements but preserve blank lines and comments around them
-            if matches!(statement, internal::Statement::EmptyStatement(_)) {
-                // Extend the search range to include trailing same-line comments of the
-                // empty statement. Without this, `; /* comment */` loses the comment.
-                let stmt_end = statement.span().end;
-                let trailing_end = self.find_end_with_trailing_comments(stmt_end).max(stmt_end);
-                // Use the extended range (covers same-line trailing comments) but cap at
-                // next statement's start to avoid capturing comments that belong to the next stmt.
-                let next_start = program
-                    .body
-                    .get(stmt_idx + 1)
-                    .map_or(program.span.end, |s| s.span().start);
-                let search_end = trailing_end.max(stmt_end).min(next_start);
-
-                // Force non-inline: since we're skipping the semicolon, any "inline" comments
-                // (on same line as the semicolon) have nothing to be inline with
-                let comments_doc =
-                    self.build_leading_comments_doc(prev_end, search_end, !has_output, true);
-                if let Some(comments_doc) = comments_doc {
-                    if has_output {
-                        // Check for blank line before the first comment (same as regular statements)
-                        let first_comment_start =
-                            comments_in_range(self.comments, prev_end, search_end)
-                                .next()
-                                .map(|c| c.span.start);
-                        let check_end = first_comment_start.unwrap_or_else(|| statement.span().end);
-
-                        if self.has_blank_line_between(prev_end, check_end) {
-                            parts.push(d.literalline()); // Blank line at column 0
-                        }
-                        parts.push(d.hardline()); // Separator with indent
-                    }
-                    parts.push(comments_doc);
-                    has_output = true;
-                }
-                prev_end = search_end;
-                continue;
-            }
-
-            // Separator between statements
-            if has_output {
-                // Check for blank line before the next item:
-                // - If there are comments, check before the first comment
-                // - If no comments, check before the statement
-                let first_comment_start =
-                    comments_in_range(self.comments, prev_end, statement.span().start)
-                        .next()
-                        .map(|c| c.span.start);
-                let check_end = first_comment_start.unwrap_or_else(|| statement.span().start);
-
-                if self.has_blank_line_between(prev_end, check_end) {
-                    parts.push(d.literalline()); // Blank line at column 0
-                }
-
-                parts.push(d.hardline()); // Separator with indent
-            }
-
-            // Leading comments (allow inline comments since statement will be printed)
-            let has_ignore = self.has_prettier_ignore_in_range(prev_end, statement.span().start);
-            if let Some(leading_doc) = self.build_leading_comments_doc(
-                prev_end,
-                statement.span().start,
-                !has_output,
-                false,
-            ) {
-                parts.push(leading_doc);
-            }
-
-            // Statement — if preceded by prettier-ignore, emit raw source
-            if has_ignore {
-                parts.push(self.raw_source_doc(statement.span()));
-            } else {
-                parts.push(self.build_statement_doc(statement));
-            }
-
-            // Trailing same-line comments. Bound the scan by the next statement's
-            // start so a comment only attaches to the statement it immediately
-            // follows — multiple statements on one source line (`a(); b(); // c`)
-            // must not each grab the trailing comment.
-            let next_start = program
-                .body
-                .get(stmt_idx + 1)
-                .map_or(program.span.end, |s| s.span().start);
-            let trailing_docs =
-                self.build_trailing_same_line_comment_docs(statement.span().end, next_start);
-            parts.extend(trailing_docs);
-
-            // Update prev_end to be after any trailing same-line comments
-            // This ensures blank line detection works correctly
-            prev_end = self.find_end_with_trailing_comments(statement.span().end);
-            has_output = true;
-        }
-
-        // Trailing program comments
-        let trailing_comments_doc = self.build_program_trailing_comments_doc(prev_end);
-        if !trailing_comments_doc.is_empty() {
-            has_output = true;
-        }
-        parts.extend(trailing_comments_doc);
-
-        // Trailing newline (only if there's content — empty files stay empty)
-        if has_output {
-            parts.push(d.hardline());
-        }
-
-        d.concat(&parts)
-    }
-
-    /// Build doc for leading comments between prev_end and curr_start
-    ///
-    /// Returns a Doc containing all leading comments with proper blank line handling.
-    /// Returns empty doc if no comments.
-    ///
-    /// Structure: Each comment is output WITHOUT a trailing hardline.
-    /// Separators (hardline or literalline+hardline) are added BEFORE each subsequent
-    /// comment and AFTER the last comment (to separate from the statement).
-    ///
-    /// When `force_non_inline` is true, all comments are treated as non-inline (own line).
-    /// This is used for empty statements that will be skipped - their inline comments
-    /// have nothing to be inline with.
-    fn build_leading_comments_doc(
-        &self,
-        prev_end: u32,
-        curr_start: u32,
-        is_first: bool,
-        force_non_inline: bool,
-    ) -> Option<DocId> {
-        let d = self.d();
-        let mut parts = Vec::new();
-        let mut last_comment_end = prev_end;
-        let mut printed_any = false;
-        let mut last_was_inline = false;
-
-        for comment in comments_in_range(self.comments, prev_end, curr_start) {
-            let position = classify_comment_fast(comment, prev_end, curr_start, self.line_breaks);
-
-            // Skip trailing comments EXCEPT for first statement (file start)
-            if !is_first && matches!(position, CommentPosition::Trailing) {
-                last_comment_end = comment.span.end;
-                continue;
-            }
-
-            // Handle inline leading comments (same line as statement)
-            // These stay on the same line, so DON'T set printed_any (no separator needed)
-            // Skip this behavior when force_non_inline is true (e.g., empty statements being skipped)
-            //
-            // Also handle block comments classified as Trailing that are on the same line as
-            // curr_start when is_first. This happens with consecutive inline block comments
-            // at file start: `/** @type {A} */ /** @type {B} */ expr;` — classify_comment_fast
-            // returns Trailing (same line as prev_end=0) but these should stay inline with
-            // the expression since they're also on the same line as curr_start.
-            let is_inline = matches!(position, CommentPosition::LeadingInline)
-                || (is_first
-                    && comment.is_block
-                    && matches!(position, CommentPosition::Trailing)
-                    && self.is_same_line(comment.span.end, curr_start));
-            if !force_non_inline && is_inline {
-                // If a previous comment was printed on a DIFFERENT line, add a line break.
-                // E.g., `// line comment\n/** @type {A} */ expr;` — needs newline after
-                // the line comment. But consecutive inline comments on the SAME line
-                // should stay inline: `/** @type {A} */ /** @type {B} */ expr;`.
-                if printed_any && !self.is_same_line(last_comment_end, comment.span.start) {
-                    let has_blank = comment.span.start > last_comment_end
-                        && self.has_blank_line_between(last_comment_end, comment.span.start);
-                    if has_blank {
-                        parts.push(d.literalline());
-                    }
-                    parts.push(d.hardline());
-                }
-                parts.push(self.build_comment_doc(comment));
-                parts.push(d.text(" "));
-                // DON'T set printed_any - inline comments don't need separators
-                last_comment_end = comment.span.end;
-                last_was_inline = true;
-                continue;
-            }
-
-            // Comment on its own line: check for blank lines BETWEEN comments
-            // Note: blank line before FIRST comment is handled by the parent (build_program_doc)
-            // We only handle blank lines between subsequent comments here
-            //
-            // Special case: when the previous comment was a multi-line block comment,
-            // a comment on the same line as its closing */ stays inline (e.g.,
-            // `/*\ncomment\n*/ /* after */` keeps `/* after */` on the `*/` line).
-            if printed_any && self.is_same_line(last_comment_end, comment.span.start) {
-                // Same line as previous comment's end — keep inline
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-            } else {
-                let has_blank_before = printed_any
-                    && comment.span.start > last_comment_end
-                    && self.has_blank_line_between(last_comment_end, comment.span.start);
-
-                // Add separator BEFORE this comment (first comment has no separator - parent's hardline handles it)
-                if has_blank_before {
-                    parts.push(d.literalline()); // Blank line at column 0
-                    parts.push(d.hardline()); // Indent for this comment
-                } else if printed_any {
-                    parts.push(d.hardline()); // Separator from previous comment
-                }
-
-                parts.push(self.build_comment_doc(comment));
-            }
-            // NO hardline after comment - let post-loop or next iteration handle it
-
-            last_comment_end = comment.span.end;
-            printed_any = true;
-            last_was_inline = false;
-        }
-
-        // After all comments: add separator for the statement (if one follows)
-        // Skip this when force_non_inline is true - that means the statement is being skipped
-        // and there's nothing for the separator to separate from.
-        // Skip when last comment was inline - it already has trailing space and the
-        // statement continues on the same line: `/** @type {A} */ expr;`
-        if printed_any && !force_non_inline && !last_was_inline {
-            // Check if there's a blank line after the last comment
-            let has_blank_after = last_comment_end < curr_start
-                && self.has_blank_line_between(last_comment_end, curr_start);
-
-            if has_blank_after {
-                parts.push(d.literalline()); // Blank line at column 0
-            }
-            parts.push(d.hardline()); // Indent for statement
-        }
-
-        if parts.is_empty() {
-            None
-        } else {
-            Some(d.concat(&parts))
-        }
-    }
-
-    /// Find the end position including any trailing same-line comments
-    ///
-    /// Used to correctly detect blank lines - need to check from after trailing
-    /// comments, not just after the statement.
-    fn find_end_with_trailing_comments(&self, after_pos: u32) -> u32 {
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, after_pos);
-        let mut end = after_pos;
-        // Track the "current line" reference — follows multi-line block comments
-        // to their closing */ line (same logic as build_trailing_same_line_comment_docs)
-        let mut line_ref = after_pos;
-
-        for comment in &self.comments[first_idx..] {
-            if self.is_same_line(line_ref, comment.span.start) {
-                end = comment.span.end;
-                // Follow multi-line block comments to their closing line
-                if comment.is_block && !self.is_same_line(comment.span.start, comment.span.end) {
-                    line_ref = comment.span.end;
-                }
-            } else {
-                break;
-            }
-        }
-        end
-    }
-
-    /// Build docs for trailing comments at the end of the program
-    ///
-    /// Handles comments that appear after all statements but before end of file.
-    fn build_program_trailing_comments_doc(&self, prev_end: u32) -> Vec<DocId> {
-        let d = self.d();
-        let mut docs = Vec::new();
-        let mut last_comment_end = prev_end;
-        let mut is_first_comment = true;
-
-        for comment in comments_after(self.comments, prev_end) {
-            // Skip comments on same line as prev_end - those are inline trailing comments
-            // already handled by build_trailing_same_line_comment_docs
-            // BUT: When prev_end == 0 (no statements), there's no previous statement to be
-            // trailing from, so comments at position 0 should NOT be skipped.
-            if prev_end > 0 && self.is_same_line(prev_end, comment.span.start) {
-                last_comment_end = comment.span.end;
-                continue;
-            }
-
-            // For comments-only files (no statements), don't add leading newline for first comment
-            if prev_end > 0 || !is_first_comment {
-                // Blank line before this comment (add literalline BEFORE hardline)
-                if self.has_blank_line_between(last_comment_end, comment.span.start) {
-                    docs.push(d.literalline());
-                }
-
-                docs.push(d.hardline());
-            }
-
-            docs.push(self.build_comment_doc(comment));
-            last_comment_end = comment.span.end;
-            is_first_comment = false;
-        }
-
-        docs
-    }
-}
-
 // Implement SymbolResolver trait for shared symbol resolution utilities
 impl<'a> SymbolResolver for Printer<'a> {
     fn interner(&self) -> &SharedInterner {
         &self.interner
-    }
-}
-
-/// Whether `expr` is a bare-decorator member chain: an identifier, or a
-/// non-computed, non-optional member chain of identifiers down to one.
-fn is_decorator_member_expression(expr: &internal::Expression) -> bool {
-    match expr {
-        internal::Expression::Identifier(_) => true,
-        internal::Expression::MemberExpression(member) => {
-            !member.computed
-                && !member.optional
-                && matches!(&*member.property, internal::Expression::Identifier(_))
-                && is_decorator_member_expression(&member.object)
-        }
-        _ => false,
-    }
-}
-
-/// Whether a decorator expression is valid without parens (see
-/// `Printer::build_decorator_expression_doc`).
-fn can_decorator_expression_unparenthesized(expr: &internal::Expression) -> bool {
-    match expr {
-        internal::Expression::CallExpression(call) => {
-            !call.optional && is_decorator_member_expression(&call.callee)
-        }
-        _ => is_decorator_member_expression(expr),
     }
 }

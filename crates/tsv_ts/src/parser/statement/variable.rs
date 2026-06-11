@@ -8,21 +8,25 @@ use tsv_lang::{ParseError, Span};
 use super::super::Parser;
 
 impl<'a> Parser<'a> {
-    pub(super) fn parse_variable_declaration(&mut self) -> Result<Statement, ParseError> {
-        let (start, _) = self.current_pos();
-
-        // Get the keyword kind
-        let kind = match self.current_kind() {
+    /// Variable kind from the current `const`/`let`/`var` keyword token.
+    fn current_variable_kind(&self) -> VariableDeclarationKind {
+        match self.current_kind() {
             TokenKind::Keyword(KeywordKind::Const) => VariableDeclarationKind::Const,
             TokenKind::Keyword(KeywordKind::Let) => VariableDeclarationKind::Let,
             TokenKind::Keyword(KeywordKind::Var) => VariableDeclarationKind::Var,
             _ => unreachable!(),
-        };
-        self.advance()?;
+        }
+    }
 
-        // Parse declarators (comma-separated)
-        let first = self.parse_variable_declarator()?;
-        let mut declarations = vec![first];
+    /// Parse the comma-separated declarator list and trailing semicolon shared
+    /// by all variable-declaration statements (`const`/`let`/`var`/`using`/
+    /// `await using`), after the keyword(s) have been consumed.
+    fn finish_variable_declaration(
+        &mut self,
+        kind: VariableDeclarationKind,
+        start: usize,
+    ) -> Result<Statement, ParseError> {
+        let mut declarations = vec![self.parse_variable_declarator()?];
         while self.eat(TokenKind::Comma) {
             declarations.push(self.parse_variable_declarator()?);
         }
@@ -37,6 +41,13 @@ impl<'a> Parser<'a> {
         }))
     }
 
+    pub(super) fn parse_variable_declaration(&mut self) -> Result<Statement, ParseError> {
+        let (start, _) = self.current_pos();
+        let kind = self.current_variable_kind();
+        self.advance()?;
+        self.finish_variable_declaration(kind, start)
+    }
+
     pub(super) fn parse_variable_declarator(&mut self) -> Result<VariableDeclarator, ParseError> {
         let id_start = self.current_pos().0;
 
@@ -45,44 +56,14 @@ impl<'a> Parser<'a> {
         // For simple identifiers, also handles definite assignment assertion (`!`)
         let (id, definite) = if let Some(symbol) = self.try_intern_binding_name() {
             self.parse_simple_binding(symbol)?
+        } else if matches!(
+            self.current_kind(),
+            TokenKind::BracketOpen | TokenKind::BraceOpen
+        ) {
+            // Destructuring patterns don't support definite assignment
+            (self.parse_destructured_binding()?, false)
         } else {
-            match self.current_kind() {
-                TokenKind::BracketOpen => {
-                    // Array destructuring pattern: [a, b] = arr
-                    let expr = self.parse_array_expression()?;
-                    let mut pattern = self.to_assignable(expr)?;
-
-                    // Check for type annotation on array pattern: [a, b]: Type
-                    if let Expression::ArrayPattern(ref mut arr) = pattern
-                        && self.check(&TokenKind::Colon)
-                    {
-                        let type_annotation = self.parse_type_annotation()?;
-                        arr.span = Span::new(arr.span.start, type_annotation.span.end);
-                        arr.type_annotation = Some(type_annotation);
-                    }
-                    // Destructuring patterns don't support definite assignment
-                    (pattern, false)
-                }
-                TokenKind::BraceOpen => {
-                    // Object destructuring pattern: {a, b} = obj
-                    let expr = self.parse_object_expression()?;
-                    let mut pattern = self.to_assignable(expr)?;
-
-                    // Check for type annotation on object pattern: {a, b}: Type
-                    if let Expression::ObjectPattern(ref mut obj) = pattern
-                        && self.check(&TokenKind::Colon)
-                    {
-                        let type_annotation = self.parse_type_annotation()?;
-                        obj.span = Span::new(obj.span.start, type_annotation.span.end);
-                        obj.type_annotation = Some(type_annotation);
-                    }
-                    // Destructuring patterns don't support definite assignment
-                    (pattern, false)
-                }
-                _ => {
-                    return Err(self.error_expected_found("identifier or destructuring pattern"));
-                }
-            }
+            return Err(self.error_expected_found("identifier or destructuring pattern"));
         };
 
         let id_end = id.span().end_usize();
@@ -100,9 +81,12 @@ impl<'a> Parser<'a> {
         // the closing `)` is consumed by the parser but not part of the inner expression's
         // span). Using max() handles both the normal case (same value) and error recovery
         // (expression span may extend further). Matches acorn's VariableDeclarator span.
-        let end = init
-            .as_ref()
-            .map_or(id_end, |e| e.span().end_usize().max(self.prev_token_end()));
+        // Without an initializer, prev_token_end() likewise extends past the id span when a
+        // definite assignment `!` was consumed without a type annotation (`let a!;`).
+        let end = init.as_ref().map_or_else(
+            || id_end.max(self.prev_token_end()),
+            |e| e.span().end_usize().max(self.prev_token_end()),
+        );
 
         Ok(VariableDeclarator {
             id,
@@ -118,12 +102,7 @@ impl<'a> Parser<'a> {
     ) -> Result<VariableDeclaration, ParseError> {
         let (decl_start, _) = self.current_pos();
 
-        let kind = match self.current_kind() {
-            TokenKind::Keyword(KeywordKind::Const) => VariableDeclarationKind::Const,
-            TokenKind::Keyword(KeywordKind::Let) => VariableDeclarationKind::Let,
-            TokenKind::Keyword(KeywordKind::Var) => VariableDeclarationKind::Var,
-            _ => unreachable!(),
-        };
+        let kind = self.current_variable_kind();
         self.advance()?;
 
         // Parse first declarator
@@ -155,21 +134,7 @@ impl<'a> Parser<'a> {
         debug_assert!(self.current_value() == "using");
         self.advance()?;
 
-        // Parse declarators (comma-separated)
-        let first = self.parse_variable_declarator()?;
-        let mut declarations = vec![first];
-        while self.eat(TokenKind::Comma) {
-            declarations.push(self.parse_variable_declarator()?);
-        }
-
-        let end = self.semicolon_end()?;
-
-        Ok(Statement::VariableDeclaration(VariableDeclaration {
-            kind: VariableDeclarationKind::Using,
-            declarations,
-            declare: false,
-            span: Span::new(start as u32, end),
-        }))
+        self.finish_variable_declaration(VariableDeclarationKind::Using, start)
     }
 
     /// Parse `await using` declaration (ES2024 Explicit Resource Management)
@@ -185,21 +150,7 @@ impl<'a> Parser<'a> {
         debug_assert!(self.current_value() == "using");
         self.advance()?;
 
-        // Parse declarators (comma-separated)
-        let first = self.parse_variable_declarator()?;
-        let mut declarations = vec![first];
-        while self.eat(TokenKind::Comma) {
-            declarations.push(self.parse_variable_declarator()?);
-        }
-
-        let end = self.semicolon_end()?;
-
-        Ok(Statement::VariableDeclaration(VariableDeclaration {
-            kind: VariableDeclarationKind::AwaitUsing,
-            declarations,
-            declare: false,
-            span: Span::new(start as u32, end),
-        }))
+        self.finish_variable_declaration(VariableDeclarationKind::AwaitUsing, start)
     }
 
     /// Parse `using` declaration for for-of loop init (without trailing semicolon)
@@ -232,24 +183,14 @@ impl<'a> Parser<'a> {
     ) -> Result<VariableDeclaration, ParseError> {
         let (decl_start, _) = self.current_pos();
 
-        // Consume 'await' keyword
+        // Consume 'await' keyword, then delegate to the `using` form
         debug_assert!(*self.current_kind() == TokenKind::Keyword(KeywordKind::Await));
         self.advance()?;
 
-        // Consume 'using' contextual keyword
-        debug_assert!(self.current_value() == "using");
-        self.advance()?;
-
-        // Parse single declarator (for-of only allows one)
-        let declarator = self.parse_variable_declarator()?;
-        let decl_end = declarator.span.end;
-
-        Ok(VariableDeclaration {
-            kind: VariableDeclarationKind::AwaitUsing,
-            declarations: vec![declarator],
-            declare: false,
-            span: Span::new(decl_start as u32, decl_end),
-        })
+        let mut decl = self.parse_for_using_declaration()?;
+        decl.kind = VariableDeclarationKind::AwaitUsing;
+        decl.span = Span::new(decl_start as u32, decl.span.end);
+        Ok(decl)
     }
 
     /// Parse an identifier or contextual keyword as a binding pattern (with optional type annotation)

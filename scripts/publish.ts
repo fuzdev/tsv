@@ -3,7 +3,9 @@
  *
  * Dry-run by default — runs all validation but does not mutate the workspace.
  * Pass `--wetrun` to bump, build, validate, publish to npm, and finalize git
- * (commit + tag + push).
+ * (commit + tag + push). The build step covers the npm packages AND the deno
+ * bundles — the deno bundles aren't published, but artifact validation checks
+ * every built bundle, so they're rebuilt here to never gate on stale artifacts.
  *
  * Version source of truth: `Cargo.toml [workspace.package] version` (read
  * directly by wasm-pack). There is no root package.json and no changesets —
@@ -14,22 +16,37 @@
  *   deno task publish                        # dry-run (validate everything)
  *   deno task publish --bump minor           # dry-run, preview the bump
  *   deno task publish --wetrun --bump patch  # bump + check + build + validate + publish + git
- *   deno task publish --wetrun               # publish the current version if unpublished
- *                                            # (first release, or retry after a failed wetrun)
+ *   deno task publish --wetrun               # resume a failed wetrun (sentinel retry only)
  *
  * Flags:
  *   --wetrun         actually mutate: bump, publish, commit, tag, push
- *   --bump <level>   patch | minor | major — how to bump the version
+ *   --bump <level>   patch | minor | major — how to bump the version.
+ *                    Required for a fresh wetrun; only a sentinel retry runs without it.
  *   --no-check       skip `deno task check` (faster retries)
  *   --no-git         skip the git commit + tag + push finalization
  *
  * Retry: a failed wetrun leaves the bump in place plus a sentinel file; re-run
  * `deno task publish --wetrun` and it resumes from the bumped version (skipping
- * the git-clean check and the bump). The publish loop itself is idempotent —
- * already-published packages are skipped.
+ * the git-clean check and the bump; a passed `--bump` is ignored with a
+ * warning). The publish loop itself is idempotent — already-published packages
+ * are skipped.
  */
 
 import { format_size, gzip_size } from './size.ts';
+
+const KNOWN_FLAGS = new Set(['--wetrun', '--no-check', '--no-git', '--bump']);
+// A misspelled --wetrun fails safe (dry-run), but a misspelled --no-git or
+// --no-check fails open — reject anything unrecognized.
+const unknown_args = Deno.args.filter((arg, i) =>
+	arg.startsWith('--') ? !KNOWN_FLAGS.has(arg) : Deno.args[i - 1] !== '--bump'
+);
+if (unknown_args.length > 0) {
+	console.error(`FAIL: unknown argument(s): ${unknown_args.join(' ')}`);
+	console.error(
+		'Usage: deno task publish [--wetrun] [--bump patch|minor|major] [--no-check] [--no-git]',
+	);
+	Deno.exit(1);
+}
 
 const wetrun = Deno.args.includes('--wetrun');
 const no_check = Deno.args.includes('--no-check');
@@ -54,14 +71,29 @@ const packages = [
 	{
 		label: '@fuzdev/tsv_format_wasm',
 		dir: 'crates/tsv_wasm/pkg/format/npm',
-		build_task: 'build:npm:format',
 	},
 	{
 		label: '@fuzdev/tsv_parse_wasm',
 		dir: 'crates/tsv_wasm/pkg/parse/npm',
-		build_task: 'build:npm:parse',
 	},
 ];
+
+/**
+ * Everything Step 6 validates, including the unpublished deno bundles —
+ * stale bundles must never gate (or falsely pass) a publish. Ordered to
+ * group cargo feature flags (default, default, ast, ast) so the crate
+ * recompiles once instead of three times.
+ */
+const build_tasks = [
+	'build:npm:format',
+	'build:wasm:deno',
+	'build:npm:parse',
+	'build:wasm:parse:deno',
+];
+
+/** Only the release files — a stray file generated mid-pipeline must never
+ * ride into the release commit. */
+const release_files = [CARGO_PATH, 'Cargo.lock', CHANGELOG_PATH];
 
 console.log(`\n=== tsv publish ${wetrun ? '(wetrun)' : '(dry-run)'} ===\n`);
 
@@ -176,6 +208,9 @@ if (wetrun) {
 	if (retry_mode) {
 		version = version_before;
 		console.log(`  Sentinel found at v${version} — skipping bump (retry)`);
+		if (bump) {
+			console.warn(`  WARN: --bump ${bump} ignored — resuming the in-progress v${version} release`);
+		}
 	} else {
 		if (initial_sentinel !== null) {
 			console.warn(`  WARN: removing stale sentinel (v${initial_sentinel})`);
@@ -186,43 +221,46 @@ if (wetrun) {
 			const cargo = Deno.readTextFileSync(CARGO_PATH);
 			Deno.writeTextFileSync(CARGO_PATH, cargo.replace(workspace_pkg_re, `$1"${version}"`));
 			console.log(`  Version bumped (${bump}): ${version_before} -> ${version}`);
-			// Sync Cargo.lock's workspace member versions
-			run('cargo update --workspace', 'cargo', ['update', '--workspace']);
-			stamp_changelog(version);
-			// Write sentinel so a retry can skip the bump + git-clean check
-			Deno.writeTextFileSync(SENTINEL_PATH, version);
-			console.log(`  Sentinel written (${SENTINEL_PATH})`);
-			// Normalize formatting of the stamped changelog so `deno fmt --check` passes
-			run('deno fmt CHANGELOG.md', 'deno', ['fmt', CHANGELOG_PATH]);
 		} else {
-			version = version_before;
-			if (all_published(version)) {
-				console.error(`  FAIL: v${version} is already published and no --bump was given`);
-				console.error('  Pass --bump patch|minor|major to release a new version.');
-				Deno.exit(1);
-			}
-			console.log(`  Publishing current unpublished version: v${version} (no bump)`);
-			stamp_changelog(version);
-			Deno.writeTextFileSync(SENTINEL_PATH, version);
-			run('deno fmt CHANGELOG.md', 'deno', ['fmt', CHANGELOG_PATH]);
+			console.error('  FAIL: --bump patch|minor|major is required for a fresh wetrun');
+			console.error('  (only a sentinel retry — resuming a failed wetrun — runs without it)');
+			Deno.exit(1);
 		}
+		// Sentinel immediately after the version write — everything below is
+		// idempotent and re-runs on retry, so any later failure is resumable.
+		Deno.writeTextFileSync(SENTINEL_PATH, version);
+		console.log(`  Sentinel written (${SENTINEL_PATH})`);
 	}
+	// Idempotent bump finalization — re-run on retry too, in case the previous
+	// wetrun died partway through.
+	// Sync Cargo.lock's workspace member versions
+	run('cargo update --workspace', 'cargo', ['update', '--workspace']);
+	stamp_changelog(version);
+	// Normalize formatting of the stamped changelog so `deno fmt --check` passes
+	run('deno fmt CHANGELOG.md', 'deno', ['fmt', CHANGELOG_PATH]);
 } else {
 	console.log('\n=== Step 2: Read version (dry-run) ===');
 	version = version_before;
 	console.log(`  Current version: v${version}`);
-	if (bump) {
-		console.log(`  Wetrun would bump (${bump}) to: v${bump_version(version, bump)}`);
-	} else if (initial_sentinel === version) {
+	const would_retry = initial_sentinel === version;
+	if (would_retry) {
+		// Mirrors wetrun precedence: retry wins over --bump
 		console.log(`  Sentinel found at v${version} — wetrun would retry from it`);
-	} else if (all_published(version)) {
-		console.warn(`  WARN: v${version} is already published — wetrun would need --bump`);
+		if (bump) {
+			console.warn(`  WARN: --bump ${bump} would be ignored — wetrun would resume v${version}`);
+		}
+	} else if (bump) {
+		console.log(`  Wetrun would bump (${bump}) to: v${bump_version(version, bump)}`);
 	} else {
-		console.log(`  v${version} is unpublished — wetrun would publish it as-is`);
-	}
-	if (!changelog_has_unreleased() && bump) {
 		console.warn(
-			`  WARN: no "## Unreleased" section in ${CHANGELOG_PATH} — add one before bumping`,
+			'  WARN: no --bump given — a fresh wetrun would fail (--bump is required except on sentinel retry)',
+		);
+	}
+	// Warn whenever the eventual wetrun would have nothing to stamp.
+	const stamp_version = bump ? bump_version(version, bump) : version;
+	if (!would_retry && !changelog_has_unreleased() && !changelog_has_version(stamp_version)) {
+		console.warn(
+			`  WARN: no "## Unreleased" section in ${CHANGELOG_PATH} — wetrun would have nothing to stamp`,
 		);
 	}
 }
@@ -237,14 +275,14 @@ if (!/^\d+\.\d+\.\d+$/.test(version)) {
 if (no_check) {
 	console.log('\n=== Step 3: Check — SKIPPED (--no-check) ===');
 } else {
-	console.log('\n=== Step 3: Check (typecheck + test + clippy + fmt) ===');
+	console.log('\n=== Step 3: Check (deno task check) ===');
 	run('deno task check', 'deno', ['task', 'check']);
 }
 
 // Step 4: Build
 
-console.log('\n=== Step 4: Build npm packages ===');
-for (const { build_task } of packages) {
+console.log('\n=== Step 4: Build WASM bundles (npm + deno) ===');
+for (const build_task of build_tasks) {
 	run(`deno task ${build_task}`, 'deno', ['task', build_task]);
 }
 
@@ -267,11 +305,7 @@ for (const { label, dir } of packages) {
 // Step 6: Test the built artifacts
 
 console.log('\n=== Step 6: Validate built packages (sizes + Deno + Node) ===');
-run(
-	'validate artifacts (size bounds + Deno smoke)',
-	'deno',
-	['run', '--allow-read', 'scripts/validate_artifacts.ts'],
-);
+run('deno task validate:artifacts', 'deno', ['task', 'validate:artifacts']);
 for (const { label, dir } of packages) {
 	const result = new Deno.Command('node', {
 		args: ['--test', 'scripts/test_npm.ts'],
@@ -332,9 +366,6 @@ if (wetrun) {
 
 if (wetrun && !no_git) {
 	console.log('\n=== Step 8: Git finalize (commit + tag + push) ===');
-	// Only the release files — a stray file generated mid-pipeline must never
-	// ride into the release commit.
-	const release_files = [CARGO_PATH, 'Cargo.lock', CHANGELOG_PATH];
 	if (capture('git', ['status', '--porcelain', '--', ...release_files]).stdout) {
 		run('git add', 'git', ['add', '--', ...release_files]);
 		run('git commit', 'git', ['commit', '-m', `publish v${version}`]);
@@ -351,10 +382,11 @@ if (wetrun && !no_git) {
 	run('git push', 'git', ['push', '--follow-tags', 'origin', 'main']);
 } else if (wetrun) {
 	console.log('\n=== Step 8: Git finalize — SKIPPED (--no-git) ===');
-	console.log('  Finalize manually:');
-	console.log('    git add -A');
+	console.log('  Finalize manually (only the release files; annotated tag — --follow-tags');
+	console.log('  ignores lightweight tags):');
+	console.log(`    git add ${release_files.join(' ')}`);
 	console.log(`    git commit -m "publish v${version}"`);
-	console.log(`    git tag v${version}`);
+	console.log(`    git tag -m v${version} v${version}`);
 	console.log('    git push --follow-tags origin main');
 }
 
@@ -374,20 +406,27 @@ for (const { label, dir } of packages) {
 }
 if (!wetrun) {
 	console.log(`\n  Dry-run complete for v${version} — all checks passed.`);
-	console.log('  Run with --wetrun (and --bump patch|minor|major) to publish.');
+	console.log('  Run with --wetrun --bump patch|minor|major to publish.');
 }
 console.log('');
 
 // Helpers
 
-/** Run a command silently and return success + trimmed stdout (stderr is discarded). */
-function capture(cmd: string, args: string[]): { success: boolean; stdout: string } {
+/** Run a command silently and return success + trimmed stdout/stderr. */
+function capture(
+	cmd: string,
+	args: string[],
+): { success: boolean; stdout: string; stderr: string } {
 	const result = new Deno.Command(cmd, {
 		args,
 		stdout: 'piped',
 		stderr: 'piped',
 	}).outputSync();
-	return { success: result.success, stdout: dec.decode(result.stdout).trim() };
+	return {
+		success: result.success,
+		stdout: dec.decode(result.stdout).trim(),
+		stderr: dec.decode(result.stderr).trim(),
+	};
 }
 
 function run(label: string, cmd: string, args: string[], cwd?: string, fail_hint?: string): void {
@@ -433,9 +472,23 @@ function stamp_changelog(new_version: string): void {
 			changelog.replace(/^## Unreleased$/m, `## ${new_version}`),
 		);
 		console.log(`  Stamped ${CHANGELOG_PATH}: ## Unreleased -> ## ${new_version}`);
+	} else if (version_heading_re(new_version).test(changelog)) {
+		console.log(`  ${CHANGELOG_PATH} already stamped with ## ${new_version}`);
 	} else {
 		console.warn(`  WARN: no "## Unreleased" section in ${CHANGELOG_PATH} — nothing to stamp`);
 	}
+}
+
+function changelog_has_version(target_version: string): boolean {
+	try {
+		return version_heading_re(target_version).test(Deno.readTextFileSync(CHANGELOG_PATH));
+	} catch {
+		return false;
+	}
+}
+
+function version_heading_re(target_version: string): RegExp {
+	return new RegExp(`^## ${target_version.replaceAll('.', '\\.')}$`, 'm');
 }
 
 function changelog_has_unreleased(): boolean {
@@ -446,13 +499,18 @@ function changelog_has_unreleased(): boolean {
 	}
 }
 
-function all_published(target_version: string): boolean {
-	return packages.every((p) => is_published(p.label, target_version));
-}
-
+/**
+ * Whether `pkg_name@target_version` exists on the registry. Distinguishes
+ * "not published" (npm E404) from npm/network failure — the latter aborts,
+ * since no publish decision is safe without an answer.
+ */
 function is_published(pkg_name: string, target_version: string): boolean {
 	const result = capture('npm', ['view', `${pkg_name}@${target_version}`, 'version']);
-	return result.success && result.stdout === target_version;
+	if (result.success) return result.stdout === target_version;
+	if (result.stderr.includes('E404')) return false;
+	console.error(`  FAIL: npm view ${pkg_name}@${target_version} failed:`);
+	console.error(result.stderr);
+	Deno.exit(1);
 }
 
 function read_sentinel(): string | null {

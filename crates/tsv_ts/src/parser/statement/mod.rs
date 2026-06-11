@@ -12,7 +12,7 @@ mod class;
 mod control_flow;
 mod function;
 mod modules;
-mod types;
+mod type_declarations;
 mod variable;
 
 impl<'a> Parser<'a> {
@@ -56,8 +56,8 @@ impl<'a> Parser<'a> {
                 KeywordKind::Async => {
                     // `async function` is a function declaration
                     // `async () => ...` or `async x => ...` is an expression
-                    // Use peek_non_comment_kind to skip comments between `async` and `function`
-                    if self.peek_non_comment_kind() == TokenKind::Keyword(KeywordKind::Function) {
+                    // peek_kind() skips comments between `async` and `function`
+                    if self.peek_kind() == TokenKind::Keyword(KeywordKind::Function) {
                         self.parse_async_function_declaration()
                     } else {
                         // Async arrow function expression
@@ -142,16 +142,16 @@ impl<'a> Parser<'a> {
                     return self.parse_using_declaration();
                 }
                 // Check for contextual keyword 'type' followed by identifier (type alias declaration)
-                // Use peek_non_comment_kind to skip comments: `type /* c */ A = string`
+                // peek_kind() skips comments: `type /* c */ A = string`
                 if self.current_value() == "type"
-                    && matches!(self.peek_non_comment_kind(), TokenKind::Identifier)
+                    && matches!(self.peek_kind(), TokenKind::Identifier)
                 {
                     return self.parse_type_alias_declaration();
                 }
                 // Check for contextual keyword 'interface' followed by identifier
-                // Use peek_non_comment_kind to skip comments: `interface /* c */ A {}`
+                // peek_kind() skips comments: `interface /* c */ A {}`
                 if self.current_value() == "interface"
-                    && matches!(self.peek_non_comment_kind(), TokenKind::Identifier)
+                    && matches!(self.peek_kind(), TokenKind::Identifier)
                 {
                     return self.parse_interface_declaration();
                 }
@@ -160,25 +160,25 @@ impl<'a> Parser<'a> {
                     return self.parse_declare_statement();
                 }
                 // Check for contextual keyword 'abstract' followed by class
-                // Use peek_non_comment_kind to skip comments: `abstract /* c */ class A {}`.
+                // peek_kind() skips comments: `abstract /* c */ class A {}`.
                 // `abstract [no LineTerminator here] class` — a break makes `abstract`
                 // an identifier statement and the class a plain declaration (tsc + acorn)
                 if self.current_value() == "abstract"
-                    && self.peek_non_comment_kind() == TokenKind::Keyword(KeywordKind::Class)
+                    && self.peek_kind() == TokenKind::Keyword(KeywordKind::Class)
                     && !self.peek_preceded_by_line_terminator()
                 {
                     return self.parse_abstract_class();
                 }
                 // Check for contextual keyword 'namespace' or 'module' followed by identifier
-                // Use peek_non_comment_kind to skip comments: `namespace /* c */ A {}`
+                // peek_kind() skips comments: `namespace /* c */ A {}`
                 if (self.current_value() == "namespace" || self.current_value() == "module")
-                    && matches!(self.peek_non_comment_kind(), TokenKind::Identifier)
+                    && matches!(self.peek_kind(), TokenKind::Identifier)
                 {
                     return self.parse_module_declaration(false, false);
                 }
                 // Check for labeled statement: `label: statement`
-                // Use peek_non_comment_kind to skip comments: `label /* c */: statement`
-                if self.peek_non_comment_kind() == TokenKind::Colon {
+                // peek_kind() skips comments: `label /* c */: statement`
+                if self.peek_kind() == TokenKind::Colon {
                     return self.parse_labeled_statement();
                 }
                 // Regular expression statement

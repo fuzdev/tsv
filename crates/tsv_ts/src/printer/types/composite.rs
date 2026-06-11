@@ -117,24 +117,10 @@ impl<'a> Printer<'a> {
                 self.build_type_doc(&c.false_type)
             };
 
-        // Comments after ? (block only — line/multiline handled in breaking path)
-        let comments_after_question = if let Some(q) = question_pos {
-            self.build_inline_comments_between_doc_trailing_space(q + 1, true_type_start)
-        } else {
-            d.empty()
-        };
-
         // Comments trailing on true_type (between true_type and :)
         // These stay with the true branch, preserving user intent.
         let trailing_on_true = if let Some(c) = colon_pos {
             self.build_inline_comments_between_doc(true_type_end, c)
-        } else {
-            d.empty()
-        };
-
-        // Comments after : (block only — line/multiline handled in breaking path)
-        let comments_after_colon = if let Some(c) = colon_pos {
-            self.build_inline_comments_between_doc_trailing_space(c + 1, false_type_start)
         } else {
             d.empty()
         };
@@ -156,29 +142,19 @@ impl<'a> Printer<'a> {
             self.build_comments_between(check_type_end, extends_kw_start, CommentSpacing::Leading);
         let extends_type_doc = self.build_conditional_type_extends_doc(c, extends_kw_end);
 
-        // A redundant-paren-stripped union/intersection branch hangs instead of
-        // gluing to `?`/`:` (mirroring Prettier's `printBranch`). Skip the hang
-        // when a comment sits between the operator and the branch — those keep
-        // the inline form so the comment placement is preserved.
-        let has_comments_after_question = question_pos.is_some_and(|q| {
-            tsv_lang::has_comments_in_range(self.comments, q + 1, true_type_start)
-        });
-        let has_comments_after_colon = colon_pos.is_some_and(|c| {
-            tsv_lang::has_comments_in_range(self.comments, c + 1, false_type_start)
-        });
         let true_arm = self.build_conditional_arm_doc(
             "?",
             &c.true_type,
             true_type_doc,
-            comments_after_question,
-            has_comments_after_question,
+            question_pos,
+            true_type_start,
         );
         let false_arm = self.build_conditional_arm_doc(
             ":",
             &c.false_type,
             false_type_doc,
-            comments_after_colon,
-            has_comments_after_colon,
+            colon_pos,
+            false_type_start,
         );
 
         d.concat(&[
@@ -212,44 +188,77 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Assemble one conditional arm (`? `/`: ` + branch). A redundant-paren
-    /// union/intersection branch hangs two levels deep — matching Prettier's
-    /// `printBranch` = `indent(print(branch))` layered over the arm `indent`:
-    /// a union drops `?`/`:` onto their own line (no trailing space) with the
-    /// leading-pipe members two levels in; an intersection keeps its first
-    /// member inline after `? `/`: ` with continuations two levels in. Every
-    /// other branch (and any branch carrying a comment after the operator) stays
-    /// inline after `? `/`: `.
+    /// Assemble one conditional arm in the non-breaking layout: `?`/`:`, any
+    /// single-line block comments between the operator and the branch (the only
+    /// comment kind that reaches this path — they glue to the operator,
+    /// `? /* c */ …`), then the branch tail.
     fn build_conditional_arm_doc(
         &self,
         op: &'static str,
         branch_type: &TSType,
         branch_doc: DocId,
-        comments: DocId,
-        has_comments: bool,
+        op_pos: Option<u32>,
+        branch_start: u32,
     ) -> DocId {
         let d = self.d();
-        if !has_comments {
-            match self.unwrap_redundant_parens(branch_type) {
-                TSType::Union(u) if !should_hug_union_type(u) => {
-                    let union_doc = self.build_union_type_doc(u, false);
-                    // No trailing space after `?`/`:`: the `line` inside
-                    // `hang_after_operator` supplies the flat-case space and the
-                    // broken-case break (so the operator sits alone, untrailed).
-                    return d.concat(&[d.text(op), d.indent(hang_after_operator(d, union_doc))]);
+        let comments = match op_pos {
+            Some(p) => self.build_inline_comments_between_doc(p + 1, branch_start),
+            None => d.empty(),
+        };
+        d.concat(&[
+            d.text(op),
+            comments,
+            self.build_conditional_branch_tail_doc(branch_type, branch_doc, false),
+        ])
+    }
+
+    /// The branch tail of a conditional arm: the separator after `?`/`:` (and
+    /// any comments already emitted by the caller) plus the branch itself.
+    /// A redundant-paren union/intersection branch hangs two levels deep —
+    /// matching Prettier's `printBranch` = `indent(print(branch))` layered over
+    /// the arm `indent`: a union puts its leading-pipe members two levels past
+    /// the operator (the `line` in `hang_after_operator` supplies the flat-case
+    /// space and the broken-case break, so the operator sits alone, untrailed);
+    /// an intersection keeps its first member on the operator's line with
+    /// continuations two levels in. Every other branch stays inline after the
+    /// separator. `on_new_line` means a line or multiline block comment ended
+    /// the operator's line (breaking layout only), so the branch starts on a
+    /// fresh line instead — one level in, two for union members.
+    fn build_conditional_branch_tail_doc(
+        &self,
+        branch_type: &TSType,
+        branch_doc: DocId,
+        on_new_line: bool,
+    ) -> DocId {
+        let d = self.d();
+        match self.unwrap_redundant_parens(branch_type) {
+            TSType::Union(u) if !should_hug_union_type(u) => {
+                let union_doc = self.build_union_type_doc(u, false);
+                if on_new_line {
+                    d.indent(d.indent(d.concat(&[d.hardline(), d.group(union_doc)])))
+                } else {
+                    d.indent(hang_after_operator(d, union_doc))
                 }
-                TSType::Intersection(i) => {
-                    // First member hugs `? `/`: `; continuations wrap two levels in.
-                    return d.concat(&[
-                        d.text(op),
-                        d.text(" "),
-                        d.indent(self.intersection_hanging_with_indent(i)),
-                    ]);
+            }
+            TSType::Intersection(i) => {
+                let hanging = self.intersection_hanging_with_indent(i);
+                if on_new_line {
+                    d.indent(d.concat(&[d.hardline(), hanging]))
+                } else {
+                    d.concat(&[d.text(" "), d.indent(hanging)])
                 }
-                _ => {}
+            }
+            _ => {
+                if on_new_line {
+                    // Literal tab text (not d.indent) shifts only the first line
+                    // without increasing the structural indent level for nested
+                    // content.
+                    d.concat(&[d.hardline(), d.text(tsv_lang::INDENT), branch_doc])
+                } else {
+                    d.concat(&[d.text(" "), branch_doc])
+                }
             }
         }
-        d.concat(&[d.text(op), d.text(" "), comments, branch_doc])
     }
 
     /// Build the extends clause doc for a conditional type, including comments
@@ -442,17 +451,11 @@ impl<'a> Printer<'a> {
                 needs_indent_before_true = true;
             }
         }
-        if needs_indent_before_true {
-            // Line or multiline block comment — branch on new indented line.
-            // Uses literal tab text (not d.indent) to shift only the first line
-            // without increasing the structural indent level for nested content.
-            q_parts.push(d.hardline());
-            q_parts.push(d.text(tsv_lang::INDENT));
-            q_parts.push(true_type_doc);
-        } else {
-            q_parts.push(d.text(" "));
-            q_parts.push(true_type_doc);
-        }
+        q_parts.push(self.build_conditional_branch_tail_doc(
+            &c.true_type,
+            true_type_doc,
+            needs_indent_before_true,
+        ));
 
         // Comments trailing on true_type (between true_type and :) — preserve position.
         // Also includes relocated leading line comments from inside false_type's parens.
@@ -493,17 +496,11 @@ impl<'a> Printer<'a> {
             }
             prev_was_line_comment = !comment.is_block;
         }
-        if needs_indent_before_false {
-            // Line or multiline block comment — branch on new indented line.
-            // Uses literal tab text (not d.indent) to shift only the first line
-            // without increasing the structural indent level for nested content.
-            q_parts.push(d.hardline());
-            q_parts.push(d.text(tsv_lang::INDENT));
-            q_parts.push(false_type_doc);
-        } else {
-            q_parts.push(d.text(" "));
-            q_parts.push(false_type_doc);
-        }
+        q_parts.push(self.build_conditional_branch_tail_doc(
+            &c.false_type,
+            false_type_doc,
+            needs_indent_before_false,
+        ));
 
         // Comments between check_type and `extends` keyword (reuses extends_kw_start from above)
         let comments_before_extends =

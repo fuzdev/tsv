@@ -7,6 +7,15 @@ use crate::printer::analysis;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::{SymbolToU32, comments_in_range};
 
+/// Printed keyword (with trailing space) for an accessibility modifier.
+fn accessibility_keyword(accessibility: &str) -> &'static str {
+    match accessibility {
+        "private" => "private ",
+        "protected" => "protected ",
+        _ => "public ",
+    }
+}
+
 impl<'a> Printer<'a> {
     /// Build a Doc for method signature (params + return type).
     ///
@@ -35,68 +44,33 @@ impl<'a> Printer<'a> {
 
         // Estimate if params should be forced to break based on total signature width.
         // Similar to build_function_signature_doc in function.rs.
-        let force_params_break = if let Some(tp) = &func.type_parameters {
-            // Type params break if: multiple params OR contains multiline content
-            let has_multiple_params = tp.params.len() > 1;
-            let span_str = tp.span.extract(self.source);
-            let is_multiline = span_str.contains('\n');
-            let type_params_will_break = has_multiple_params || is_multiline;
-
-            if type_params_will_break {
-                // Type params break → params get fresh line budget → don't force break
-                false
-            } else if return_type_will_break {
-                // Return type is multiline - it breaks on its own, so only check if params fit
-                let current_col = self.current_column();
-                let params_width: usize = func
-                    .params
-                    .iter()
-                    .map(|p| (p.span().end - p.span().start) as usize + 2)
-                    .sum();
-                // +4 for (): and opening of return type
-                let estimated_params = current_col + params_width + 4;
-                estimated_params > tsv_lang::PRINT_WIDTH
-            } else {
-                // Estimate total signature width (current column + remaining content)
-                let current_col = self.current_column();
-                let params_width: usize = func
-                    .params
-                    .iter()
-                    .map(|p| (p.span().end - p.span().start) as usize + 2)
-                    .sum();
-                let return_type_width = func
-                    .return_type
-                    .as_ref()
-                    .map_or(0, |rt| (rt.span.end - rt.span.start) as usize);
-                // +4 accounts for parens and spaces: "()" around params, " {}" body
-                let estimated_total = current_col + params_width + return_type_width + 4;
-                estimated_total > tsv_lang::PRINT_WIDTH
-            }
-        } else if return_type_will_break {
-            // Return type is multiline - it breaks on its own, so only check if params fit
-            let current_col = self.current_column();
-            let params_width: usize = func
-                .params
-                .iter()
-                .map(|p| (p.span().end - p.span().start) as usize + 2)
-                .sum();
-            // +4 for (): and opening of return type
-            let estimated_params = current_col + params_width + 4;
-            estimated_params > tsv_lang::PRINT_WIDTH
+        // Type params break if: multiple params OR contains multiline content.
+        // When they break, params get a fresh line budget → don't force break.
+        let type_params_will_break = func
+            .type_parameters
+            .as_ref()
+            .is_some_and(|tp| tp.params.len() > 1 || tp.span.extract(self.source).contains('\n'));
+        let force_params_break = if type_params_will_break {
+            false
         } else {
-            // No type params - still need to check if signature fits
+            // Estimate total signature width (current column + remaining content).
+            // When the return type breaks on its own, exclude its width and only
+            // check whether the params fit.
             let current_col = self.current_column();
             let params_width: usize = func
                 .params
                 .iter()
                 .map(|p| (p.span().end - p.span().start) as usize + 2)
                 .sum();
-            let return_type_width = func
-                .return_type
-                .as_ref()
-                .map_or(0, |rt| (rt.span.end - rt.span.start) as usize);
-            let estimated_total = current_col + params_width + return_type_width + 4;
-            estimated_total > tsv_lang::PRINT_WIDTH
+            let return_type_width = if return_type_will_break {
+                0
+            } else {
+                func.return_type
+                    .as_ref()
+                    .map_or(0, |rt| (rt.span.end - rt.span.start) as usize)
+            };
+            // +4 accounts for parens and spaces: "()" around params, " {}" body
+            current_col + params_width + return_type_width + 4 > tsv_lang::PRINT_WIDTH
         };
 
         let mut parts = Vec::new();
@@ -443,12 +417,27 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = Vec::new();
 
+        // Modifier keywords, preserving comments before the `[`
+        // (e.g., `readonly /* c */ [k: string]: T`)
+        let bracket_bound = sig
+            .parameters
+            .first()
+            .map_or(sig.span.end, |p| p.span.start);
+        let mut cursor = sig.span.start;
         if sig.is_static {
-            parts.push(d.text("static "));
+            self.push_member_keyword_doc(&mut parts, "static ", &mut cursor, bracket_bound);
         }
         if sig.readonly {
-            parts.push(d.text("readonly "));
+            self.push_member_keyword_doc(&mut parts, "readonly ", &mut cursor, bracket_bound);
         }
+        let bracket_pos = analysis::find_char_skipping_comments(
+            self.source.as_bytes(),
+            cursor as usize,
+            bracket_bound as usize,
+            b'[',
+        )
+        .map_or(cursor, |p| p as u32);
+        self.push_pre_name_comments_doc(&mut parts, cursor, bracket_pos);
 
         parts.push(d.text("["));
         parts.push(d.join(
@@ -495,51 +484,67 @@ impl<'a> Printer<'a> {
             parts.push(dec_doc);
         }
 
+        // Modifier keywords, preserving comments between them and before the
+        // name (e.g., `static /* c */ readonly p`). `cursor` tracks the scan
+        // position so each comment is emitted at the user's placement.
+        let key_start = prop.key.span().start;
+        let mut cursor = next_token_start;
+
         // Declare modifier (comes first, before accessibility)
         if prop.declare {
-            parts.push(d.text("declare "));
+            self.push_member_keyword_doc(&mut parts, "declare ", &mut cursor, key_start);
         }
 
         // Accessibility modifier
         if let Some(accessibility) = &prop.accessibility {
-            parts.push(d.text(accessibility.as_str()));
-            parts.push(d.text(" "));
+            let kind_text = accessibility_keyword(accessibility.as_str());
+            self.push_member_keyword_doc(&mut parts, kind_text, &mut cursor, key_start);
         }
 
         // Static modifier
         if prop.is_static {
-            parts.push(d.text("static "));
+            self.push_member_keyword_doc(&mut parts, "static ", &mut cursor, key_start);
         }
 
         // Override modifier
         if prop.r#override {
-            parts.push(d.text("override "));
+            self.push_member_keyword_doc(&mut parts, "override ", &mut cursor, key_start);
         }
 
         // Abstract modifier
         if prop.r#abstract {
-            parts.push(d.text("abstract "));
+            self.push_member_keyword_doc(&mut parts, "abstract ", &mut cursor, key_start);
         }
 
         // Readonly modifier
         if prop.readonly {
-            parts.push(d.text("readonly "));
+            self.push_member_keyword_doc(&mut parts, "readonly ", &mut cursor, key_start);
         }
 
         // Accessor keyword
         if prop.accessor {
-            parts.push(d.text("accessor "));
+            self.push_member_keyword_doc(&mut parts, "accessor ", &mut cursor, key_start);
         }
 
         // Key (track key_region_end to avoid double-counting comments inside brackets)
         let key_region_end;
         if prop.computed {
+            // Comments before the `[` (inside-bracket comments are handled by
+            // the bracket builder)
+            let bracket_pos = analysis::find_char_skipping_comments(
+                self.source.as_bytes(),
+                cursor as usize,
+                key_start as usize,
+                b'[',
+            )
+            .map_or(key_start, |p| p as u32);
+            self.push_pre_name_comments_doc(&mut parts, cursor, bracket_pos);
             let key_doc = self.build_expression_doc(&prop.key);
-            let (doc, end) =
-                self.build_computed_key_bracket_doc(prop.span.start, &prop.key, key_doc);
+            let (doc, end) = self.build_computed_key_bracket_doc(cursor, &prop.key, key_doc);
             key_region_end = end;
             parts.push(doc);
         } else {
+            self.push_pre_name_comments_doc(&mut parts, cursor, key_start);
             key_region_end = prop.key.span().end;
             parts.push(self.build_expression_doc(&prop.key));
         }
@@ -551,30 +556,8 @@ impl<'a> Printer<'a> {
                 internal::PropertyModifier::Definite => b'!',
                 internal::PropertyModifier::None => unreachable!(),
             };
-            let search_end = prop.type_annotation.as_ref().map_or_else(
-                || {
-                    prop.value
-                        .as_ref()
-                        .map_or(prop.span.end, |v| v.span().start)
-                },
-                |ta| ta.span.start,
-            );
-            #[allow(clippy::expect_used)] // Parser guarantees modifier char exists
-            let modifier_pos = analysis::find_char_skipping_comments(
-                self.source.as_bytes(),
-                key_region_end as usize,
-                search_end as usize,
-                modifier_char,
-            )
-            .expect("modifier char not found") as u32;
-
             // Comments between key and modifier (e.g., `a /* c */? = 1;`)
-            if self.has_comments_between(key_region_end, modifier_pos) {
-                parts.push(self.build_inline_comments_between_doc(key_region_end, modifier_pos));
-            }
-
-            parts.push(d.text(if modifier_char == b'?' { "?" } else { "!" }));
-            modifier_pos + 1
+            self.push_modifier_marker_doc(&mut parts, key_region_end, modifier_char)
         } else {
             key_region_end
         };
@@ -682,68 +665,91 @@ impl<'a> Printer<'a> {
             parts.push(dec_doc);
         }
 
+        // Modifier keywords, preserving comments between them and before the
+        // name (e.g., `static /* c */ async m()`). `cursor` tracks the scan
+        // position so each comment is emitted at the user's placement.
+        let key_start = method.key.span().start;
+        let mut cursor = next_token_start;
+
         // Accessibility modifier
         if let Some(accessibility) = &method.accessibility {
-            parts.push(d.text(accessibility.as_str()));
-            parts.push(d.text(" "));
+            let kind_text = accessibility_keyword(accessibility.as_str());
+            self.push_member_keyword_doc(&mut parts, kind_text, &mut cursor, key_start);
         }
 
         // Static modifier
         if method.is_static {
-            parts.push(d.text("static "));
+            self.push_member_keyword_doc(&mut parts, "static ", &mut cursor, key_start);
         }
 
         // Override modifier
         if method.r#override {
-            parts.push(d.text("override "));
+            self.push_member_keyword_doc(&mut parts, "override ", &mut cursor, key_start);
         }
 
         // Abstract modifier
         if method.r#abstract {
-            parts.push(d.text("abstract "));
+            self.push_member_keyword_doc(&mut parts, "abstract ", &mut cursor, key_start);
         }
 
         // Async modifier
         if method.value.r#async {
-            parts.push(d.text("async "));
+            self.push_member_keyword_doc(&mut parts, "async ", &mut cursor, key_start);
         }
 
-        // Generator marker
+        // Generator marker (owns comment handling from `*` to the key)
         if method.value.generator {
             parts.push(d.text("*"));
-            self.append_generator_star_comments(
-                &mut parts,
-                method.span.start,
-                method.key.span().start,
-            );
+            self.append_generator_star_comments(&mut parts, cursor, key_start);
         }
 
         // Get/set for accessors
         match method.kind {
-            internal::MethodKind::Get => parts.push(d.text("get ")),
-            internal::MethodKind::Set => parts.push(d.text("set ")),
+            internal::MethodKind::Get => {
+                self.push_member_keyword_doc(&mut parts, "get ", &mut cursor, key_start);
+            }
+            internal::MethodKind::Set => {
+                self.push_member_keyword_doc(&mut parts, "set ", &mut cursor, key_start);
+            }
             _ => {}
         }
 
         // Key
         let key_region_end;
         if method.computed {
+            // Comments before the `[` (inside-bracket comments are handled by
+            // the bracket builder); generators handle this span after the `*`.
+            if !method.value.generator {
+                let bracket_pos = analysis::find_char_skipping_comments(
+                    self.source.as_bytes(),
+                    cursor as usize,
+                    key_start as usize,
+                    b'[',
+                )
+                .map_or(key_start, |p| p as u32);
+                self.push_pre_name_comments_doc(&mut parts, cursor, bracket_pos);
+            }
             let key_doc = self.build_expression_doc(&method.key);
-            let (doc, end) =
-                self.build_computed_key_bracket_doc(method.span.start, &method.key, key_doc);
+            let (doc, end) = self.build_computed_key_bracket_doc(cursor, &method.key, key_doc);
             key_region_end = end;
             parts.push(doc);
         } else {
+            if !method.value.generator {
+                self.push_pre_name_comments_doc(&mut parts, cursor, key_start);
+            }
             key_region_end = method.key.span().end;
             parts.push(self.build_expression_doc(&method.key));
         }
 
-        // Optional marker: `m?()` (abstract / ambient / interface methods)
-        if method.optional {
-            parts.push(d.text("?"));
-        }
+        // Optional marker: `m?()` (abstract / ambient / interface methods),
+        // preserving comments between name and `?` (e.g., `m /* c */?()`)
+        let after_key = if method.optional {
+            self.push_modifier_marker_doc(&mut parts, key_region_end, b'?')
+        } else {
+            key_region_end
+        };
 
-        // Comments between key and next token: [x] /* c */() or method /* c */ <T>()
+        // Comments between key/`?` and next token: [x] /* c */() or method /* c */ <T>()
         // Line comments get a hardline to prevent absorbing type params as comment text
         let next_after_key = method
             .value
@@ -751,7 +757,7 @@ impl<'a> Printer<'a> {
             .as_ref()
             .map_or(method.value.params_start, |tp| tp.span.start);
         parts.push(self.build_name_to_type_params_comments(
-            key_region_end,
+            after_key,
             next_after_key,
             CommentSpacing::for_type_params(method.value.type_parameters.is_some()),
         ));
@@ -784,16 +790,12 @@ impl<'a> Printer<'a> {
         // For abstract methods or overload signatures, use semicolon instead of body
         if method.r#abstract || is_overload_signature {
             // Comments between return type (or params) and `;`
-            let content_end = if let Some(rt) = &method.value.return_type {
-                rt.span.end
-            } else {
-                self.find_closing_paren(method.value.params_start, method.span.end)
-                    .unwrap_or(method.span.end)
-            };
-            for comment in comments_in_range(self.comments, content_end, method.span.end) {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-            }
+            self.append_signature_end_comments(
+                &mut parts,
+                method.value.return_type.as_ref(),
+                Some(method.value.params_start),
+                method.span.end,
+            );
             parts.push(d.text(";"));
         } else {
             let sig_end = if let Some(rt) = &method.value.return_type {

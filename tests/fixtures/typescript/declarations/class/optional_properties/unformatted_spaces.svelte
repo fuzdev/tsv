@@ -41,4 +41,9 @@
   class H {
     a !  :  string ;
   }
+  // Without type annotation (implicit any)
+  class I {
+    a ?  ;
+    b !  ;
+  }
 </script>

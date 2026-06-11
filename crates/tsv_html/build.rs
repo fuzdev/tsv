@@ -61,8 +61,11 @@ fn main() {
 
     writeln!(f, "}};").unwrap();
 
-    println!(
-        "cargo:warning=Generated entity map with {} entries",
+    // No cargo:warning here — it would print on every build of every consumer.
+    // A broken/truncated entities.json should fail instead (full list is ~2231).
+    assert!(
+        entities.len() > 2000,
+        "entity map suspiciously small: {} entries",
         entities.len()
     );
 }

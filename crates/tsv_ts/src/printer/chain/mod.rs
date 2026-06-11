@@ -21,6 +21,7 @@
 // - **analysis.rs**: Linearization, grouping, merge decisions, SymbolLookup trait
 // - **types.rs**: Core data structures (ChainNode, ChainGroup)
 // - **printing.rs**: Node/group rendering, ChainPrinter trait
+// - **adapter.rs**: ChainPrinter/SymbolLookup impls binding the main Printer to this module
 // - **builder/**: Doc building logic split into focused submodules
 //   - mod.rs: Main build_chain_doc entry point
 //   - member_only.rs: Member-only chains using fill()
@@ -30,6 +31,7 @@
 // ## References
 // - prettier/src/language-js/print/member-chain.js
 
+mod adapter;
 mod analysis;
 mod builder;
 mod printing;

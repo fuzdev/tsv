@@ -31,7 +31,7 @@ use super::printing::{
 };
 use super::types::{ChainGroup, ChainNode};
 use crate::ast::internal::{ArrowFunctionBody, Expression};
-use crate::printer::utils::contains_call_expression;
+use crate::printer::calls::arg_predicates::contains_call_expression;
 use tsv_lang::doc::arena::DocId;
 
 /// Cutoff for short chains when groups should NOT be merged

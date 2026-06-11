@@ -233,14 +233,15 @@ delete pkg.module;
 Deno.writeTextFileSync(pkg_path, JSON.stringify(pkg, null, '\t') + '\n');
 console.log(`Patched ${pkg_path}: name → ${pkg.name}, version ${pkg.version}`);
 
-await print_summary(pkg_root);
+await print_summary(pkg_root, [...pkg.files, 'package.json']);
 
-async function print_summary(dir: string): Promise<void> {
-	const entries = [...Deno.readDirSync(dir)]
-		.filter((e) => e.isFile && !e.name.startsWith('.'))
-		.map((e) => {
-			const path = `${dir}/${e.name}`;
-			return { name: e.name, path, size: Deno.statSync(path).size };
+/** Lists what actually ships (`files[]` + package.json), not everything in
+ * the build dir — wasm-pack leaves strays like `tsv_wasm_bg.wasm.d.ts`. */
+async function print_summary(dir: string, files: string[]): Promise<void> {
+	const entries = files
+		.map((name) => {
+			const path = `${dir}/${name}`;
+			return { name, path, size: Deno.statSync(path).size };
 		})
 		.sort((a, b) => b.size - a.size);
 

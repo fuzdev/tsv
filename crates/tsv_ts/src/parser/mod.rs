@@ -12,6 +12,7 @@ mod expression;
 mod expression_lookahead; // Arrow function and type argument disambiguation
 mod scan; // Low-level byte scanning utilities
 mod statement; // Statement parsing (refactored into submodules)
+mod types; // TypeScript type-syntax parsing (annotations, type expressions, type parameters)
 
 #[allow(clippy::struct_excessive_bools)]
 pub struct Parser<'a> {
@@ -48,6 +49,10 @@ pub struct Parser<'a> {
     /// Stored lexer error from peek_kind(). Returned on next advance() call.
     /// This ensures lexer errors propagate even when peek swallows them.
     lexer_error: Option<ParseError>,
+    /// Whether a line terminator (including before/inside comments drained
+    /// during the peek) precedes the cached peek token. Only meaningful while
+    /// `peek_cache` is `Some`; consumed by `advance_inner()`.
+    peek_had_line_terminator: bool,
     /// Whether to allow `in` as a binary operator.
     /// Set to false when parsing for-loop headers to distinguish `for (x in y)` from expressions.
     allow_in: bool,
@@ -111,6 +116,7 @@ impl<'a> Parser<'a> {
             grouping_depth: 0,              // Not inside any grouping delimiters
             in_ambient_context: false,      // Not in declare namespace/module
             lexer_error: None,              // No stored lexer error
+            peek_had_line_terminator: false, // No peek cached yet
             allow_in: true,                 // Allow `in` binary operator by default
         })
     }
@@ -134,9 +140,9 @@ impl<'a> Parser<'a> {
             self.current_start = peek.start;
             self.current_end = peek.end;
             self.current_decoded = peek.decoded;
-            // Peek doesn't preserve line terminator info, so check lexer state
-            // Note: This is slightly imprecise for peek, but peek is rare
-            self.had_line_terminator = self.lexer.had_line_terminator();
+            // Recorded while populating the peek cache — includes line
+            // terminators before/inside comments drained during the peek.
+            self.had_line_terminator = self.peek_had_line_terminator;
         } else {
             let token = self.lexer.next_token()?;
             self.current_kind = token.kind;
@@ -482,21 +488,51 @@ impl<'a> Parser<'a> {
     // Peek helpers for lookahead (needed for type annotations, operators, etc.)
     // Lazily computes peek token on first access.
     // Stores lexer errors to be returned on next advance() call.
+    //
+    // Comment tokens are drained into `self.comments` (mirroring
+    // `collect_comments()`) so the cached token — and every peek-based
+    // decision — is the next CODE token. Line terminators seen while
+    // draining are recorded in `peek_had_line_terminator` for the
+    // advance() that later consumes the cached token.
     pub(super) fn peek_kind(&mut self) -> TokenKind {
         if self.peek_cache.is_none() && self.lexer_error.is_none() {
-            match self.lexer.next_token() {
-                Ok(token) => {
-                    self.peek_cache = Some(PeekData::with_decoded(
-                        token.kind,
-                        token.start,
-                        token.end,
-                        token.decoded,
-                    ));
+            self.peek_had_line_terminator = false;
+            loop {
+                match self.lexer.next_token() {
+                    Ok(token) => {
+                        if self.lexer.had_line_terminator() {
+                            self.peek_had_line_terminator = true;
+                        }
+                        if let TokenKind::Comment { content, is_block } = &token.kind {
+                            // ECMAScript spec: a MultiLineComment containing a line
+                            // terminator counts as one for ASI purposes.
+                            if *is_block && content.contains(['\n', '\r', '\u{2028}', '\u{2029}']) {
+                                self.peek_had_line_terminator = true;
+                            }
+                            self.comments.push(Comment {
+                                content: content.clone(),
+                                is_block: *is_block,
+                                span: Span::new(
+                                    (token.start + self.base_offset) as u32,
+                                    (token.end + self.base_offset) as u32,
+                                ),
+                                emit_character_field: false,
+                            });
+                            continue;
+                        }
+                        self.peek_cache = Some(PeekData::with_decoded(
+                            token.kind,
+                            token.start,
+                            token.end,
+                            token.decoded,
+                        ));
+                    }
+                    Err(err) => {
+                        // Store error to be returned on next advance()
+                        self.lexer_error = Some(err);
+                    }
                 }
-                Err(err) => {
-                    // Store error to be returned on next advance()
-                    self.lexer_error = Some(err);
-                }
+                break;
             }
         }
         self.peek_cache
@@ -572,59 +608,6 @@ impl<'a> Parser<'a> {
                 | TokenKind::Number
                 | TokenKind::Keyword(_)
         )
-    }
-
-    /// Peek past any comments to find the next non-comment token kind.
-    ///
-    /// Unlike `peek_kind()`, this skips over comment tokens to find the actual
-    /// next code token. Comments encountered are collected into the comments Vec.
-    ///
-    /// Used for disambiguating constructs where comments may appear between keywords:
-    /// - `async /* comment */ function` - detect async function declaration
-    ///
-    /// Note: This may consume multiple tokens from the lexer. The peek_cache
-    /// will hold the first non-comment token found.
-    pub(super) fn peek_non_comment_kind(&mut self) -> TokenKind {
-        // First, populate peek_cache if empty
-        let mut kind = self.peek_kind();
-
-        // Skip over any comment tokens
-        while let TokenKind::Comment { content, is_block } = &kind {
-            // Collect the comment
-            if let Some(peek) = self.peek_cache.take() {
-                self.comments.push(Comment {
-                    content: content.clone(),
-                    is_block: *is_block,
-                    span: Span::new(
-                        (peek.start + self.base_offset) as u32,
-                        (peek.end + self.base_offset) as u32,
-                    ),
-                    emit_character_field: false,
-                });
-            }
-
-            // Get the next token
-            if self.lexer_error.is_some() {
-                return TokenKind::Eof;
-            }
-            match self.lexer.next_token() {
-                Ok(token) => {
-                    self.peek_cache = Some(PeekData::with_decoded(
-                        token.kind.clone(),
-                        token.start,
-                        token.end,
-                        token.decoded,
-                    ));
-                    kind = token.kind;
-                }
-                Err(err) => {
-                    self.lexer_error = Some(err);
-                    return TokenKind::Eof;
-                }
-            }
-        }
-
-        kind
     }
 
     /// Check if current token is an identifier or keyword.
@@ -767,6 +750,16 @@ impl<'a> Parser<'a> {
                 // `>=`, `>>=`, `>>>=` - consume `>`, re-lex from next position
                 // The remainder might combine with subsequent chars (e.g., `>=` -> `=>`)
                 let new_start = self.current_start + 1;
+                // Drop comments drained by a discarded peek — the seek below
+                // re-lexes that region, and they'd be collected twice.
+                let relex_from = (new_start + self.base_offset) as u32;
+                while self
+                    .comments
+                    .last()
+                    .is_some_and(|c| c.span.start >= relex_from)
+                {
+                    self.comments.pop();
+                }
                 let token = self.lexer.seek_and_next_token(new_start)?;
                 self.current_kind = token.kind;
                 self.current_start = token.start;
@@ -978,6 +971,38 @@ impl<'a> Parser<'a> {
         Ok(param)
     }
 
+    /// Parse a destructuring binding (`[a, b]` / `{a, b}`) with an optional
+    /// type annotation attached to the resulting pattern.
+    ///
+    /// Current token must be `[` or `{`. Shared by parameter lists and
+    /// variable declarators; default values are handled by the caller.
+    pub(super) fn parse_destructured_binding(&mut self) -> Result<Expression, ParseError> {
+        let expr = if self.check(&TokenKind::BracketOpen) {
+            self.parse_array_expression()?
+        } else {
+            self.parse_object_expression()?
+        };
+        let mut pattern = self.to_assignable(expr)?;
+
+        // Check for type annotation: [a, b]: Type or {a, b}: Type
+        if self.check(&TokenKind::Colon) {
+            let type_annotation = self.parse_type_annotation()?;
+            let end = type_annotation.span.end;
+            match &mut pattern {
+                Expression::ArrayPattern(p) => {
+                    p.type_annotation = Some(type_annotation);
+                    p.span.end = end;
+                }
+                Expression::ObjectPattern(p) => {
+                    p.type_annotation = Some(type_annotation);
+                    p.span.end = end;
+                }
+                _ => {}
+            }
+        }
+        Ok(pattern)
+    }
+
     /// Parse a parenthesized parameter list: `(a, b, c)`
     ///
     /// Used by function declarations, method shorthand, and arrow functions.
@@ -1060,53 +1085,10 @@ impl<'a> Parser<'a> {
                     }
                     // TypeScript `this` parameter: `function f(this: T) {}`
                     TokenKind::Keyword(KeywordKind::This) => self.parse_simple_param()?,
-                    TokenKind::BracketOpen => {
-                        // Array destructuring pattern: [a, b] or [a, b]: Type
-                        let expr = self.parse_array_expression()?;
-                        let mut pattern = self.to_assignable(expr)?;
-
-                        // Check for type annotation: [a, b]: Type
-                        if self.check(&TokenKind::Colon) {
-                            let ta = self.parse_type_annotation()?;
-                            let end = ta.span.end;
-                            // Update the pattern with type annotation
-                            if let Expression::ArrayPattern(ref mut ap) = pattern {
-                                ap.type_annotation = Some(ta);
-                                ap.span.end = end;
-                            }
-                        }
-
-                        // Check for default value
-                        if self.check(&TokenKind::Equals) {
-                            let pattern_start = pattern.span().start;
-                            self.advance()?; // consume '='
-                            let default_value = self.parse_assignment_expression()?;
-                            // prev_token_end covers a parenthesized default's closing `)`
-                            let assign_end = self.prev_token_end() as u32;
-                            Expression::AssignmentPattern(AssignmentPattern {
-                                left: Box::new(pattern),
-                                right: Box::new(default_value),
-                                span: Span::new(pattern_start, assign_end),
-                            })
-                        } else {
-                            pattern
-                        }
-                    }
-                    TokenKind::BraceOpen => {
-                        // Object destructuring pattern: {a, b} or {a, b}: Type
-                        let expr = self.parse_object_expression()?;
-                        let mut pattern = self.to_assignable(expr)?;
-
-                        // Check for type annotation: {a, b}: Type
-                        if self.check(&TokenKind::Colon) {
-                            let ta = self.parse_type_annotation()?;
-                            let end = ta.span.end;
-                            // Update the pattern with type annotation
-                            if let Expression::ObjectPattern(ref mut op) = pattern {
-                                op.type_annotation = Some(ta);
-                                op.span.end = end;
-                            }
-                        }
+                    TokenKind::BracketOpen | TokenKind::BraceOpen => {
+                        // Destructuring pattern: [a, b] / {a, b}, with optional
+                        // type annotation and default value
+                        let pattern = self.parse_destructured_binding()?;
 
                         // Check for default value
                         if self.check(&TokenKind::Equals) {

@@ -6,12 +6,12 @@
 //
 // Note: Block statements are in blocks.rs as a reusable utility
 
-use super::super::utils::arrow_has_trailing_param_comments;
 use super::super::{has_newline_before_position, is_multiline_template_expression};
 use super::{ParenContext, Printer, needs_parens, unwrap_parenthesized};
 use crate::ast::internal;
 use crate::printer::ArrowChainContext;
 use crate::printer::analysis::find_char_skipping_comments;
+use crate::printer::calls::arg_predicates::arrow_has_trailing_param_comments;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::needs_parens::leftmost_no_lookahead;
 use crate::printer::types::helpers::is_huggable_type;

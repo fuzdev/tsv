@@ -296,36 +296,16 @@ impl<'a> Printer<'a> {
             search_end as usize,
         ) as u32;
 
-        // Find `?` position once (used for both optional handling and type annotation)
-        let q_pos = if id.optional && id.type_annotation.is_some() {
-            analysis::find_char_skipping_comments(
-                self.source.as_bytes(),
-                raw_name_end as usize,
-                search_end as usize,
-                b'?',
-            )
-            .map(|p| p as u32)
+        // Handle optional marker (e.g., `a?` in `function fn(a?: number) {}`),
+        // with comments between name and `?` (e.g., `a /* c */?`)
+        let after_modifier = if id.optional {
+            self.push_modifier_marker_doc(&mut parts, raw_name_end, b'?')
         } else {
-            None
+            raw_name_end
         };
-
-        // Handle optional marker (e.g., `a?` in `function fn(a?: number) {}`)
-        if id.optional {
-            // Comments between name and `?` (e.g., `a /* c */?`) — only when type annotation
-            // exists. Without a type annotation, the identifier span covers only the name
-            // (the `?` is not in the span range).
-            if let Some(q) = q_pos
-                && self.has_comments_between(raw_name_end, q)
-            {
-                parts.push(self.build_inline_comments_between_doc(raw_name_end, q));
-            }
-            parts.push(d.text("?"));
-        }
 
         // Handle type annotations
         if let Some(type_annotation) = &id.type_annotation {
-            // Position after name and optional `?`
-            let after_modifier = q_pos.map_or(raw_name_end, |q| q + 1);
             // Extract comments between name/modifier and `:` (e.g., `a /* c */: number`)
             if self.has_comments_between(after_modifier, type_annotation.span.start) {
                 let comment_doc = self
@@ -405,6 +385,24 @@ impl<'a> Printer<'a> {
         }
         d.concat(&parts)
     }
+}
+
+/// Check if a string is a valid JS identifier (so prettier outputs it unquoted).
+///
+/// Built on the lexer's identifier grammar (`lexer::ident`) so any key we
+/// unquote here can be re-lexed as an identifier (idempotency). Reserved words
+/// count as identifiers here (prettier outputs them unquoted).
+pub(in crate::printer) fn is_valid_js_identifier(s: &str) -> bool {
+    use crate::lexer::ident::{is_id_continue, is_id_start};
+
+    let mut chars = s.chars();
+
+    match chars.next() {
+        Some(c) if is_id_start(c) => {}
+        _ => return false,
+    }
+
+    chars.all(is_id_continue)
 }
 
 #[cfg(test)]

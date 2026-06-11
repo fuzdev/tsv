@@ -26,7 +26,24 @@ impl<'a> Printer<'a> {
             TSTypeElement::PropertySignature(prop) => {
                 let mut parts = vec![];
                 if prop.readonly {
-                    parts.push(d.text("readonly "));
+                    // Preserve comments after the keyword (e.g., `readonly /* c */ a`);
+                    // bounded at `[` for computed keys (inner comments are the
+                    // bracket builder's)
+                    let key_start = prop.key.span().start;
+                    let mut cursor = prop.span.start;
+                    self.push_member_keyword_doc(&mut parts, "readonly ", &mut cursor, key_start);
+                    let bound = if prop.computed {
+                        find_char_skipping_comments(
+                            self.source.as_bytes(),
+                            cursor as usize,
+                            key_start as usize,
+                            b'[',
+                        )
+                        .map_or(cursor, |pos| pos as u32)
+                    } else {
+                        key_start
+                    };
+                    self.push_pre_name_comments_doc(&mut parts, cursor, bound);
                 }
                 let (key_doc, key_region_end) =
                     self.build_type_member_key_doc(prop.span.start, &prop.key, prop.computed, true);
@@ -62,10 +79,21 @@ impl<'a> Printer<'a> {
             }
             TSTypeElement::MethodSignature(method) => {
                 let mut parts = vec![];
-                // Print accessor keyword for get/set signatures
+                // Print accessor keyword for get/set signatures, preserving
+                // comments between keyword and name
                 match method.kind {
-                    internal::MethodKind::Get => parts.push(d.text("get ")),
-                    internal::MethodKind::Set => parts.push(d.text("set ")),
+                    internal::MethodKind::Get => self.push_accessor_keyword_doc(
+                        &mut parts,
+                        "get ",
+                        method.span.start,
+                        method.key.span().start,
+                    ),
+                    internal::MethodKind::Set => self.push_accessor_keyword_doc(
+                        &mut parts,
+                        "set ",
+                        method.span.start,
+                        method.key.span().start,
+                    ),
                     _ => {}
                 }
                 let (key_doc, key_region_end) = self.build_type_member_key_doc(
@@ -120,18 +148,12 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_signature_return_type_doc(paren_pos, return_type));
                 }
                 // Comments between return type (or params) and `;`
-                let content_end = method.return_type.as_ref().map_or_else(
-                    || {
-                        paren_pos
-                            .and_then(|p| self.find_closing_paren(p, method.span.end))
-                            .unwrap_or(method.span.end)
-                    },
-                    |rt| rt.span.end,
+                self.append_signature_end_comments(
+                    &mut parts,
+                    method.return_type.as_ref(),
+                    paren_pos,
+                    method.span.end,
                 );
-                for comment in comments_in_range(self.comments, content_end, method.span.end) {
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
-                }
                 d.group(d.concat(&parts))
             }
             TSTypeElement::CallSignature(call) => {
@@ -166,18 +188,12 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_signature_return_type_doc(paren_pos, return_type));
                 }
                 // Comments between return type (or params) and `;`
-                let content_end = call.return_type.as_ref().map_or_else(
-                    || {
-                        paren_pos
-                            .and_then(|p| self.find_closing_paren(p, call.span.end))
-                            .unwrap_or(call.span.end)
-                    },
-                    |rt| rt.span.end,
+                self.append_signature_end_comments(
+                    &mut parts,
+                    call.return_type.as_ref(),
+                    paren_pos,
+                    call.span.end,
                 );
-                for comment in comments_in_range(self.comments, content_end, call.span.end) {
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
-                }
                 d.group(d.concat(&parts))
             }
             TSTypeElement::ConstructSignature(ctor) => {
@@ -239,18 +255,12 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_signature_return_type_doc(paren_pos, return_type));
                 }
                 // Comments between return type (or params) and `;`
-                let content_end = ctor.return_type.as_ref().map_or_else(
-                    || {
-                        paren_pos
-                            .and_then(|p| self.find_closing_paren(p, ctor.span.end))
-                            .unwrap_or(ctor.span.end)
-                    },
-                    |rt| rt.span.end,
+                self.append_signature_end_comments(
+                    &mut parts,
+                    ctor.return_type.as_ref(),
+                    paren_pos,
+                    ctor.span.end,
                 );
-                for comment in comments_in_range(self.comments, content_end, ctor.span.end) {
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
-                }
                 d.group(d.concat(&parts))
             }
             TSTypeElement::IndexSignature(idx) => self.build_type_element_index_signature_doc(idx),
@@ -262,7 +272,21 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = vec![];
         if idx.readonly {
-            parts.push(d.text("readonly "));
+            // Preserve comments before the `[` (e.g., `readonly /* c */ [k: string]: T`)
+            let bracket_bound = idx
+                .parameters
+                .first()
+                .map_or(idx.span.end, |p| p.span.start);
+            let mut cursor = idx.span.start;
+            self.push_member_keyword_doc(&mut parts, "readonly ", &mut cursor, bracket_bound);
+            let bracket_pos = find_char_skipping_comments(
+                self.source.as_bytes(),
+                cursor as usize,
+                bracket_bound as usize,
+                b'[',
+            )
+            .map_or(cursor, |p| p as u32);
+            self.push_pre_name_comments_doc(&mut parts, cursor, bracket_pos);
         }
 
         // Build the key parameter docs

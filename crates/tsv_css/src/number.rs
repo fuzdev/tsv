@@ -2,7 +2,7 @@
 // scanned, shared by the lexer (token spans), the parser (dimension splitting),
 // and the printer (value/prelude normalization). Pure functions over `&str`;
 // no allocation, no AST. Formatting (leading-zero/trailing-zero normalization)
-// lives in `printer::source_fidelity`, not here — this module is grammar only.
+// lives in `printer::value_normalization`, not here — this module is grammar only.
 
 /// Can `ch` continue a dimension unit / CSS identifier?
 ///

@@ -13,19 +13,21 @@
 // - **test_patterns.rs**: Test function detection (Jest, Mocha, Playwright, etc.)
 // - **module_paths.rs**: Module path patterns (require, import.meta)
 // - **arg_comments.rs**: Comment handling in argument lists
+// - **arg_predicates.rs**: Call-argument and arrow shape predicates
 // - **arg_wrapping.rs**: Argument classification and wrapping utilities
 // - **call_formatting.rs**: Main call expression formatting logic
+// - **new_expression.rs**: `new` expression formatting (shares the call wrapping patterns)
 // - **import_expr.rs**: Import expression and meta property handling
 // - **chain_args.rs**: Chain-specific argument building
-// - **chain_printer.rs**: ChainPrinter trait implementation
 
 mod arg_comments;
+pub(in crate::printer) mod arg_predicates;
 mod arg_wrapping;
 mod call_formatting;
 mod chain_args;
-mod chain_printer;
 mod import_expr;
 mod module_paths;
+mod new_expression;
 mod test_patterns;
 
 // Re-export items needed by other printer modules
@@ -45,9 +47,9 @@ pub(crate) use arg_wrapping::{
 
 use super::Printer;
 use super::chain;
-use super::utils::{is_block_function, preceding_args_allow_expand_last};
 use crate::ast::internal;
 use arg_comments::{any_comment_forces_expansion, last_arg_has_comments};
+use arg_predicates::{is_block_function, preceding_args_allow_expand_last};
 use tsv_lang::doc::arena::DocId;
 
 /// Check if a chain expression contains any call expressions

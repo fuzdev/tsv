@@ -86,36 +86,10 @@ impl<'a> Printer<'a> {
         let mut after_modifier = raw_name_end;
 
         if definite {
-            #[allow(clippy::expect_used)] // Parser guarantees `!` exists for definite identifier
-            let bang_pos = analysis::find_char_skipping_comments(
-                self.source.as_bytes(),
-                after_modifier as usize,
-                search_end as usize,
-                b'!',
-            )
-            .expect("! not found for definite identifier") as u32;
-            // Comments between name and `!` (e.g., `a /* c */ !`)
-            if self.has_comments_between(after_modifier, bang_pos) {
-                parts.push(self.build_inline_comments_between_doc(after_modifier, bang_pos));
-            }
-            parts.push(d.text("!"));
-            after_modifier = bang_pos + 1;
+            after_modifier = self.push_modifier_marker_doc(&mut parts, after_modifier, b'!');
         }
         if ident.optional {
-            #[allow(clippy::expect_used)] // Parser guarantees `?` exists for optional identifier
-            let q_pos = analysis::find_char_skipping_comments(
-                self.source.as_bytes(),
-                after_modifier as usize,
-                search_end as usize,
-                b'?',
-            )
-            .expect("? not found for optional identifier") as u32;
-            // Comments between name/! and `?` (e.g., `a /* c */ ?`)
-            if self.has_comments_between(after_modifier, q_pos) {
-                parts.push(self.build_inline_comments_between_doc(after_modifier, q_pos));
-            }
-            parts.push(d.text("?"));
-            after_modifier = q_pos + 1;
+            after_modifier = self.push_modifier_marker_doc(&mut parts, after_modifier, b'?');
         }
         if let Some(type_ann) = &ident.type_annotation {
             // Extract comments between modifiers and `:` (e.g., `a! /* c */: number`)
@@ -284,8 +258,23 @@ impl<'a> Printer<'a> {
 
             // Initializer with comment handling around =
             if let Some(init) = &declarator.init {
-                let id_end = declarator.id.span().end;
+                let mut id_end = declarator.id.span().end;
                 let init_start = init.span().start;
+                // With definite assignment but no type annotation (`let a! = x`), the id
+                // span excludes the `!`; advance past it so comments between the name and
+                // `!` (already emitted inside the id doc) aren't re-emitted before `=`.
+                if declarator.definite
+                    && let Expression::Identifier(ident) = &declarator.id
+                    && ident.type_annotation.is_none()
+                    && let Some(bang_pos) = analysis::find_char_skipping_comments(
+                        self.source.as_bytes(),
+                        id_end as usize,
+                        init_start as usize,
+                        b'!',
+                    )
+                {
+                    id_end = bang_pos as u32 + 1;
+                }
                 let equals_pos = self.find_equals_position(id_end, init_start);
                 let has_comments_before_eq = self.has_comments_between(id_end, equals_pos);
                 let has_comments_after_eq = self.has_comments_between(equals_pos + 1, init_start);

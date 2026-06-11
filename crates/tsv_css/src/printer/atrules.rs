@@ -10,7 +10,7 @@
 // wrapping). The complex prelude and block handling remains imperative for clarity.
 
 use super::Printer;
-use super::source_fidelity;
+use super::value_normalization;
 use crate::ast::internal;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::{self, Mode, arena::DocId};
@@ -89,7 +89,7 @@ impl<'a> Printer<'a> {
                     {
                         // Normalize from source (comment-aware) so embedded comments and
                         // their spacing survive (`screen /* c */ and (...)`).
-                        let normalized = source_fidelity::normalize_css_whitespace(
+                        let normalized = value_normalization::normalize_css_whitespace(
                             value_span.extract(self.source),
                         );
                         // Route a wrappable media condition through the line-wrapping
@@ -448,7 +448,7 @@ impl<'a> Printer<'a> {
             .map(|p| internal::SupportsPart {
                 connector: p.connector,
                 content: if kind.normalizes() {
-                    source_fidelity::normalize_value_text(&p.content)
+                    value_normalization::normalize_value_text(&p.content)
                 } else {
                     p.content.clone()
                 },
@@ -788,7 +788,7 @@ impl<'a> Printer<'a> {
     /// comma-separated query *list* packs greedily — see
     /// `print_import_media_query_fill`. The trailing `;` is the only suffix (1).
     fn print_import_media_query(&mut self, content: &str) {
-        let normalized = source_fidelity::normalize_value_text(content);
+        let normalized = value_normalization::normalize_value_text(content);
         // Fits inline (counting the trailing `;`) — emit verbatim.
         let total_width = self.current_column() + normalized.len() + 1;
         if total_width <= tsv_lang::PRINT_WIDTH {
@@ -802,7 +802,7 @@ impl<'a> Printer<'a> {
             self.print_media_query_with_wrapping(&normalized, 1, MediaWrap::AndOr);
             return;
         }
-        let queries: Vec<&str> = source_fidelity::split_args_by_comma(&normalized)
+        let queries: Vec<&str> = value_normalization::split_args_by_comma(&normalized)
             .into_iter()
             .map(str::trim)
             .filter(|q| !q.is_empty())
@@ -874,7 +874,7 @@ impl<'a> Printer<'a> {
         indent2: usize,
         width: usize,
     ) -> usize {
-        let atoms = source_fidelity::split_by_space_preserving_parens(query);
+        let atoms = value_normalization::split_by_space_preserving_parens(query);
         let last = atoms.len().saturating_sub(1);
         let mut col = start_col;
         for (ai, &atom) in atoms.iter().enumerate() {
@@ -914,7 +914,7 @@ impl<'a> Printer<'a> {
     ) {
         // Normalize numbers and string quotes in the raw prelude (`.5px` → `0.5px`,
         // `"x"` → `'x'`), matching the declaration-value path. Comments preserved.
-        let content = source_fidelity::normalize_value_text(content);
+        let content = value_normalization::normalize_value_text(content);
         let content = content.as_str();
 
         let current_col = self.current_column();
@@ -929,7 +929,7 @@ impl<'a> Printer<'a> {
         // query per line (prettier's `group(indent(join(line, …)))`). A single
         // query (no top-level comma) falls through to `and`/`or` wrapping below.
         if matches!(wrap, MediaWrap::CommaList) {
-            let queries: Vec<&str> = source_fidelity::split_args_by_comma(content)
+            let queries: Vec<&str> = value_normalization::split_args_by_comma(content)
                 .into_iter()
                 .map(str::trim)
                 .filter(|q| !q.is_empty())

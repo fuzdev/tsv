@@ -3,16 +3,20 @@
 // ## Module Organization
 //
 // - **element.rs** - Element entry points (print_element, print_special_element)
-// - **fragment_doc.rs** - Core doc-based fragment formatting, control flow blocks, template tags
+// - **fragment_doc.rs** - Core doc-based fragment formatting (text fill, node dispatch)
+// - **blocks_doc.rs** - Doc-based formatting for control flow blocks ({#if}, {#each}, etc.)
+// - **tags_doc.rs** - Doc-based formatting for template tags ({@html}, {@const}, etc.)
 // - **element_doc.rs** - Doc-based formatting for regular HTML/component elements
 // - **special_doc.rs** - Doc-based formatting for svelte:* special elements
 // - **helpers.rs** - Utilities (expression tags, patterns, source position tracking)
 //
-// Note: Control flow blocks ({#if}, {#each}, etc.) are in ../blocks.rs
-// and template tags ({@html}, {@const}, etc.) are in ../tags.rs
+// Note: Control flow block and template tag entry points are in ../blocks.rs
+// and ../tags.rs
 
+mod blocks_doc;
 mod element;
 mod element_doc;
 mod fragment_doc;
 mod helpers;
 mod special_doc;
+mod tags_doc;

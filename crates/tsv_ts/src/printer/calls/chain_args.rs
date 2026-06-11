@@ -4,17 +4,17 @@
 // is handled separately by the chain printer.
 
 use super::super::comments::{CommentFilter, CommentSpacing};
-use super::super::utils::{
-    arrow_has_trailing_param_comments, is_block_function, is_concise_numeric_array,
-    is_curried_arrow, is_function_composition_args, is_short_second_arg_for_expand_first,
-    is_ternary_arrow_body, last_arg_is_array_or_object, preceding_args_allow_expand_last,
-};
 use super::super::{Printer, has_newline_before_position, is_multiline_template_expression};
 use super::arg_comments::{
     PartitionedComments, any_comment_forces_expansion, find_comma_pos, first_arg_has_any_comments,
     has_blank_line_between_args, has_inter_argument_comments, has_trailing_comments_on_args,
     is_comment_after_comma, is_comment_before_comma, is_comment_inline_with_next,
     last_arg_has_comments,
+};
+use super::arg_predicates::{
+    arrow_has_trailing_param_comments, is_block_function, is_concise_numeric_array,
+    is_curried_arrow, is_function_composition_args, is_short_second_arg_for_expand_first,
+    is_ternary_arrow_body, last_arg_is_array_or_object, preceding_args_allow_expand_last,
 };
 use super::arg_wrapping::{
     ChainArgKind, arrow_has_type_annotations, arrow_has_type_reference_return,

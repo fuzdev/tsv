@@ -3,71 +3,32 @@
 // Contains the primary `build_call_doc_with_wrapping` function that handles
 // all the special cases for call expression formatting.
 
-use super::super::comments::{CommentFilter, CommentSpacing};
-use super::super::utils::{
-    arrow_has_trailing_param_comments, is_array_or_object_unwrapped, is_block_function,
-    is_concise_numeric_array, is_curried_arrow, is_function_composition_args,
-    is_short_second_arg_for_expand_first, is_ternary_arrow_body, last_arg_is_array_or_object,
-    preceding_args_allow_expand_last,
-};
-use super::super::{
-    ParenContext, Printer, has_multiline_content, has_newline_before_position,
-    is_multiline_template_expression, needs_parens,
-};
+use super::super::{ParenContext, Printer, has_multiline_content, needs_parens};
 use super::arg_comments::{
     PartitionedComments, any_comment_forces_expansion, find_comma_pos, first_arg_has_any_comments,
     has_blank_line_between_args, has_inter_argument_comments, has_trailing_comments_on_args,
     is_comment_after_comma, is_comment_before_comma, last_arg_has_comments,
     should_force_expansion_for_comments,
 };
+use super::arg_predicates::{
+    arrow_has_trailing_param_comments, is_array_or_object_unwrapped, is_concise_numeric_array,
+    is_curried_arrow, is_function_composition_args, is_ternary_arrow_body,
+    last_arg_is_array_or_object, preceding_args_allow_expand_last,
+};
 use super::arg_wrapping::{
-    arg_needs_soft_wrap, arrow_has_type_annotations, arrow_has_type_reference_return,
-    build_args_joined_with_comments, build_args_split_last, build_arrow_call_body_states,
-    build_arrow_inline_signature, build_arrow_sig_doc, build_break_body_state,
-    build_expand_all_args, build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
-    last_two_args_same_type, prepend_arrow_body_comments, wrap_call_with_hard_breaks,
-    wrap_call_with_soft_breaks,
+    append_type_args_with_gap_comments, arg_needs_soft_wrap, arrow_has_type_annotations,
+    arrow_has_type_reference_return, build_args_joined_with_comments, build_args_split_last,
+    build_args_with_blank_lines, build_arrow_call_body_states, build_arrow_inline_signature,
+    build_arrow_sig_doc, build_break_body_state, build_empty_args_doc, build_expand_all_args,
+    build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
+    last_two_args_same_type, prepend_arrow_body_comments, should_expand_first_arg,
+    try_hug_multiline_template_arg, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
 };
 use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_module_path_no_break};
 use super::test_patterns::{callee_chain_string, is_test_call};
 use crate::ast::internal;
 use tsv_lang::SymbolResolver;
 use tsv_lang::doc::arena::DocId;
-
-/// Check if call should use "expand first arg" pattern
-///
-/// This matches prettier's behavior for calls like `setTimeout(() => {...}, 100)`:
-/// - First arg is function/arrow with block body
-/// - Remaining args are "hopefully short" (simple values)
-/// - Result: first arg expands, tail args stay inline after closing `}`
-fn should_expand_first_arg(printer: &Printer, args: &[internal::Expression]) -> bool {
-    // Need exactly 2 args (first is function, second is short)
-    if args.len() != 2 {
-        return false;
-    }
-
-    // First arg must be a function with block body
-    if !is_block_function(&args[0]) {
-        return false;
-    }
-
-    // Prettier's couldExpandArg returns true for objects/arrays with hasComment(node),
-    // which includes leading comments. This makes !couldExpandArg(secondArg) = false,
-    // blocking shouldExpandFirstArg. Without this check, the expand-first path also
-    // drops the leading comment (SAFETY).
-    if matches!(
-        &args[1],
-        internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)
-    ) && printer.has_comments_between(args[0].span().end, args[1].span().start)
-    {
-        return false;
-    }
-
-    // Second arg must be short/simple
-    is_short_second_arg_for_expand_first(&args[1], |start, end| {
-        printer.has_comments_between(start, end)
-    })
-}
 
 /// Print a call expression: `foo()`, `obj.method(arg1, arg2)`
 ///
@@ -121,28 +82,14 @@ pub(super) fn build_call_doc_with_wrapping(
         callee
     };
 
-    // Build type arguments: `<T, U>`
-    let type_args_doc = call
-        .type_arguments
-        .as_ref()
-        .map(|ta| printer.build_type_parameter_instantiation_doc(ta));
-
-    // Combine callee with type arguments, preserving comments in the gap
+    // Combine callee with type arguments (`fn<T>`), preserving comments in the gap
     // e.g., `fn/* c1 */ <string>()` — comment between callee and `<`
-    // Uses build_name_to_type_params_comments for safe line comment handling
-    let callee = match (&type_args_doc, &call.type_arguments) {
-        (Some(ta_doc), Some(ta)) => {
-            match printer.build_name_to_type_params_comments_opt(
-                call.callee.span().end,
-                ta.span.start,
-                CommentSpacing::Trailing,
-            ) {
-                Some(comments_doc) => d.concat(&[callee, comments_doc, *ta_doc]),
-                None => d.concat(&[callee, *ta_doc]),
-            }
-        }
-        _ => callee,
-    };
+    let callee = append_type_args_with_gap_comments(
+        printer,
+        callee,
+        call.callee.span().end,
+        call.type_arguments.as_ref(),
+    );
 
     // Empty args: just `fn()` or `fn<T>()`, preserving dangling comments
     if call.arguments.is_empty() {
@@ -150,35 +97,7 @@ pub(super) fn build_call_doc_with_wrapping(
             .type_arguments
             .as_ref()
             .map_or_else(|| call.callee.span().end, |ta| ta.span.end);
-        let paren_close = call.span.end;
-        // Find the actual `(` to separate pre-paren comments from inside-paren comments
-        // e.g., `fn<string> /* c2 */()` — comment should stay before `(`
-        let actual_paren = printer.find_char_outside_comments(after_type_args, paren_close, b'(');
-        if let Some(paren_pos) = actual_paren {
-            let pre_paren_comments = printer.build_comments_between_filtered_opt(
-                after_type_args,
-                paren_pos,
-                CommentSpacing::Leading,
-                CommentFilter::All,
-            );
-            let inside_paren_comments = printer
-                .build_inline_comments_between_doc_no_leading_space_opt(paren_pos + 1, paren_close);
-            let mut parts = vec![callee];
-            if let Some(pre) = pre_paren_comments {
-                parts.push(pre);
-            }
-            match inside_paren_comments {
-                Some(inner) => {
-                    parts.push(d.text("("));
-                    parts.push(inner);
-                    parts.push(d.text(")"));
-                }
-                None => parts.push(d.text("()")),
-            }
-            return d.concat(&parts);
-        }
-        // Fallback: no `(` found (shouldn't happen for valid code)
-        return d.concat(&[callee, d.text("()")]);
+        return build_empty_args_doc(printer, callee, after_type_args, call.span.end);
     }
 
     // Check for comments inside call arguments (e.g., require(/* comment */ 'a'))
@@ -671,31 +590,14 @@ pub(super) fn build_call_doc_with_wrapping(
         }
     }
 
-    // Single template literal argument with embedded newlines:
-    // Prettier has source-position-dependent behavior (isTemplateOnItsOwnLine):
-    // - Hugged: `fn(\`line1\nline2\`)` → keep inline (no groups)
-    // - Expanded: `fn(\n\t\`line1\nline2\`,\n)` → preserve expanded form
-    // The check walks backwards from the template backtick to see if there's a newline.
-    if call.arguments.len() == 1 && is_multiline_template_expression(&call.arguments[0]) {
-        let template_start = call.arguments[0].span().start;
-        if !has_newline_before_position(printer.source, template_start) {
-            // Template on same line as ( — hug it
-            let arg_doc = printer.build_expression_doc(&call.arguments[0]);
-            let mut parts = vec![callee, d.text("("), arg_doc, d.text(")")];
-
-            // Add trailing comments as line suffix (moves outside call, like test calls)
-            let last_arg = &call.arguments[0];
-            let paren_close = call.span.end;
-            if let Some(suffix) =
-                printer.build_trailing_comments_line_suffix(last_arg.span().end, paren_close)
-            {
-                parts.push(suffix);
-            }
-
-            return d.concat(&parts);
-        }
-        // Template on its own line — fall through to has_multiline_content
-        // which produces the expanded form via wrap_call_with_hard_breaks
+    // Single template literal argument with embedded newlines on the same line
+    // as `(` — hug it. A template on its own line falls through to
+    // has_multiline_content, which produces the expanded form via
+    // wrap_call_with_hard_breaks.
+    if let Some(doc) =
+        try_hug_multiline_template_arg(printer, callee, &call.arguments, call.span.end)
+    {
+        return doc;
     }
 
     // Position after type args (or callee if no type args) — the `(` follows this
@@ -1409,46 +1311,10 @@ pub(super) fn build_call_doc_with_wrapping(
     });
 
     if has_blank_lines {
-        // Build arguments with blank line preservation (forced expansion)
-        let mut arg_parts = Vec::new();
-        for (i, arg) in call.arguments.iter().enumerate() {
-            // Check for blank line before this arg
-            if i > 0 {
-                let prev_end = call.arguments[i - 1].span().end;
-                let curr_start = arg.span().start;
-                if has_blank_line_between_args(
-                    printer.source,
-                    printer.line_breaks,
-                    prev_end,
-                    curr_start,
-                ) {
-                    arg_parts.push(d.literalline());
-                    arg_parts.push(d.hardline());
-                }
-            }
-
-            arg_parts.push(printer.build_expression_doc(arg));
-
-            // Add comma+hardline after each arg except the last
-            if i < call.arguments.len() - 1 {
-                arg_parts.push(d.text(","));
-
-                // Check if next arg has blank line before it
-                // If not, add hardline here
-                let next_start = call.arguments[i + 1].span().start;
-                let curr_end = arg.span().end;
-                if !has_blank_line_between_args(
-                    printer.source,
-                    printer.line_breaks,
-                    curr_end,
-                    next_start,
-                ) {
-                    arg_parts.push(d.hardline());
-                }
-            }
-        }
-
-        let arg_doc = d.concat(&arg_parts);
+        // Build arguments with blank line preservation (forced expansion).
+        // The shared builder's comment branches never fire here: the comment
+        // handling path above returns early when any inter-arg comments exist.
+        let arg_doc = build_args_with_blank_lines(printer, &call.arguments);
         return wrap_call_with_hard_breaks(d, callee, arg_doc);
     }
 

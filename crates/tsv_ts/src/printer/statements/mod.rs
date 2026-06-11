@@ -12,7 +12,7 @@ mod class;
 mod control_flow;
 mod function;
 mod modules;
-mod types;
+mod type_declarations;
 mod variable;
 
 // Re-export for submodules to use `super::Printer` instead of `super::super::Printer`

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 581,
+	"end": 650,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -137,24 +137,40 @@
 					"column": 37
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " Without type annotation (implicit any)",
+			"start": 572,
+			"end": 613,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 1
+				},
+				"end": {
+					"line": 44,
+					"column": 42
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 580,
+		"end": 649,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 571,
+			"end": 640,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 44,
+					"line": 49,
 					"column": 9
 				}
 			},
@@ -1382,6 +1398,133 @@
 							"value": " Definite assignment assertion (!)",
 							"start": 506,
 							"end": 542
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 615,
+					"end": 639,
+					"loc": {
+						"start": {
+							"line": 45,
+							"column": 1
+						},
+						"end": {
+							"line": 48,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 621,
+						"end": 622,
+						"loc": {
+							"start": {
+								"line": 45,
+								"column": 7
+							},
+							"end": {
+								"line": 45,
+								"column": 8
+							}
+						},
+						"name": "I"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 623,
+						"end": 639,
+						"loc": {
+							"start": {
+								"line": 45,
+								"column": 9
+							},
+							"end": {
+								"line": 48,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 627,
+								"end": 630,
+								"loc": {
+									"start": {
+										"line": 46,
+										"column": 2
+									},
+									"end": {
+										"line": 46,
+										"column": 5
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 627,
+									"end": 628,
+									"loc": {
+										"start": {
+											"line": 46,
+											"column": 2
+										},
+										"end": {
+											"line": 46,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"optional": true,
+								"value": null
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 633,
+								"end": 636,
+								"loc": {
+									"start": {
+										"line": 47,
+										"column": 2
+									},
+									"end": {
+										"line": 47,
+										"column": 5
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 633,
+									"end": 634,
+									"loc": {
+										"start": {
+											"line": 47,
+											"column": 2
+										},
+										"end": {
+											"line": 47,
+											"column": 3
+										}
+									},
+									"name": "b"
+								},
+								"definite": true,
+								"value": null
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Without type annotation (implicit any)",
+							"start": 572,
+							"end": 613
 						}
 					]
 				}

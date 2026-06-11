@@ -7,6 +7,19 @@ use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
 
+/// Wrap a declaration statement in an `ExportNamedDeclaration` with no
+/// specifiers or source (`export <declaration>`).
+fn export_named(start: usize, declaration: Statement, export_kind: ExportKind) -> Statement {
+    let end = declaration.span().end;
+    Statement::ExportNamedDeclaration(ExportNamedDeclaration {
+        declaration: Some(Box::new(declaration)),
+        specifiers: Vec::new(),
+        source: None,
+        export_kind,
+        span: Span::new(start as u32, end),
+    })
+}
+
 impl<'a> Parser<'a> {
     pub(super) fn parse_export_declaration(&mut self) -> Result<Statement, ParseError> {
         let (start, _) = self.current_pos();
@@ -36,19 +49,13 @@ impl<'a> Parser<'a> {
             // export * from "y" or export * as ns from "y"
             TokenKind::Star => self.parse_export_all_declaration(start as u32, ExportKind::Value),
             // export { x, y as z } or export { x } from "y"
-            TokenKind::BraceOpen => self.parse_export_named_specifiers(start as u32),
+            TokenKind::BraceOpen => self.parse_export_specifiers(start as u32, ExportKind::Value),
             // export const/let/var
-            TokenKind::Keyword(KeywordKind::Let | KeywordKind::Var) => {
-                let declaration = self.parse_variable_declaration()?;
-                let end = declaration.span().end;
-                Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
-                    declaration: Some(Box::new(declaration)),
-                    specifiers: Vec::new(),
-                    source: None,
-                    export_kind: ExportKind::Value,
-                    span: Span::new(start as u32, end),
-                }))
-            }
+            TokenKind::Keyword(KeywordKind::Let | KeywordKind::Var) => Ok(export_named(
+                start,
+                self.parse_variable_declaration()?,
+                ExportKind::Value,
+            )),
             // export const ... or export const enum ...
             TokenKind::Keyword(KeywordKind::Const) => {
                 // Check for `export const enum` declaration
@@ -57,61 +64,30 @@ impl<'a> Parser<'a> {
                 } else {
                     self.parse_variable_declaration()?
                 };
-                let end = declaration.span().end;
-                Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
-                    declaration: Some(Box::new(declaration)),
-                    specifiers: Vec::new(),
-                    source: None,
-                    export_kind: ExportKind::Value,
-                    span: Span::new(start as u32, end),
-                }))
+                Ok(export_named(start, declaration, ExportKind::Value))
             }
             // export enum ...
-            TokenKind::Keyword(KeywordKind::Enum) => {
-                let declaration = self.parse_enum_declaration(false, false)?;
-                let end = declaration.span().end;
-                Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
-                    declaration: Some(Box::new(declaration)),
-                    specifiers: Vec::new(),
-                    source: None,
-                    export_kind: ExportKind::Value,
-                    span: Span::new(start as u32, end),
-                }))
-            }
-            TokenKind::Keyword(KeywordKind::Function) => {
-                let declaration = self.parse_function_declaration()?;
-                let end = declaration.span().end;
-                Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
-                    declaration: Some(Box::new(declaration)),
-                    specifiers: Vec::new(),
-                    source: None,
-                    export_kind: ExportKind::Value,
-                    span: Span::new(start as u32, end),
-                }))
-            }
-            TokenKind::Keyword(KeywordKind::Async) => {
-                // export async function foo() {}
-                let declaration = self.parse_async_function_declaration()?;
-                let end = declaration.span().end;
-                Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
-                    declaration: Some(Box::new(declaration)),
-                    specifiers: Vec::new(),
-                    source: None,
-                    export_kind: ExportKind::Value,
-                    span: Span::new(start as u32, end),
-                }))
-            }
-            TokenKind::Keyword(KeywordKind::Class) => {
-                let declaration = self.parse_class_declaration()?;
-                let end = declaration.span().end;
-                Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
-                    declaration: Some(Box::new(declaration)),
-                    specifiers: Vec::new(),
-                    source: None,
-                    export_kind: ExportKind::Value,
-                    span: Span::new(start as u32, end),
-                }))
-            }
+            TokenKind::Keyword(KeywordKind::Enum) => Ok(export_named(
+                start,
+                self.parse_enum_declaration(false, false)?,
+                ExportKind::Value,
+            )),
+            TokenKind::Keyword(KeywordKind::Function) => Ok(export_named(
+                start,
+                self.parse_function_declaration()?,
+                ExportKind::Value,
+            )),
+            // export async function foo() {}
+            TokenKind::Keyword(KeywordKind::Async) => Ok(export_named(
+                start,
+                self.parse_async_function_declaration()?,
+                ExportKind::Value,
+            )),
+            TokenKind::Keyword(KeywordKind::Class) => Ok(export_named(
+                start,
+                self.parse_class_declaration()?,
+                ExportKind::Value,
+            )),
             // export type X = T or export interface X { } or export declare function/class
             TokenKind::Identifier => {
                 let value = self.current_value().to_string();
@@ -127,72 +103,43 @@ impl<'a> Parser<'a> {
 
                         if matches!(self.current_kind(), TokenKind::BraceOpen) {
                             // export type { Name } from "..." - type-only re-export
-                            self.parse_export_type_specifiers(start as u32)
+                            self.parse_export_specifiers(start as u32, ExportKind::Type)
                         } else if matches!(self.current_kind(), TokenKind::Star) {
                             // export type * from "..." or export type * as ns from "..."
                             self.parse_export_all_declaration(start as u32, ExportKind::Type)
                         } else {
                             // export type X = T - type alias declaration
-                            let declaration =
-                                self.parse_type_alias_declaration_inner(type_start)?;
-                            let end = declaration.span().end;
-                            Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
-                                declaration: Some(Box::new(declaration)),
-                                specifiers: Vec::new(),
-                                source: None,
-                                export_kind: ExportKind::Type,
-                                span: Span::new(start as u32, end),
-                            }))
+                            Ok(export_named(
+                                start,
+                                self.parse_type_alias_declaration_inner(type_start)?,
+                                ExportKind::Type,
+                            ))
                         }
                     }
-                    "interface" => {
-                        // export interface X { }
-                        let declaration = self.parse_interface_declaration()?;
-                        let end = declaration.span().end;
-                        Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
-                            declaration: Some(Box::new(declaration)),
-                            specifiers: Vec::new(),
-                            source: None,
-                            export_kind: ExportKind::Type,
-                            span: Span::new(start as u32, end),
-                        }))
-                    }
-                    "declare" => {
-                        // export declare function/class — ambient declarations are type-level
-                        let declaration = self.parse_declare_statement()?;
-                        let end = declaration.span().end;
-                        Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
-                            declaration: Some(Box::new(declaration)),
-                            specifiers: Vec::new(),
-                            source: None,
-                            export_kind: ExportKind::Type,
-                            span: Span::new(start as u32, end),
-                        }))
-                    }
-                    "abstract" => {
-                        // export abstract class Foo {}
-                        let declaration = self.parse_abstract_class()?;
-                        let end = declaration.span().end;
-                        Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
-                            declaration: Some(Box::new(declaration)),
-                            specifiers: Vec::new(),
-                            source: None,
-                            export_kind: ExportKind::Value,
-                            span: Span::new(start as u32, end),
-                        }))
-                    }
-                    "namespace" | "module" => {
-                        // export namespace/module
-                        let declaration = self.parse_module_declaration(false, false)?;
-                        let end = declaration.span().end;
-                        Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
-                            declaration: Some(Box::new(declaration)),
-                            specifiers: Vec::new(),
-                            source: None,
-                            export_kind: ExportKind::Value,
-                            span: Span::new(start as u32, end),
-                        }))
-                    }
+                    // export interface X { }
+                    "interface" => Ok(export_named(
+                        start,
+                        self.parse_interface_declaration()?,
+                        ExportKind::Type,
+                    )),
+                    // export declare function/class — ambient declarations are type-level
+                    "declare" => Ok(export_named(
+                        start,
+                        self.parse_declare_statement()?,
+                        ExportKind::Type,
+                    )),
+                    // export abstract class Foo {}
+                    "abstract" => Ok(export_named(
+                        start,
+                        self.parse_abstract_class()?,
+                        ExportKind::Value,
+                    )),
+                    // export namespace/module
+                    "namespace" | "module" => Ok(export_named(
+                        start,
+                        self.parse_module_declaration(false, false)?,
+                        ExportKind::Value,
+                    )),
                     _ => {
                         Err(self
                             .error_expected_after("declaration, '{', '*', or 'default'", "export"))
@@ -352,11 +299,16 @@ impl<'a> Parser<'a> {
         }))
     }
 
-    /// Parse export named specifiers:
-    /// - `export { x, y as z }`
-    /// - `export { x } from "y"`
-    /// - `export { type x, y }` (inline type modifier)
-    fn parse_export_named_specifiers(&mut self, start: u32) -> Result<Statement, ParseError> {
+    /// Parse export specifiers `{ x, y as z }` with optional `from "source"`:
+    /// - `export { x, y as z }` / `export { x } from "y"` (`export_kind: Value`)
+    /// - `export { type x, y }` (inline type modifier, value exports only)
+    /// - `export type { Name } from "..."` (`export_kind: Type`; specifiers
+    ///   stay value — the type-ness lives on the declaration)
+    fn parse_export_specifiers(
+        &mut self,
+        start: u32,
+        export_kind: ExportKind,
+    ) -> Result<Statement, ParseError> {
         // Consume '{'
         debug_assert!(matches!(self.current_kind(), TokenKind::BraceOpen));
         self.advance()?;
@@ -367,8 +319,11 @@ impl<'a> Parser<'a> {
         while !matches!(self.current_kind(), TokenKind::BraceClose) {
             let (spec_start, _) = self.current_pos();
 
-            // Check for inline type modifier: `export { type A, B }`
-            let specifier_export_kind = if matches!(self.current_kind(), TokenKind::Identifier)
+            // Check for inline type modifier: `export { type A, B }`.
+            // Not recognized inside `export type { ... }` (TS rejects doubled
+            // type modifiers), so `type A` there errors at `A` below.
+            let specifier_export_kind = if matches!(export_kind, ExportKind::Value)
+                && matches!(self.current_kind(), TokenKind::Identifier)
                 && self.current_value() == "type"
             {
                 // Look ahead to see if next is identifier or keyword-as-identifier
@@ -423,62 +378,7 @@ impl<'a> Parser<'a> {
             declaration: None,
             specifiers,
             source,
-            export_kind: ExportKind::Value,
-            span: Span::new(start, end),
-        }))
-    }
-
-    /// Parse type-only export specifiers: `export type { Name } from "..."`
-    fn parse_export_type_specifiers(&mut self, start: u32) -> Result<Statement, ParseError> {
-        // Consume '{'
-        debug_assert!(matches!(self.current_kind(), TokenKind::BraceOpen));
-        self.advance()?;
-
-        let mut specifiers = Vec::new();
-
-        // Parse specifiers until '}'
-        while !matches!(self.current_kind(), TokenKind::BraceClose) {
-            let (spec_start, _) = self.current_pos();
-
-            let (local, exported, spec_end) = self.parse_export_specifier_names()?;
-
-            specifiers.push(ExportSpecifier {
-                local,
-                exported,
-                // For `export type { ... }`, specifiers are value (type is on declaration)
-                export_kind: ExportKind::Value,
-                span: Span::new(spec_start as u32, spec_end),
-            });
-
-            // Check for comma
-            if matches!(self.current_kind(), TokenKind::Comma) {
-                self.advance()?;
-            } else {
-                break;
-            }
-        }
-
-        // Expect '}'
-        if !matches!(self.current_kind(), TokenKind::BraceClose) {
-            return Err(self.error_expected("'}' to close export specifiers"));
-        }
-        self.advance()?;
-
-        // Check for 'from "source"' - type exports typically require a source
-        let source = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::From)) {
-            self.advance()?;
-            Some(self.parse_string_literal()?)
-        } else {
-            None
-        };
-
-        let end = self.semicolon_end()?;
-
-        Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
-            declaration: None,
-            specifiers,
-            source,
-            export_kind: ExportKind::Type,
+            export_kind,
             span: Span::new(start, end),
         }))
     }
@@ -577,7 +477,7 @@ impl<'a> Parser<'a> {
             // vs `import type from "y"` (importing a default export named "type").
             // Skip comments so `import type /* c */ {}` isn't misread as a default
             // import named `type` (the comment is collected for the printer).
-            let next_kind = self.peek_non_comment_kind();
+            let next_kind = self.peek_kind();
             if matches!(
                 next_kind,
                 TokenKind::BraceOpen | TokenKind::Star | TokenKind::Identifier

@@ -1,6 +1,7 @@
 // Element-specific formatting for Svelte templates
 //
-// Public entry points that delegate to doc builders in fragment_doc.rs.
+// Public entry points that delegate to doc builders in element_doc.rs and
+// special_doc.rs.
 
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
@@ -26,7 +27,7 @@ impl<'a> Printer<'a> {
     }
 
     //
-    // Hug mode helpers (used by fragment_doc.rs)
+    // Hug mode helpers (used by element_doc.rs and special_doc.rs)
     //
 
     /// Check if element should hug the start

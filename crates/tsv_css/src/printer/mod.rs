@@ -23,7 +23,7 @@ mod atrules;
 mod declarations;
 mod rules;
 mod selectors;
-pub mod source_fidelity;
+pub mod value_normalization;
 mod values;
 
 use crate::ast::internal::{Comment, CssBlockChild, CssNode, CssStyleSheet, CssValue};

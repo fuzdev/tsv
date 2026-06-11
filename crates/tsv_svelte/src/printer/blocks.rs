@@ -1,6 +1,6 @@
 //! Control flow block printing (if, each, await, key, snippet)
 //!
-//! All blocks use doc-based formatting via builders in fragment_doc.rs.
+//! All blocks use doc-based formatting via builders in nodes/blocks_doc.rs.
 
 use super::Printer;
 use crate::ast::internal;

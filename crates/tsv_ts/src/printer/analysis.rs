@@ -175,7 +175,7 @@ pub(crate) fn conditional_should_break_after_op(expr: &internal::Expression) -> 
         // but exclude logical expressions with inline-able RHS (non-empty object/array).
         // Prettier ref: assignment.js:219 `isBinaryish(test) && !shouldInlineLogicalExpression(test)`
         if let internal::Expression::BinaryExpression(binary) = cond.test.as_ref() {
-            !super::assignment::should_inline_logical_expression(binary)
+            !super::expressions::assignment::should_inline_logical_expression(binary)
         } else {
             false
         }

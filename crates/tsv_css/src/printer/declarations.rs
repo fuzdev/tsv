@@ -6,7 +6,7 @@
 //! - Width-based wrapping for long lists
 //! - Doc building for width calculations
 
-use super::{Printer, has_wrappable_args, source_fidelity};
+use super::{Printer, has_wrappable_args, value_normalization};
 use crate::ast::internal::{self, CssValue};
 use tsv_lang::doc::{self, DocContext, Mode, arena::DocId};
 
@@ -196,7 +196,7 @@ impl<'a> Printer<'a> {
 
         // Extract property name from source to preserve escape sequences
         let decl_source = decl.span.extract(self.source);
-        let property_normalized = source_fidelity::extract_property_name(decl_source);
+        let property_normalized = value_normalization::extract_property_name(decl_source);
         self.write(&property_normalized);
 
         // Dispatch to appropriate handler based on value type and formatting needs
@@ -278,7 +278,7 @@ impl<'a> Printer<'a> {
         if has_comments {
             // Use NORMALIZED source length for accurate width
             let func_source = span.extract(self.source);
-            let normalized = source_fidelity::normalize_value_spacing(func_source);
+            let normalized = value_normalization::normalize_value_spacing(func_source);
             let inline_len = decl.property.len() + 2 + normalized.len() + 1;
             self.indent_width() + inline_len > tsv_lang::PRINT_WIDTH
         } else {
@@ -336,7 +336,7 @@ impl<'a> Printer<'a> {
     fn print_inline_function(&mut self, decl_source: &str, has_comments: bool, value: &CssValue) {
         self.write(": ");
         if has_comments
-            && let Some(normalized) = source_fidelity::extract_value_with_comments(decl_source)
+            && let Some(normalized) = value_normalization::extract_value_with_comments(decl_source)
         {
             self.write(&normalized);
         } else {
@@ -347,7 +347,7 @@ impl<'a> Printer<'a> {
     /// Print declaration with comments in value (non-function)
     fn print_decl_with_comments(&mut self, decl: &internal::CssDeclaration, decl_source: &str) {
         self.write(": ");
-        if let Some(normalized) = source_fidelity::extract_value_with_comments(decl_source) {
+        if let Some(normalized) = value_normalization::extract_value_with_comments(decl_source) {
             self.write(&normalized);
         } else {
             self.write(decl_source);
@@ -363,10 +363,10 @@ impl<'a> Printer<'a> {
         quote: char,
     ) {
         self.write(": ");
-        if let Some(formatted) = source_fidelity::extract_string_value(decl_source, quote) {
+        if let Some(formatted) = value_normalization::extract_string_value(decl_source, quote) {
             self.write(&formatted);
         } else {
-            let formatted = source_fidelity::format_string_value("", quote);
+            let formatted = value_normalization::format_string_value("", quote);
             self.write(&formatted);
         }
         self.write_declaration_end(decl);
@@ -640,21 +640,21 @@ impl<'a> Printer<'a> {
         let decl_source = decl.span.extract(self.source);
 
         // Extract function args content from source, or fall back to semantic printing
-        let Some(args_content) = source_fidelity::extract_function_args(decl_source, func_name)
+        let Some(args_content) = value_normalization::extract_function_args(decl_source, func_name)
         else {
             self.print_function_args_semantic(args);
             return;
         };
 
         // Split by top-level commas and print each normalized arg
-        let arg_strs = source_fidelity::split_args_by_comma(args_content);
+        let arg_strs = value_normalization::split_args_by_comma(args_content);
         for (i, arg_str) in arg_strs.iter().enumerate() {
             self.write_indent();
-            let normalized = source_fidelity::normalize_value_spacing(arg_str);
+            let normalized = value_normalization::normalize_value_spacing(arg_str);
 
             // Check if this arg has space-separated values that would exceed width
             // Split by top-level spaces (not inside parens) to get individual values
-            let space_parts = source_fidelity::split_by_space_preserving_parens(&normalized);
+            let space_parts = value_normalization::split_by_space_preserving_parens(&normalized);
             if space_parts.len() > 1 && self.arg_string_exceeds_width(&normalized) {
                 // Use fill wrapping with continuation indent
                 self.print_space_separated_with_fill(&space_parts);

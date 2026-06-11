@@ -7,7 +7,7 @@
 // - Callback analysis
 
 use crate::ast::internal::{ArrowFunctionBody, Expression};
-use crate::printer::utils::is_simple_call_argument;
+use crate::printer::calls::arg_predicates::is_simple_call_argument;
 
 use super::super::printing::ChainPrinter;
 use super::super::types::{ChainGroup, ChainNode};

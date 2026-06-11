@@ -14,7 +14,7 @@
 //! The main entry point is `build_css_value_doc()`, which dispatches to
 //! specialized doc builders for each value type.
 
-use super::{Printer, has_wrappable_args, source_fidelity};
+use super::{Printer, has_wrappable_args, value_normalization};
 use crate::ast::internal::CssValue;
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
@@ -77,14 +77,14 @@ impl<'a> Printer<'a> {
             if !raw.is_empty() {
                 // Normalize whitespace for parenthesized expressions
                 // (e.g., "(  100%  -  40px  )" → "(100% - 40px)")
-                let normalized = source_fidelity::normalize_css_whitespace(raw);
+                let normalized = value_normalization::normalize_css_whitespace(raw);
 
                 // Parenthesized groups with multiple space-separated tokens get
                 // fill-based wrapping so they can break at operator boundaries.
                 // Matches prettier's group(indent(fill(parts))) for paren groups.
                 if normalized.starts_with('(') && normalized.ends_with(')') {
                     let inner = &normalized[1..normalized.len() - 1];
-                    let tokens = source_fidelity::split_by_space_preserving_parens(inner);
+                    let tokens = value_normalization::split_by_space_preserving_parens(inner);
                     if tokens.len() >= 3 {
                         return self.build_paren_group_doc(&tokens);
                     }
@@ -94,7 +94,7 @@ impl<'a> Printer<'a> {
             }
         }
         // Fallback: semantic formatting
-        let formatted = source_fidelity::format_identifier_value(name);
+        let formatted = value_normalization::format_identifier_value(name);
         d.text_owned(formatted)
     }
 
@@ -143,11 +143,11 @@ impl<'a> Printer<'a> {
                 let inner = &raw[1..raw.len() - 1];
                 return self
                     .d()
-                    .text_owned(source_fidelity::format_string_value(inner, quote));
+                    .text_owned(value_normalization::format_string_value(inner, quote));
             }
         }
         // Fallback: semantic formatting from decoded content (span unavailable)
-        let formatted = source_fidelity::format_string_value(content, quote);
+        let formatted = value_normalization::format_string_value(content, quote);
         self.d().text_owned(formatted)
     }
 
@@ -157,7 +157,7 @@ impl<'a> Printer<'a> {
     /// characteristics like leading zeros and signs.
     fn build_dimension_doc(&self, span: Span) -> DocId {
         let raw = span.extract(self.source);
-        let normalized = source_fidelity::normalize_dimension_from_source(raw);
+        let normalized = value_normalization::normalize_dimension_from_source(raw);
         self.d().text_owned(normalized)
     }
 
@@ -165,7 +165,7 @@ impl<'a> Printer<'a> {
     ///
     /// Preserves color syntax (hex, rgb, hsl, etc.) from source.
     fn build_color_doc(&self, color: &crate::ast::internal::Color, span: Span) -> DocId {
-        let formatted = source_fidelity::format_color_from_source(color, self.source, span);
+        let formatted = value_normalization::format_color_from_source(color, self.source, span);
         self.d().text_owned(formatted)
     }
 

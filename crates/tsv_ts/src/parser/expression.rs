@@ -1003,6 +1003,14 @@ impl<'a> Parser<'a> {
                 //
                 // Use current_start directly (not current_pos) because the lexer expects positions
                 // relative to its source slice, not the full document offset.
+                //
+                // The relex re-reads source from the `/`: a populated peek cache here
+                // would leave a stale token behind, and comments drained by that peek
+                // would be re-read as regex pattern chars.
+                debug_assert!(
+                    self.peek_cache.is_none(),
+                    "regex relex with populated peek cache"
+                );
                 let lexer_start = self.current_start;
                 let regex_token = self.lexer.read_regex_literal(lexer_start)?;
                 let lexer_end = regex_token.end;

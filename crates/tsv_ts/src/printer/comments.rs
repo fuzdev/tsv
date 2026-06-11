@@ -207,6 +207,94 @@ impl<'a> Printer<'a> {
         self.build_comments_between(start, end, CommentSpacing::Leading)
     }
 
+    /// Emit a member keyword (modifier like `static ` / `readonly `, or
+    /// accessor `get ` / `set `) preserving comments BEFORE it: the range
+    /// `(cursor, keyword_pos)` is emitted ahead of the keyword text, so a chain
+    /// of calls keeps each comment at the user's position
+    /// (`static /* c */ readonly p`). Advances `cursor` past the keyword.
+    ///
+    /// Callers finish the chain with [`Self::push_pre_name_comments_doc`] for
+    /// the final `(cursor, name_start)` range.
+    pub(crate) fn push_member_keyword_doc(
+        &self,
+        parts: &mut Vec<DocId>,
+        kind_text: &'static str,
+        cursor: &mut u32,
+        bound: u32,
+    ) {
+        let keyword = kind_text.trim_end();
+        if let Some(kw_pos) = self.find_keyword_in_range(*cursor, bound, keyword) {
+            if self.has_comments_between(*cursor, kw_pos) {
+                parts.push(self.build_trailing_comments_break_for_line(*cursor, kw_pos));
+            }
+            *cursor = kw_pos + keyword.len() as u32;
+        }
+        parts.push(self.d().text(kind_text));
+    }
+
+    /// Emit comments between the last member keyword and the member name
+    /// (e.g., `get /* c */ a()`); block comments get a trailing space, line
+    /// comments a hardline.
+    pub(crate) fn push_pre_name_comments_doc(
+        &self,
+        parts: &mut Vec<DocId>,
+        cursor: u32,
+        name_start: u32,
+    ) {
+        if self.has_comments_between(cursor, name_start) {
+            parts.push(self.build_trailing_comments_break_for_line(cursor, name_start));
+        }
+    }
+
+    /// Emit an accessor keyword (`get ` / `set `) preserving comments between
+    /// the keyword and the key (e.g., `get /* c */ a()`).
+    ///
+    /// Single-keyword convenience over [`Self::push_member_keyword_doc`] +
+    /// [`Self::push_pre_name_comments_doc`]; `search_from` is the member's start.
+    pub(crate) fn push_accessor_keyword_doc(
+        &self,
+        parts: &mut Vec<DocId>,
+        kind_text: &'static str,
+        search_from: u32,
+        key_start: u32,
+    ) {
+        let mut cursor = search_from;
+        self.push_member_keyword_doc(parts, kind_text, &mut cursor, key_start);
+        self.push_pre_name_comments_doc(parts, cursor, key_start);
+    }
+
+    /// Emit an optional/definite modifier marker (`?` or `!`) that follows a key
+    /// or name, preserving comments between the name and the marker
+    /// (e.g., `a /* c */?: number`). Returns the position after the marker.
+    ///
+    /// Scans for the first `marker` byte outside comments, unbounded to the end
+    /// of source: the AST flag is only set when the parser consumed the marker
+    /// directly after the name (whitespace and comments only in between), so the
+    /// first non-comment occurrence is always the right one. Callers must NOT
+    /// derive a search bound from spans — spans exclude the marker in some shapes
+    /// (`let a! = x`, `interface I { a? }`), which is how past panics happened.
+    pub(crate) fn push_modifier_marker_doc(
+        &self,
+        parts: &mut Vec<DocId>,
+        after: u32,
+        marker: u8,
+    ) -> u32 {
+        let d = self.d();
+        #[allow(clippy::expect_used)] // Parser guarantees the marker exists when the flag is set
+        let pos = find_char_skipping_comments(
+            self.source.as_bytes(),
+            after as usize,
+            self.source.len(),
+            marker,
+        )
+        .expect("modifier marker (`?`/`!`) not found") as u32;
+        if self.has_comments_between(after, pos) {
+            parts.push(self.build_inline_comments_between_doc(after, pos));
+        }
+        parts.push(d.text(if marker == b'?' { "?" } else { "!" }));
+        pos + 1
+    }
+
     /// Build a Doc for trailing comments where a line comment must force the
     /// following content onto a new line.
     ///
@@ -1822,6 +1910,53 @@ impl<'a> Printer<'a> {
             b',',
         )
         .expect("comma must exist between list elements") as u32
+    }
+
+    /// Append the comments between a signature's last content token and the
+    /// member's end (typically right before the printed `;`): after the return
+    /// type, or after the params' closing `)` when there is no return type.
+    ///
+    /// Shared by method/call/construct signatures in interfaces and type
+    /// literals, abstract/overload class methods, and declare functions.
+    pub(crate) fn append_signature_end_comments(
+        &self,
+        parts: &mut Vec<DocId>,
+        return_type: Option<&internal::TSTypeAnnotation>,
+        paren_pos: Option<u32>,
+        span_end: u32,
+    ) {
+        let d = self.d();
+        let content_end = return_type.map_or_else(
+            || {
+                paren_pos
+                    .and_then(|p| self.find_closing_paren(p, span_end))
+                    .unwrap_or(span_end)
+            },
+            |rt| rt.span.end,
+        );
+        for comment in comments_in_range(self.comments, content_end, span_end) {
+            parts.push(d.text(" "));
+            parts.push(self.build_comment_doc(comment));
+        }
+    }
+
+    /// Append leading inline block comments (`/*content*/ ` format) between two positions.
+    ///
+    /// Only emits block comments; line comments are skipped (they would have been
+    /// detected earlier and routed to the multiline path). Counterpart of
+    /// [`Self::append_trailing_inline_block_comments`].
+    pub(crate) fn append_leading_inline_block_comments(
+        &self,
+        parts: &mut Vec<DocId>,
+        start: u32,
+        end: u32,
+    ) {
+        let d = self.d();
+        for comment in comments_in_range(self.comments, start, end) {
+            if comment.is_block {
+                parts.push(d.text_owned(format!("/*{}*/ ", comment.content)));
+            }
+        }
     }
 
     /// Append trailing inline block comments (` /*content*/` format) between two positions.

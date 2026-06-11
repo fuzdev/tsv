@@ -5,8 +5,8 @@
 // - Meta properties: `import.meta`, `new.target`
 
 use super::super::Printer;
-use super::super::utils::is_expandable_object;
 use super::arg_comments::PartitionedComments;
+use super::arg_predicates::is_expandable_object;
 use crate::ast::internal;
 use tsv_lang::SymbolResolver;
 use tsv_lang::doc::arena::DocId;
