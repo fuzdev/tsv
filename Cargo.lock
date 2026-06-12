@@ -467,7 +467,7 @@ dependencies = [
 
 [[package]]
 name = "tsv"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "futures-util",
  "serde",
@@ -483,7 +483,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_cli"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "argh",
  "serde",
@@ -495,7 +495,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_css"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "phf",
  "serde",
@@ -505,7 +505,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_debug"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "argh",
  "futures-util",
@@ -524,7 +524,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_ffi"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "serde_json",
  "tsv_css",
@@ -534,7 +534,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_html"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "phf",
  "serde_json",
@@ -542,7 +542,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_lang"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "smallvec",
  "string-interner",
@@ -553,7 +553,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_svelte"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -566,7 +566,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_ts"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "phf",
  "serde",
@@ -579,7 +579,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_wasm"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "js-sys",
  "tsv_css",
