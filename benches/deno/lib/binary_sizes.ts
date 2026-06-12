@@ -145,9 +145,10 @@ export async function collect_binary_sizes(
 		);
 	}
 
-	// tsv WASM — two builds from one crate via the `ast` feature:
-	// pkg/format/deno (format-only, @fuzdev/tsv_format_wasm) and pkg/parse/deno
-	// (parse + format, @fuzdev/tsv_parse_wasm).
+	// tsv WASM — three builds from one crate via the `format`/`parse` features:
+	// pkg/format/deno (format-only, @fuzdev/tsv_format_wasm), pkg/parse/deno
+	// (parse-only, @fuzdev/tsv_parse_wasm), and pkg/all/deno (both,
+	// @fuzdev/tsv_wasm — the bundle the bench executes).
 	if (options?.has_wasm !== false) {
 		await push_size(
 			staged,
@@ -160,6 +161,12 @@ export async function collect_binary_sizes(
 			'tsv_parse_wasm',
 			'wasm',
 			`${project_root}/crates/tsv_wasm/pkg/parse/deno/tsv_wasm_bg.wasm`,
+		);
+		await push_size(
+			staged,
+			'tsv_wasm',
+			'wasm',
+			`${project_root}/crates/tsv_wasm/pkg/all/deno/tsv_wasm_bg.wasm`,
 		);
 	}
 
@@ -250,7 +257,11 @@ function build_display_entries(sizes: BinarySize[]): {
 	native_entries: DisplayRow[];
 } {
 	const tsv_native = sizes.find((s) => s.label === 'tsv');
-	const tsv_wasm = sizes.find((s) => s.label === 'tsv_format_wasm');
+	// "vs tsv" wasm anchor: the flagship full build (`tsv_wasm`, the artifact
+	// the bench executes), falling back to the format subset for reports
+	// generated before shape v2 added the third build.
+	const tsv_wasm = sizes.find((s) => s.label === 'tsv_wasm') ??
+		sizes.find((s) => s.label === 'tsv_format_wasm');
 
 	const wasm_sizes = sizes.filter((s) => s.kind === 'wasm');
 	const native_sizes = sizes.filter((s) => s.kind === 'native');

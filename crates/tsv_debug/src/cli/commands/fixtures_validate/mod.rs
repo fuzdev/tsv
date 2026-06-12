@@ -85,18 +85,38 @@ impl FixturesValidateCommand {
             .unwrap_or(4);
         let prettier_only = self.prettier_only;
 
-        let results: Vec<_> =
-            stream::iter(fixture_list)
-                .map(|fixture| async move {
-                    validation::validate_fixture(&fixture, prettier_only).await
-                })
-                .buffer_unordered(concurrency)
-                .collect()
-                .await;
+        // Bulk workload: spread the JS work (prettier/parsers) across a small
+        // sidecar pool — a single sidecar is one single-threaded process and
+        // becomes the wall-clock bound
+        crate::deno::set_pool_size(crate::deno::bulk_pool_size(concurrency));
 
-        // Aggregate results
+        // tokio::spawn per fixture: buffer_unordered alone only interleaves at
+        // await points on the single stream-driving task — the CPU-bound Rust
+        // work (parse, format, serde, diff) would serialize on one core.
+        // Spawned tasks run on all runtime workers.
+        let mut results = stream::iter(fixture_list)
+            .map(|fixture| {
+                tokio::spawn(
+                    async move { validation::validate_fixture(&fixture, prettier_only).await },
+                )
+            })
+            .buffer_unordered(concurrency);
+
+        // Aggregate results, printing each fixture's buffered failure diffs as it
+        // completes — phases never print directly, so concurrent fixtures can't
+        // interleave output (each fixture's diffs stay contiguous, in completion order)
         let mut summary = validation::ValidationSummary::new();
-        for result in results {
+        while let Some(joined) = results.next().await {
+            let result = match joined {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("fixture validation task panicked: {e}");
+                    std::process::exit(2);
+                }
+            };
+            if !result.diff_output.is_empty() {
+                eprint!("{}", result.diff_output);
+            }
             summary.add(result);
         }
 

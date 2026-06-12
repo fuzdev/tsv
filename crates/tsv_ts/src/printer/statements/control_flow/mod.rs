@@ -2,7 +2,7 @@
 //
 // Statement families live in submodules; this mod.rs keeps the helpers they
 // share (comment partitioning, keyword/paren comment placement, and the
-// `if`/`while`/`switch` condition-group builders).
+// condition-group builders used across the statement families).
 //
 // - if_else.rs: if/else statements and else-clause layout
 // - loops.rs: for / for-in / for-of headers and bodies, while, do-while
@@ -18,8 +18,8 @@ use smallvec::SmallVec;
 
 use crate::ast::internal::Expression;
 use crate::printer::Printer;
-use crate::printer::analysis::find_char_skipping_comments;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::find_char_skipping_comments;
 
 /// Small vector of comment references, stack-allocated for typical cases.
 type CommentVec<'a> = SmallVec<[&'a tsv_lang::Comment; 2]>;
@@ -108,10 +108,6 @@ impl<'a> Printer<'a> {
         end
     }
 
-    /// Append `) ` to parts, extracting any comments between the close paren and body.
-    ///
-    /// Used for block bodies: if, while, for-in/for-of `{ }`. For non-block bodies in
-    /// for-in/for-of, use `append_close_paren_with_non_block_body` which also indents.
     /// Append `)` + comments + `;` for empty statement bodies.
     ///
     /// Handles comments between `)` and `;`:
@@ -145,6 +141,11 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Append `) ` to parts, extracting any comments between the close paren and body.
+    ///
+    /// Used for block bodies: if, while, for-in/for-of `{ }`. For non-block bodies in
+    /// for-in/for-of, use `append_close_paren_with_non_block_body` which also indents.
+    ///
     /// Block comments are always inlined (trailing after `)`). Line comments preserve
     /// their position: trailing stays trailing, own-line stays on its own line (with
     /// blank line preservation). Line comments force a hardline before the body.

@@ -2,7 +2,7 @@
 //! divergence-suffix naming rules.
 
 use crate::deno::PrettierParser;
-use crate::fixtures::audit_signature::AUDIT_SIGNATURE_FILENAME;
+use crate::fixtures::AUDIT_SIGNATURE_FILENAME;
 use std::path::PathBuf;
 use tsv_cli::cli::input::ParserType;
 
@@ -11,6 +11,16 @@ use tsv_cli::cli::input::ParserType;
 /// This is the complete JSON content (with trailing newline) written to expected_svelte.json
 /// when Svelte's parser fails to parse the input.
 pub const EXPECTED_SVELTE_ERROR_JSON: &str = "{\"error\": \"failed to parse\"}\n";
+
+/// Marker file asserting prettier has NO fixed point on the fixture's input —
+/// each pass keeps changing the output forever, so prettier cannot serve as a
+/// formatter oracle (no `output_prettier.*`, no chain to pin in
+/// `audit_signature.txt`). The validator live-verifies the claim instead of
+/// running F2/F3/F4 and the prettier-side N rules (rule F5): `prettier(input)`
+/// must differ from input AND `prettier^2(input)` must differ from
+/// `prettier(input)`. Only sanctioned in `_prettier_divergence` directories
+/// with a README; content is free-form prose describing the non-convergence.
+pub const PRETTIER_NONCONVERGENT_FILENAME: &str = "prettier_nonconvergent.txt";
 
 /// Type of input file for a fixture
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -161,6 +171,11 @@ impl Fixture {
     /// Get the full path to audit_signature.txt (sibling of output_prettier.*)
     pub fn audit_signature_path(&self) -> PathBuf {
         self.path.join(AUDIT_SIGNATURE_FILENAME)
+    }
+
+    /// Get the full path to the prettier non-convergence marker file
+    pub fn prettier_nonconvergent_path(&self) -> PathBuf {
+        self.path.join(PRETTIER_NONCONVERGENT_FILENAME)
     }
 
     /// Check if this fixture matches any of the given filter terms

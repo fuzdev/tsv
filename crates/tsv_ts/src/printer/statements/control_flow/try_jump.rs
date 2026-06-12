@@ -2,9 +2,9 @@
 
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
-use crate::printer::analysis::find_char_skipping_comments;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::find_char_skipping_comments;
 
 impl<'a> Printer<'a> {
     /// Append a space (or comments + space/hardline) between a keyword/token end and body start.

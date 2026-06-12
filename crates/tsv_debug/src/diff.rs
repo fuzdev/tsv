@@ -299,8 +299,25 @@ impl DiffOptions {
 
 /// Print a colored diff with custom options
 pub fn print_diff_with_options(label: &str, expected: &str, actual: &str, options: &DiffOptions) {
-    eprintln!("\n{INDENT}{label}:");
-    eprint!("{}", diff_to_string(expected, actual, options));
+    eprint!(
+        "{}",
+        render_diff_with_options(label, expected, actual, options)
+    );
+}
+
+/// Render a labeled diff to a string — the buffered variant of
+/// `print_diff_with_options`, for callers that run concurrently (fixture
+/// validation) and must not interleave output from different fixtures.
+pub fn render_diff_with_options(
+    label: &str,
+    expected: &str,
+    actual: &str,
+    options: &DiffOptions,
+) -> String {
+    format!(
+        "\n{INDENT}{label}:\n{}",
+        diff_to_string(expected, actual, options)
+    )
 }
 
 /// Generate a diff string (returned, not printed)
@@ -904,9 +921,11 @@ mod tests {
         let right = "line1\nline3\n";
 
         // Default options (no labels)
-        let mut options = DiffOptions::default();
-        options.show_summary = true;
-        options.color = false;
+        let options = DiffOptions {
+            show_summary: true,
+            color: false,
+            ..Default::default()
+        };
         let output = diff_to_string(left, right, &options);
         assert!(
             output.contains("-1 deletions, +1 insertions"),

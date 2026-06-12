@@ -186,13 +186,13 @@ mod tests {
 
     #[test]
     fn test_parse_simple() {
-        let content = r#"// Copyright
+        let content = r"// Copyright
 /*---
 esid: sec-example
 description: Test description
 ---*/
 var x = 1;
-"#;
+";
 
         let fm = parse(content).unwrap();
         assert!(fm.features.is_empty());
@@ -202,9 +202,9 @@ var x = 1;
 
     #[test]
     fn test_parse_features() {
-        let content = r#"/*---
+        let content = r"/*---
 features: [BigInt, class-fields-private]
----*/"#;
+---*/";
 
         let fm = parse(content).unwrap();
         assert_eq!(fm.features, vec!["BigInt", "class-fields-private"]);
@@ -212,9 +212,9 @@ features: [BigInt, class-fields-private]
 
     #[test]
     fn test_parse_flags() {
-        let content = r#"/*---
+        let content = r"/*---
 flags: [async, module, onlyStrict]
----*/"#;
+---*/";
 
         let fm = parse(content).unwrap();
         assert_eq!(fm.flags, vec!["async", "module", "onlyStrict"]);
@@ -222,13 +222,13 @@ flags: [async, module, onlyStrict]
 
     #[test]
     fn test_parse_negative_parse() {
-        let content = r#"/*---
+        let content = r"/*---
 negative:
   phase: parse
   type: SyntaxError
 ---*/
 $DONOTEVALUATE();
-"#;
+";
 
         let fm = parse(content).unwrap();
         assert!(fm.is_negative_parse());
@@ -237,11 +237,11 @@ $DONOTEVALUATE();
 
     #[test]
     fn test_parse_negative_runtime() {
-        let content = r#"/*---
+        let content = r"/*---
 negative:
   phase: runtime
   type: TypeError
----*/"#;
+---*/";
 
         let fm = parse(content).unwrap();
         assert!(fm.is_negative_runtime());
@@ -250,9 +250,9 @@ negative:
 
     #[test]
     fn test_is_module() {
-        let content = r#"/*---
+        let content = r"/*---
 flags: [module]
----*/"#;
+---*/";
 
         let fm = parse(content).unwrap();
         assert!(fm.is_module());

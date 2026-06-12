@@ -273,31 +273,6 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Find the end position including any trailing same-line comments
-    ///
-    /// Used to correctly detect blank lines - need to check from after trailing
-    /// comments, not just after the statement.
-    pub(in crate::printer) fn find_end_with_trailing_comments(&self, after_pos: u32) -> u32 {
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, after_pos);
-        let mut end = after_pos;
-        // Track the "current line" reference — follows multi-line block comments
-        // to their closing */ line (same logic as build_trailing_same_line_comment_docs)
-        let mut line_ref = after_pos;
-
-        for comment in &self.comments[first_idx..] {
-            if self.is_same_line(line_ref, comment.span.start) {
-                end = comment.span.end;
-                // Follow multi-line block comments to their closing line
-                if comment.is_block && !self.is_same_line(comment.span.start, comment.span.end) {
-                    line_ref = comment.span.end;
-                }
-            } else {
-                break;
-            }
-        }
-        end
-    }
-
     /// Build docs for trailing comments at the end of the program
     ///
     /// Handles comments that appear after all statements but before end of file.

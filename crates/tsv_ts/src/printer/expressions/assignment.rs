@@ -16,8 +16,8 @@
 use crate::ast::internal::{self, Expression};
 use crate::printer::ArrowChainContext;
 use crate::printer::Printer;
-use crate::printer::analysis::conditional_should_break_after_op;
-use crate::printer::expressions::format_string_literal_from_ast;
+use crate::printer::conditional_should_break_after_op;
+use crate::printer::expressions::literals::format_string_literal_from_ast;
 use crate::printer::is_string_literal;
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use tsv_lang::Comment;

@@ -2,6 +2,7 @@ use crate::deno::{parse_css, parse_svelte, parse_typescript};
 use crate::fixtures;
 use crate::fixtures::InputType;
 use argh::FromArgs;
+use futures_util::stream::{self, StreamExt};
 use std::path::Path;
 use tsv_cli::json_utils::to_json_with_tabs;
 
@@ -80,8 +81,37 @@ async fn run(list_only: bool, filters: &[String]) {
     let mut unchanged = 0;
     let mut failed = 0;
 
-    for fixture in &fixture_list {
-        match generate_expected_fixture(fixture).await {
+    let matched_count = fixture_list.len();
+
+    // Bulk workload: spread the JS work (parsers) across a small sidecar pool —
+    // a single sidecar is one single-threaded process and becomes the wall-clock bound
+    let concurrency = std::thread::available_parallelism()
+        .map(std::num::NonZero::get)
+        .unwrap_or(4);
+    crate::deno::set_pool_size(crate::deno::bulk_pool_size(concurrency));
+
+    // tokio::spawn per fixture so the CPU-bound Rust work runs on all runtime
+    // workers (buffer_unordered alone only interleaves at await points on the
+    // stream-driving task). `buffered` (not `buffer_unordered`) so progress
+    // lines print in fixture order — deterministic output, work still parallel.
+    let mut results = stream::iter(fixture_list)
+        .map(|fixture| {
+            tokio::spawn(async move {
+                let result = generate_expected_fixture(&fixture).await;
+                (fixture, result)
+            })
+        })
+        .buffered(concurrency);
+
+    while let Some(joined) = results.next().await {
+        let (fixture, result) = match joined {
+            Ok(pair) => pair,
+            Err(e) => {
+                eprintln!("fixture update task panicked: {e}");
+                std::process::exit(2);
+            }
+        };
+        match result {
             FixtureResult::Created => {
                 if fixture.has_expected_ours() {
                     println!(
@@ -124,22 +154,11 @@ async fn run(list_only: bool, filters: &[String]) {
 
     if filters.is_empty() {
         println!(
-            "\nSummary: {} created, {} updated, {} unchanged, {} failed ({} fixtures)",
-            created,
-            updated,
-            unchanged,
-            failed,
-            fixture_list.len()
+            "\nSummary: {created} created, {updated} updated, {unchanged} unchanged, {failed} failed ({matched_count} fixtures)"
         );
     } else {
         println!(
-            "\nSummary: {} created, {} updated, {} unchanged, {} failed (matched {} of {} fixtures)",
-            created,
-            updated,
-            unchanged,
-            failed,
-            fixture_list.len(),
-            total_count
+            "\nSummary: {created} created, {updated} updated, {unchanged} unchanged, {failed} failed (matched {matched_count} of {total_count} fixtures)"
         );
     }
 

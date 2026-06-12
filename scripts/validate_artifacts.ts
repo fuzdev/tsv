@@ -52,20 +52,25 @@ function file_size(path: URL): number | null {
 
 // --- WASM binary size checks ---
 
-const VARIANTS = ['format', 'parse'] as const;
+const VARIANTS = ['format', 'parse', 'all'] as const;
 const TARGETS = ['npm', 'deno'] as const;
 
-// Measured 2026-06-11 at v0.1.0: format 2,223,914 B (npm) / 2,223,935 B
-// (deno); parse 2,917,712 B (npm) / 2,917,796 B (deno).
+// Measured 2026-06-11 (shape v2 — parse slimmed to parse-only, all = both
+// features): format 2,196,623 B (npm); parse 1,699,885 B; all 2,889,210 B.
 const BOUNDS = {
-	format: { min: 2_050_000, max: 2_400_000 },
-	parse: { min: 2_700_000, max: 3_150_000 },
+	format: { min: 2_020_000, max: 2_370_000 },
+	parse: { min: 1_560_000, max: 1_840_000 },
+	all: { min: 2_660_000, max: 3_120_000 },
 };
 
-// parse = format + the `ast` feature (parser + convert + serde path).
-// Measured delta 693,798 B. A delta near zero means the feature gate broke.
-const DELTA_MIN = 550_000;
-const DELTA_MAX = 900_000;
+// all = format + parse. `all − format` is the parse feature (parser convert +
+// serde path; measured 692,587 B); `all − parse` is the format feature
+// (printers + doc builder, dropped from the parse-only build at link time;
+// measured 1,189,325 B). A delta near zero means a feature gate broke.
+const DELTAS = {
+	format: { min: 550_000, max: 850_000 }, // all − format
+	parse: { min: 1_050_000, max: 1_300_000 }, // all − parse
+};
 
 console.log('=== WASM binary sizes ===');
 
@@ -96,27 +101,31 @@ for (const target of TARGETS) {
 	}
 }
 
-// Relative invariant per target: parse carries the parser, so it must sit a
-// stable margin above format.
+// Relative invariants per target: `all` is the superset build, so each
+// subset must sit a stable margin below it.
 for (const target of TARGETS) {
-	const format_bytes = sizes[`format/${target}`];
-	const parse_bytes = sizes[`parse/${target}`];
-	if (format_bytes === undefined || parse_bytes === undefined) continue;
-	const delta = parse_bytes - format_bytes;
-	if (delta < DELTA_MIN) {
-		fail(
-			`parse - format (${target}) = ${format_size(delta)} — expected ≥${
-				format_size(DELTA_MIN)
-			} (ast feature gate broken?)`,
-		);
-	} else if (delta > DELTA_MAX) {
-		fail(
-			`parse - format (${target}) = ${format_size(delta)} — expected ≤${
-				format_size(DELTA_MAX)
-			} (unexpected bloat)`,
-		);
-	} else {
-		pass(`parse - format (${target}) = ${format_size(delta)}`);
+	const all_bytes = sizes[`all/${target}`];
+	if (all_bytes === undefined) continue;
+	for (const variant of ['format', 'parse'] as const) {
+		const subset_bytes = sizes[`${variant}/${target}`];
+		if (subset_bytes === undefined) continue;
+		const { min, max } = DELTAS[variant];
+		const delta = all_bytes - subset_bytes;
+		if (delta < min) {
+			fail(
+				`all - ${variant} (${target}) = ${format_size(delta)} — expected ≥${
+					format_size(min)
+				} (feature gate broken?)`,
+			);
+		} else if (delta > max) {
+			fail(
+				`all - ${variant} (${target}) = ${format_size(delta)} — expected ≤${
+					format_size(max)
+				} (unexpected bloat)`,
+			);
+		} else {
+			pass(`all - ${variant} (${target}) = ${format_size(delta)}`);
+		}
 	}
 }
 
@@ -125,33 +134,32 @@ for (const target of TARGETS) {
 interface SmokeTarget {
 	label: string;
 	entry: string;
+	has_format: boolean;
 	has_parse: boolean;
 }
 
-const smoke_targets: SmokeTarget[] = [
-	// npm packages via their published Node entry (auto-init; Deno supports node:fs)
+const smoke_entries = (variant: 'format' | 'parse' | 'all'): SmokeTarget[] => [
+	// npm package via its published Node entry (auto-init; Deno supports node:fs)
 	{
-		label: 'format/npm index.js',
-		entry: 'crates/tsv_wasm/pkg/format/npm/index.js',
-		has_parse: false,
+		label: `${variant}/npm index.js`,
+		entry: `crates/tsv_wasm/pkg/${variant}/npm/index.js`,
+		has_format: variant !== 'parse',
+		has_parse: variant !== 'format',
 	},
-	{ label: 'parse/npm index.js', entry: 'crates/tsv_wasm/pkg/parse/npm/index.js', has_parse: true },
-	// deno-target bundles (auto-init at import)
+	// deno-target bundle (auto-init at import)
 	{
-		label: 'format/deno bundle',
-		entry: 'crates/tsv_wasm/pkg/format/deno/tsv_wasm.js',
-		has_parse: false,
-	},
-	{
-		label: 'parse/deno bundle',
-		entry: 'crates/tsv_wasm/pkg/parse/deno/tsv_wasm.js',
-		has_parse: true,
+		label: `${variant}/deno bundle`,
+		entry: `crates/tsv_wasm/pkg/${variant}/deno/tsv_wasm.js`,
+		has_format: variant !== 'parse',
+		has_parse: variant !== 'format',
 	},
 ];
 
+const smoke_targets: SmokeTarget[] = VARIANTS.flatMap(smoke_entries);
+
 console.log('\n=== Deno runtime smoke ===');
 
-for (const { label, entry, has_parse } of smoke_targets) {
+for (const { label, entry, has_format, has_parse } of smoke_targets) {
 	const entry_url = new URL(entry, root);
 	if (file_size(entry_url) === null) {
 		skip(`${label} — not built`);
@@ -164,13 +172,21 @@ for (const { label, entry, has_parse } of smoke_targets) {
 		fail(`${label} — import threw: ${error}`);
 		continue;
 	}
-	check(
-		label,
-		'format_typescript',
-		() => mod.format_typescript('const   x=1') === 'const x = 1;\n',
-	);
-	check(label, 'format_css', () => mod.format_css('a{color:red}') === 'a {\n\tcolor: red;\n}\n');
-	check(label, 'format_svelte', () => mod.format_svelte('<div   >x</div   >') === '<div>x</div>\n');
+	if (has_format) {
+		check(
+			label,
+			'format_typescript',
+			() => mod.format_typescript('const   x=1') === 'const x = 1;\n',
+		);
+		check(label, 'format_css', () => mod.format_css('a{color:red}') === 'a {\n\tcolor: red;\n}\n');
+		check(
+			label,
+			'format_svelte',
+			() => mod.format_svelte('<div   >x</div   >') === '<div>x</div>\n',
+		);
+	} else {
+		check(label, 'format_* absent (parse-only build)', () => mod.format_typescript === undefined);
+	}
 	if (has_parse) {
 		check(
 			label,

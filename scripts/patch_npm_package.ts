@@ -17,30 +17,43 @@
  * `lang_bindings!` flows through with no changes here. `parse_internal_*`
  * exports are bench-only and excluded from the wrappers.
  *
- * For the `parse` variant, also copies `crates/tsv_wasm/types/tsv_ast.d.ts`
- * into the package root alongside the generated `tsv_wasm.d.ts`. The
- * wasm-bindgen `typescript_type = "import('./tsv_ast').*"` extern types
- * resolve against this bundled file at consumer compile time.
+ * For the variants with parse exports (`parse`, `all`), also copies
+ * `crates/tsv_wasm/types/tsv_ast.d.ts` into the package root alongside the
+ * generated `tsv_wasm.d.ts`. The wasm-bindgen
+ * `typescript_type = "import('./tsv_ast').*"` extern types resolve against
+ * this bundled file at consumer compile time.
  *
- * Usage:  patch_npm_package.ts <format|parse>
+ * The `all` variant additionally ships the CLI: `crates/tsv_wasm/npm/cli.js`
+ * is copied into the package root and wired up as the `tsv` bin.
+ *
+ * Usage:  patch_npm_package.ts <format|parse|all>
  *
  *   format → crates/tsv_wasm/pkg/format/npm/ → @fuzdev/tsv_format_wasm
  *   parse  → crates/tsv_wasm/pkg/parse/npm/  → @fuzdev/tsv_parse_wasm
+ *   all    → crates/tsv_wasm/pkg/all/npm/    → @fuzdev/tsv_wasm
  */
 
 import { format_size, gzip_size } from './size.ts';
 
 const variant = Deno.args[0];
-if (variant !== 'format' && variant !== 'parse') {
-	console.error(`Usage: patch_npm_package.ts <format|parse>`);
+if (variant !== 'format' && variant !== 'parse' && variant !== 'all') {
+	console.error(`Usage: patch_npm_package.ts <format|parse|all>`);
 	Deno.exit(1);
 }
 
-const pkg_name = variant === 'format' ? '@fuzdev/tsv_format_wasm' : '@fuzdev/tsv_parse_wasm';
+const PKG_NAMES = {
+	format: '@fuzdev/tsv_format_wasm',
+	parse: '@fuzdev/tsv_parse_wasm',
+	all: '@fuzdev/tsv_wasm',
+} as const;
+const pkg_name = PKG_NAMES[variant];
+const has_format_exports = variant !== 'parse';
+const has_parse_exports = variant !== 'format';
 const pkg_root = `crates/tsv_wasm/pkg/${variant}/npm`;
 const main_js = 'tsv_wasm.js';
 const dts_file = 'tsv_wasm.d.ts';
 const wasm_file = 'tsv_wasm_bg.wasm';
+const cli_file = 'cli.js';
 
 // 1. Extract the public function exports from the generated JS.
 
@@ -51,19 +64,27 @@ const fns = [...generated_js.matchAll(/^export function (\w+)/gm)]
 	.sort();
 
 const expected_formats = ['format_css', 'format_svelte', 'format_typescript'];
-for (const name of expected_formats) {
-	if (!fns.includes(name)) {
-		console.error(`FAIL: generated ${main_js} is missing expected export \`${name}\``);
-		Deno.exit(1);
-	}
-}
+const has_format = fns.some((name) => name.startsWith('format_'));
 const has_parse = fns.some((name) => name.startsWith('parse_'));
-if (variant === 'parse' && !has_parse) {
-	console.error(`FAIL: parse variant has no parse_* exports — was \`--features ast\` passed?`);
+if (has_format_exports) {
+	for (const name of expected_formats) {
+		if (!fns.includes(name)) {
+			console.error(`FAIL: generated ${main_js} is missing expected export \`${name}\``);
+			Deno.exit(1);
+		}
+	}
+} else if (has_format) {
+	console.error(`FAIL: ${variant} variant contains format_* exports — stale build dir?`);
 	Deno.exit(1);
 }
-if (variant === 'format' && has_parse) {
-	console.error(`FAIL: format variant contains parse_* exports — stale build dir?`);
+if (has_parse_exports && !has_parse) {
+	console.error(
+		`FAIL: ${variant} variant has no parse_* exports — was \`--features parse\` passed?`,
+	);
+	Deno.exit(1);
+}
+if (!has_parse_exports && has_parse) {
+	console.error(`FAIL: ${variant} variant contains parse_* exports — stale build dir?`);
 	Deno.exit(1);
 }
 console.log(`Exports: ${fns.join(', ')}`);
@@ -137,7 +158,7 @@ console.log(`Created ${pkg_root}/browser.js`);
 // Re-exports the generated function types, but declares init/init_sync with clean
 // signatures to avoid leaking wasm-bindgen internals (InitOutput with raw pointers).
 
-const ast_reexport = variant === 'parse' ? `export type * from './tsv_ast';\n` : '';
+const ast_reexport = has_parse_exports ? `export type * from './tsv_ast';\n` : '';
 const index_dts = `${ast_reexport}export {
 ${fns.map((f) => `\t${f},`).join('\n')}
 } from './${dts_file.replace(/\.d\.ts$/, '')}';
@@ -163,10 +184,16 @@ console.log(`Copied ${readme_src} → ${pkg_root}/README.md`);
 Deno.copyFileSync('LICENSE', `${pkg_root}/LICENSE`);
 console.log(`Copied LICENSE → ${pkg_root}/LICENSE`);
 
-if (variant === 'parse') {
+if (has_parse_exports) {
 	// Bundle the hand-maintained AST types alongside the generated `tsv_wasm.d.ts`.
 	Deno.copyFileSync('crates/tsv_wasm/types/tsv_ast.d.ts', `${pkg_root}/tsv_ast.d.ts`);
 	console.log(`Copied crates/tsv_wasm/types/tsv_ast.d.ts → ${pkg_root}/tsv_ast.d.ts`);
+}
+
+if (variant === 'all') {
+	// The full-tool package ships the CLI (`tsv` bin); the subsets stay pure libraries.
+	Deno.copyFileSync(`crates/tsv_wasm/npm/${cli_file}`, `${pkg_root}/${cli_file}`);
+	console.log(`Copied crates/tsv_wasm/npm/${cli_file} → ${pkg_root}/${cli_file}`);
 }
 
 // 6. Patch package.json.
@@ -175,9 +202,11 @@ const pkg_path = `${pkg_root}/package.json`;
 const pkg = JSON.parse(Deno.readTextFileSync(pkg_path));
 
 pkg.name = pkg_name;
-pkg.description = variant === 'format'
-	? 'formatter for TypeScript, Svelte, and CSS'
-	: 'parser for TypeScript, Svelte, and CSS';
+pkg.description = {
+	format: 'formatter for TypeScript, Svelte, and CSS',
+	parse: 'parser for TypeScript, Svelte, and CSS',
+	all: 'formatter and parser for TypeScript, Svelte, and CSS',
+}[variant];
 pkg.type = 'module';
 pkg.exports = {
 	'./package.json': './package.json',
@@ -187,6 +216,9 @@ pkg.exports = {
 		default: './browser.js',
 	},
 };
+if (variant === 'all') {
+	pkg.bin = { tsv: `./${cli_file}` };
+}
 pkg.files = [
 	'index.js',
 	'index.d.ts',
@@ -194,7 +226,8 @@ pkg.files = [
 	main_js,
 	dts_file,
 	wasm_file,
-	...(variant === 'parse' ? ['tsv_ast.d.ts'] : []),
+	...(has_parse_exports ? ['tsv_ast.d.ts'] : []),
+	...(variant === 'all' ? [cli_file] : []),
 	'README.md',
 	'LICENSE',
 ];
@@ -202,7 +235,9 @@ pkg.keywords = [
 	'typescript',
 	'svelte',
 	'css',
-	...(variant === 'format' ? ['formatter', 'prettier'] : ['parser', 'ast', 'acorn']),
+	...(has_format_exports ? ['formatter', 'prettier'] : []),
+	...(has_parse_exports ? ['parser', 'ast', 'acorn'] : []),
+	...(variant === 'all' ? ['cli'] : []),
 	'wasm',
 	'webassembly',
 ];

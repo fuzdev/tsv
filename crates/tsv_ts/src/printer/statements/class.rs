@@ -3,7 +3,6 @@
 use super::Printer;
 use crate::ast::internal;
 use crate::printer::CommentSpacing;
-use crate::printer::analysis;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::{SymbolToU32, comments_in_range};
 
@@ -430,7 +429,7 @@ impl<'a> Printer<'a> {
         if sig.readonly {
             self.push_member_keyword_doc(&mut parts, "readonly ", &mut cursor, bracket_bound);
         }
-        let bracket_pos = analysis::find_char_skipping_comments(
+        let bracket_pos = tsv_lang::source_scan::find_char_skipping_comments(
             self.source.as_bytes(),
             cursor as usize,
             bracket_bound as usize,
@@ -531,7 +530,7 @@ impl<'a> Printer<'a> {
         if prop.computed {
             // Comments before the `[` (inside-bracket comments are handled by
             // the bracket builder)
-            let bracket_pos = analysis::find_char_skipping_comments(
+            let bracket_pos = tsv_lang::source_scan::find_char_skipping_comments(
                 self.source.as_bytes(),
                 cursor as usize,
                 key_start as usize,
@@ -720,7 +719,7 @@ impl<'a> Printer<'a> {
             // Comments before the `[` (inside-bracket comments are handled by
             // the bracket builder); generators handle this span after the `*`.
             if !method.value.generator {
-                let bracket_pos = analysis::find_char_skipping_comments(
+                let bracket_pos = tsv_lang::source_scan::find_char_skipping_comments(
                     self.source.as_bytes(),
                     cursor as usize,
                     key_start as usize,
@@ -767,7 +766,7 @@ impl<'a> Printer<'a> {
             parts.push(self.build_type_parameter_declaration_doc(type_params));
 
             // Comments between type_params `>` and `(` go after type_params
-            if let Some(pp) = analysis::find_char_skipping_comments(
+            if let Some(pp) = tsv_lang::source_scan::find_char_skipping_comments(
                 self.source.as_bytes(),
                 type_params.span.end as usize,
                 self.source.len(),

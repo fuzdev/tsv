@@ -6,7 +6,7 @@
 use serde::Serialize;
 
 use crate::ast::{internal, public};
-use tsv_lang::{Comment, LocationTracker, Span, printing};
+use tsv_lang::{Comment, LocationTracker, Span};
 
 // Module declarations
 mod attributes;
@@ -17,8 +17,7 @@ mod fragments;
 mod special;
 mod tags;
 
-// Re-export functions needed by other modules within convert/
-// These are visible via super:: from sibling modules
+// Imported into the module root so sibling modules can reach them via `super::`
 use attributes::{convert_attribute_node, convert_attribute_value};
 use blocks::*;
 use directives::*;
@@ -37,7 +36,7 @@ pub use comment_attachment::{
 /// Convert an internal `Span` to a public `NameLocation`
 ///
 /// Computes line/column via `LocationTracker` and includes the byte offset as `character`.
-pub(crate) fn span_to_name_loc(span: Span, loc: &LocationTracker) -> public::NameLocation {
+fn span_to_name_loc(span: Span, loc: &LocationTracker) -> public::NameLocation {
     let start = loc.offset_to_position(span.start_usize());
     let end = loc.offset_to_position(span.end_usize());
     public::NameLocation {
@@ -63,7 +62,7 @@ pub(crate) fn span_to_name_loc(span: Span, loc: &LocationTracker) -> public::Nam
 ///
 /// Panics if serialization fails (indicates a bug in our Serialize impl).
 #[allow(clippy::expect_used)]
-pub(crate) fn to_json_value<T: Serialize>(value: &T) -> serde_json::Value {
+fn to_json_value<T: Serialize>(value: &T) -> serde_json::Value {
     serde_json::to_value(value).expect("AST types derive Serialize correctly")
 }
 
@@ -71,7 +70,7 @@ pub(crate) fn to_json_value<T: Serialize>(value: &T) -> serde_json::Value {
 ///
 /// Simple identifiers get `character` in loc via `inject_loc_character()`.
 /// Destructure patterns get column +1 via `adjust_read_pattern_columns()`.
-pub(crate) fn convert_pattern_expression(
+fn convert_pattern_expression(
     expr: &tsv_ts::ast::internal::Expression,
     source: &str,
     loc: &LocationTracker,
@@ -124,7 +123,7 @@ fn strip_type_annotation_loc(value: &mut serde_json::Value) {
 ///
 /// Our parser computes correct columns, so we add +1 to match Svelte's quirky output.
 /// Only called for destructure patterns (ObjectPattern, ArrayPattern) parsed via `read_pattern`.
-pub(crate) fn adjust_read_pattern_columns(value: &mut serde_json::Value) {
+fn adjust_read_pattern_columns(value: &mut serde_json::Value) {
     // Find the pattern's starting line from the root node's loc
     let target_line = value
         .get("loc")
@@ -253,36 +252,11 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
                 ));
             }
 
-            // Helper to convert a Comment to its JSON representation
+            // Helper to convert a Comment to its JSON representation:
+            // the shared type/value/start/end shape plus a `loc` field
             let comment_to_json_value = |comment: &Comment| {
-                let comment_type = if comment.is_block { "Block" } else { "Line" };
+                let mut value = comment_attachment::comment_to_json(comment, source);
                 let location = loc.span_to_location(comment.span);
-
-                // Apply Svelte's indentation stripping for multi-line block comments
-                let value = if comment.is_block && comment.content.contains('\n') {
-                    printing::strip_comment_indentation(
-                        source,
-                        &comment.content,
-                        comment.span.start,
-                    )
-                } else {
-                    comment.content.clone()
-                };
-
-                let mut map = serde_json::Map::new();
-                map.insert(
-                    "type".to_string(),
-                    serde_json::Value::String(comment_type.to_string()),
-                );
-                map.insert("value".to_string(), serde_json::Value::String(value));
-                map.insert(
-                    "start".to_string(),
-                    serde_json::Value::Number(comment.span.start.into()),
-                );
-                map.insert(
-                    "end".to_string(),
-                    serde_json::Value::Number(comment.span.end.into()),
-                );
                 let loc_value = if comment.emit_character_field {
                     serde_json::json!({
                         "start": {
@@ -308,8 +282,10 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
                         },
                     })
                 };
-                map.insert("loc".to_string(), loc_value);
-                serde_json::Value::Object(map)
+                if let Some(map) = value.as_object_mut() {
+                    map.insert("loc".to_string(), loc_value);
+                }
+                value
             };
 
             tsv_ts::ast::convert::build_comments_with_duplicates(

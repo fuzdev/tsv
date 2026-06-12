@@ -9,9 +9,11 @@
 
 use smallvec::SmallVec;
 
-use super::{PatternContext, Printer, object_pattern_should_expand};
 use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternProperty};
 use crate::printer::CommentSpacing;
+use crate::printer::{
+    ParenContext, PatternContext, Printer, needs_parens, object_pattern_should_expand,
+};
 use tsv_lang::Comment;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
@@ -727,7 +729,7 @@ impl<'a> Printer<'a> {
                     let value_start = p.value.span().start;
                     #[allow(clippy::expect_used)]
                     // Parser guarantees `:` exists in destructuring property
-                    let colon_pos = super::super::analysis::find_char_skipping_comments(
+                    let colon_pos = tsv_lang::source_scan::find_char_skipping_comments(
                         self.source.as_bytes(),
                         key_region_end as usize,
                         value_start as usize,
@@ -1032,13 +1034,11 @@ impl<'a> Printer<'a> {
         let inline_comments = self.build_rhs_comments_opt(eq_pos + 1, rhs_start);
 
         let rhs_doc = self.build_expression_doc(&pattern.right);
-        let rhs_doc =
-            if super::super::needs_parens(&pattern.right, super::super::ParenContext::DefaultValue)
-            {
-                d.concat(&[d.text("("), rhs_doc, d.text(")")])
-            } else {
-                rhs_doc
-            };
+        let rhs_doc = if needs_parens(&pattern.right, ParenContext::DefaultValue) {
+            d.concat(&[d.text("("), rhs_doc, d.text(")")])
+        } else {
+            rhs_doc
+        };
         let value_doc = if let Some(comments_doc) = inline_comments {
             d.concat(&[comments_doc, rhs_doc])
         } else {

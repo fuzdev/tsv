@@ -405,6 +405,11 @@ pub fn build_program_doc(
     printer.build_program_doc(program)
 }
 
+// Assignment-layout predicates for embedders: tsv_svelte's {@const} tag
+// mirrors Prettier's assignment layout selection and must apply the same
+// break-after-operator rules as our own assignment printer.
+pub use printer::{conditional_should_break_after_op, should_inline_logical_expression};
+
 // Re-exports of types that appear in this crate's public function signatures
 // (`Program`, `Expression`, `TSTypeAnnotation`) or are named via the short
 // `tsv_ts::Foo` path by external consumers (`Statement`, `ObjectProperty`,

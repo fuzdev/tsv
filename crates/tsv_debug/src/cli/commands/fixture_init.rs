@@ -1,5 +1,5 @@
 use crate::deno;
-use crate::fixtures::{self, InputType};
+use crate::fixtures::{self, InputType, find_input_file};
 use argh::FromArgs;
 use std::path::Path;
 use tsv_cli::json_utils::to_json_with_tabs;
@@ -149,13 +149,11 @@ fn resolve_input_type(parser: Option<&str>, dir: &Path) -> InputType {
         };
     }
 
-    // Auto-detect from existing input file
-    if let Some(input_file) = find_input_file(dir) {
-        return input_file_to_type(input_file);
-    }
-
-    // Default to svelte
-    InputType::Svelte
+    // Auto-detect from existing input file (closed set, so from_filepath
+    // always matches; the unwrap_or is the no-file default)
+    find_input_file(dir)
+        .and_then(InputType::from_filepath)
+        .unwrap_or(InputType::Svelte)
 }
 
 /// Resolve content from --content, --stdin, or existing input file
@@ -199,34 +197,6 @@ fn resolve_content(
         "No content source. Provide --content, --stdin (heredoc), or ensure input file exists."
             .to_string(),
     )
-}
-
-/// Find the input file in a directory, if any
-fn find_input_file(dir: &Path) -> Option<&'static str> {
-    if dir.join("input.svelte").exists() {
-        Some("input.svelte")
-    } else if dir.join("input.svelte.ts").exists() {
-        Some("input.svelte.ts")
-    } else if dir.join("input.ts").exists() {
-        Some("input.ts")
-    } else if dir.join("input.css").exists() {
-        Some("input.css")
-    } else {
-        None
-    }
-}
-
-/// Convert input filename to InputType
-fn input_file_to_type(input_file: &str) -> InputType {
-    if input_file.ends_with(".svelte.ts") {
-        InputType::SvelteTs
-    } else if input_file.ends_with(".ts") {
-        InputType::TypeScript
-    } else if input_file.ends_with(".css") {
-        InputType::Css
-    } else {
-        InputType::Svelte
-    }
 }
 
 /// Print a compact line width summary for the formatted input.

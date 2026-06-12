@@ -37,19 +37,22 @@ mod statements;
 mod types;
 
 use analysis::needs_isolation_for_hugging;
+// Layout predicates re-exported from the crate root for embedders (tsv_svelte's
+// {@const} assignment layout reuses Prettier's break-after-operator rules).
+pub use analysis::conditional_should_break_after_op;
 pub(crate) use analysis::{
-    PatternContext, build_entity_name_doc, conditional_should_break_after_op,
-    has_multiline_content, has_newline_before_position, is_brace_block_multiline,
-    is_module_path_fluid_call, is_multiline_string_literal, is_multiline_template_expression,
-    is_pure_property_chain, is_string_literal, object_pattern_should_expand,
-    template_literal_has_newlines,
+    PatternContext, build_entity_name_doc, has_multiline_content, has_newline_before_position,
+    is_brace_block_multiline, is_module_path_fluid_call, is_multiline_string_literal,
+    is_multiline_template_expression, is_pure_property_chain, is_string_literal,
+    object_pattern_should_expand, template_literal_has_newlines,
 };
 pub(crate) use comments::{CommentFilter, CommentSpacing};
+pub use expressions::assignment::should_inline_logical_expression;
 pub(crate) use expressions::assignment::{
     arrow_chain_has_return_type, is_call_on_member_chain, is_curried_arrow_chain,
     is_curried_arrow_with_return_type, is_literal_member_chain, is_poorly_breakable_chain,
     is_regex_root_chain, is_self_expanding_value, is_simple_self_expanding, is_simple_value,
-    is_single_call_on_member_chain, is_type_assertion_call, should_inline_logical_expression,
+    is_single_call_on_member_chain, is_type_assertion_call,
 };
 pub(crate) use needs_parens::{ParenContext, needs_parens};
 pub(crate) use types::{should_hug_union_type, unwrap_parenthesized};
@@ -463,7 +466,7 @@ impl<'a> Printer<'a> {
         let mut i = start_pos;
 
         while i < end_pos {
-            if let Some(new_i) = analysis::skip_comment(bytes, i, end_pos) {
+            if let Some(new_i) = tsv_lang::source_scan::skip_comment(bytes, i, end_pos) {
                 i = new_i;
                 continue;
             }
@@ -513,7 +516,7 @@ impl<'a> Printer<'a> {
     /// Find the first occurrence of a byte in source between `start` and `end`
     /// that is NOT inside a comment. Returns absolute position.
     pub(crate) fn find_char_outside_comments(&self, start: u32, end: u32, ch: u8) -> Option<u32> {
-        analysis::find_char_skipping_comments(
+        tsv_lang::source_scan::find_char_skipping_comments(
             self.source.as_bytes(),
             start as usize,
             end as usize,

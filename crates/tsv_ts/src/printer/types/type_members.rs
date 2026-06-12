@@ -12,10 +12,11 @@ use super::CommentSpacing;
 use super::Printer;
 use super::helpers::intersection_has_huggable_last_type;
 use crate::ast::internal::{self, TSType, TSTypeElement};
-use crate::printer::analysis::{find_char_skipping_comments, skip_identifier_at};
+use crate::printer::analysis::skip_identifier_at;
 use crate::printer::layout::hang_after_operator;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::find_char_skipping_comments;
 
 impl<'a> Printer<'a> {
     /// Build doc for a type member without its trailing `;` — the type-literal

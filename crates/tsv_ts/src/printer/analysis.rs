@@ -9,10 +9,6 @@ use string_interner::DefaultStringInterner;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
-// Re-export from tsv_lang for use within tsv_ts printer and AST modules
-pub(crate) use tsv_lang::source_scan::find_char_skipping_comments;
-pub(crate) use tsv_lang::source_scan::skip_comment;
-
 /// Skip past identifier characters (alphanumeric, `_`, `$`, non-ASCII) starting at `pos`.
 ///
 /// Returns the position after the last identifier character, or `pos` if none found.
@@ -169,7 +165,7 @@ pub(crate) fn is_pure_property_chain(expr: &internal::Expression) -> bool {
 /// ```
 ///
 /// Prettier ref: shouldBreakAfterOperator (assignment.js:216-219)
-pub(crate) fn conditional_should_break_after_op(expr: &internal::Expression) -> bool {
+pub fn conditional_should_break_after_op(expr: &internal::Expression) -> bool {
     if let internal::Expression::ConditionalExpression(cond) = expr {
         // Check if test is binaryish (BinaryExpression includes logical operators like &&, ||),
         // but exclude logical expressions with inline-able RHS (non-empty object/array).

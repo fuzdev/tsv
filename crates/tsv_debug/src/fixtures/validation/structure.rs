@@ -2,11 +2,8 @@
 //! expected-JSON patterns, and divergence-suffix naming.
 
 use crate::fixtures::{
-    AUDIT_SIGNATURE_FILENAME, Fixture, determine_required_suffix,
-    discover_prettier_intermediate_to_variant_variants, discover_prettier_intermediate_variants,
-    discover_prettier_variant_variants, discover_unformatted_ours_variants,
-    discover_unformatted_prettier_variants, discover_unformatted_variants,
-    discover_variant_variants, has_prettier_divergence_suffix, has_svelte_divergence_suffix,
+    AUDIT_SIGNATURE_FILENAME, Fixture, FixtureFiles, PRETTIER_NONCONVERGENT_FILENAME,
+    determine_required_suffix, has_prettier_divergence_suffix, has_svelte_divergence_suffix,
     read_file,
 };
 
@@ -29,8 +26,14 @@ use crate::fixtures::{
 /// S14: `expected_ours.json` MUST be in svelte divergence dirs
 /// S15: `expected_svelte.json` MUST be in svelte divergence dirs
 /// S16: Svelte divergence dirs CANNOT have `expected.json`
+/// S18: `prettier_nonconvergent.txt` requires a prettier divergence dir and CANNOT
+///      coexist with prettier-claim files (`output_prettier.*`, `unformatted_*`,
+///      `unformatted_prettier_*`, `prettier_variant_*`, `variant_*`,
+///      `prettier_intermediate_*`) — prettier has no fixed point, so no
+///      prettier-anchored claim is expressible (`unformatted_ours_*` stays allowed:
+///      it claims only OUR normalization)
 /// D1:  README.md required for divergences
-pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
+pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Result<(), String> {
     let fixture_dir = &fixture.path;
 
     // Get input type (validates that it's a known type)
@@ -71,18 +74,13 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         if !is_svelte_divergence_dir {
             // Determine correct suffix based on what files exist (must check prettier files too)
             let output_prettier_path = fixture.output_prettier_path();
-            let prettier_variant_variants =
-                discover_prettier_variant_variants(fixture_dir, input_ext);
-            let unformatted_ours_variants =
-                discover_unformatted_ours_variants(fixture_dir, input_ext);
-            let variant_variants = discover_variant_variants(fixture_dir, input_ext);
             let suggested_suffix = determine_required_suffix(
                 true, // has_expected_ours (we know this is true)
                 true, // has_expected_svelte (we know this is true)
                 output_prettier_path.exists(),
-                !prettier_variant_variants.is_empty(),
-                !unformatted_ours_variants.is_empty(),
-                !variant_variants.is_empty(),
+                !files.prettier_variant.is_empty(),
+                !files.unformatted_ours.is_empty(),
+                !files.variant.is_empty(),
             )
             .unwrap_or("_svelte_divergence");
 
@@ -172,9 +170,43 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         ));
     }
 
+    // S18: the prettier non-convergence marker contradicts every prettier-anchored
+    // claim file — prettier has no fixed point here, so there is no canonical
+    // prettier output to record (output_prettier.*), no stable form to preserve
+    // (prettier_variant_*/variant_*), and nothing prettier can normalize a variant
+    // to (unformatted_*/unformatted_prettier_*/prettier_intermediate_*).
+    // unformatted_ours_* stays allowed: it claims only OUR formatter's normalization.
+    if files.prettier_nonconvergent {
+        let mut conflicts = Vec::new();
+        if output_prettier_path.exists() {
+            conflicts.push(output_prettier_filename.to_string());
+        }
+        for name in files
+            .unformatted
+            .iter()
+            .chain(&files.unformatted_prettier)
+            .chain(&files.prettier_variant)
+            .chain(&files.variant)
+            .chain(&files.prettier_intermediate)
+            .chain(&files.prettier_intermediate_to_variant)
+        {
+            conflicts.push(name.clone());
+        }
+        if !conflicts.is_empty() {
+            return Err(format!(
+                "{PRETTIER_NONCONVERGENT_FILENAME} cannot coexist with prettier-claim files.\n\
+                The marker asserts prettier has NO fixed point on this input, so no\n\
+                prettier-anchored claim (output_prettier.*, prettier_variant_*, variant_*,\n\
+                unformatted_*, unformatted_prettier_*, prettier_intermediate_*) is expressible.\n\
+                Conflicting file(s): {}\n\
+                Either delete the marker (if prettier converges now) or remove the claim files.",
+                conflicts.join(", ")
+            ));
+        }
+    }
+
     // Check unformatted_* variants are not identical to input
-    let unformatted_variants = discover_unformatted_variants(fixture_dir, input_ext);
-    for variant_name in &unformatted_variants {
+    for variant_name in &files.unformatted {
         let variant_path = fixture_dir.join(variant_name);
         let variant_content = read_file(&variant_path)?;
 
@@ -186,9 +218,10 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         }
     }
 
-    // Check prettier_variant_* variants
-    let prettier_variant_variants = discover_prettier_variant_variants(fixture_dir, input_ext);
-    for variant_name in &prettier_variant_variants {
+    // Check prettier_variant_* variants, collecting contents for the
+    // variant_* cross-check below
+    let mut prettier_variant_contents: Vec<(String, String)> = Vec::new();
+    for variant_name in &files.prettier_variant {
         let variant_path = fixture_dir.join(variant_name);
         let variant_content = read_file(&variant_path)?;
 
@@ -199,20 +232,11 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
                 fixture.input_file
             ));
         }
-    }
-
-    // Check variant_* variants
-    let variant_variants = discover_variant_variants(fixture_dir, input_ext);
-
-    // Collect prettier_variant_* contents for cross-checking against variant_*
-    let mut prettier_variant_contents: Vec<(String, String)> = Vec::new();
-    for variant_name in &prettier_variant_variants {
-        let variant_path = fixture_dir.join(variant_name);
-        let variant_content = read_file(&variant_path)?;
         prettier_variant_contents.push((variant_name.clone(), variant_content));
     }
 
-    for variant_name in &variant_variants {
+    // Check variant_* variants
+    for variant_name in &files.variant {
         let variant_path = fixture_dir.join(variant_name);
         let variant_content = read_file(&variant_path)?;
 
@@ -236,16 +260,9 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         }
     }
 
-    // Discover unformatted_ours_* variants (needed for S8 validation)
-    let unformatted_ours_variants = discover_unformatted_ours_variants(fixture_dir, input_ext);
-
-    // Discover unformatted_prettier_* variants (needed for S8 validation)
-    let unformatted_prettier_variants =
-        discover_unformatted_prettier_variants(fixture_dir, input_ext);
-
     // S8: Check directory naming - prettier divergence suffix required when prettier validation should be skipped
-    let has_prettier_variant_files = !prettier_variant_variants.is_empty();
-    let has_variant_files = !variant_variants.is_empty();
+    let has_prettier_variant_files = !files.prettier_variant.is_empty();
+    let has_variant_files = !files.variant.is_empty();
     let has_output_prettier = output_prettier_path.exists();
 
     // Divergence documentation: files that show what prettier produces
@@ -253,25 +270,19 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
     let has_divergence_documentation =
         has_output_prettier || has_prettier_variant_files || has_variant_files;
 
-    // Discover prettier_intermediate_* variants (needed for S8 validation)
-    let prettier_intermediate_variants =
-        discover_prettier_intermediate_variants(fixture_dir, input_ext);
-    let has_prettier_intermediate_files = !prettier_intermediate_variants.is_empty();
-
-    // Discover prettier_intermediate_to_variant_* variants (needed for S8 validation)
-    let prettier_intermediate_to_variant_variants =
-        discover_prettier_intermediate_to_variant_variants(fixture_dir, input_ext);
+    let has_prettier_intermediate_files = !files.prettier_intermediate.is_empty();
     let has_prettier_intermediate_to_variant_files =
-        !prettier_intermediate_to_variant_variants.is_empty();
+        !files.prettier_intermediate_to_variant.is_empty();
 
     // Prettier divergence suffix is required when ANY prettier divergence files exist
     let needs_prettier_divergence_suffix = has_output_prettier
         || has_prettier_variant_files
         || has_variant_files
-        || !unformatted_ours_variants.is_empty()
-        || !unformatted_prettier_variants.is_empty()
+        || !files.unformatted_ours.is_empty()
+        || !files.unformatted_prettier.is_empty()
         || has_prettier_intermediate_files
-        || has_prettier_intermediate_to_variant_files;
+        || has_prettier_intermediate_to_variant_files
+        || files.prettier_nonconvergent;
 
     if needs_prettier_divergence_suffix && !is_prettier_divergence_dir {
         let mut reasons = Vec::new();
@@ -281,44 +292,47 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         if has_prettier_variant_files {
             reasons.push(format!(
                 "{} prettier_variant_*{} file(s)",
-                prettier_variant_variants.len(),
+                files.prettier_variant.len(),
                 input_ext
             ));
         }
         if has_variant_files {
             reasons.push(format!(
                 "{} variant_*{} file(s)",
-                variant_variants.len(),
+                files.variant.len(),
                 input_ext
             ));
         }
-        if !unformatted_ours_variants.is_empty() {
+        if !files.unformatted_ours.is_empty() {
             reasons.push(format!(
                 "{} unformatted_ours_*{} file(s)",
-                unformatted_ours_variants.len(),
+                files.unformatted_ours.len(),
                 input_ext
             ));
         }
         if has_prettier_intermediate_files {
             reasons.push(format!(
                 "{} prettier_intermediate_*{} file(s)",
-                prettier_intermediate_variants.len(),
+                files.prettier_intermediate.len(),
                 input_ext
             ));
         }
         if has_prettier_intermediate_to_variant_files {
             reasons.push(format!(
                 "{} prettier_intermediate_to_variant_*{} file(s)",
-                prettier_intermediate_to_variant_variants.len(),
+                files.prettier_intermediate_to_variant.len(),
                 input_ext
             ));
         }
-        if !unformatted_prettier_variants.is_empty() {
+        if !files.unformatted_prettier.is_empty() {
             reasons.push(format!(
                 "{} unformatted_prettier_*{} file(s)",
-                unformatted_prettier_variants.len(),
+                files.unformatted_prettier.len(),
                 input_ext
             ));
+        }
+        if files.prettier_nonconvergent {
+            reasons.push(PRETTIER_NONCONVERGENT_FILENAME.to_string());
         }
         let reason = reasons.join(" and ");
 
@@ -328,7 +342,7 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
             has_expected_svelte,
             has_output_prettier,
             has_prettier_variant_files,
-            !unformatted_ours_variants.is_empty(),
+            !files.unformatted_ours.is_empty(),
             has_variant_files,
         )
         .unwrap_or("_prettier_divergence");
@@ -343,11 +357,10 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         )];
 
         // If the only issue is unformatted_ours_* files, offer the rename alternative
-        if !unformatted_ours_variants.is_empty()
-            && !has_output_prettier
-            && !has_prettier_variant_files
+        if !files.unformatted_ours.is_empty() && !has_output_prettier && !has_prettier_variant_files
         {
-            let file_renames: Vec<String> = unformatted_ours_variants
+            let file_renames: Vec<String> = files
+                .unformatted_ours
                 .iter()
                 .map(|f| {
                     let new_name = f.replace("unformatted_ours_", "unformatted_");
@@ -378,12 +391,17 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
     // - unformatted_ours_*.* + README.md (for normalization divergence where prettier(input)==input)
     let readme_path = fixture_dir.join("README.md");
     let has_readme = readme_path.exists();
-    let has_unformatted_ours = !unformatted_ours_variants.is_empty();
+    let has_unformatted_ours = !files.unformatted_ours.is_empty();
 
     // unformatted_ours_* + README is acceptable when prettier(input) == input
     // (divergence is about normalization behavior, not formatting the canonical input)
     let has_normalization_divergence_docs = has_unformatted_ours && has_readme;
-    let has_any_divergence_docs = has_divergence_documentation || has_normalization_divergence_docs;
+    // prettier_nonconvergent.txt + README documents "prettier has no fixed point"
+    // (live-verified by F5 — there is no prettier output file to record)
+    let has_nonconvergence_docs = files.prettier_nonconvergent && has_readme;
+    let has_any_divergence_docs = has_divergence_documentation
+        || has_normalization_divergence_docs
+        || has_nonconvergence_docs;
 
     if !has_any_divergence_docs && is_prettier_divergence_dir {
         // For pure _prettier_divergence dirs (not combined with _svelte)
@@ -395,7 +413,8 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
                 - {output_prettier_filename} (if prettier formats input differently)\n\
                 - prettier_variant_*{input_ext} files (if prettier has stable variants our formatter normalizes)\n\
                 - variant_*{input_ext} files (if both formatters keep the form stable)\n\
-                - unformatted_ours_*{input_ext} files + README.md (if divergence is about normalization)"
+                - unformatted_ours_*{input_ext} files + README.md (if divergence is about normalization)\n\
+                - {PRETTIER_NONCONVERGENT_FILENAME} + README.md (if prettier never reaches a fixed point)"
             ));
         }
         // For combined _svelte_prettier_divergence dirs
@@ -407,15 +426,21 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
                 Either:\n\
                 - Add {output_prettier_filename} or prettier_variant_*{input_ext} or variant_*{input_ext} to document formatter divergence, OR\n\
                 - Add unformatted_ours_*{input_ext} + README.md for normalization divergence, OR\n\
+                - Add {PRETTIER_NONCONVERGENT_FILENAME} + README.md if prettier never reaches a fixed point, OR\n\
                 - Rename to '{}_svelte_divergence' if there's no formatter divergence",
                 dir_name.trim_end_matches("_svelte_prettier_divergence")
             ));
         }
     }
 
-    // S9: Prettier divergence directories CANNOT have unformatted_* files (only unformatted_ours_*)
-    if is_prettier_divergence_dir && !unformatted_variants.is_empty() {
-        let renamed_files = unformatted_variants
+    // S9: Prettier divergence directories with output_prettier.* CANNOT have unformatted_* files.
+    // There prettier(input) != input, so prettier can never normalize a variant to input —
+    // use unformatted_prettier_* (→ output_prettier) or unformatted_ours_* instead.
+    // Without output_prettier.*, input is prettier-stable (F3), so unformatted_* is
+    // meaningful and N3 validates it.
+    if is_prettier_divergence_dir && has_output_prettier && !files.unformatted.is_empty() {
+        let renamed_files = files
+            .unformatted
             .iter()
             .map(|f| {
                 format!(
@@ -427,33 +452,25 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
             .collect::<Vec<_>>()
             .join("\n");
 
-        // Strip any divergence suffix for the suggested rename
-        let dir_base = dir_name
-            .trim_end_matches("_svelte_prettier_divergence")
-            .trim_end_matches("_prettier_divergence")
-            .trim_end_matches("_svelte_divergence");
-
         return Err(format!(
-            "Directory with prettier divergence suffix cannot have unformatted_*{input_ext} files.\n\
+            "Directory with prettier divergence suffix and {output_prettier_filename} cannot have unformatted_*{input_ext} files.\n\
             Found {} unformatted_*{input_ext} file(s) in directory '{}'.\n\
+            Prettier formats input differently here, so it can never normalize these variants to input.\n\
             \n\
             Choose one solution:\n\
             \n\
-            Option 1: Rename files to unformatted_ours_*{input_ext} (if testing our formatter only)\n\
+            Option 1: Rename files to unformatted_ours_*{input_ext} (if only our formatter normalizes them to input)\n\
             {}\n\
             \n\
-            Option 2: Remove prettier divergence suffix from directory (if testing both formatters)\n\
-            - Rename directory to: '{}'\n\
-            - This will enable prettier validation for these files",
-            unformatted_variants.len(),
+            Option 2: Rename files to unformatted_prettier_*{input_ext} (if prettier normalizes them to {output_prettier_filename})",
+            files.unformatted.len(),
             dir_name,
             renamed_files,
-            dir_base
         ));
     }
 
     // Check unformatted_ours_* variants
-    for variant_name in &unformatted_ours_variants {
+    for variant_name in &files.unformatted_ours {
         let variant_path = fixture_dir.join(variant_name);
         let variant_content = read_file(&variant_path)?;
 
@@ -468,7 +485,7 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
 
     // Check unformatted_prettier_* variants
     // These require output_prettier.* to exist (they normalize to prettier's output)
-    if !unformatted_prettier_variants.is_empty() && !has_output_prettier {
+    if !files.unformatted_prettier.is_empty() && !has_output_prettier {
         return Err(format!(
             "unformatted_prettier_*{input_ext} files require {} to exist.\n\
             Found {} unformatted_prettier_*{input_ext} file(s) but no {}.\n\
@@ -477,13 +494,13 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
             - Add {} (run: deno task fixtures:update:formatted), OR\n\
             - Remove unformatted_prettier_*{input_ext} files",
             output_prettier_filename,
-            unformatted_prettier_variants.len(),
+            files.unformatted_prettier.len(),
             output_prettier_filename,
             output_prettier_filename,
         ));
     }
 
-    for variant_name in &unformatted_prettier_variants {
+    for variant_name in &files.unformatted_prettier {
         let variant_path = fixture_dir.join(variant_name);
         let variant_content = read_file(&variant_path)?;
 
@@ -499,18 +516,18 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
     // Check if README.md should exist (D1 validation)
     let has_parser_divergence = has_expected_ours && has_expected_svelte;
     let has_formatter_divergence = output_prettier_path.exists();
-    let has_prettier_variants = !prettier_variant_variants.is_empty();
-    let has_variants = !variant_variants.is_empty();
-    let has_prettier_intermediate = !prettier_intermediate_variants.is_empty();
-    let has_prettier_intermediate_to_variant =
-        !prettier_intermediate_to_variant_variants.is_empty();
+    let has_prettier_variants = !files.prettier_variant.is_empty();
+    let has_variants = !files.variant.is_empty();
+    let has_prettier_intermediate = !files.prettier_intermediate.is_empty();
+    let has_prettier_intermediate_to_variant = !files.prettier_intermediate_to_variant.is_empty();
 
     let needs_readme = has_parser_divergence
         || has_formatter_divergence
         || has_prettier_variants
         || has_variants
         || has_prettier_intermediate
-        || has_prettier_intermediate_to_variant;
+        || has_prettier_intermediate_to_variant
+        || files.prettier_nonconvergent;
 
     if needs_readme && !has_readme {
         let mut reasons = Vec::new();
@@ -540,6 +557,11 @@ pub fn validate_fixture_structure(fixture: &Fixture) -> Result<(), String> {
         if has_prettier_intermediate_to_variant {
             reasons.push(format!(
                 "- Prettier intermediate to variant (prettier_intermediate_to_variant_*{input_ext})"
+            ));
+        }
+        if files.prettier_nonconvergent {
+            reasons.push(format!(
+                "- Prettier non-convergence ({PRETTIER_NONCONVERGENT_FILENAME})"
             ));
         }
 

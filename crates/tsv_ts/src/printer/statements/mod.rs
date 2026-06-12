@@ -20,7 +20,7 @@ pub(super) use super::{
     Printer, build_entity_name_doc, should_hug_union_type, unwrap_parenthesized,
 };
 
-use super::expressions::format_directive;
+use super::expressions::literals::format_directive;
 use super::needs_parens::leftmost_no_lookahead;
 use super::{ParenContext, needs_parens};
 use crate::ast::internal::{self, Expression, LiteralValue, Statement};

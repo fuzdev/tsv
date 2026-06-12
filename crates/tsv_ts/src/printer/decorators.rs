@@ -17,7 +17,10 @@ impl<'a> Printer<'a> {
     /// non-optional call on such a chain — anything else (`@(fn().fn1())`,
     /// `@(a?.b)`, `@(a[b])`) keeps parens. Prettier ref:
     /// `canDecoratorExpressionUnparenthesized` in parentheses/parent-needs-parentheses.js.
-    pub(crate) fn build_decorator_expression_doc(&self, decorator: &internal::Decorator) -> DocId {
+    pub(in crate::printer) fn build_decorator_expression_doc(
+        &self,
+        decorator: &internal::Decorator,
+    ) -> DocId {
         let d = self.d();
         let expr_doc = self.build_expression_doc(&decorator.expression);
         if can_decorator_expression_unparenthesized(&decorator.expression) {
@@ -32,7 +35,7 @@ impl<'a> Printer<'a> {
     /// Returns None if there are no decorators.
     /// Each decorator is formatted as `@expression` followed by hardline.
     /// Used for class-level decorators which always go on their own line.
-    pub(crate) fn build_decorators_doc(
+    pub(in crate::printer) fn build_decorators_doc(
         &self,
         decorators: Option<&[internal::Decorator]>,
         next_token_start: u32,
@@ -76,7 +79,7 @@ impl<'a> Printer<'a> {
     ///
     /// Prettier ref: `printClassMemberDecorators` in print/decorators.js
     /// uses `hasNewlineBetweenOrAfterDecorators` to decide `hardline` vs `line`.
-    pub(crate) fn build_class_member_decorators_doc(
+    pub(in crate::printer) fn build_class_member_decorators_doc(
         &self,
         decorators: Option<&[internal::Decorator]>,
         next_token_start: u32,

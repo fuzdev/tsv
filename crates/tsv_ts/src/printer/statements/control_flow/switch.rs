@@ -4,8 +4,8 @@
 
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
-use crate::printer::analysis::find_char_skipping_comments;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::find_char_skipping_comments;
 
 impl<'a> Printer<'a> {
     /// Build a doc for a switch statement with proper line-width wrapping

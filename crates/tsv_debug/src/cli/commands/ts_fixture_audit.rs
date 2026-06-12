@@ -95,6 +95,8 @@ enum Verdict {
     Convertible,
 }
 
+// Deliberately serial (no spawn-per-fixture / sidecar pool like the other bulk
+// fixtures commands): only ~19 input.ts fixtures exist, a full run is ~0.4s.
 async fn run(verbose: bool, filters: &[String]) {
     let fixtures_dir = Path::new("tests/fixtures");
     if !fixtures_dir.exists() {

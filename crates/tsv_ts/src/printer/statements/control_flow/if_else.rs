@@ -6,6 +6,7 @@
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::skip_comment;
 
 /// Check if a statement can be printed inline after `if (cond)` without a newline.
 ///
@@ -150,30 +151,15 @@ impl<'a> Printer<'a> {
         let mut i = from as usize;
         let end = to as usize;
         while i + 4 <= end {
-            match bytes[i] {
-                b'/' if i + 1 < end => match bytes[i + 1] {
-                    b'*' => {
-                        i += 2;
-                        while i + 1 < end && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
-                            i += 1;
-                        }
-                        i += 2;
-                        // Clamp in case block comment was unterminated
-                        i = i.min(end);
-                    }
-                    b'/' => {
-                        while i < end && bytes[i] != b'\n' {
-                            i += 1;
-                        }
-                        i = (i + 1).min(end);
-                    }
-                    _ => i += 1,
-                },
-                b'e' if i + 4 <= end && &self.source[i..i + 4] == "else" => {
-                    return Some((i + 4) as u32);
-                }
-                _ => i += 1,
+            if let Some(new_i) = skip_comment(bytes, i, end) {
+                // Clamp in case a block comment was unterminated
+                i = new_i.min(end);
+                continue;
             }
+            if bytes[i] == b'e' && &self.source[i..i + 4] == "else" {
+                return Some((i + 4) as u32);
+            }
+            i += 1;
         }
         None
     }

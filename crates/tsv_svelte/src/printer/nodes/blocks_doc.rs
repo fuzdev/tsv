@@ -2,8 +2,6 @@
 //
 // {#if}/{:else if}/{:else}, {#each}, {#await}, {#key}, and {#snippet} —
 // opening/closing tag layout, branch flattening, and section bodies.
-// (The `_doc` suffix in this directory distinguishes doc-IR builders from
-// printer entry points.)
 
 // Allow Svelte block syntax like `{:else}`, `{:then}`, `{:catch}` which
 // look like Rust format args but are valid Svelte template syntax.
@@ -13,7 +11,7 @@ use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
 use tsv_lang::doc::arena::DocId;
 
-use super::fragment_doc::indent_body;
+use super::helpers::indent_body;
 
 /// Build an await block section body with newline-based whitespace detection.
 ///

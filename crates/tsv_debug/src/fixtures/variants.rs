@@ -1,190 +1,131 @@
-//! Variant-file discovery: the `discover_*_variants` family plus
-//! unknown-file detection for catching typos in fixture directories.
+//! Single-scan discovery of a fixture directory's variant files.
 
 use crate::fixtures::Fixture;
-use crate::fixtures::audit_signature::AUDIT_SIGNATURE_FILENAME;
+use crate::fixtures::{AUDIT_SIGNATURE_FILENAME, PRETTIER_NONCONVERGENT_FILENAME};
 use std::fs;
-use std::path::Path;
 
-/// Discover fixture files matching `prefix` (and not any of
-/// `exclude_prefixes`) with the given extension, sorted by name.
+/// A fixture directory's variant files, partitioned by filename prefix in a
+/// single directory scan (each list sorted by name).
 ///
-/// Shared body of every `discover_*_variants` function. The exclusions
-/// exist because some variant prefixes are prefixes of more specific
-/// sibling prefixes (`unformatted_` vs `unformatted_ours_`).
-fn discover_prefixed_files(
-    fixture_dir: &Path,
-    ext: &str,
-    prefix: &str,
-    exclude_prefixes: &[&str],
-) -> Vec<String> {
-    let mut variants = Vec::new();
+/// Built once per fixture (`FixtureFiles::scan`) and threaded to every
+/// consumer — structure rules, validation phases, audits, update commands —
+/// so each fixture directory is read exactly once instead of once per
+/// variant kind.
+#[derive(Debug, Default)]
+pub struct FixtureFiles {
+    /// `unformatted_*` (excluding `unformatted_ours_*` / `unformatted_prettier_*`):
+    /// variants both formatters normalize to the input file.
+    pub unformatted: Vec<String>,
+    /// `unformatted_ours_*`: variants only OUR formatter normalizes to input
+    /// (used in `_prettier_divergence` directories where prettier validation
+    /// is skipped).
+    pub unformatted_ours: Vec<String>,
+    /// `unformatted_prettier_*`: variants prettier normalizes to
+    /// `output_prettier.*` (our formatter validation is not applied).
+    pub unformatted_prettier: Vec<String>,
+    /// `prettier_variant_*`: prettier's stable variants — inputs prettier
+    /// preserves as-is while our formatter normalizes them to input.
+    pub prettier_variant: Vec<String>,
+    /// `variant_*`: dual-stable forms both formatters keep stable (distinct
+    /// from input, unlike `prettier_variant_*`).
+    pub variant: Vec<String>,
+    /// `prettier_intermediate_*` (excluding `prettier_intermediate_to_variant_*`):
+    /// prettier's unstable first-pass output from `unformatted_ours_*` files;
+    /// the second pass converges to input.
+    pub prettier_intermediate: Vec<String>,
+    /// `prettier_intermediate_to_variant_*`: like `prettier_intermediate`,
+    /// but the second pass converges to a documented `variant_*` /
+    /// `prettier_variant_*` form rather than input (N7b).
+    pub prettier_intermediate_to_variant: Vec<String>,
+    /// `input_invalid_*`: invalid syntax that must fail BOTH parsers.
+    pub input_invalid: Vec<String>,
+    /// `prettier_nonconvergent.txt` marker present: prettier has no fixed
+    /// point on this input, so F2/F3/F4 and the prettier-side N rules are
+    /// replaced by the live non-convergence check (F5).
+    pub prettier_nonconvergent: bool,
+    /// Files matching no known fixture pattern — catches typos like
+    /// "unformated_*.svelte" (missing 't') or accidental additions.
+    /// Variant-prefixed files with the wrong extension land here too.
+    pub unknown: Vec<String>,
+}
 
-    if let Ok(entries) = fs::read_dir(fixture_dir) {
+impl FixtureFiles {
+    /// Scan the fixture directory once and partition entries by filename.
+    pub fn scan(fixture: &Fixture) -> Self {
+        let ext = fixture.input_type().extension();
+        let mut files = Self::default();
+
+        let Ok(entries) = fs::read_dir(&fixture.path) else {
+            return files;
+        };
+
         for entry in entries.flatten() {
-            if let Some(filename) = entry.file_name().to_str()
-                && filename.starts_with(prefix)
-                && !exclude_prefixes.iter().any(|p| filename.starts_with(p))
-                && filename.ends_with(ext)
-            {
-                variants.push(filename.to_string());
+            let os_filename = entry.file_name();
+            let Some(filename) = os_filename.to_str() else {
+                continue;
+            };
+            if filename == PRETTIER_NONCONVERGENT_FILENAME {
+                files.prettier_nonconvergent = true;
+                continue;
+            }
+            if is_static_fixture_file(filename) {
+                continue;
+            }
+            if let Some(bucket) = files.variant_bucket(filename, ext) {
+                bucket.push(filename.to_string());
+            } else if entry.path().is_file() {
+                files.unknown.push(filename.to_string());
             }
         }
+
+        files.unformatted.sort();
+        files.unformatted_ours.sort();
+        files.unformatted_prettier.sort();
+        files.prettier_variant.sort();
+        files.variant.sort();
+        files.prettier_intermediate.sort();
+        files.prettier_intermediate_to_variant.sort();
+        files.input_invalid.sort();
+        files.unknown.sort();
+        files
     }
 
-    variants.sort();
-    variants
-}
-
-/// Discover unformatted_* variant files in a fixture directory
-/// (excludes unformatted_ours_* files, which are handled separately)
-///
-/// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
-pub fn discover_unformatted_variants(fixture_dir: &Path, ext: &str) -> Vec<String> {
-    discover_prefixed_files(
-        fixture_dir,
-        ext,
-        "unformatted_",
-        &["unformatted_ours_", "unformatted_prettier_"],
-    )
-}
-
-/// Discover prettier_variant_* variant files in a fixture directory
-///
-/// These files document Prettier's stable variants - inputs that Prettier preserves
-/// as-is rather than normalizing to a single canonical form.
-///
-/// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
-pub fn discover_prettier_variant_variants(fixture_dir: &Path, ext: &str) -> Vec<String> {
-    discover_prefixed_files(fixture_dir, ext, "prettier_variant_", &[])
-}
-
-/// Discover variant_* variant files in a fixture directory
-///
-/// These files document dual-stable forms that our formatter also keeps stable,
-/// but does NOT normalize to `input`. Unlike `prettier_variant_*` (which our formatter
-/// normalizes to input), these represent dual-stable forms where both formatters
-/// preserve distinct canonical outputs.
-///
-/// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
-pub fn discover_variant_variants(fixture_dir: &Path, ext: &str) -> Vec<String> {
-    discover_prefixed_files(fixture_dir, ext, "variant_", &[])
-}
-
-/// Discover unformatted_ours_* variant files in a fixture directory
-/// These files test OUR formatter's normalization capability in _prettier_divergence directories
-/// where prettier validation is skipped.
-///
-/// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
-pub fn discover_unformatted_ours_variants(fixture_dir: &Path, ext: &str) -> Vec<String> {
-    discover_prefixed_files(fixture_dir, ext, "unformatted_ours_", &[])
-}
-
-/// Discover unformatted_prettier_* variant files in a fixture directory
-///
-/// These files test that PRETTIER normalizes certain inputs to `output_prettier.*`.
-/// Used in `_prettier_divergence` directories where `output_prettier.*` exists.
-///
-/// Validation rules:
-/// - `prettier(unformatted_prettier_*) == output_prettier.*` (prettier normalizes to its canonical output)
-/// - Our formatter validation is NOT applied (these test prettier's behavior, not ours)
-///
-/// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
-pub fn discover_unformatted_prettier_variants(fixture_dir: &Path, ext: &str) -> Vec<String> {
-    discover_prefixed_files(fixture_dir, ext, "unformatted_prettier_", &[])
-}
-
-/// Discover prettier_intermediate_* files in a fixture directory
-///
-/// These files capture Prettier's unstable intermediate output from `unformatted_ours_*` files.
-/// They document what Prettier produces on the first pass before reaching a stable form.
-///
-/// Validation rules:
-/// 1. `prettier(unformatted_ours_X) == prettier_intermediate_X` (captures first-pass output)
-/// 2. `prettier(prettier_intermediate_X) != prettier_intermediate_X` (verifies it's unstable)
-/// 3. `prettier(prettier_intermediate_X) == input` (converges to stable form)
-///
-/// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
-pub fn discover_prettier_intermediate_variants(fixture_dir: &Path, ext: &str) -> Vec<String> {
-    discover_prefixed_files(
-        fixture_dir,
-        ext,
-        "prettier_intermediate_",
-        &["prettier_intermediate_to_variant_"],
-    )
-}
-
-/// Discover prettier_intermediate_to_variant_* files in a fixture directory
-///
-/// These files capture Prettier's unstable intermediate output from `unformatted_ours_*` files
-/// when the second pass converges to a documented `variant_*`/`prettier_variant_*` file
-/// rather than to `input`.
-///
-/// Validation rules (N7b):
-/// 1. `prettier(unformatted_ours_X) == prettier_intermediate_to_variant_X` (captures first-pass output)
-/// 2. `prettier(prettier_intermediate_to_variant_X) != prettier_intermediate_to_variant_X` (verifies it's unstable)
-/// 3. `prettier(prettier_intermediate_to_variant_X) ∈ {variant_*, prettier_variant_*}` content
-///
-/// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
-pub fn discover_prettier_intermediate_to_variant_variants(
-    fixture_dir: &Path,
-    ext: &str,
-) -> Vec<String> {
-    discover_prefixed_files(fixture_dir, ext, "prettier_intermediate_to_variant_", &[])
-}
-
-/// Discover input_invalid_* files in a fixture directory
-///
-/// These files test that parsers correctly reject invalid syntax.
-/// They should fail to parse with both our parser and the canonical parser.
-///
-/// The `ext` parameter should match the input file extension (e.g., ".svelte" or ".ts")
-pub fn discover_invalid_variants(fixture_dir: &Path, ext: &str) -> Vec<String> {
-    discover_prefixed_files(fixture_dir, ext, "input_invalid_", &[])
-}
-
-/// Discover unknown files in a fixture directory
-///
-/// Returns a list of files that don't match any known fixture file pattern.
-/// This helps catch typos like "unformated_*.svelte" (missing 't') or other
-/// unexpected files that may have been added by accident.
-///
-/// Known file patterns:
-/// - Input files: input.svelte, input.svelte.ts, input.ts, input.css
-/// - Expected JSON: expected.json, expected_ours.json, expected_svelte.json
-/// - Output prettier: output_prettier.{ext}
-/// - Variants: unformatted_*.{ext}, unformatted_ours_*.{ext}, prettier_variant_*.{ext}, variant_*.{ext}, input_invalid_*.{ext}
-/// - Documentation: README.md
-pub fn discover_unknown_files(fixture: &Fixture) -> Vec<String> {
-    let fixture_dir = &fixture.path;
-    let input_ext = fixture.input_type().extension();
-    let mut unknown = Vec::new();
-
-    let Ok(entries) = fs::read_dir(fixture_dir) else {
-        return unknown;
-    };
-
-    for entry in entries.flatten() {
-        if !entry.path().is_file() {
-            continue;
+    /// The bucket a variant filename belongs to, or `None` for non-variants.
+    ///
+    /// More specific prefixes are checked before their parents
+    /// (`unformatted_ours_` before `unformatted_`, …). Variant files must
+    /// carry the input file's extension; wrong-extension matches fall
+    /// through to `unknown`.
+    fn variant_bucket(&mut self, filename: &str, ext: &str) -> Option<&mut Vec<String>> {
+        if !filename.ends_with(ext) {
+            return None;
         }
-        let os_filename = entry.file_name();
-        let Some(filename) = os_filename.to_str() else {
-            continue;
-        };
-        if !is_known_fixture_file(filename, input_ext) {
-            unknown.push(filename.to_string());
+        if filename.starts_with("unformatted_ours_") {
+            Some(&mut self.unformatted_ours)
+        } else if filename.starts_with("unformatted_prettier_") {
+            Some(&mut self.unformatted_prettier)
+        } else if filename.starts_with("unformatted_") {
+            Some(&mut self.unformatted)
+        } else if filename.starts_with("prettier_intermediate_to_variant_") {
+            Some(&mut self.prettier_intermediate_to_variant)
+        } else if filename.starts_with("prettier_intermediate_") {
+            Some(&mut self.prettier_intermediate)
+        } else if filename.starts_with("prettier_variant_") {
+            Some(&mut self.prettier_variant)
+        } else if filename.starts_with("variant_") {
+            Some(&mut self.variant)
+        } else if filename.starts_with("input_invalid_") {
+            Some(&mut self.input_invalid)
+        } else {
+            None
         }
     }
-
-    unknown.sort();
-    unknown
 }
 
-/// Check if a filename is a known fixture file pattern
-fn is_known_fixture_file(filename: &str, input_ext: &str) -> bool {
-    // Static files (input, expected, output_prettier, README, audit_signature)
-    if matches!(
+/// Check if a filename is a known non-variant fixture file
+/// (input, expected JSON, output_prettier, README, audit signature).
+fn is_static_fixture_file(filename: &str) -> bool {
+    matches!(
         filename,
         "input.svelte"
             | "input.svelte.ts"
@@ -199,48 +140,75 @@ fn is_known_fixture_file(filename: &str, input_ext: &str) -> bool {
             | "output_prettier.css"
             | "README.md"
             | AUDIT_SIGNATURE_FILENAME
-    ) {
-        return true;
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Which bucket a filename lands in, by pushing through `variant_bucket`
+    /// and seeing which list became non-empty.
+    fn bucket_of(filename: &str, ext: &str) -> Option<&'static str> {
+        let mut files = FixtureFiles::default();
+        files
+            .variant_bucket(filename, ext)?
+            .push(filename.to_string());
+        let buckets = [
+            ("unformatted", &files.unformatted),
+            ("unformatted_ours", &files.unformatted_ours),
+            ("unformatted_prettier", &files.unformatted_prettier),
+            ("prettier_variant", &files.prettier_variant),
+            ("variant", &files.variant),
+            ("prettier_intermediate", &files.prettier_intermediate),
+            (
+                "prettier_intermediate_to_variant",
+                &files.prettier_intermediate_to_variant,
+            ),
+            ("input_invalid", &files.input_invalid),
+        ];
+        buckets.iter().find(|(_, v)| !v.is_empty()).map(|(n, _)| *n)
     }
 
-    // Variant files must have correct extension matching input type
-    // unformatted_*.{ext} (but not unformatted_ours_*)
-    if filename.starts_with("unformatted_")
-        && !filename.starts_with("unformatted_ours_")
-        && filename.ends_with(input_ext)
-    {
-        return true;
+    /// More specific prefixes must win over their parents — some variant kinds
+    /// (e.g. `unformatted_prettier_*`) have no in-tree fixtures, so the e2e
+    /// suite doesn't exercise every arm of the chain.
+    #[test]
+    fn prefix_precedence() {
+        let cases = [
+            ("unformatted_x.svelte", "unformatted"),
+            ("unformatted_ours_x.svelte", "unformatted_ours"),
+            ("unformatted_prettier_x.svelte", "unformatted_prettier"),
+            ("prettier_variant_x.svelte", "prettier_variant"),
+            ("variant_x.svelte", "variant"),
+            ("prettier_intermediate_x.svelte", "prettier_intermediate"),
+            (
+                "prettier_intermediate_to_variant_x.svelte",
+                "prettier_intermediate_to_variant",
+            ),
+            ("input_invalid_x.svelte", "input_invalid"),
+        ];
+        for (filename, expected) in cases {
+            assert_eq!(bucket_of(filename, ".svelte"), Some(expected), "{filename}");
+        }
     }
 
-    // unformatted_ours_*.{ext}
-    if filename.starts_with("unformatted_ours_") && filename.ends_with(input_ext) {
-        return true;
+    /// Variant files must carry the input file's extension; everything else
+    /// (wrong extension, typo'd prefix) is not a variant and lands in `unknown`.
+    #[test]
+    fn non_variants_fall_through() {
+        assert_eq!(bucket_of("unformatted_x.ts", ".svelte"), None);
+        assert_eq!(bucket_of("unformatted_x.svelte", ".svelte.ts"), None);
+        assert_eq!(bucket_of("unformated_typo.svelte", ".svelte"), None);
+        assert_eq!(bucket_of("notes.svelte", ".svelte"), None);
     }
 
-    // unformatted_prettier_*.{ext}
-    if filename.starts_with("unformatted_prettier_") && filename.ends_with(input_ext) {
-        return true;
+    #[test]
+    fn static_files_are_known() {
+        assert!(is_static_fixture_file("input.svelte"));
+        assert!(is_static_fixture_file("expected.json"));
+        assert!(is_static_fixture_file("README.md"));
+        assert!(is_static_fixture_file(AUDIT_SIGNATURE_FILENAME));
+        assert!(!is_static_fixture_file("notes.md"));
     }
-
-    // prettier_variant_*.{ext}
-    if filename.starts_with("prettier_variant_") && filename.ends_with(input_ext) {
-        return true;
-    }
-
-    // variant_*.{ext}
-    if filename.starts_with("variant_") && filename.ends_with(input_ext) {
-        return true;
-    }
-
-    // prettier_intermediate_*.{ext}
-    if filename.starts_with("prettier_intermediate_") && filename.ends_with(input_ext) {
-        return true;
-    }
-
-    // input_invalid_*.{ext}
-    if filename.starts_with("input_invalid_") && filename.ends_with(input_ext) {
-        return true;
-    }
-
-    false
 }

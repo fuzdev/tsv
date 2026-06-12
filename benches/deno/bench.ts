@@ -334,10 +334,10 @@ await check_artifact_freshness([
 		rebuild: 'deno task build:ffi',
 	},
 	{
-		label: 'WASM (parse/deno)',
-		path: wasm_artifact_path('parse'),
+		label: 'WASM (all/deno)',
+		path: wasm_artifact_path('all'),
 		binding_crates: ['tsv_wasm'],
-		rebuild: 'deno task build:wasm:parse:deno',
+		rebuild: 'deno task build:wasm:all:deno',
 	},
 ]);
 

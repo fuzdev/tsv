@@ -33,7 +33,6 @@ pub use helpers::{should_hug_union_type, unwrap_parenthesized};
 pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 
 use crate::ast::internal::{TSImportType, TSParenthesizedType, TSType};
-use crate::printer::analysis::find_char_skipping_comments;
 use crate::printer::calls::PartitionedComments;
 use crate::printer::layout::hang_after_operator;
 use helpers::type_needs_parens_for_indexed_access_object;
@@ -42,6 +41,7 @@ use helpers::type_needs_parens_for_prefix_operator;
 use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::find_char_skipping_comments;
 
 impl<'a> Printer<'a> {
     //

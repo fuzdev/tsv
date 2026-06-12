@@ -56,7 +56,7 @@ pub(super) fn find_separator_position(
     end: u32,
     separator: u8,
 ) -> Option<u32> {
-    crate::printer::analysis::find_char_skipping_comments(
+    tsv_lang::source_scan::find_char_skipping_comments(
         source.as_bytes(),
         start as usize,
         end as usize,

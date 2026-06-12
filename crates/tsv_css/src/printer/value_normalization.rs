@@ -976,7 +976,7 @@ mod tests {
             vec!["--font", r#" "Font, Name""#]
         );
         assert_eq!(
-            split_args_by_comma(r#"'a, b', 'c, d'"#),
+            split_args_by_comma(r"'a, b', 'c, d'"),
             vec!["'a, b'", " 'c, d'"]
         );
     }

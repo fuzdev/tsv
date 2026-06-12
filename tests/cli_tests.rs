@@ -4,6 +4,8 @@ use std::path::PathBuf;
 use std::process::Command;
 
 /// Run the tsv binary with the given arguments.
+/// Test helper; panicking on spawn failure is the desired behavior.
+#[allow(clippy::expect_used)]
 fn tsv(args: &[&str]) -> std::process::Output {
     Command::new("cargo")
         .args(["run", "-p", "tsv_cli", "-q"])
@@ -13,6 +15,8 @@ fn tsv(args: &[&str]) -> std::process::Output {
 }
 
 /// Create a fresh temp directory unique to this test.
+/// Test helper; panicking on IO failure is the desired behavior.
+#[allow(clippy::expect_used)]
 fn temp_dir(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("tsv_cli_tests_{name}_{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
@@ -168,6 +172,8 @@ fn test_format_directory_recursive_in_place() {
     fs::create_dir_all(dir.join("dist")).unwrap();
     fs::write(dir.join("a.ts"), UNFORMATTED_TS).unwrap();
     fs::write(dir.join("sub/b.svelte"), "<div   >hi</div>\n").unwrap();
+    // `{color:red}` is CSS, not a format placeholder
+    #[allow(clippy::literal_string_with_formatting_args)]
     fs::write(dir.join("c.css"), "body{color:red}\n").unwrap();
     fs::write(dir.join("README.md"), "#   hi\n").unwrap();
     fs::write(dir.join("node_modules/x.ts"), UNFORMATTED_TS).unwrap();

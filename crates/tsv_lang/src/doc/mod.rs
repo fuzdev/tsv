@@ -424,7 +424,7 @@ mod arena_tests {
     #[test]
     fn test_arena_fill_wraps_last_item_at_101() {
         let a = DocArena::new(2);
-        let items = vec![
+        let items = [
             "a0000000000",
             "a1111111111",
             "a2222222222",
@@ -436,7 +436,7 @@ mod arena_tests {
 
         let mut parts = Vec::new();
         for (i, item) in items.iter().enumerate() {
-            parts.push(a.text(*item));
+            parts.push(a.text(item));
             if i < items.len() - 1 {
                 parts.push(a.concat(&[a.text(","), a.line()]));
             }
@@ -470,8 +470,7 @@ mod arena_tests {
         );
         assert!(
             output.contains("a5555555555,\n\t\t\ta6666666666666666"),
-            "Expected last item on own line. Got:\n{}",
-            output
+            "Expected last item on own line. Got:\n{output}"
         );
     }
 

@@ -797,7 +797,7 @@ impl<'a> Printer<'a> {
     /// Find the position of `:` after a position (for finding colon in property)
     /// Skips over comments to avoid matching colons inside them.
     pub(in crate::printer) fn find_colon_after(&self, start: u32) -> u32 {
-        crate::printer::analysis::find_char_skipping_comments(
+        tsv_lang::source_scan::find_char_skipping_comments(
             self.source.as_bytes(),
             start as usize,
             self.source.len(),
@@ -842,7 +842,7 @@ impl<'a> Printer<'a> {
     /// Find the opening `[` bracket between two positions (for computed properties).
     /// Returns the first `[` found outside comments in the range [start, end).
     fn find_opening_bracket_after(&self, start: u32, end: u32) -> u32 {
-        crate::printer::analysis::find_char_skipping_comments(
+        tsv_lang::source_scan::find_char_skipping_comments(
             self.source.as_bytes(),
             start as usize,
             end as usize,
@@ -854,7 +854,7 @@ impl<'a> Printer<'a> {
     /// Find the closing `]` bracket after a position (for computed properties)
     /// Skips over comments to avoid matching brackets inside them.
     fn find_closing_bracket_after(&self, pos: u32) -> u32 {
-        crate::printer::analysis::find_char_skipping_comments(
+        tsv_lang::source_scan::find_char_skipping_comments(
             self.source.as_bytes(),
             pos as usize,
             self.source.len(),

@@ -8,8 +8,8 @@
 // - Regex literals
 // - Spread elements
 
-use super::Printer;
 use crate::ast::internal::{self, LiteralValue};
+use crate::printer::Printer;
 use crate::printer::analysis;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::DocId;

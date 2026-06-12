@@ -18,9 +18,9 @@ use super::{CommentSpacing, Printer};
 use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
-use crate::printer::analysis::find_char_skipping_comments;
 use crate::printer::layout::hang_after_operator;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::find_char_skipping_comments;
 
 impl<'a> Printer<'a> {
     //

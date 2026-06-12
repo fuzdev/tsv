@@ -3,10 +3,11 @@
 
 use super::{Printer, build_entity_name_doc, should_hug_union_type, unwrap_parenthesized};
 use crate::ast::internal::{self, TSType};
-use crate::printer::analysis::{find_char_skipping_comments, skip_identifier_at};
+use crate::printer::analysis::skip_identifier_at;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentFilter, CommentSpacing};
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, SymbolToU32, comments_in_range};
 
 /// Check if a type is "generic" - i.e., has type parameters.

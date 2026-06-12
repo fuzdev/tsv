@@ -298,7 +298,7 @@ impl<'a> Printer<'a> {
         // prettier) — otherwise the comment swallows the rest of the header.
         let has_line_comment_in_header =
             if let (Some(open), Some(close)) = (open_paren, spans.close_paren) {
-                self.has_line_comments_in_range(open + 1, close)
+                self.has_line_comments_between(open + 1, close)
             } else {
                 false
             };
@@ -631,9 +631,9 @@ impl<'a> Printer<'a> {
         // Check for line comments in the header - if present, use breaking layout
         let close = close_paren.unwrap_or(right_end + 1);
         let has_line_comments = if let Some(open) = open_paren {
-            self.has_line_comments_in_range(open + 1, close)
+            self.has_line_comments_between(open + 1, close)
         } else {
-            self.has_line_comments_in_range(left_start, close)
+            self.has_line_comments_between(left_start, close)
         };
 
         if has_line_comments {
@@ -723,7 +723,7 @@ impl<'a> Printer<'a> {
 
         while i + kw_len <= len {
             // Skip over comments
-            if let Some(new_i) = crate::printer::analysis::skip_comment(bytes, i, len) {
+            if let Some(new_i) = tsv_lang::source_scan::skip_comment(bytes, i, len) {
                 i = new_i;
                 continue;
             }
@@ -786,9 +786,9 @@ impl<'a> Printer<'a> {
         // We check from open paren to close paren
         let close = close_paren.unwrap_or(right_end + 1);
         let has_line_comments = if let Some(open) = open_paren {
-            self.has_line_comments_in_range(open + 1, close)
+            self.has_line_comments_between(open + 1, close)
         } else {
-            self.has_line_comments_in_range(left_start, close)
+            self.has_line_comments_between(left_start, close)
         };
 
         if has_line_comments {
@@ -991,11 +991,6 @@ impl<'a> Printer<'a> {
             internal::ForInOfLeft::VariableDeclaration(decl) => decl.span.start,
             internal::ForInOfLeft::Pattern(expr) => expr.span().start,
         }
-    }
-
-    /// Check if there are any line comments in the given range
-    fn has_line_comments_in_range(&self, start: u32, end: u32) -> bool {
-        tsv_lang::comments_in_range(self.comments, start, end).any(|c| !c.is_block)
     }
 
     /// Append inline block comments for for-in/for-of statements.
@@ -1317,28 +1312,7 @@ impl<'a> Printer<'a> {
         // Search forward from body end, skipping over comments to find the actual keyword
         let body_end = stmt.body.span().end;
         let test_start = stmt.test.span().start;
-        let while_pos = {
-            let search = &self.source[body_end as usize..test_start as usize];
-            let mut pos = 0;
-            let mut found = None;
-            while pos < search.len() {
-                if search[pos..].starts_with("//") {
-                    // Skip line comment
-                    pos += search[pos..].find('\n').unwrap_or(search.len() - pos);
-                } else if search[pos..].starts_with("/*") {
-                    // Skip block comment
-                    pos += search[pos + 2..]
-                        .find("*/")
-                        .map_or(search.len() - pos, |p| p + 4);
-                } else if search[pos..].starts_with("while") {
-                    found = Some(body_end + pos as u32);
-                    break;
-                } else {
-                    pos += 1;
-                }
-            }
-            found
-        };
+        let while_pos = self.find_keyword_in_source(body_end, test_start, "while");
 
         // Check for comments between } and while, determine if while stays on same line
         let while_on_same_line = if let Some(while_start) = while_pos

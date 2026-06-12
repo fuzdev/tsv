@@ -3,10 +3,10 @@
 use super::{Printer, build_entity_name_doc};
 use crate::ast::internal;
 use crate::printer::CommentSpacing;
-use crate::printer::analysis::find_char_skipping_comments;
 use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::find_char_skipping_comments;
 
 /// Byte length of the leading `import`/`export` keyword (both 6 chars). Added to
 /// a declaration's span start to reach the position just past the keyword.

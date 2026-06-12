@@ -266,7 +266,7 @@ impl<'a> Printer<'a> {
                 if declarator.definite
                     && let Expression::Identifier(ident) = &declarator.id
                     && ident.type_annotation.is_none()
-                    && let Some(bang_pos) = analysis::find_char_skipping_comments(
+                    && let Some(bang_pos) = tsv_lang::source_scan::find_char_skipping_comments(
                         self.source.as_bytes(),
                         id_end as usize,
                         init_start as usize,

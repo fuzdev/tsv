@@ -46,7 +46,7 @@ fn get_subdirectory_names(dir: &Path) -> Vec<String> {
 /// Find the input file in a directory, if any
 ///
 /// Prefers input.svelte, falls back to input.svelte.ts, input.ts, or input.css.
-fn find_input_file(dir: &Path) -> Option<&'static str> {
+pub fn find_input_file(dir: &Path) -> Option<&'static str> {
     if dir.join("input.svelte").exists() {
         Some("input.svelte")
     } else if dir.join("input.svelte.ts").exists() {

@@ -16,10 +16,15 @@ crate-type = ["cdylib", "rlib"]
 wasm-opt = ['-O3', '--enable-bulk-memory', '--enable-nontrapping-float-to-int']
 
 [features]
-# Default build: format-only (@fuzdev/tsv_format_wasm).
-default = []
-# `--features ast`: adds parse_* + convert layer (@fuzdev/tsv_parse_wasm).
-ast = [
+# Default build: everything (@fuzdev/tsv_wasm). Subset packages build with
+# `--no-default-features --features format|parse`.
+default = ["format", "parse"]
+# `format_*` exports (@fuzdev/tsv_format_wasm when alone).
+format = []
+# `parse_*` exports + convert layer (@fuzdev/tsv_parse_wasm when alone).
+# The parse-only build drops the printers via link-level dead-code
+# elimination — no printer feature gates in the language crates.
+parse = [
     "tsv_ts/convert",
     "tsv_css/convert",
     "tsv_svelte/convert",

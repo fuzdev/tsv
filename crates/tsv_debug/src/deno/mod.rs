@@ -21,16 +21,55 @@ mod protocol;
 pub use error::DenoError;
 
 use actor::DenoActor;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::sync::OnceCell;
 
-/// Global lazy-initialized Deno actor
-static DENO_ACTOR: OnceCell<DenoActor> = OnceCell::const_new();
+/// Global lazy-initialized Deno actor pool
+static DENO_POOL: OnceCell<Vec<DenoActor>> = OnceCell::const_new();
 
-/// Get or spawn the Deno actor (lazy initialization)
+/// Requested pool size, read once when the pool is first spawned
+static POOL_SIZE: AtomicUsize = AtomicUsize::new(1);
+
+/// Round-robin dispatch counter
+static NEXT_ACTOR: AtomicUsize = AtomicUsize::new(0);
+
+/// Pool size for bulk workloads, given the caller's task concurrency: a few
+/// sidecars well below the task count. Each sidecar multiplexes many in-flight
+/// requests, and beyond ~3 processes extra sidecars just pay their own
+/// module-load cost and memory without improving wall time.
+pub fn bulk_pool_size(concurrency: usize) -> usize {
+    (concurrency / 4).clamp(1, 4)
+}
+
+/// Set the sidecar pool size (number of Deno processes).
+///
+/// Each sidecar is a single-threaded JS process, so a workload that issues many
+/// concurrent calls (fixture validation) is wall-clock-bound on one process;
+/// a small pool spreads the JS work across cores. Each process pays its own
+/// module-load cost on first use and holds its own memory, so this only pays
+/// off for bulk workloads — single-shot commands should leave the default of 1.
+///
+/// Must be called before the first sidecar call; once the pool is spawned the
+/// size is fixed and later calls have no effect.
+pub fn set_pool_size(n: usize) {
+    POOL_SIZE.store(n.max(1), Ordering::Relaxed);
+}
+
+/// Get a Deno actor from the pool, spawning the pool on first use.
+///
+/// Requests dispatch round-robin: each actor already multiplexes concurrent
+/// requests (pending-map + per-request oneshot), so distribution by call count
+/// is enough to spread load.
 async fn get_actor() -> Result<&'static DenoActor, DenoError> {
-    DENO_ACTOR
-        .get_or_try_init(|| async { DenoActor::spawn() })
-        .await
+    let pool = DENO_POOL
+        .get_or_try_init(|| async {
+            (0..POOL_SIZE.load(Ordering::Relaxed))
+                .map(|_| DenoActor::spawn())
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .await?;
+    let i = NEXT_ACTOR.fetch_add(1, Ordering::Relaxed) % pool.len();
+    Ok(&pool[i])
 }
 
 /// Specifies how prettier should determine the parser

@@ -3,9 +3,9 @@
 use super::Printer;
 use crate::ast::internal;
 use crate::printer::CommentSpacing;
-use crate::printer::analysis::find_char_skipping_comments;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::source_scan::find_char_skipping_comments;
 
 use super::super::types::function_types::{
     return_type_triggers_grouping, type_params_allow_grouping,

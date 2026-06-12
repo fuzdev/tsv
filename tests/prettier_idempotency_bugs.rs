@@ -14,7 +14,7 @@ async fn prettier_bug_space_after_block() {
     // Prettier preserves leading space after block element on first pass,
     // but removes it on second pass (non-idempotent behavior)
     assert_prettier_idempotency_bug(
-        r#"<div><div>block</div> text</div>"#,
+        r"<div><div>block</div> text</div>",
         "<div>\n\t<div>block</div>\n\t text\n</div>\n", // First pass (preserves space)
         "<div>\n\t<div>block</div>\n\ttext\n</div>\n",  // Second pass (removes space)
     )

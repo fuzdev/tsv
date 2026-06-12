@@ -496,7 +496,7 @@ fn find_bracket_position<P: ChainPrinter>(printer: &P, start: u32, end: u32) -> 
     let mut i = start_pos;
 
     while i < end_pos {
-        if let Some(new_i) = crate::printer::analysis::skip_comment(bytes, i, end_pos) {
+        if let Some(new_i) = tsv_lang::source_scan::skip_comment(bytes, i, end_pos) {
             i = new_i;
             continue;
         }

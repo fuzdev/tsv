@@ -761,7 +761,7 @@ impl<'a> Printer<'a> {
 
         while i + op_len <= range_end {
             // Skip comments
-            if let Some(new_i) = crate::printer::analysis::skip_comment(bytes, i, range_end) {
+            if let Some(new_i) = tsv_lang::source_scan::skip_comment(bytes, i, range_end) {
                 i = new_i;
                 continue;
             }

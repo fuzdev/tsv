@@ -6,9 +6,9 @@
  *   - crates/tsv_css/src/ast/public.rs
  *   - crates/tsv_svelte/src/ast/public.rs
  *
- * Bundled inside `@fuzdev/tsv_parse_wasm`. Any change to a `pub` field in the
- * Rust sources must be mirrored here — see `crates/tsv_wasm/CLAUDE.md`
- * for the maintenance checklist.
+ * Bundled inside `@fuzdev/tsv_parse_wasm` and `@fuzdev/tsv_wasm`. Any change
+ * to a `pub` field in the Rust sources must be mirrored here — see
+ * `crates/tsv_wasm/CLAUDE.md` for the maintenance checklist.
  *
  * Field names follow `#[serde(rename = "...")]` where present, otherwise
  * the Rust field name verbatim. Optional fields use `T?` for

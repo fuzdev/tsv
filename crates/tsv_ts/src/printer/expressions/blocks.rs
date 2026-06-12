@@ -12,8 +12,8 @@
 
 use smallvec::SmallVec;
 
-use super::Printer;
 use crate::ast::internal;
+use crate::printer::Printer;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {

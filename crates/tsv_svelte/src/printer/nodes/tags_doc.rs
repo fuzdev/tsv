@@ -1,8 +1,7 @@
 // Doc builders for Svelte template tags
 //
 // {@html}, {@const}, {@debug}, and {@render} — tag layout and the
-// {@const} initializer break rules. (The `_doc` suffix in this directory
-// distinguishes doc-IR builders from printer entry points.)
+// {@const} initializer break rules.
 
 use std::rc::Rc;
 
@@ -94,8 +93,8 @@ impl<'a> Printer<'a> {
     /// Check if a @const init expression needs break-after-operator layout.
     ///
     /// Matches prettier's `shouldBreakAfterOperator` for the expression types
-    /// that appear in @const tags. Binary expressions and conditionals with
-    /// binary tests break after `=`; other expressions use fluid layout.
+    /// that appear in @const tags, delegating to tsv_ts's predicates so the
+    /// rules can't drift from our own assignment printer.
     /// Prettier ref: assignment.js:196-226
     fn const_should_break_after_op(expr: &tsv_ts::Expression) -> bool {
         match expr {
@@ -103,31 +102,15 @@ impl<'a> Printer<'a> {
             // with a self-expanding RHS (non-empty object/array). In that case, the
             // RHS handles its own expansion: `= item || { ... }` not `=\n  item || {}`
             // Prettier ref: assignment.js:199 `isBinaryish && !shouldInlineLogicalExpression`
-            tsv_ts::Expression::BinaryExpression(bin) => !Self::is_inline_logical(bin),
-            tsv_ts::Expression::SequenceExpression(_) => true,
-            tsv_ts::Expression::ConditionalExpression(cond) => {
-                // Only break-after-operator when test is binary (and not inline logical).
-                // Simple identifier tests (e.g., `cond ? a : b`) use fluid layout.
-                // Prettier ref: assignment.js:216-219
-                matches!(&*cond.test, tsv_ts::Expression::BinaryExpression(bin) if !Self::is_inline_logical(bin))
+            tsv_ts::Expression::BinaryExpression(bin) => {
+                !tsv_ts::should_inline_logical_expression(bin)
             }
-            _ => false,
-        }
-    }
-
-    /// Check if a binary expression is a logical expression with a self-expanding RHS.
-    ///
-    /// Logical operators (`&&`, `||`, `??`) with non-empty object or array on the
-    /// right should NOT use break-after-operator — the RHS self-expands.
-    /// Prettier ref: `shouldInlineLogicalExpression` (binaryish.js:361)
-    fn is_inline_logical(bin: &tsv_ts::ast::internal::BinaryExpression) -> bool {
-        if !bin.operator.is_logical() {
-            return false;
-        }
-        match &*bin.right {
-            tsv_ts::Expression::ObjectExpression(obj) => !obj.properties.is_empty(),
-            tsv_ts::Expression::ArrayExpression(arr) => !arr.elements.is_empty(),
-            _ => false,
+            tsv_ts::Expression::SequenceExpression(_) => true,
+            // Conditionals break only when the test is binary (and not inline
+            // logical); simple identifier tests (e.g., `cond ? a : b`) use fluid
+            // layout. False for every other expression type.
+            // Prettier ref: assignment.js:216-219
+            _ => tsv_ts::conditional_should_break_after_op(expr),
         }
     }
 

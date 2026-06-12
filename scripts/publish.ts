@@ -76,19 +76,25 @@ const packages = [
 		label: '@fuzdev/tsv_parse_wasm',
 		dir: 'crates/tsv_wasm/pkg/parse/npm',
 	},
+	{
+		label: '@fuzdev/tsv_wasm',
+		dir: 'crates/tsv_wasm/pkg/all/npm',
+	},
 ];
 
 /**
  * Everything Step 6 validates, including the unpublished deno bundles —
  * stale bundles must never gate (or falsely pass) a publish. Ordered to
- * group cargo feature flags (default, default, ast, ast) so the crate
- * recompiles once instead of three times.
+ * group cargo feature sets (format, format, parse, parse, default, default)
+ * so the crate recompiles once per feature set instead of once per task.
  */
 const build_tasks = [
 	'build:npm:format',
 	'build:wasm:deno',
 	'build:npm:parse',
 	'build:wasm:parse:deno',
+	'build:npm:all',
+	'build:wasm:all:deno',
 ];
 
 /** Only the release files — a stray file generated mid-pipeline must never

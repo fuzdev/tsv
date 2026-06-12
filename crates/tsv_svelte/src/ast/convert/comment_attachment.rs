@@ -12,14 +12,14 @@
 
 use std::collections::VecDeque;
 
-use tsv_lang::{Comment, printing};
+use tsv_lang::{Comment, printing, source_scan::skip_comment};
 
 /// Context for comment attachment process
 ///
 /// Holds a mutable queue of comments (sorted by position) that gets consumed
 /// during the DFS walk, matching acorn's algorithm from:
 /// svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js
-pub(crate) struct CommentAttachmentContext<'a> {
+pub(super) struct CommentAttachmentContext<'a> {
     /// Comment queue sorted by start position. Comments are shifted from the front
     /// as they get attached to nodes during the DFS walk.
     pub comments: VecDeque<serde_json::Value>,
@@ -72,7 +72,7 @@ fn is_ast_node(value: &serde_json::Value) -> bool {
 /// 4. Recurse into children (which consume their own comments from the queue)
 /// 5. After recursion: check for trailing comments based on context
 /// 6. Remaining comments after full walk → trailing on root
-pub(crate) fn attach_comments_recursively(
+pub(super) fn attach_comments_recursively(
     root: &mut serde_json::Value,
     ctx: &mut CommentAttachmentContext<'_>,
 ) {
@@ -399,7 +399,7 @@ fn get_comment_value(comment: &Comment, source: &str) -> String {
 }
 
 /// Convert Comment to JSON format (without loc - simplified for attachment)
-pub(crate) fn comment_to_json(comment: &Comment, source: &str) -> serde_json::Value {
+pub(super) fn comment_to_json(comment: &Comment, source: &str) -> serde_json::Value {
     let comment_type = if comment.is_block { "Block" } else { "Line" };
     let value = get_comment_value(comment, source);
 
@@ -876,45 +876,35 @@ fn try_attach_comments_to_expression(
 /// Acorn's token scanner reads past whitespace and comments when looking for the next token.
 /// This function mimics that: starting at `pos`, skip whitespace and block/line comments,
 /// and return the position after the last skipped comment. If no comments are found, returns `pos`.
+///
+/// `skip_comment` is passed `bytes.len()` (not `limit`) as its bound, and its
+/// past-`end` return on an unterminated block comment is unreachable here:
+/// this runs only after a successful parse, and every comment in the scanned
+/// window was already lexed as terminated. Expression tags track comments in
+/// their closing-brace scan (unterminated → no `}` found → parse error);
+/// block tags hand their content to the TS parser, whose one-token lookahead
+/// lexes all trivia after the expression and hard-errors on an unterminated
+/// block comment. This scanner's trivia set (` \t\r\n` + JS comments) is a
+/// subset of the lexer's, so it can never walk past that validated region.
 fn scan_past_trailing_comments(source: &str, start: u32, limit: u32) -> u32 {
     let bytes = source.as_bytes();
     let mut pos = start as usize;
-    let limit = limit as usize;
+    let limit = (limit as usize).min(bytes.len());
     let mut last_comment_end = start;
 
-    while pos < limit && pos < bytes.len() {
+    while pos < limit {
         match bytes[pos] {
             b' ' | b'\t' | b'\r' | b'\n' => {
                 pos += 1;
             }
-            b'/' if pos + 1 < bytes.len() => {
-                if bytes[pos + 1] == b'*' {
-                    // Block comment: /* ... */
-                    pos += 2;
-                    while pos + 1 < bytes.len() {
-                        if bytes[pos] == b'*' && bytes[pos + 1] == b'/' {
-                            pos += 2;
-                            break;
-                        }
-                        pos += 1;
-                    }
+            _ => match skip_comment(bytes, pos, bytes.len()) {
+                Some(next) => {
+                    pos = next;
                     last_comment_end = pos as u32;
-                } else if bytes[pos + 1] == b'/' {
-                    // Line comment: // ...
-                    pos += 2;
-                    while pos < bytes.len() && bytes[pos] != b'\n' {
-                        pos += 1;
-                    }
-                    last_comment_end = pos as u32;
-                } else {
-                    // Not a comment, stop scanning
-                    break;
                 }
-            }
-            _ => {
                 // Non-whitespace, non-comment — stop scanning
-                break;
-            }
+                None => break,
+            },
         }
     }
 
@@ -928,6 +918,8 @@ mod tests {
     /// Parse a `<script lang="ts">` body and return the public JSON AST.
     fn convert_ts(body: &str) -> Value {
         let source = format!("<script lang=\"ts\">\n{body}\n</script>");
+        // Test inputs are hardcoded valid sources; a parse failure should panic
+        #[allow(clippy::expect_used)]
         let root = crate::parse(&source).expect("parse");
         crate::convert_ast_json(&root, &source)
     }

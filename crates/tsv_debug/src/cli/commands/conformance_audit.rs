@@ -3,18 +3,19 @@ use argh::FromArgs;
 use std::collections::BTreeSet;
 use std::path::Path;
 
-/// Audit that every `_prettier_divergence` fixture is linked in
-/// `docs/conformance_prettier.md`.
+/// Audit that every divergence-suffixed fixture is linked in its conformance doc.
 ///
-/// Walks `tests/fixtures/` for directories with a prettier-divergence suffix
-/// (`_prettier_divergence` or `_svelte_prettier_divergence`) and verifies each is
-/// referenced by a `tests/fixtures/<path>` link in `docs/conformance_prettier.md`.
-/// The suffix asserts a deliberate formatting difference from Prettier; that claim
-/// must be cataloged in the conformance doc so the divergence is sanctioned and
+/// Walks `tests/fixtures/` and verifies each divergence directory is referenced by a
+/// `tests/fixtures/<path>` link in the doc that sanctions its claim:
+///
+/// - `_prettier_divergence` (incl. `_svelte_prettier_divergence`) → `docs/conformance_prettier.md`
+/// - `_svelte_divergence` (incl. `_svelte_prettier_divergence`) → `docs/conformance_svelte.md`
+///
+/// A divergence suffix asserts a deliberate difference from a canonical tool; that
+/// claim must be cataloged in the conformance doc so the divergence is sanctioned and
 /// discoverable (and reviewers can find the rationale). A `_svelte_prettier_divergence`
-/// fixture has a prettier aspect too, so it must appear here as well as in
-/// `conformance_svelte.md`. Exits non-zero on any unlinked fixture. Part of
-/// `deno task check`.
+/// fixture asserts both, so it must appear in both docs. Exits non-zero on any
+/// unlinked fixture. Part of `deno task check`.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "conformance_audit")]
 pub struct ConformanceAuditCommand {
@@ -24,7 +25,14 @@ pub struct ConformanceAuditCommand {
 }
 
 const FIXTURES_DIR: &str = "tests/fixtures";
-const DOC_PATH: &str = "docs/conformance_prettier.md";
+
+/// One doc-coverage audit: which suffix class must be linked in which doc.
+struct Audit {
+    doc_path: &'static str,
+    suffix_label: &'static str,
+    total: usize,
+    unlinked: Vec<String>,
+}
 
 impl ConformanceAuditCommand {
     pub fn run(self) {
@@ -42,35 +50,70 @@ impl ConformanceAuditCommand {
             }
         };
 
-        let doc = match std::fs::read_to_string(DOC_PATH) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("Error reading {DOC_PATH}: {e}");
-                std::process::exit(1);
-            }
-        };
-        let linked = extract_linked_fixtures(&doc);
-
-        // Every prettier-divergence fixture (sorted/deduped) that must be cataloged.
-        let divergence: BTreeSet<String> = all
-            .iter()
-            .filter(|f| f.is_prettier_divergence())
-            .map(|f| normalize_fixture_path(&f.relative_path))
-            .collect();
-
-        let unlinked: Vec<&String> = divergence.iter().filter(|p| !linked.contains(*p)).collect();
+        let audits = [
+            run_audit(
+                &all,
+                "docs/conformance_prettier.md",
+                "_prettier_divergence",
+                fixtures::Fixture::is_prettier_divergence,
+            ),
+            run_audit(
+                &all,
+                "docs/conformance_svelte.md",
+                "_svelte_divergence",
+                fixtures::Fixture::is_svelte_divergence,
+            ),
+        ];
 
         if self.json {
-            print_json(divergence.len(), &unlinked);
+            print_json(&audits);
         } else {
-            print_human(divergence.len(), &unlinked);
+            for audit in &audits {
+                print_human(audit);
+            }
         }
 
-        if unlinked.is_empty() {
+        if audits.iter().all(|a| a.unlinked.is_empty()) {
             std::process::exit(0);
         } else {
             std::process::exit(1);
         }
+    }
+}
+
+fn run_audit(
+    all: &[fixtures::Fixture],
+    doc_path: &'static str,
+    suffix_label: &'static str,
+    is_in_class: impl Fn(&fixtures::Fixture) -> bool,
+) -> Audit {
+    let doc = match std::fs::read_to_string(doc_path) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("Error reading {doc_path}: {e}");
+            std::process::exit(1);
+        }
+    };
+    let linked = extract_linked_fixtures(&doc);
+
+    // Every divergence fixture (sorted/deduped) that must be cataloged.
+    let divergence: BTreeSet<String> = all
+        .iter()
+        .filter(|f| is_in_class(f))
+        .map(|f| normalize_fixture_path(&f.relative_path))
+        .collect();
+
+    let total = divergence.len();
+    let unlinked: Vec<String> = divergence
+        .into_iter()
+        .filter(|p| !linked.contains(p))
+        .collect();
+
+    Audit {
+        doc_path,
+        suffix_label,
+        total,
+        unlinked,
     }
 }
 
@@ -107,33 +150,44 @@ fn extract_linked_fixtures(doc: &str) -> BTreeSet<String> {
     set
 }
 
-fn print_human(total: usize, unlinked: &[&String]) {
+fn print_human(audit: &Audit) {
+    let Audit {
+        doc_path,
+        suffix_label,
+        total,
+        unlinked,
+    } = audit;
     if unlinked.is_empty() {
-        println!("✓ all {total} _prettier_divergence fixtures linked in {DOC_PATH}");
+        println!("✓ all {total} {suffix_label} fixtures linked in {doc_path}");
         return;
     }
     eprintln!(
-        "✗ {} of {total} _prettier_divergence fixtures NOT linked in {DOC_PATH}:\n",
+        "✗ {} of {total} {suffix_label} fixtures NOT linked in {doc_path}:\n",
         unlinked.len(),
     );
     for p in unlinked {
         eprintln!("  - {p}");
     }
     eprintln!(
-        "\nEach _prettier_divergence fixture asserts a deliberate difference from Prettier.\n\
-         Add a `tests/fixtures/<path>` link in {DOC_PATH} §Catalog (e.g. the §Comment\n\
-         relocation table for comment-position divergences) so the divergence is\n\
+        "\nEach {suffix_label} fixture asserts a deliberate difference from the canonical tool.\n\
+         Add a `tests/fixtures/<path>` link in {doc_path} so the divergence is\n\
          sanctioned and discoverable."
     );
 }
 
-fn print_json(total: usize, unlinked: &[&String]) {
-    let report = serde_json::json!({
-        "doc": DOC_PATH,
-        "total": total,
-        "unlinked_count": unlinked.len(),
-        "unlinked": unlinked,
-    });
+fn print_json(audits: &[Audit]) {
+    let report: Vec<_> = audits
+        .iter()
+        .map(|a| {
+            serde_json::json!({
+                "doc": a.doc_path,
+                "suffix": a.suffix_label,
+                "total": a.total,
+                "unlinked_count": a.unlinked.len(),
+                "unlinked": a.unlinked,
+            })
+        })
+        .collect();
     println!(
         "{}",
         serde_json::to_string_pretty(&report).unwrap_or_default()

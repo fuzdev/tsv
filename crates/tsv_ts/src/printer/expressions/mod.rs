@@ -27,16 +27,9 @@ mod operators;
 mod patterns;
 mod template_literal;
 
-pub(super) use literals::{format_directive, format_string_literal_from_ast};
-
-// Re-export for submodules to use `super::X` instead of `super::super::X`
-use super::chain;
-use super::comments::CommentSpacing;
-pub(super) use super::{
-    ParenContext, PatternContext, Printer, needs_parens, object_pattern_should_expand,
-    unwrap_parenthesized,
-};
 use crate::ast::internal::{BinaryExpression, BinaryOperator, Expression, TSType};
+use crate::printer::comments::CommentSpacing;
+use crate::printer::{ParenContext, PatternContext, Printer, chain, needs_parens};
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {

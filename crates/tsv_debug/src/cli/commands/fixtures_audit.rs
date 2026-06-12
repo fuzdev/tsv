@@ -1,10 +1,5 @@
 use crate::deno::run_prettier;
-use crate::fixtures::{
-    self, AuditSignature, Fixture, InputType, discover_prettier_intermediate_to_variant_variants,
-    discover_prettier_intermediate_variants, discover_prettier_variant_variants,
-    discover_unformatted_ours_variants, discover_unformatted_variants, discover_variant_variants,
-    read_file,
-};
+use crate::fixtures::{self, AuditSignature, Fixture, FixtureFiles, read_file};
 use argh::FromArgs;
 use futures_util::stream::{self, StreamExt};
 use std::collections::HashMap;
@@ -74,16 +69,30 @@ impl FixturesAuditCommand {
             std::process::exit(1);
         }
 
-        // Audit fixtures concurrently
+        // Audit fixtures in parallel — tokio::spawn per fixture so the
+        // CPU-bound Rust work runs on all runtime workers (buffer_unordered
+        // alone only interleaves at await points on the stream-driving task),
+        // with a small sidecar pool for the JS side
         let concurrency = std::thread::available_parallelism()
             .map(std::num::NonZero::get)
             .unwrap_or(4);
+        crate::deno::set_pool_size(crate::deno::bulk_pool_size(concurrency));
 
-        let results: Vec<_> = stream::iter(fixture_list)
-            .map(|fixture| async move { audit_fixture(&fixture).await })
+        let joined: Vec<_> = stream::iter(fixture_list)
+            .map(|fixture| tokio::spawn(async move { audit_fixture(&fixture).await }))
             .buffer_unordered(concurrency)
             .collect()
             .await;
+        let mut results = Vec::with_capacity(joined.len());
+        for handle in joined {
+            match handle {
+                Ok(r) => results.push(r),
+                Err(e) => {
+                    eprintln!("fixture audit task panicked: {e}");
+                    std::process::exit(2);
+                }
+            }
+        }
 
         if self.json {
             self.print_json(&results);
@@ -316,6 +325,7 @@ async fn audit_fixture(fixture: &Fixture) -> FixtureAudit {
     let input_type = fixture.input_type();
     let input_ext = input_type.extension();
     let prettier_parser = input_type.prettier_parser();
+    let files = FixtureFiles::scan(fixture);
 
     // Read all known file contents
     let input_content = read_file(&fixture.input_path()).unwrap_or_default();
@@ -336,31 +346,13 @@ async fn audit_fixture(fixture: &Fixture) -> FixtureAudit {
         known_files.insert(fixture.output_prettier_filename().to_string(), opc.clone());
     }
 
-    let prettier_variant_variants = discover_prettier_variant_variants(fixture_dir, input_ext);
-    for name in &prettier_variant_variants {
-        if let Ok(content) = read_file(&fixture_dir.join(name)) {
-            known_files.insert(name.clone(), content);
-        }
-    }
-
-    let variant_variants = discover_variant_variants(fixture_dir, input_ext);
-    for name in &variant_variants {
-        if let Ok(content) = read_file(&fixture_dir.join(name)) {
-            known_files.insert(name.clone(), content);
-        }
-    }
-
-    let prettier_intermediate_variants =
-        discover_prettier_intermediate_variants(fixture_dir, input_ext);
-    for name in &prettier_intermediate_variants {
-        if let Ok(content) = read_file(&fixture_dir.join(name)) {
-            known_files.insert(name.clone(), content);
-        }
-    }
-
-    let prettier_intermediate_to_variant_variants =
-        discover_prettier_intermediate_to_variant_variants(fixture_dir, input_ext);
-    for name in &prettier_intermediate_to_variant_variants {
+    for name in files
+        .prettier_variant
+        .iter()
+        .chain(&files.variant)
+        .chain(&files.prettier_intermediate)
+        .chain(&files.prettier_intermediate_to_variant)
+    {
         if let Ok(content) = read_file(&fixture_dir.join(name)) {
             known_files.insert(name.clone(), content);
         }
@@ -373,23 +365,21 @@ async fn audit_fixture(fixture: &Fixture) -> FixtureAudit {
         files_to_audit.push(fixture.output_prettier_filename().to_string());
     }
 
-    let unformatted_variants = discover_unformatted_variants(fixture_dir, input_ext);
-    files_to_audit.extend(unformatted_variants);
-
-    let unformatted_ours_variants = discover_unformatted_ours_variants(fixture_dir, input_ext);
-    files_to_audit.extend(unformatted_ours_variants);
-
-    files_to_audit.extend(prettier_variant_variants);
-    files_to_audit.extend(variant_variants);
-    files_to_audit.extend(prettier_intermediate_variants);
-    files_to_audit.extend(prettier_intermediate_to_variant_variants);
+    files_to_audit.extend(files.unformatted.iter().cloned());
+    files_to_audit.extend(files.unformatted_ours.iter().cloned());
+    files_to_audit.extend(files.prettier_variant.iter().cloned());
+    files_to_audit.extend(files.variant.iter().cloned());
+    files_to_audit.extend(files.prettier_intermediate.iter().cloned());
+    files_to_audit.extend(files.prettier_intermediate_to_variant.iter().cloned());
 
     let mut file_audits = Vec::new();
     let mut has_novel = false;
     let mut suggestions = Vec::new();
 
-    // Only run prettier for Svelte/SvelteTs fixtures
-    let use_prettier = input_type == InputType::Svelte || input_type == InputType::SvelteTs;
+    // Skip prettier only for prettier_nonconvergent.txt fixtures — prettier has no
+    // fixed point there, so its output of any file is unclassifiable noise. All
+    // input types otherwise audit (prettier_parser() routes .ts/.css correctly).
+    let use_prettier = !files.prettier_nonconvergent;
 
     for filename in &files_to_audit {
         let filepath = fixture_dir.join(filename);

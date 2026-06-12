@@ -3,6 +3,8 @@
 use std::fmt;
 use thiserror::Error;
 
+use crate::fixtures::InputType;
+
 /// Why `audit_signature.txt` is stale.
 ///
 /// Both cases are repaired by the same command (`fixtures:update:formatted`), but the user-facing
@@ -73,6 +75,16 @@ pub enum ValidationError {
     FormatterError(String),
     #[error("Formatter error (svelte_divergence): {0}")]
     FormatterErrorInDivergence(String),
+
+    // Prettier non-convergence marker (F5): the claimed behavior no longer holds
+    #[error(
+        "prettier_nonconvergent.txt is stale: prettier is idempotent on {0} (the divergence is gone)"
+    )]
+    NonconvergentMarkerButPrettierIdempotent(String),
+    #[error(
+        "prettier_nonconvergent.txt is stale: prettier converges after one pass on {0} (a fixed point exists)"
+    )]
+    NonconvergentMarkerButPrettierConverges(String),
 
     // Normalization
     #[error("{0} not preserved by prettier")]
@@ -177,6 +189,13 @@ pub enum ValidationError {
     // Unknown files
     #[error("Unknown file: {0}")]
     UnknownFile(String),
+
+    // IO
+    /// A file listed by the directory scan could not be read. Loud rather than
+    /// silently skipped: a `continue` here would count the file's checks as passed.
+    /// The message comes from `read_file` and already names the path.
+    #[error("{0}")]
+    FileReadError(String),
 }
 
 impl ValidationError {
@@ -205,28 +224,38 @@ impl ValidationError {
             }
             Self::FormatterInputNotIdempotent(input_file) => {
                 // Return static str - the dynamic path is shown in the error message itself
-                if input_file.ends_with(".svelte") {
-                    "Debug: cargo run -p tsv_debug compare <fixture>/input.svelte"
-                } else if input_file.ends_with(".svelte.ts") {
-                    "Debug: cargo run -p tsv_debug compare <fixture>/input.svelte.ts"
-                } else if input_file.ends_with(".ts") {
-                    "Debug: cargo run -p tsv_debug compare <fixture>/input.ts"
-                } else {
-                    "Debug: cargo run -p tsv_debug compare <fixture>/input.css"
+                match InputType::from_filepath(input_file) {
+                    Some(InputType::Svelte) => {
+                        "Debug: cargo run -p tsv_debug compare <fixture>/input.svelte"
+                    }
+                    Some(InputType::SvelteTs) => {
+                        "Debug: cargo run -p tsv_debug compare <fixture>/input.svelte.ts"
+                    }
+                    Some(InputType::TypeScript) => {
+                        "Debug: cargo run -p tsv_debug compare <fixture>/input.ts"
+                    }
+                    Some(InputType::Css) | None => {
+                        "Debug: cargo run -p tsv_debug compare <fixture>/input.css"
+                    }
                 }
             }
             Self::FormatterOutputPrettierOutdated => {
                 "Run: deno task fixtures:update:formatted <pattern>"
             }
             Self::FormatterInputDiffersFromPrettier(input_file) => {
-                if input_file.ends_with(".svelte") {
-                    "Run: cargo run -p tsv_debug compare <fixture>/input.svelte to see difference"
-                } else if input_file.ends_with(".svelte.ts") {
-                    "Run: cargo run -p tsv_debug compare <fixture>/input.svelte.ts to see difference"
-                } else if input_file.ends_with(".ts") {
-                    "Run: cargo run -p tsv_debug compare <fixture>/input.ts to see difference"
-                } else {
-                    "Run: cargo run -p tsv_debug compare <fixture>/input.css to see difference"
+                match InputType::from_filepath(input_file) {
+                    Some(InputType::Svelte) => {
+                        "Run: cargo run -p tsv_debug compare <fixture>/input.svelte to see difference"
+                    }
+                    Some(InputType::SvelteTs) => {
+                        "Run: cargo run -p tsv_debug compare <fixture>/input.svelte.ts to see difference"
+                    }
+                    Some(InputType::TypeScript) => {
+                        "Run: cargo run -p tsv_debug compare <fixture>/input.ts to see difference"
+                    }
+                    Some(InputType::Css) | None => {
+                        "Run: cargo run -p tsv_debug compare <fixture>/input.css to see difference"
+                    }
                 }
             }
             Self::FormatterAuditSignatureOutdated(AuditSignatureStaleness::Drift) => {
@@ -244,6 +273,12 @@ impl ValidationError {
             Self::FormatterError(_) => "Fix the formatter implementation",
             Self::FormatterErrorInDivergence(_) => {
                 "Fix the formatter to support this syntax (svelte_divergence fixture)"
+            }
+            Self::NonconvergentMarkerButPrettierIdempotent(_) => {
+                "Delete prettier_nonconvergent.txt and re-evaluate the _prettier_divergence designation (prettier formats input stably now)"
+            }
+            Self::NonconvergentMarkerButPrettierConverges(_) => {
+                "Delete prettier_nonconvergent.txt and document the divergence normally (output_prettier.* / audit_signature.txt): deno task fixtures:update:formatted <pattern>"
             }
             Self::NormalizationPrettierVariantNotPreserved(_) => {
                 "Prettier doesn't preserve this file - rename to unformatted_*.svelte"
@@ -336,6 +371,9 @@ impl ValidationError {
             Self::UnknownFile(_) => {
                 "Remove or rename the file. Check for typos (e.g., 'unformated' vs 'unformatted')."
             }
+            Self::FileReadError(_) => {
+                "Check filesystem permissions/encoding — the directory scan listed this file but it could not be read"
+            }
         }
     }
 
@@ -361,7 +399,9 @@ impl ValidationError {
             | Self::FormatterAuditSignatureMalformed(_)
             | Self::FormatterAuditSignatureWalkFailed(_)
             | Self::FormatterError(_)
-            | Self::FormatterErrorInDivergence(_) => "Formatter",
+            | Self::FormatterErrorInDivergence(_)
+            | Self::NonconvergentMarkerButPrettierIdempotent(_)
+            | Self::NonconvergentMarkerButPrettierConverges(_) => "Formatter",
 
             Self::NormalizationPrettierVariantNotPreserved(_)
             | Self::NormalizationPrettierVariantNotNormalized(_)
@@ -398,7 +438,7 @@ impl ValidationError {
             | Self::InvalidSyntaxParsedByOurCss(_)
             | Self::InvalidSyntaxParsedByParseCss(_) => "InvalidSyntax",
 
-            Self::UnknownFile(_) => "Structure",
+            Self::UnknownFile(_) | Self::FileReadError(_) => "Structure",
         }
     }
 }
@@ -419,6 +459,17 @@ pub enum ValidationSuccess {
     VariantVariantsOk(usize),       // number of variant_* checked
     NormalizationSkipped,           // skipped due to formatter failure
     InvalidSyntaxVariantsOk(usize), // number of invalid syntax files validated
+    // Prettier-side normalization rules: one counter per rule so summaries can
+    // distinguish "validated n files" from "had nothing to validate"
+    PrettierVariantsStable(usize),                 // N1
+    VariantsStable(usize),                         // N9a
+    UnformattedPrettierNormalized(usize),          // N3
+    UnformattedOursDivergent(usize),               // N6
+    PrettierIntermediatesConverge(usize),          // N7
+    PrettierIntermediatesToVariantConverge(usize), // N7b
+    UnformattedPrettierToOutput(usize),            // N8
+    PrettierOutputsPinned(usize),                  // N10
+    PrettierNonconvergenceVerified,                // F5
 }
 
 impl fmt::Display for ValidationSuccess {
@@ -448,6 +499,43 @@ impl fmt::Display for ValidationSuccess {
             Self::NormalizationSkipped => write!(f, "SKIPPED (formatter not idempotent)"),
             Self::InvalidSyntaxVariantsOk(n) => {
                 write!(f, "{n} invalid syntax files correctly rejected")
+            }
+            Self::PrettierVariantsStable(n) => {
+                write!(f, "{n} prettier_variant_* preserved by prettier (N1)")
+            }
+            Self::VariantsStable(n) => write!(f, "{n} variant_* preserved by prettier (N9a)"),
+            Self::UnformattedPrettierNormalized(n) => {
+                write!(f, "{n} unformatted_* normalized to input by prettier (N3)")
+            }
+            Self::UnformattedOursDivergent(n) => {
+                write!(
+                    f,
+                    "{n} unformatted_ours_* confirmed prettier-divergent (N6)"
+                )
+            }
+            Self::PrettierIntermediatesConverge(n) => {
+                write!(f, "{n} prettier_intermediate_* converge to input (N7)")
+            }
+            Self::PrettierIntermediatesToVariantConverge(n) => {
+                write!(
+                    f,
+                    "{n} prettier_intermediate_to_variant_* converge to a variant (N7b)"
+                )
+            }
+            Self::UnformattedPrettierToOutput(n) => {
+                write!(
+                    f,
+                    "{n} unformatted_prettier_* normalize to output_prettier (N8)"
+                )
+            }
+            Self::PrettierOutputsPinned(n) => {
+                write!(
+                    f,
+                    "{n} unclaimed prettier outputs match documented forms (N10)"
+                )
+            }
+            Self::PrettierNonconvergenceVerified => {
+                write!(f, "prettier non-convergence verified live (F5)")
             }
         }
     }

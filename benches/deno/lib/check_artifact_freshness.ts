@@ -16,10 +16,11 @@
  * This module stats the crate sources that feed each executed artifact against
  * that artifact's own mtime and aborts the run when any source is newer (or the
  * artifact is missing). It only guards artifacts that are actually *executed*
- * during measurement — the FFI library and the `pkg/parse/deno` WASM bundle
- * (whose `--features ast` build supplies both the parse and format functions the
- * bench runs). Size-only artifacts like the format-only `pkg/format/deno` bundle
- * aren't guarded: `binary_sizes.ts` already degrades gracefully when they're absent.
+ * during measurement — the FFI library and the `pkg/all/deno` WASM bundle
+ * (the default full build, supplying both the parse and format functions the
+ * bench runs). Size-only artifacts like the subset `pkg/format/deno` and
+ * `pkg/parse/deno` bundles aren't guarded: `binary_sizes.ts` already degrades
+ * gracefully when they're absent.
  *
  * Escape hatch: set `BENCH_STALE_OK=1` to run anyway. A missing artifact is
  * always fatal (you can't measure what isn't there); `BENCH_STALE_OK=1`
@@ -194,7 +195,7 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
 }
 
 /** Path to a deno-target WASM bundle's compiled `.wasm` file for the given variant. */
-export function wasm_artifact_path(variant: 'format' | 'parse'): string {
+export function wasm_artifact_path(variant: 'format' | 'parse' | 'all'): string {
 	return new URL(`../../../crates/tsv_wasm/pkg/${variant}/deno/tsv_wasm_bg.wasm`, import.meta.url)
 		.pathname;
 }

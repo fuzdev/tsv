@@ -10,10 +10,10 @@ use super::super::comments_in_range;
 use super::helpers::type_args_should_wrap_for_return_type;
 use super::{CommentSpacing, Printer};
 use crate::ast::internal::{self, TSConstructorType, TSFunctionType, TSType};
-use crate::printer::analysis::find_char_skipping_comments;
 use crate::printer::layout::hang_after_operator;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::source_scan::find_char_skipping_comments;
 
 /// Check if an expression is an identifier with a TypeLiteral type annotation.
 ///

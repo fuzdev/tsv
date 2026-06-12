@@ -72,7 +72,7 @@ export class WasmImplementation implements TsvImplementation {
 
 	async init(): Promise<void> {
 		const wasm_path = new URL(
-			'../../../crates/tsv_wasm/pkg/parse/deno/tsv_wasm.js',
+			'../../../crates/tsv_wasm/pkg/all/deno/tsv_wasm.js',
 			import.meta.url,
 		).pathname;
 
@@ -81,7 +81,7 @@ export class WasmImplementation implements TsvImplementation {
 		} catch {
 			throw new Error(
 				`WASM module not found at ${wasm_path}. ` +
-					`Run 'deno task build:wasm:parse:deno' first.`,
+					`Run 'deno task build:wasm:all:deno' first.`,
 			);
 		}
 

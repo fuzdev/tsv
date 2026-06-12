@@ -6,11 +6,11 @@
 
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
-use crate::printer::analysis::find_char_skipping_comments;
 use crate::printer::layout::fluid_after_operator;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::find_char_skipping_comments;
 
 impl<'a> Printer<'a> {
     //
