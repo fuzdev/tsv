@@ -1,0 +1,190 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 53,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RenderTag",
+				"start": 0,
+				"end": 14,
+				"expression": {
+					"type": "CallExpression",
+					"start": 9,
+					"end": 13,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 9
+						},
+						"end": {
+							"line": 1,
+							"column": 13
+						}
+					},
+					"callee": {
+						"type": "Identifier",
+						"start": 9,
+						"end": 11,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 9
+							},
+							"end": {
+								"line": 1,
+								"column": 11
+							}
+						},
+						"name": "fn"
+					},
+					"arguments": [],
+					"optional": false
+				}
+			},
+			{
+				"type": "Text",
+				"start": 14,
+				"end": 16,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RenderTag",
+				"start": 16,
+				"end": 34,
+				"expression": {
+					"type": "CallExpression",
+					"start": 25,
+					"end": 33,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 9
+						},
+						"end": {
+							"line": 3,
+							"column": 17
+						}
+					},
+					"callee": {
+						"type": "Identifier",
+						"start": 25,
+						"end": 27,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 9
+							},
+							"end": {
+								"line": 3,
+								"column": 11
+							}
+						},
+						"name": "fn"
+					},
+					"arguments": [
+						{
+							"type": "Identifier",
+							"start": 28,
+							"end": 29,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 12
+								},
+								"end": {
+									"line": 3,
+									"column": 13
+								}
+							},
+							"name": "a"
+						},
+						{
+							"type": "Identifier",
+							"start": 31,
+							"end": 32,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 15
+								},
+								"end": {
+									"line": 3,
+									"column": 16
+								}
+							},
+							"name": "b"
+						}
+					],
+					"optional": false
+				}
+			},
+			{
+				"type": "Text",
+				"start": 34,
+				"end": 36,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RenderTag",
+				"start": 36,
+				"end": 52,
+				"expression": {
+					"type": "ChainExpression",
+					"start": 45,
+					"end": 51,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 9
+						},
+						"end": {
+							"line": 5,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 45,
+						"end": 51,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 9
+							},
+							"end": {
+								"line": 5,
+								"column": 15
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 45,
+							"end": 47,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 9
+								},
+								"end": {
+									"line": 5,
+									"column": 11
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [],
+						"optional": true
+					}
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

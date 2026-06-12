@@ -1,0 +1,531 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1075,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 77,
+				"data": " short multiline value - forces attr break even when content is short "
+			},
+			{
+				"type": "Text",
+				"start": 77,
+				"end": 78,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 78,
+				"end": 110,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 79
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 82
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 84,
+						"end": 102,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 3,
+								"column": 1,
+								"character": 84
+							},
+							"end": {
+								"line": 3,
+								"column": 10,
+								"character": 93
+							}
+						},
+						"value": [
+							{
+								"start": 95,
+								"end": 101,
+								"type": "Text",
+								"raw": "a,\n  b",
+								"data": "a,\n  b"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 110,
+				"end": 112,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 112,
+				"end": 170,
+				"data": " self-closing with multiline value - same behavior "
+			},
+			{
+				"type": "Text",
+				"start": 170,
+				"end": 171,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 171,
+				"end": 200,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 172
+					},
+					"end": {
+						"line": 8,
+						"column": 6,
+						"character": 177
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 179,
+						"end": 197,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 9,
+								"column": 1,
+								"character": 179
+							},
+							"end": {
+								"line": 9,
+								"column": 10,
+								"character": 188
+							}
+						},
+						"value": [
+							{
+								"start": 190,
+								"end": 196,
+								"type": "Text",
+								"raw": "a,\n  b",
+								"data": "a,\n  b"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 200,
+				"end": 202,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 202,
+				"end": 268,
+				"data": " multiple attrs with one multiline value - all attrs break "
+			},
+			{
+				"type": "Text",
+				"start": 268,
+				"end": 269,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 269,
+				"end": 323,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 270
+					},
+					"end": {
+						"line": 14,
+						"column": 4,
+						"character": 273
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 275,
+						"end": 294,
+						"name": "data-attr1",
+						"name_loc": {
+							"start": {
+								"line": 15,
+								"column": 1,
+								"character": 275
+							},
+							"end": {
+								"line": 15,
+								"column": 11,
+								"character": 285
+							}
+						},
+						"value": [
+							{
+								"start": 287,
+								"end": 293,
+								"type": "Text",
+								"raw": "value1",
+								"data": "value1"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 296,
+						"end": 315,
+						"name": "data-attr2",
+						"name_loc": {
+							"start": {
+								"line": 16,
+								"column": 1,
+								"character": 296
+							},
+							"end": {
+								"line": 16,
+								"column": 11,
+								"character": 306
+							}
+						},
+						"value": [
+							{
+								"start": 308,
+								"end": 314,
+								"type": "Text",
+								"raw": "a,\n  b",
+								"data": "a,\n  b"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 323,
+				"end": 325,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 325,
+				"end": 420,
+				"data": " 100 flat boundary: would be exactly 100 if single-line - still breaks due to multiline "
+			},
+			{
+				"type": "Text",
+				"start": 420,
+				"end": 421,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 421,
+				"end": 528,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 21,
+						"column": 1,
+						"character": 422
+					},
+					"end": {
+						"line": 21,
+						"column": 4,
+						"character": 425
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 427,
+						"end": 520,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 22,
+								"column": 1,
+								"character": 427
+							},
+							"end": {
+								"line": 22,
+								"column": 10,
+								"character": 436
+							}
+						},
+						"value": [
+							{
+								"start": 438,
+								"end": 519,
+								"type": "Text",
+								"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n  bbbbbbbbbbbbbbbbbbbbbbbbb",
+								"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n  bbbbbbbbbbbbbbbbbbbbbbbbb"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 528,
+				"end": 530,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 530,
+				"end": 611,
+				"data": " 101 flat boundary: would be 101 if single-line - breaks for both reasons "
+			},
+			{
+				"type": "Text",
+				"start": 611,
+				"end": 612,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 612,
+				"end": 721,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 27,
+						"column": 1,
+						"character": 613
+					},
+					"end": {
+						"line": 27,
+						"column": 4,
+						"character": 616
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 618,
+						"end": 713,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 28,
+								"column": 1,
+								"character": 618
+							},
+							"end": {
+								"line": 28,
+								"column": 10,
+								"character": 627
+							}
+						},
+						"value": [
+							{
+								"start": 629,
+								"end": 712,
+								"type": "Text",
+								"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n  bbbbbbbbbbbbbbbbbbbbbbbbb",
+								"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n  bbbbbbbbbbbbbbbbbbbbbbbbb"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 721,
+				"end": 723,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 723,
+				"end": 787,
+				"data": " control: single-line attr at 100 chars - does NOT break "
+			},
+			{
+				"type": "Text",
+				"start": 787,
+				"end": 788,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 788,
+				"end": 888,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 33,
+						"column": 1,
+						"character": 789
+					},
+					"end": {
+						"line": 33,
+						"column": 4,
+						"character": 792
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 793,
+						"end": 881,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 33,
+								"column": 5,
+								"character": 793
+							},
+							"end": {
+								"line": 33,
+								"column": 14,
+								"character": 802
+							}
+						},
+						"value": [
+							{
+								"start": 804,
+								"end": 880,
+								"type": "Text",
+								"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 888,
+				"end": 890,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 890,
+				"end": 970,
+				"data": " control: single-line attr at 101 chars - breaks normally (no multiline) "
+			},
+			{
+				"type": "Text",
+				"start": 970,
+				"end": 971,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 971,
+				"end": 1074,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 36,
+						"column": 1,
+						"character": 972
+					},
+					"end": {
+						"line": 36,
+						"column": 4,
+						"character": 975
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 977,
+						"end": 1066,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 37,
+								"column": 1,
+								"character": 977
+							},
+							"end": {
+								"line": 37,
+								"column": 10,
+								"character": 986
+							}
+						},
+						"value": [
+							{
+								"start": 988,
+								"end": 1065,
+								"type": "Text",
+								"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

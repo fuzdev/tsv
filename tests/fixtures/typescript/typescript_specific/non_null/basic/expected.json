@@ -1,0 +1,2554 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 688,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": "",
+			"start": 20,
+			"end": 22,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 3
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Non-Null Assertion Operator (!)",
+			"start": 24,
+			"end": 58,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 35
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": "",
+			"start": 60,
+			"end": 62,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 3
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Basic non-null assertion",
+			"start": 65,
+			"end": 92,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Member access after non-null",
+			"start": 100,
+			"end": 131,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Call result",
+			"start": 152,
+			"end": 166,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Array/index access",
+			"start": 189,
+			"end": 210,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Optional chaining then non-null",
+			"start": 237,
+			"end": 271,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 35
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Parenthesized (low precedence expressions)",
+			"start": 293,
+			"end": 338,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " With await",
+			"start": 389,
+			"end": 402,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " In assignment",
+			"start": 444,
+			"end": 460,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " With type assertion",
+			"start": 496,
+			"end": 518,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 1
+				},
+				"end": {
+					"line": 39,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Double assertion (non-null twice - valid but unusual)",
+			"start": 543,
+			"end": 599,
+			"loc": {
+				"start": {
+					"line": 43,
+					"column": 1
+				},
+				"end": {
+					"line": 43,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Non-null in expression context",
+			"start": 608,
+			"end": 641,
+			"loc": {
+				"start": {
+					"line": 46,
+					"column": 1
+				},
+				"end": {
+					"line": 46,
+					"column": 34
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 687,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 678,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 50,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 94,
+					"end": 97,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "TSNonNullExpression",
+						"start": 94,
+						"end": 96,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 3
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 94,
+							"end": 95,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 1
+								},
+								"end": {
+									"line": 7,
+									"column": 2
+								}
+							},
+							"name": "a"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": "",
+							"start": 20,
+							"end": 22
+						},
+						{
+							"type": "Line",
+							"value": " Non-Null Assertion Operator (!)",
+							"start": 24,
+							"end": 58
+						},
+						{
+							"type": "Line",
+							"value": "",
+							"start": 60,
+							"end": 62
+						},
+						{
+							"type": "Line",
+							"value": " Basic non-null assertion",
+							"start": 65,
+							"end": 92
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 133,
+					"end": 138,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 133,
+						"end": 137,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 5
+							}
+						},
+						"object": {
+							"type": "TSNonNullExpression",
+							"start": 133,
+							"end": 135,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 1
+								},
+								"end": {
+									"line": 10,
+									"column": 3
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 133,
+								"end": 134,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 1
+									},
+									"end": {
+										"line": 10,
+										"column": 2
+									}
+								},
+								"name": "a"
+							}
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 136,
+							"end": 137,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 4
+								},
+								"end": {
+									"line": 10,
+									"column": 5
+								}
+							},
+							"name": "b"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Member access after non-null",
+							"start": 100,
+							"end": 131
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 140,
+					"end": 149,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 10
+						}
+					},
+					"expression": {
+						"type": "TSNonNullExpression",
+						"start": 140,
+						"end": 148,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 1
+							},
+							"end": {
+								"line": 11,
+								"column": 9
+							}
+						},
+						"expression": {
+							"type": "MemberExpression",
+							"start": 140,
+							"end": 147,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 1
+								},
+								"end": {
+									"line": 11,
+									"column": 8
+								}
+							},
+							"object": {
+								"type": "TSNonNullExpression",
+								"start": 140,
+								"end": 145,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 1
+									},
+									"end": {
+										"line": 11,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "MemberExpression",
+									"start": 140,
+									"end": 144,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 1
+										},
+										"end": {
+											"line": 11,
+											"column": 5
+										}
+									},
+									"object": {
+										"type": "TSNonNullExpression",
+										"start": 140,
+										"end": 142,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 1
+											},
+											"end": {
+												"line": 11,
+												"column": 3
+											}
+										},
+										"expression": {
+											"type": "Identifier",
+											"start": 140,
+											"end": 141,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 1
+												},
+												"end": {
+													"line": 11,
+													"column": 2
+												}
+											},
+											"name": "a"
+										}
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 143,
+										"end": 144,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 4
+											},
+											"end": {
+												"line": 11,
+												"column": 5
+											}
+										},
+										"name": "b"
+									},
+									"computed": false,
+									"optional": false
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 146,
+								"end": 147,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"computed": false,
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 168,
+					"end": 174,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "TSNonNullExpression",
+						"start": 168,
+						"end": 173,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 6
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 168,
+							"end": 172,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 1
+								},
+								"end": {
+									"line": 14,
+									"column": 5
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 168,
+								"end": 170,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 1
+									},
+									"end": {
+										"line": 14,
+										"column": 3
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Call result",
+							"start": 152,
+							"end": 166
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 176,
+					"end": 186,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 11
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 176,
+						"end": 185,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 1
+							},
+							"end": {
+								"line": 15,
+								"column": 10
+							}
+						},
+						"object": {
+							"type": "TSNonNullExpression",
+							"start": 176,
+							"end": 183,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 1
+								},
+								"end": {
+									"line": 15,
+									"column": 8
+								}
+							},
+							"expression": {
+								"type": "CallExpression",
+								"start": 176,
+								"end": 182,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 1
+									},
+									"end": {
+										"line": 15,
+										"column": 7
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 176,
+									"end": 180,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 1
+										},
+										"end": {
+											"line": 15,
+											"column": 5
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 176,
+										"end": 177,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 1
+											},
+											"end": {
+												"line": 15,
+												"column": 2
+											}
+										},
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 178,
+										"end": 180,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 3
+											},
+											"end": {
+												"line": 15,
+												"column": 5
+											}
+										},
+										"name": "fn"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							}
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 184,
+							"end": 185,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 9
+								},
+								"end": {
+									"line": 15,
+									"column": 10
+								}
+							},
+							"name": "b"
+						},
+						"computed": false,
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 212,
+					"end": 218,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "TSNonNullExpression",
+						"start": 212,
+						"end": 217,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 1
+							},
+							"end": {
+								"line": 18,
+								"column": 6
+							}
+						},
+						"expression": {
+							"type": "MemberExpression",
+							"start": 212,
+							"end": 216,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 1
+								},
+								"end": {
+									"line": 18,
+									"column": 5
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 212,
+								"end": 213,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 1
+									},
+									"end": {
+										"line": 18,
+										"column": 2
+									}
+								},
+								"name": "a"
+							},
+							"property": {
+								"type": "Literal",
+								"start": 214,
+								"end": 215,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 3
+									},
+									"end": {
+										"line": 18,
+										"column": 4
+									}
+								},
+								"value": 0,
+								"raw": "0"
+							},
+							"computed": true,
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Array/index access",
+							"start": 189,
+							"end": 210
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 220,
+					"end": 234,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "TSNonNullExpression",
+						"start": 220,
+						"end": 233,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 1
+							},
+							"end": {
+								"line": 19,
+								"column": 14
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 220,
+							"end": 232,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 1
+								},
+								"end": {
+									"line": 19,
+									"column": 13
+								}
+							},
+							"callee": {
+								"type": "MemberExpression",
+								"start": 220,
+								"end": 225,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 1
+									},
+									"end": {
+										"line": 19,
+										"column": 6
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 220,
+									"end": 221,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 1
+										},
+										"end": {
+											"line": 19,
+											"column": 2
+										}
+									},
+									"name": "a"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 222,
+									"end": 225,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 3
+										},
+										"end": {
+											"line": 19,
+											"column": 6
+										}
+									},
+									"name": "get"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "Literal",
+									"start": 226,
+									"end": 231,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 7
+										},
+										"end": {
+											"line": 19,
+											"column": 12
+										}
+									},
+									"value": "key",
+									"raw": "'key'"
+								}
+							],
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 273,
+					"end": 279,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "ChainExpression",
+						"start": 273,
+						"end": 278,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 1
+							},
+							"end": {
+								"line": 22,
+								"column": 6
+							}
+						},
+						"expression": {
+							"type": "TSNonNullExpression",
+							"start": 273,
+							"end": 278,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 1
+								},
+								"end": {
+									"line": 22,
+									"column": 6
+								}
+							},
+							"expression": {
+								"type": "MemberExpression",
+								"start": 273,
+								"end": 277,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 1
+									},
+									"end": {
+										"line": 22,
+										"column": 5
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 273,
+									"end": 274,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 1
+										},
+										"end": {
+											"line": 22,
+											"column": 2
+										}
+									},
+									"name": "a"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 276,
+									"end": 277,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 4
+										},
+										"end": {
+											"line": 22,
+											"column": 5
+										}
+									},
+									"name": "b"
+								},
+								"computed": false,
+								"optional": true
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Optional chaining then non-null",
+							"start": 237,
+							"end": 271
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 281,
+					"end": 290,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 10
+						}
+					},
+					"expression": {
+						"type": "ChainExpression",
+						"start": 281,
+						"end": 289,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 1
+							},
+							"end": {
+								"line": 23,
+								"column": 9
+							}
+						},
+						"expression": {
+							"type": "TSNonNullExpression",
+							"start": 281,
+							"end": 289,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 1
+								},
+								"end": {
+									"line": 23,
+									"column": 9
+								}
+							},
+							"expression": {
+								"type": "MemberExpression",
+								"start": 281,
+								"end": 288,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 1
+									},
+									"end": {
+										"line": 23,
+										"column": 8
+									}
+								},
+								"object": {
+									"type": "MemberExpression",
+									"start": 281,
+									"end": 285,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 1
+										},
+										"end": {
+											"line": 23,
+											"column": 5
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 281,
+										"end": 282,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 1
+											},
+											"end": {
+												"line": 23,
+												"column": 2
+											}
+										},
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 284,
+										"end": 285,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 4
+											},
+											"end": {
+												"line": 23,
+												"column": 5
+											}
+										},
+										"name": "b"
+									},
+									"computed": false,
+									"optional": true
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 287,
+									"end": 288,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 7
+										},
+										"end": {
+											"line": 23,
+											"column": 8
+										}
+									},
+									"name": "c"
+								},
+								"computed": false,
+								"optional": true
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 340,
+					"end": 350,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 11
+						}
+					},
+					"expression": {
+						"type": "TSNonNullExpression",
+						"start": 340,
+						"end": 349,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 1
+							},
+							"end": {
+								"line": 26,
+								"column": 10
+							}
+						},
+						"expression": {
+							"type": "LogicalExpression",
+							"start": 341,
+							"end": 347,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 2
+								},
+								"end": {
+									"line": 26,
+									"column": 8
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 341,
+								"end": 342,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							"operator": "||",
+							"right": {
+								"type": "Identifier",
+								"start": 346,
+								"end": 347,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 7
+									},
+									"end": {
+										"line": 26,
+										"column": 8
+									}
+								},
+								"name": "b"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Parenthesized (low precedence expressions)",
+							"start": 293,
+							"end": 338
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 352,
+					"end": 361,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 10
+						}
+					},
+					"expression": {
+						"type": "TSNonNullExpression",
+						"start": 352,
+						"end": 360,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 1
+							},
+							"end": {
+								"line": 27,
+								"column": 9
+							}
+						},
+						"expression": {
+							"type": "BinaryExpression",
+							"start": 353,
+							"end": 358,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 2
+								},
+								"end": {
+									"line": 27,
+									"column": 7
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 353,
+								"end": 354,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 2
+									},
+									"end": {
+										"line": 27,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							"operator": "+",
+							"right": {
+								"type": "Identifier",
+								"start": 357,
+								"end": 358,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 6
+									},
+									"end": {
+										"line": 27,
+										"column": 7
+									}
+								},
+								"name": "b"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 363,
+					"end": 376,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 14
+						}
+					},
+					"expression": {
+						"type": "TSNonNullExpression",
+						"start": 363,
+						"end": 375,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 1
+							},
+							"end": {
+								"line": 28,
+								"column": 13
+							}
+						},
+						"expression": {
+							"type": "ConditionalExpression",
+							"start": 364,
+							"end": 373,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 2
+								},
+								"end": {
+									"line": 28,
+									"column": 11
+								}
+							},
+							"test": {
+								"type": "Identifier",
+								"start": 364,
+								"end": 365,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							"consequent": {
+								"type": "Identifier",
+								"start": 368,
+								"end": 369,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 6
+									},
+									"end": {
+										"line": 28,
+										"column": 7
+									}
+								},
+								"name": "b"
+							},
+							"alternate": {
+								"type": "Identifier",
+								"start": 372,
+								"end": 373,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 10
+									},
+									"end": {
+										"line": 28,
+										"column": 11
+									}
+								},
+								"name": "c"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 378,
+					"end": 386,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 9
+						}
+					},
+					"expression": {
+						"type": "TSNonNullExpression",
+						"start": 378,
+						"end": 385,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 1
+							},
+							"end": {
+								"line": 29,
+								"column": 8
+							}
+						},
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 379,
+							"end": 383,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 2
+								},
+								"end": {
+									"line": 29,
+									"column": 6
+								}
+							},
+							"expressions": [
+								{
+									"type": "Identifier",
+									"start": 379,
+									"end": 380,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 2
+										},
+										"end": {
+											"line": 29,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								{
+									"type": "Identifier",
+									"start": 382,
+									"end": 383,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 5
+										},
+										"end": {
+											"line": 29,
+											"column": 6
+										}
+									},
+									"name": "b"
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 404,
+					"end": 421,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 18
+						}
+					},
+					"expression": {
+						"type": "TSNonNullExpression",
+						"start": 404,
+						"end": 420,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 1
+							},
+							"end": {
+								"line": 32,
+								"column": 17
+							}
+						},
+						"expression": {
+							"type": "AwaitExpression",
+							"start": 405,
+							"end": 418,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 2
+								},
+								"end": {
+									"line": 32,
+									"column": 15
+								}
+							},
+							"argument": {
+								"type": "Identifier",
+								"start": 411,
+								"end": 418,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 8
+									},
+									"end": {
+										"line": 32,
+										"column": 15
+									}
+								},
+								"name": "promise"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " With await",
+							"start": 389,
+							"end": 402
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 423,
+					"end": 441,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 19
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 423,
+						"end": 440,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 1
+							},
+							"end": {
+								"line": 33,
+								"column": 18
+							}
+						},
+						"object": {
+							"type": "TSNonNullExpression",
+							"start": 423,
+							"end": 438,
+							"loc": {
+								"start": {
+									"line": 33,
+									"column": 1
+								},
+								"end": {
+									"line": 33,
+									"column": 16
+								}
+							},
+							"expression": {
+								"type": "AwaitExpression",
+								"start": 424,
+								"end": 436,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 2
+									},
+									"end": {
+										"line": 33,
+										"column": 14
+									}
+								},
+								"argument": {
+									"type": "CallExpression",
+									"start": 430,
+									"end": 436,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 8
+										},
+										"end": {
+											"line": 33,
+											"column": 14
+										}
+									},
+									"callee": {
+										"type": "MemberExpression",
+										"start": 430,
+										"end": 434,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 8
+											},
+											"end": {
+												"line": 33,
+												"column": 12
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 430,
+											"end": 431,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 8
+												},
+												"end": {
+													"line": 33,
+													"column": 9
+												}
+											},
+											"name": "a"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 432,
+											"end": 434,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 10
+												},
+												"end": {
+													"line": 33,
+													"column": 12
+												}
+											},
+											"name": "fn"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 439,
+							"end": 440,
+							"loc": {
+								"start": {
+									"line": 33,
+									"column": 17
+								},
+								"end": {
+									"line": 33,
+									"column": 18
+								}
+							},
+							"name": "b"
+						},
+						"computed": false,
+						"optional": false
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 462,
+					"end": 475,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 14
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 468,
+							"end": 474,
+							"loc": {
+								"start": {
+									"line": 36,
+									"column": 7
+								},
+								"end": {
+									"line": 36,
+									"column": 13
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 468,
+								"end": 469,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 7
+									},
+									"end": {
+										"line": 36,
+										"column": 8
+									}
+								},
+								"name": "x"
+							},
+							"init": {
+								"type": "TSNonNullExpression",
+								"start": 472,
+								"end": 474,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 11
+									},
+									"end": {
+										"line": 36,
+										"column": 13
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 472,
+									"end": 473,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 11
+										},
+										"end": {
+											"line": 36,
+											"column": 12
+										}
+									},
+									"name": "a"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " In assignment",
+							"start": 444,
+							"end": 460
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 477,
+					"end": 493,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
+							"column": 17
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 483,
+							"end": 492,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 7
+								},
+								"end": {
+									"line": 37,
+									"column": 16
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 483,
+								"end": 484,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 7
+									},
+									"end": {
+										"line": 37,
+										"column": 8
+									}
+								},
+								"name": "y"
+							},
+							"init": {
+								"type": "TSNonNullExpression",
+								"start": 487,
+								"end": 492,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 11
+									},
+									"end": {
+										"line": 37,
+										"column": 16
+									}
+								},
+								"expression": {
+									"type": "MemberExpression",
+									"start": 487,
+									"end": 491,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 11
+										},
+										"end": {
+											"line": 37,
+											"column": 15
+										}
+									},
+									"object": {
+										"type": "TSNonNullExpression",
+										"start": 487,
+										"end": 489,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 11
+											},
+											"end": {
+												"line": 37,
+												"column": 13
+											}
+										},
+										"expression": {
+											"type": "Identifier",
+											"start": 487,
+											"end": 488,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 11
+												},
+												"end": {
+													"line": 37,
+													"column": 12
+												}
+											},
+											"name": "a"
+										}
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 490,
+										"end": 491,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 14
+											},
+											"end": {
+												"line": 37,
+												"column": 15
+											}
+										},
+										"name": "b"
+									},
+									"computed": false,
+									"optional": false
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 520,
+					"end": 530,
+					"loc": {
+						"start": {
+							"line": 40,
+							"column": 1
+						},
+						"end": {
+							"line": 40,
+							"column": 11
+						}
+					},
+					"expression": {
+						"type": "TSNonNullExpression",
+						"start": 520,
+						"end": 529,
+						"loc": {
+							"start": {
+								"line": 40,
+								"column": 1
+							},
+							"end": {
+								"line": 40,
+								"column": 10
+							}
+						},
+						"expression": {
+							"type": "TSAsExpression",
+							"start": 521,
+							"end": 527,
+							"loc": {
+								"start": {
+									"line": 40,
+									"column": 2
+								},
+								"end": {
+									"line": 40,
+									"column": 8
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 521,
+								"end": 522,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 2
+									},
+									"end": {
+										"line": 40,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 526,
+								"end": 527,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 7
+									},
+									"end": {
+										"line": 40,
+										"column": 8
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 526,
+									"end": 527,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 7
+										},
+										"end": {
+											"line": 40,
+											"column": 8
+										}
+									},
+									"name": "T"
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " With type assertion",
+							"start": 496,
+							"end": 518
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 532,
+					"end": 540,
+					"loc": {
+						"start": {
+							"line": 41,
+							"column": 1
+						},
+						"end": {
+							"line": 41,
+							"column": 9
+						}
+					},
+					"expression": {
+						"type": "TSNonNullExpression",
+						"start": 532,
+						"end": 539,
+						"loc": {
+							"start": {
+								"line": 41,
+								"column": 1
+							},
+							"end": {
+								"line": 41,
+								"column": 8
+							}
+						},
+						"expression": {
+							"type": "TSTypeAssertion",
+							"start": 533,
+							"end": 537,
+							"loc": {
+								"start": {
+									"line": 41,
+									"column": 2
+								},
+								"end": {
+									"line": 41,
+									"column": 6
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 534,
+								"end": 535,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 3
+									},
+									"end": {
+										"line": 41,
+										"column": 4
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 534,
+									"end": 535,
+									"loc": {
+										"start": {
+											"line": 41,
+											"column": 3
+										},
+										"end": {
+											"line": 41,
+											"column": 4
+										}
+									},
+									"name": "T"
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 536,
+								"end": 537,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 5
+									},
+									"end": {
+										"line": 41,
+										"column": 6
+									}
+								},
+								"name": "a"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 601,
+					"end": 605,
+					"loc": {
+						"start": {
+							"line": 44,
+							"column": 1
+						},
+						"end": {
+							"line": 44,
+							"column": 5
+						}
+					},
+					"expression": {
+						"type": "TSNonNullExpression",
+						"start": 601,
+						"end": 604,
+						"loc": {
+							"start": {
+								"line": 44,
+								"column": 1
+							},
+							"end": {
+								"line": 44,
+								"column": 4
+							}
+						},
+						"expression": {
+							"type": "TSNonNullExpression",
+							"start": 601,
+							"end": 603,
+							"loc": {
+								"start": {
+									"line": 44,
+									"column": 1
+								},
+								"end": {
+									"line": 44,
+									"column": 3
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 601,
+								"end": 602,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 1
+									},
+									"end": {
+										"line": 44,
+										"column": 2
+									}
+								},
+								"name": "a"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Double assertion (non-null twice - valid but unusual)",
+							"start": 543,
+							"end": 599
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 643,
+					"end": 654,
+					"loc": {
+						"start": {
+							"line": 47,
+							"column": 1
+						},
+						"end": {
+							"line": 47,
+							"column": 12
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 643,
+						"end": 653,
+						"loc": {
+							"start": {
+								"line": 47,
+								"column": 1
+							},
+							"end": {
+								"line": 47,
+								"column": 11
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 643,
+							"end": 645,
+							"loc": {
+								"start": {
+									"line": 47,
+									"column": 1
+								},
+								"end": {
+									"line": 47,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "TSNonNullExpression",
+								"start": 646,
+								"end": 648,
+								"loc": {
+									"start": {
+										"line": 47,
+										"column": 4
+									},
+									"end": {
+										"line": 47,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 646,
+									"end": 647,
+									"loc": {
+										"start": {
+											"line": 47,
+											"column": 4
+										},
+										"end": {
+											"line": 47,
+											"column": 5
+										}
+									},
+									"name": "a"
+								}
+							},
+							{
+								"type": "TSNonNullExpression",
+								"start": 650,
+								"end": 652,
+								"loc": {
+									"start": {
+										"line": 47,
+										"column": 8
+									},
+									"end": {
+										"line": 47,
+										"column": 10
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 650,
+									"end": 651,
+									"loc": {
+										"start": {
+											"line": 47,
+											"column": 8
+										},
+										"end": {
+											"line": 47,
+											"column": 9
+										}
+									},
+									"name": "b"
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Non-null in expression context",
+							"start": 608,
+							"end": 641
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 656,
+					"end": 664,
+					"loc": {
+						"start": {
+							"line": 48,
+							"column": 1
+						},
+						"end": {
+							"line": 48,
+							"column": 9
+						}
+					},
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 656,
+						"end": 663,
+						"loc": {
+							"start": {
+								"line": 48,
+								"column": 1
+							},
+							"end": {
+								"line": 48,
+								"column": 8
+							}
+						},
+						"left": {
+							"type": "TSNonNullExpression",
+							"start": 656,
+							"end": 658,
+							"loc": {
+								"start": {
+									"line": 48,
+									"column": 1
+								},
+								"end": {
+									"line": 48,
+									"column": 3
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 656,
+								"end": 657,
+								"loc": {
+									"start": {
+										"line": 48,
+										"column": 1
+									},
+									"end": {
+										"line": 48,
+										"column": 2
+									}
+								},
+								"name": "a"
+							}
+						},
+						"operator": "+",
+						"right": {
+							"type": "TSNonNullExpression",
+							"start": 661,
+							"end": 663,
+							"loc": {
+								"start": {
+									"line": 48,
+									"column": 6
+								},
+								"end": {
+									"line": 48,
+									"column": 8
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 661,
+								"end": 662,
+								"loc": {
+									"start": {
+										"line": 48,
+										"column": 6
+									},
+									"end": {
+										"line": 48,
+										"column": 7
+									}
+								},
+								"name": "b"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 666,
+					"end": 677,
+					"loc": {
+						"start": {
+							"line": 49,
+							"column": 1
+						},
+						"end": {
+							"line": 49,
+							"column": 12
+						}
+					},
+					"expression": {
+						"type": "ConditionalExpression",
+						"start": 666,
+						"end": 676,
+						"loc": {
+							"start": {
+								"line": 49,
+								"column": 1
+							},
+							"end": {
+								"line": 49,
+								"column": 11
+							}
+						},
+						"test": {
+							"type": "TSNonNullExpression",
+							"start": 666,
+							"end": 668,
+							"loc": {
+								"start": {
+									"line": 49,
+									"column": 1
+								},
+								"end": {
+									"line": 49,
+									"column": 3
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 666,
+								"end": 667,
+								"loc": {
+									"start": {
+										"line": 49,
+										"column": 1
+									},
+									"end": {
+										"line": 49,
+										"column": 2
+									}
+								},
+								"name": "a"
+							}
+						},
+						"consequent": {
+							"type": "Identifier",
+							"start": 671,
+							"end": 672,
+							"loc": {
+								"start": {
+									"line": 49,
+									"column": 6
+								},
+								"end": {
+									"line": 49,
+									"column": 7
+								}
+							},
+							"name": "b"
+						},
+						"alternate": {
+							"type": "Identifier",
+							"start": 675,
+							"end": 676,
+							"loc": {
+								"start": {
+									"line": 49,
+									"column": 10
+								},
+								"end": {
+									"line": 49,
+									"column": 11
+								}
+							},
+							"name": "c"
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

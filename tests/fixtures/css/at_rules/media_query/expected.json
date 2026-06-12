@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 74,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 65,
+				"name": "media",
+				"prelude": "(min-width: 400px)",
+				"block": {
+					"type": "Block",
+					"start": 35,
+					"end": 65,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 39,
+								"end": 41,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 39,
+										"end": 41,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "a",
+														"start": 39,
+														"end": 41
+													}
+												],
+												"start": 39,
+												"end": 41
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 42,
+								"end": 62,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 47,
+										"end": 57,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 39,
+							"end": 62
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 66,
+			"styles": "\n\t@media (min-width: 400px) {\n\t\t.a {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 75,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

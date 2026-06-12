@@ -1,0 +1,68 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 261,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 252,
+				"name": "font-face",
+				"prelude": "",
+				"block": {
+					"type": "Block",
+					"start": 20,
+					"end": 252,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 49,
+							"end": 68,
+							"property": "unicode-range",
+							"value": "U+26"
+						},
+						{
+							"type": "Declaration",
+							"start": 96,
+							"end": 122,
+							"property": "unicode-range",
+							"value": "U+0025-00FF"
+						},
+						{
+							"type": "Declaration",
+							"start": 149,
+							"end": 169,
+							"property": "unicode-range",
+							"value": "U+4??"
+						},
+						{
+							"type": "Declaration",
+							"start": 215,
+							"end": 248,
+							"property": "unicode-range",
+							"value": "U+0025-00FF, U+4??"
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 253,
+			"styles": "\n\t@font-face {\n\t\t/* single codepoint */\n\t\tunicode-range: U+26;\n\t\t/* codepoint range */\n\t\tunicode-range: U+0025-00FF;\n\t\t/* wildcard range */\n\t\tunicode-range: U+4??;\n\t\t/* multiple values, range + wildcard */\n\t\tunicode-range: U+0025-00FF, U+4??;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 262,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

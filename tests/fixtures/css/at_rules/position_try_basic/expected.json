@@ -1,0 +1,75 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 188,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 179,
+				"name": "position-try",
+				"prelude": "--custom-position",
+				"block": {
+					"type": "Block",
+					"start": 41,
+					"end": 179,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 45,
+							"end": 64,
+							"property": "top",
+							"value": "anchor(bottom)"
+						},
+						{
+							"type": "Declaration",
+							"start": 68,
+							"end": 75,
+							"property": "left",
+							"value": "0"
+						},
+						{
+							"type": "Declaration",
+							"start": 79,
+							"end": 104,
+							"property": "width",
+							"value": "anchor-size(width)"
+						},
+						{
+							"type": "Declaration",
+							"start": 108,
+							"end": 135,
+							"property": "height",
+							"value": "anchor-size(height)"
+						},
+						{
+							"type": "Declaration",
+							"start": 139,
+							"end": 175,
+							"property": "max-width",
+							"value": "anchor-size(width, 200px)"
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 180,
+			"styles": "\n\t@position-try --custom-position {\n\t\ttop: anchor(bottom);\n\t\tleft: 0;\n\t\twidth: anchor-size(width);\n\t\theight: anchor-size(height);\n\t\tmax-width: anchor-size(width, 200px);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 189,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

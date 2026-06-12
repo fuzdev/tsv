@@ -1,0 +1,188 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 105,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 25,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 25,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "p",
+											"start": 9,
+											"end": 10
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-of-type",
+											"args": {
+												"type": "SelectorList",
+												"start": 23,
+												"end": 24,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 23,
+														"end": 24,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2",
+																		"start": 23,
+																		"end": 24
+																	}
+																],
+																"start": 23,
+																"end": 24
+															}
+														]
+													}
+												]
+											},
+											"start": 10,
+											"end": 25
+										}
+									],
+									"start": 9,
+									"end": 25
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 26,
+					"end": 51,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 30,
+							"end": 47,
+							"property": "font-weight",
+							"value": "bold"
+						}
+					]
+				},
+				"start": 9,
+				"end": 51
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 54,
+					"end": 75,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 54,
+							"end": 75,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 54,
+											"end": 57
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-of-type",
+											"args": {
+												"type": "SelectorList",
+												"start": 70,
+												"end": 74,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 70,
+														"end": 74,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "even",
+																		"start": 70,
+																		"end": 74
+																	}
+																],
+																"start": 70,
+																"end": 74
+															}
+														]
+													}
+												]
+											},
+											"start": 57,
+											"end": 75
+										}
+									],
+									"start": 54,
+									"end": 75
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 76,
+					"end": 96,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 80,
+							"end": 92,
+							"property": "float",
+							"value": "right"
+						}
+					]
+				},
+				"start": 54,
+				"end": 96
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 97,
+			"styles": "\n\tp:nth-of-type(2) {\n\t\tfont-weight: bold;\n\t}\n\n\tdiv:nth-of-type(even) {\n\t\tfloat: right;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 106,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

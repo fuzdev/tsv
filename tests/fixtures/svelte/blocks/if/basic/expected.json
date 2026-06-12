@@ -1,0 +1,237 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 93,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 0,
+				"end": 27,
+				"test": {
+					"type": "Identifier",
+					"start": 5,
+					"end": 6,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 5
+						},
+						"end": {
+							"line": 1,
+							"column": 6
+						}
+					},
+					"name": "a"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 7,
+							"end": 22,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 1,
+									"column": 8,
+									"character": 8
+								},
+								"end": {
+									"line": 1,
+									"column": 11,
+									"character": 11
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 12,
+										"end": 16,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 27,
+				"end": 29,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 29,
+				"end": 59,
+				"test": {
+					"type": "Identifier",
+					"start": 34,
+					"end": 35,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 5
+						},
+						"end": {
+							"line": 3,
+							"column": 6
+						}
+					},
+					"name": "a"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 36,
+							"end": 38,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 38,
+							"end": 53,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 2,
+									"character": 39
+								},
+								"end": {
+									"line": 4,
+									"column": 5,
+									"character": 42
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 43,
+										"end": 47,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 53,
+							"end": 54,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 59,
+				"end": 61,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 61,
+				"end": 74,
+				"test": {
+					"type": "Identifier",
+					"start": 66,
+					"end": 67,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 5
+						},
+						"end": {
+							"line": 7,
+							"column": 6
+						}
+					},
+					"name": "a"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 68,
+							"end": 69,
+							"raw": "t",
+							"data": "t"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 74,
+				"end": 76,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 76,
+				"end": 92,
+				"test": {
+					"type": "Identifier",
+					"start": 81,
+					"end": 82,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 5
+						},
+						"end": {
+							"line": 9,
+							"column": 6
+						}
+					},
+					"name": "a"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 83,
+							"end": 87,
+							"raw": "\n\tt\n",
+							"data": "\n\tt\n"
+						}
+					]
+				},
+				"alternate": null
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,1486 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 803,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Function-type extends operand: a constrained-infer return keeps its parens",
+			"start": 20,
+			"end": 97,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (without them the infer's `extends C` and the conditional's `?` are ambiguous)",
+			"start": 99,
+			"end": 180,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Type-predicate return whose asserted type is a constrained infer also keeps parens",
+			"start": 256,
+			"end": 341,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Constructor-type extends operand, same rule",
+			"start": 433,
+			"end": 479,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Contrast: a bare `infer U` return (no constraint) needs no parens",
+			"start": 561,
+			"end": 629,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Contrast: a simple return type needs no parens",
+			"start": 690,
+			"end": 739,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 50
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 802,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 793,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 182,
+					"end": 253,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 72
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 187,
+						"end": 194,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 6
+							},
+							"end": {
+								"line": 4,
+								"column": 13
+							}
+						},
+						"name": "FnInfer"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 194,
+						"end": 197,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 13
+							},
+							"end": {
+								"line": 4,
+								"column": 16
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 195,
+								"end": 196,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 14
+									},
+									"end": {
+										"line": 4,
+										"column": 15
+									}
+								},
+								"name": "M"
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 200,
+						"end": 252,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 19
+							},
+							"end": {
+								"line": 4,
+								"column": 71
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 200,
+							"end": 201,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 19
+								},
+								"end": {
+									"line": 4,
+									"column": 20
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 200,
+								"end": 201,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 19
+									},
+									"end": {
+										"line": 4,
+										"column": 20
+									}
+								},
+								"name": "M"
+							}
+						},
+						"extendsType": {
+							"type": "TSParenthesizedType",
+							"start": 210,
+							"end": 240,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 29
+								},
+								"end": {
+									"line": 4,
+									"column": 59
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSFunctionType",
+								"start": 211,
+								"end": 239,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 30
+									},
+									"end": {
+										"line": 4,
+										"column": 58
+									}
+								},
+								"parameters": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 214,
+									"end": 239,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 33
+										},
+										"end": {
+											"line": 4,
+											"column": 58
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSInferType",
+										"start": 217,
+										"end": 239,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 36
+											},
+											"end": {
+												"line": 4,
+												"column": 58
+											}
+										},
+										"typeParameter": {
+											"type": "TSTypeParameter",
+											"start": 223,
+											"end": 239,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 42
+												},
+												"end": {
+													"line": 4,
+													"column": 58
+												}
+											},
+											"name": "U",
+											"constraint": {
+												"type": "TSStringKeyword",
+												"start": 233,
+												"end": 239,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 52
+													},
+													"end": {
+														"line": 4,
+														"column": 58
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 243,
+							"end": 244,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 62
+								},
+								"end": {
+									"line": 4,
+									"column": 63
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 243,
+								"end": 244,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 62
+									},
+									"end": {
+										"line": 4,
+										"column": 63
+									}
+								},
+								"name": "U"
+							}
+						},
+						"falseType": {
+							"type": "TSNeverKeyword",
+							"start": 247,
+							"end": 252,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 66
+								},
+								"end": {
+									"line": 4,
+									"column": 71
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Function-type extends operand: a constrained-infer return keeps its parens",
+							"start": 20,
+							"end": 97
+						},
+						{
+							"type": "Line",
+							"value": " (without them the infer's `extends C` and the conditional's `?` are ambiguous)",
+							"start": 99,
+							"end": 180
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 343,
+					"end": 430,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 88
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 348,
+						"end": 357,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 6
+							},
+							"end": {
+								"line": 7,
+								"column": 15
+							}
+						},
+						"name": "PredInfer"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 357,
+						"end": 360,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 15
+							},
+							"end": {
+								"line": 7,
+								"column": 18
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 358,
+								"end": 359,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 16
+									},
+									"end": {
+										"line": 7,
+										"column": 17
+									}
+								},
+								"name": "M"
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 363,
+						"end": 429,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 21
+							},
+							"end": {
+								"line": 7,
+								"column": 87
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 363,
+							"end": 364,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 21
+								},
+								"end": {
+									"line": 7,
+									"column": 22
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 363,
+								"end": 364,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 21
+									},
+									"end": {
+										"line": 7,
+										"column": 22
+									}
+								},
+								"name": "M"
+							}
+						},
+						"extendsType": {
+							"type": "TSParenthesizedType",
+							"start": 373,
+							"end": 417,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 31
+								},
+								"end": {
+									"line": 7,
+									"column": 75
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSFunctionType",
+								"start": 374,
+								"end": 416,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 32
+									},
+									"end": {
+										"line": 7,
+										"column": 74
+									}
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 375,
+										"end": 384,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 33
+											},
+											"end": {
+												"line": 7,
+												"column": 42
+											}
+										},
+										"name": "x",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 376,
+											"end": 384,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 34
+												},
+												"end": {
+													"line": 7,
+													"column": 42
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 378,
+												"end": 384,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 36
+													},
+													"end": {
+														"line": 7,
+														"column": 42
+													}
+												}
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 386,
+									"end": 416,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 44
+										},
+										"end": {
+											"line": 7,
+											"column": 74
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypePredicate",
+										"start": 389,
+										"end": 416,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 47
+											},
+											"end": {
+												"line": 7,
+												"column": 74
+											}
+										},
+										"parameterName": {
+											"type": "Identifier",
+											"start": 389,
+											"end": 390,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 47
+												},
+												"end": {
+													"line": 7,
+													"column": 48
+												}
+											},
+											"name": "x"
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 394,
+											"end": 416,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 52
+												},
+												"end": {
+													"line": 7,
+													"column": 74
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSInferType",
+												"start": 394,
+												"end": 416,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 52
+													},
+													"end": {
+														"line": 7,
+														"column": 74
+													}
+												},
+												"typeParameter": {
+													"type": "TSTypeParameter",
+													"start": 400,
+													"end": 416,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 58
+														},
+														"end": {
+															"line": 7,
+															"column": 74
+														}
+													},
+													"name": "U",
+													"constraint": {
+														"type": "TSStringKeyword",
+														"start": 410,
+														"end": 416,
+														"loc": {
+															"start": {
+																"line": 7,
+																"column": 68
+															},
+															"end": {
+																"line": 7,
+																"column": 74
+															}
+														}
+													}
+												}
+											}
+										},
+										"asserts": false
+									}
+								}
+							}
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 420,
+							"end": 421,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 78
+								},
+								"end": {
+									"line": 7,
+									"column": 79
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 420,
+								"end": 421,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 78
+									},
+									"end": {
+										"line": 7,
+										"column": 79
+									}
+								},
+								"name": "U"
+							}
+						},
+						"falseType": {
+							"type": "TSNeverKeyword",
+							"start": 424,
+							"end": 429,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 82
+								},
+								"end": {
+									"line": 7,
+									"column": 87
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Type-predicate return whose asserted type is a constrained infer also keeps parens",
+							"start": 256,
+							"end": 341
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 481,
+					"end": 558,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 78
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 486,
+						"end": 495,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 6
+							},
+							"end": {
+								"line": 10,
+								"column": 15
+							}
+						},
+						"name": "CtorInfer"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 495,
+						"end": 498,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 15
+							},
+							"end": {
+								"line": 10,
+								"column": 18
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 496,
+								"end": 497,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 16
+									},
+									"end": {
+										"line": 10,
+										"column": 17
+									}
+								},
+								"name": "M"
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 501,
+						"end": 557,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 21
+							},
+							"end": {
+								"line": 10,
+								"column": 77
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 501,
+							"end": 502,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 21
+								},
+								"end": {
+									"line": 10,
+									"column": 22
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 501,
+								"end": 502,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 21
+									},
+									"end": {
+										"line": 10,
+										"column": 22
+									}
+								},
+								"name": "M"
+							}
+						},
+						"extendsType": {
+							"type": "TSParenthesizedType",
+							"start": 511,
+							"end": 545,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 31
+								},
+								"end": {
+									"line": 10,
+									"column": 65
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSConstructorType",
+								"start": 512,
+								"end": 544,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 32
+									},
+									"end": {
+										"line": 10,
+										"column": 64
+									}
+								},
+								"abstract": false,
+								"parameters": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 519,
+									"end": 544,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 39
+										},
+										"end": {
+											"line": 10,
+											"column": 64
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSInferType",
+										"start": 522,
+										"end": 544,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 42
+											},
+											"end": {
+												"line": 10,
+												"column": 64
+											}
+										},
+										"typeParameter": {
+											"type": "TSTypeParameter",
+											"start": 528,
+											"end": 544,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 48
+												},
+												"end": {
+													"line": 10,
+													"column": 64
+												}
+											},
+											"name": "U",
+											"constraint": {
+												"type": "TSNumberKeyword",
+												"start": 538,
+												"end": 544,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 58
+													},
+													"end": {
+														"line": 10,
+														"column": 64
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 548,
+							"end": 549,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 68
+								},
+								"end": {
+									"line": 10,
+									"column": 69
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 548,
+								"end": 549,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 68
+									},
+									"end": {
+										"line": 10,
+										"column": 69
+									}
+								},
+								"name": "U"
+							}
+						},
+						"falseType": {
+							"type": "TSNeverKeyword",
+							"start": 552,
+							"end": 557,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 72
+								},
+								"end": {
+									"line": 10,
+									"column": 77
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Constructor-type extends operand, same rule",
+							"start": 433,
+							"end": 479
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 631,
+					"end": 687,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 57
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 636,
+						"end": 645,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 6
+							},
+							"end": {
+								"line": 13,
+								"column": 15
+							}
+						},
+						"name": "BareInfer"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 645,
+						"end": 648,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 15
+							},
+							"end": {
+								"line": 13,
+								"column": 18
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 646,
+								"end": 647,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 16
+									},
+									"end": {
+										"line": 13,
+										"column": 17
+									}
+								},
+								"name": "M"
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 651,
+						"end": 686,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 21
+							},
+							"end": {
+								"line": 13,
+								"column": 56
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 651,
+							"end": 652,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 21
+								},
+								"end": {
+									"line": 13,
+									"column": 22
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 651,
+								"end": 652,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 21
+									},
+									"end": {
+										"line": 13,
+										"column": 22
+									}
+								},
+								"name": "M"
+							}
+						},
+						"extendsType": {
+							"type": "TSFunctionType",
+							"start": 661,
+							"end": 674,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 31
+								},
+								"end": {
+									"line": 13,
+									"column": 44
+								}
+							},
+							"parameters": [],
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 664,
+								"end": 674,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 34
+									},
+									"end": {
+										"line": 13,
+										"column": 44
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSInferType",
+									"start": 667,
+									"end": 674,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 37
+										},
+										"end": {
+											"line": 13,
+											"column": 44
+										}
+									},
+									"typeParameter": {
+										"type": "TSTypeParameter",
+										"start": 673,
+										"end": 674,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 43
+											},
+											"end": {
+												"line": 13,
+												"column": 44
+											}
+										},
+										"name": "U"
+									}
+								}
+							}
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 677,
+							"end": 678,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 47
+								},
+								"end": {
+									"line": 13,
+									"column": 48
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 677,
+								"end": 678,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 47
+									},
+									"end": {
+										"line": 13,
+										"column": 48
+									}
+								},
+								"name": "U"
+							}
+						},
+						"falseType": {
+							"type": "TSNeverKeyword",
+							"start": 681,
+							"end": 686,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 51
+								},
+								"end": {
+									"line": 13,
+									"column": 56
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Contrast: a bare `infer U` return (no constraint) needs no parens",
+							"start": 561,
+							"end": 629
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 741,
+					"end": 792,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 52
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 746,
+						"end": 755,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 6
+							},
+							"end": {
+								"line": 16,
+								"column": 15
+							}
+						},
+						"name": "SimpleRet"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 755,
+						"end": 758,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 15
+							},
+							"end": {
+								"line": 16,
+								"column": 18
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 756,
+								"end": 757,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 16
+									},
+									"end": {
+										"line": 16,
+										"column": 17
+									}
+								},
+								"name": "M"
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 761,
+						"end": 791,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 21
+							},
+							"end": {
+								"line": 16,
+								"column": 51
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 761,
+							"end": 762,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 21
+								},
+								"end": {
+									"line": 16,
+									"column": 22
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 761,
+								"end": 762,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 21
+									},
+									"end": {
+										"line": 16,
+										"column": 22
+									}
+								},
+								"name": "M"
+							}
+						},
+						"extendsType": {
+							"type": "TSFunctionType",
+							"start": 771,
+							"end": 783,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 31
+								},
+								"end": {
+									"line": 16,
+									"column": 43
+								}
+							},
+							"parameters": [],
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 774,
+								"end": 783,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 34
+									},
+									"end": {
+										"line": 16,
+										"column": 43
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSStringKeyword",
+									"start": 777,
+									"end": 783,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 37
+										},
+										"end": {
+											"line": 16,
+											"column": 43
+										}
+									}
+								}
+							}
+						},
+						"trueType": {
+							"type": "TSLiteralType",
+							"start": 786,
+							"end": 787,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 46
+								},
+								"end": {
+									"line": 16,
+									"column": 47
+								}
+							},
+							"literal": {
+								"type": "Literal",
+								"start": 786,
+								"end": 787,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 46
+									},
+									"end": {
+										"line": 16,
+										"column": 47
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						},
+						"falseType": {
+							"type": "TSLiteralType",
+							"start": 790,
+							"end": 791,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 50
+								},
+								"end": {
+									"line": 16,
+									"column": 51
+								}
+							},
+							"literal": {
+								"type": "Literal",
+								"start": 790,
+								"end": 791,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 50
+									},
+									"end": {
+										"line": 16,
+										"column": 51
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Contrast: a simple return type needs no parens",
+							"start": 690,
+							"end": 739
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

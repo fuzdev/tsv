@@ -1,0 +1,122 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 312,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 303,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 41,
+							"property": "width",
+							"value": "calc(100% - 20px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 45,
+							"end": 80,
+							"property": "width",
+							"value": "calc(var(--size) * 2 + 10px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 84,
+							"end": 119,
+							"property": "width",
+							"value": "calc(calc(100px + 50px) * 2)"
+						},
+						{
+							"type": "Declaration",
+							"start": 123,
+							"end": 141,
+							"property": "color",
+							"value": "var(--var1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 145,
+							"end": 169,
+							"property": "color",
+							"value": "var(--var1, blue)"
+						},
+						{
+							"type": "Declaration",
+							"start": 173,
+							"end": 213,
+							"property": "color",
+							"value": "var(--a, var(--b, var(--c, red)))"
+						},
+						{
+							"type": "Declaration",
+							"start": 217,
+							"end": 255,
+							"property": "color",
+							"value": "rgb(var(--r) var(--g) var(--b))"
+						},
+						{
+							"type": "Declaration",
+							"start": 259,
+							"end": 299,
+							"property": "transform",
+							"value": "translate(var(--x), var(--y))"
+						}
+					]
+				},
+				"start": 9,
+				"end": 303
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 304,
+			"styles": "\n\tdiv {\n\t\twidth: calc(100% - 20px);\n\t\twidth: calc(var(--size) * 2 + 10px);\n\t\twidth: calc(calc(100px + 50px) * 2);\n\t\tcolor: var(--var1);\n\t\tcolor: var(--var1, blue);\n\t\tcolor: var(--a, var(--b, var(--c, red)));\n\t\tcolor: rgb(var(--r) var(--g) var(--b));\n\t\ttransform: translate(var(--x), var(--y));\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 313,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

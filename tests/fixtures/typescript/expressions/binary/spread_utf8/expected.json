@@ -1,0 +1,566 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 258,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Spread operator with UTF-8 context (position + 2 boundary check)",
+			"start": 20,
+			"end": 87,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Before fix: panicked when peek_chars used byte arithmetic",
+			"start": 89,
+			"end": 149,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 3-byte UTF-8",
+			"start": 213,
+			"end": 228,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 16
+				},
+				"end": {
+					"line": 6,
+					"column": 31
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 257,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 248,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 151,
+					"end": 171,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 21
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 157,
+							"end": 170,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 20
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 157,
+								"end": 158,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 161,
+								"end": 170,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 11
+									},
+									"end": {
+										"line": 4,
+										"column": 20
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 162,
+										"end": 163,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 12
+											},
+											"end": {
+												"line": 4,
+												"column": 13
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									},
+									{
+										"type": "Literal",
+										"start": 165,
+										"end": 166,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 15
+											},
+											"end": {
+												"line": 4,
+												"column": 16
+											}
+										},
+										"value": 2,
+										"raw": "2"
+									},
+									{
+										"type": "Literal",
+										"start": 168,
+										"end": 169,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 18
+											},
+											"end": {
+												"line": 4,
+												"column": 19
+											}
+										},
+										"value": 3,
+										"raw": "3"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Spread operator with UTF-8 context (position + 2 boundary check)",
+							"start": 20,
+							"end": 87
+						},
+						{
+							"type": "Line",
+							"value": " Before fix: panicked when peek_chars used byte arithmetic",
+							"start": 89,
+							"end": 149
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 173,
+					"end": 196,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 24
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 179,
+							"end": 195,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 23
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 179,
+								"end": 180,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 183,
+								"end": 195,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 23
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 184,
+										"end": 188,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 12
+											},
+											"end": {
+												"line": 5,
+												"column": 16
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 184,
+											"end": 185,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 12
+												},
+												"end": {
+													"line": 5,
+													"column": 13
+												}
+											},
+											"name": "x"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 187,
+											"end": 188,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 15
+												},
+												"end": {
+													"line": 5,
+													"column": 16
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "SpreadElement",
+										"start": 190,
+										"end": 194,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 18
+											},
+											"end": {
+												"line": 5,
+												"column": 22
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 193,
+											"end": 194,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 21
+												},
+												"end": {
+													"line": 5,
+													"column": 22
+												}
+											},
+											"name": "a"
+										}
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 198,
+					"end": 212,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 15
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 204,
+							"end": 211,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 14
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 204,
+								"end": 205,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 208,
+								"end": 211,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 11
+									},
+									"end": {
+										"line": 6,
+										"column": 14
+									}
+								},
+								"value": "⟳",
+								"raw": "'⟳'"
+							}
+						}
+					],
+					"kind": "const",
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " 3-byte UTF-8",
+							"start": 213,
+							"end": 228
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 230,
+					"end": 247,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 18
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 236,
+							"end": 246,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 17
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 236,
+								"end": 237,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 240,
+								"end": 246,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 11
+									},
+									"end": {
+										"line": 7,
+										"column": 17
+									}
+								},
+								"properties": [
+									{
+										"type": "SpreadElement",
+										"start": 241,
+										"end": 245,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 12
+											},
+											"end": {
+												"line": 7,
+												"column": 16
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 244,
+											"end": 245,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 15
+												},
+												"end": {
+													"line": 7,
+													"column": 16
+												}
+											},
+											"name": "b"
+										}
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

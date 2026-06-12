@@ -1,0 +1,312 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 64,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 63,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 54,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 53,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 44
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 16,
+							"end": 52,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 2,
+									"column": 43
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 16,
+								"end": 17,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 8
+									}
+								},
+								"name": "o"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 20,
+								"end": 52,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 11
+									},
+									"end": {
+										"line": 2,
+										"column": 43
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 21,
+										"end": 28,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 12
+											},
+											"end": {
+												"line": 2,
+												"column": 19
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 21,
+											"end": 25,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 12
+												},
+												"end": {
+													"line": 2,
+													"column": 16
+												}
+											},
+											"name": "café"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 27,
+											"end": 28,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 18
+												},
+												"end": {
+													"line": 2,
+													"column": 19
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 30,
+										"end": 34,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 21
+											},
+											"end": {
+												"line": 2,
+												"column": 25
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 30,
+											"end": 31,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 21
+												},
+												"end": {
+													"line": 2,
+													"column": 22
+												}
+											},
+											"name": "π"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 33,
+											"end": 34,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 24
+												},
+												"end": {
+													"line": 2,
+													"column": 25
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 36,
+										"end": 41,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 27
+											},
+											"end": {
+												"line": 2,
+												"column": 32
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 36,
+											"end": 38,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 27
+												},
+												"end": {
+													"line": 2,
+													"column": 29
+												}
+											},
+											"name": "_ü"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 40,
+											"end": 41,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 31
+												},
+												"end": {
+													"line": 2,
+													"column": 32
+												}
+											},
+											"value": 3,
+											"raw": "3"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 43,
+										"end": 51,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 34
+											},
+											"end": {
+												"line": 2,
+												"column": 42
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 43,
+											"end": 48,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 34
+												},
+												"end": {
+													"line": 2,
+													"column": 39
+												}
+											},
+											"name": "Ωμέγα"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 50,
+											"end": 51,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 41
+												},
+												"end": {
+													"line": 2,
+													"column": 42
+												}
+											},
+											"value": 4,
+											"raw": "4"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

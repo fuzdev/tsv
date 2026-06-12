@@ -1,0 +1,169 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 78,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "AwaitBlock",
+				"start": 0,
+				"end": 77,
+				"expression": {
+					"type": "Identifier",
+					"start": 8,
+					"end": 15,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 8
+						},
+						"end": {
+							"line": 1,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": {
+					"type": "Identifier",
+					"name": "value",
+					"start": 42,
+					"end": 47,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 7,
+							"character": 42
+						},
+						"end": {
+							"line": 3,
+							"column": 12,
+							"character": 47
+						}
+					}
+				},
+				"error": null,
+				"pending": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 16,
+							"end": 18,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 18,
+							"end": 34,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 19
+								},
+								"end": {
+									"line": 2,
+									"column": 5,
+									"character": 22
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 23,
+										"end": 28,
+										"raw": "text1",
+										"data": "text1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 34,
+							"end": 35,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 48,
+							"end": 50,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 50,
+							"end": 68,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 2,
+									"character": 51
+								},
+								"end": {
+									"line": 4,
+									"column": 5,
+									"character": 54
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 55,
+										"end": 62,
+										"expression": {
+											"type": "Identifier",
+											"start": 56,
+											"end": 61,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 7
+												},
+												"end": {
+													"line": 4,
+													"column": 12
+												}
+											},
+											"name": "value"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 68,
+							"end": 69,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"catch": null
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

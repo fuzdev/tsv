@@ -1,0 +1,469 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 192,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Empty call with block comment",
+			"start": 10,
+			"end": 42,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 66,
+			"end": 79,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 23
+				},
+				"end": {
+					"line": 3,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Empty call with comment in middle of chain",
+			"start": 84,
+			"end": 129,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 143,
+			"end": 151,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 13
+				},
+				"end": {
+					"line": 6,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 171,
+			"end": 179,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 41
+				},
+				"end": {
+					"line": 6,
+					"column": 49
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 191,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 182,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 44,
+					"end": 81,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 38
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 44,
+						"end": 80,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 3,
+								"column": 37
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 44,
+							"end": 65,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 22
+								}
+							},
+							"object": {
+								"type": "CallExpression",
+								"start": 44,
+								"end": 57,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 1
+									},
+									"end": {
+										"line": 3,
+										"column": 14
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 44,
+									"end": 55,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 1
+										},
+										"end": {
+											"line": 3,
+											"column": 12
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 44,
+										"end": 47,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 1
+											},
+											"end": {
+												"line": 3,
+												"column": 4
+											}
+										},
+										"name": "obj"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 48,
+										"end": 55,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 5
+											},
+											"end": {
+												"line": 3,
+												"column": 12
+											}
+										},
+										"name": "method1"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 58,
+								"end": 65,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 15
+									},
+									"end": {
+										"line": 3,
+										"column": 22
+									}
+								},
+								"name": "method2"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Empty call with block comment",
+							"start": 10,
+							"end": 42
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 131,
+					"end": 181,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 51
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 131,
+						"end": 180,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 50
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 131,
+							"end": 170,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 1
+								},
+								"end": {
+									"line": 6,
+									"column": 40
+								}
+							},
+							"object": {
+								"type": "CallExpression",
+								"start": 131,
+								"end": 162,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 1
+									},
+									"end": {
+										"line": 6,
+										"column": 32
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 131,
+									"end": 160,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 1
+										},
+										"end": {
+											"line": 6,
+											"column": 30
+										}
+									},
+									"object": {
+										"type": "CallExpression",
+										"start": 131,
+										"end": 152,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 1
+											},
+											"end": {
+												"line": 6,
+												"column": 22
+											}
+										},
+										"callee": {
+											"type": "MemberExpression",
+											"start": 131,
+											"end": 142,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 1
+												},
+												"end": {
+													"line": 6,
+													"column": 12
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 131,
+												"end": 134,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 1
+													},
+													"end": {
+														"line": 6,
+														"column": 4
+													}
+												},
+												"name": "obj"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 135,
+												"end": 142,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 5
+													},
+													"end": {
+														"line": 6,
+														"column": 12
+													}
+												},
+												"name": "method1"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 153,
+										"end": 160,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 23
+											},
+											"end": {
+												"line": 6,
+												"column": 30
+											}
+										},
+										"name": "method2",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 143,
+												"end": 151
+											}
+										]
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 163,
+								"end": 170,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 33
+									},
+									"end": {
+										"line": 6,
+										"column": 40
+									}
+								},
+								"name": "method3"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " comment ",
+							"start": 66,
+							"end": 79
+						},
+						{
+							"type": "Line",
+							"value": " Empty call with comment in middle of chain",
+							"start": 84,
+							"end": 129
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c2 ",
+							"start": 171,
+							"end": 179
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

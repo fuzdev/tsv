@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions, feature requests, problems, talk, etc
+    url: https://github.com/fuzdev/tsv/discussions/new/choose
+    about: discussions

@@ -1,0 +1,185 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 1475,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 1466,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 43,
+							"end": 91,
+							"property": "font-family",
+							"value": "'Helvetica Neue', Arial, sans-serif"
+						},
+						{
+							"type": "Declaration",
+							"start": 95,
+							"end": 132,
+							"property": "font",
+							"value": "'Times New Roman', Times, serif"
+						},
+						{
+							"type": "Declaration",
+							"start": 165,
+							"end": 199,
+							"property": "background",
+							"value": "url(1.png), url(2.png)"
+						},
+						{
+							"type": "Declaration",
+							"start": 203,
+							"end": 290,
+							"property": "background-image",
+							"value": "url(top.png), url(bottom.png), linear-gradient(to bottom, #fff, #000)"
+						},
+						{
+							"type": "Declaration",
+							"start": 324,
+							"end": 384,
+							"property": "transition",
+							"value": "opacity 0.3s ease,\n\t\t\ttransform 0.3s ease-out"
+						},
+						{
+							"type": "Declaration",
+							"start": 388,
+							"end": 441,
+							"property": "-webkit-transition",
+							"value": "all 0.2s,\n\t\t\tcolor 0.5s linear"
+						},
+						{
+							"type": "Declaration",
+							"start": 474,
+							"end": 548,
+							"property": "animation",
+							"value": "fade 1s ease-in,\n\t\t\tslide 0.5s ease-out,\n\t\t\trotate 2s linear"
+						},
+						{
+							"type": "Declaration",
+							"start": 552,
+							"end": 588,
+							"property": "animation-name",
+							"value": "spin, bounce, wobble"
+						},
+						{
+							"type": "Declaration",
+							"start": 592,
+							"end": 624,
+							"property": "animation-duration",
+							"value": "1s, 2s, 1.5s"
+						},
+						{
+							"type": "Declaration",
+							"start": 667,
+							"end": 759,
+							"property": "text-shadow",
+							"value": "1px 1px 2px #000,\n\t\t\t0 0 5px rgba(255, 255, 255, 0.5),\n\t\t\t-1px -1px 3px blue"
+						},
+						{
+							"type": "Declaration",
+							"start": 807,
+							"end": 890,
+							"property": "box-shadow",
+							"value": "2px 2px 4px rgba(0, 0, 0, 0.3),\n\t\t\t0 0 10px rgba(255, 255, 255, 0.2)"
+						},
+						{
+							"type": "Declaration",
+							"start": 953,
+							"end": 1018,
+							"property": "border",
+							"value": "rgb(255, 0, 0) solid 2px,\n\t\t\trgb(0, 255, 0) dashed 1px"
+						},
+						{
+							"type": "Declaration",
+							"start": 1079,
+							"end": 1113,
+							"property": "prop1",
+							"value": "atomic,\n\t\t\tvalue1 value2"
+						},
+						{
+							"type": "Declaration",
+							"start": 1158,
+							"end": 1181,
+							"property": "prop2",
+							"value": "atomic1, atomic2"
+						},
+						{
+							"type": "Declaration",
+							"start": 1243,
+							"end": 1302,
+							"property": "--my-transition",
+							"value": "opacity 0.3s ease, transform 0.3s ease-out"
+						},
+						{
+							"type": "Declaration",
+							"start": 1306,
+							"end": 1336,
+							"property": "--spacing",
+							"value": "10px 20px, 5px 15px"
+						},
+						{
+							"type": "Declaration",
+							"start": 1361,
+							"end": 1462,
+							"property": "outline",
+							"value": "url(pattern.png) repeat,\n\t\t\tlinear-gradient(to right, red, blue) no-repeat center / cover"
+						}
+					]
+				},
+				"start": 9,
+				"end": 1466
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 1467,
+			"styles": "\n\tdiv {\n\t\t/* Font-family lists */\n\t\tfont-family: 'Helvetica Neue', Arial, sans-serif;\n\t\tfont: 'Times New Roman', Times, serif;\n\t\t/* Multiple backgrounds */\n\t\tbackground: url(1.png), url(2.png);\n\t\tbackground-image: url(top.png), url(bottom.png), linear-gradient(to bottom, #fff, #000);\n\t\t/* Transition properties */\n\t\ttransition:\n\t\t\topacity 0.3s ease,\n\t\t\ttransform 0.3s ease-out;\n\t\t-webkit-transition:\n\t\t\tall 0.2s,\n\t\t\tcolor 0.5s linear;\n\t\t/* Animation properties */\n\t\tanimation:\n\t\t\tfade 1s ease-in,\n\t\t\tslide 0.5s ease-out,\n\t\t\trotate 2s linear;\n\t\tanimation-name: spin, bounce, wobble;\n\t\tanimation-duration: 1s, 2s, 1.5s;\n\t\t/* Text-shadow - multiple shadows */\n\t\ttext-shadow:\n\t\t\t1px 1px 2px #000,\n\t\t\t0 0 5px rgba(255, 255, 255, 0.5),\n\t\t\t-1px -1px 3px blue;\n\t\t/* Box-shadow - space-separated values */\n\t\tbox-shadow:\n\t\t\t2px 2px 4px rgba(0, 0, 0, 0.3),\n\t\t\t0 0 10px rgba(255, 255, 255, 0.2);\n\t\t/* Function with trailing values (triggers multiline) */\n\t\tborder:\n\t\t\trgb(255, 0, 0) solid 2px,\n\t\t\trgb(0, 255, 0) dashed 1px;\n\t\t/* One bad apple - mixed atomic and space-separated */\n\t\tprop1:\n\t\t\tatomic,\n\t\t\tvalue1 value2;\n\t\t/* Pure atomic values - stay inline */\n\t\tprop2: atomic1, atomic2;\n\t\t/* Custom properties - stay inline despite structure */\n\t\t--my-transition: opacity 0.3s ease, transform 0.3s ease-out;\n\t\t--spacing: 10px 20px, 5px 15px;\n\t\t/* Mixed values */\n\t\toutline:\n\t\t\turl(pattern.png) repeat,\n\t\t\tlinear-gradient(to right, red, blue) no-repeat center / cover;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 1476,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

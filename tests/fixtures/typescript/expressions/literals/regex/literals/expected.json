@@ -1,0 +1,1395 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 820,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Basic regex literal",
+			"start": 10,
+			"end": 32,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Regex with flags",
+			"start": 59,
+			"end": 78,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Regex with character class",
+			"start": 111,
+			"end": 140,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Regex with escaped slash",
+			"start": 171,
+			"end": 198,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Regex with slash inside character class",
+			"start": 231,
+			"end": 273,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 43
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Regex with various escapes",
+			"start": 307,
+			"end": 336,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Regex with anchors",
+			"start": 368,
+			"end": 389,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Regex in array",
+			"start": 426,
+			"end": 443,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Division vs regex (division should still work)",
+			"start": 482,
+			"end": 531,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Nested brackets in character class",
+			"start": 560,
+			"end": 597,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Escaped backslash",
+			"start": 633,
+			"end": 653,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " All standard flags",
+			"start": 690,
+			"end": 711,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Regex as function argument",
+			"start": 746,
+			"end": 775,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 1
+				},
+				"end": {
+					"line": 38,
+					"column": 30
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 819,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 810,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 40,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 34,
+					"end": 56,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 23
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 40,
+							"end": 55,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 22
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 40,
+								"end": 45,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 12
+									}
+								},
+								"name": "basic"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 48,
+								"end": 55,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 15
+									},
+									"end": {
+										"line": 3,
+										"column": 22
+									}
+								},
+								"value": {},
+								"raw": "/hello/",
+								"regex": {
+									"pattern": "hello",
+									"flags": ""
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Basic regex literal",
+							"start": 10,
+							"end": 32
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 80,
+					"end": 108,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 29
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 86,
+							"end": 107,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 28
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 86,
+								"end": 95,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 16
+									}
+								},
+								"name": "withFlags"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 98,
+								"end": 107,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 19
+									},
+									"end": {
+										"line": 6,
+										"column": 28
+									}
+								},
+								"value": {},
+								"raw": "/world/gi",
+								"regex": {
+									"pattern": "world",
+									"flags": "gi"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Regex with flags",
+							"start": 59,
+							"end": 78
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 142,
+					"end": 168,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 27
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 148,
+							"end": 167,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 26
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 148,
+								"end": 157,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 16
+									}
+								},
+								"name": "charClass"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 160,
+								"end": 167,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 19
+									},
+									"end": {
+										"line": 9,
+										"column": 26
+									}
+								},
+								"value": {},
+								"raw": "/[a-z]/",
+								"regex": {
+									"pattern": "[a-z]",
+									"flags": ""
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Regex with character class",
+							"start": 111,
+							"end": 140
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 200,
+					"end": 228,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 29
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 206,
+							"end": 227,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 28
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 206,
+								"end": 218,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 19
+									}
+								},
+								"name": "escapedSlash"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 221,
+								"end": 227,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 22
+									},
+									"end": {
+										"line": 12,
+										"column": 28
+									}
+								},
+								"value": {},
+								"raw": "/a\\/b/",
+								"regex": {
+									"pattern": "a\\/b",
+									"flags": ""
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Regex with escaped slash",
+							"start": 171,
+							"end": 198
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 275,
+					"end": 304,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 30
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 281,
+							"end": 303,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 29
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 281,
+								"end": 293,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 19
+									}
+								},
+								"name": "slashInClass"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 296,
+								"end": 303,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 22
+									},
+									"end": {
+										"line": 15,
+										"column": 29
+									}
+								},
+								"value": {},
+								"raw": "/a[/]b/",
+								"regex": {
+									"pattern": "a[/]b",
+									"flags": ""
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Regex with slash inside character class",
+							"start": 231,
+							"end": 273
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 338,
+					"end": 365,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 28
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 344,
+							"end": 364,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 7
+								},
+								"end": {
+									"line": 18,
+									"column": 27
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 344,
+								"end": 351,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 14
+									}
+								},
+								"name": "escapes"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 354,
+								"end": 364,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 17
+									},
+									"end": {
+										"line": 18,
+										"column": 27
+									}
+								},
+								"value": {},
+								"raw": "/\\d+\\.\\w*/",
+								"regex": {
+									"pattern": "\\d+\\.\\w*",
+									"flags": ""
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Regex with various escapes",
+							"start": 307,
+							"end": 336
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 391,
+					"end": 423,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 33
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 397,
+							"end": 422,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 7
+								},
+								"end": {
+									"line": 21,
+									"column": 32
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 397,
+								"end": 404,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 7
+									},
+									"end": {
+										"line": 21,
+										"column": 14
+									}
+								},
+								"name": "anchors"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 407,
+								"end": 422,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 17
+									},
+									"end": {
+										"line": 21,
+										"column": 32
+									}
+								},
+								"value": {},
+								"raw": "/^start.*end$/m",
+								"regex": {
+									"pattern": "^start.*end$",
+									"flags": "m"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Regex with anchors",
+							"start": 368,
+							"end": 389
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 445,
+					"end": 479,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 35
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 451,
+							"end": 478,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 7
+								},
+								"end": {
+									"line": 24,
+									"column": 34
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 451,
+								"end": 459,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 7
+									},
+									"end": {
+										"line": 24,
+										"column": 15
+									}
+								},
+								"name": "patterns"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 462,
+								"end": 478,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 18
+									},
+									"end": {
+										"line": 24,
+										"column": 34
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 463,
+										"end": 468,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 19
+											},
+											"end": {
+												"line": 24,
+												"column": 24
+											}
+										},
+										"value": {},
+										"raw": "/foo/",
+										"regex": {
+											"pattern": "foo",
+											"flags": ""
+										}
+									},
+									{
+										"type": "Literal",
+										"start": 470,
+										"end": 477,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 26
+											},
+											"end": {
+												"line": 24,
+												"column": 33
+											}
+										},
+										"value": {},
+										"raw": "/bar/gi",
+										"regex": {
+											"pattern": "bar",
+											"flags": "gi"
+										}
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Regex in array",
+							"start": 426,
+							"end": 443
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 533,
+					"end": 557,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 25
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 539,
+							"end": 556,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 7
+								},
+								"end": {
+									"line": 27,
+									"column": 24
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 539,
+								"end": 547,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 7
+									},
+									"end": {
+										"line": 27,
+										"column": 15
+									}
+								},
+								"name": "division"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 550,
+								"end": 556,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 18
+									},
+									"end": {
+										"line": 27,
+										"column": 24
+									}
+								},
+								"left": {
+									"type": "Literal",
+									"start": 550,
+									"end": 552,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 18
+										},
+										"end": {
+											"line": 27,
+											"column": 20
+										}
+									},
+									"value": 10,
+									"raw": "10"
+								},
+								"operator": "/",
+								"right": {
+									"type": "Literal",
+									"start": 555,
+									"end": 556,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 23
+										},
+										"end": {
+											"line": 27,
+											"column": 24
+										}
+									},
+									"value": 2,
+									"raw": "2"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Division vs regex (division should still work)",
+							"start": 482,
+							"end": 531
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 599,
+					"end": 630,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 605,
+							"end": 629,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 7
+								},
+								"end": {
+									"line": 30,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 605,
+								"end": 619,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 7
+									},
+									"end": {
+										"line": 30,
+										"column": 21
+									}
+								},
+								"name": "nestedBrackets"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 622,
+								"end": 629,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 24
+									},
+									"end": {
+										"line": 30,
+										"column": 31
+									}
+								},
+								"value": {},
+								"raw": "/[[\\]]/",
+								"regex": {
+									"pattern": "[[\\]]",
+									"flags": ""
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Nested brackets in character class",
+							"start": 560,
+							"end": 597
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 655,
+					"end": 687,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 33
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 661,
+							"end": 686,
+							"loc": {
+								"start": {
+									"line": 33,
+									"column": 7
+								},
+								"end": {
+									"line": 33,
+									"column": 32
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 661,
+								"end": 677,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 7
+									},
+									"end": {
+										"line": 33,
+										"column": 23
+									}
+								},
+								"name": "escapedBackslash"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 680,
+								"end": 686,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 26
+									},
+									"end": {
+										"line": 33,
+										"column": 32
+									}
+								},
+								"value": {},
+								"raw": "/a\\\\b/",
+								"regex": {
+									"pattern": "a\\\\b",
+									"flags": ""
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Escaped backslash",
+							"start": 633,
+							"end": 653
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 713,
+					"end": 743,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 31
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 719,
+							"end": 742,
+							"loc": {
+								"start": {
+									"line": 36,
+									"column": 7
+								},
+								"end": {
+									"line": 36,
+									"column": 30
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 719,
+								"end": 727,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 7
+									},
+									"end": {
+										"line": 36,
+										"column": 15
+									}
+								},
+								"name": "allFlags"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 730,
+								"end": 742,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 18
+									},
+									"end": {
+										"line": 36,
+										"column": 30
+									}
+								},
+								"value": {},
+								"raw": "/test/gimsuy",
+								"regex": {
+									"pattern": "test",
+									"flags": "gimsuy"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " All standard flags",
+							"start": 690,
+							"end": 711
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 777,
+					"end": 809,
+					"loc": {
+						"start": {
+							"line": 39,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 33
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 783,
+							"end": 808,
+							"loc": {
+								"start": {
+									"line": 39,
+									"column": 7
+								},
+								"end": {
+									"line": 39,
+									"column": 32
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 783,
+								"end": 788,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 7
+									},
+									"end": {
+										"line": 39,
+										"column": 12
+									}
+								},
+								"name": "match"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 791,
+								"end": 808,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 15
+									},
+									"end": {
+										"line": 39,
+										"column": 32
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 791,
+									"end": 800,
+									"loc": {
+										"start": {
+											"line": 39,
+											"column": 15
+										},
+										"end": {
+											"line": 39,
+											"column": 24
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 791,
+										"end": 794,
+										"loc": {
+											"start": {
+												"line": 39,
+												"column": 15
+											},
+											"end": {
+												"line": 39,
+												"column": 18
+											}
+										},
+										"name": "str"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 795,
+										"end": 800,
+										"loc": {
+											"start": {
+												"line": 39,
+												"column": 19
+											},
+											"end": {
+												"line": 39,
+												"column": 24
+											}
+										},
+										"name": "match"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 801,
+										"end": 807,
+										"loc": {
+											"start": {
+												"line": 39,
+												"column": 25
+											},
+											"end": {
+												"line": 39,
+												"column": 31
+											}
+										},
+										"value": {},
+										"raw": "/\\d+/g",
+										"regex": {
+											"pattern": "\\d+",
+											"flags": "g"
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Regex as function argument",
+							"start": 746,
+							"end": 775
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

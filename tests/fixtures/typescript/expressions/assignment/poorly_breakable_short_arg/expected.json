@@ -1,0 +1,1706 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1856,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Poorly breakable chains: \"short arg\" types → break at `=` when line > print_width",
+			"start": 10,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Prettier ref: isLoneShortArgument (utils/index.js:434)",
+			"start": 96,
+			"end": 153,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Unary: signed numeric — short via isSignedNumericLiteral + UnaryExpression recursion",
+			"start": 156,
+			"end": 243,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Unary: logical not — short via UnaryExpression recursion to Identifier",
+			"start": 353,
+			"end": 426,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Unary: typeof — NOT short (typeof is not in isLoneShortArgument)",
+			"start": 538,
+			"end": 605,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Unary: void — NOT short (void is not in isLoneShortArgument)",
+			"start": 722,
+			"end": 785,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " RegExp: short pattern — short via regexpPattern.length <= threshold",
+			"start": 898,
+			"end": 968,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Zero-arg call: short callee — short via callee.name.length <= threshold - 2",
+			"start": 1081,
+			"end": 1159,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Zero-arg call: long callee — NOT short (name exceeds threshold - 2 = 23)",
+			"start": 1271,
+			"end": 1346,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control: already-handled short types",
+			"start": 1485,
+			"end": 1524,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 40
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1855,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 1846,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 41,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 245,
+					"end": 350,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 68
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 251,
+							"end": 349,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 67
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 251,
+								"end": 279,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 35
+									}
+								},
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 284,
+								"end": 349,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 67
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 284,
+									"end": 344,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 62
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 284,
+										"end": 301,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 2
+											},
+											"end": {
+												"line": 7,
+												"column": 19
+											}
+										},
+										"name": "VeryLongClassName"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 302,
+										"end": 344,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 20
+											},
+											"end": {
+												"line": 7,
+												"column": 62
+											}
+										},
+										"name": "createSomethingWithAVeryLongMethodNameHere"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "UnaryExpression",
+										"start": 345,
+										"end": 348,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 63
+											},
+											"end": {
+												"line": 7,
+												"column": 66
+											}
+										},
+										"operator": "-",
+										"prefix": true,
+										"argument": {
+											"type": "Literal",
+											"start": 346,
+											"end": 348,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 64
+												},
+												"end": {
+													"line": 7,
+													"column": 66
+												}
+											},
+											"value": 42,
+											"raw": "42"
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Poorly breakable chains: \"short arg\" types → break at `=` when line > print_width",
+							"start": 10,
+							"end": 94
+						},
+						{
+							"type": "Line",
+							"value": " Prettier ref: isLoneShortArgument (utils/index.js:434)",
+							"start": 96,
+							"end": 153
+						},
+						{
+							"type": "Line",
+							"value": " Unary: signed numeric — short via isSignedNumericLiteral + UnaryExpression recursion",
+							"start": 156,
+							"end": 243
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 428,
+					"end": 535,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 70
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 434,
+							"end": 534,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 69
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 434,
+								"end": 462,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 35
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 467,
+								"end": 534,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 69
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 467,
+									"end": 527,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 62
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 467,
+										"end": 484,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
+												"column": 19
+											}
+										},
+										"name": "VeryLongClassName"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 485,
+										"end": 527,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 20
+											},
+											"end": {
+												"line": 11,
+												"column": 62
+											}
+										},
+										"name": "createSomethingWithAVeryLongMethodNameHere"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "UnaryExpression",
+										"start": 528,
+										"end": 533,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 63
+											},
+											"end": {
+												"line": 11,
+												"column": 68
+											}
+										},
+										"operator": "!",
+										"prefix": true,
+										"argument": {
+											"type": "Identifier",
+											"start": 529,
+											"end": 533,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 64
+												},
+												"end": {
+													"line": 11,
+													"column": 68
+												}
+											},
+											"name": "flag"
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Unary: logical not — short via UnaryExpression recursion to Identifier",
+							"start": 353,
+							"end": 426
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 607,
+					"end": 719,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 75
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 613,
+							"end": 718,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 74
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 613,
+								"end": 641,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 35
+									}
+								},
+								"name": "cccccccccccccccccccccccccccc"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 646,
+								"end": 718,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 74
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 646,
+									"end": 706,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 62
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 646,
+										"end": 663,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 2
+											},
+											"end": {
+												"line": 15,
+												"column": 19
+											}
+										},
+										"name": "VeryLongClassName"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 664,
+										"end": 706,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 20
+											},
+											"end": {
+												"line": 15,
+												"column": 62
+											}
+										},
+										"name": "createSomethingWithAVeryLongMethodNameHere"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "UnaryExpression",
+										"start": 707,
+										"end": 717,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 63
+											},
+											"end": {
+												"line": 15,
+												"column": 73
+											}
+										},
+										"operator": "typeof",
+										"prefix": true,
+										"argument": {
+											"type": "Identifier",
+											"start": 714,
+											"end": 717,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 70
+												},
+												"end": {
+													"line": 15,
+													"column": 73
+												}
+											},
+											"name": "val"
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Unary: typeof — NOT short (typeof is not in isLoneShortArgument)",
+							"start": 538,
+							"end": 605
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 787,
+					"end": 895,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 71
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 793,
+							"end": 894,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 7
+								},
+								"end": {
+									"line": 19,
+									"column": 70
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 793,
+								"end": 821,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 35
+									}
+								},
+								"name": "dddddddddddddddddddddddddddd"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 826,
+								"end": 894,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 70
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 826,
+									"end": 886,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 2
+										},
+										"end": {
+											"line": 19,
+											"column": 62
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 826,
+										"end": 843,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 2
+											},
+											"end": {
+												"line": 19,
+												"column": 19
+											}
+										},
+										"name": "VeryLongClassName"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 844,
+										"end": 886,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 20
+											},
+											"end": {
+												"line": 19,
+												"column": 62
+											}
+										},
+										"name": "createSomethingWithAVeryLongMethodNameHere"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "UnaryExpression",
+										"start": 887,
+										"end": 893,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 63
+											},
+											"end": {
+												"line": 19,
+												"column": 69
+											}
+										},
+										"operator": "void",
+										"prefix": true,
+										"argument": {
+											"type": "Literal",
+											"start": 892,
+											"end": 893,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 68
+												},
+												"end": {
+													"line": 19,
+													"column": 69
+												}
+											},
+											"value": 0,
+											"raw": "0"
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Unary: void — NOT short (void is not in isLoneShortArgument)",
+							"start": 722,
+							"end": 785
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 970,
+					"end": 1078,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 71
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 976,
+							"end": 1077,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 7
+								},
+								"end": {
+									"line": 23,
+									"column": 70
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 976,
+								"end": 1004,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 7
+									},
+									"end": {
+										"line": 22,
+										"column": 35
+									}
+								},
+								"name": "eeeeeeeeeeeeeeeeeeeeeeeeeeee"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1009,
+								"end": 1077,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 70
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1009,
+									"end": 1069,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 2
+										},
+										"end": {
+											"line": 23,
+											"column": 62
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 1009,
+										"end": 1026,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 2
+											},
+											"end": {
+												"line": 23,
+												"column": 19
+											}
+										},
+										"name": "VeryLongClassName"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1027,
+										"end": 1069,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 20
+											},
+											"end": {
+												"line": 23,
+												"column": 62
+											}
+										},
+										"name": "createSomethingWithAVeryLongMethodNameHere"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 1070,
+										"end": 1076,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 63
+											},
+											"end": {
+												"line": 23,
+												"column": 69
+											}
+										},
+										"value": {},
+										"raw": "/abc/g",
+										"regex": {
+											"pattern": "abc",
+											"flags": "g"
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " RegExp: short pattern — short via regexpPattern.length <= threshold",
+							"start": 898,
+							"end": 968
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1161,
+					"end": 1268,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 70
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1167,
+							"end": 1267,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 7
+								},
+								"end": {
+									"line": 27,
+									"column": 69
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1167,
+								"end": 1195,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 7
+									},
+									"end": {
+										"line": 26,
+										"column": 35
+									}
+								},
+								"name": "ffffffffffffffffffffffffffff"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1200,
+								"end": 1267,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 2
+									},
+									"end": {
+										"line": 27,
+										"column": 69
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1200,
+									"end": 1260,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 2
+										},
+										"end": {
+											"line": 27,
+											"column": 62
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 1200,
+										"end": 1217,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 2
+											},
+											"end": {
+												"line": 27,
+												"column": 19
+											}
+										},
+										"name": "VeryLongClassName"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1218,
+										"end": 1260,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 20
+											},
+											"end": {
+												"line": 27,
+												"column": 62
+											}
+										},
+										"name": "createSomethingWithAVeryLongMethodNameHere"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "CallExpression",
+										"start": 1261,
+										"end": 1266,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 63
+											},
+											"end": {
+												"line": 27,
+												"column": 68
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 1261,
+											"end": 1264,
+											"loc": {
+												"start": {
+													"line": 27,
+													"column": 63
+												},
+												"end": {
+													"line": 27,
+													"column": 66
+												}
+											},
+											"name": "foo"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Zero-arg call: short callee — short via callee.name.length <= threshold - 2",
+							"start": 1081,
+							"end": 1159
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1348,
+					"end": 1482,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1354,
+							"end": 1481,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 7
+								},
+								"end": {
+									"line": 32,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1354,
+								"end": 1382,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 7
+									},
+									"end": {
+										"line": 30,
+										"column": 35
+									}
+								},
+								"name": "gggggggggggggggggggggggggggg"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1385,
+								"end": 1481,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 38
+									},
+									"end": {
+										"line": 32,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1385,
+									"end": 1445,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 38
+										},
+										"end": {
+											"line": 30,
+											"column": 98
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 1385,
+										"end": 1402,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 38
+											},
+											"end": {
+												"line": 30,
+												"column": 55
+											}
+										},
+										"name": "VeryLongClassName"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1403,
+										"end": 1445,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 56
+											},
+											"end": {
+												"line": 30,
+												"column": 98
+											}
+										},
+										"name": "createSomethingWithAVeryLongMethodNameHere"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "CallExpression",
+										"start": 1449,
+										"end": 1477,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 2
+											},
+											"end": {
+												"line": 31,
+												"column": 30
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 1449,
+											"end": 1475,
+											"loc": {
+												"start": {
+													"line": 31,
+													"column": 2
+												},
+												"end": {
+													"line": 31,
+													"column": 28
+												}
+											},
+											"name": "veryLongFunctionNameHereXX"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Zero-arg call: long callee — NOT short (name exceeds threshold - 2 = 23)",
+							"start": 1271,
+							"end": 1346
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1526,
+					"end": 1632,
+					"loc": {
+						"start": {
+							"line": 35,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 69
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1532,
+							"end": 1631,
+							"loc": {
+								"start": {
+									"line": 35,
+									"column": 7
+								},
+								"end": {
+									"line": 36,
+									"column": 68
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1532,
+								"end": 1560,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 7
+									},
+									"end": {
+										"line": 35,
+										"column": 35
+									}
+								},
+								"name": "hhhhhhhhhhhhhhhhhhhhhhhhhhhh"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1565,
+								"end": 1631,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 2
+									},
+									"end": {
+										"line": 36,
+										"column": 68
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1565,
+									"end": 1625,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 2
+										},
+										"end": {
+											"line": 36,
+											"column": 62
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 1565,
+										"end": 1582,
+										"loc": {
+											"start": {
+												"line": 36,
+												"column": 2
+											},
+											"end": {
+												"line": 36,
+												"column": 19
+											}
+										},
+										"name": "VeryLongClassName"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1583,
+										"end": 1625,
+										"loc": {
+											"start": {
+												"line": 36,
+												"column": 20
+											},
+											"end": {
+												"line": 36,
+												"column": 62
+											}
+										},
+										"name": "createSomethingWithAVeryLongMethodNameHere"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 1626,
+										"end": 1630,
+										"loc": {
+											"start": {
+												"line": 36,
+												"column": 63
+											},
+											"end": {
+												"line": 36,
+												"column": 67
+											}
+										},
+										"value": "hi",
+										"raw": "'hi'"
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control: already-handled short types",
+							"start": 1485,
+							"end": 1524
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1634,
+					"end": 1738,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 67
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1640,
+							"end": 1737,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 7
+								},
+								"end": {
+									"line": 38,
+									"column": 66
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1640,
+								"end": 1668,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 7
+									},
+									"end": {
+										"line": 37,
+										"column": 35
+									}
+								},
+								"name": "iiiiiiiiiiiiiiiiiiiiiiiiiiii"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1673,
+								"end": 1737,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 2
+									},
+									"end": {
+										"line": 38,
+										"column": 66
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1673,
+									"end": 1733,
+									"loc": {
+										"start": {
+											"line": 38,
+											"column": 2
+										},
+										"end": {
+											"line": 38,
+											"column": 62
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 1673,
+										"end": 1690,
+										"loc": {
+											"start": {
+												"line": 38,
+												"column": 2
+											},
+											"end": {
+												"line": 38,
+												"column": 19
+											}
+										},
+										"name": "VeryLongClassName"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1691,
+										"end": 1733,
+										"loc": {
+											"start": {
+												"line": 38,
+												"column": 20
+											},
+											"end": {
+												"line": 38,
+												"column": 62
+											}
+										},
+										"name": "createSomethingWithAVeryLongMethodNameHere"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 1734,
+										"end": 1736,
+										"loc": {
+											"start": {
+												"line": 38,
+												"column": 63
+											},
+											"end": {
+												"line": 38,
+												"column": 65
+											}
+										},
+										"value": 42,
+										"raw": "42"
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1740,
+					"end": 1845,
+					"loc": {
+						"start": {
+							"line": 39,
+							"column": 1
+						},
+						"end": {
+							"line": 40,
+							"column": 68
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1746,
+							"end": 1844,
+							"loc": {
+								"start": {
+									"line": 39,
+									"column": 7
+								},
+								"end": {
+									"line": 40,
+									"column": 67
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1746,
+								"end": 1774,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 7
+									},
+									"end": {
+										"line": 39,
+										"column": 35
+									}
+								},
+								"name": "jjjjjjjjjjjjjjjjjjjjjjjjjjjj"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1779,
+								"end": 1844,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 2
+									},
+									"end": {
+										"line": 40,
+										"column": 67
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1779,
+									"end": 1839,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 2
+										},
+										"end": {
+											"line": 40,
+											"column": 62
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 1779,
+										"end": 1796,
+										"loc": {
+											"start": {
+												"line": 40,
+												"column": 2
+											},
+											"end": {
+												"line": 40,
+												"column": 19
+											}
+										},
+										"name": "VeryLongClassName"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1797,
+										"end": 1839,
+										"loc": {
+											"start": {
+												"line": 40,
+												"column": 20
+											},
+											"end": {
+												"line": 40,
+												"column": 62
+											}
+										},
+										"name": "createSomethingWithAVeryLongMethodNameHere"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 1840,
+										"end": 1843,
+										"loc": {
+											"start": {
+												"line": 40,
+												"column": 63
+											},
+											"end": {
+												"line": 40,
+												"column": 66
+											}
+										},
+										"name": "arg"
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

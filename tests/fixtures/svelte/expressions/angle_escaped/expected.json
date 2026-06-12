@@ -1,0 +1,858 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 557,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 37,
+				"data": " Basic escaped angle brackets "
+			},
+			{
+				"type": "Text",
+				"start": 37,
+				"end": 38,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 38,
+				"end": 43,
+				"expression": {
+					"type": "Literal",
+					"start": 39,
+					"end": 42,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 4
+						}
+					},
+					"value": "<",
+					"raw": "'<'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 43,
+				"end": 46,
+				"raw": "div",
+				"data": "div"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 46,
+				"end": 51,
+				"expression": {
+					"type": "Literal",
+					"start": 47,
+					"end": 50,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 9
+						},
+						"end": {
+							"line": 2,
+							"column": 12
+						}
+					},
+					"value": ">",
+					"raw": "'>'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 51,
+				"end": 52,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 52,
+				"end": 57,
+				"expression": {
+					"type": "Literal",
+					"start": 53,
+					"end": 56,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 4
+						}
+					},
+					"value": "<",
+					"raw": "'<'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 57,
+				"end": 61,
+				"raw": "code",
+				"data": "code"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 61,
+				"end": 66,
+				"expression": {
+					"type": "Literal",
+					"start": 62,
+					"end": 65,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 10
+						},
+						"end": {
+							"line": 3,
+							"column": 13
+						}
+					},
+					"value": ">",
+					"raw": "'>'"
+				}
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 66,
+				"end": 71,
+				"expression": {
+					"type": "Literal",
+					"start": 67,
+					"end": 70,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 15
+						},
+						"end": {
+							"line": 3,
+							"column": 18
+						}
+					},
+					"value": "<",
+					"raw": "'<'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 71,
+				"end": 76,
+				"raw": "/code",
+				"data": "/code"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 76,
+				"end": 81,
+				"expression": {
+					"type": "Literal",
+					"start": 77,
+					"end": 80,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 25
+						},
+						"end": {
+							"line": 3,
+							"column": 28
+						}
+					},
+					"value": ">",
+					"raw": "'>'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 81,
+				"end": 83,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 83,
+				"end": 113,
+				"data": " With surrounding text "
+			},
+			{
+				"type": "Text",
+				"start": 113,
+				"end": 126,
+				"raw": "\nText before ",
+				"data": "\nText before "
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 126,
+				"end": 131,
+				"expression": {
+					"type": "Literal",
+					"start": 127,
+					"end": 130,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 13
+						},
+						"end": {
+							"line": 6,
+							"column": 16
+						}
+					},
+					"value": "<",
+					"raw": "'<'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 131,
+				"end": 134,
+				"raw": "div",
+				"data": "div"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 134,
+				"end": 139,
+				"expression": {
+					"type": "Literal",
+					"start": 135,
+					"end": 138,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 21
+						},
+						"end": {
+							"line": 6,
+							"column": 24
+						}
+					},
+					"value": ">",
+					"raw": "'>'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 139,
+				"end": 152,
+				"raw": " text after\n\n",
+				"data": " text after\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 152,
+				"end": 179,
+				"data": " Only trailing text "
+			},
+			{
+				"type": "Text",
+				"start": 179,
+				"end": 180,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 180,
+				"end": 185,
+				"expression": {
+					"type": "Literal",
+					"start": 181,
+					"end": 184,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 4
+						}
+					},
+					"value": "<",
+					"raw": "'<'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 185,
+				"end": 189,
+				"raw": "span",
+				"data": "span"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 189,
+				"end": 194,
+				"expression": {
+					"type": "Literal",
+					"start": 190,
+					"end": 193,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 10
+						},
+						"end": {
+							"line": 9,
+							"column": 13
+						}
+					},
+					"value": ">",
+					"raw": "'>'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 194,
+				"end": 207,
+				"raw": " text after\n\n",
+				"data": " text after\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 207,
+				"end": 233,
+				"data": " Only leading text "
+			},
+			{
+				"type": "Text",
+				"start": 233,
+				"end": 246,
+				"raw": "\nText before ",
+				"data": "\nText before "
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 246,
+				"end": 251,
+				"expression": {
+					"type": "Literal",
+					"start": 247,
+					"end": 250,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 13
+						},
+						"end": {
+							"line": 12,
+							"column": 16
+						}
+					},
+					"value": "<",
+					"raw": "'<'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 251,
+				"end": 255,
+				"raw": "span",
+				"data": "span"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 255,
+				"end": 260,
+				"expression": {
+					"type": "Literal",
+					"start": 256,
+					"end": 259,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 22
+						},
+						"end": {
+							"line": 12,
+							"column": 25
+						}
+					},
+					"value": ">",
+					"raw": "'>'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 260,
+				"end": 262,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 262,
+				"end": 298,
+				"data": " Multiple pairs with content "
+			},
+			{
+				"type": "Text",
+				"start": 298,
+				"end": 299,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 299,
+				"end": 304,
+				"expression": {
+					"type": "Literal",
+					"start": 300,
+					"end": 303,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 4
+						}
+					},
+					"value": "<",
+					"raw": "'<'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 304,
+				"end": 305,
+				"raw": "p",
+				"data": "p"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 305,
+				"end": 310,
+				"expression": {
+					"type": "Literal",
+					"start": 306,
+					"end": 309,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 7
+						},
+						"end": {
+							"line": 15,
+							"column": 10
+						}
+					},
+					"value": ">",
+					"raw": "'>'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 310,
+				"end": 319,
+				"raw": "paragraph",
+				"data": "paragraph"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 319,
+				"end": 324,
+				"expression": {
+					"type": "Literal",
+					"start": 320,
+					"end": 323,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 21
+						},
+						"end": {
+							"line": 15,
+							"column": 24
+						}
+					},
+					"value": "<",
+					"raw": "'<'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 324,
+				"end": 326,
+				"raw": "/p",
+				"data": "/p"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 326,
+				"end": 331,
+				"expression": {
+					"type": "Literal",
+					"start": 327,
+					"end": 330,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 28
+						},
+						"end": {
+							"line": 15,
+							"column": 31
+						}
+					},
+					"value": ">",
+					"raw": "'>'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 331,
+				"end": 333,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 333,
+				"end": 362,
+				"data": " Self-closing pattern "
+			},
+			{
+				"type": "Text",
+				"start": 362,
+				"end": 363,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 363,
+				"end": 368,
+				"expression": {
+					"type": "Literal",
+					"start": 364,
+					"end": 367,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 4
+						}
+					},
+					"value": "<",
+					"raw": "'<'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 368,
+				"end": 371,
+				"raw": "br/",
+				"data": "br/"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 371,
+				"end": 376,
+				"expression": {
+					"type": "Literal",
+					"start": 372,
+					"end": 375,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 9
+						},
+						"end": {
+							"line": 18,
+							"column": 12
+						}
+					},
+					"value": ">",
+					"raw": "'>'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 376,
+				"end": 378,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 378,
+				"end": 406,
+				"data": " With attribute text "
+			},
+			{
+				"type": "Text",
+				"start": 406,
+				"end": 407,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 407,
+				"end": 412,
+				"expression": {
+					"type": "Literal",
+					"start": 408,
+					"end": 411,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 4
+						}
+					},
+					"value": "<",
+					"raw": "'<'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 412,
+				"end": 428,
+				"raw": "div class=\"test\"",
+				"data": "div class=\"test\""
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 428,
+				"end": 433,
+				"expression": {
+					"type": "Literal",
+					"start": 429,
+					"end": 432,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 22
+						},
+						"end": {
+							"line": 21,
+							"column": 25
+						}
+					},
+					"value": ">",
+					"raw": "'>'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 433,
+				"end": 435,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 435,
+				"end": 465,
+				"data": " Inside inline element "
+			},
+			{
+				"type": "Text",
+				"start": 465,
+				"end": 466,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 466,
+				"end": 492,
+				"name": "code",
+				"name_loc": {
+					"start": {
+						"line": 24,
+						"column": 1,
+						"character": 467
+					},
+					"end": {
+						"line": 24,
+						"column": 5,
+						"character": 471
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 472,
+							"end": 477,
+							"expression": {
+								"type": "Literal",
+								"start": 473,
+								"end": 476,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 7
+									},
+									"end": {
+										"line": 24,
+										"column": 10
+									}
+								},
+								"value": "<",
+								"raw": "'<'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 477,
+							"end": 480,
+							"raw": "div",
+							"data": "div"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 480,
+							"end": 485,
+							"expression": {
+								"type": "Literal",
+								"start": 481,
+								"end": 484,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 15
+									},
+									"end": {
+										"line": 24,
+										"column": 18
+									}
+								},
+								"value": ">",
+								"raw": "'>'"
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 492,
+				"end": 494,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 494,
+				"end": 528,
+				"data": " With expression in middle "
+			},
+			{
+				"type": "Text",
+				"start": 528,
+				"end": 529,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 529,
+				"end": 534,
+				"expression": {
+					"type": "Literal",
+					"start": 530,
+					"end": 533,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 4
+						}
+					},
+					"value": "<",
+					"raw": "'<'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 534,
+				"end": 544,
+				"raw": "Component ",
+				"data": "Component "
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 544,
+				"end": 550,
+				"expression": {
+					"type": "Identifier",
+					"start": 545,
+					"end": 549,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 16
+						},
+						"end": {
+							"line": 27,
+							"column": 20
+						}
+					},
+					"name": "prop"
+				}
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 550,
+				"end": 556,
+				"expression": {
+					"type": "Literal",
+					"start": 551,
+					"end": 555,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 22
+						},
+						"end": {
+							"line": 27,
+							"column": 26
+						}
+					},
+					"value": "/>",
+					"raw": "'/>'"
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

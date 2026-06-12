@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 229,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 90,
+				"end": 220,
+				"name": "media",
+				"prelude": "(min-width: 1000px)  and (max-width: 2000px) and (height > 300px) and\n\t\t(a: 100aaaaa)",
+				"block": {
+					"type": "Block",
+					"start": 190,
+					"end": 220,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 194,
+								"end": 196,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 194,
+										"end": 196,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "a",
+														"start": 194,
+														"end": 196
+													}
+												],
+												"start": 194,
+												"end": 196
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 197,
+								"end": 217,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 202,
+										"end": 212,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 194,
+							"end": 217
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 221,
+			"styles": "\n\t/* Long @media query with comment - we wrap at 101+ chars, Prettier doesn't */\n\n\t@media (min-width: 1000px) /* c */ and (max-width: 2000px) and (height > 300px) and\n\t\t(a: 100aaaaa) {\n\t\t.a {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 230,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

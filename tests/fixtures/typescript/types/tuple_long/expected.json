@@ -1,0 +1,1203 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 706,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Unlabeled tuples",
+			"start": 20,
+			"end": 39,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 100 chars exactly - stays inline (at boundary)",
+			"start": 42,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars - wraps to one element per line",
+			"start": 194,
+			"end": 238,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Labeled tuples",
+			"start": 364,
+			"end": 381,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 100 chars exactly - stays inline (at boundary)",
+			"start": 384,
+			"end": 433,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars - wraps to one element per line",
+			"start": 536,
+			"end": 580,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 45
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 705,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 696,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 33,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 93,
+					"end": 191,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 99
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 98,
+						"end": 99,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 6
+							},
+							"end": {
+								"line": 5,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 102,
+						"end": 190,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 10
+							},
+							"end": {
+								"line": 5,
+								"column": 98
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSStringKeyword",
+								"start": 103,
+								"end": 109,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 17
+									}
+								}
+							},
+							{
+								"type": "TSNumberKeyword",
+								"start": 111,
+								"end": 117,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 19
+									},
+									"end": {
+										"line": 5,
+										"column": 25
+									}
+								}
+							},
+							{
+								"type": "TSBooleanKeyword",
+								"start": 119,
+								"end": 126,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 27
+									},
+									"end": {
+										"line": 5,
+										"column": 34
+									}
+								}
+							},
+							{
+								"type": "TSObjectKeyword",
+								"start": 128,
+								"end": 134,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 36
+									},
+									"end": {
+										"line": 5,
+										"column": 42
+									}
+								}
+							},
+							{
+								"type": "TSNullKeyword",
+								"start": 136,
+								"end": 140,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 44
+									},
+									"end": {
+										"line": 5,
+										"column": 48
+									}
+								}
+							},
+							{
+								"type": "TSUndefinedKeyword",
+								"start": 142,
+								"end": 151,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 50
+									},
+									"end": {
+										"line": 5,
+										"column": 59
+									}
+								}
+							},
+							{
+								"type": "TSSymbolKeyword",
+								"start": 153,
+								"end": 159,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 61
+									},
+									"end": {
+										"line": 5,
+										"column": 67
+									}
+								}
+							},
+							{
+								"type": "TSBigIntKeyword",
+								"start": 161,
+								"end": 167,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 69
+									},
+									"end": {
+										"line": 5,
+										"column": 75
+									}
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 169,
+								"end": 189,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 77
+									},
+									"end": {
+										"line": 5,
+										"column": 97
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 169,
+									"end": 189,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 77
+										},
+										"end": {
+											"line": 5,
+											"column": 97
+										}
+									},
+									"name": "neverrrrrrrrrrrrrrrr"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Unlabeled tuples",
+							"start": 20,
+							"end": 39
+						},
+						{
+							"type": "Line",
+							"value": " 100 chars exactly - stays inline (at boundary)",
+							"start": 42,
+							"end": 91
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 240,
+					"end": 361,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 245,
+						"end": 246,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 6
+							},
+							"end": {
+								"line": 8,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 249,
+						"end": 360,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 10
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSStringKeyword",
+								"start": 253,
+								"end": 259,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								}
+							},
+							{
+								"type": "TSNumberKeyword",
+								"start": 263,
+								"end": 269,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								}
+							},
+							{
+								"type": "TSBooleanKeyword",
+								"start": 273,
+								"end": 280,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 9
+									}
+								}
+							},
+							{
+								"type": "TSObjectKeyword",
+								"start": 284,
+								"end": 290,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								}
+							},
+							{
+								"type": "TSNullKeyword",
+								"start": 294,
+								"end": 298,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 6
+									}
+								}
+							},
+							{
+								"type": "TSUndefinedKeyword",
+								"start": 302,
+								"end": 311,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 11
+									}
+								}
+							},
+							{
+								"type": "TSSymbolKeyword",
+								"start": 315,
+								"end": 321,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 8
+									}
+								}
+							},
+							{
+								"type": "TSBigIntKeyword",
+								"start": 325,
+								"end": 331,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 8
+									}
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 335,
+								"end": 356,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 23
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 335,
+									"end": 356,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 2
+										},
+										"end": {
+											"line": 17,
+											"column": 23
+										}
+									},
+									"name": "neverrrrrrrrrrrrrrrrr"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 chars - wraps to one element per line",
+							"start": 194,
+							"end": 238
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 435,
+					"end": 533,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 99
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 440,
+						"end": 441,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 6
+							},
+							"end": {
+								"line": 23,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 444,
+						"end": 532,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 10
+							},
+							"end": {
+								"line": 23,
+								"column": 98
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSNamedTupleMember",
+								"start": 445,
+								"end": 458,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 11
+									},
+									"end": {
+										"line": 23,
+										"column": 24
+									}
+								},
+								"optional": false,
+								"label": {
+									"type": "Identifier",
+									"start": 445,
+									"end": 450,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 11
+										},
+										"end": {
+											"line": 23,
+											"column": 16
+										}
+									},
+									"name": "first"
+								},
+								"elementType": {
+									"type": "TSStringKeyword",
+									"start": 452,
+									"end": 458,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 18
+										},
+										"end": {
+											"line": 23,
+											"column": 24
+										}
+									}
+								}
+							},
+							{
+								"type": "TSNamedTupleMember",
+								"start": 460,
+								"end": 474,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 26
+									},
+									"end": {
+										"line": 23,
+										"column": 40
+									}
+								},
+								"optional": false,
+								"label": {
+									"type": "Identifier",
+									"start": 460,
+									"end": 466,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 26
+										},
+										"end": {
+											"line": 23,
+											"column": 32
+										}
+									},
+									"name": "second"
+								},
+								"elementType": {
+									"type": "TSNumberKeyword",
+									"start": 468,
+									"end": 474,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 34
+										},
+										"end": {
+											"line": 23,
+											"column": 40
+										}
+									}
+								}
+							},
+							{
+								"type": "TSNamedTupleMember",
+								"start": 476,
+								"end": 490,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 42
+									},
+									"end": {
+										"line": 23,
+										"column": 56
+									}
+								},
+								"optional": false,
+								"label": {
+									"type": "Identifier",
+									"start": 476,
+									"end": 481,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 42
+										},
+										"end": {
+											"line": 23,
+											"column": 47
+										}
+									},
+									"name": "third"
+								},
+								"elementType": {
+									"type": "TSBooleanKeyword",
+									"start": 483,
+									"end": 490,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 49
+										},
+										"end": {
+											"line": 23,
+											"column": 56
+										}
+									}
+								}
+							},
+							{
+								"type": "TSNamedTupleMember",
+								"start": 492,
+								"end": 506,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 58
+									},
+									"end": {
+										"line": 23,
+										"column": 72
+									}
+								},
+								"optional": false,
+								"label": {
+									"type": "Identifier",
+									"start": 492,
+									"end": 498,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 58
+										},
+										"end": {
+											"line": 23,
+											"column": 64
+										}
+									},
+									"name": "fourth"
+								},
+								"elementType": {
+									"type": "TSObjectKeyword",
+									"start": 500,
+									"end": 506,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 66
+										},
+										"end": {
+											"line": 23,
+											"column": 72
+										}
+									}
+								}
+							},
+							{
+								"type": "TSNamedTupleMember",
+								"start": 508,
+								"end": 531,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 74
+									},
+									"end": {
+										"line": 23,
+										"column": 97
+									}
+								},
+								"optional": false,
+								"label": {
+									"type": "Identifier",
+									"start": 508,
+									"end": 513,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 74
+										},
+										"end": {
+											"line": 23,
+											"column": 79
+										}
+									},
+									"name": "fifth"
+								},
+								"elementType": {
+									"type": "TSTypeReference",
+									"start": 515,
+									"end": 531,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 81
+										},
+										"end": {
+											"line": 23,
+											"column": 97
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 515,
+										"end": 531,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 81
+											},
+											"end": {
+												"line": 23,
+												"column": 97
+											}
+										},
+										"name": "neverrrrrrrrrrrr"
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Labeled tuples",
+							"start": 364,
+							"end": 381
+						},
+						{
+							"type": "Line",
+							"value": " 100 chars exactly - stays inline (at boundary)",
+							"start": 384,
+							"end": 433
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 582,
+					"end": 695,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 587,
+						"end": 588,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 6
+							},
+							"end": {
+								"line": 26,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 591,
+						"end": 694,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 10
+							},
+							"end": {
+								"line": 32,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSNamedTupleMember",
+								"start": 595,
+								"end": 608,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 2
+									},
+									"end": {
+										"line": 27,
+										"column": 15
+									}
+								},
+								"optional": false,
+								"label": {
+									"type": "Identifier",
+									"start": 595,
+									"end": 600,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 2
+										},
+										"end": {
+											"line": 27,
+											"column": 7
+										}
+									},
+									"name": "first"
+								},
+								"elementType": {
+									"type": "TSStringKeyword",
+									"start": 602,
+									"end": 608,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 9
+										},
+										"end": {
+											"line": 27,
+											"column": 15
+										}
+									}
+								}
+							},
+							{
+								"type": "TSNamedTupleMember",
+								"start": 612,
+								"end": 626,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 16
+									}
+								},
+								"optional": false,
+								"label": {
+									"type": "Identifier",
+									"start": 612,
+									"end": 618,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 2
+										},
+										"end": {
+											"line": 28,
+											"column": 8
+										}
+									},
+									"name": "second"
+								},
+								"elementType": {
+									"type": "TSNumberKeyword",
+									"start": 620,
+									"end": 626,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 10
+										},
+										"end": {
+											"line": 28,
+											"column": 16
+										}
+									}
+								}
+							},
+							{
+								"type": "TSNamedTupleMember",
+								"start": 630,
+								"end": 644,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 16
+									}
+								},
+								"optional": false,
+								"label": {
+									"type": "Identifier",
+									"start": 630,
+									"end": 635,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 2
+										},
+										"end": {
+											"line": 29,
+											"column": 7
+										}
+									},
+									"name": "third"
+								},
+								"elementType": {
+									"type": "TSBooleanKeyword",
+									"start": 637,
+									"end": 644,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 9
+										},
+										"end": {
+											"line": 29,
+											"column": 16
+										}
+									}
+								}
+							},
+							{
+								"type": "TSNamedTupleMember",
+								"start": 648,
+								"end": 662,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 2
+									},
+									"end": {
+										"line": 30,
+										"column": 16
+									}
+								},
+								"optional": false,
+								"label": {
+									"type": "Identifier",
+									"start": 648,
+									"end": 654,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 2
+										},
+										"end": {
+											"line": 30,
+											"column": 8
+										}
+									},
+									"name": "fourth"
+								},
+								"elementType": {
+									"type": "TSObjectKeyword",
+									"start": 656,
+									"end": 662,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 10
+										},
+										"end": {
+											"line": 30,
+											"column": 16
+										}
+									}
+								}
+							},
+							{
+								"type": "TSNamedTupleMember",
+								"start": 666,
+								"end": 690,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 2
+									},
+									"end": {
+										"line": 31,
+										"column": 26
+									}
+								},
+								"optional": false,
+								"label": {
+									"type": "Identifier",
+									"start": 666,
+									"end": 671,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 2
+										},
+										"end": {
+											"line": 31,
+											"column": 7
+										}
+									},
+									"name": "fifth"
+								},
+								"elementType": {
+									"type": "TSTypeReference",
+									"start": 673,
+									"end": 690,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 9
+										},
+										"end": {
+											"line": 31,
+											"column": 26
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 673,
+										"end": 690,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 9
+											},
+											"end": {
+												"line": 31,
+												"column": 26
+											}
+										},
+										"name": "neverrrrrrrrrrrrr"
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 chars - wraps to one element per line",
+							"start": 536,
+							"end": 580
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

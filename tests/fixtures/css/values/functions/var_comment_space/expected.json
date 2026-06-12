@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 134,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 125,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 51,
+							"property": "color",
+							"value": "var(--a,  red)"
+						},
+						{
+							"type": "Declaration",
+							"start": 55,
+							"end": 86,
+							"property": "width",
+							"value": "var(--b,  100px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 90,
+							"end": 121,
+							"property": "height",
+							"value": "var(--c,  50px)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 125
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 126,
+			"styles": "\n\tdiv {\n\t\tcolor: var(--a, /* comment */ red);\n\t\twidth: var(--b, /* c2 */ 100px);\n\t\theight: var(--c, /* c3 */ 50px);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 135,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

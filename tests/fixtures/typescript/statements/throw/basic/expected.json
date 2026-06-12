@@ -1,0 +1,214 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 93,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 92,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 83,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ThrowStatement",
+					"start": 10,
+					"end": 21,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 12
+						}
+					},
+					"argument": {
+						"type": "Identifier",
+						"start": 16,
+						"end": 20,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 7
+							},
+							"end": {
+								"line": 2,
+								"column": 11
+							}
+						},
+						"name": "expr"
+					}
+				},
+				{
+					"type": "ThrowStatement",
+					"start": 24,
+					"end": 51,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 28
+						}
+					},
+					"argument": {
+						"type": "NewExpression",
+						"start": 30,
+						"end": 50,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 7
+							},
+							"end": {
+								"line": 4,
+								"column": 27
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 34,
+							"end": 39,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 11
+								},
+								"end": {
+									"line": 4,
+									"column": 16
+								}
+							},
+							"name": "Error"
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 40,
+								"end": 49,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 17
+									},
+									"end": {
+										"line": 4,
+										"column": 26
+									}
+								},
+								"value": "message",
+								"raw": "'message'"
+							}
+						]
+					}
+				},
+				{
+					"type": "IfStatement",
+					"start": 54,
+					"end": 82,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 58,
+						"end": 62,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 5
+							},
+							"end": {
+								"line": 6,
+								"column": 9
+							}
+						},
+						"name": "cond"
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 64,
+						"end": 82,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 11
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ThrowStatement",
+								"start": 68,
+								"end": 79,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 13
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 74,
+									"end": 78,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 8
+										},
+										"end": {
+											"line": 7,
+											"column": 12
+										}
+									},
+									"name": "expr"
+								}
+							}
+						]
+					},
+					"alternate": null
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

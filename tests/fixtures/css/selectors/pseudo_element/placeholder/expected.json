@@ -1,0 +1,79 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 56,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 27,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 27,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "input",
+											"start": 9,
+											"end": 14
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "placeholder",
+											"start": 14,
+											"end": 27
+										}
+									],
+									"start": 9,
+									"end": 27
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 28,
+					"end": 47,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 32,
+							"end": 43,
+							"property": "color",
+							"value": "gray"
+						}
+					]
+				},
+				"start": 9,
+				"end": 47
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 48,
+			"styles": "\n\tinput::placeholder {\n\t\tcolor: gray;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 57,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

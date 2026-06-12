@@ -1,0 +1,435 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 100,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 99,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 90,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "WhileStatement",
+					"start": 20,
+					"end": 41,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 22
+						}
+					},
+					"test": {
+						"type": "AssignmentExpression",
+						"start": 28,
+						"end": 36,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 9
+							},
+							"end": {
+								"line": 2,
+								"column": 17
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 28,
+							"end": 29,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 9
+								},
+								"end": {
+									"line": 2,
+									"column": 10
+								}
+							},
+							"name": "x"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 32,
+							"end": 36,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 13
+								},
+								"end": {
+									"line": 2,
+									"column": 17
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 32,
+								"end": 34,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 13
+									},
+									"end": {
+										"line": 2,
+										"column": 15
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 39,
+						"end": 41,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 20
+							},
+							"end": {
+								"line": 2,
+								"column": 22
+							}
+						},
+						"body": []
+					}
+				},
+				{
+					"type": "WhileStatement",
+					"start": 43,
+					"end": 67,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 25
+						}
+					},
+					"test": {
+						"type": "AssignmentExpression",
+						"start": 51,
+						"end": 62,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 9
+							},
+							"end": {
+								"line": 3,
+								"column": 20
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 51,
+							"end": 52,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 9
+								},
+								"end": {
+									"line": 3,
+									"column": 10
+								}
+							},
+							"name": "x"
+						},
+						"right": {
+							"type": "ChainExpression",
+							"start": 55,
+							"end": 62,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 13
+								},
+								"end": {
+									"line": 3,
+									"column": 20
+								}
+							},
+							"expression": {
+								"type": "CallExpression",
+								"start": 55,
+								"end": 62,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 13
+									},
+									"end": {
+										"line": 3,
+										"column": 20
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 55,
+									"end": 59,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 13
+										},
+										"end": {
+											"line": 3,
+											"column": 17
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 55,
+										"end": 56,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 13
+											},
+											"end": {
+												"line": 3,
+												"column": 14
+											}
+										},
+										"name": "x"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 58,
+										"end": 59,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 16
+											},
+											"end": {
+												"line": 3,
+												"column": 17
+											}
+										},
+										"name": "a"
+									},
+									"computed": false,
+									"optional": true
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 60,
+										"end": 61,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 18
+											},
+											"end": {
+												"line": 3,
+												"column": 19
+											}
+										},
+										"name": "y"
+									}
+								],
+								"optional": false
+							}
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 65,
+						"end": 67,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 23
+							},
+							"end": {
+								"line": 3,
+								"column": 25
+							}
+						},
+						"body": []
+					}
+				},
+				{
+					"type": "WhileStatement",
+					"start": 69,
+					"end": 89,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 21
+						}
+					},
+					"test": {
+						"type": "AssignmentExpression",
+						"start": 77,
+						"end": 84,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 9
+							},
+							"end": {
+								"line": 4,
+								"column": 16
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 77,
+							"end": 78,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 9
+								},
+								"end": {
+									"line": 4,
+									"column": 10
+								}
+							},
+							"name": "x"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 81,
+							"end": 84,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 13
+								},
+								"end": {
+									"line": 4,
+									"column": 16
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 81,
+								"end": 82,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 13
+									},
+									"end": {
+										"line": 4,
+										"column": 14
+									}
+								},
+								"name": "y"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 83,
+								"end": 84,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 15
+									},
+									"end": {
+										"line": 4,
+										"column": 16
+									}
+								},
+								"name": "z"
+							},
+							"computed": false,
+							"optional": false
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 87,
+						"end": 89,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 19
+							},
+							"end": {
+								"line": 4,
+								"column": 21
+							}
+						},
+						"body": []
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

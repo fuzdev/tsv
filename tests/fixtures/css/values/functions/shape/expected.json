@@ -1,0 +1,129 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 410,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 401,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 39,
+							"property": "clip-path",
+							"value": "circle(50%)"
+						},
+						{
+							"type": "Declaration",
+							"start": 43,
+							"end": 77,
+							"property": "clip-path",
+							"value": "circle(50px at 50% 50%)"
+						},
+						{
+							"type": "Declaration",
+							"start": 81,
+							"end": 108,
+							"property": "clip-path",
+							"value": "ellipse(50% 25%)"
+						},
+						{
+							"type": "Declaration",
+							"start": 112,
+							"end": 152,
+							"property": "clip-path",
+							"value": "ellipse(100px 50px at center)"
+						},
+						{
+							"type": "Declaration",
+							"start": 156,
+							"end": 178,
+							"property": "clip-path",
+							"value": "inset(10px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 182,
+							"end": 229,
+							"property": "clip-path",
+							"value": "inset(10px 20px 30px 40px round 5px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 233,
+							"end": 283,
+							"property": "clip-path",
+							"value": "polygon(0 0, 100% 0, 100% 100%, 0 100%)"
+						},
+						{
+							"type": "Declaration",
+							"start": 287,
+							"end": 341,
+							"property": "clip-path",
+							"value": "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)"
+						},
+						{
+							"type": "Declaration",
+							"start": 345,
+							"end": 397,
+							"property": "clip-path",
+							"value": "path('M 10 10 L 90 10 L 90 90 L 10 90 Z')"
+						}
+					]
+				},
+				"start": 9,
+				"end": 401
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 402,
+			"styles": "\n\tdiv {\n\t\tclip-path: circle(50%);\n\t\tclip-path: circle(50px at 50% 50%);\n\t\tclip-path: ellipse(50% 25%);\n\t\tclip-path: ellipse(100px 50px at center);\n\t\tclip-path: inset(10px);\n\t\tclip-path: inset(10px 20px 30px 40px round 5px);\n\t\tclip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);\n\t\tclip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);\n\t\tclip-path: path('M 10 10 L 90 10 L 90 90 L 10 90 Z');\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 411,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

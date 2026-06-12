@@ -1,0 +1,101 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 145,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 136,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 40,
+							"property": "outline",
+							"value": "2px solid blue"
+						},
+						{
+							"type": "Declaration",
+							"start": 44,
+							"end": 62,
+							"property": "outline-width",
+							"value": "3px"
+						},
+						{
+							"type": "Declaration",
+							"start": 66,
+							"end": 87,
+							"property": "outline-style",
+							"value": "dashed"
+						},
+						{
+							"type": "Declaration",
+							"start": 91,
+							"end": 109,
+							"property": "outline-color",
+							"value": "red"
+						},
+						{
+							"type": "Declaration",
+							"start": 113,
+							"end": 132,
+							"property": "outline-offset",
+							"value": "5px"
+						}
+					]
+				},
+				"start": 9,
+				"end": 136
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 137,
+			"styles": "\n\tdiv {\n\t\toutline: 2px solid blue;\n\t\toutline-width: 3px;\n\t\toutline-style: dashed;\n\t\toutline-color: red;\n\t\toutline-offset: 5px;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 146,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

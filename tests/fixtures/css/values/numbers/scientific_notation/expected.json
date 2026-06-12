@@ -1,0 +1,143 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 150,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 141,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 15,
+							"end": 21,
+							"property": "a",
+							"value": "1e1"
+						},
+						{
+							"type": "Declaration",
+							"start": 25,
+							"end": 31,
+							"property": "b",
+							"value": "1e1"
+						},
+						{
+							"type": "Declaration",
+							"start": 35,
+							"end": 42,
+							"property": "c",
+							"value": "1e-1"
+						},
+						{
+							"type": "Declaration",
+							"start": 46,
+							"end": 55,
+							"property": "d",
+							"value": "1.5e10"
+						},
+						{
+							"type": "Declaration",
+							"start": 59,
+							"end": 68,
+							"property": "e",
+							"value": "1.5e10"
+						},
+						{
+							"type": "Declaration",
+							"start": 72,
+							"end": 82,
+							"property": "f",
+							"value": "1.5e-10"
+						},
+						{
+							"type": "Declaration",
+							"start": 86,
+							"end": 95,
+							"property": "g",
+							"value": "1.5e10"
+						},
+						{
+							"type": "Declaration",
+							"start": 99,
+							"end": 105,
+							"property": "h",
+							"value": "0.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 109,
+							"end": 115,
+							"property": "i",
+							"value": "1.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 119,
+							"end": 125,
+							"property": "j",
+							"value": "1e1"
+						},
+						{
+							"type": "Declaration",
+							"start": 129,
+							"end": 137,
+							"property": "k",
+							"value": "0.1e1"
+						}
+					]
+				},
+				"start": 9,
+				"end": 141
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 142,
+			"styles": "\n\ta {\n\t\ta: 1e1;\n\t\tb: 1e1;\n\t\tc: 1e-1;\n\t\td: 1.5e10;\n\t\te: 1.5e10;\n\t\tf: 1.5e-10;\n\t\tg: 1.5e10;\n\t\th: 0.5;\n\t\ti: 1.5;\n\t\tj: 1e1;\n\t\tk: 0.1e1;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 151,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

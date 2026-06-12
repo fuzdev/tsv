@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 435,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 426,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 41,
+							"end": 136,
+							"property": "animation-name",
+							"value": "a0000000000, a1111111111, a2222222222, a3333333333, a4444444444, a555555555, a6"
+						},
+						{
+							"type": "Declaration",
+							"start": 163,
+							"end": 262,
+							"property": "animation-name",
+							"value": "a0000000000, a1111111111, a2222222222, a3333333333, a4444444444, a555555555, a66"
+						},
+						{
+							"type": "Declaration",
+							"start": 305,
+							"end": 422,
+							"property": "animation-name",
+							"value": "a0000000000, a1111111111, a2222222222, a3333333333, a4444444444, a5555555555,\n\t\t\ta6666666666666666"
+						}
+					]
+				},
+				"start": 9,
+				"end": 426
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 427,
+			"styles": "\n\tdiv {\n\t\t/* before boundary */\n\t\tanimation-name: a0000000000, a1111111111, a2222222222, a3333333333, a4444444444, a555555555, a6;\n\t\t/* after boundary */\n\t\tanimation-name:\n\t\t\ta0000000000, a1111111111, a2222222222, a3333333333, a4444444444, a555555555, a66;\n\t\t/* 102+ chars - wraps to new line */\n\t\tanimation-name:\n\t\t\ta0000000000, a1111111111, a2222222222, a3333333333, a4444444444, a5555555555,\n\t\t\ta6666666666666666;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 436,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

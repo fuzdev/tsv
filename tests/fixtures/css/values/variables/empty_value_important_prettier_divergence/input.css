@@ -1,0 +1,6 @@
+:root {
+	/* Empty custom-property value carrying !important normalizes to a single space */
+	--a: !important;
+	/* Non-empty custom-property value with !important is unaffected */
+	--b: red !important;
+}

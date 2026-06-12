@@ -1,0 +1,327 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 238,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Line comment between } and while - we preserve, prettier moves into condition",
+			"start": 10,
+			"end": 90,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment before while",
+			"start": 109,
+			"end": 132,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " With blank line before comment",
+			"start": 147,
+			"end": 180,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " blank before",
+			"start": 200,
+			"end": 215,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 16
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 237,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 228,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "DoWhileStatement",
+					"start": 92,
+					"end": 144,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 11
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 95,
+						"end": 107,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 4
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 99,
+								"end": 104,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 99,
+									"end": 103,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 99,
+										"end": 101,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 141,
+						"end": 142,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 8
+							},
+							"end": {
+								"line": 7,
+								"column": 9
+							}
+						},
+						"name": "a",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " comment before while",
+								"start": 109,
+								"end": 132
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment between } and while - we preserve, prettier moves into condition",
+							"start": 10,
+							"end": 90
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 182,
+					"end": 227,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 11
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 185,
+						"end": 197,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 4
+							},
+							"end": {
+								"line": 12,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 189,
+								"end": 194,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 189,
+									"end": 193,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 189,
+										"end": 191,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 224,
+						"end": 225,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 8
+							},
+							"end": {
+								"line": 15,
+								"column": 9
+							}
+						},
+						"name": "a",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " blank before",
+								"start": 200,
+								"end": 215
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " With blank line before comment",
+							"start": 147,
+							"end": 180
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

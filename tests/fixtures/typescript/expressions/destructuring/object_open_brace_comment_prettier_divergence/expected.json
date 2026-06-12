@@ -1,0 +1,607 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 291,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " line comment trailing `{` - single property",
+			"start": 10,
+			"end": 56,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 66,
+			"end": 71,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 9
+				},
+				"end": {
+					"line": 3,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment trailing `{` - multiple properties",
+			"start": 88,
+			"end": 138,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 148,
+			"end": 153,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 9
+				},
+				"end": {
+					"line": 8,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment trailing `{`, then own-line leading comment",
+			"start": 175,
+			"end": 235,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " brace ",
+			"start": 245,
+			"end": 256,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 9
+				},
+				"end": {
+					"line": 14,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " lead",
+			"start": 259,
+			"end": 266,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 290,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 281,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 18,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 58,
+					"end": 85,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 64,
+							"end": 84,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 64,
+								"end": 79,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 74,
+										"end": 75,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 3
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 74,
+											"end": 75,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 2
+												},
+												"end": {
+													"line": 4,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 74,
+											"end": 75,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 2
+												},
+												"end": {
+													"line": 4,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c1",
+												"start": 66,
+												"end": 71
+											}
+										]
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 82,
+								"end": 84,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 5
+									},
+									"end": {
+										"line": 5,
+										"column": 7
+									}
+								},
+								"name": "o1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment trailing `{` - single property",
+							"start": 10,
+							"end": 56
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 140,
+					"end": 172,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 146,
+							"end": 171,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 146,
+								"end": 166,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 156,
+										"end": 157,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 3
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 156,
+											"end": 157,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 2
+												},
+												"end": {
+													"line": 9,
+													"column": 3
+												}
+											},
+											"name": "b"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 156,
+											"end": 157,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 2
+												},
+												"end": {
+													"line": 9,
+													"column": 3
+												}
+											},
+											"name": "b"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c2",
+												"start": 148,
+												"end": 153
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 161,
+										"end": 162,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 2
+											},
+											"end": {
+												"line": 10,
+												"column": 3
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 161,
+											"end": 162,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 2
+												},
+												"end": {
+													"line": 10,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 161,
+											"end": 162,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 2
+												},
+												"end": {
+													"line": 10,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 169,
+								"end": 171,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 5
+									},
+									"end": {
+										"line": 11,
+										"column": 7
+									}
+								},
+								"name": "o2"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment trailing `{` - multiple properties",
+							"start": 88,
+							"end": 138
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 237,
+					"end": 280,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 243,
+							"end": 279,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 7
+								},
+								"end": {
+									"line": 17,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 243,
+								"end": 274,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 17,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 269,
+										"end": 270,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 2
+											},
+											"end": {
+												"line": 16,
+												"column": 3
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 269,
+											"end": 270,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 2
+												},
+												"end": {
+													"line": 16,
+													"column": 3
+												}
+											},
+											"name": "d"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 269,
+											"end": 270,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 2
+												},
+												"end": {
+													"line": 16,
+													"column": 3
+												}
+											},
+											"name": "d"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " brace ",
+												"start": 245,
+												"end": 256
+											},
+											{
+												"type": "Line",
+												"value": " lead",
+												"start": 259,
+												"end": 266
+											}
+										]
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 277,
+								"end": 279,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 5
+									},
+									"end": {
+										"line": 17,
+										"column": 7
+									}
+								},
+								"name": "o3"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment trailing `{`, then own-line leading comment",
+							"start": 175,
+							"end": 235
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

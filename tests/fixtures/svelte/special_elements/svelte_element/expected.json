@@ -1,0 +1,153 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 111,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "SvelteElement",
+				"start": 0,
+				"end": 80,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 15,
+						"character": 15
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 27,
+						"end": 40,
+						"name": "class",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 27,
+								"character": 27
+							},
+							"end": {
+								"line": 1,
+								"column": 32,
+								"character": 32
+							}
+						},
+						"value": [
+							{
+								"start": 34,
+								"end": 39,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 41,
+						"end": 58,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 41,
+								"character": 41
+							},
+							"end": {
+								"line": 1,
+								"column": 50,
+								"character": 50
+							}
+						},
+						"value": [
+							{
+								"start": 52,
+								"end": 57,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 59,
+							"end": 63,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				},
+				"tag": {
+					"type": "Identifier",
+					"start": 22,
+					"end": 25,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 22
+						},
+						"end": {
+							"line": 1,
+							"column": 25
+						}
+					},
+					"name": "tag"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 80,
+				"end": 82,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "SvelteElement",
+				"start": 82,
+				"end": 110,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 83
+					},
+					"end": {
+						"line": 3,
+						"column": 15,
+						"character": 97
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"tag": {
+					"type": "Literal",
+					"value": "hr",
+					"raw": "'hr'",
+					"start": 104,
+					"end": 106
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,80 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 44,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 15,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 15,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "link",
+											"args": null,
+											"start": 10,
+											"end": 15
+										}
+									],
+									"start": 9,
+									"end": 15
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 16,
+					"end": 35,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 20,
+							"end": 31,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 9,
+				"end": 35
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 36,
+			"styles": "\n\ta:link {\n\t\tcolor: blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 45,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,395 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 145,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 144,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 135,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "SwitchStatement",
+					"start": 20,
+					"end": 134,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 28,
+						"end": 29,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 9
+							},
+							"end": {
+								"line": 2,
+								"column": 10
+							}
+						},
+						"name": "x"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 35,
+							"end": 70,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 2
+								},
+								"end": {
+									"line": 6,
+									"column": 3
+								}
+							},
+							"consequent": [
+								{
+									"type": "BlockStatement",
+									"start": 45,
+									"end": 70,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 12
+										},
+										"end": {
+											"line": 6,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 50,
+											"end": 56,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 3
+												},
+												"end": {
+													"line": 4,
+													"column": 9
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 50,
+												"end": 55,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 3
+													},
+													"end": {
+														"line": 4,
+														"column": 8
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 50,
+													"end": 53,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 3
+														},
+														"end": {
+															"line": 4,
+															"column": 6
+														}
+													},
+													"name": "foo"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										},
+										{
+											"type": "BreakStatement",
+											"start": 60,
+											"end": 66,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 3
+												},
+												"end": {
+													"line": 5,
+													"column": 9
+												}
+											},
+											"label": null
+										}
+									]
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 40,
+								"end": 43,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 10
+									}
+								},
+								"value": "a",
+								"raw": "'a'"
+							}
+						},
+						{
+							"type": "SwitchCase",
+							"start": 74,
+							"end": 109,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 2
+								},
+								"end": {
+									"line": 11,
+									"column": 3
+								}
+							},
+							"consequent": [
+								{
+									"type": "BlockStatement",
+									"start": 84,
+									"end": 109,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 12
+										},
+										"end": {
+											"line": 11,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 89,
+											"end": 95,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 3
+												},
+												"end": {
+													"line": 9,
+													"column": 9
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 89,
+												"end": 94,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 3
+													},
+													"end": {
+														"line": 9,
+														"column": 8
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 89,
+													"end": 92,
+													"loc": {
+														"start": {
+															"line": 9,
+															"column": 3
+														},
+														"end": {
+															"line": 9,
+															"column": 6
+														}
+													},
+													"name": "bar"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										},
+										{
+											"type": "BreakStatement",
+											"start": 99,
+											"end": 105,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 3
+												},
+												"end": {
+													"line": 10,
+													"column": 9
+												}
+											},
+											"label": null
+										}
+									]
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 79,
+								"end": 82,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 10
+									}
+								},
+								"value": "b",
+								"raw": "'b'"
+							}
+						},
+						{
+							"type": "SwitchCase",
+							"start": 113,
+							"end": 131,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 2
+								},
+								"end": {
+									"line": 14,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "ExpressionStatement",
+									"start": 125,
+									"end": 131,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 3
+										},
+										"end": {
+											"line": 14,
+											"column": 9
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 125,
+										"end": 130,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 3
+											},
+											"end": {
+												"line": 14,
+												"column": 8
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 125,
+											"end": 128,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 3
+												},
+												"end": {
+													"line": 14,
+													"column": 6
+												}
+											},
+											"name": "baz"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								}
+							],
+							"test": null
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

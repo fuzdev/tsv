@@ -1,0 +1,172 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 48,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " , ",
+			"start": 25,
+			"end": 32,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 6
+				},
+				"end": {
+					"line": 2,
+					"column": 13
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 47,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 38,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 20,
+					"end": 37,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 18
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 20,
+						"end": 36,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 1
+							},
+							"end": {
+								"line": 2,
+								"column": 17
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 20,
+							"end": 22,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 1
+								},
+								"end": {
+									"line": 2,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 23,
+								"end": 24,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 4
+									},
+									"end": {
+										"line": 2,
+										"column": 5
+									}
+								},
+								"name": "a",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " , ",
+										"start": 25,
+										"end": 32
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 34,
+								"end": 35,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 15
+									},
+									"end": {
+										"line": 2,
+										"column": 16
+									}
+								},
+								"name": "b"
+							}
+						],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

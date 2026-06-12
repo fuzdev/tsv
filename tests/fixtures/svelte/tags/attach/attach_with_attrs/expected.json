@@ -1,0 +1,292 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 137,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 36,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 5,
+						"end": 16,
+						"name": "class",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 5,
+								"character": 5
+							},
+							"end": {
+								"line": 1,
+								"column": 10,
+								"character": 10
+							}
+						},
+						"value": [
+							{
+								"start": 12,
+								"end": 15,
+								"type": "Text",
+								"raw": "foo",
+								"data": "foo"
+							}
+						]
+					},
+					{
+						"type": "AttachTag",
+						"start": 17,
+						"end": 29,
+						"expression": {
+							"type": "Identifier",
+							"start": 26,
+							"end": 28,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 26
+								},
+								"end": {
+									"line": 1,
+									"column": 28
+								}
+							},
+							"name": "fn"
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 36,
+				"end": 38,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 38,
+				"end": 74,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 39
+					},
+					"end": {
+						"line": 3,
+						"column": 4,
+						"character": 42
+					}
+				},
+				"attributes": [
+					{
+						"type": "AttachTag",
+						"start": 43,
+						"end": 55,
+						"expression": {
+							"type": "Identifier",
+							"start": 52,
+							"end": 54,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 14
+								},
+								"end": {
+									"line": 3,
+									"column": 16
+								}
+							},
+							"name": "fn"
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 56,
+						"end": 67,
+						"name": "class",
+						"name_loc": {
+							"start": {
+								"line": 3,
+								"column": 18,
+								"character": 56
+							},
+							"end": {
+								"line": 3,
+								"column": 23,
+								"character": 61
+							}
+						},
+						"value": [
+							{
+								"start": 63,
+								"end": 66,
+								"type": "Text",
+								"raw": "foo",
+								"data": "foo"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 74,
+				"end": 76,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 76,
+				"end": 136,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 77
+					},
+					"end": {
+						"line": 5,
+						"column": 4,
+						"character": 80
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 81,
+						"end": 92,
+						"name": "class",
+						"name_loc": {
+							"start": {
+								"line": 5,
+								"column": 5,
+								"character": 81
+							},
+							"end": {
+								"line": 5,
+								"column": 10,
+								"character": 86
+							}
+						},
+						"value": [
+							{
+								"start": 88,
+								"end": 91,
+								"type": "Text",
+								"raw": "foo",
+								"data": "foo"
+							}
+						]
+					},
+					{
+						"type": "AttachTag",
+						"start": 93,
+						"end": 106,
+						"expression": {
+							"type": "Identifier",
+							"start": 102,
+							"end": 105,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 26
+								},
+								"end": {
+									"line": 5,
+									"column": 29
+								}
+							},
+							"name": "fn1"
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 107,
+						"end": 115,
+						"name": "id",
+						"name_loc": {
+							"start": {
+								"line": 5,
+								"column": 31,
+								"character": 107
+							},
+							"end": {
+								"line": 5,
+								"column": 33,
+								"character": 109
+							}
+						},
+						"value": [
+							{
+								"start": 111,
+								"end": 114,
+								"type": "Text",
+								"raw": "bar",
+								"data": "bar"
+							}
+						]
+					},
+					{
+						"type": "AttachTag",
+						"start": 116,
+						"end": 129,
+						"expression": {
+							"type": "Identifier",
+							"start": 125,
+							"end": 128,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 49
+								},
+								"end": {
+									"line": 5,
+									"column": 52
+								}
+							},
+							"name": "fn2"
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,678 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 204,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 203,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 10,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 41,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 16,
+							"end": 40,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 2,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 16,
+								"end": 20,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 11
+									}
+								},
+								"name": "obj1"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 23,
+								"end": 40,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 14
+									},
+									"end": {
+										"line": 2,
+										"column": 31
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 24,
+										"end": 39,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 15
+											},
+											"end": {
+												"line": 2,
+												"column": 30
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 24,
+											"end": 33,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 15
+												},
+												"end": {
+													"line": 2,
+													"column": 24
+												}
+											},
+											"name": "__proto__"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 35,
+											"end": 39,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 26
+												},
+												"end": {
+													"line": 2,
+													"column": 30
+												}
+											},
+											"value": null,
+											"raw": "null"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 43,
+					"end": 74,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 49,
+							"end": 73,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 49,
+								"end": 53,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 11
+									}
+								},
+								"name": "obj2"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 56,
+								"end": 73,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 14
+									},
+									"end": {
+										"line": 3,
+										"column": 31
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 57,
+										"end": 72,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 15
+											},
+											"end": {
+												"line": 3,
+												"column": 30
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 57,
+											"end": 66,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 15
+												},
+												"end": {
+													"line": 3,
+													"column": 24
+												}
+											},
+											"name": "__proto__"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 68,
+											"end": 72,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 26
+												},
+												"end": {
+													"line": 3,
+													"column": 30
+												}
+											},
+											"name": "base"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 76,
+					"end": 108,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 33
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 82,
+							"end": 107,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 32
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 82,
+								"end": 86,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 11
+									}
+								},
+								"name": "obj3"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 89,
+								"end": 107,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 14
+									},
+									"end": {
+										"line": 4,
+										"column": 32
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 90,
+										"end": 106,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 15
+											},
+											"end": {
+												"line": 4,
+												"column": 31
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 90,
+											"end": 99,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 15
+												},
+												"end": {
+													"line": 4,
+													"column": 24
+												}
+											},
+											"name": "__proto__"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 101,
+											"end": 106,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 26
+												},
+												"end": {
+													"line": 4,
+													"column": 31
+												}
+											},
+											"name": "value"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 110,
+					"end": 146,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 37
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 116,
+							"end": 145,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 36
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 116,
+								"end": 120,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 11
+									}
+								},
+								"name": "obj4"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 123,
+								"end": 145,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 14
+									},
+									"end": {
+										"line": 5,
+										"column": 36
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 124,
+										"end": 144,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 15
+											},
+											"end": {
+												"line": 5,
+												"column": 35
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": true,
+										"key": {
+											"type": "Literal",
+											"start": 125,
+											"end": 136,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 16
+												},
+												"end": {
+													"line": 5,
+													"column": 27
+												}
+											},
+											"value": "__proto__",
+											"raw": "'__proto__'"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 139,
+											"end": 144,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 30
+												},
+												"end": {
+													"line": 5,
+													"column": 35
+												}
+											},
+											"name": "value"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 148,
+					"end": 193,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 154,
+							"end": 192,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 154,
+								"end": 158,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 11
+									}
+								},
+								"name": "obj5"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 161,
+								"end": 192,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 14
+									},
+									"end": {
+										"line": 9,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 165,
+										"end": 180,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 2
+											},
+											"end": {
+												"line": 7,
+												"column": 17
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 165,
+											"end": 174,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 2
+												},
+												"end": {
+													"line": 7,
+													"column": 11
+												}
+											},
+											"name": "__proto__"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 176,
+											"end": 180,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 13
+												},
+												"end": {
+													"line": 7,
+													"column": 17
+												}
+											},
+											"value": null,
+											"raw": "null"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 184,
+										"end": 188,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 2
+											},
+											"end": {
+												"line": 8,
+												"column": 6
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 184,
+											"end": 185,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 2
+												},
+												"end": {
+													"line": 8,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 187,
+											"end": 188,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 5
+												},
+												"end": {
+													"line": 8,
+													"column": 6
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

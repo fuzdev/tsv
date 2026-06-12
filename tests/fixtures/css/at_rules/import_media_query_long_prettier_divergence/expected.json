@@ -1,0 +1,50 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 529,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 134,
+				"end": 232,
+				"name": "import",
+				"prelude": "url('./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.css') screen and (min-width: 768px)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 285,
+				"end": 386,
+				"name": "import",
+				"prelude": "url('./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.css') screen and\n\t\t(min-width: 768px)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 418,
+				"end": 520,
+				"name": "import",
+				"prelude": "url('./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.css') screen and\n\t\t(min-width: 768px)",
+				"block": null
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 521,
+			"styles": "\n\t/* @import wraps at 101 chars (we wrap at >100, Prettier waits until >102) */\n\n\t/* 100 chars - stays inline (both agree) */\n\t@import url('./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.css') screen and (min-width: 768px);\n\n\t/* 101 chars - we wrap, Prettier stays inline */\n\t@import url('./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.css') screen and\n\t\t(min-width: 768px);\n\n\t/* 102 chars - both wrap */\n\t@import url('./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.css') screen and\n\t\t(min-width: 768px);\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 530,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

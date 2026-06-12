@@ -1,0 +1,94 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 67,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 39,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 16,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 9,
+											"end": 16
+										}
+									],
+									"start": 9,
+									"end": 16
+								}
+							]
+						},
+						{
+							"type": "ComplexSelector",
+							"start": 32,
+							"end": 39,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class2",
+											"start": 32,
+											"end": 39
+										}
+									],
+									"start": 32,
+									"end": 39
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 40,
+					"end": 58,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 44,
+							"end": 54,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 9,
+				"end": 58
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 59,
+			"styles": "\n\t.class1, /* comment */ .class2 {\n\t\tcolor: red;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 68,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

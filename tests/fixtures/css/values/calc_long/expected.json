@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 555,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 546,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 81,
+							"end": 176,
+							"property": "min-width",
+							"value": "calc(100% - 20px + 10px - 5px + 2px - 1px + 0.5px - 0.25px + 0.125px + 0.00390625px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 238,
+							"end": 341,
+							"property": "min-width",
+							"value": "calc(\n\t\t\t100% - 20px + 10px - 5px + 2px - 1px + 0.5px - 0.25px + 0.125px + 0.001953125px\n\t\t)"
+						},
+						{
+							"type": "Declaration",
+							"start": 418,
+							"end": 542,
+							"property": "min-width",
+							"value": "calc(\n\t\t\t100% - 20px + 10px - 5px + 2px - 1px + 0.5px - 0.25px + 0.125px + 0.001953125px +\n\t\t\t\t0.0009765625px\n\t\t)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 546
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 547,
+			"styles": "\n\tdiv {\n\t\t/* calc() - 100 chars exactly - stays inline (at boundary) */\n\t\tmin-width: calc(100% - 20px + 10px - 5px + 2px - 1px + 0.5px - 0.25px + 0.125px + 0.00390625px);\n\n\t\t/* calc() - 101 chars - wraps (exceeds print_width) */\n\t\tmin-width: calc(\n\t\t\t100% - 20px + 10px - 5px + 2px - 1px + 0.5px - 0.25px + 0.125px + 0.001953125px\n\t\t);\n\n\t\t/* calc() - expression exceeds 100 chars - wraps with continuation */\n\t\tmin-width: calc(\n\t\t\t100% - 20px + 10px - 5px + 2px - 1px + 0.5px - 0.25px + 0.125px + 0.001953125px +\n\t\t\t\t0.0009765625px\n\t\t);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 556,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,437 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 330,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Exactly 100 chars - fits on one line",
+			"start": 20,
+			"end": 59,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Exactly 101 chars - array expands to multi-line",
+			"start": 162,
+			"end": 212,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 51
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 329,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 320,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 61,
+					"end": 159,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 99
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 67,
+							"end": 158,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 98
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 67,
+								"end": 83,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 23
+									}
+								},
+								"name": "a",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 68,
+									"end": 83,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 8
+										},
+										"end": {
+											"line": 3,
+											"column": 23
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 70,
+										"end": 83,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 10
+											},
+											"end": {
+												"line": 3,
+												"column": 23
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 70,
+											"end": 75,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 10
+												},
+												"end": {
+													"line": 3,
+													"column": 15
+												}
+											},
+											"name": "Array"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 75,
+											"end": 83,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 15
+												},
+												"end": {
+													"line": 3,
+													"column": 23
+												}
+											},
+											"params": [
+												{
+													"type": "TSStringKeyword",
+													"start": 76,
+													"end": 82,
+													"loc": {
+														"start": {
+															"line": 3,
+															"column": 16
+														},
+														"end": {
+															"line": 3,
+															"column": 22
+														}
+													}
+												}
+											]
+										}
+									}
+								}
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 86,
+								"end": 158,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 26
+									},
+									"end": {
+										"line": 3,
+										"column": 98
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 87,
+										"end": 157,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 27
+											},
+											"end": {
+												"line": 3,
+												"column": 97
+											}
+										},
+										"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+										"raw": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Exactly 100 chars - fits on one line",
+							"start": 20,
+							"end": 59
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 214,
+					"end": 319,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 220,
+							"end": 318,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 220,
+								"end": 236,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 23
+									}
+								},
+								"name": "b",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 221,
+									"end": 236,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 8
+										},
+										"end": {
+											"line": 6,
+											"column": 23
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 223,
+										"end": 236,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 10
+											},
+											"end": {
+												"line": 6,
+												"column": 23
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 223,
+											"end": 228,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 10
+												},
+												"end": {
+													"line": 6,
+													"column": 15
+												}
+											},
+											"name": "Array"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 228,
+											"end": 236,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 15
+												},
+												"end": {
+													"line": 6,
+													"column": 23
+												}
+											},
+											"params": [
+												{
+													"type": "TSStringKeyword",
+													"start": 229,
+													"end": 235,
+													"loc": {
+														"start": {
+															"line": 6,
+															"column": 16
+														},
+														"end": {
+															"line": 6,
+															"column": 22
+														}
+													}
+												}
+											]
+										}
+									}
+								}
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 239,
+								"end": 318,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 26
+									},
+									"end": {
+										"line": 8,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 243,
+										"end": 314,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 2
+											},
+											"end": {
+												"line": 7,
+												"column": 73
+											}
+										},
+										"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+										"raw": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Exactly 101 chars - array expands to multi-line",
+							"start": 162,
+							"end": 212
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

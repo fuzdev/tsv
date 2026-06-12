@@ -1,0 +1,120 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 57,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "AwaitBlock",
+				"start": 0,
+				"end": 56,
+				"expression": {
+					"type": "Identifier",
+					"start": 8,
+					"end": 15,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 8
+						},
+						"end": {
+							"line": 1,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": {
+					"type": "Identifier",
+					"name": "value",
+					"start": 21,
+					"end": 26,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 21,
+							"character": 21
+						},
+						"end": {
+							"line": 1,
+							"column": 26,
+							"character": 26
+						}
+					}
+				},
+				"error": null,
+				"pending": null,
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 27,
+							"end": 29,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 29,
+							"end": 47,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 30
+								},
+								"end": {
+									"line": 2,
+									"column": 5,
+									"character": 33
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 34,
+										"end": 41,
+										"expression": {
+											"type": "Identifier",
+											"start": 35,
+											"end": 40,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 7
+												},
+												"end": {
+													"line": 2,
+													"column": 12
+												}
+											},
+											"name": "value"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 47,
+							"end": 48,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"catch": null
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

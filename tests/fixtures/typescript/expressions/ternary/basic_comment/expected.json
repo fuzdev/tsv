@@ -1,0 +1,731 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 422,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " after equals",
+			"start": 20,
+			"end": 35,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 11
+				},
+				"end": {
+					"line": 2,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " before condition",
+			"start": 38,
+			"end": 57,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inline",
+			"start": 65,
+			"end": 74,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 7
+				},
+				"end": {
+					"line": 4,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " before consequent",
+			"start": 80,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 5
+				},
+				"end": {
+					"line": 5,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inline consequent",
+			"start": 107,
+			"end": 127,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 6
+				},
+				"end": {
+					"line": 6,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " before alternate",
+			"start": 133,
+			"end": 152,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 5
+				},
+				"end": {
+					"line": 7,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inline alternate",
+			"start": 160,
+			"end": 179,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 7
+				},
+				"end": {
+					"line": 8,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Simple inline ternary with trailing",
+			"start": 182,
+			"end": 220,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing after ternary",
+			"start": 246,
+			"end": 271,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 25
+				},
+				"end": {
+					"line": 11,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Block comment variant",
+			"start": 274,
+			"end": 298,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " after equals ",
+			"start": 310,
+			"end": 328,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 11
+				},
+				"end": {
+					"line": 14,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " before ",
+			"start": 329,
+			"end": 341,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 30
+				},
+				"end": {
+					"line": 14,
+					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " after cond ",
+			"start": 347,
+			"end": 363,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 48
+				},
+				"end": {
+					"line": 14,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " before cons ",
+			"start": 368,
+			"end": 385,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 4
+				},
+				"end": {
+					"line": 15,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " before alt ",
+			"start": 392,
+			"end": 408,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 4
+				},
+				"end": {
+					"line": 16,
+					"column": 20
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 421,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 412,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 159,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 16,
+							"end": 158,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 16,
+								"end": 17,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 8
+									}
+								},
+								"name": "x"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 60,
+								"end": 158,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 5
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 60,
+									"end": 64,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 6
+										}
+									},
+									"name": "cond",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " inline",
+											"start": 65,
+											"end": 74
+										}
+									]
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 105,
+									"end": 106,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 4
+										},
+										"end": {
+											"line": 6,
+											"column": 5
+										}
+									},
+									"name": "a",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " before consequent",
+											"start": 80,
+											"end": 100
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " inline consequent",
+											"start": 107,
+											"end": 127
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 157,
+									"end": 158,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 4
+										},
+										"end": {
+											"line": 8,
+											"column": 5
+										}
+									},
+									"name": "b",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " before alternate",
+											"start": 133,
+											"end": 152
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " after equals",
+										"start": 20,
+										"end": 35
+									},
+									{
+										"type": "Line",
+										"value": " before condition",
+										"start": 38,
+										"end": 57
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " inline alternate",
+							"start": 160,
+							"end": 179
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 222,
+					"end": 245,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 24
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 228,
+							"end": 244,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 23
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 228,
+								"end": 229,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"name": "y"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 232,
+								"end": 244,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 11
+									},
+									"end": {
+										"line": 11,
+										"column": 23
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 232,
+									"end": 236,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 11
+										},
+										"end": {
+											"line": 11,
+											"column": 15
+										}
+									},
+									"name": "cond"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 239,
+									"end": 240,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 18
+										},
+										"end": {
+											"line": 11,
+											"column": 19
+										}
+									},
+									"name": "a"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 243,
+									"end": 244,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 22
+										},
+										"end": {
+											"line": 11,
+											"column": 23
+										}
+									},
+									"name": "b"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Simple inline ternary with trailing",
+							"start": 182,
+							"end": 220
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " trailing after ternary",
+							"start": 246,
+							"end": 271
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 300,
+					"end": 411,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 23
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 306,
+							"end": 410,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 7
+								},
+								"end": {
+									"line": 16,
+									"column": 22
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 306,
+								"end": 307,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 8
+									}
+								},
+								"name": "z"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 342,
+								"end": 410,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 43
+									},
+									"end": {
+										"line": 16,
+										"column": 22
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 342,
+									"end": 346,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 43
+										},
+										"end": {
+											"line": 14,
+											"column": 47
+										}
+									},
+									"name": "cond",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " after cond ",
+											"start": 347,
+											"end": 363
+										}
+									]
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 386,
+									"end": 387,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 22
+										},
+										"end": {
+											"line": 15,
+											"column": 23
+										}
+									},
+									"name": "a",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " before cons ",
+											"start": 368,
+											"end": 385
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 409,
+									"end": 410,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 21
+										},
+										"end": {
+											"line": 16,
+											"column": 22
+										}
+									},
+									"name": "b",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " before alt ",
+											"start": 392,
+											"end": 408
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " after equals ",
+										"start": 310,
+										"end": 328
+									},
+									{
+										"type": "Block",
+										"value": " before ",
+										"start": 329,
+										"end": 341
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block comment variant",
+							"start": 274,
+							"end": 298
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

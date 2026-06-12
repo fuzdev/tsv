@@ -1,0 +1,267 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 117,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " comment1 ",
+			"start": 10,
+			"end": 24,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment2 ",
+			"start": 43,
+			"end": 57,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 34
+				},
+				"end": {
+					"line": 2,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment3 ",
+			"start": 59,
+			"end": 73,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment4 ",
+			"start": 92,
+			"end": 106,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 34
+				},
+				"end": {
+					"line": 3,
+					"column": 48
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 116,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 107,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 25,
+					"end": 42,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 16
+						},
+						"end": {
+							"line": 2,
+							"column": 33
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 31,
+							"end": 41,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 22
+								},
+								"end": {
+									"line": 2,
+									"column": 32
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 31,
+								"end": 37,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 22
+									},
+									"end": {
+										"line": 2,
+										"column": 28
+									}
+								},
+								"name": "value1"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 40,
+								"end": 41,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 31
+									},
+									"end": {
+										"line": 2,
+										"column": 32
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " comment1 ",
+							"start": 10,
+							"end": 24
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " comment2 ",
+							"start": 43,
+							"end": 57
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 74,
+					"end": 91,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 16
+						},
+						"end": {
+							"line": 3,
+							"column": 33
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 80,
+							"end": 90,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 22
+								},
+								"end": {
+									"line": 3,
+									"column": 32
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 80,
+								"end": 86,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 22
+									},
+									"end": {
+										"line": 3,
+										"column": 28
+									}
+								},
+								"name": "value2"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 89,
+								"end": 90,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 31
+									},
+									"end": {
+										"line": 3,
+										"column": 32
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " comment3 ",
+							"start": 59,
+							"end": 73
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " comment4 ",
+							"start": 92,
+							"end": 106
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -1,0 +1,538 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 250,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " new with class expression - needs parens",
+			"start": 20,
+			"end": 63,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " contrast: regular callee - no parens needed",
+			"start": 170,
+			"end": 216,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 47
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 249,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 240,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 65,
+					"end": 92,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 28
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 71,
+							"end": 91,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 27
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 71,
+								"end": 72,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "NewExpression",
+								"start": 75,
+								"end": 91,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 27
+									}
+								},
+								"callee": {
+									"type": "ClassExpression",
+									"start": 80,
+									"end": 88,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 16
+										},
+										"end": {
+											"line": 3,
+											"column": 24
+										}
+									},
+									"id": null,
+									"superClass": null,
+									"body": {
+										"type": "ClassBody",
+										"start": 86,
+										"end": 88,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 22
+											},
+											"end": {
+												"line": 3,
+												"column": 24
+											}
+										},
+										"body": []
+									}
+								},
+								"arguments": []
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " new with class expression - needs parens",
+							"start": 20,
+							"end": 63
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 94,
+					"end": 125,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 100,
+							"end": 124,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 100,
+								"end": 101,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "NewExpression",
+								"start": 104,
+								"end": 124,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 11
+									},
+									"end": {
+										"line": 4,
+										"column": 31
+									}
+								},
+								"callee": {
+									"type": "ClassExpression",
+									"start": 109,
+									"end": 121,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 16
+										},
+										"end": {
+											"line": 4,
+											"column": 28
+										}
+									},
+									"id": {
+										"type": "Identifier",
+										"start": 115,
+										"end": 118,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 22
+											},
+											"end": {
+												"line": 4,
+												"column": 25
+											}
+										},
+										"name": "Foo"
+									},
+									"superClass": null,
+									"body": {
+										"type": "ClassBody",
+										"start": 119,
+										"end": 121,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 26
+											},
+											"end": {
+												"line": 4,
+												"column": 28
+											}
+										},
+										"body": []
+									}
+								},
+								"arguments": []
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 127,
+					"end": 167,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 41
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 133,
+							"end": 166,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 40
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 133,
+								"end": 134,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "NewExpression",
+								"start": 137,
+								"end": 166,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 40
+									}
+								},
+								"callee": {
+									"type": "ClassExpression",
+									"start": 142,
+									"end": 163,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 16
+										},
+										"end": {
+											"line": 5,
+											"column": 37
+										}
+									},
+									"id": null,
+									"superClass": {
+										"type": "Identifier",
+										"start": 156,
+										"end": 160,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 30
+											},
+											"end": {
+												"line": 5,
+												"column": 34
+											}
+										},
+										"name": "Base"
+									},
+									"body": {
+										"type": "ClassBody",
+										"start": 161,
+										"end": 163,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 35
+											},
+											"end": {
+												"line": 5,
+												"column": 37
+											}
+										},
+										"body": []
+									}
+								},
+								"arguments": []
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 218,
+					"end": 239,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 22
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 224,
+							"end": 238,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 21
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 224,
+								"end": 225,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 228,
+								"end": 238,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 11
+									},
+									"end": {
+										"line": 8,
+										"column": 21
+									}
+								},
+								"callee": {
+									"type": "ClassExpression",
+									"start": 228,
+									"end": 236,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 11
+										},
+										"end": {
+											"line": 8,
+											"column": 19
+										}
+									},
+									"id": null,
+									"superClass": null,
+									"body": {
+										"type": "ClassBody",
+										"start": 234,
+										"end": 236,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 17
+											},
+											"end": {
+												"line": 8,
+												"column": 19
+											}
+										},
+										"body": []
+									}
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " contrast: regular callee - no parens needed",
+							"start": 170,
+							"end": 216
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

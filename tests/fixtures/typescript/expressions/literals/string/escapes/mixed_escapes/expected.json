@@ -1,0 +1,236 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 148,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 147,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 138,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 41,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 16,
+							"end": 40,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 2,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 16,
+								"end": 21,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 12
+									}
+								},
+								"name": "mixed"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 24,
+								"end": 40,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 15
+									},
+									"end": {
+										"line": 2,
+										"column": 31
+									}
+								},
+								"value": "\nAB\t",
+								"raw": "'\\n\\u0041\\x42\\t'"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 43,
+					"end": 95,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 53
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 49,
+							"end": 94,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 52
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 49,
+								"end": 56,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 14
+									}
+								},
+								"name": "complex"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 59,
+								"end": 94,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 17
+									},
+									"end": {
+										"line": 3,
+										"column": 52
+									}
+								},
+								"value": "Start\nMiddle: A = A\tEnd",
+								"raw": "'Start\\nMiddle: \\u0041 = \\x41\\tEnd'"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 97,
+					"end": 137,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 41
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 103,
+							"end": 136,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 40
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 103,
+								"end": 110,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 14
+									}
+								},
+								"name": "unicode"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 113,
+								"end": 136,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 17
+									},
+									"end": {
+										"line": 4,
+										"column": 40
+									}
+								},
+								"value": "💩\nHi",
+								"raw": "'\\u{1F4A9}\\n\\u0048\\x69'"
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

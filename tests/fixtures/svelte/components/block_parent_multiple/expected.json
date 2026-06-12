@@ -1,0 +1,113 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 56,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 55,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 2,
+						"character": 2
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 3,
+							"end": 9,
+							"raw": "text1 ",
+							"data": "text1 "
+						},
+						{
+							"type": "Component",
+							"start": 9,
+							"end": 18,
+							"name": "Comp1",
+							"name_loc": {
+								"start": {
+									"line": 1,
+									"column": 10,
+									"character": 10
+								},
+								"end": {
+									"line": 1,
+									"column": 15,
+									"character": 15
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 18,
+							"end": 25,
+							"raw": " text2 ",
+							"data": " text2 "
+						},
+						{
+							"type": "Component",
+							"start": 25,
+							"end": 45,
+							"name": "Comp2",
+							"name_loc": {
+								"start": {
+									"line": 1,
+									"column": 26,
+									"character": 26
+								},
+								"end": {
+									"line": 1,
+									"column": 31,
+									"character": 31
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 32,
+										"end": 37,
+										"raw": "text3",
+										"data": "text3"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 45,
+							"end": 51,
+							"raw": " text4",
+							"data": " text4"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

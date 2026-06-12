@@ -1,0 +1,1 @@
+<!-- comment --><div>text</div>

@@ -1,0 +1,280 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 135,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Comment should be outside parens wrapping ternary tag",
+			"start": 20,
+			"end": 76,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 88,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 11
+				},
+				"end": {
+					"line": 3,
+					"column": 24
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 134,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 125,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 78,
+					"end": 124,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 47
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 84,
+							"end": 123,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 46
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 84,
+								"end": 85,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 102,
+								"end": 123,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 25
+									},
+									"end": {
+										"line": 3,
+										"column": 46
+									}
+								},
+								"tag": {
+									"type": "ConditionalExpression",
+									"start": 103,
+									"end": 112,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 26
+										},
+										"end": {
+											"line": 3,
+											"column": 35
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 103,
+										"end": 104,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 26
+											},
+											"end": {
+												"line": 3,
+												"column": 27
+											}
+										},
+										"name": "x"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 107,
+										"end": 108,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 30
+											},
+											"end": {
+												"line": 3,
+												"column": 31
+											}
+										},
+										"name": "y"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 111,
+										"end": 112,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 34
+											},
+											"end": {
+												"line": 3,
+												"column": 35
+											}
+										},
+										"name": "z"
+									}
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 113,
+									"end": 123,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 36
+										},
+										"end": {
+											"line": 3,
+											"column": 46
+										}
+									},
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 114,
+											"end": 122,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 37
+												},
+												"end": {
+													"line": 3,
+													"column": 45
+												}
+											},
+											"value": {
+												"raw": "template",
+												"cooked": "template"
+											},
+											"tail": true
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " comment ",
+										"start": 88,
+										"end": 101
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Comment should be outside parens wrapping ternary tag",
+							"start": 20,
+							"end": 76
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

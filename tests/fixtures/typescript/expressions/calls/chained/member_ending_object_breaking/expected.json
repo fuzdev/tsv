@@ -1,0 +1,790 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 392,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Chain ending with member access - object hugs inline",
+			"start": 20,
+			"end": 75,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Longer chain - still hugs",
+			"start": 125,
+			"end": 153,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Very long chain - breaks eventually",
+			"start": 218,
+			"end": 256,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 39
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 391,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 382,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 77,
+					"end": 122,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 11
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 77,
+						"end": 121,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 5,
+								"column": 10
+							}
+						},
+						"object": {
+							"type": "CallExpression",
+							"start": 77,
+							"end": 114,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 5,
+									"column": 3
+								}
+							},
+							"callee": {
+								"type": "MemberExpression",
+								"start": 77,
+								"end": 91,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 1
+									},
+									"end": {
+										"line": 3,
+										"column": 15
+									}
+								},
+								"object": {
+									"type": "MemberExpression",
+									"start": 77,
+									"end": 86,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 1
+										},
+										"end": {
+											"line": 3,
+											"column": 10
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 77,
+										"end": 81,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 1
+											},
+											"end": {
+												"line": 3,
+												"column": 5
+											}
+										},
+										"name": "aaaa"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 82,
+										"end": 86,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 6
+											},
+											"end": {
+												"line": 3,
+												"column": 10
+											}
+										},
+										"name": "bbbb"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 87,
+									"end": 91,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 11
+										},
+										"end": {
+											"line": 3,
+											"column": 15
+										}
+									},
+									"name": "cccc"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "ObjectExpression",
+									"start": 92,
+									"end": 113,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 16
+										},
+										"end": {
+											"line": 5,
+											"column": 2
+										}
+									},
+									"properties": [
+										{
+											"type": "Property",
+											"start": 96,
+											"end": 109,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 2
+												},
+												"end": {
+													"line": 4,
+													"column": 15
+												}
+											},
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 96,
+												"end": 100,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 2
+													},
+													"end": {
+														"line": 4,
+														"column": 6
+													}
+												},
+												"name": "prop"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 102,
+												"end": 109,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 8
+													},
+													"end": {
+														"line": 4,
+														"column": 15
+													}
+												},
+												"value": "value",
+												"raw": "'value'"
+											},
+											"kind": "init"
+										}
+									]
+								}
+							],
+							"optional": false
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 115,
+							"end": 121,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 4
+								},
+								"end": {
+									"line": 5,
+									"column": 10
+								}
+							},
+							"name": "length"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Chain ending with member access - object hugs inline",
+							"start": 20,
+							"end": 75
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 155,
+					"end": 215,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 11
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 155,
+						"end": 214,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 10
+							}
+						},
+						"object": {
+							"type": "CallExpression",
+							"start": 155,
+							"end": 207,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 1
+								},
+								"end": {
+									"line": 10,
+									"column": 3
+								}
+							},
+							"callee": {
+								"type": "MemberExpression",
+								"start": 155,
+								"end": 184,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 1
+									},
+									"end": {
+										"line": 8,
+										"column": 30
+									}
+								},
+								"object": {
+									"type": "MemberExpression",
+									"start": 155,
+									"end": 174,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 1
+										},
+										"end": {
+											"line": 8,
+											"column": 20
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 155,
+										"end": 164,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 1
+											},
+											"end": {
+												"line": 8,
+												"column": 10
+											}
+										},
+										"name": "aaaaaaaaa"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 165,
+										"end": 174,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 11
+											},
+											"end": {
+												"line": 8,
+												"column": 20
+											}
+										},
+										"name": "bbbbbbbbb"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 175,
+									"end": 184,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 21
+										},
+										"end": {
+											"line": 8,
+											"column": 30
+										}
+									},
+									"name": "ccccccccc"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "ObjectExpression",
+									"start": 185,
+									"end": 206,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 31
+										},
+										"end": {
+											"line": 10,
+											"column": 2
+										}
+									},
+									"properties": [
+										{
+											"type": "Property",
+											"start": 189,
+											"end": 202,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 2
+												},
+												"end": {
+													"line": 9,
+													"column": 15
+												}
+											},
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 189,
+												"end": 193,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 2
+													},
+													"end": {
+														"line": 9,
+														"column": 6
+													}
+												},
+												"name": "prop"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 195,
+												"end": 202,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 8
+													},
+													"end": {
+														"line": 9,
+														"column": 15
+													}
+												},
+												"value": "value",
+												"raw": "'value'"
+											},
+											"kind": "init"
+										}
+									]
+								}
+							],
+							"optional": false
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 208,
+							"end": 214,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 4
+								},
+								"end": {
+									"line": 10,
+									"column": 10
+								}
+							},
+							"name": "length"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Longer chain - still hugs",
+							"start": 125,
+							"end": 153
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 258,
+					"end": 381,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 11
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 258,
+						"end": 380,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 1
+							},
+							"end": {
+								"line": 15,
+								"column": 10
+							}
+						},
+						"object": {
+							"type": "CallExpression",
+							"start": 258,
+							"end": 373,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 1
+								},
+								"end": {
+									"line": 15,
+									"column": 3
+								}
+							},
+							"callee": {
+								"type": "MemberExpression",
+								"start": 258,
+								"end": 350,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 1
+									},
+									"end": {
+										"line": 13,
+										"column": 93
+									}
+								},
+								"object": {
+									"type": "MemberExpression",
+									"start": 258,
+									"end": 330,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 1
+										},
+										"end": {
+											"line": 13,
+											"column": 73
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 258,
+										"end": 310,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 1
+											},
+											"end": {
+												"line": 13,
+												"column": 53
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 311,
+										"end": 330,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 54
+											},
+											"end": {
+												"line": 13,
+												"column": 73
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbb"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 331,
+									"end": 350,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 74
+										},
+										"end": {
+											"line": 13,
+											"column": 93
+										}
+									},
+									"name": "ccccccccccccccccccc"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "ObjectExpression",
+									"start": 351,
+									"end": 372,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 94
+										},
+										"end": {
+											"line": 15,
+											"column": 2
+										}
+									},
+									"properties": [
+										{
+											"type": "Property",
+											"start": 355,
+											"end": 368,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 2
+												},
+												"end": {
+													"line": 14,
+													"column": 15
+												}
+											},
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 355,
+												"end": 359,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 2
+													},
+													"end": {
+														"line": 14,
+														"column": 6
+													}
+												},
+												"name": "prop"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 361,
+												"end": 368,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 8
+													},
+													"end": {
+														"line": 14,
+														"column": 15
+													}
+												},
+												"value": "value",
+												"raw": "'value'"
+											},
+											"kind": "init"
+										}
+									]
+								}
+							],
+							"optional": false
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 374,
+							"end": 380,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 4
+								},
+								"end": {
+									"line": 15,
+									"column": 10
+								}
+							},
+							"name": "length"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Very long chain - breaks eventually",
+							"start": 218,
+							"end": 256
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

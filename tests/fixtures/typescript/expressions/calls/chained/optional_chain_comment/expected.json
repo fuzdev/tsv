@@ -1,0 +1,216 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 93,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Optional chaining with comment in segment",
+			"start": 10,
+			"end": 54,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 58,
+			"end": 71,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 3
+				},
+				"end": {
+					"line": 3,
+					"column": 16
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 92,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 83,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 56,
+					"end": 82,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "ChainExpression",
+						"start": 56,
+						"end": 81,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 4,
+								"column": 6
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 56,
+							"end": 81,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 6
+								}
+							},
+							"callee": {
+								"type": "MemberExpression",
+								"start": 56,
+								"end": 79,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 1
+									},
+									"end": {
+										"line": 4,
+										"column": 4
+									}
+								},
+								"object": {
+									"type": "MemberExpression",
+									"start": 56,
+									"end": 74,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 1
+										},
+										"end": {
+											"line": 3,
+											"column": 19
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 56,
+										"end": 57,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 1
+											},
+											"end": {
+												"line": 3,
+												"column": 2
+											}
+										},
+										"name": "a",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " comment ",
+												"start": 58,
+												"end": 71
+											}
+										]
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 73,
+										"end": 74,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 18
+											},
+											"end": {
+												"line": 3,
+												"column": 19
+											}
+										},
+										"name": "b"
+									},
+									"computed": false,
+									"optional": true
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 78,
+									"end": 79,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 3
+										},
+										"end": {
+											"line": 4,
+											"column": 4
+										}
+									},
+									"name": "c"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Optional chaining with comment in segment",
+							"start": 10,
+							"end": 54
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

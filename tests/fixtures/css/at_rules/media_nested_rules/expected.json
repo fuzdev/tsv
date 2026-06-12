@@ -1,0 +1,134 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 100,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 91,
+				"name": "media",
+				"prelude": "print",
+				"block": {
+					"type": "Block",
+					"start": 22,
+					"end": 91,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 26,
+								"end": 29,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 26,
+										"end": 29,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 26,
+														"end": 29
+													}
+												],
+												"start": 26,
+												"end": 29
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 30,
+								"end": 52,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 35,
+										"end": 47,
+										"property": "color",
+										"value": "black"
+									}
+								]
+							},
+							"start": 26,
+							"end": 52
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 56,
+								"end": 60,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 56,
+										"end": 60,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "span",
+														"start": 56,
+														"end": 60
+													}
+												],
+												"start": 56,
+												"end": 60
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 61,
+								"end": 88,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 66,
+										"end": 83,
+										"property": "font-weight",
+										"value": "bold"
+									}
+								]
+							},
+							"start": 56,
+							"end": 88
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 92,
+			"styles": "\n\t@media print {\n\t\tdiv {\n\t\t\tcolor: black;\n\t\t}\n\n\t\tspan {\n\t\t\tfont-weight: bold;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 101,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

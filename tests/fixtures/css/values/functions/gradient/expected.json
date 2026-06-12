@@ -1,0 +1,122 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 494,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 485,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 62,
+							"property": "background",
+							"value": "linear-gradient(45deg, red, blue)"
+						},
+						{
+							"type": "Declaration",
+							"start": 66,
+							"end": 122,
+							"property": "background",
+							"value": "linear-gradient(to right, red 0%, blue 100%)"
+						},
+						{
+							"type": "Declaration",
+							"start": 126,
+							"end": 172,
+							"property": "background",
+							"value": "radial-gradient(circle, red, blue)"
+						},
+						{
+							"type": "Declaration",
+							"start": 176,
+							"end": 232,
+							"property": "background",
+							"value": "radial-gradient(circle at center, red, blue)"
+						},
+						{
+							"type": "Declaration",
+							"start": 236,
+							"end": 282,
+							"property": "background",
+							"value": "conic-gradient(red, yellow, green)"
+						},
+						{
+							"type": "Declaration",
+							"start": 286,
+							"end": 350,
+							"property": "background",
+							"value": "repeating-linear-gradient(45deg, red 0px, blue 10px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 354,
+							"end": 419,
+							"property": "background",
+							"value": "repeating-radial-gradient(circle, red 0px, blue 10px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 423,
+							"end": 481,
+							"property": "background",
+							"value": "repeating-conic-gradient(red 0deg, blue 30deg)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 485
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 486,
+			"styles": "\n\tdiv {\n\t\tbackground: linear-gradient(45deg, red, blue);\n\t\tbackground: linear-gradient(to right, red 0%, blue 100%);\n\t\tbackground: radial-gradient(circle, red, blue);\n\t\tbackground: radial-gradient(circle at center, red, blue);\n\t\tbackground: conic-gradient(red, yellow, green);\n\t\tbackground: repeating-linear-gradient(45deg, red 0px, blue 10px);\n\t\tbackground: repeating-radial-gradient(circle, red 0px, blue 10px);\n\t\tbackground: repeating-conic-gradient(red 0deg, blue 30deg);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 495,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

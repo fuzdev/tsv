@@ -1,0 +1,104 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 70,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 69,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 60,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 59,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 5
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 16,
+							"end": 58,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 4
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 16,
+								"end": 25,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 16
+									}
+								},
+								"name": "continued"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 30,
+								"end": 58,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 4
+									}
+								},
+								"value": "a  b   \t \td\t\t\te f ",
+								"raw": "'a \\\n b   \\\n\t \td\t\t\t\\\ne\\\n f '"
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

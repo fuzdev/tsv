@@ -1,0 +1,115 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 181,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 172,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 36,
+							"property": "grid-column",
+							"value": "1 / -1"
+						},
+						{
+							"type": "Declaration",
+							"start": 40,
+							"end": 60,
+							"property": "grid-column-start",
+							"value": "2"
+						},
+						{
+							"type": "Declaration",
+							"start": 64,
+							"end": 87,
+							"property": "grid-column-end",
+							"value": "span 3"
+						},
+						{
+							"type": "Declaration",
+							"start": 91,
+							"end": 107,
+							"property": "grid-row",
+							"value": "span 2"
+						},
+						{
+							"type": "Declaration",
+							"start": 111,
+							"end": 128,
+							"property": "grid-row-start",
+							"value": "1"
+						},
+						{
+							"type": "Declaration",
+							"start": 132,
+							"end": 147,
+							"property": "grid-row-end",
+							"value": "4"
+						},
+						{
+							"type": "Declaration",
+							"start": 151,
+							"end": 168,
+							"property": "grid-area",
+							"value": "header"
+						}
+					]
+				},
+				"start": 9,
+				"end": 172
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 173,
+			"styles": "\n\tdiv {\n\t\tgrid-column: 1 / -1;\n\t\tgrid-column-start: 2;\n\t\tgrid-column-end: span 3;\n\t\tgrid-row: span 2;\n\t\tgrid-row-start: 1;\n\t\tgrid-row-end: 4;\n\t\tgrid-area: header;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 182,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

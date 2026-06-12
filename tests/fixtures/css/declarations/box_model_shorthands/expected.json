@@ -1,0 +1,234 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 658,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 649,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 29,
+							"property": "margin",
+							"value": "auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 33,
+							"end": 45,
+							"property": "margin",
+							"value": "1rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 49,
+							"end": 66,
+							"property": "margin",
+							"value": "1rem 2rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 70,
+							"end": 92,
+							"property": "margin",
+							"value": "1rem 2rem 3rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 96,
+							"end": 123,
+							"property": "margin",
+							"value": "1rem 2rem 3rem 4rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 127,
+							"end": 141,
+							"property": "padding",
+							"value": "0.5em"
+						},
+						{
+							"type": "Declaration",
+							"start": 145,
+							"end": 163,
+							"property": "padding",
+							"value": "0.5em 1em"
+						},
+						{
+							"type": "Declaration",
+							"start": 167,
+							"end": 191,
+							"property": "padding",
+							"value": "0.5em 1em 1.5em"
+						},
+						{
+							"type": "Declaration",
+							"start": 195,
+							"end": 223,
+							"property": "padding",
+							"value": "0.5em 1em 1.5em 2em"
+						},
+						{
+							"type": "Declaration",
+							"start": 227,
+							"end": 240,
+							"property": "border",
+							"value": "solid"
+						},
+						{
+							"type": "Declaration",
+							"start": 244,
+							"end": 261,
+							"property": "border",
+							"value": "1px solid"
+						},
+						{
+							"type": "Declaration",
+							"start": 265,
+							"end": 286,
+							"property": "border",
+							"value": "1px solid red"
+						},
+						{
+							"type": "Declaration",
+							"start": 290,
+							"end": 307,
+							"property": "border-width",
+							"value": "1px"
+						},
+						{
+							"type": "Declaration",
+							"start": 311,
+							"end": 332,
+							"property": "border-width",
+							"value": "1px 2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 336,
+							"end": 361,
+							"property": "border-width",
+							"value": "1px 2px 3px"
+						},
+						{
+							"type": "Declaration",
+							"start": 365,
+							"end": 394,
+							"property": "border-width",
+							"value": "1px 2px 3px 4px"
+						},
+						{
+							"type": "Declaration",
+							"start": 398,
+							"end": 417,
+							"property": "border-style",
+							"value": "solid"
+						},
+						{
+							"type": "Declaration",
+							"start": 421,
+							"end": 447,
+							"property": "border-style",
+							"value": "solid dashed"
+						},
+						{
+							"type": "Declaration",
+							"start": 451,
+							"end": 486,
+							"property": "border-color",
+							"value": "red green blue yellow"
+						},
+						{
+							"type": "Declaration",
+							"start": 490,
+							"end": 509,
+							"property": "border-radius",
+							"value": "10px"
+						},
+						{
+							"type": "Declaration",
+							"start": 513,
+							"end": 537,
+							"property": "border-radius",
+							"value": "10px 20px"
+						},
+						{
+							"type": "Declaration",
+							"start": 541,
+							"end": 575,
+							"property": "border-radius",
+							"value": "10px 20px 30px 40px"
+						},
+						{
+							"type": "Declaration",
+							"start": 579,
+							"end": 605,
+							"property": "border-radius",
+							"value": "10px / 20px"
+						},
+						{
+							"type": "Declaration",
+							"start": 609,
+							"end": 645,
+							"property": "border-radius",
+							"value": "10px 20px / 30px 40px"
+						}
+					]
+				},
+				"start": 9,
+				"end": 649
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 650,
+			"styles": "\n\tdiv {\n\t\tmargin: auto;\n\t\tmargin: 1rem;\n\t\tmargin: 1rem 2rem;\n\t\tmargin: 1rem 2rem 3rem;\n\t\tmargin: 1rem 2rem 3rem 4rem;\n\t\tpadding: 0.5em;\n\t\tpadding: 0.5em 1em;\n\t\tpadding: 0.5em 1em 1.5em;\n\t\tpadding: 0.5em 1em 1.5em 2em;\n\t\tborder: solid;\n\t\tborder: 1px solid;\n\t\tborder: 1px solid red;\n\t\tborder-width: 1px;\n\t\tborder-width: 1px 2px;\n\t\tborder-width: 1px 2px 3px;\n\t\tborder-width: 1px 2px 3px 4px;\n\t\tborder-style: solid;\n\t\tborder-style: solid dashed;\n\t\tborder-color: red green blue yellow;\n\t\tborder-radius: 10px;\n\t\tborder-radius: 10px 20px;\n\t\tborder-radius: 10px 20px 30px 40px;\n\t\tborder-radius: 10px / 20px;\n\t\tborder-radius: 10px 20px / 30px 40px;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 659,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

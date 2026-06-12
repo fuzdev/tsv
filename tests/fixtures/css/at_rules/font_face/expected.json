@@ -1,0 +1,117 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 380,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 371,
+				"name": "font-face",
+				"prelude": "",
+				"block": {
+					"type": "Block",
+					"start": 20,
+					"end": 371,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 24,
+							"end": 44,
+							"property": "font-family",
+							"value": "'Font1'"
+						},
+						{
+							"type": "Declaration",
+							"start": 48,
+							"end": 127,
+							"property": "src",
+							"value": "url('font1.woff2') format('woff2'),\n\t\t\turl('font1.woff') format('woff')"
+						},
+						{
+							"type": "Declaration",
+							"start": 131,
+							"end": 151,
+							"property": "font-weight",
+							"value": "100 900"
+						},
+						{
+							"type": "Declaration",
+							"start": 155,
+							"end": 173,
+							"property": "font-style",
+							"value": "italic"
+						},
+						{
+							"type": "Declaration",
+							"start": 177,
+							"end": 195,
+							"property": "font-display",
+							"value": "swap"
+						},
+						{
+							"type": "Declaration",
+							"start": 199,
+							"end": 221,
+							"property": "font-stretch",
+							"value": "50% 200%"
+						},
+						{
+							"type": "Declaration",
+							"start": 225,
+							"end": 272,
+							"property": "unicode-range",
+							"value": "U+0000-00FF, U+0131, U+0152-0153"
+						},
+						{
+							"type": "Declaration",
+							"start": 276,
+							"end": 296,
+							"property": "ascent-override",
+							"value": "90%"
+						},
+						{
+							"type": "Declaration",
+							"start": 300,
+							"end": 321,
+							"property": "descent-override",
+							"value": "10%"
+						},
+						{
+							"type": "Declaration",
+							"start": 325,
+							"end": 346,
+							"property": "line-gap-override",
+							"value": "0%"
+						},
+						{
+							"type": "Declaration",
+							"start": 350,
+							"end": 367,
+							"property": "size-adjust",
+							"value": "100%"
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 372,
+			"styles": "\n\t@font-face {\n\t\tfont-family: 'Font1';\n\t\tsrc:\n\t\t\turl('font1.woff2') format('woff2'),\n\t\t\turl('font1.woff') format('woff');\n\t\tfont-weight: 100 900;\n\t\tfont-style: italic;\n\t\tfont-display: swap;\n\t\tfont-stretch: 50% 200%;\n\t\tunicode-range: U+0000-00FF, U+0131, U+0152-0153;\n\t\tascent-override: 90%;\n\t\tdescent-override: 10%;\n\t\tline-gap-override: 0%;\n\t\tsize-adjust: 100%;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 381,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

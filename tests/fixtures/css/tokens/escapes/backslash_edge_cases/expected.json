@@ -1,0 +1,214 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 158,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 16,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 16,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 9,
+											"end": 16
+										}
+									],
+									"start": 9,
+									"end": 16
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 17,
+					"end": 38,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 21,
+							"end": 34,
+							"property": "content",
+							"value": "'\\ '"
+						}
+					]
+				},
+				"start": 9,
+				"end": 38
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 41,
+					"end": 48,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 41,
+							"end": 48,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class2",
+											"start": 41,
+											"end": 48
+										}
+									],
+									"start": 41,
+									"end": 48
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 49,
+					"end": 70,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 53,
+							"end": 66,
+							"property": "content",
+							"value": "'\\\\'"
+						}
+					]
+				},
+				"start": 41,
+				"end": 70
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 73,
+					"end": 80,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 73,
+							"end": 80,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class3",
+											"start": 73,
+											"end": 80
+										}
+									],
+									"start": 73,
+									"end": 80
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 81,
+					"end": 108,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 85,
+							"end": 104,
+							"property": "content",
+							"value": "'\\\\ \\\\ \\\\'"
+						}
+					]
+				},
+				"start": 73,
+				"end": 108
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 111,
+					"end": 118,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 111,
+							"end": 118,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class4",
+											"start": 111,
+											"end": 118
+										}
+									],
+									"start": 111,
+									"end": 118
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 119,
+					"end": 149,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 123,
+							"end": 145,
+							"property": "content",
+							"value": "'test\\\\slash'"
+						}
+					]
+				},
+				"start": 111,
+				"end": 149
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 150,
+			"styles": "\n\t.class1 {\n\t\tcontent: '\\ ';\n\t}\n\n\t.class2 {\n\t\tcontent: '\\\\';\n\t}\n\n\t.class3 {\n\t\tcontent: '\\\\ \\\\ \\\\';\n\t}\n\n\t.class4 {\n\t\tcontent: 'test\\\\slash';\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 159,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

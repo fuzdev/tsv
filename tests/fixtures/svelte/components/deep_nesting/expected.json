@@ -1,0 +1,109 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 55,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Component",
+				"start": 0,
+				"end": 54,
+				"name": "Comp1",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 6,
+						"character": 6
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Component",
+							"start": 7,
+							"end": 46,
+							"name": "Comp2",
+							"name_loc": {
+								"start": {
+									"line": 1,
+									"column": 8,
+									"character": 8
+								},
+								"end": {
+									"line": 1,
+									"column": 13,
+									"character": 13
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Component",
+										"start": 14,
+										"end": 38,
+										"name": "Comp3",
+										"name_loc": {
+											"start": {
+												"line": 1,
+												"column": 15,
+												"character": 15
+											},
+											"end": {
+												"line": 1,
+												"column": 20,
+												"character": 20
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Component",
+													"start": 21,
+													"end": 30,
+													"name": "Comp4",
+													"name_loc": {
+														"start": {
+															"line": 1,
+															"column": 22,
+															"character": 22
+														},
+														"end": {
+															"line": 1,
+															"column": 27,
+															"character": 27
+														}
+													},
+													"attributes": [],
+													"fragment": {
+														"type": "Fragment",
+														"nodes": []
+													}
+												}
+											]
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

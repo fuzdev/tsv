@@ -1,0 +1,608 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 382,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 381,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 5,
+							"end": 7,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 7,
+							"end": 22,
+							"data": " Single "
+						},
+						{
+							"type": "Text",
+							"start": 22,
+							"end": 24,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 24,
+							"end": 29,
+							"expression": {
+								"type": "Literal",
+								"start": 25,
+								"end": 28,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 3,
+										"column": 5
+									}
+								},
+								"value": "{",
+								"raw": "'{'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 29,
+							"end": 31,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 31,
+							"end": 36,
+							"expression": {
+								"type": "Literal",
+								"start": 32,
+								"end": 35,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 5
+									}
+								},
+								"value": "}",
+								"raw": "'}'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 36,
+							"end": 39,
+							"raw": "\n\n\t",
+							"data": "\n\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 39,
+							"end": 66,
+							"data": " With trailing text "
+						},
+						{
+							"type": "Text",
+							"start": 66,
+							"end": 68,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 68,
+							"end": 73,
+							"expression": {
+								"type": "Literal",
+								"start": 69,
+								"end": 72,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 5
+									}
+								},
+								"value": "{",
+								"raw": "'{'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 73,
+							"end": 81,
+							"raw": "text}\n\n\t",
+							"data": "text}\n\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 81,
+							"end": 107,
+							"data": " With text between "
+						},
+						{
+							"type": "Text",
+							"start": 107,
+							"end": 109,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 109,
+							"end": 114,
+							"expression": {
+								"type": "Literal",
+								"start": 110,
+								"end": 113,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 5
+									}
+								},
+								"value": "{",
+								"raw": "'{'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 114,
+							"end": 118,
+							"raw": "text",
+							"data": "text"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 118,
+							"end": 123,
+							"expression": {
+								"type": "Literal",
+								"start": 119,
+								"end": 122,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 11
+									},
+									"end": {
+										"line": 10,
+										"column": 14
+									}
+								},
+								"value": "}",
+								"raw": "'}'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 123,
+							"end": 126,
+							"raw": "\n\n\t",
+							"data": "\n\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 126,
+							"end": 153,
+							"data": " Adjacent (no text) "
+						},
+						{
+							"type": "Text",
+							"start": 153,
+							"end": 155,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 155,
+							"end": 160,
+							"expression": {
+								"type": "Literal",
+								"start": 156,
+								"end": 159,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 5
+									}
+								},
+								"value": "{",
+								"raw": "'{'"
+							}
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 160,
+							"end": 165,
+							"expression": {
+								"type": "Literal",
+								"start": 161,
+								"end": 164,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 10
+									}
+								},
+								"value": "}",
+								"raw": "'}'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 165,
+							"end": 168,
+							"raw": "\n\n\t",
+							"data": "\n\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 168,
+							"end": 191,
+							"data": " Multiple pairs "
+						},
+						{
+							"type": "Text",
+							"start": 191,
+							"end": 193,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 193,
+							"end": 198,
+							"expression": {
+								"type": "Literal",
+								"start": 194,
+								"end": 197,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 5
+									}
+								},
+								"value": "{",
+								"raw": "'{'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 198,
+							"end": 200,
+							"raw": "a}",
+							"data": "a}"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 200,
+							"end": 205,
+							"expression": {
+								"type": "Literal",
+								"start": 201,
+								"end": 204,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 9
+									},
+									"end": {
+										"line": 16,
+										"column": 12
+									}
+								},
+								"value": "{",
+								"raw": "'{'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 205,
+							"end": 210,
+							"raw": "b}\n\n\t",
+							"data": "b}\n\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 210,
+							"end": 241,
+							"data": " Adjacent to expression "
+						},
+						{
+							"type": "Text",
+							"start": 241,
+							"end": 243,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 243,
+							"end": 248,
+							"expression": {
+								"type": "Literal",
+								"start": 244,
+								"end": 247,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 5
+									}
+								},
+								"value": "{",
+								"raw": "'{'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 248,
+							"end": 250,
+							"raw": "} ",
+							"data": "} "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 250,
+							"end": 256,
+							"expression": {
+								"type": "Identifier",
+								"start": 251,
+								"end": 255,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 9
+									},
+									"end": {
+										"line": 19,
+										"column": 13
+									}
+								},
+								"name": "expr"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 256,
+							"end": 259,
+							"raw": "\n\n\t",
+							"data": "\n\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 259,
+							"end": 285,
+							"data": " In inline element "
+						},
+						{
+							"type": "Text",
+							"start": 285,
+							"end": 287,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 287,
+							"end": 311,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 22,
+									"column": 2,
+									"character": 288
+								},
+								"end": {
+									"line": 22,
+									"column": 6,
+									"character": 292
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 293,
+										"end": 298,
+										"expression": {
+											"type": "Literal",
+											"start": 294,
+											"end": 297,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 8
+												},
+												"end": {
+													"line": 22,
+													"column": 11
+												}
+											},
+											"value": "{",
+											"raw": "'{'"
+										}
+									},
+									{
+										"type": "Text",
+										"start": 298,
+										"end": 304,
+										"raw": "value}",
+										"data": "value}"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 311,
+							"end": 314,
+							"raw": "\n\n\t",
+							"data": "\n\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 314,
+							"end": 335,
+							"data": " In attribute "
+						},
+						{
+							"type": "Text",
+							"start": 335,
+							"end": 337,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 337,
+							"end": 374,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 25,
+									"column": 2,
+									"character": 338
+								},
+								"end": {
+									"line": 25,
+									"column": 6,
+									"character": 342
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 343,
+									"end": 362,
+									"name": "title",
+									"name_loc": {
+										"start": {
+											"line": 25,
+											"column": 7,
+											"character": 343
+										},
+										"end": {
+											"line": 25,
+											"column": 12,
+											"character": 348
+										}
+									},
+									"value": [
+										{
+											"type": "ExpressionTag",
+											"start": 350,
+											"end": 355,
+											"expression": {
+												"type": "Literal",
+												"start": 351,
+												"end": 354,
+												"loc": {
+													"start": {
+														"line": 25,
+														"column": 15
+													},
+													"end": {
+														"line": 25,
+														"column": 18
+													}
+												},
+												"value": "{",
+												"raw": "'{'"
+											}
+										},
+										{
+											"start": 355,
+											"end": 361,
+											"type": "Text",
+											"raw": "value}",
+											"data": "value}"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 363,
+										"end": 367,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 374,
+							"end": 375,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

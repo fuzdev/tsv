@@ -1,0 +1,287 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 205,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 16,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 16,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 9,
+											"end": 16
+										}
+									],
+									"start": 9,
+									"end": 16
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 17,
+					"end": 196,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 21,
+							"end": 38,
+							"property": "background",
+							"value": "white"
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 43,
+								"end": 50,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 43,
+										"end": 50,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "NestingSelector",
+														"name": "&",
+														"start": 43,
+														"end": 44
+													},
+													{
+														"type": "PseudoClassSelector",
+														"name": "hover",
+														"args": null,
+														"start": 44,
+														"end": 50
+													}
+												],
+												"start": 43,
+												"end": 50
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 51,
+								"end": 77,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 56,
+										"end": 72,
+										"property": "background",
+										"value": "gray"
+									}
+								]
+							},
+							"start": 43,
+							"end": 77
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 81,
+								"end": 88,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 81,
+										"end": 88,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "NestingSelector",
+														"name": "&",
+														"start": 81,
+														"end": 82
+													},
+													{
+														"type": "PseudoClassSelector",
+														"name": "focus",
+														"args": null,
+														"start": 82,
+														"end": 88
+													}
+												],
+												"start": 81,
+												"end": 88
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 89,
+								"end": 122,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 94,
+										"end": 117,
+										"property": "outline",
+										"value": "2px solid blue"
+									}
+								]
+							},
+							"start": 81,
+							"end": 122
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 126,
+								"end": 135,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 126,
+										"end": 135,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "NestingSelector",
+														"name": "&",
+														"start": 126,
+														"end": 127
+													},
+													{
+														"type": "PseudoElementSelector",
+														"name": "before",
+														"start": 127,
+														"end": 135
+													}
+												],
+												"start": 126,
+												"end": 135
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 136,
+								"end": 158,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 141,
+										"end": 153,
+										"property": "content",
+										"value": "'>'"
+									}
+								]
+							},
+							"start": 126,
+							"end": 158
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 162,
+								"end": 170,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 162,
+										"end": 170,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "NestingSelector",
+														"name": "&",
+														"start": 162,
+														"end": 163
+													},
+													{
+														"type": "PseudoElementSelector",
+														"name": "after",
+														"start": 163,
+														"end": 170
+													}
+												],
+												"start": 162,
+												"end": 170
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 171,
+								"end": 193,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 176,
+										"end": 188,
+										"property": "content",
+										"value": "'<'"
+									}
+								]
+							},
+							"start": 162,
+							"end": 193
+						}
+					]
+				},
+				"start": 9,
+				"end": 196
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 197,
+			"styles": "\n\t.class1 {\n\t\tbackground: white;\n\n\t\t&:hover {\n\t\t\tbackground: gray;\n\t\t}\n\n\t\t&:focus {\n\t\t\toutline: 2px solid blue;\n\t\t}\n\n\t\t&::before {\n\t\t\tcontent: '>';\n\t\t}\n\n\t\t&::after {\n\t\t\tcontent: '<';\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 206,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

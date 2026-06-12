@@ -1,0 +1,95 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 43,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 42,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 6,
+						"character": 6
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 7,
+						"end": 17,
+						"name": "data-attr1",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 7,
+								"character": 7
+							},
+							"end": {
+								"line": 1,
+								"column": 17,
+								"character": 17
+							}
+						},
+						"value": true
+					},
+					{
+						"type": "Attribute",
+						"start": 18,
+						"end": 28,
+						"name": "data-attr2",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 18,
+								"character": 18
+							},
+							"end": {
+								"line": 1,
+								"column": 28,
+								"character": 28
+							}
+						},
+						"value": true
+					},
+					{
+						"type": "Attribute",
+						"start": 29,
+						"end": 39,
+						"name": "data-attr3",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 29,
+								"character": 29
+							},
+							"end": {
+								"line": 1,
+								"column": 39,
+								"character": 39
+							}
+						},
+						"value": true
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

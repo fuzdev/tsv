@@ -1,0 +1,438 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 202,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 95,
+				"name": "select",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 7,
+						"character": 7
+					}
+				},
+				"attributes": [
+					{
+						"start": 8,
+						"end": 24,
+						"type": "BindDirective",
+						"name": "value",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 8,
+								"character": 8
+							},
+							"end": {
+								"line": 1,
+								"column": 18,
+								"character": 18
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 20,
+							"end": 23,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 20
+								},
+								"end": {
+									"line": 1,
+									"column": 23
+								}
+							},
+							"name": "val"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 25,
+							"end": 27,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 27,
+							"end": 55,
+							"name": "option",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 28
+								},
+								"end": {
+									"line": 2,
+									"column": 8,
+									"character": 34
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 35,
+									"end": 44,
+									"name": "value",
+									"name_loc": {
+										"start": {
+											"line": 2,
+											"column": 9,
+											"character": 35
+										},
+										"end": {
+											"line": 2,
+											"column": 14,
+											"character": 40
+										}
+									},
+									"value": [
+										{
+											"start": 42,
+											"end": 43,
+											"type": "Text",
+											"raw": "a",
+											"data": "a"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 45,
+										"end": 46,
+										"raw": "A",
+										"data": "A"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 55,
+							"end": 57,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 57,
+							"end": 85,
+							"name": "option",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 58
+								},
+								"end": {
+									"line": 3,
+									"column": 8,
+									"character": 64
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 65,
+									"end": 74,
+									"name": "value",
+									"name_loc": {
+										"start": {
+											"line": 3,
+											"column": 9,
+											"character": 65
+										},
+										"end": {
+											"line": 3,
+											"column": 14,
+											"character": 70
+										}
+									},
+									"value": [
+										{
+											"start": 72,
+											"end": 73,
+											"type": "Text",
+											"raw": "b",
+											"data": "b"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 75,
+										"end": 76,
+										"raw": "B",
+										"data": "B"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 85,
+							"end": 86,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 95,
+				"end": 97,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 97,
+				"end": 201,
+				"name": "select",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 98
+					},
+					"end": {
+						"line": 6,
+						"column": 7,
+						"character": 104
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 105,
+						"end": 113,
+						"name": "multiple",
+						"name_loc": {
+							"start": {
+								"line": 6,
+								"column": 8,
+								"character": 105
+							},
+							"end": {
+								"line": 6,
+								"column": 16,
+								"character": 113
+							}
+						},
+						"value": true
+					},
+					{
+						"start": 114,
+						"end": 130,
+						"type": "BindDirective",
+						"name": "value",
+						"name_loc": {
+							"start": {
+								"line": 6,
+								"column": 17,
+								"character": 114
+							},
+							"end": {
+								"line": 6,
+								"column": 27,
+								"character": 124
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 126,
+							"end": 129,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 29
+								},
+								"end": {
+									"line": 6,
+									"column": 32
+								}
+							},
+							"name": "arr"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 131,
+							"end": 133,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 133,
+							"end": 161,
+							"name": "option",
+							"name_loc": {
+								"start": {
+									"line": 7,
+									"column": 2,
+									"character": 134
+								},
+								"end": {
+									"line": 7,
+									"column": 8,
+									"character": 140
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 141,
+									"end": 150,
+									"name": "value",
+									"name_loc": {
+										"start": {
+											"line": 7,
+											"column": 9,
+											"character": 141
+										},
+										"end": {
+											"line": 7,
+											"column": 14,
+											"character": 146
+										}
+									},
+									"value": [
+										{
+											"start": 148,
+											"end": 149,
+											"type": "Text",
+											"raw": "a",
+											"data": "a"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 151,
+										"end": 152,
+										"raw": "A",
+										"data": "A"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 161,
+							"end": 163,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 163,
+							"end": 191,
+							"name": "option",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 2,
+									"character": 164
+								},
+								"end": {
+									"line": 8,
+									"column": 8,
+									"character": 170
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 171,
+									"end": 180,
+									"name": "value",
+									"name_loc": {
+										"start": {
+											"line": 8,
+											"column": 9,
+											"character": 171
+										},
+										"end": {
+											"line": 8,
+											"column": 14,
+											"character": 176
+										}
+									},
+									"value": [
+										{
+											"start": 178,
+											"end": 179,
+											"type": "Text",
+											"raw": "b",
+											"data": "b"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 181,
+										"end": 182,
+										"raw": "B",
+										"data": "B"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 191,
+							"end": 192,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

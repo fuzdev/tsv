@@ -1,0 +1,234 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 91,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Comment in middle of chain before call",
+			"start": 10,
+			"end": 51,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 57,
+			"end": 70,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 5
+				},
+				"end": {
+					"line": 3,
+					"column": 18
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 90,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 81,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 53,
+					"end": 80,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 53,
+						"end": 79,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 4,
+								"column": 6
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 53,
+							"end": 77,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 4
+								}
+							},
+							"object": {
+								"type": "MemberExpression",
+								"start": 53,
+								"end": 72,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 1
+									},
+									"end": {
+										"line": 3,
+										"column": 20
+									}
+								},
+								"object": {
+									"type": "MemberExpression",
+									"start": 53,
+									"end": 56,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 1
+										},
+										"end": {
+											"line": 3,
+											"column": 4
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 53,
+										"end": 54,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 1
+											},
+											"end": {
+												"line": 3,
+												"column": 2
+											}
+										},
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 55,
+										"end": 56,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 3
+											},
+											"end": {
+												"line": 3,
+												"column": 4
+											}
+										},
+										"name": "b"
+									},
+									"computed": false,
+									"optional": false,
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " comment ",
+											"start": 57,
+											"end": 70
+										}
+									]
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 71,
+									"end": 72,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 19
+										},
+										"end": {
+											"line": 3,
+											"column": 20
+										}
+									},
+									"name": "c"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 76,
+								"end": 77,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 3
+									},
+									"end": {
+										"line": 4,
+										"column": 4
+									}
+								},
+								"name": "d"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Comment in middle of chain before call",
+							"start": 10,
+							"end": 51
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

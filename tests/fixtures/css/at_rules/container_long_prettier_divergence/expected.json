@@ -1,0 +1,270 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 826,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 132,
+				"end": 259,
+				"name": "container",
+				"prelude": "(min-width: 1000px) and (max-width: 2000px) and (height > 300px) and (a: 100aaaaaaaa)",
+				"block": {
+					"type": "Block",
+					"start": 229,
+					"end": 259,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 233,
+								"end": 235,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 233,
+										"end": 235,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "a",
+														"start": 233,
+														"end": 235
+													}
+												],
+												"start": 233,
+												"end": 235
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 236,
+								"end": 256,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 241,
+										"end": 251,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 233,
+							"end": 256
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 312,
+				"end": 443,
+				"name": "container",
+				"prelude": "(min-width: 1000px) and (max-width: 2000px) and (height > 300px) and\n\t\t(a: 100aaaaaaaaa)",
+				"block": {
+					"type": "Block",
+					"start": 412,
+					"end": 443,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 416,
+								"end": 418,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 416,
+										"end": 418,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "b",
+														"start": 416,
+														"end": 418
+													}
+												],
+												"start": 416,
+												"end": 418
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 419,
+								"end": 440,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 424,
+										"end": 435,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 416,
+							"end": 440
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 496,
+				"end": 629,
+				"name": "container",
+				"prelude": "(min-width: 1000px) and (max-width: 2000px) and (height > 300px) and\n\t\t(a: 100aaaaaaaaaa)",
+				"block": {
+					"type": "Block",
+					"start": 597,
+					"end": 629,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 601,
+								"end": 603,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 601,
+										"end": 603,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "c",
+														"start": 601,
+														"end": 603
+													}
+												],
+												"start": 601,
+												"end": 603
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 604,
+								"end": 626,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 609,
+										"end": 621,
+										"property": "color",
+										"value": "green"
+									}
+								]
+							},
+							"start": 601,
+							"end": 626
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 682,
+				"end": 817,
+				"name": "container",
+				"prelude": "(min-width: 1000px) and (max-width: 2000px) and (height > 300px) and\n\t\t(a: 100aaaaaaaaaaa)",
+				"block": {
+					"type": "Block",
+					"start": 784,
+					"end": 817,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 788,
+								"end": 790,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 788,
+										"end": 790,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "d",
+														"start": 788,
+														"end": 790
+													}
+												],
+												"start": 788,
+												"end": 790
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 791,
+								"end": 814,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 796,
+										"end": 809,
+										"property": "color",
+										"value": "yellow"
+									}
+								]
+							},
+							"start": 788,
+							"end": 814
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 818,
+			"styles": "\n\t/* @container wraps at 101 chars (we wrap at >100, Prettier never wraps) */\n\n\t/* 100 chars - stays inline (both agree) */\n\t@container (min-width: 1000px) and (max-width: 2000px) and (height > 300px) and (a: 100aaaaaaaa) {\n\t\t.a {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* 101 chars - we wrap, Prettier stays inline */\n\t@container (min-width: 1000px) and (max-width: 2000px) and (height > 300px) and\n\t\t(a: 100aaaaaaaaa) {\n\t\t.b {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n\n\t/* 102 chars - we wrap, Prettier stays inline */\n\t@container (min-width: 1000px) and (max-width: 2000px) and (height > 300px) and\n\t\t(a: 100aaaaaaaaaa) {\n\t\t.c {\n\t\t\tcolor: green;\n\t\t}\n\t}\n\n\t/* 103 chars - we wrap, Prettier stays inline */\n\t@container (min-width: 1000px) and (max-width: 2000px) and (height > 300px) and\n\t\t(a: 100aaaaaaaaaaa) {\n\t\t.d {\n\t\t\tcolor: yellow;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 827,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,299 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 154,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Arrow with block comment - prettier moves inside parens, we preserve between > and (",
+			"start": 20,
+			"end": 107,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 124,
+			"end": 131,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 16
+				},
+				"end": {
+					"line": 3,
+					"column": 23
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 153,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 144,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 109,
+					"end": 143,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 35
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 115,
+							"end": 142,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 34
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 115,
+								"end": 116,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 119,
+								"end": 142,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 34
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 132,
+										"end": 136,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 24
+											},
+											"end": {
+												"line": 3,
+												"column": 28
+											}
+										},
+										"name": "x",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 133,
+											"end": 136,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 25
+												},
+												"end": {
+													"line": 3,
+													"column": 28
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 135,
+												"end": 136,
+												"loc": {
+													"start": {
+														"line": 3,
+														"column": 27
+													},
+													"end": {
+														"line": 3,
+														"column": 28
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 135,
+													"end": 136,
+													"loc": {
+														"start": {
+															"line": 3,
+															"column": 27
+														},
+														"end": {
+															"line": 3,
+															"column": 28
+														}
+													},
+													"name": "T"
+												}
+											}
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 124,
+												"end": 131
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 141,
+									"end": 142,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 33
+										},
+										"end": {
+											"line": 3,
+											"column": 34
+										}
+									},
+									"name": "x"
+								},
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 119,
+									"end": 123,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 11
+										},
+										"end": {
+											"line": 3,
+											"column": 15
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 120,
+											"end": 121,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 12
+												},
+												"end": {
+													"line": 3,
+													"column": 13
+												}
+											},
+											"name": "T"
+										}
+									],
+									"extra": {
+										"trailingComma": 121
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Arrow with block comment - prettier moves inside parens, we preserve between > and (",
+							"start": 20,
+							"end": 107
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

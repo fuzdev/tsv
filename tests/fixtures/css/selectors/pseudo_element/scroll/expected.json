@@ -1,0 +1,421 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 557,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 38,
+					"end": 53,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 38,
+							"end": 53,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "scroll-marker",
+											"start": 38,
+											"end": 53
+										}
+									],
+									"start": 38,
+									"end": 53
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 54,
+					"end": 78,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 58,
+							"end": 74,
+							"property": "background",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 38,
+				"end": 78
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 108,
+					"end": 129,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 108,
+							"end": 129,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "scroll-marker-group",
+											"start": 108,
+											"end": 129
+										}
+									],
+									"start": 108,
+									"end": 129
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 130,
+					"end": 151,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 134,
+							"end": 147,
+							"property": "padding",
+							"value": "10px"
+						}
+					]
+				},
+				"start": 108,
+				"end": 151
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 190,
+					"end": 209,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 190,
+							"end": 209,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "scroll-button",
+											"start": 190,
+											"end": 205
+										}
+									],
+									"start": 190,
+									"end": 209
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 210,
+					"end": 236,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 214,
+							"end": 232,
+							"property": "border-radius",
+							"value": "50%"
+						}
+					]
+				},
+				"start": 190,
+				"end": 236
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 239,
+					"end": 260,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 239,
+							"end": 260,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "scroll-button",
+											"start": 239,
+											"end": 254
+										}
+									],
+									"start": 239,
+									"end": 260
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 261,
+					"end": 287,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 265,
+							"end": 283,
+							"property": "border-radius",
+							"value": "50%"
+						}
+					]
+				},
+				"start": 239,
+				"end": 287
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 290,
+					"end": 311,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 290,
+							"end": 311,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "scroll-button",
+											"start": 290,
+											"end": 305
+										}
+									],
+									"start": 290,
+									"end": 311
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 312,
+					"end": 338,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 316,
+							"end": 334,
+							"property": "border-radius",
+							"value": "50%"
+						}
+					]
+				},
+				"start": 290,
+				"end": 338
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 341,
+					"end": 363,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 341,
+							"end": 363,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "scroll-button",
+											"start": 341,
+											"end": 356
+										}
+									],
+									"start": 341,
+									"end": 363
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 364,
+					"end": 390,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 368,
+							"end": 386,
+							"property": "border-radius",
+							"value": "50%"
+						}
+					]
+				},
+				"start": 341,
+				"end": 390
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 424,
+					"end": 446,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 424,
+							"end": 446,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 424,
+											"end": 431
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "scroll-marker",
+											"start": 431,
+											"end": 446
+										}
+									],
+									"start": 424,
+									"end": 446
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 447,
+					"end": 465,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 451,
+							"end": 461,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 424,
+				"end": 465
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 493,
+					"end": 527,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 493,
+							"end": 527,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 493,
+											"end": 500
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "hover",
+											"args": null,
+											"start": 500,
+											"end": 506
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "scroll-marker-group",
+											"start": 506,
+											"end": 527
+										}
+									],
+									"start": 493,
+									"end": 527
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 528,
+					"end": 548,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 532,
+							"end": 544,
+							"property": "opacity",
+							"value": "0.8"
+						}
+					]
+				},
+				"start": 493,
+				"end": 548
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 549,
+			"styles": "\n\t/* Scroll marker styling */\n\t::scroll-marker {\n\t\tbackground: blue;\n\t}\n\n\t/* Scroll marker group */\n\t::scroll-marker-group {\n\t\tpadding: 10px;\n\t}\n\n\t/* Scroll button with direction */\n\t::scroll-button(up) {\n\t\tborder-radius: 50%;\n\t}\n\n\t::scroll-button(down) {\n\t\tborder-radius: 50%;\n\t}\n\n\t::scroll-button(left) {\n\t\tborder-radius: 50%;\n\t}\n\n\t::scroll-button(right) {\n\t\tborder-radius: 50%;\n\t}\n\n\t/* Combined with selectors */\n\t.class1::scroll-marker {\n\t\tcolor: red;\n\t}\n\n\t/* With pseudo-class */\n\t.class1:hover::scroll-marker-group {\n\t\topacity: 0.8;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 558,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,115 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 254,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 245,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 63,
+							"property": "transform",
+							"value": "translate(10px, 20px) rotate(45deg)"
+						},
+						{
+							"type": "Declaration",
+							"start": 67,
+							"end": 95,
+							"property": "transform-origin",
+							"value": "center top"
+						},
+						{
+							"type": "Declaration",
+							"start": 99,
+							"end": 124,
+							"property": "transform-box",
+							"value": "border-box"
+						},
+						{
+							"type": "Declaration",
+							"start": 128,
+							"end": 156,
+							"property": "transform-style",
+							"value": "preserve-3d"
+						},
+						{
+							"type": "Declaration",
+							"start": 160,
+							"end": 179,
+							"property": "perspective",
+							"value": "1000px"
+						},
+						{
+							"type": "Declaration",
+							"start": 183,
+							"end": 210,
+							"property": "perspective-origin",
+							"value": "50% 50%"
+						},
+						{
+							"type": "Declaration",
+							"start": 214,
+							"end": 241,
+							"property": "backface-visibility",
+							"value": "hidden"
+						}
+					]
+				},
+				"start": 9,
+				"end": 245
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 246,
+			"styles": "\n\tdiv {\n\t\ttransform: translate(10px, 20px) rotate(45deg);\n\t\ttransform-origin: center top;\n\t\ttransform-box: border-box;\n\t\ttransform-style: preserve-3d;\n\t\tperspective: 1000px;\n\t\tperspective-origin: 50% 50%;\n\t\tbackface-visibility: hidden;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 255,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

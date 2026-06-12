@@ -1,0 +1,80 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 370,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 361,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 86,
+							"end": 181,
+							"property": "color",
+							"value": "color-mix(in oklch, oklch(0.5555555 0.22222 180) 25%, oklch(0.88888888 0.155555 90) 75%)"
+						},
+						{
+							"type": "Declaration",
+							"start": 248,
+							"end": 357,
+							"property": "color",
+							"value": "color-mix(\n\t\t\tin oklch,\n\t\t\toklch(0.55555555 0.22222 180) 25%,\n\t\t\toklch(0.88888888 0.155555 90) 75%\n\t\t)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 361
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 362,
+			"styles": "\n\tdiv {\n\t\t/* color-mix() - 100 chars exactly - stays inline (at boundary) */\n\t\tcolor: color-mix(in oklch, oklch(0.5555555 0.22222 180) 25%, oklch(0.88888888 0.155555 90) 75%);\n\n\t\t/* color-mix() - 101 chars - wraps (exceeds print_width) */\n\t\tcolor: color-mix(\n\t\t\tin oklch,\n\t\t\toklch(0.55555555 0.22222 180) 25%,\n\t\t\toklch(0.88888888 0.155555 90) 75%\n\t\t);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 371,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

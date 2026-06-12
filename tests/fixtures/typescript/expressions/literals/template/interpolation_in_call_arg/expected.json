@@ -1,0 +1,203 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 225,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Template at exactly 100 chars - should NOT break",
+			"start": 10,
+			"end": 61,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 52
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 224,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 215,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 63,
+					"end": 214,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 63,
+						"end": 213,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 63,
+							"end": 65,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 69,
+								"end": 164,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 97
+									}
+								},
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 153,
+										"end": 157,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 86
+											},
+											"end": {
+												"line": 4,
+												"column": 90
+											}
+										},
+										"name": "expr"
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 70,
+										"end": 151,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 3
+											},
+											"end": {
+												"line": 4,
+												"column": 84
+											}
+										},
+										"value": {
+											"raw": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx ",
+											"cooked": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 158,
+										"end": 163,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 91
+											},
+											"end": {
+												"line": 4,
+												"column": 96
+											}
+										},
+										"value": {
+											"raw": " xxxx",
+											"cooked": " xxxx"
+										},
+										"tail": true
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 168,
+								"end": 209,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 43
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Template at exactly 100 chars - should NOT break",
+							"start": 10,
+							"end": 61
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

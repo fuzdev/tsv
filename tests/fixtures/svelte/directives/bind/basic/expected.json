@@ -1,0 +1,129 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 46,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 24,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 6,
+						"character": 6
+					}
+				},
+				"attributes": [
+					{
+						"start": 7,
+						"end": 21,
+						"type": "BindDirective",
+						"name": "value",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 7,
+								"character": 7
+							},
+							"end": {
+								"line": 1,
+								"column": 17,
+								"character": 17
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 19,
+							"end": 20,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 19
+								},
+								"end": {
+									"line": 1,
+									"column": 20
+								}
+							},
+							"name": "a"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 24,
+				"end": 25,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 25,
+				"end": 45,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 26
+					},
+					"end": {
+						"line": 2,
+						"column": 6,
+						"character": 31
+					}
+				},
+				"attributes": [
+					{
+						"start": 32,
+						"end": 42,
+						"type": "BindDirective",
+						"name": "value",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 7,
+								"character": 32
+							},
+							"end": {
+								"line": 2,
+								"column": 17,
+								"character": 42
+							}
+						},
+						"expression": {
+							"start": 37,
+							"end": 42,
+							"type": "Identifier",
+							"name": "value"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

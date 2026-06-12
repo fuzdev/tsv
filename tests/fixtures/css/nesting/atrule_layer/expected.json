@@ -1,0 +1,122 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 166,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 19,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 19,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "component",
+											"start": 9,
+											"end": 19
+										}
+									],
+									"start": 9,
+									"end": 19
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 20,
+					"end": 157,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 24,
+							"end": 34,
+							"property": "color",
+							"value": "red"
+						},
+						{
+							"type": "Atrule",
+							"start": 39,
+							"end": 76,
+							"name": "layer",
+							"prelude": "base",
+							"block": {
+								"type": "Block",
+								"start": 51,
+								"end": 76,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 56,
+										"end": 71,
+										"property": "font-size",
+										"value": "16px"
+									}
+								]
+							}
+						},
+						{
+							"type": "Atrule",
+							"start": 80,
+							"end": 154,
+							"name": "layer",
+							"prelude": "utilities",
+							"block": {
+								"type": "Block",
+								"start": 97,
+								"end": 154,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 102,
+										"end": 119,
+										"property": "font-weight",
+										"value": "bold"
+									},
+									{
+										"type": "Declaration",
+										"start": 124,
+										"end": 149,
+										"property": "text-transform",
+										"value": "uppercase"
+									}
+								]
+							}
+						}
+					]
+				},
+				"start": 9,
+				"end": 157
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 158,
+			"styles": "\n\t.component {\n\t\tcolor: red;\n\n\t\t@layer base {\n\t\t\tfont-size: 16px;\n\t\t}\n\n\t\t@layer utilities {\n\t\t\tfont-weight: bold;\n\t\t\ttext-transform: uppercase;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 167,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

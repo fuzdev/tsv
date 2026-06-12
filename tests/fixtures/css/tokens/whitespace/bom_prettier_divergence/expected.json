@@ -1,0 +1,70 @@
+{
+	"type": "StyleSheetFile",
+	"start": 0,
+	"end": 20,
+	"children": [
+		{
+			"type": "Rule",
+			"prelude": {
+				"type": "SelectorList",
+				"start": 0,
+				"end": 2,
+				"children": [
+					{
+						"type": "ComplexSelector",
+						"start": 0,
+						"end": 2,
+						"children": [
+							{
+								"type": "RelativeSelector",
+								"combinator": null,
+								"selectors": [
+									{
+										"type": "ClassSelector",
+										"name": "a",
+										"start": 0,
+										"end": 2
+									}
+								],
+								"start": 0,
+								"end": 2,
+								"metadata": {
+									"is_global": false,
+									"is_global_like": false,
+									"scoped": false
+								}
+							}
+						],
+						"metadata": {
+							"rule": null,
+							"is_global": false,
+							"used": false
+						}
+					}
+				]
+			},
+			"block": {
+				"type": "Block",
+				"start": 3,
+				"end": 19,
+				"children": [
+					{
+						"type": "Declaration",
+						"start": 6,
+						"end": 16,
+						"property": "color",
+						"value": "red"
+					}
+				]
+			},
+			"start": 0,
+			"end": 19,
+			"metadata": {
+				"parent_rule": null,
+				"has_local_selectors": false,
+				"has_global_selectors": false,
+				"is_global_block": false
+			}
+		}
+	]
+}

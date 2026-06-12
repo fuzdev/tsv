@@ -1,0 +1,83 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 37,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 19,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 5,
+						"character": 5
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 6,
+							"end": 12,
+							"raw": "inline",
+							"data": "inline"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 19,
+				"end": 20,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 20,
+				"end": 36,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 21
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 24
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 25,
+							"end": 30,
+							"raw": "block",
+							"data": "block"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,47 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 108,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 99,
+				"name": "color-profile",
+				"prelude": "--swop5c",
+				"block": {
+					"type": "Block",
+					"start": 33,
+					"end": 99,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 37,
+							"end": 95,
+							"property": "src",
+							"value": "url('https://example.tsv.dev/SWOP2006_Coated5v2.icc')"
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 100,
+			"styles": "\n\t@color-profile --swop5c {\n\t\tsrc: url('https://example.tsv.dev/SWOP2006_Coated5v2.icc');\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 109,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

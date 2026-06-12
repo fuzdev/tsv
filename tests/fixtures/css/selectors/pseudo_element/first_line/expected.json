@@ -1,0 +1,146 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 139,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 22,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 22,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "p",
+											"start": 9,
+											"end": 10
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "first-line",
+											"start": 10,
+											"end": 22
+										}
+									],
+									"start": 9,
+									"end": 22
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 23,
+					"end": 68,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 27,
+							"end": 44,
+							"property": "font-weight",
+							"value": "bold"
+						},
+						{
+							"type": "Declaration",
+							"start": 48,
+							"end": 64,
+							"property": "font-size",
+							"value": "1.2em"
+						}
+					]
+				},
+				"start": 9,
+				"end": 68
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 71,
+					"end": 92,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 71,
+							"end": 92,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "article",
+											"start": 71,
+											"end": 78
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "first-letter",
+											"start": 78,
+											"end": 92
+										}
+									],
+									"start": 71,
+									"end": 92
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 93,
+					"end": 130,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 97,
+							"end": 111,
+							"property": "font-size",
+							"value": "2em"
+						},
+						{
+							"type": "Declaration",
+							"start": 115,
+							"end": 126,
+							"property": "float",
+							"value": "left"
+						}
+					]
+				},
+				"start": 71,
+				"end": 130
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 131,
+			"styles": "\n\tp::first-line {\n\t\tfont-weight: bold;\n\t\tfont-size: 1.2em;\n\t}\n\n\tarticle::first-letter {\n\t\tfont-size: 2em;\n\t\tfloat: left;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 140,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

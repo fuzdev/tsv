@@ -1,0 +1,95 @@
+[package]
+name = "tsv_ffi"
+version.workspace = true
+edition.workspace = true
+description = "TypeScript and Svelte tools - C FFI bindings"
+license.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+tsv_svelte = { workspace = true, features = ["convert"] }
+tsv_ts = { workspace = true, features = ["convert"] }
+tsv_css = { workspace = true, features = ["convert"] }
+serde_json.workspace = true
+
+# FFI requires unsafe code. Cargo replaces the whole [lints] table on
+# override (no partial inherit), so the workspace lints are re-declared
+# verbatim below — only `unsafe_code` differs. Keep in sync with the root
+# [workspace.lints] block; the restriction lints (panic/unwrap_used/etc.)
+# must stay so this crate keeps the same floor as the rest of the workspace.
+[lints.rust]
+unsafe_code = "allow"
+missing_debug_implementations = "allow"
+trivial_casts = "warn"
+trivial_numeric_casts = "warn"
+unused_lifetimes = "warn"
+unused_qualifications = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+# Pedantic overrides
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+similar_names = "allow"
+too_many_lines = "allow"
+use_self = "allow"
+doc_markdown = "allow"
+unreadable_literal = "allow"
+option_if_let_else = "allow"
+if_not_else = "allow"
+match_same_arms = "allow"
+single_match_else = "allow"
+wildcard_imports = "allow"
+unused_self = "allow"
+unnested_or_patterns = "allow"
+explicit_iter_loop = "allow"
+match_wildcard_for_single_variants = "allow"
+needless_pass_by_value = "allow"
+bool_to_int_with_if = "allow"
+unnecessary_wraps = "allow"
+fn_params_excessive_bools = "allow"
+comparison_chain = "allow"
+large_enum_variant = "allow"
+too_long_first_doc_paragraph = "allow"
+struct_field_names = "allow"
+items_after_statements = "allow"
+implicit_hasher = "allow"
+doc_link_with_quotes = "allow"
+return_self_not_must_use = "allow"
+case_sensitive_file_extension_comparisons = "allow"
+needless_continue = "allow"
+unnecessary_debug_formatting = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+cast_possible_truncation = "allow"
+cast_lossless = "allow"
+cast_possible_wrap = "allow"
+# Nursery overrides
+significant_drop_tightening = "allow"
+missing_const_for_fn = "allow"
+redundant_pub_crate = "allow"
+branches_sharing_code = "allow"
+cognitive_complexity = "allow"
+future_not_send = "allow"
+unnecessary_literal_bound = "allow"
+equatable_if_let = "allow"
+useless_let_if_seq = "allow"
+elidable_lifetime_names = "allow"
+# Cargo overrides
+cargo_common_metadata = "allow"      # internal crates, not published to crates.io
+# hashbrown 0.15 (string-interner) vs 0.16 (serde_json preserve_order -> indexmap);
+# unresolvable until string-interner bumps upstream
+multiple_crate_versions = "allow"
+# Restriction lints (panic points need explicit #[allow] with justification)
+clone_on_ref_ptr = "warn"
+dbg_macro = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
+unwrap_used = "warn"

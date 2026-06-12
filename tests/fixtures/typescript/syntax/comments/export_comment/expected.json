@@ -1,0 +1,420 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 171,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 17,
+			"end": 30,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 8
+				},
+				"end": {
+					"line": 2,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 55,
+			"end": 68,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 8
+				},
+				"end": {
+					"line": 3,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 88,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 8
+				},
+				"end": {
+					"line": 4,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 131,
+			"end": 144,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 16
+				},
+				"end": {
+					"line": 5,
+					"column": 29
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 170,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 161,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 10,
+					"end": 46,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 37
+						}
+					},
+					"declaration": {
+						"type": "FunctionDeclaration",
+						"start": 31,
+						"end": 46,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 22
+							},
+							"end": {
+								"line": 2,
+								"column": 37
+							}
+						},
+						"id": {
+							"type": "Identifier",
+							"start": 40,
+							"end": 41,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 31
+								},
+								"end": {
+									"line": 2,
+									"column": 32
+								}
+							},
+							"name": "a"
+						},
+						"expression": false,
+						"generator": false,
+						"async": false,
+						"params": [],
+						"body": {
+							"type": "BlockStatement",
+							"start": 44,
+							"end": 46,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 35
+								},
+								"end": {
+									"line": 2,
+									"column": 37
+								}
+							},
+							"body": []
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " comment ",
+								"start": 17,
+								"end": 30
+							}
+						]
+					},
+					"specifiers": [],
+					"source": null,
+					"attributes": []
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 48,
+					"end": 79,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 32
+						}
+					},
+					"declaration": {
+						"type": "ClassDeclaration",
+						"start": 69,
+						"end": 79,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 22
+							},
+							"end": {
+								"line": 3,
+								"column": 32
+							}
+						},
+						"id": {
+							"type": "Identifier",
+							"start": 75,
+							"end": 76,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 28
+								},
+								"end": {
+									"line": 3,
+									"column": 29
+								}
+							},
+							"name": "B"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 77,
+							"end": 79,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 30
+								},
+								"end": {
+									"line": 3,
+									"column": 32
+								}
+							},
+							"body": []
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " comment ",
+								"start": 55,
+								"end": 68
+							}
+						]
+					},
+					"specifiers": [],
+					"source": null,
+					"attributes": []
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 81,
+					"end": 114,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 34
+						}
+					},
+					"declaration": {
+						"type": "VariableDeclaration",
+						"start": 102,
+						"end": 114,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 22
+							},
+							"end": {
+								"line": 4,
+								"column": 34
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 108,
+								"end": 113,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 28
+									},
+									"end": {
+										"line": 4,
+										"column": 33
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 108,
+									"end": 109,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 28
+										},
+										"end": {
+											"line": 4,
+											"column": 29
+										}
+									},
+									"name": "c"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 112,
+									"end": 113,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 32
+										},
+										"end": {
+											"line": 4,
+											"column": 33
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						],
+						"kind": "const",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " comment ",
+								"start": 88,
+								"end": 101
+							}
+						]
+					},
+					"specifiers": [],
+					"source": null,
+					"attributes": []
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 116,
+					"end": 160,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 45
+						}
+					},
+					"declaration": {
+						"type": "FunctionDeclaration",
+						"start": 145,
+						"end": 160,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 30
+							},
+							"end": {
+								"line": 5,
+								"column": 45
+							}
+						},
+						"id": {
+							"type": "Identifier",
+							"start": 154,
+							"end": 155,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 39
+								},
+								"end": {
+									"line": 5,
+									"column": 40
+								}
+							},
+							"name": "d"
+						},
+						"expression": false,
+						"generator": false,
+						"async": false,
+						"params": [],
+						"body": {
+							"type": "BlockStatement",
+							"start": 158,
+							"end": 160,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 43
+								},
+								"end": {
+									"line": 5,
+									"column": 45
+								}
+							},
+							"body": []
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " comment ",
+								"start": 131,
+								"end": 144
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -1,0 +1,844 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 516,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Multiple arrow function arguments are always expanded to multiple lines",
+			"start": 10,
+			"end": 84,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (Prettier always expands 2+ arrow args, regardless of source formatting)",
+			"start": 86,
+			"end": 161,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Arrow callbacks in standalone call - always expanded",
+			"start": 242,
+			"end": 297,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Arrow with expression body",
+			"start": 331,
+			"end": 360,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Three arrow args - always expanded",
+			"start": 423,
+			"end": 460,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 38
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 515,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 506,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 27,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 163,
+					"end": 239,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 169,
+							"end": 238,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 169,
+								"end": 174,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 12
+									}
+								},
+								"name": "entry"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 177,
+								"end": 238,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 15
+									},
+									"end": {
+										"line": 7,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 177,
+									"end": 198,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 15
+										},
+										"end": {
+											"line": 4,
+											"column": 36
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 177,
+										"end": 188,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 15
+											},
+											"end": {
+												"line": 4,
+												"column": 26
+											}
+										},
+										"name": "contextmenu"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 189,
+										"end": 198,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 27
+											},
+											"end": {
+												"line": 4,
+												"column": 36
+											}
+										},
+										"name": "add_entry"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 202,
+										"end": 211,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 2
+											},
+											"end": {
+												"line": 5,
+												"column": 11
+											}
+										},
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [],
+										"body": {
+											"type": "Identifier",
+											"start": 208,
+											"end": 211,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 8
+												},
+												"end": {
+													"line": 5,
+													"column": 11
+												}
+											},
+											"name": "run"
+										}
+									},
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 215,
+										"end": 234,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 21
+											}
+										},
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [],
+										"body": {
+											"type": "Identifier",
+											"start": 221,
+											"end": 234,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 8
+												},
+												"end": {
+													"line": 6,
+													"column": 21
+												}
+											},
+											"name": "disabled_prop"
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multiple arrow function arguments are always expanded to multiple lines",
+							"start": 10,
+							"end": 84
+						},
+						{
+							"type": "Line",
+							"value": " (Prettier always expands 2+ arrow args, regardless of source formatting)",
+							"start": 86,
+							"end": 161
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 299,
+					"end": 328,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 299,
+						"end": 327,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 1
+							},
+							"end": {
+								"line": 13,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 299,
+							"end": 301,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 1
+								},
+								"end": {
+									"line": 10,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 305,
+								"end": 312,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 9
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "Identifier",
+									"start": 311,
+									"end": 312,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 8
+										},
+										"end": {
+											"line": 11,
+											"column": 9
+										}
+									},
+									"name": "x"
+								}
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 316,
+								"end": 323,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 9
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "Identifier",
+									"start": 322,
+									"end": 323,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 8
+										},
+										"end": {
+											"line": 12,
+											"column": 9
+										}
+									},
+									"name": "y"
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Arrow callbacks in standalone call - always expanded",
+							"start": 242,
+							"end": 297
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 362,
+					"end": 420,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 362,
+						"end": 419,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 1
+							},
+							"end": {
+								"line": 19,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 362,
+							"end": 369,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 1
+								},
+								"end": {
+									"line": 16,
+									"column": 8
+								}
+							},
+							"name": "process"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 373,
+								"end": 393,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 22
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 374,
+										"end": 378,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 3
+											},
+											"end": {
+												"line": 17,
+												"column": 7
+											}
+										},
+										"name": "item"
+									}
+								],
+								"body": {
+									"type": "MemberExpression",
+									"start": 383,
+									"end": 393,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 12
+										},
+										"end": {
+											"line": 17,
+											"column": 22
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 383,
+										"end": 387,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 12
+											},
+											"end": {
+												"line": 17,
+												"column": 16
+											}
+										},
+										"name": "item"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 388,
+										"end": 393,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 17
+											},
+											"end": {
+												"line": 17,
+												"column": 22
+											}
+										},
+										"name": "value"
+									},
+									"computed": false,
+									"optional": false
+								}
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 397,
+								"end": 415,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 20
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 398,
+										"end": 402,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 3
+											},
+											"end": {
+												"line": 18,
+												"column": 7
+											}
+										},
+										"name": "item"
+									}
+								],
+								"body": {
+									"type": "MemberExpression",
+									"start": 407,
+									"end": 415,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 12
+										},
+										"end": {
+											"line": 18,
+											"column": 20
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 407,
+										"end": 411,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 12
+											},
+											"end": {
+												"line": 18,
+												"column": 16
+											}
+										},
+										"name": "item"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 412,
+										"end": 415,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 17
+											},
+											"end": {
+												"line": 18,
+												"column": 20
+											}
+										},
+										"name": "key"
+									},
+									"computed": false,
+									"optional": false
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Arrow with expression body",
+							"start": 331,
+							"end": 360
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 462,
+					"end": 505,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 462,
+						"end": 504,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 1
+							},
+							"end": {
+								"line": 26,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 462,
+							"end": 467,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 1
+								},
+								"end": {
+									"line": 22,
+									"column": 6
+								}
+							},
+							"name": "setup"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 471,
+								"end": 478,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 9
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "Identifier",
+									"start": 477,
+									"end": 478,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 8
+										},
+										"end": {
+											"line": 23,
+											"column": 9
+										}
+									},
+									"name": "a"
+								}
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 482,
+								"end": 489,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 2
+									},
+									"end": {
+										"line": 24,
+										"column": 9
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "Identifier",
+									"start": 488,
+									"end": 489,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 8
+										},
+										"end": {
+											"line": 24,
+											"column": 9
+										}
+									},
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 493,
+								"end": 500,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 2
+									},
+									"end": {
+										"line": 25,
+										"column": 9
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "Identifier",
+									"start": 499,
+									"end": 500,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 8
+										},
+										"end": {
+											"line": 25,
+											"column": 9
+										}
+									},
+									"name": "c"
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Three arrow args - always expanded",
+							"start": 423,
+							"end": 460
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

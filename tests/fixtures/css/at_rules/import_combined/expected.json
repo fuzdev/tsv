@@ -1,0 +1,34 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 86,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 77,
+				"name": "import",
+				"prelude": "url('style.css') layer(base) supports(display: grid) screen",
+				"block": null
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 78,
+			"styles": "\n\t@import url('style.css') layer(base) supports(display: grid) screen;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 87,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,559 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 303,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " `using` as a plain identifier — member, index, and assignment targets,",
+			"start": 20,
+			"end": 93,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " not a resource declaration",
+			"start": 95,
+			"end": 124,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `await using` where `using` is a member expression is an await expression",
+			"start": 168,
+			"end": 244,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 77
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 302,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 293,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 126,
+					"end": 139,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 14
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 126,
+						"end": 138,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 4,
+								"column": 13
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "MemberExpression",
+							"start": 126,
+							"end": 134,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 9
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 126,
+								"end": 131,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 1
+									},
+									"end": {
+										"line": 4,
+										"column": 6
+									}
+								},
+								"name": "using"
+							},
+							"property": {
+								"type": "Literal",
+								"start": 132,
+								"end": 133,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"value": 0,
+								"raw": "0"
+							},
+							"computed": true,
+							"optional": false
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 137,
+							"end": 138,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 12
+								},
+								"end": {
+									"line": 4,
+									"column": 13
+								}
+							},
+							"name": "a"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `using` as a plain identifier — member, index, and assignment targets,",
+							"start": 20,
+							"end": 93
+						},
+						{
+							"type": "Line",
+							"value": " not a resource declaration",
+							"start": 95,
+							"end": 124
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 141,
+					"end": 153,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 13
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 141,
+						"end": 152,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 1
+							},
+							"end": {
+								"line": 5,
+								"column": 12
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "MemberExpression",
+							"start": 141,
+							"end": 148,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 1
+								},
+								"end": {
+									"line": 5,
+									"column": 8
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 141,
+								"end": 146,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 1
+									},
+									"end": {
+										"line": 5,
+										"column": 6
+									}
+								},
+								"name": "using"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 147,
+								"end": 148,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 151,
+							"end": 152,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 11
+								},
+								"end": {
+									"line": 5,
+									"column": 12
+								}
+							},
+							"name": "c"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 155,
+					"end": 165,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 11
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 155,
+						"end": 164,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 10
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 155,
+							"end": 160,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 1
+								},
+								"end": {
+									"line": 6,
+									"column": 6
+								}
+							},
+							"name": "using"
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 163,
+							"end": 164,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 9
+								},
+								"end": {
+									"line": 6,
+									"column": 10
+								}
+							},
+							"name": "d"
+						}
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 246,
+					"end": 292,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 252,
+							"end": 291,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 252,
+								"end": 254,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 9
+									}
+								},
+								"name": "fn"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 257,
+								"end": 291,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 12
+									},
+									"end": {
+										"line": 11,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": true,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 269,
+									"end": 291,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 24
+										},
+										"end": {
+											"line": 11,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 273,
+											"end": 288,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 2
+												},
+												"end": {
+													"line": 10,
+													"column": 17
+												}
+											},
+											"expression": {
+												"type": "AwaitExpression",
+												"start": 273,
+												"end": 287,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 2
+													},
+													"end": {
+														"line": 10,
+														"column": 16
+													}
+												},
+												"argument": {
+													"type": "MemberExpression",
+													"start": 279,
+													"end": 287,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 8
+														},
+														"end": {
+															"line": 10,
+															"column": 16
+														}
+													},
+													"object": {
+														"type": "Identifier",
+														"start": 279,
+														"end": 284,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 8
+															},
+															"end": {
+																"line": 10,
+																"column": 13
+															}
+														},
+														"name": "using"
+													},
+													"property": {
+														"type": "Literal",
+														"start": 285,
+														"end": 286,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 14
+															},
+															"end": {
+																"line": 10,
+																"column": 15
+															}
+														},
+														"value": 0,
+														"raw": "0"
+													},
+													"computed": true,
+													"optional": false
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `await using` where `using` is a member expression is an await expression",
+							"start": 168,
+							"end": 244
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

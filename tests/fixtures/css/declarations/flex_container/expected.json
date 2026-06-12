@@ -1,0 +1,136 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 250,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 241,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 30,
+							"property": "display",
+							"value": "flex"
+						},
+						{
+							"type": "Declaration",
+							"start": 34,
+							"end": 53,
+							"property": "flex-direction",
+							"value": "row"
+						},
+						{
+							"type": "Declaration",
+							"start": 57,
+							"end": 72,
+							"property": "flex-wrap",
+							"value": "wrap"
+						},
+						{
+							"type": "Declaration",
+							"start": 76,
+							"end": 100,
+							"property": "flex-flow",
+							"value": "column nowrap"
+						},
+						{
+							"type": "Declaration",
+							"start": 104,
+							"end": 134,
+							"property": "justify-content",
+							"value": "space-between"
+						},
+						{
+							"type": "Declaration",
+							"start": 138,
+							"end": 157,
+							"property": "align-items",
+							"value": "center"
+						},
+						{
+							"type": "Declaration",
+							"start": 161,
+							"end": 183,
+							"property": "align-content",
+							"value": "stretch"
+						},
+						{
+							"type": "Declaration",
+							"start": 187,
+							"end": 196,
+							"property": "gap",
+							"value": "1rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 200,
+							"end": 215,
+							"property": "row-gap",
+							"value": "0.5rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 219,
+							"end": 237,
+							"property": "column-gap",
+							"value": "1.5rem"
+						}
+					]
+				},
+				"start": 9,
+				"end": 241
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 242,
+			"styles": "\n\tdiv {\n\t\tdisplay: flex;\n\t\tflex-direction: row;\n\t\tflex-wrap: wrap;\n\t\tflex-flow: column nowrap;\n\t\tjustify-content: space-between;\n\t\talign-items: center;\n\t\talign-content: stretch;\n\t\tgap: 1rem;\n\t\trow-gap: 0.5rem;\n\t\tcolumn-gap: 1.5rem;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 251,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

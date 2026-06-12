@@ -1,0 +1,5 @@
+<style>
+	@color-profile --swop5c {
+		src: url('https://example.tsv.dev/SWOP2006_Coated5v2.icc');
+	}
+</style>

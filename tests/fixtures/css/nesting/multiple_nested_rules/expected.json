@@ -1,0 +1,205 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 158,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 52,
+					"end": 59,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 52,
+							"end": 59,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 52,
+											"end": 59
+										}
+									],
+									"start": 52,
+									"end": 59
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 60,
+					"end": 149,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 64,
+							"end": 74,
+							"property": "color",
+							"value": "red"
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 79,
+								"end": 88,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 79,
+										"end": 88,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "NestingSelector",
+														"name": "&",
+														"start": 79,
+														"end": 80
+													}
+												],
+												"start": 79,
+												"end": 80
+											},
+											{
+												"type": "RelativeSelector",
+												"combinator": {
+													"type": "Combinator",
+													"name": " ",
+													"start": 80,
+													"end": 81
+												},
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "class2",
+														"start": 81,
+														"end": 88
+													}
+												],
+												"start": 80,
+												"end": 88
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 89,
+								"end": 110,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 94,
+										"end": 105,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 79,
+							"end": 110
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 114,
+								"end": 123,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 114,
+										"end": 123,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "NestingSelector",
+														"name": "&",
+														"start": 114,
+														"end": 115
+													}
+												],
+												"start": 114,
+												"end": 115
+											},
+											{
+												"type": "RelativeSelector",
+												"combinator": {
+													"type": "Combinator",
+													"name": " ",
+													"start": 115,
+													"end": 116
+												},
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "class3",
+														"start": 116,
+														"end": 123
+													}
+												],
+												"start": 115,
+												"end": 123
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 124,
+								"end": 146,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 129,
+										"end": 141,
+										"property": "color",
+										"value": "green"
+									}
+								]
+							},
+							"start": 114,
+							"end": 146
+						}
+					]
+				},
+				"start": 52,
+				"end": 149
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 150,
+			"styles": "\n\t/* Multiple nested rules at same level */\n\t.class1 {\n\t\tcolor: red;\n\n\t\t& .class2 {\n\t\t\tcolor: blue;\n\t\t}\n\n\t\t& .class3 {\n\t\t\tcolor: green;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 159,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

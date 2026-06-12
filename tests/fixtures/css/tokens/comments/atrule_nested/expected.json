@@ -1,0 +1,101 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 244,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 235,
+				"name": "media",
+				"prelude": "screen",
+				"block": {
+					"type": "Block",
+					"start": 23,
+					"end": 235,
+					"children": [
+						{
+							"type": "Atrule",
+							"start": 64,
+							"end": 198,
+							"name": "supports",
+							"prelude": "(display: grid)",
+							"block": {
+								"type": "Block",
+								"start": 90,
+								"end": 198,
+								"children": [
+									{
+										"type": "Rule",
+										"prelude": {
+											"type": "SelectorList",
+											"start": 129,
+											"end": 132,
+											"children": [
+												{
+													"type": "ComplexSelector",
+													"start": 129,
+													"end": 132,
+													"children": [
+														{
+															"type": "RelativeSelector",
+															"combinator": null,
+															"selectors": [
+																{
+																	"type": "TypeSelector",
+																	"name": "div",
+																	"start": 129,
+																	"end": 132
+																}
+															],
+															"start": 129,
+															"end": 132
+														}
+													]
+												}
+											]
+										},
+										"block": {
+											"type": "Block",
+											"start": 133,
+											"end": 194,
+											"children": [
+												{
+													"type": "Declaration",
+													"start": 139,
+													"end": 152,
+													"property": "display",
+													"value": "grid"
+												}
+											]
+										},
+										"start": 129,
+										"end": 194
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 236,
+			"styles": "\n\t@media screen {\n\t\t/* comment before nested atrule */\n\t\t@supports (display: grid) {\n\t\t\t/* comment in nested atrule */\n\t\t\tdiv {\n\t\t\t\tdisplay: grid; /* comment in deeply nested rule */\n\t\t\t}\n\t\t} /* comment after nested atrule */\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 245,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

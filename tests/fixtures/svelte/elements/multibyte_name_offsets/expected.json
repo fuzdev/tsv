@@ -1,0 +1,370 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 304,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 50,
+				"end": 52,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 52,
+				"end": 211,
+				"data": " Element, attribute, and directive name_loc positions (column + character)\n     after multibyte text on the same line must translate to UTF-16 offsets. "
+			},
+			{
+				"type": "Text",
+				"start": 211,
+				"end": 215,
+				"raw": "\n中文 ",
+				"data": "\n中文 "
+			},
+			{
+				"type": "RegularElement",
+				"start": 215,
+				"end": 257,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 4,
+						"character": 216
+					},
+					"end": {
+						"line": 7,
+						"column": 9,
+						"character": 221
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 222,
+						"end": 239,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 10,
+								"character": 222
+							},
+							"end": {
+								"line": 7,
+								"column": 19,
+								"character": 231
+							}
+						},
+						"value": [
+							{
+								"start": 233,
+								"end": 238,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					},
+					{
+						"start": 240,
+						"end": 254,
+						"type": "BindDirective",
+						"name": "value",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 28,
+								"character": 240
+							},
+							"end": {
+								"line": 7,
+								"column": 38,
+								"character": 250
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 252,
+							"end": 253,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 40
+								},
+								"end": {
+									"line": 7,
+									"column": 41
+								}
+							},
+							"name": "a"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 257,
+				"end": 258,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 258,
+				"end": 303,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 259
+					},
+					"end": {
+						"line": 8,
+						"column": 2,
+						"character": 260
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 261,
+							"end": 264,
+							"raw": "😀 ",
+							"data": "😀 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 264,
+							"end": 299,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 7,
+									"character": 265
+								},
+								"end": {
+									"line": 8,
+									"column": 11,
+									"character": 269
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 270,
+									"end": 287,
+									"name": "data-attr",
+									"name_loc": {
+										"start": {
+											"line": 8,
+											"column": 12,
+											"character": 270
+										},
+										"end": {
+											"line": 8,
+											"column": 21,
+											"character": 279
+										}
+									},
+									"value": [
+										{
+											"start": 281,
+											"end": 286,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 288,
+										"end": 292,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 50,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 41,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 20,
+					"end": 40,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 21
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 24,
+							"end": 39,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 5
+								},
+								"end": {
+									"line": 2,
+									"column": 20
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 24,
+								"end": 25,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 5
+									},
+									"end": {
+										"line": 2,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 28,
+								"end": 39,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 9
+									},
+									"end": {
+										"line": 2,
+										"column": 20
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 28,
+									"end": 34,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 9
+										},
+										"end": {
+											"line": 2,
+											"column": 15
+										}
+									},
+									"name": "$state"
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 35,
+										"end": 38,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 16
+											},
+											"end": {
+												"line": 2,
+												"column": 19
+											}
+										},
+										"value": "中",
+										"raw": "'中'"
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

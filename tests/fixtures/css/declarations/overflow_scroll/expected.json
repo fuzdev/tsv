@@ -1,0 +1,150 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 345,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 336,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 31,
+							"property": "overflow",
+							"value": "auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 35,
+							"end": 53,
+							"property": "overflow-x",
+							"value": "hidden"
+						},
+						{
+							"type": "Declaration",
+							"start": 57,
+							"end": 75,
+							"property": "overflow-y",
+							"value": "scroll"
+						},
+						{
+							"type": "Declaration",
+							"start": 79,
+							"end": 102,
+							"property": "scroll-behavior",
+							"value": "smooth"
+						},
+						{
+							"type": "Declaration",
+							"start": 106,
+							"end": 134,
+							"property": "overscroll-behavior",
+							"value": "contain"
+						},
+						{
+							"type": "Declaration",
+							"start": 138,
+							"end": 165,
+							"property": "overscroll-behavior-x",
+							"value": "none"
+						},
+						{
+							"type": "Declaration",
+							"start": 169,
+							"end": 196,
+							"property": "overscroll-behavior-y",
+							"value": "auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 200,
+							"end": 229,
+							"property": "scroll-snap-type",
+							"value": "x mandatory"
+						},
+						{
+							"type": "Declaration",
+							"start": 233,
+							"end": 257,
+							"property": "scroll-snap-align",
+							"value": "start"
+						},
+						{
+							"type": "Declaration",
+							"start": 261,
+							"end": 285,
+							"property": "scroll-snap-stop",
+							"value": "always"
+						},
+						{
+							"type": "Declaration",
+							"start": 289,
+							"end": 308,
+							"property": "scroll-margin",
+							"value": "1rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 312,
+							"end": 332,
+							"property": "scroll-padding",
+							"value": "2rem"
+						}
+					]
+				},
+				"start": 9,
+				"end": 336
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 337,
+			"styles": "\n\tdiv {\n\t\toverflow: auto;\n\t\toverflow-x: hidden;\n\t\toverflow-y: scroll;\n\t\tscroll-behavior: smooth;\n\t\toverscroll-behavior: contain;\n\t\toverscroll-behavior-x: none;\n\t\toverscroll-behavior-y: auto;\n\t\tscroll-snap-type: x mandatory;\n\t\tscroll-snap-align: start;\n\t\tscroll-snap-stop: always;\n\t\tscroll-margin: 1rem;\n\t\tscroll-padding: 2rem;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 346,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

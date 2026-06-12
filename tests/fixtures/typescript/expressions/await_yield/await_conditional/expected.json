@@ -1,0 +1,780 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 429,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " await with conditional - parens required (await has higher precedence than ?:)",
+			"start": 20,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " await with logical in conditional - parens required",
+			"start": 134,
+			"end": 188,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " await with simple identifier - no parens",
+			"start": 226,
+			"end": 269,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " await with call - no parens",
+			"start": 292,
+			"end": 322,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " await with member access - no parens",
+			"start": 348,
+			"end": 387,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 40
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 428,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 419,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 103,
+					"end": 131,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 29
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 109,
+							"end": 130,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 28
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 109,
+								"end": 110,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "AwaitExpression",
+								"start": 113,
+								"end": 130,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 28
+									}
+								},
+								"argument": {
+									"type": "ConditionalExpression",
+									"start": 120,
+									"end": 129,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 18
+										},
+										"end": {
+											"line": 3,
+											"column": 27
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 120,
+										"end": 121,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 18
+											},
+											"end": {
+												"line": 3,
+												"column": 19
+											}
+										},
+										"name": "x"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 124,
+										"end": 125,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 22
+											},
+											"end": {
+												"line": 3,
+												"column": 23
+											}
+										},
+										"name": "y"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 128,
+										"end": 129,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 26
+											},
+											"end": {
+												"line": 3,
+												"column": 27
+											}
+										},
+										"name": "z"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " await with conditional - parens required (await has higher precedence than ?:)",
+							"start": 20,
+							"end": 101
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 190,
+					"end": 223,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 34
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 196,
+							"end": 222,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 33
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 196,
+								"end": 197,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "AwaitExpression",
+								"start": 200,
+								"end": 222,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 11
+									},
+									"end": {
+										"line": 6,
+										"column": 33
+									}
+								},
+								"argument": {
+									"type": "ConditionalExpression",
+									"start": 207,
+									"end": 221,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 18
+										},
+										"end": {
+											"line": 6,
+											"column": 32
+										}
+									},
+									"test": {
+										"type": "LogicalExpression",
+										"start": 207,
+										"end": 213,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 18
+											},
+											"end": {
+												"line": 6,
+												"column": 24
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 207,
+											"end": 208,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 18
+												},
+												"end": {
+													"line": 6,
+													"column": 19
+												}
+											},
+											"name": "x"
+										},
+										"operator": "||",
+										"right": {
+											"type": "Identifier",
+											"start": 212,
+											"end": 213,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 23
+												},
+												"end": {
+													"line": 6,
+													"column": 24
+												}
+											},
+											"name": "y"
+										}
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 216,
+										"end": 217,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 27
+											},
+											"end": {
+												"line": 6,
+												"column": 28
+											}
+										},
+										"name": "z"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 220,
+										"end": 221,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 31
+											},
+											"end": {
+												"line": 6,
+												"column": 32
+											}
+										},
+										"name": "w"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " await with logical in conditional - parens required",
+							"start": 134,
+							"end": 188
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 271,
+					"end": 289,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 19
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 277,
+							"end": 288,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 18
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 277,
+								"end": 278,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "AwaitExpression",
+								"start": 281,
+								"end": 288,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 11
+									},
+									"end": {
+										"line": 9,
+										"column": 18
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 287,
+									"end": 288,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 17
+										},
+										"end": {
+											"line": 9,
+											"column": 18
+										}
+									},
+									"name": "x"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " await with simple identifier - no parens",
+							"start": 226,
+							"end": 269
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 324,
+					"end": 345,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 22
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 330,
+							"end": 344,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 21
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 330,
+								"end": 331,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "AwaitExpression",
+								"start": 334,
+								"end": 344,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 11
+									},
+									"end": {
+										"line": 12,
+										"column": 21
+									}
+								},
+								"argument": {
+									"type": "CallExpression",
+									"start": 340,
+									"end": 344,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 17
+										},
+										"end": {
+											"line": 12,
+											"column": 21
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 340,
+										"end": 342,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 17
+											},
+											"end": {
+												"line": 12,
+												"column": 19
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " await with call - no parens",
+							"start": 292,
+							"end": 322
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 389,
+					"end": 418,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 30
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 395,
+							"end": 417,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 29
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 395,
+								"end": 396,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "AwaitExpression",
+								"start": 399,
+								"end": 417,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 11
+									},
+									"end": {
+										"line": 15,
+										"column": 29
+									}
+								},
+								"argument": {
+									"type": "CallExpression",
+									"start": 405,
+									"end": 417,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 17
+										},
+										"end": {
+											"line": 15,
+											"column": 29
+										}
+									},
+									"callee": {
+										"type": "MemberExpression",
+										"start": 405,
+										"end": 415,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 17
+											},
+											"end": {
+												"line": 15,
+												"column": 27
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 405,
+											"end": 408,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 17
+												},
+												"end": {
+													"line": 15,
+													"column": 20
+												}
+											},
+											"name": "obj"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 409,
+											"end": 415,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 21
+												},
+												"end": {
+													"line": 15,
+													"column": 27
+												}
+											},
+											"name": "method"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " await with member access - no parens",
+							"start": 348,
+							"end": 387
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

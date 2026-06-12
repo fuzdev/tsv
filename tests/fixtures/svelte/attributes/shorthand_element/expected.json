@@ -1,0 +1,120 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 18,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 17,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 6,
+						"character": 6
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 7,
+						"end": 10,
+						"name": "a",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 8,
+								"character": 8
+							},
+							"end": {
+								"line": 1,
+								"column": 9,
+								"character": 9
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 8,
+							"end": 9,
+							"expression": {
+								"type": "Identifier",
+								"name": "a",
+								"start": 8,
+								"end": 9,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 8,
+										"character": 8
+									},
+									"end": {
+										"line": 1,
+										"column": 9,
+										"character": 9
+									}
+								}
+							}
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 11,
+						"end": 14,
+						"name": "b",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 12,
+								"character": 12
+							},
+							"end": {
+								"line": 1,
+								"column": 13,
+								"character": 13
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 12,
+							"end": 13,
+							"expression": {
+								"type": "Identifier",
+								"name": "b",
+								"start": 12,
+								"end": 13,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 12,
+										"character": 12
+									},
+									"end": {
+										"line": 1,
+										"column": 13,
+										"character": 13
+									}
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

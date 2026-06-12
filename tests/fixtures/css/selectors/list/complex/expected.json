@@ -1,0 +1,160 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 69,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 41,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 16,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "a",
+											"start": 9,
+											"end": 11
+										}
+									],
+									"start": 9,
+									"end": 11
+								},
+								{
+									"type": "RelativeSelector",
+									"combinator": {
+										"type": "Combinator",
+										"name": ">",
+										"start": 12,
+										"end": 13
+									},
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "b",
+											"start": 14,
+											"end": 16
+										}
+									],
+									"start": 12,
+									"end": 16
+								}
+							]
+						},
+						{
+							"type": "ComplexSelector",
+							"start": 19,
+							"end": 29,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "IdSelector",
+											"name": "id",
+											"start": 19,
+											"end": 22
+										}
+									],
+									"start": 19,
+									"end": 22
+								},
+								{
+									"type": "RelativeSelector",
+									"combinator": {
+										"type": "Combinator",
+										"name": "+",
+										"start": 23,
+										"end": 24
+									},
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "span",
+											"start": 25,
+											"end": 29
+										}
+									],
+									"start": 23,
+									"end": 29
+								}
+							]
+						},
+						{
+							"type": "ComplexSelector",
+							"start": 32,
+							"end": 41,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 32,
+											"end": 35
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "hover",
+											"args": null,
+											"start": 35,
+											"end": 41
+										}
+									],
+									"start": 32,
+									"end": 41
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 42,
+					"end": 60,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 46,
+							"end": 56,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 9,
+				"end": 60
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 61,
+			"styles": "\n\t.a > .b,\n\t#id + span,\n\tdiv:hover {\n\t\tcolor: red;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 70,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

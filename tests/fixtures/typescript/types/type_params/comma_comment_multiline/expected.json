@@ -1,0 +1,745 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 532,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Type param declaration: inline block comment after comma",
+			"start": 20,
+			"end": 79,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment",
+			"start": 102,
+			"end": 117,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 120,
+			"end": 127,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Type param declaration: trailing block comment before comma",
+			"start": 141,
+			"end": 203,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 223,
+			"end": 230,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 4
+				},
+				"end": {
+					"line": 11,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment",
+			"start": 234,
+			"end": 249,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Type param instantiation (call): inline block comment after comma",
+			"start": 265,
+			"end": 333,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment",
+			"start": 352,
+			"end": 367,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 19,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 370,
+			"end": 377,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 2
+				},
+				"end": {
+					"line": 20,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Type param instantiation (call): trailing block comment before comma",
+			"start": 393,
+			"end": 464,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 480,
+			"end": 487,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 9
+				},
+				"end": {
+					"line": 25,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment",
+			"start": 491,
+			"end": 506,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 2
+				},
+				"end": {
+					"line": 26,
+					"column": 17
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 531,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 522,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 29,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 81,
+					"end": 138,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 7
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 90,
+						"end": 93,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 3,
+								"column": 13
+							}
+						},
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 93,
+						"end": 133,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 13
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 97,
+								"end": 98,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 3
+									}
+								},
+								"name": "T"
+							},
+							{
+								"type": "TSTypeParameter",
+								"start": 128,
+								"end": 129,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 10
+									},
+									"end": {
+										"line": 6,
+										"column": 11
+									}
+								},
+								"name": "U",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " line comment",
+										"start": 102,
+										"end": 117
+									},
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 120,
+										"end": 127
+									}
+								]
+							}
+						],
+						"extra": {
+							"trailingComma": 129
+						}
+					},
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 136,
+						"end": 138,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 5
+							},
+							"end": {
+								"line": 7,
+								"column": 7
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Type param declaration: inline block comment after comma",
+							"start": 20,
+							"end": 79
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 205,
+					"end": 262,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 7
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 214,
+						"end": 217,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 10
+							},
+							"end": {
+								"line": 10,
+								"column": 13
+							}
+						},
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 217,
+						"end": 257,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 13
+							},
+							"end": {
+								"line": 14,
+								"column": 2
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 221,
+								"end": 222,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 3
+									}
+								},
+								"name": "T",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 223,
+										"end": 230
+									}
+								]
+							},
+							{
+								"type": "TSTypeParameter",
+								"start": 252,
+								"end": 253,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 3
+									}
+								},
+								"name": "U",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " line comment",
+										"start": 234,
+										"end": 249
+									}
+								]
+							}
+						],
+						"extra": {
+							"trailingComma": 253
+						}
+					},
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 260,
+						"end": 262,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 5
+							},
+							"end": {
+								"line": 14,
+								"column": 7
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Type param declaration: trailing block comment before comma",
+							"start": 141,
+							"end": 203
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 335,
+					"end": 390,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 5
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 335,
+						"end": 389,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 1
+							},
+							"end": {
+								"line": 21,
+								"column": 4
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 335,
+							"end": 338,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 1
+								},
+								"end": {
+									"line": 17,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 338,
+							"end": 387,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 4
+								},
+								"end": {
+									"line": 21,
+									"column": 2
+								}
+							},
+							"params": [
+								{
+									"type": "TSStringKeyword",
+									"start": 342,
+									"end": 348,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 8
+										}
+									}
+								},
+								{
+									"type": "TSNumberKeyword",
+									"start": 378,
+									"end": 384,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 10
+										},
+										"end": {
+											"line": 20,
+											"column": 16
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " line comment",
+											"start": 352,
+											"end": 367
+										},
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 370,
+											"end": 377
+										}
+									]
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Type param instantiation (call): inline block comment after comma",
+							"start": 265,
+							"end": 333
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 466,
+					"end": 521,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 5
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 466,
+						"end": 520,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 1
+							},
+							"end": {
+								"line": 28,
+								"column": 4
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 466,
+							"end": 469,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 1
+								},
+								"end": {
+									"line": 24,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 469,
+							"end": 518,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 4
+								},
+								"end": {
+									"line": 28,
+									"column": 2
+								}
+							},
+							"params": [
+								{
+									"type": "TSStringKeyword",
+									"start": 473,
+									"end": 479,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 2
+										},
+										"end": {
+											"line": 25,
+											"column": 8
+										}
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 480,
+											"end": 487
+										}
+									]
+								},
+								{
+									"type": "TSNumberKeyword",
+									"start": 509,
+									"end": 515,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 2
+										},
+										"end": {
+											"line": 27,
+											"column": 8
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " line comment",
+											"start": 491,
+											"end": 506
+										}
+									]
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Type param instantiation (call): trailing block comment before comma",
+							"start": 393,
+							"end": 464
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

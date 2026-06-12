@@ -1,0 +1,236 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 169,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 168,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 159,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 62,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 16,
+							"end": 61,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 16,
+								"end": 28,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 19
+									}
+								},
+								"name": "preferDouble"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 33,
+								"end": 61,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 5
+									}
+								},
+								"value": "has 'single' quotes here",
+								"raw": "\"has 'single' quotes \\\nhere\""
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 64,
+					"end": 116,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 70,
+							"end": 115,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 70,
+								"end": 82,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 19
+									}
+								},
+								"name": "preferSingle"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 87,
+								"end": 115,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 5
+									}
+								},
+								"value": "has \"double\" quotes here",
+								"raw": "'has \"double\" quotes \\\nhere'"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 118,
+					"end": 158,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 124,
+							"end": 157,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 10,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 124,
+								"end": 128,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 11
+									}
+								},
+								"name": "both"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 133,
+								"end": 157,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								},
+								"value": "has 'both' \"types\"",
+								"raw": "'has \\'both\\' \\\n\"types\"'"
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

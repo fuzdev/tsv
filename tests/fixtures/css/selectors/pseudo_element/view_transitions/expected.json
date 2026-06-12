@@ -1,0 +1,481 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 910,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 43,
+					"end": 60,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 43,
+							"end": 60,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "view-transition",
+											"start": 43,
+											"end": 60
+										}
+									],
+									"start": 43,
+									"end": 60
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 61,
+					"end": 96,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 65,
+							"end": 80,
+							"property": "position",
+							"value": "fixed"
+						},
+						{
+							"type": "Declaration",
+							"start": 84,
+							"end": 92,
+							"property": "inset",
+							"value": "0"
+						}
+					]
+				},
+				"start": 43,
+				"end": 96
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 144,
+					"end": 173,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 144,
+							"end": 173,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "view-transition-group",
+											"start": 144,
+											"end": 167
+										}
+									],
+									"start": 144,
+									"end": 173
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 174,
+					"end": 206,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 178,
+							"end": 202,
+							"property": "animation-duration",
+							"value": "0.5s"
+						}
+					]
+				},
+				"start": 144,
+				"end": 206
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 252,
+					"end": 278,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 252,
+							"end": 278,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "view-transition-group",
+											"start": 252,
+											"end": 275
+										}
+									],
+									"start": 252,
+									"end": 278
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 279,
+					"end": 325,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 283,
+							"end": 321,
+							"property": "animation-timing-function",
+							"value": "ease-in-out"
+						}
+					]
+				},
+				"start": 252,
+				"end": 325
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 362,
+					"end": 396,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 362,
+							"end": 396,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "view-transition-image-pair",
+											"start": 362,
+											"end": 390
+										}
+									],
+									"start": 362,
+									"end": 396
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 397,
+					"end": 423,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 401,
+							"end": 419,
+							"property": "isolation",
+							"value": "isolate"
+						}
+					]
+				},
+				"start": 362,
+				"end": 423
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 449,
+					"end": 476,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 449,
+							"end": 476,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "view-transition-old",
+											"start": 449,
+											"end": 470
+										}
+									],
+									"start": 449,
+									"end": 476
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 477,
+					"end": 509,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 481,
+							"end": 505,
+							"property": "animation",
+							"value": "fade-out 0.3s"
+						}
+					]
+				},
+				"start": 449,
+				"end": 509
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 535,
+					"end": 562,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 535,
+							"end": 562,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "view-transition-new",
+											"start": 535,
+											"end": 556
+										}
+									],
+									"start": 535,
+									"end": 562
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 563,
+					"end": 594,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 567,
+							"end": 590,
+							"property": "animation",
+							"value": "fade-in 0.3s"
+						}
+					]
+				},
+				"start": 535,
+				"end": 594
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 623,
+					"end": 662,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 623,
+							"end": 662,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 623,
+											"end": 630
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "view-transition-group",
+											"start": 630,
+											"end": 653
+										}
+									],
+									"start": 623,
+									"end": 662
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 663,
+					"end": 696,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 667,
+							"end": 692,
+							"property": "animation-duration",
+							"value": "0.25s"
+						}
+					]
+				},
+				"start": 623,
+				"end": 696
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 729,
+					"end": 783,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 729,
+							"end": 783,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "view-transition-group",
+											"start": 729,
+											"end": 752
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "view-transition-old",
+											"start": 759,
+											"end": 780
+										}
+									],
+									"start": 729,
+									"end": 783
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 784,
+					"end": 802,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 788,
+							"end": 798,
+							"property": "opacity",
+							"value": "0"
+						}
+					]
+				},
+				"start": 729,
+				"end": 802
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 830,
+					"end": 871,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 830,
+							"end": 871,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class2",
+											"start": 830,
+											"end": 837
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "hover",
+											"args": null,
+											"start": 837,
+											"end": 843
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "view-transition-new",
+											"start": 843,
+											"end": 864
+										}
+									],
+									"start": 830,
+									"end": 871
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 872,
+					"end": 901,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 876,
+							"end": 897,
+							"property": "transform",
+							"value": "scale(1.1)"
+						}
+					]
+				},
+				"start": 830,
+				"end": 901
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 902,
+			"styles": "\n\t/* Basic view transition root */\n\t::view-transition {\n\t\tposition: fixed;\n\t\tinset: 0;\n\t}\n\n\t/* View transition group with identifier */\n\t::view-transition-group(root) {\n\t\tanimation-duration: 0.5s;\n\t}\n\n\t/* View transition group with wildcard */\n\t::view-transition-group(*) {\n\t\tanimation-timing-function: ease-in-out;\n\t}\n\n\t/* Image pair for transitions */\n\t::view-transition-image-pair(root) {\n\t\tisolation: isolate;\n\t}\n\n\t/* Old image state */\n\t::view-transition-old(root) {\n\t\tanimation: fade-out 0.3s;\n\t}\n\n\t/* New image state */\n\t::view-transition-new(root) {\n\t\tanimation: fade-in 0.3s;\n\t}\n\n\t/* With type selector */\n\t.class1::view-transition-group(content) {\n\t\tanimation-duration: 0.25s;\n\t}\n\n\t/* Nested pseudo-elements */\n\t::view-transition-group(name1)::view-transition-old(*) {\n\t\topacity: 0;\n\t}\n\n\t/* With pseudo-class */\n\t.class2:hover::view-transition-new(name2) {\n\t\ttransform: scale(1.1);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 911,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

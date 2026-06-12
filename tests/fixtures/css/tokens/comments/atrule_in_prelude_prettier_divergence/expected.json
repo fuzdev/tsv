@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 103,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 94,
+				"name": "media",
+				"prelude": "screen  and (min-width: 500px)",
+				"block": {
+					"type": "Block",
+					"start": 63,
+					"end": 94,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 67,
+								"end": 70,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 67,
+										"end": 70,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 67,
+														"end": 70
+													}
+												],
+												"start": 67,
+												"end": 70
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 71,
+								"end": 91,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 76,
+										"end": 86,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 67,
+							"end": 91
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 95,
+			"styles": "\n\t@media screen /* in prelude */ and (min-width: 500px) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 104,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

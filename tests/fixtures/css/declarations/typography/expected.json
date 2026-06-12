@@ -1,0 +1,150 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 313,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 304,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 35,
+							"property": "text-align",
+							"value": "center"
+						},
+						{
+							"type": "Declaration",
+							"start": 39,
+							"end": 63,
+							"property": "text-align-last",
+							"value": "justify"
+						},
+						{
+							"type": "Declaration",
+							"start": 67,
+							"end": 91,
+							"property": "text-justify",
+							"value": "inter-word"
+						},
+						{
+							"type": "Declaration",
+							"start": 95,
+							"end": 118,
+							"property": "text-overflow",
+							"value": "ellipsis"
+						},
+						{
+							"type": "Declaration",
+							"start": 122,
+							"end": 138,
+							"property": "text-indent",
+							"value": "2em"
+						},
+						{
+							"type": "Declaration",
+							"start": 142,
+							"end": 161,
+							"property": "white-space",
+							"value": "nowrap"
+						},
+						{
+							"type": "Declaration",
+							"start": 165,
+							"end": 187,
+							"property": "word-break",
+							"value": "break-word"
+						},
+						{
+							"type": "Declaration",
+							"start": 191,
+							"end": 216,
+							"property": "overflow-wrap",
+							"value": "break-word"
+						},
+						{
+							"type": "Declaration",
+							"start": 220,
+							"end": 233,
+							"property": "hyphens",
+							"value": "auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 237,
+							"end": 253,
+							"property": "line-height",
+							"value": "1.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 257,
+							"end": 278,
+							"property": "-webkit-line-clamp",
+							"value": "3"
+						},
+						{
+							"type": "Declaration",
+							"start": 282,
+							"end": 300,
+							"property": "line-break",
+							"value": "strict"
+						}
+					]
+				},
+				"start": 9,
+				"end": 304
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 305,
+			"styles": "\n\tdiv {\n\t\ttext-align: center;\n\t\ttext-align-last: justify;\n\t\ttext-justify: inter-word;\n\t\ttext-overflow: ellipsis;\n\t\ttext-indent: 2em;\n\t\twhite-space: nowrap;\n\t\tword-break: break-word;\n\t\toverflow-wrap: break-word;\n\t\thyphens: auto;\n\t\tline-height: 1.5;\n\t\t-webkit-line-clamp: 3;\n\t\tline-break: strict;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 314,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

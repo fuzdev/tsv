@@ -1,0 +1,283 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 1149,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 75,
+					"end": 78,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 75,
+							"end": 78,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 75,
+											"end": 78
+										}
+									],
+									"start": 75,
+									"end": 78
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 79,
+					"end": 1140,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 119,
+							"end": 128,
+							"property": "margin",
+							"value": "0"
+						},
+						{
+							"type": "Declaration",
+							"start": 132,
+							"end": 144,
+							"property": "padding",
+							"value": "0px"
+						},
+						{
+							"type": "Declaration",
+							"start": 148,
+							"end": 165,
+							"property": "border-width",
+							"value": "0em"
+						},
+						{
+							"type": "Declaration",
+							"start": 169,
+							"end": 186,
+							"property": "outline-width",
+							"value": "0%"
+						},
+						{
+							"type": "Declaration",
+							"start": 236,
+							"end": 247,
+							"property": "right",
+							"value": "-0px"
+						},
+						{
+							"type": "Declaration",
+							"start": 251,
+							"end": 262,
+							"property": "left",
+							"value": "-0rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 312,
+							"end": 323,
+							"property": "float",
+							"value": "+0em"
+						},
+						{
+							"type": "Declaration",
+							"start": 327,
+							"end": 337,
+							"property": "clear",
+							"value": "+0%"
+						},
+						{
+							"type": "Declaration",
+							"start": 387,
+							"end": 398,
+							"property": "z-index",
+							"value": "+5"
+						},
+						{
+							"type": "Declaration",
+							"start": 402,
+							"end": 421,
+							"property": "margin-left",
+							"value": "+1.5px"
+						},
+						{
+							"type": "Declaration",
+							"start": 425,
+							"end": 442,
+							"property": "max-width",
+							"value": "+100em"
+						},
+						{
+							"type": "Declaration",
+							"start": 446,
+							"end": 465,
+							"property": "min-height",
+							"value": "+0.5rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 519,
+							"end": 529,
+							"property": "top",
+							"value": "-10px"
+						},
+						{
+							"type": "Declaration",
+							"start": 533,
+							"end": 545,
+							"property": "left",
+							"value": "-2.5em"
+						},
+						{
+							"type": "Declaration",
+							"start": 549,
+							"end": 562,
+							"property": "bottom",
+							"value": "-1rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 566,
+							"end": 583,
+							"property": "margin-top",
+							"value": "-100%"
+						},
+						{
+							"type": "Declaration",
+							"start": 610,
+							"end": 626,
+							"property": "line-height",
+							"value": "1.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 630,
+							"end": 649,
+							"property": "font-size",
+							"value": "0.875rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 653,
+							"end": 665,
+							"property": "width",
+							"value": "2.5vw"
+						},
+						{
+							"type": "Declaration",
+							"start": 728,
+							"end": 740,
+							"property": "opacity",
+							"value": "0.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 744,
+							"end": 763,
+							"property": "padding-top",
+							"value": "0.25em"
+						},
+						{
+							"type": "Declaration",
+							"start": 767,
+							"end": 788,
+							"property": "padding-left",
+							"value": "0.75rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 815,
+							"end": 828,
+							"property": "height",
+							"value": "1.5em"
+						},
+						{
+							"type": "Declaration",
+							"start": 832,
+							"end": 850,
+							"property": "margin-bottom",
+							"value": "2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 880,
+							"end": 902,
+							"property": "letter-spacing",
+							"value": "0.01em"
+						},
+						{
+							"type": "Declaration",
+							"start": 906,
+							"end": 927,
+							"property": "border-width",
+							"value": "0.001px"
+						},
+						{
+							"type": "Declaration",
+							"start": 957,
+							"end": 974,
+							"property": "max-width",
+							"value": "9999px"
+						},
+						{
+							"type": "Declaration",
+							"start": 978,
+							"end": 999,
+							"property": "min-height",
+							"value": "1000000px"
+						},
+						{
+							"type": "Declaration",
+							"start": 1029,
+							"end": 1052,
+							"property": "transform",
+							"value": "scale(1000%)"
+						},
+						{
+							"type": "Declaration",
+							"start": 1083,
+							"end": 1108,
+							"property": "padding",
+							"value": "0 10px 0.5em 1px"
+						},
+						{
+							"type": "Declaration",
+							"start": 1112,
+							"end": 1136,
+							"property": "margin",
+							"value": "1px 0 2.5rem 0px"
+						}
+					]
+				},
+				"start": 75,
+				"end": 1140
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 1141,
+			"styles": "\n\t/* Test dimension edge cases: zero, negative, decimals, signs */\n\tdiv {\n\t\t/* Zero with and without units */\n\t\tmargin: 0;\n\t\tpadding: 0px;\n\t\tborder-width: 0em;\n\t\toutline-width: 0%;\n\t\t/* Negative zero preserved like Prettier */\n\t\tright: -0px;\n\t\tleft: -0rem;\n\t\t/* Positive zero preserved like Prettier */\n\t\tfloat: +0em;\n\t\tclear: +0%;\n\t\t/* Positive sign preserved like Prettier */\n\t\tz-index: +5;\n\t\tmargin-left: +1.5px;\n\t\tmax-width: +100em;\n\t\tmin-height: +0.5rem;\n\t\t/* Negative values (lengths and percentages) */\n\t\ttop: -10px;\n\t\tleft: -2.5em;\n\t\tbottom: -1rem;\n\t\tmargin-top: -100%;\n\t\t/* Decimal values */\n\t\tline-height: 1.5;\n\t\tfont-size: 0.875rem;\n\t\twidth: 2.5vw;\n\t\t/* Leading decimal point (prettier adds leading zero) */\n\t\topacity: 0.5;\n\t\tpadding-top: 0.25em;\n\t\tpadding-left: 0.75rem;\n\t\t/* Trailing zeros */\n\t\theight: 1.5em;\n\t\tmargin-bottom: 2px;\n\t\t/* Very small values */\n\t\tletter-spacing: 0.01em;\n\t\tborder-width: 0.001px;\n\t\t/* Very large values */\n\t\tmax-width: 9999px;\n\t\tmin-height: 1000000px;\n\t\t/* Large percentages */\n\t\ttransform: scale(1000%);\n\t\t/* Mixed in shorthand */\n\t\tpadding: 0 10px 0.5em 1px;\n\t\tmargin: 1px 0 2.5rem 0px;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 1150,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

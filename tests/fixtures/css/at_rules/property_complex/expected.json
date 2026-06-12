@@ -1,0 +1,192 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 376,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 95,
+				"name": "property",
+				"prelude": "--prop1",
+				"block": {
+					"type": "Block",
+					"start": 27,
+					"end": 95,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 31,
+							"end": 49,
+							"property": "syntax",
+							"value": "'<length>'"
+						},
+						{
+							"type": "Declaration",
+							"start": 53,
+							"end": 67,
+							"property": "inherits",
+							"value": "true"
+						},
+						{
+							"type": "Declaration",
+							"start": 71,
+							"end": 91,
+							"property": "initial-value",
+							"value": "100px"
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 98,
+				"end": 183,
+				"name": "property",
+				"prelude": "--prop2",
+				"block": {
+					"type": "Block",
+					"start": 116,
+					"end": 183,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 120,
+							"end": 137,
+							"property": "syntax",
+							"value": "'<color>'"
+						},
+						{
+							"type": "Declaration",
+							"start": 141,
+							"end": 156,
+							"property": "inherits",
+							"value": "false"
+						},
+						{
+							"type": "Declaration",
+							"start": 160,
+							"end": 179,
+							"property": "initial-value",
+							"value": "blue"
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 186,
+				"end": 285,
+				"name": "property",
+				"prelude": "--prop3",
+				"block": {
+					"type": "Block",
+					"start": 204,
+					"end": 285,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 208,
+							"end": 241,
+							"property": "syntax",
+							"value": "'<percentage> | <number>'"
+						},
+						{
+							"type": "Declaration",
+							"start": 245,
+							"end": 259,
+							"property": "inherits",
+							"value": "true"
+						},
+						{
+							"type": "Declaration",
+							"start": 263,
+							"end": 281,
+							"property": "initial-value",
+							"value": "50%"
+						}
+					]
+				}
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 288,
+					"end": 291,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 288,
+							"end": 291,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 288,
+											"end": 291
+										}
+									],
+									"start": 288,
+									"end": 291
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 292,
+					"end": 367,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 296,
+							"end": 315,
+							"property": "width",
+							"value": "var(--prop1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 319,
+							"end": 338,
+							"property": "color",
+							"value": "var(--prop2)"
+						},
+						{
+							"type": "Declaration",
+							"start": 342,
+							"end": 363,
+							"property": "opacity",
+							"value": "var(--prop3)"
+						}
+					]
+				},
+				"start": 288,
+				"end": 367
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 368,
+			"styles": "\n\t@property --prop1 {\n\t\tsyntax: '<length>';\n\t\tinherits: true;\n\t\tinitial-value: 100px;\n\t}\n\n\t@property --prop2 {\n\t\tsyntax: '<color>';\n\t\tinherits: false;\n\t\tinitial-value: blue;\n\t}\n\n\t@property --prop3 {\n\t\tsyntax: '<percentage> | <number>';\n\t\tinherits: true;\n\t\tinitial-value: 50%;\n\t}\n\n\tdiv {\n\t\twidth: var(--prop1);\n\t\tcolor: var(--prop2);\n\t\topacity: var(--prop3);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 377,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

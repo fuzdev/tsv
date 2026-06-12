@@ -1,0 +1,866 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 202,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 201,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 192,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 20,
+					"end": 51,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 26,
+							"end": 50,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 2,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 26,
+								"end": 31,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 12
+									}
+								},
+								"name": "expr1"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 34,
+								"end": 50,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 15
+									},
+									"end": {
+										"line": 2,
+										"column": 31
+									}
+								},
+								"expressions": [
+									{
+										"type": "BinaryExpression",
+										"start": 43,
+										"end": 48,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 24
+											},
+											"end": {
+												"line": 2,
+												"column": 29
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 43,
+											"end": 44,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 24
+												},
+												"end": {
+													"line": 2,
+													"column": 25
+												}
+											},
+											"name": "a"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 47,
+											"end": 48,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 28
+												},
+												"end": {
+													"line": 2,
+													"column": 29
+												}
+											},
+											"name": "b"
+										}
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 35,
+										"end": 41,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 16
+											},
+											"end": {
+												"line": 2,
+												"column": 22
+											}
+										},
+										"value": {
+											"raw": "text1 ",
+											"cooked": "text1 "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 49,
+										"end": 49,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 30
+											},
+											"end": {
+												"line": 2,
+												"column": 30
+											}
+										},
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 53,
+					"end": 84,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 59,
+							"end": 83,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 59,
+								"end": 64,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 12
+									}
+								},
+								"name": "expr2"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 67,
+								"end": 83,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 15
+									},
+									"end": {
+										"line": 3,
+										"column": 31
+									}
+								},
+								"expressions": [
+									{
+										"type": "CallExpression",
+										"start": 76,
+										"end": 81,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 24
+											},
+											"end": {
+												"line": 3,
+												"column": 29
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 76,
+											"end": 78,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 24
+												},
+												"end": {
+													"line": 3,
+													"column": 26
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 79,
+												"end": 80,
+												"loc": {
+													"start": {
+														"line": 3,
+														"column": 27
+													},
+													"end": {
+														"line": 3,
+														"column": 28
+													}
+												},
+												"name": "a"
+											}
+										],
+										"optional": false
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 68,
+										"end": 74,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 16
+											},
+											"end": {
+												"line": 3,
+												"column": 22
+											}
+										},
+										"value": {
+											"raw": "text1 ",
+											"cooked": "text1 "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 82,
+										"end": 82,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 30
+											},
+											"end": {
+												"line": 3,
+												"column": 30
+											}
+										},
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 86,
+					"end": 120,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 35
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 92,
+							"end": 119,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 34
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 92,
+								"end": 97,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 12
+									}
+								},
+								"name": "expr3"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 100,
+								"end": 119,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 15
+									},
+									"end": {
+										"line": 4,
+										"column": 34
+									}
+								},
+								"expressions": [
+									{
+										"type": "MemberExpression",
+										"start": 109,
+										"end": 117,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 24
+											},
+											"end": {
+												"line": 4,
+												"column": 32
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 109,
+											"end": 112,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 24
+												},
+												"end": {
+													"line": 4,
+													"column": 27
+												}
+											},
+											"name": "obj"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 113,
+											"end": 117,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 28
+												},
+												"end": {
+													"line": 4,
+													"column": 32
+												}
+											},
+											"name": "prop"
+										},
+										"computed": false,
+										"optional": false
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 101,
+										"end": 107,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 16
+											},
+											"end": {
+												"line": 4,
+												"column": 22
+											}
+										},
+										"value": {
+											"raw": "text1 ",
+											"cooked": "text1 "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 118,
+										"end": 118,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 33
+											},
+											"end": {
+												"line": 4,
+												"column": 33
+											}
+										},
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 122,
+					"end": 154,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 33
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 128,
+							"end": 153,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 32
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 128,
+								"end": 133,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 12
+									}
+								},
+								"name": "expr4"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 136,
+								"end": 153,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 15
+									},
+									"end": {
+										"line": 5,
+										"column": 32
+									}
+								},
+								"expressions": [
+									{
+										"type": "MemberExpression",
+										"start": 145,
+										"end": 151,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 24
+											},
+											"end": {
+												"line": 5,
+												"column": 30
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 145,
+											"end": 148,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 24
+												},
+												"end": {
+													"line": 5,
+													"column": 27
+												}
+											},
+											"name": "arr"
+										},
+										"property": {
+											"type": "Literal",
+											"start": 149,
+											"end": 150,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 28
+												},
+												"end": {
+													"line": 5,
+													"column": 29
+												}
+											},
+											"value": 0,
+											"raw": "0"
+										},
+										"computed": true,
+										"optional": false
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 137,
+										"end": 143,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 16
+											},
+											"end": {
+												"line": 5,
+												"column": 22
+											}
+										},
+										"value": {
+											"raw": "text1 ",
+											"cooked": "text1 "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 152,
+										"end": 152,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 31
+											},
+											"end": {
+												"line": 5,
+												"column": 31
+											}
+										},
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 156,
+					"end": 191,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 36
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 162,
+							"end": 190,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 35
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 162,
+								"end": 167,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 12
+									}
+								},
+								"name": "expr5"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 170,
+								"end": 190,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 15
+									},
+									"end": {
+										"line": 6,
+										"column": 35
+									}
+								},
+								"expressions": [
+									{
+										"type": "ConditionalExpression",
+										"start": 179,
+										"end": 188,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 24
+											},
+											"end": {
+												"line": 6,
+												"column": 33
+											}
+										},
+										"test": {
+											"type": "Identifier",
+											"start": 179,
+											"end": 180,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 24
+												},
+												"end": {
+													"line": 6,
+													"column": 25
+												}
+											},
+											"name": "a"
+										},
+										"consequent": {
+											"type": "Identifier",
+											"start": 183,
+											"end": 184,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 28
+												},
+												"end": {
+													"line": 6,
+													"column": 29
+												}
+											},
+											"name": "b"
+										},
+										"alternate": {
+											"type": "Identifier",
+											"start": 187,
+											"end": 188,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 32
+												},
+												"end": {
+													"line": 6,
+													"column": 33
+												}
+											},
+											"name": "c"
+										}
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 171,
+										"end": 177,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 16
+											},
+											"end": {
+												"line": 6,
+												"column": 22
+											}
+										},
+										"value": {
+											"raw": "text1 ",
+											"cooked": "text1 "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 189,
+										"end": 189,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 34
+											},
+											"end": {
+												"line": 6,
+												"column": 34
+											}
+										},
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

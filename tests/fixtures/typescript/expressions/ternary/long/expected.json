@@ -1,0 +1,311 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 296,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " Short ternary - stays inline (under 100 chars) ",
+			"start": 10,
+			"end": 62,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " Long condition - exceeds 100 chars, wraps ? and : to new lines ",
+			"start": 102,
+			"end": 170,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 69
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 295,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 286,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 64,
+					"end": 99,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 36
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 70,
+							"end": 98,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 35
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 70,
+								"end": 75,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 12
+									}
+								},
+								"name": "short"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 78,
+								"end": 98,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 15
+									},
+									"end": {
+										"line": 3,
+										"column": 35
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 78,
+									"end": 82,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 15
+										},
+										"end": {
+											"line": 3,
+											"column": 19
+										}
+									},
+									"name": "cond"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 85,
+									"end": 90,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 22
+										},
+										"end": {
+											"line": 3,
+											"column": 27
+										}
+									},
+									"name": "expr1"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 93,
+									"end": 98,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 30
+										},
+										"end": {
+											"line": 3,
+											"column": 35
+										}
+									},
+									"name": "expr2"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " Short ternary - stays inline (under 100 chars) ",
+							"start": 10,
+							"end": 62
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 172,
+					"end": 285,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 10
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 178,
+							"end": 284,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 9
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 178,
+								"end": 182,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 11
+									}
+								},
+								"name": "long"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 185,
+								"end": 284,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 14
+									},
+									"end": {
+										"line": 8,
+										"column": 9
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 185,
+									"end": 264,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 14
+										},
+										"end": {
+											"line": 6,
+											"column": 93
+										}
+									},
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 269,
+									"end": 274,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 4
+										},
+										"end": {
+											"line": 7,
+											"column": 9
+										}
+									},
+									"name": "expr1"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 279,
+									"end": 284,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 4
+										},
+										"end": {
+											"line": 8,
+											"column": 9
+										}
+									},
+									"name": "expr2"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " Long condition - exceeds 100 chars, wraps ? and : to new lines ",
+							"start": 102,
+							"end": 170
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

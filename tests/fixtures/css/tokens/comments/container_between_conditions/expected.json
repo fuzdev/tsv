@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 178,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 60,
+				"end": 169,
+				"name": "container",
+				"prelude": "(min-width: 100px)  and  (max-width: 200px)",
+				"block": {
+					"type": "Block",
+					"start": 137,
+					"end": 169,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 141,
+								"end": 144,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 141,
+										"end": 144,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 141,
+														"end": 144
+													}
+												],
+												"start": 141,
+												"end": 144
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 145,
+								"end": 166,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 150,
+										"end": 161,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 141,
+							"end": 166
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 170,
+			"styles": "\n\t/* Comments between @container condition parts */\n\t@container /* a */ (min-width: 100px) /* b */ and /* c */ (max-width: 200px) {\n\t\tdiv {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 179,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

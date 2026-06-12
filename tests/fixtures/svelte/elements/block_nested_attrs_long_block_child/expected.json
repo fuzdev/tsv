@@ -1,0 +1,756 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 665,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 67,
+				"data": " Block child at indent 1 - triggers the bug (101 effective) "
+			},
+			{
+				"type": "Text",
+				"start": 67,
+				"end": 68,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 68,
+				"end": 239,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 69
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 72
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 73,
+							"end": 75,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 75,
+							"end": 232,
+							"name": "button",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 76
+								},
+								"end": {
+									"line": 3,
+									"column": 8,
+									"character": 82
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 85,
+									"end": 98,
+									"name": "type",
+									"name_loc": {
+										"start": {
+											"line": 4,
+											"column": 2,
+											"character": 85
+										},
+										"end": {
+											"line": 4,
+											"column": 6,
+											"character": 89
+										}
+									},
+									"value": [
+										{
+											"start": 91,
+											"end": 97,
+											"type": "Text",
+											"raw": "button",
+											"data": "button"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 101,
+									"end": 171,
+									"name": "class",
+									"name_loc": {
+										"start": {
+											"line": 5,
+											"column": 2,
+											"character": 101
+										},
+										"end": {
+											"line": 5,
+											"column": 7,
+											"character": 106
+										}
+									},
+									"value": [
+										{
+											"start": 108,
+											"end": 170,
+											"type": "Text",
+											"raw": "class1 class2 class3 class4 class5 class6 class7 class8 class9",
+											"data": "class1 class2 class3 class4 class5 class6 class7 class8 class9"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 174,
+									"end": 197,
+									"name": "onclick",
+									"name_loc": {
+										"start": {
+											"line": 6,
+											"column": 2,
+											"character": 174
+										},
+										"end": {
+											"line": 6,
+											"column": 9,
+											"character": 181
+										}
+									},
+									"value": {
+										"type": "ExpressionTag",
+										"start": 182,
+										"end": 197,
+										"expression": {
+											"type": "ArrowFunctionExpression",
+											"start": 183,
+											"end": 196,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 11
+												},
+												"end": {
+													"line": 6,
+													"column": 24
+												}
+											},
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [],
+											"body": {
+												"type": "CallExpression",
+												"start": 189,
+												"end": 196,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 17
+													},
+													"end": {
+														"line": 6,
+														"column": 24
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 189,
+													"end": 191,
+													"loc": {
+														"start": {
+															"line": 6,
+															"column": 17
+														},
+														"end": {
+															"line": 6,
+															"column": 19
+														}
+													},
+													"name": "fn"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 192,
+														"end": 195,
+														"loc": {
+															"start": {
+																"line": 6,
+																"column": 20
+															},
+															"end": {
+																"line": 6,
+																"column": 23
+															}
+														},
+														"name": "arg"
+													}
+												],
+												"optional": false
+											}
+										}
+									}
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 200,
+										"end": 203,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 203,
+										"end": 221,
+										"name": "div",
+										"name_loc": {
+											"start": {
+												"line": 8,
+												"column": 3,
+												"character": 204
+											},
+											"end": {
+												"line": 8,
+												"column": 6,
+												"character": 207
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 208,
+													"end": 215,
+													"raw": "content",
+													"data": "content"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 221,
+										"end": 223,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 232,
+							"end": 233,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 239,
+				"end": 241,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 241,
+				"end": 303,
+				"data": " Text child at indent 1 - works correctly (same attrs) "
+			},
+			{
+				"type": "Text",
+				"start": 303,
+				"end": 304,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 304,
+				"end": 464,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 305
+					},
+					"end": {
+						"line": 13,
+						"column": 4,
+						"character": 308
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 309,
+							"end": 311,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 311,
+							"end": 457,
+							"name": "button",
+							"name_loc": {
+								"start": {
+									"line": 14,
+									"column": 2,
+									"character": 312
+								},
+								"end": {
+									"line": 14,
+									"column": 8,
+									"character": 318
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 321,
+									"end": 334,
+									"name": "type",
+									"name_loc": {
+										"start": {
+											"line": 15,
+											"column": 2,
+											"character": 321
+										},
+										"end": {
+											"line": 15,
+											"column": 6,
+											"character": 325
+										}
+									},
+									"value": [
+										{
+											"start": 327,
+											"end": 333,
+											"type": "Text",
+											"raw": "button",
+											"data": "button"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 337,
+									"end": 407,
+									"name": "class",
+									"name_loc": {
+										"start": {
+											"line": 16,
+											"column": 2,
+											"character": 337
+										},
+										"end": {
+											"line": 16,
+											"column": 7,
+											"character": 342
+										}
+									},
+									"value": [
+										{
+											"start": 344,
+											"end": 406,
+											"type": "Text",
+											"raw": "class1 class2 class3 class4 class5 class6 class7 class8 class9",
+											"data": "class1 class2 class3 class4 class5 class6 class7 class8 class9"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 410,
+									"end": 433,
+									"name": "onclick",
+									"name_loc": {
+										"start": {
+											"line": 17,
+											"column": 2,
+											"character": 410
+										},
+										"end": {
+											"line": 17,
+											"column": 9,
+											"character": 417
+										}
+									},
+									"value": {
+										"type": "ExpressionTag",
+										"start": 418,
+										"end": 433,
+										"expression": {
+											"type": "ArrowFunctionExpression",
+											"start": 419,
+											"end": 432,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 11
+												},
+												"end": {
+													"line": 17,
+													"column": 24
+												}
+											},
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [],
+											"body": {
+												"type": "CallExpression",
+												"start": 425,
+												"end": 432,
+												"loc": {
+													"start": {
+														"line": 17,
+														"column": 17
+													},
+													"end": {
+														"line": 17,
+														"column": 24
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 425,
+													"end": 427,
+													"loc": {
+														"start": {
+															"line": 17,
+															"column": 17
+														},
+														"end": {
+															"line": 17,
+															"column": 19
+														}
+													},
+													"name": "fn"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 428,
+														"end": 431,
+														"loc": {
+															"start": {
+																"line": 17,
+																"column": 20
+															},
+															"end": {
+																"line": 17,
+																"column": 23
+															}
+														},
+														"name": "arg"
+													}
+												],
+												"optional": false
+											}
+										}
+									}
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 436,
+										"end": 448,
+										"raw": "\n\t\tcontent\n\t",
+										"data": "\n\t\tcontent\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 457,
+							"end": 458,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 464,
+				"end": 466,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 466,
+				"end": 512,
+				"data": " Block child at root - works correctly "
+			},
+			{
+				"type": "Text",
+				"start": 512,
+				"end": 513,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 513,
+				"end": 664,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 24,
+						"column": 1,
+						"character": 514
+					},
+					"end": {
+						"line": 24,
+						"column": 7,
+						"character": 520
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 522,
+						"end": 535,
+						"name": "type",
+						"name_loc": {
+							"start": {
+								"line": 25,
+								"column": 1,
+								"character": 522
+							},
+							"end": {
+								"line": 25,
+								"column": 5,
+								"character": 526
+							}
+						},
+						"value": [
+							{
+								"start": 528,
+								"end": 534,
+								"type": "Text",
+								"raw": "button",
+								"data": "button"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 537,
+						"end": 607,
+						"name": "class",
+						"name_loc": {
+							"start": {
+								"line": 26,
+								"column": 1,
+								"character": 537
+							},
+							"end": {
+								"line": 26,
+								"column": 6,
+								"character": 542
+							}
+						},
+						"value": [
+							{
+								"start": 544,
+								"end": 606,
+								"type": "Text",
+								"raw": "class1 class2 class3 class4 class5 class6 class7 class8 class9",
+								"data": "class1 class2 class3 class4 class5 class6 class7 class8 class9"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 609,
+						"end": 632,
+						"name": "onclick",
+						"name_loc": {
+							"start": {
+								"line": 27,
+								"column": 1,
+								"character": 609
+							},
+							"end": {
+								"line": 27,
+								"column": 8,
+								"character": 616
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 617,
+							"end": 632,
+							"expression": {
+								"type": "ArrowFunctionExpression",
+								"start": 618,
+								"end": 631,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 10
+									},
+									"end": {
+										"line": 27,
+										"column": 23
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "CallExpression",
+									"start": 624,
+									"end": 631,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 16
+										},
+										"end": {
+											"line": 27,
+											"column": 23
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 624,
+										"end": 626,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 16
+											},
+											"end": {
+												"line": 27,
+												"column": 18
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 627,
+											"end": 630,
+											"loc": {
+												"start": {
+													"line": 27,
+													"column": 19
+												},
+												"end": {
+													"line": 27,
+													"column": 22
+												}
+											},
+											"name": "arg"
+										}
+									],
+									"optional": false
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 634,
+							"end": 636,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 636,
+							"end": 654,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 29,
+									"column": 2,
+									"character": 637
+								},
+								"end": {
+									"line": 29,
+									"column": 5,
+									"character": 640
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 641,
+										"end": 648,
+										"raw": "content",
+										"data": "content"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 654,
+							"end": 655,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

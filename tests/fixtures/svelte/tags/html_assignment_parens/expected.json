@@ -1,0 +1,314 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 135,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 29,
+				"end": 31,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 31,
+				"end": 83,
+				"data": " Assignment expressions need parens in @html "
+			},
+			{
+				"type": "Text",
+				"start": 83,
+				"end": 84,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 84,
+				"end": 99,
+				"expression": {
+					"type": "AssignmentExpression",
+					"start": 92,
+					"end": 97,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 8
+						},
+						"end": {
+							"line": 6,
+							"column": 13
+						}
+					},
+					"operator": "=",
+					"left": {
+						"type": "Identifier",
+						"start": 92,
+						"end": 93,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 8
+							},
+							"end": {
+								"line": 6,
+								"column": 9
+							}
+						},
+						"name": "a"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 96,
+						"end": 97,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 12
+							},
+							"end": {
+								"line": 6,
+								"column": 13
+							}
+						},
+						"name": "b"
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 99,
+				"end": 100,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 100,
+				"end": 116,
+				"expression": {
+					"type": "AssignmentExpression",
+					"start": 108,
+					"end": 114,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 8
+						},
+						"end": {
+							"line": 7,
+							"column": 14
+						}
+					},
+					"operator": "+=",
+					"left": {
+						"type": "Identifier",
+						"start": 108,
+						"end": 109,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 8
+							},
+							"end": {
+								"line": 7,
+								"column": 9
+							}
+						},
+						"name": "a"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 113,
+						"end": 114,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 13
+							},
+							"end": {
+								"line": 7,
+								"column": 14
+							}
+						},
+						"name": "b"
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 116,
+				"end": 117,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 117,
+				"end": 134,
+				"expression": {
+					"type": "AssignmentExpression",
+					"start": 125,
+					"end": 132,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 8
+						},
+						"end": {
+							"line": 8,
+							"column": 15
+						}
+					},
+					"operator": "||=",
+					"left": {
+						"type": "Identifier",
+						"start": 125,
+						"end": 126,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 8
+							},
+							"end": {
+								"line": 8,
+								"column": 9
+							}
+						},
+						"name": "a"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 131,
+						"end": 132,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 14
+							},
+							"end": {
+								"line": 8,
+								"column": 15
+							}
+						},
+						"name": "b"
+					}
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 29,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 20,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 19,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 10
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 14,
+							"end": 15,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 5
+								},
+								"end": {
+									"line": 2,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 14,
+								"end": 15,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 5
+									},
+									"end": {
+										"line": 2,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							"init": null
+						},
+						{
+							"type": "VariableDeclarator",
+							"start": 17,
+							"end": 18,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 8
+								},
+								"end": {
+									"line": 2,
+									"column": 9
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 17,
+								"end": 18,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 8
+									},
+									"end": {
+										"line": 2,
+										"column": 9
+									}
+								},
+								"name": "b"
+							},
+							"init": null
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

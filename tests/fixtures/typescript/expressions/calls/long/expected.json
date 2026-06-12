@@ -1,0 +1,429 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 298,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " Short call - stays inline (under 100 chars) ",
+			"start": 10,
+			"end": 59,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " Long call - exceeds 100 chars, wraps to one arg per line ",
+			"start": 99,
+			"end": 161,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 63
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 297,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 288,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 61,
+					"end": 96,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 36
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 67,
+							"end": 95,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 35
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 67,
+								"end": 72,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 12
+									}
+								},
+								"name": "short"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 75,
+								"end": 95,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 15
+									},
+									"end": {
+										"line": 3,
+										"column": 35
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 75,
+									"end": 77,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 15
+										},
+										"end": {
+											"line": 3,
+											"column": 17
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 78,
+										"end": 82,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 18
+											},
+											"end": {
+												"line": 3,
+												"column": 22
+											}
+										},
+										"name": "arg1"
+									},
+									{
+										"type": "Identifier",
+										"start": 84,
+										"end": 88,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 24
+											},
+											"end": {
+												"line": 3,
+												"column": 28
+											}
+										},
+										"name": "arg2"
+									},
+									{
+										"type": "Identifier",
+										"start": 90,
+										"end": 94,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 30
+											},
+											"end": {
+												"line": 3,
+												"column": 34
+											}
+										},
+										"name": "arg3"
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " Short call - stays inline (under 100 chars) ",
+							"start": 10,
+							"end": 59
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 163,
+					"end": 287,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 169,
+							"end": 286,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 169,
+								"end": 173,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 11
+									}
+								},
+								"name": "long"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 176,
+								"end": 286,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 14
+									},
+									"end": {
+										"line": 15,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 176,
+									"end": 178,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 14
+										},
+										"end": {
+											"line": 6,
+											"column": 16
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 182,
+										"end": 191,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 2
+											},
+											"end": {
+												"line": 7,
+												"column": 11
+											}
+										},
+										"name": "argument1"
+									},
+									{
+										"type": "Identifier",
+										"start": 195,
+										"end": 204,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 2
+											},
+											"end": {
+												"line": 8,
+												"column": 11
+											}
+										},
+										"name": "argument2"
+									},
+									{
+										"type": "Identifier",
+										"start": 208,
+										"end": 217,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 11
+											}
+										},
+										"name": "argument3"
+									},
+									{
+										"type": "Identifier",
+										"start": 221,
+										"end": 230,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 2
+											},
+											"end": {
+												"line": 10,
+												"column": 11
+											}
+										},
+										"name": "argument4"
+									},
+									{
+										"type": "Identifier",
+										"start": 234,
+										"end": 243,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
+												"column": 11
+											}
+										},
+										"name": "argument5"
+									},
+									{
+										"type": "Identifier",
+										"start": 247,
+										"end": 256,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 2
+											},
+											"end": {
+												"line": 12,
+												"column": 11
+											}
+										},
+										"name": "argument6"
+									},
+									{
+										"type": "Identifier",
+										"start": 260,
+										"end": 269,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 2
+											},
+											"end": {
+												"line": 13,
+												"column": 11
+											}
+										},
+										"name": "argument7"
+									},
+									{
+										"type": "Identifier",
+										"start": 273,
+										"end": 282,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 2
+											},
+											"end": {
+												"line": 14,
+												"column": 11
+											}
+										},
+										"name": "argument8"
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " Long call - exceeds 100 chars, wraps to one arg per line ",
+							"start": 99,
+							"end": 161
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

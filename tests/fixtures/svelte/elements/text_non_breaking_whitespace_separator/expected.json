@@ -1,0 +1,460 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 700,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 131,
+				"data": " Non-breaking space (U+00A0) as the entire text node between inline elements is preserved, not collapsed to a regular space "
+			},
+			{
+				"type": "Text",
+				"start": 131,
+				"end": 132,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 132,
+				"end": 152,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 133
+					},
+					"end": {
+						"line": 2,
+						"column": 5,
+						"character": 137
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 138,
+							"end": 145,
+							"raw": "inline1",
+							"data": "inline1"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 152,
+				"end": 153,
+				"raw": " ",
+				"data": " "
+			},
+			{
+				"type": "RegularElement",
+				"start": 153,
+				"end": 173,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 22,
+						"character": 154
+					},
+					"end": {
+						"line": 2,
+						"column": 26,
+						"character": 158
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 159,
+							"end": 166,
+							"raw": "inline2",
+							"data": "inline2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 173,
+				"end": 175,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 175,
+				"end": 250,
+				"data": " Narrow non-breaking space (U+202F) separator is likewise preserved "
+			},
+			{
+				"type": "Text",
+				"start": 250,
+				"end": 251,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 251,
+				"end": 271,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 252
+					},
+					"end": {
+						"line": 5,
+						"column": 5,
+						"character": 256
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 257,
+							"end": 264,
+							"raw": "inline1",
+							"data": "inline1"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 271,
+				"end": 272,
+				"raw": " ",
+				"data": " "
+			},
+			{
+				"type": "RegularElement",
+				"start": 272,
+				"end": 292,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 22,
+						"character": 273
+					},
+					"end": {
+						"line": 5,
+						"column": 26,
+						"character": 277
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 278,
+							"end": 285,
+							"raw": "inline2",
+							"data": "inline2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 292,
+				"end": 294,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 294,
+				"end": 370,
+				"data": " Non-breaking space separator between inline components is preserved "
+			},
+			{
+				"type": "Text",
+				"start": 370,
+				"end": 371,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 371,
+				"end": 380,
+				"name": "Comp1",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 372
+					},
+					"end": {
+						"line": 8,
+						"column": 6,
+						"character": 377
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 380,
+				"end": 381,
+				"raw": " ",
+				"data": " "
+			},
+			{
+				"type": "Component",
+				"start": 381,
+				"end": 390,
+				"name": "Comp2",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 11,
+						"character": 382
+					},
+					"end": {
+						"line": 8,
+						"column": 16,
+						"character": 387
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 390,
+				"end": 392,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 392,
+				"end": 505,
+				"data": " Regular spaces around a non-breaking space collapse to single boundary spaces; the nbsp stays as content "
+			},
+			{
+				"type": "Text",
+				"start": 505,
+				"end": 506,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 506,
+				"end": 526,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 1,
+						"character": 507
+					},
+					"end": {
+						"line": 11,
+						"column": 5,
+						"character": 511
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 512,
+							"end": 519,
+							"raw": "inline1",
+							"data": "inline1"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 526,
+				"end": 529,
+				"raw": "   ",
+				"data": "   "
+			},
+			{
+				"type": "RegularElement",
+				"start": 529,
+				"end": 549,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 24,
+						"character": 530
+					},
+					"end": {
+						"line": 11,
+						"column": 28,
+						"character": 534
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 535,
+							"end": 542,
+							"raw": "inline2",
+							"data": "inline2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 549,
+				"end": 551,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 551,
+				"end": 646,
+				"data": " Nested inside a block element: the nbsp separator between inline children is preserved "
+			},
+			{
+				"type": "Text",
+				"start": 646,
+				"end": 647,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 647,
+				"end": 699,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 648
+					},
+					"end": {
+						"line": 14,
+						"column": 4,
+						"character": 651
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 652,
+							"end": 672,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 14,
+									"column": 6,
+									"character": 653
+								},
+								"end": {
+									"line": 14,
+									"column": 10,
+									"character": 657
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 658,
+										"end": 665,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 672,
+							"end": 673,
+							"raw": " ",
+							"data": " "
+						},
+						{
+							"type": "RegularElement",
+							"start": 673,
+							"end": 693,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 14,
+									"column": 27,
+									"character": 674
+								},
+								"end": {
+									"line": 14,
+									"column": 31,
+									"character": 678
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 679,
+										"end": 686,
+										"raw": "inline2",
+										"data": "inline2"
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

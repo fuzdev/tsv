@@ -1,0 +1,1 @@
+<Comp /> <div>block</div>

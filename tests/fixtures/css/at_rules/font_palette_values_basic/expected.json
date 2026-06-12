@@ -1,0 +1,61 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 140,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 131,
+				"name": "font-palette-values",
+				"prelude": "--custom",
+				"block": {
+					"type": "Block",
+					"start": 39,
+					"end": 131,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 43,
+							"end": 68,
+							"property": "font-family",
+							"value": "'Color Font'"
+						},
+						{
+							"type": "Declaration",
+							"start": 72,
+							"end": 87,
+							"property": "base-palette",
+							"value": "0"
+						},
+						{
+							"type": "Declaration",
+							"start": 91,
+							"end": 127,
+							"property": "override-colors",
+							"value": "0 red,\n\t\t\t1 blue"
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 132,
+			"styles": "\n\t@font-palette-values --custom {\n\t\tfont-family: 'Color Font';\n\t\tbase-palette: 0;\n\t\toverride-colors:\n\t\t\t0 red,\n\t\t\t1 blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 141,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

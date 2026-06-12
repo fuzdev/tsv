@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 236,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 227,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 75,
+							"end": 89,
+							"property": "src",
+							"value": "url(a,b,)"
+						},
+						{
+							"type": "Declaration",
+							"start": 137,
+							"end": 151,
+							"property": "src",
+							"value": "url(c,,d)"
+						},
+						{
+							"type": "Declaration",
+							"start": 198,
+							"end": 223,
+							"property": "src",
+							"value": "url(e.ttf?list=f,g,)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 227
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 228,
+			"styles": "\n\ta {\n\t\t/* trailing comma preserved verbatim in unquoted url() */\n\t\tsrc: url(a,b,);\n\t\t/* consecutive empty segment preserved */\n\t\tsrc: url(c,,d);\n\t\t/* query string with a trailing comma */\n\t\tsrc: url(e.ttf?list=f,g,);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 237,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

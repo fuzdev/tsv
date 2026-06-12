@@ -1,0 +1,150 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 384,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 375,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 40,
+							"property": "margin-block",
+							"value": "1rem 2rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 44,
+							"end": 68,
+							"property": "margin-inline",
+							"value": "3rem 4rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 72,
+							"end": 98,
+							"property": "margin-block-start",
+							"value": "0.5rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 102,
+							"end": 126,
+							"property": "margin-block-end",
+							"value": "1.5rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 130,
+							"end": 157,
+							"property": "margin-inline-start",
+							"value": "2.5rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 161,
+							"end": 186,
+							"property": "margin-inline-end",
+							"value": "3.5rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 190,
+							"end": 212,
+							"property": "padding-block",
+							"value": "1em 2em"
+						},
+						{
+							"type": "Declaration",
+							"start": 216,
+							"end": 239,
+							"property": "padding-inline",
+							"value": "3em 4em"
+						},
+						{
+							"type": "Declaration",
+							"start": 243,
+							"end": 270,
+							"property": "border-block",
+							"value": "1px solid red"
+						},
+						{
+							"type": "Declaration",
+							"start": 274,
+							"end": 304,
+							"property": "border-inline",
+							"value": "2px dashed blue"
+						},
+						{
+							"type": "Declaration",
+							"start": 308,
+							"end": 337,
+							"property": "border-block-start-width",
+							"value": "3px"
+						},
+						{
+							"type": "Declaration",
+							"start": 341,
+							"end": 371,
+							"property": "border-inline-end-color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 9,
+				"end": 375
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 376,
+			"styles": "\n\tdiv {\n\t\tmargin-block: 1rem 2rem;\n\t\tmargin-inline: 3rem 4rem;\n\t\tmargin-block-start: 0.5rem;\n\t\tmargin-block-end: 1.5rem;\n\t\tmargin-inline-start: 2.5rem;\n\t\tmargin-inline-end: 3.5rem;\n\t\tpadding-block: 1em 2em;\n\t\tpadding-inline: 3em 4em;\n\t\tborder-block: 1px solid red;\n\t\tborder-inline: 2px dashed blue;\n\t\tborder-block-start-width: 3px;\n\t\tborder-inline-end-color: green;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 385,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

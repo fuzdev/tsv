@@ -1,0 +1,1387 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 733,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Keywords as import specifiers",
+			"start": 10,
+			"end": 42,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Keywords as re-export specifiers",
+			"start": 159,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Keywords as local export alias",
+			"start": 277,
+			"end": 310,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Reserved words as re-export alias",
+			"start": 349,
+			"end": 385,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Reserved words as export alias (any keyword valid in export name position)",
+			"start": 421,
+			"end": 498,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Keyword as function name (in block to avoid shadowing import)",
+			"start": 560,
+			"end": 624,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 65
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 732,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 723,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 33,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 44,
+					"end": 71,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 28
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 52,
+							"end": 58,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 9
+								},
+								"end": {
+									"line": 3,
+									"column": 15
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 52,
+								"end": 58,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 9
+									},
+									"end": {
+										"line": 3,
+										"column": 15
+									}
+								},
+								"name": "object"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 52,
+								"end": 58,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 9
+									},
+									"end": {
+										"line": 3,
+										"column": 15
+									}
+								},
+								"name": "object"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 65,
+						"end": 70,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 22
+							},
+							"end": {
+								"line": 3,
+								"column": 27
+							}
+						},
+						"value": "./a",
+						"raw": "'./a'"
+					},
+					"attributes": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Keywords as import specifiers",
+							"start": 10,
+							"end": 42
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 73,
+					"end": 106,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 34
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 81,
+							"end": 93,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 9
+								},
+								"end": {
+									"line": 4,
+									"column": 21
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 81,
+								"end": 86,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 9
+									},
+									"end": {
+										"line": 4,
+										"column": 14
+									}
+								},
+								"name": "async"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 90,
+								"end": 93,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 18
+									},
+									"end": {
+										"line": 4,
+										"column": 21
+									}
+								},
+								"name": "fn1"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 100,
+						"end": 105,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 28
+							},
+							"end": {
+								"line": 4,
+								"column": 33
+							}
+						},
+						"value": "./b",
+						"raw": "'./b'"
+					},
+					"attributes": []
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 108,
+					"end": 156,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 49
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 116,
+							"end": 129,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 9
+								},
+								"end": {
+									"line": 5,
+									"column": 22
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 116,
+								"end": 122,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 9
+									},
+									"end": {
+										"line": 5,
+										"column": 15
+									}
+								},
+								"name": "object"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 126,
+								"end": 129,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 19
+									},
+									"end": {
+										"line": 5,
+										"column": 22
+									}
+								},
+								"name": "obj"
+							}
+						},
+						{
+							"type": "ImportSpecifier",
+							"start": 131,
+							"end": 143,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 24
+								},
+								"end": {
+									"line": 5,
+									"column": 36
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 131,
+								"end": 136,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 24
+									},
+									"end": {
+										"line": 5,
+										"column": 29
+									}
+								},
+								"name": "async"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 140,
+								"end": 143,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 33
+									},
+									"end": {
+										"line": 5,
+										"column": 36
+									}
+								},
+								"name": "fn2"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 150,
+						"end": 155,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 43
+							},
+							"end": {
+								"line": 5,
+								"column": 48
+							}
+						},
+						"value": "./c",
+						"raw": "'./c'"
+					},
+					"attributes": []
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 196,
+					"end": 234,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 39
+						}
+					},
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 204,
+							"end": 221,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 9
+								},
+								"end": {
+									"line": 8,
+									"column": 26
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 204,
+								"end": 210,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 9
+									},
+									"end": {
+										"line": 8,
+										"column": 15
+									}
+								},
+								"name": "object"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 214,
+								"end": 221,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 19
+									},
+									"end": {
+										"line": 8,
+										"column": 26
+									}
+								},
+								"name": "renamed"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 228,
+						"end": 233,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 33
+							},
+							"end": {
+								"line": 8,
+								"column": 38
+							}
+						},
+						"value": "./d",
+						"raw": "'./d'"
+					},
+					"attributes": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Keywords as re-export specifiers",
+							"start": 159,
+							"end": 194
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 236,
+					"end": 274,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 39
+						}
+					},
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 244,
+							"end": 261,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 9
+								},
+								"end": {
+									"line": 9,
+									"column": 26
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 244,
+								"end": 249,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 9
+									},
+									"end": {
+										"line": 9,
+										"column": 14
+									}
+								},
+								"name": "async"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 253,
+								"end": 261,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 18
+									},
+									"end": {
+										"line": 9,
+										"column": 26
+									}
+								},
+								"name": "renamed2"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 268,
+						"end": 273,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 33
+							},
+							"end": {
+								"line": 9,
+								"column": 38
+							}
+						},
+						"value": "./e",
+						"raw": "'./e'"
+					},
+					"attributes": []
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 312,
+					"end": 324,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 318,
+							"end": 323,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 318,
+								"end": 319,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 322,
+								"end": 323,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 11
+									},
+									"end": {
+										"line": 12,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Keywords as local export alias",
+							"start": 277,
+							"end": 310
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 326,
+					"end": 346,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 21
+						}
+					},
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 334,
+							"end": 344,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 9
+								},
+								"end": {
+									"line": 13,
+									"column": 19
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 334,
+								"end": 335,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 9
+									},
+									"end": {
+										"line": 13,
+										"column": 10
+									}
+								},
+								"name": "a"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 339,
+								"end": 344,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 14
+									},
+									"end": {
+										"line": 13,
+										"column": 19
+									}
+								},
+								"name": "async"
+							}
+						}
+					],
+					"source": null,
+					"attributes": []
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 387,
+					"end": 418,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 32
+						}
+					},
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 395,
+							"end": 405,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 9
+								},
+								"end": {
+									"line": 16,
+									"column": 19
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 395,
+								"end": 396,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 9
+									},
+									"end": {
+										"line": 16,
+										"column": 10
+									}
+								},
+								"name": "x"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 400,
+								"end": 405,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 14
+									},
+									"end": {
+										"line": 16,
+										"column": 19
+									}
+								},
+								"name": "await"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 412,
+						"end": 417,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 26
+							},
+							"end": {
+								"line": 16,
+								"column": 31
+							}
+						},
+						"value": "./f",
+						"raw": "'./f'"
+					},
+					"attributes": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Reserved words as re-export alias",
+							"start": 349,
+							"end": 385
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 500,
+					"end": 512,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 506,
+							"end": 511,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 7
+								},
+								"end": {
+									"line": 19,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 506,
+								"end": 507,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 7
+									},
+									"end": {
+										"line": 19,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 510,
+								"end": 511,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 11
+									},
+									"end": {
+										"line": 19,
+										"column": 12
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Reserved words as export alias (any keyword valid in export name position)",
+							"start": 421,
+							"end": 498
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 514,
+					"end": 526,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 520,
+							"end": 525,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 7
+								},
+								"end": {
+									"line": 20,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 520,
+								"end": 521,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 7
+									},
+									"end": {
+										"line": 20,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 524,
+								"end": 525,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 11
+									},
+									"end": {
+										"line": 20,
+										"column": 12
+									}
+								},
+								"value": 3,
+								"raw": "3"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 528,
+					"end": 557,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 30
+						}
+					},
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 536,
+							"end": 546,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 9
+								},
+								"end": {
+									"line": 21,
+									"column": 19
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 536,
+								"end": 537,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 9
+									},
+									"end": {
+										"line": 21,
+										"column": 10
+									}
+								},
+								"name": "b"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 541,
+								"end": 546,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 14
+									},
+									"end": {
+										"line": 21,
+										"column": 19
+									}
+								},
+								"name": "const"
+							}
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 548,
+							"end": 555,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 21
+								},
+								"end": {
+									"line": 21,
+									"column": 28
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 548,
+								"end": 549,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 21
+									},
+									"end": {
+										"line": 21,
+										"column": 22
+									}
+								},
+								"name": "c"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 553,
+								"end": 555,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 26
+									},
+									"end": {
+										"line": 21,
+										"column": 28
+									}
+								},
+								"name": "if"
+							}
+						}
+					],
+					"source": null,
+					"attributes": []
+				},
+				{
+					"type": "BlockStatement",
+					"start": 626,
+					"end": 722,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 2
+						}
+					},
+					"body": [
+						{
+							"type": "FunctionDeclaration",
+							"start": 630,
+							"end": 667,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 2
+								},
+								"end": {
+									"line": 27,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 639,
+								"end": 645,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 11
+									},
+									"end": {
+										"line": 25,
+										"column": 17
+									}
+								},
+								"name": "object"
+							},
+							"expression": false,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 646,
+									"end": 647,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 18
+										},
+										"end": {
+											"line": 25,
+											"column": 19
+										}
+									},
+									"name": "x"
+								}
+							],
+							"body": {
+								"type": "BlockStatement",
+								"start": 649,
+								"end": 667,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 21
+									},
+									"end": {
+										"line": 27,
+										"column": 3
+									}
+								},
+								"body": [
+									{
+										"type": "ReturnStatement",
+										"start": 654,
+										"end": 663,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 3
+											},
+											"end": {
+												"line": 26,
+												"column": 12
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 661,
+											"end": 662,
+											"loc": {
+												"start": {
+													"line": 26,
+													"column": 10
+												},
+												"end": {
+													"line": 26,
+													"column": 11
+												}
+											},
+											"name": "x"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "FunctionDeclaration",
+							"start": 670,
+							"end": 706,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 2
+								},
+								"end": {
+									"line": 30,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 679,
+								"end": 684,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 11
+									},
+									"end": {
+										"line": 28,
+										"column": 16
+									}
+								},
+								"name": "async"
+							},
+							"expression": false,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 685,
+									"end": 686,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 17
+										},
+										"end": {
+											"line": 28,
+											"column": 18
+										}
+									},
+									"name": "x"
+								}
+							],
+							"body": {
+								"type": "BlockStatement",
+								"start": 688,
+								"end": 706,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 20
+									},
+									"end": {
+										"line": 30,
+										"column": 3
+									}
+								},
+								"body": [
+									{
+										"type": "ReturnStatement",
+										"start": 693,
+										"end": 702,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 3
+											},
+											"end": {
+												"line": 29,
+												"column": 12
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 700,
+											"end": 701,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 10
+												},
+												"end": {
+													"line": 29,
+													"column": 11
+												}
+											},
+											"name": "x"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "ExpressionStatement",
+							"start": 709,
+							"end": 719,
+							"loc": {
+								"start": {
+									"line": 31,
+									"column": 2
+								},
+								"end": {
+									"line": 31,
+									"column": 12
+								}
+							},
+							"expression": {
+								"type": "CallExpression",
+								"start": 709,
+								"end": 718,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 2
+									},
+									"end": {
+										"line": 31,
+										"column": 11
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 709,
+									"end": 715,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 2
+										},
+										"end": {
+											"line": 31,
+											"column": 8
+										}
+									},
+									"name": "object"
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 716,
+										"end": 717,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 9
+											},
+											"end": {
+												"line": 31,
+												"column": 10
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Keyword as function name (in block to avoid shadowing import)",
+							"start": 560,
+							"end": 624
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

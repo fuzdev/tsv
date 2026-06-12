@@ -1,0 +1,234 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 98,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 97,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 88,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 20,
+					"end": 87,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 26,
+							"end": 86,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 26,
+								"end": 27,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 8
+									}
+								},
+								"name": "x"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 30,
+								"end": 86,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 11
+									},
+									"end": {
+										"line": 8,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 30,
+									"end": 38,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 11
+										},
+										"end": {
+											"line": 2,
+											"column": 19
+										}
+									},
+									"name": "$derived"
+								},
+								"arguments": [
+									{
+										"type": "ConditionalExpression",
+										"start": 42,
+										"end": 82,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 2
+											},
+											"end": {
+												"line": 7,
+												"column": 8
+											}
+										},
+										"test": {
+											"type": "Identifier",
+											"start": 42,
+											"end": 46,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 2
+												},
+												"end": {
+													"line": 3,
+													"column": 6
+												}
+											},
+											"name": "cond"
+										},
+										"consequent": {
+											"type": "TemplateLiteral",
+											"start": 52,
+											"end": 73,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 5
+												},
+												"end": {
+													"line": 6,
+													"column": 8
+												}
+											},
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 53,
+													"end": 72,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 6
+														},
+														"end": {
+															"line": 6,
+															"column": 7
+														}
+													},
+													"value": {
+														"raw": "line1\nline2\n\t line3",
+														"cooked": "line1\nline2\n\t line3"
+													},
+													"tail": true
+												}
+											]
+										},
+										"alternate": {
+											"type": "Identifier",
+											"start": 79,
+											"end": 82,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 5
+												},
+												"end": {
+													"line": 7,
+													"column": 8
+												}
+											},
+											"name": "alt"
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

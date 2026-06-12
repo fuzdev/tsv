@@ -1,0 +1,98 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 123,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 93,
+				"data": " svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions "
+			},
+			{
+				"type": "Text",
+				"start": 93,
+				"end": 94,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 94,
+				"end": 122,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 95
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 98
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 99,
+						"end": 111,
+						"name": "onclick",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 5,
+								"character": 99
+							},
+							"end": {
+								"line": 2,
+								"column": 12,
+								"character": 106
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 107,
+							"end": 111,
+							"expression": {
+								"type": "Identifier",
+								"start": 108,
+								"end": 110,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 14
+									},
+									"end": {
+										"line": 2,
+										"column": 16
+									}
+								},
+								"name": "fn"
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 112,
+							"end": 116,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

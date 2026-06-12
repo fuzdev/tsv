@@ -1,0 +1,485 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 335,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "SnippetBlock",
+				"start": 0,
+				"end": 163,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn",
+					"start": 10,
+					"end": 12,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 10,
+							"character": 10
+						},
+						"end": {
+							"line": 1,
+							"column": 12,
+							"character": 12
+						}
+					}
+				},
+				"parameters": [
+					{
+						"type": "Identifier",
+						"start": 13,
+						"end": 19,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 13
+							},
+							"end": {
+								"line": 1,
+								"column": 19
+							}
+						},
+						"name": "paramA"
+					},
+					{
+						"type": "Identifier",
+						"start": 21,
+						"end": 27,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 21
+							},
+							"end": {
+								"line": 1,
+								"column": 27
+							}
+						},
+						"name": "paramB"
+					},
+					{
+						"type": "Identifier",
+						"start": 29,
+						"end": 35,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 29
+							},
+							"end": {
+								"line": 1,
+								"column": 35
+							}
+						},
+						"name": "paramC"
+					},
+					{
+						"type": "Identifier",
+						"start": 37,
+						"end": 43,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 37
+							},
+							"end": {
+								"line": 1,
+								"column": 43
+							}
+						},
+						"name": "paramD"
+					},
+					{
+						"type": "Identifier",
+						"start": 45,
+						"end": 51,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 45
+							},
+							"end": {
+								"line": 1,
+								"column": 51
+							}
+						},
+						"name": "paramE"
+					},
+					{
+						"type": "Identifier",
+						"start": 53,
+						"end": 59,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 53
+							},
+							"end": {
+								"line": 1,
+								"column": 59
+							}
+						},
+						"name": "paramF"
+					},
+					{
+						"type": "Identifier",
+						"start": 61,
+						"end": 67,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 61
+							},
+							"end": {
+								"line": 1,
+								"column": 67
+							}
+						},
+						"name": "paramG"
+					},
+					{
+						"type": "Identifier",
+						"start": 69,
+						"end": 75,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 69
+							},
+							"end": {
+								"line": 1,
+								"column": 75
+							}
+						},
+						"name": "paramH"
+					},
+					{
+						"type": "Identifier",
+						"start": 77,
+						"end": 98,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 77
+							},
+							"end": {
+								"line": 1,
+								"column": 98
+							}
+						},
+						"name": "paramIIIIIIIIIIIIIIII"
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 100,
+							"end": 102,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 102,
+							"end": 135,
+							"data": " 100 chars - stays inline "
+						},
+						{
+							"type": "Text",
+							"start": 135,
+							"end": 137,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 137,
+							"end": 152,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 138
+								},
+								"end": {
+									"line": 3,
+									"column": 5,
+									"character": 141
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 142,
+										"end": 146,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 152,
+							"end": 153,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 163,
+				"end": 165,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 165,
+				"end": 334,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn",
+					"start": 175,
+					"end": 177,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 10,
+							"character": 175
+						},
+						"end": {
+							"line": 6,
+							"column": 12,
+							"character": 177
+						}
+					}
+				},
+				"parameters": [
+					{
+						"type": "Identifier",
+						"start": 180,
+						"end": 186,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 7
+							}
+						},
+						"name": "paramA"
+					},
+					{
+						"type": "Identifier",
+						"start": 189,
+						"end": 195,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 7
+							}
+						},
+						"name": "paramB"
+					},
+					{
+						"type": "Identifier",
+						"start": 198,
+						"end": 204,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 7
+							}
+						},
+						"name": "paramC"
+					},
+					{
+						"type": "Identifier",
+						"start": 207,
+						"end": 213,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 7
+							}
+						},
+						"name": "paramD"
+					},
+					{
+						"type": "Identifier",
+						"start": 216,
+						"end": 222,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 1
+							},
+							"end": {
+								"line": 11,
+								"column": 7
+							}
+						},
+						"name": "paramE"
+					},
+					{
+						"type": "Identifier",
+						"start": 225,
+						"end": 231,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 1
+							},
+							"end": {
+								"line": 12,
+								"column": 7
+							}
+						},
+						"name": "paramF"
+					},
+					{
+						"type": "Identifier",
+						"start": 234,
+						"end": 240,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 1
+							},
+							"end": {
+								"line": 13,
+								"column": 7
+							}
+						},
+						"name": "paramG"
+					},
+					{
+						"type": "Identifier",
+						"start": 243,
+						"end": 249,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 7
+							}
+						},
+						"name": "paramH"
+					},
+					{
+						"type": "Identifier",
+						"start": 252,
+						"end": 274,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 1
+							},
+							"end": {
+								"line": 15,
+								"column": 23
+							}
+						},
+						"name": "paramIIIIIIIIIIIIIIIII"
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 278,
+							"end": 280,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 280,
+							"end": 306,
+							"data": " 101 chars - wraps "
+						},
+						{
+							"type": "Text",
+							"start": 306,
+							"end": 308,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 308,
+							"end": 323,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 18,
+									"column": 2,
+									"character": 309
+								},
+								"end": {
+									"line": 18,
+									"column": 5,
+									"character": 312
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 313,
+										"end": 317,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 323,
+							"end": 324,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

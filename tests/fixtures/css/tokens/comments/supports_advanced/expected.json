@@ -1,0 +1,209 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 345,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 29,
+				"end": 113,
+				"name": "supports",
+				"prelude": "(display: grid) or  (flex: 1)",
+				"block": {
+					"type": "Block",
+					"start": 82,
+					"end": 113,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 86,
+								"end": 89,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 86,
+										"end": 89,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 86,
+														"end": 89
+													}
+												],
+												"start": 86,
+												"end": 89
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 90,
+								"end": 110,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 95,
+										"end": 105,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 86,
+							"end": 110
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 135,
+				"end": 214,
+				"name": "supports",
+				"prelude": "not (display: grid)",
+				"block": {
+					"type": "Block",
+					"start": 182,
+					"end": 214,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 186,
+								"end": 189,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 186,
+										"end": 189,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 186,
+														"end": 189
+													}
+												],
+												"start": 186,
+												"end": 189
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 190,
+								"end": 211,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 195,
+										"end": 206,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 186,
+							"end": 211
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 245,
+				"end": 336,
+				"name": "supports",
+				"prelude": "(display: grid)   and (flex: 1)",
+				"block": {
+					"type": "Block",
+					"start": 303,
+					"end": 336,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 307,
+								"end": 310,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 307,
+										"end": 310,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 307,
+														"end": 310
+													}
+												],
+												"start": 307,
+												"end": 310
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 311,
+								"end": 333,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 316,
+										"end": 328,
+										"property": "color",
+										"value": "green"
+									}
+								]
+							},
+							"start": 307,
+							"end": 333
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 337,
+			"styles": "\n\t/* or connector */\n\t@supports (display: grid) or /* comment */ (flex: 1) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* not keyword */\n\t@supports /* before not */ not (display: grid) {\n\t\tdiv {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n\n\t/* multiple consecutive */\n\t@supports (display: grid) /* c1 */ /* c2 */ and (flex: 1) {\n\t\tdiv {\n\t\t\tcolor: green;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 346,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

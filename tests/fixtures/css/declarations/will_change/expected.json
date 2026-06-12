@@ -1,0 +1,101 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 165,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 156,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 34,
+							"property": "will-change",
+							"value": "auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 38,
+							"end": 66,
+							"property": "will-change",
+							"value": "scroll-position"
+						},
+						{
+							"type": "Declaration",
+							"start": 70,
+							"end": 91,
+							"property": "will-change",
+							"value": "contents"
+						},
+						{
+							"type": "Declaration",
+							"start": 95,
+							"end": 117,
+							"property": "will-change",
+							"value": "transform"
+						},
+						{
+							"type": "Declaration",
+							"start": 121,
+							"end": 152,
+							"property": "will-change",
+							"value": "opacity, transform"
+						}
+					]
+				},
+				"start": 9,
+				"end": 156
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 157,
+			"styles": "\n\tdiv {\n\t\twill-change: auto;\n\t\twill-change: scroll-position;\n\t\twill-change: contents;\n\t\twill-change: transform;\n\t\twill-change: opacity, transform;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 166,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

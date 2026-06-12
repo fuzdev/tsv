@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 90,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 81,
+				"name": "media",
+				"prelude": "(min-width: 0.5px) and (max-width: 1.5em)",
+				"block": {
+					"type": "Block",
+					"start": 58,
+					"end": 81,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 62,
+								"end": 63,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 62,
+										"end": 63,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 62,
+														"end": 63
+													}
+												],
+												"start": 62,
+												"end": 63
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 64,
+								"end": 78,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 69,
+										"end": 73,
+										"property": "b",
+										"value": "c"
+									}
+								]
+							},
+							"start": 62,
+							"end": 78
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 82,
+			"styles": "\n\t@media (min-width: 0.5px) and (max-width: 1.5em) {\n\t\ta {\n\t\t\tb: c;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 91,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,88 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 90,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 14,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 14,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "root",
+											"args": null,
+											"start": 9,
+											"end": 14
+										}
+									],
+									"start": 9,
+									"end": 14
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 15,
+					"end": 81,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 19,
+							"end": 30,
+							"property": "--l",
+							"value": ", #000"
+						},
+						{
+							"type": "Declaration",
+							"start": 34,
+							"end": 47,
+							"property": "--normal",
+							"value": "red"
+						},
+						{
+							"type": "Declaration",
+							"start": 51,
+							"end": 77,
+							"property": "--with-comma",
+							"value": "hello, world"
+						}
+					]
+				},
+				"start": 9,
+				"end": 81
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 82,
+			"styles": "\n\t:root {\n\t\t--l: , #000;\n\t\t--normal: red;\n\t\t--with-comma: hello, world;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 91,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

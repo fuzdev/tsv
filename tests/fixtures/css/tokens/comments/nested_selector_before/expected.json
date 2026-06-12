@@ -1,0 +1,139 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 156,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 47,
+					"end": 54,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 47,
+							"end": 54,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 47,
+											"end": 54
+										}
+									],
+									"start": 47,
+									"end": 54
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 55,
+					"end": 147,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 59,
+							"end": 69,
+							"property": "color",
+							"value": "red"
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 113,
+								"end": 122,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 113,
+										"end": 122,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "NestingSelector",
+														"name": "&",
+														"start": 113,
+														"end": 114
+													}
+												],
+												"start": 113,
+												"end": 114
+											},
+											{
+												"type": "RelativeSelector",
+												"combinator": {
+													"type": "Combinator",
+													"name": " ",
+													"start": 114,
+													"end": 115
+												},
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "class2",
+														"start": 115,
+														"end": 122
+													}
+												],
+												"start": 114,
+												"end": 122
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 123,
+								"end": 144,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 128,
+										"end": 139,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 113,
+							"end": 144
+						}
+					]
+				},
+				"start": 47,
+				"end": 147
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 148,
+			"styles": "\n\t/* Comment before nested selector */\n\t.class1 {\n\t\tcolor: red;\n\n\t\t/* This styles the nested element */\n\t\t& .class2 {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 157,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

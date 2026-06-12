@@ -1,0 +1,21 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 18,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 0,
+				"end": 17,
+				"raw": "text1 text2 text3",
+				"data": "text1 text2 text3"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

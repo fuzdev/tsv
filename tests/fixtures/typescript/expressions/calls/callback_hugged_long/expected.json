@@ -1,0 +1,2922 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1941,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Short - stays inline",
+			"start": 20,
+			"end": 43,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Long expression arrow - outer wraps, params inline",
+			"start": 69,
+			"end": 122,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Long expression arrow - params wrap individually",
+			"start": 241,
+			"end": 292,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Long block arrow - stays hugged, params inline",
+			"start": 461,
+			"end": 510,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Long block arrow - params wrap, body hugged",
+			"start": 635,
+			"end": 681,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Long return type - wraps params and union type",
+			"start": 867,
+			"end": 916,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1
+				},
+				"end": {
+					"line": 36,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Long generic callback - type params inline, value params wrap",
+			"start": 1073,
+			"end": 1137,
+			"loc": {
+				"start": {
+					"line": 47,
+					"column": 1
+				},
+				"end": {
+					"line": 47,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Long generic callback - type params wrap individually",
+			"start": 1275,
+			"end": 1331,
+			"loc": {
+				"start": {
+					"line": 55,
+					"column": 1
+				},
+				"end": {
+					"line": 55,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Long async callback - stays hugged, params inline",
+			"start": 1503,
+			"end": 1555,
+			"loc": {
+				"start": {
+					"line": 68,
+					"column": 1
+				},
+				"end": {
+					"line": 68,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Long async callback - params wrap, body hugged",
+			"start": 1689,
+			"end": 1738,
+			"loc": {
+				"start": {
+					"line": 73,
+					"column": 1
+				},
+				"end": {
+					"line": 73,
+					"column": 50
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1940,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1931,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 83,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 45,
+					"end": 66,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 22
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 45,
+						"end": 65,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 3,
+								"column": 21
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 45,
+							"end": 47,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 48,
+								"end": 64,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 4
+									},
+									"end": {
+										"line": 3,
+										"column": 20
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 49,
+										"end": 58,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 5
+											},
+											"end": {
+												"line": 3,
+												"column": 14
+											}
+										},
+										"name": "x",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 50,
+											"end": 58,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 6
+												},
+												"end": {
+													"line": 3,
+													"column": 14
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSNumberKeyword",
+												"start": 52,
+												"end": 58,
+												"loc": {
+													"start": {
+														"line": 3,
+														"column": 8
+													},
+													"end": {
+														"line": 3,
+														"column": 14
+													}
+												}
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 63,
+									"end": 64,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 19
+										},
+										"end": {
+											"line": 3,
+											"column": 20
+										}
+									},
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Short - stays inline",
+							"start": 20,
+							"end": 43
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 124,
+					"end": 238,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 124,
+						"end": 237,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 124,
+							"end": 126,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 1
+								},
+								"end": {
+									"line": 6,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 130,
+								"end": 233,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 21
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 131,
+										"end": 168,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 3
+											},
+											"end": {
+												"line": 7,
+												"column": 40
+											}
+										},
+										"name": "veryLongParamName1",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 149,
+											"end": 168,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 21
+												},
+												"end": {
+													"line": 7,
+													"column": 40
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 151,
+												"end": 168,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 23
+													},
+													"end": {
+														"line": 7,
+														"column": 40
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 151,
+													"end": 168,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 23
+														},
+														"end": {
+															"line": 7,
+															"column": 40
+														}
+													},
+													"name": "VeryLongTypeName1"
+												}
+											}
+										}
+									},
+									{
+										"type": "Identifier",
+										"start": 170,
+										"end": 207,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 42
+											},
+											"end": {
+												"line": 7,
+												"column": 79
+											}
+										},
+										"name": "veryLongParamName2",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 188,
+											"end": 207,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 60
+												},
+												"end": {
+													"line": 7,
+													"column": 79
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 190,
+												"end": 207,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 62
+													},
+													"end": {
+														"line": 7,
+														"column": 79
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 190,
+													"end": 207,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 62
+														},
+														"end": {
+															"line": 7,
+															"column": 79
+														}
+													},
+													"name": "VeryLongTypeName2"
+												}
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 215,
+									"end": 233,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 3
+										},
+										"end": {
+											"line": 8,
+											"column": 21
+										}
+									},
+									"name": "veryLongParamName1"
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Long expression arrow - outer wraps, params inline",
+							"start": 69,
+							"end": 122
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 294,
+					"end": 458,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 294,
+						"end": 457,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 1
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 294,
+							"end": 296,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 1
+								},
+								"end": {
+									"line": 12,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 300,
+								"end": 453,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 25
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 305,
+										"end": 342,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 3
+											},
+											"end": {
+												"line": 14,
+												"column": 40
+											}
+										},
+										"name": "veryLongParamName1",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 323,
+											"end": 342,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 21
+												},
+												"end": {
+													"line": 14,
+													"column": 40
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 325,
+												"end": 342,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 23
+													},
+													"end": {
+														"line": 14,
+														"column": 40
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 325,
+													"end": 342,
+													"loc": {
+														"start": {
+															"line": 14,
+															"column": 23
+														},
+														"end": {
+															"line": 14,
+															"column": 40
+														}
+													},
+													"name": "VeryLongTypeName1"
+												}
+											}
+										}
+									},
+									{
+										"type": "Identifier",
+										"start": 347,
+										"end": 384,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 3
+											},
+											"end": {
+												"line": 15,
+												"column": 40
+											}
+										},
+										"name": "veryLongParamName2",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 365,
+											"end": 384,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 21
+												},
+												"end": {
+													"line": 15,
+													"column": 40
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 367,
+												"end": 384,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 23
+													},
+													"end": {
+														"line": 15,
+														"column": 40
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 367,
+													"end": 384,
+													"loc": {
+														"start": {
+															"line": 15,
+															"column": 23
+														},
+														"end": {
+															"line": 15,
+															"column": 40
+														}
+													},
+													"name": "VeryLongTypeName2"
+												}
+											}
+										}
+									},
+									{
+										"type": "Identifier",
+										"start": 389,
+										"end": 426,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 3
+											},
+											"end": {
+												"line": 16,
+												"column": 40
+											}
+										},
+										"name": "veryLongParamName3",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 407,
+											"end": 426,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 21
+												},
+												"end": {
+													"line": 16,
+													"column": 40
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 409,
+												"end": 426,
+												"loc": {
+													"start": {
+														"line": 16,
+														"column": 23
+													},
+													"end": {
+														"line": 16,
+														"column": 40
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 409,
+													"end": 426,
+													"loc": {
+														"start": {
+															"line": 16,
+															"column": 23
+														},
+														"end": {
+															"line": 16,
+															"column": 40
+														}
+													},
+													"name": "VeryLongTypeName3"
+												}
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 435,
+									"end": 453,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 7
+										},
+										"end": {
+											"line": 17,
+											"column": 25
+										}
+									},
+									"name": "veryLongParamName1"
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Long expression arrow - params wrap individually",
+							"start": 241,
+							"end": 292
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 512,
+					"end": 632,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 512,
+						"end": 631,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 1
+							},
+							"end": {
+								"line": 23,
+								"column": 3
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 512,
+							"end": 514,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 1
+								},
+								"end": {
+									"line": 21,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 515,
+								"end": 630,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 4
+									},
+									"end": {
+										"line": 23,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 516,
+										"end": 553,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 5
+											},
+											"end": {
+												"line": 21,
+												"column": 42
+											}
+										},
+										"name": "veryLongParamName1",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 534,
+											"end": 553,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 23
+												},
+												"end": {
+													"line": 21,
+													"column": 42
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 536,
+												"end": 553,
+												"loc": {
+													"start": {
+														"line": 21,
+														"column": 25
+													},
+													"end": {
+														"line": 21,
+														"column": 42
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 536,
+													"end": 553,
+													"loc": {
+														"start": {
+															"line": 21,
+															"column": 25
+														},
+														"end": {
+															"line": 21,
+															"column": 42
+														}
+													},
+													"name": "VeryLongTypeName1"
+												}
+											}
+										}
+									},
+									{
+										"type": "Identifier",
+										"start": 555,
+										"end": 592,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 44
+											},
+											"end": {
+												"line": 21,
+												"column": 81
+											}
+										},
+										"name": "veryLongParamName2",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 573,
+											"end": 592,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 62
+												},
+												"end": {
+													"line": 21,
+													"column": 81
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 575,
+												"end": 592,
+												"loc": {
+													"start": {
+														"line": 21,
+														"column": 64
+													},
+													"end": {
+														"line": 21,
+														"column": 81
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 575,
+													"end": 592,
+													"loc": {
+														"start": {
+															"line": 21,
+															"column": 64
+														},
+														"end": {
+															"line": 21,
+															"column": 81
+														}
+													},
+													"name": "VeryLongTypeName2"
+												}
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 597,
+									"end": 630,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 86
+										},
+										"end": {
+											"line": 23,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ReturnStatement",
+											"start": 601,
+											"end": 627,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 2
+												},
+												"end": {
+													"line": 22,
+													"column": 28
+												}
+											},
+											"argument": {
+												"type": "Identifier",
+												"start": 608,
+												"end": 626,
+												"loc": {
+													"start": {
+														"line": 22,
+														"column": 9
+													},
+													"end": {
+														"line": 22,
+														"column": 27
+													}
+												},
+												"name": "veryLongParamName1"
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Long block arrow - stays hugged, params inline",
+							"start": 461,
+							"end": 510
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 683,
+					"end": 864,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 683,
+						"end": 863,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 1
+							},
+							"end": {
+								"line": 34,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 683,
+							"end": 685,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 1
+								},
+								"end": {
+									"line": 26,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 689,
+								"end": 859,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 2
+									},
+									"end": {
+										"line": 33,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 694,
+										"end": 731,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 3
+											},
+											"end": {
+												"line": 28,
+												"column": 40
+											}
+										},
+										"name": "veryLongParamName1",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 712,
+											"end": 731,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 21
+												},
+												"end": {
+													"line": 28,
+													"column": 40
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 714,
+												"end": 731,
+												"loc": {
+													"start": {
+														"line": 28,
+														"column": 23
+													},
+													"end": {
+														"line": 28,
+														"column": 40
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 714,
+													"end": 731,
+													"loc": {
+														"start": {
+															"line": 28,
+															"column": 23
+														},
+														"end": {
+															"line": 28,
+															"column": 40
+														}
+													},
+													"name": "VeryLongTypeName1"
+												}
+											}
+										}
+									},
+									{
+										"type": "Identifier",
+										"start": 736,
+										"end": 773,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 3
+											},
+											"end": {
+												"line": 29,
+												"column": 40
+											}
+										},
+										"name": "veryLongParamName2",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 754,
+											"end": 773,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 21
+												},
+												"end": {
+													"line": 29,
+													"column": 40
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 756,
+												"end": 773,
+												"loc": {
+													"start": {
+														"line": 29,
+														"column": 23
+													},
+													"end": {
+														"line": 29,
+														"column": 40
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 756,
+													"end": 773,
+													"loc": {
+														"start": {
+															"line": 29,
+															"column": 23
+														},
+														"end": {
+															"line": 29,
+															"column": 40
+														}
+													},
+													"name": "VeryLongTypeName2"
+												}
+											}
+										}
+									},
+									{
+										"type": "Identifier",
+										"start": 778,
+										"end": 815,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 3
+											},
+											"end": {
+												"line": 30,
+												"column": 40
+											}
+										},
+										"name": "veryLongParamName3",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 796,
+											"end": 815,
+											"loc": {
+												"start": {
+													"line": 30,
+													"column": 21
+												},
+												"end": {
+													"line": 30,
+													"column": 40
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 798,
+												"end": 815,
+												"loc": {
+													"start": {
+														"line": 30,
+														"column": 23
+													},
+													"end": {
+														"line": 30,
+														"column": 40
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 798,
+													"end": 815,
+													"loc": {
+														"start": {
+															"line": 30,
+															"column": 23
+														},
+														"end": {
+															"line": 30,
+															"column": 40
+														}
+													},
+													"name": "VeryLongTypeName3"
+												}
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 824,
+									"end": 859,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 7
+										},
+										"end": {
+											"line": 33,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ReturnStatement",
+											"start": 829,
+											"end": 855,
+											"loc": {
+												"start": {
+													"line": 32,
+													"column": 3
+												},
+												"end": {
+													"line": 32,
+													"column": 29
+												}
+											},
+											"argument": {
+												"type": "Identifier",
+												"start": 836,
+												"end": 854,
+												"loc": {
+													"start": {
+														"line": 32,
+														"column": 10
+													},
+													"end": {
+														"line": 32,
+														"column": 28
+													}
+												},
+												"name": "veryLongParamName1"
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Long block arrow - params wrap, body hugged",
+							"start": 635,
+							"end": 681
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 918,
+					"end": 1070,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 45,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 918,
+						"end": 1069,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 1
+							},
+							"end": {
+								"line": 45,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 918,
+							"end": 920,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 1
+								},
+								"end": {
+									"line": 37,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 924,
+								"end": 1065,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 2
+									},
+									"end": {
+										"line": 44,
+										"column": 33
+									}
+								},
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 943,
+									"end": 1060,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 3
+										},
+										"end": {
+											"line": 44,
+											"column": 28
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 948,
+										"end": 1060,
+										"loc": {
+											"start": {
+												"line": 41,
+												"column": 3
+											},
+											"end": {
+												"line": 44,
+												"column": 28
+											}
+										},
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 950,
+												"end": 973,
+												"loc": {
+													"start": {
+														"line": 41,
+														"column": 5
+													},
+													"end": {
+														"line": 41,
+														"column": 28
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 950,
+													"end": 973,
+													"loc": {
+														"start": {
+															"line": 41,
+															"column": 5
+														},
+														"end": {
+															"line": 41,
+															"column": 28
+														}
+													},
+													"name": "VeryLongReturnTypeName1"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 979,
+												"end": 1002,
+												"loc": {
+													"start": {
+														"line": 42,
+														"column": 5
+													},
+													"end": {
+														"line": 42,
+														"column": 28
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 979,
+													"end": 1002,
+													"loc": {
+														"start": {
+															"line": 42,
+															"column": 5
+														},
+														"end": {
+															"line": 42,
+															"column": 28
+														}
+													},
+													"name": "VeryLongReturnTypeName2"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 1008,
+												"end": 1031,
+												"loc": {
+													"start": {
+														"line": 43,
+														"column": 5
+													},
+													"end": {
+														"line": 43,
+														"column": 28
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 1008,
+													"end": 1031,
+													"loc": {
+														"start": {
+															"line": 43,
+															"column": 5
+														},
+														"end": {
+															"line": 43,
+															"column": 28
+														}
+													},
+													"name": "VeryLongReturnTypeName3"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 1037,
+												"end": 1060,
+												"loc": {
+													"start": {
+														"line": 44,
+														"column": 5
+													},
+													"end": {
+														"line": 44,
+														"column": 28
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 1037,
+													"end": 1060,
+													"loc": {
+														"start": {
+															"line": 44,
+															"column": 5
+														},
+														"end": {
+															"line": 44,
+															"column": 28
+														}
+													},
+													"name": "VeryLongReturnTypeName4"
+												}
+											}
+										]
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 929,
+										"end": 938,
+										"loc": {
+											"start": {
+												"line": 39,
+												"column": 3
+											},
+											"end": {
+												"line": 39,
+												"column": 12
+											}
+										},
+										"name": "x",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 930,
+											"end": 938,
+											"loc": {
+												"start": {
+													"line": 39,
+													"column": 4
+												},
+												"end": {
+													"line": 39,
+													"column": 12
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSNumberKeyword",
+												"start": 932,
+												"end": 938,
+												"loc": {
+													"start": {
+														"line": 39,
+														"column": 6
+													},
+													"end": {
+														"line": 39,
+														"column": 12
+													}
+												}
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 1064,
+									"end": 1065,
+									"loc": {
+										"start": {
+											"line": 44,
+											"column": 32
+										},
+										"end": {
+											"line": 44,
+											"column": 33
+										}
+									},
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Long return type - wraps params and union type",
+							"start": 867,
+							"end": 916
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1139,
+					"end": 1272,
+					"loc": {
+						"start": {
+							"line": 48,
+							"column": 1
+						},
+						"end": {
+							"line": 53,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1139,
+						"end": 1271,
+						"loc": {
+							"start": {
+								"line": 48,
+								"column": 1
+							},
+							"end": {
+								"line": 53,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1139,
+							"end": 1141,
+							"loc": {
+								"start": {
+									"line": 48,
+									"column": 1
+								},
+								"end": {
+									"line": 48,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 1145,
+								"end": 1267,
+								"loc": {
+									"start": {
+										"line": 49,
+										"column": 2
+									},
+									"end": {
+										"line": 52,
+										"column": 8
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1210,
+										"end": 1231,
+										"loc": {
+											"start": {
+												"line": 50,
+												"column": 3
+											},
+											"end": {
+												"line": 50,
+												"column": 24
+											}
+										},
+										"name": "x",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1211,
+											"end": 1231,
+											"loc": {
+												"start": {
+													"line": 50,
+													"column": 4
+												},
+												"end": {
+													"line": 50,
+													"column": 24
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 1213,
+												"end": 1231,
+												"loc": {
+													"start": {
+														"line": 50,
+														"column": 6
+													},
+													"end": {
+														"line": 50,
+														"column": 24
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 1213,
+													"end": 1231,
+													"loc": {
+														"start": {
+															"line": 50,
+															"column": 6
+														},
+														"end": {
+															"line": 50,
+															"column": 24
+														}
+													},
+													"name": "VeryLongTypeParam1"
+												}
+											}
+										}
+									},
+									{
+										"type": "Identifier",
+										"start": 1236,
+										"end": 1257,
+										"loc": {
+											"start": {
+												"line": 51,
+												"column": 3
+											},
+											"end": {
+												"line": 51,
+												"column": 24
+											}
+										},
+										"name": "y",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1237,
+											"end": 1257,
+											"loc": {
+												"start": {
+													"line": 51,
+													"column": 4
+												},
+												"end": {
+													"line": 51,
+													"column": 24
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 1239,
+												"end": 1257,
+												"loc": {
+													"start": {
+														"line": 51,
+														"column": 6
+													},
+													"end": {
+														"line": 51,
+														"column": 24
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 1239,
+													"end": 1257,
+													"loc": {
+														"start": {
+															"line": 51,
+															"column": 6
+														},
+														"end": {
+															"line": 51,
+															"column": 24
+														}
+													},
+													"name": "VeryLongTypeParam2"
+												}
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 1266,
+									"end": 1267,
+									"loc": {
+										"start": {
+											"line": 52,
+											"column": 7
+										},
+										"end": {
+											"line": 52,
+											"column": 8
+										}
+									},
+									"name": "x"
+								},
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 1145,
+									"end": 1205,
+									"loc": {
+										"start": {
+											"line": 49,
+											"column": 2
+										},
+										"end": {
+											"line": 49,
+											"column": 62
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 1146,
+											"end": 1164,
+											"loc": {
+												"start": {
+													"line": 49,
+													"column": 3
+												},
+												"end": {
+													"line": 49,
+													"column": 21
+												}
+											},
+											"name": "VeryLongTypeParam1"
+										},
+										{
+											"type": "TSTypeParameter",
+											"start": 1166,
+											"end": 1184,
+											"loc": {
+												"start": {
+													"line": 49,
+													"column": 23
+												},
+												"end": {
+													"line": 49,
+													"column": 41
+												}
+											},
+											"name": "VeryLongTypeParam2"
+										},
+										{
+											"type": "TSTypeParameter",
+											"start": 1186,
+											"end": 1204,
+											"loc": {
+												"start": {
+													"line": 49,
+													"column": 43
+												},
+												"end": {
+													"line": 49,
+													"column": 61
+												}
+											},
+											"name": "VeryLongTypeParam3"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Long generic callback - type params inline, value params wrap",
+							"start": 1073,
+							"end": 1137
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1333,
+					"end": 1500,
+					"loc": {
+						"start": {
+							"line": 56,
+							"column": 1
+						},
+						"end": {
+							"line": 66,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1333,
+						"end": 1499,
+						"loc": {
+							"start": {
+								"line": 56,
+								"column": 1
+							},
+							"end": {
+								"line": 66,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1333,
+							"end": 1335,
+							"loc": {
+								"start": {
+									"line": 56,
+									"column": 1
+								},
+								"end": {
+									"line": 56,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 1339,
+								"end": 1495,
+								"loc": {
+									"start": {
+										"line": 57,
+										"column": 2
+									},
+									"end": {
+										"line": 65,
+										"column": 8
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1464,
+										"end": 1485,
+										"loc": {
+											"start": {
+												"line": 64,
+												"column": 3
+											},
+											"end": {
+												"line": 64,
+												"column": 24
+											}
+										},
+										"name": "x",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1465,
+											"end": 1485,
+											"loc": {
+												"start": {
+													"line": 64,
+													"column": 4
+												},
+												"end": {
+													"line": 64,
+													"column": 24
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 1467,
+												"end": 1485,
+												"loc": {
+													"start": {
+														"line": 64,
+														"column": 6
+													},
+													"end": {
+														"line": 64,
+														"column": 24
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 1467,
+													"end": 1485,
+													"loc": {
+														"start": {
+															"line": 64,
+															"column": 6
+														},
+														"end": {
+															"line": 64,
+															"column": 24
+														}
+													},
+													"name": "VeryLongTypeParam1"
+												}
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 1494,
+									"end": 1495,
+									"loc": {
+										"start": {
+											"line": 65,
+											"column": 7
+										},
+										"end": {
+											"line": 65,
+											"column": 8
+										}
+									},
+									"name": "x"
+								},
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 1339,
+									"end": 1459,
+									"loc": {
+										"start": {
+											"line": 57,
+											"column": 2
+										},
+										"end": {
+											"line": 63,
+											"column": 3
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 1344,
+											"end": 1362,
+											"loc": {
+												"start": {
+													"line": 58,
+													"column": 3
+												},
+												"end": {
+													"line": 58,
+													"column": 21
+												}
+											},
+											"name": "VeryLongTypeParam1"
+										},
+										{
+											"type": "TSTypeParameter",
+											"start": 1367,
+											"end": 1385,
+											"loc": {
+												"start": {
+													"line": 59,
+													"column": 3
+												},
+												"end": {
+													"line": 59,
+													"column": 21
+												}
+											},
+											"name": "VeryLongTypeParam2"
+										},
+										{
+											"type": "TSTypeParameter",
+											"start": 1390,
+											"end": 1408,
+											"loc": {
+												"start": {
+													"line": 60,
+													"column": 3
+												},
+												"end": {
+													"line": 60,
+													"column": 21
+												}
+											},
+											"name": "VeryLongTypeParam3"
+										},
+										{
+											"type": "TSTypeParameter",
+											"start": 1413,
+											"end": 1431,
+											"loc": {
+												"start": {
+													"line": 61,
+													"column": 3
+												},
+												"end": {
+													"line": 61,
+													"column": 21
+												}
+											},
+											"name": "VeryLongTypeParam4"
+										},
+										{
+											"type": "TSTypeParameter",
+											"start": 1436,
+											"end": 1454,
+											"loc": {
+												"start": {
+													"line": 62,
+													"column": 3
+												},
+												"end": {
+													"line": 62,
+													"column": 21
+												}
+											},
+											"name": "VeryLongTypeParam5"
+										}
+									],
+									"extra": {
+										"trailingComma": 1454
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Long generic callback - type params wrap individually",
+							"start": 1275,
+							"end": 1331
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1557,
+					"end": 1686,
+					"loc": {
+						"start": {
+							"line": 69,
+							"column": 1
+						},
+						"end": {
+							"line": 71,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1557,
+						"end": 1685,
+						"loc": {
+							"start": {
+								"line": 69,
+								"column": 1
+							},
+							"end": {
+								"line": 71,
+								"column": 3
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1557,
+							"end": 1559,
+							"loc": {
+								"start": {
+									"line": 69,
+									"column": 1
+								},
+								"end": {
+									"line": 69,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 1560,
+								"end": 1684,
+								"loc": {
+									"start": {
+										"line": 69,
+										"column": 4
+									},
+									"end": {
+										"line": 71,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": true,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1567,
+										"end": 1604,
+										"loc": {
+											"start": {
+												"line": 69,
+												"column": 11
+											},
+											"end": {
+												"line": 69,
+												"column": 48
+											}
+										},
+										"name": "veryLongParamName1",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1585,
+											"end": 1604,
+											"loc": {
+												"start": {
+													"line": 69,
+													"column": 29
+												},
+												"end": {
+													"line": 69,
+													"column": 48
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 1587,
+												"end": 1604,
+												"loc": {
+													"start": {
+														"line": 69,
+														"column": 31
+													},
+													"end": {
+														"line": 69,
+														"column": 48
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 1587,
+													"end": 1604,
+													"loc": {
+														"start": {
+															"line": 69,
+															"column": 31
+														},
+														"end": {
+															"line": 69,
+															"column": 48
+														}
+													},
+													"name": "VeryLongTypeName1"
+												}
+											}
+										}
+									},
+									{
+										"type": "Identifier",
+										"start": 1606,
+										"end": 1643,
+										"loc": {
+											"start": {
+												"line": 69,
+												"column": 50
+											},
+											"end": {
+												"line": 69,
+												"column": 87
+											}
+										},
+										"name": "veryLongParamName2",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1624,
+											"end": 1643,
+											"loc": {
+												"start": {
+													"line": 69,
+													"column": 68
+												},
+												"end": {
+													"line": 69,
+													"column": 87
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 1626,
+												"end": 1643,
+												"loc": {
+													"start": {
+														"line": 69,
+														"column": 70
+													},
+													"end": {
+														"line": 69,
+														"column": 87
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 1626,
+													"end": 1643,
+													"loc": {
+														"start": {
+															"line": 69,
+															"column": 70
+														},
+														"end": {
+															"line": 69,
+															"column": 87
+														}
+													},
+													"name": "VeryLongTypeName2"
+												}
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 1648,
+									"end": 1684,
+									"loc": {
+										"start": {
+											"line": 69,
+											"column": 92
+										},
+										"end": {
+											"line": 71,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 1652,
+											"end": 1681,
+											"loc": {
+												"start": {
+													"line": 70,
+													"column": 2
+												},
+												"end": {
+													"line": 70,
+													"column": 31
+												}
+											},
+											"expression": {
+												"type": "AwaitExpression",
+												"start": 1652,
+												"end": 1680,
+												"loc": {
+													"start": {
+														"line": 70,
+														"column": 2
+													},
+													"end": {
+														"line": 70,
+														"column": 30
+													}
+												},
+												"argument": {
+													"type": "CallExpression",
+													"start": 1658,
+													"end": 1680,
+													"loc": {
+														"start": {
+															"line": 70,
+															"column": 8
+														},
+														"end": {
+															"line": 70,
+															"column": 30
+														}
+													},
+													"callee": {
+														"type": "Identifier",
+														"start": 1658,
+														"end": 1660,
+														"loc": {
+															"start": {
+																"line": 70,
+																"column": 8
+															},
+															"end": {
+																"line": 70,
+																"column": 10
+															}
+														},
+														"name": "fn"
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 1661,
+															"end": 1679,
+															"loc": {
+																"start": {
+																	"line": 70,
+																	"column": 11
+																},
+																"end": {
+																	"line": 70,
+																	"column": 29
+																}
+															},
+															"name": "veryLongParamName1"
+														}
+													],
+													"optional": false
+												}
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Long async callback - stays hugged, params inline",
+							"start": 1503,
+							"end": 1555
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1740,
+					"end": 1930,
+					"loc": {
+						"start": {
+							"line": 74,
+							"column": 1
+						},
+						"end": {
+							"line": 82,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1740,
+						"end": 1929,
+						"loc": {
+							"start": {
+								"line": 74,
+								"column": 1
+							},
+							"end": {
+								"line": 82,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1740,
+							"end": 1742,
+							"loc": {
+								"start": {
+									"line": 74,
+									"column": 1
+								},
+								"end": {
+									"line": 74,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 1746,
+								"end": 1925,
+								"loc": {
+									"start": {
+										"line": 75,
+										"column": 2
+									},
+									"end": {
+										"line": 81,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": true,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1757,
+										"end": 1794,
+										"loc": {
+											"start": {
+												"line": 76,
+												"column": 3
+											},
+											"end": {
+												"line": 76,
+												"column": 40
+											}
+										},
+										"name": "veryLongParamName1",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1775,
+											"end": 1794,
+											"loc": {
+												"start": {
+													"line": 76,
+													"column": 21
+												},
+												"end": {
+													"line": 76,
+													"column": 40
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 1777,
+												"end": 1794,
+												"loc": {
+													"start": {
+														"line": 76,
+														"column": 23
+													},
+													"end": {
+														"line": 76,
+														"column": 40
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 1777,
+													"end": 1794,
+													"loc": {
+														"start": {
+															"line": 76,
+															"column": 23
+														},
+														"end": {
+															"line": 76,
+															"column": 40
+														}
+													},
+													"name": "VeryLongTypeName1"
+												}
+											}
+										}
+									},
+									{
+										"type": "Identifier",
+										"start": 1799,
+										"end": 1836,
+										"loc": {
+											"start": {
+												"line": 77,
+												"column": 3
+											},
+											"end": {
+												"line": 77,
+												"column": 40
+											}
+										},
+										"name": "veryLongParamName2",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1817,
+											"end": 1836,
+											"loc": {
+												"start": {
+													"line": 77,
+													"column": 21
+												},
+												"end": {
+													"line": 77,
+													"column": 40
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 1819,
+												"end": 1836,
+												"loc": {
+													"start": {
+														"line": 77,
+														"column": 23
+													},
+													"end": {
+														"line": 77,
+														"column": 40
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 1819,
+													"end": 1836,
+													"loc": {
+														"start": {
+															"line": 77,
+															"column": 23
+														},
+														"end": {
+															"line": 77,
+															"column": 40
+														}
+													},
+													"name": "VeryLongTypeName2"
+												}
+											}
+										}
+									},
+									{
+										"type": "Identifier",
+										"start": 1841,
+										"end": 1878,
+										"loc": {
+											"start": {
+												"line": 78,
+												"column": 3
+											},
+											"end": {
+												"line": 78,
+												"column": 40
+											}
+										},
+										"name": "veryLongParamName3",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1859,
+											"end": 1878,
+											"loc": {
+												"start": {
+													"line": 78,
+													"column": 21
+												},
+												"end": {
+													"line": 78,
+													"column": 40
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 1861,
+												"end": 1878,
+												"loc": {
+													"start": {
+														"line": 78,
+														"column": 23
+													},
+													"end": {
+														"line": 78,
+														"column": 40
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 1861,
+													"end": 1878,
+													"loc": {
+														"start": {
+															"line": 78,
+															"column": 23
+														},
+														"end": {
+															"line": 78,
+															"column": 40
+														}
+													},
+													"name": "VeryLongTypeName3"
+												}
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 1887,
+									"end": 1925,
+									"loc": {
+										"start": {
+											"line": 79,
+											"column": 7
+										},
+										"end": {
+											"line": 81,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 1892,
+											"end": 1921,
+											"loc": {
+												"start": {
+													"line": 80,
+													"column": 3
+												},
+												"end": {
+													"line": 80,
+													"column": 32
+												}
+											},
+											"expression": {
+												"type": "AwaitExpression",
+												"start": 1892,
+												"end": 1920,
+												"loc": {
+													"start": {
+														"line": 80,
+														"column": 3
+													},
+													"end": {
+														"line": 80,
+														"column": 31
+													}
+												},
+												"argument": {
+													"type": "CallExpression",
+													"start": 1898,
+													"end": 1920,
+													"loc": {
+														"start": {
+															"line": 80,
+															"column": 9
+														},
+														"end": {
+															"line": 80,
+															"column": 31
+														}
+													},
+													"callee": {
+														"type": "Identifier",
+														"start": 1898,
+														"end": 1900,
+														"loc": {
+															"start": {
+																"line": 80,
+																"column": 9
+															},
+															"end": {
+																"line": 80,
+																"column": 11
+															}
+														},
+														"name": "fn"
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 1901,
+															"end": 1919,
+															"loc": {
+																"start": {
+																	"line": 80,
+																	"column": 12
+																},
+																"end": {
+																	"line": 80,
+																	"column": 30
+																}
+															},
+															"name": "veryLongParamName1"
+														}
+													],
+													"optional": false
+												}
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Long async callback - params wrap, body hugged",
+							"start": 1689,
+							"end": 1738
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

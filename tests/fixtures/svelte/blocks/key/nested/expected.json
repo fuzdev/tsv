@@ -1,0 +1,125 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 52,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "KeyBlock",
+				"start": 0,
+				"end": 51,
+				"expression": {
+					"type": "Identifier",
+					"start": 6,
+					"end": 7,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 6
+						},
+						"end": {
+							"line": 1,
+							"column": 7
+						}
+					},
+					"name": "a"
+				},
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 8,
+							"end": 10,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "KeyBlock",
+							"start": 10,
+							"end": 44,
+							"expression": {
+								"type": "Identifier",
+								"start": 16,
+								"end": 17,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 18,
+										"end": 21,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 21,
+										"end": 36,
+										"name": "div",
+										"name_loc": {
+											"start": {
+												"line": 3,
+												"column": 3,
+												"character": 22
+											},
+											"end": {
+												"line": 3,
+												"column": 6,
+												"character": 25
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 26,
+													"end": 30,
+													"raw": "text",
+													"data": "text"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 36,
+										"end": 38,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 44,
+							"end": 45,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

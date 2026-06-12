@@ -1,0 +1,6 @@
+<Comp
+	items={[
+		// comment
+		a,
+	]}
+/>

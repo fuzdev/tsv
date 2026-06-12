@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 79,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 70,
+				"name": "supports",
+				"prelude": "selector(:has(> img))",
+				"block": {
+					"type": "Block",
+					"start": 41,
+					"end": 70,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 45,
+								"end": 46,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 45,
+										"end": 46,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 45,
+														"end": 46
+													}
+												],
+												"start": 45,
+												"end": 46
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 47,
+								"end": 67,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 52,
+										"end": 62,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 45,
+							"end": 67
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 71,
+			"styles": "\n\t@supports selector(:has(> img)) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 80,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

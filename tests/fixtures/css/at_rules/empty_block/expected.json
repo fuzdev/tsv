@@ -1,0 +1,92 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 126,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 27,
+				"name": "media",
+				"prelude": "screen",
+				"block": {
+					"type": "Block",
+					"start": 23,
+					"end": 27,
+					"children": []
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 29,
+				"end": 59,
+				"name": "supports",
+				"prelude": "(display: grid)",
+				"block": {
+					"type": "Block",
+					"start": 55,
+					"end": 59,
+					"children": []
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 61,
+				"end": 76,
+				"name": "font-face",
+				"prelude": "",
+				"block": {
+					"type": "Block",
+					"start": 72,
+					"end": 76,
+					"children": []
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 78,
+				"end": 117,
+				"name": "media",
+				"prelude": "print",
+				"block": {
+					"type": "Block",
+					"start": 91,
+					"end": 117,
+					"children": [
+						{
+							"type": "Atrule",
+							"start": 95,
+							"end": 114,
+							"name": "media",
+							"prelude": "screen",
+							"block": {
+								"type": "Block",
+								"start": 109,
+								"end": 114,
+								"children": []
+							}
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 118,
+			"styles": "\n\t@media screen {\n\t}\n\t@supports (display: grid) {\n\t}\n\t@font-face {\n\t}\n\t@media print {\n\t\t@media screen {\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 127,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

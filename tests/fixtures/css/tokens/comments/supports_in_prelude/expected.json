@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 92,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 83,
+				"name": "supports",
+				"prelude": "(display:  grid)",
+				"block": {
+					"type": "Block",
+					"start": 49,
+					"end": 83,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 53,
+								"end": 56,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 53,
+										"end": 56,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 53,
+														"end": 56
+													}
+												],
+												"start": 53,
+												"end": 56
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 57,
+								"end": 80,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 62,
+										"end": 75,
+										"property": "display",
+										"value": "grid"
+									}
+								]
+							},
+							"start": 53,
+							"end": 80
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 84,
+			"styles": "\n\t@supports (display: /* comment */ grid) {\n\t\tdiv {\n\t\t\tdisplay: grid;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 93,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

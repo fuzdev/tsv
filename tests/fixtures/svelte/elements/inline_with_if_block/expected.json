@@ -1,0 +1,101 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 54,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 53,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 5,
+						"character": 5
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 6,
+						"end": 23,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 6,
+								"character": 6
+							},
+							"end": {
+								"line": 1,
+								"column": 15,
+								"character": 15
+							}
+						},
+						"value": [
+							{
+								"start": 17,
+								"end": 22,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 26,
+							"end": 45,
+							"test": {
+								"type": "Identifier",
+								"start": 31,
+								"end": 35,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 11
+									}
+								},
+								"name": "cond"
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 36,
+										"end": 40,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							},
+							"alternate": null
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

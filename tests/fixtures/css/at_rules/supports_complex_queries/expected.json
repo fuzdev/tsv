@@ -1,0 +1,338 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 534,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 110,
+				"name": "supports",
+				"prelude": "(display: grid) and (gap: 1rem)",
+				"block": {
+					"type": "Block",
+					"start": 51,
+					"end": 110,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 55,
+								"end": 69,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 55,
+										"end": 69,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "grid-with-gap",
+														"start": 55,
+														"end": 69
+													}
+												],
+												"start": 55,
+												"end": 69
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 70,
+								"end": 107,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 75,
+										"end": 88,
+										"property": "display",
+										"value": "grid"
+									},
+									{
+										"type": "Declaration",
+										"start": 93,
+										"end": 102,
+										"property": "gap",
+										"value": "1rem"
+									}
+								]
+							},
+							"start": 55,
+							"end": 107
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 113,
+				"end": 202,
+				"name": "supports",
+				"prelude": "(display: flex) or (display: grid)",
+				"block": {
+					"type": "Block",
+					"start": 158,
+					"end": 202,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 162,
+								"end": 175,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 162,
+										"end": 175,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "flex-or-grid",
+														"start": 162,
+														"end": 175
+													}
+												],
+												"start": 162,
+												"end": 175
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 176,
+								"end": 199,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 181,
+										"end": 194,
+										"property": "display",
+										"value": "flex"
+									}
+								]
+							},
+							"start": 162,
+							"end": 199
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 205,
+				"end": 275,
+				"name": "supports",
+				"prelude": "not (display: grid)",
+				"block": {
+					"type": "Block",
+					"start": 235,
+					"end": 275,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 239,
+								"end": 247,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 239,
+										"end": 247,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "no-grid",
+														"start": 239,
+														"end": 247
+													}
+												],
+												"start": 239,
+												"end": 247
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 248,
+								"end": 272,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 253,
+										"end": 267,
+										"property": "display",
+										"value": "block"
+									}
+								]
+							},
+							"start": 239,
+							"end": 272
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 278,
+				"end": 386,
+				"name": "supports",
+				"prelude": "(display: grid) and ((gap: 1rem) or (grid-gap: 1rem))",
+				"block": {
+					"type": "Block",
+					"start": 342,
+					"end": 386,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 346,
+								"end": 359,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 346,
+										"end": 359,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "nested-logic",
+														"start": 346,
+														"end": 359
+													}
+												],
+												"start": 346,
+												"end": 359
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 360,
+								"end": 383,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 365,
+										"end": 378,
+										"property": "display",
+										"value": "grid"
+									}
+								]
+							},
+							"start": 346,
+							"end": 383
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 389,
+				"end": 525,
+				"name": "supports",
+				"prelude": "((display: flex) or (display: grid)) and (color: oklch(0.5 0.2 180))",
+				"block": {
+					"type": "Block",
+					"start": 468,
+					"end": 525,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 472,
+								"end": 486,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 472,
+										"end": 486,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "mixed-complex",
+														"start": 472,
+														"end": 486
+													}
+												],
+												"start": 472,
+												"end": 486
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 487,
+								"end": 522,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 492,
+										"end": 517,
+										"property": "color",
+										"value": "oklch(0.5 0.2 180)"
+									}
+								]
+							},
+							"start": 472,
+							"end": 522
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 526,
+			"styles": "\n\t@supports (display: grid) and (gap: 1rem) {\n\t\t.grid-with-gap {\n\t\t\tdisplay: grid;\n\t\t\tgap: 1rem;\n\t\t}\n\t}\n\n\t@supports (display: flex) or (display: grid) {\n\t\t.flex-or-grid {\n\t\t\tdisplay: flex;\n\t\t}\n\t}\n\n\t@supports not (display: grid) {\n\t\t.no-grid {\n\t\t\tdisplay: block;\n\t\t}\n\t}\n\n\t@supports (display: grid) and ((gap: 1rem) or (grid-gap: 1rem)) {\n\t\t.nested-logic {\n\t\t\tdisplay: grid;\n\t\t}\n\t}\n\n\t@supports ((display: flex) or (display: grid)) and (color: oklch(0.5 0.2 180)) {\n\t\t.mixed-complex {\n\t\t\tcolor: oklch(0.5 0.2 180);\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 535,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

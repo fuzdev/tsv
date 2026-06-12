@@ -1,0 +1,1705 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 702,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Basic import type",
+			"start": 20,
+			"end": 40,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " With qualifier",
+			"start": 66,
+			"end": 83,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " With type arguments",
+			"start": 113,
+			"end": 135,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " With multiple type arguments",
+			"start": 174,
+			"end": 205,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Qualified name (nested)",
+			"start": 245,
+			"end": 271,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " In function parameter and return type",
+			"start": 305,
+			"end": 345,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " In generic constraint",
+			"start": 415,
+			"end": 439,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Array of import type",
+			"start": 494,
+			"end": 517,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Union with import types",
+			"start": 547,
+			"end": 573,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Intersection with import types",
+			"start": 617,
+			"end": 650,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 34
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 701,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 692,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 33,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 42,
+					"end": 63,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 22
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 47,
+						"end": 48,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSImportType",
+						"start": 51,
+						"end": 62,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 3,
+								"column": 21
+							}
+						},
+						"argument": {
+							"type": "Literal",
+							"start": 58,
+							"end": 61,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 17
+								},
+								"end": {
+									"line": 3,
+									"column": 20
+								}
+							},
+							"value": "a",
+							"raw": "'a'"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Basic import type",
+							"start": 20,
+							"end": 40
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 85,
+					"end": 110,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 26
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 90,
+						"end": 91,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 6
+							},
+							"end": {
+								"line": 6,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSImportType",
+						"start": 94,
+						"end": 109,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 10
+							},
+							"end": {
+								"line": 6,
+								"column": 25
+							}
+						},
+						"argument": {
+							"type": "Literal",
+							"start": 101,
+							"end": 106,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 17
+								},
+								"end": {
+									"line": 6,
+									"column": 22
+								}
+							},
+							"value": "./b",
+							"raw": "'./b'"
+						},
+						"qualifier": {
+							"type": "Identifier",
+							"start": 108,
+							"end": 109,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 24
+								},
+								"end": {
+									"line": 6,
+									"column": 25
+								}
+							},
+							"name": "T"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " With qualifier",
+							"start": 66,
+							"end": 83
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 137,
+					"end": 171,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 35
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 142,
+						"end": 143,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 6
+							},
+							"end": {
+								"line": 9,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSImportType",
+						"start": 146,
+						"end": 170,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 10
+							},
+							"end": {
+								"line": 9,
+								"column": 34
+							}
+						},
+						"argument": {
+							"type": "Literal",
+							"start": 153,
+							"end": 156,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 17
+								},
+								"end": {
+									"line": 9,
+									"column": 20
+								}
+							},
+							"value": "c",
+							"raw": "'c'"
+						},
+						"qualifier": {
+							"type": "Identifier",
+							"start": 158,
+							"end": 162,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 22
+								},
+								"end": {
+									"line": 9,
+									"column": 26
+								}
+							},
+							"name": "Type"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 162,
+							"end": 170,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 26
+								},
+								"end": {
+									"line": 9,
+									"column": 34
+								}
+							},
+							"params": [
+								{
+									"type": "TSStringKeyword",
+									"start": 163,
+									"end": 169,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 27
+										},
+										"end": {
+											"line": 9,
+											"column": 33
+										}
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " With type arguments",
+							"start": 113,
+							"end": 135
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 207,
+					"end": 242,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 36
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 212,
+						"end": 213,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 6
+							},
+							"end": {
+								"line": 12,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSImportType",
+						"start": 216,
+						"end": 241,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 10
+							},
+							"end": {
+								"line": 12,
+								"column": 35
+							}
+						},
+						"argument": {
+							"type": "Literal",
+							"start": 223,
+							"end": 226,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 17
+								},
+								"end": {
+									"line": 12,
+									"column": 20
+								}
+							},
+							"value": "d",
+							"raw": "'d'"
+						},
+						"qualifier": {
+							"type": "Identifier",
+							"start": 228,
+							"end": 232,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 22
+								},
+								"end": {
+									"line": 12,
+									"column": 26
+								}
+							},
+							"name": "Type"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 232,
+							"end": 241,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 26
+								},
+								"end": {
+									"line": 12,
+									"column": 35
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 233,
+									"end": 234,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 27
+										},
+										"end": {
+											"line": 12,
+											"column": 28
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 233,
+										"end": 234,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 27
+											},
+											"end": {
+												"line": 12,
+												"column": 28
+											}
+										},
+										"name": "T"
+									}
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 236,
+									"end": 237,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 30
+										},
+										"end": {
+											"line": 12,
+											"column": 31
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 236,
+										"end": 237,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 30
+											},
+											"end": {
+												"line": 12,
+												"column": 31
+											}
+										},
+										"name": "U"
+									}
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 239,
+									"end": 240,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 33
+										},
+										"end": {
+											"line": 12,
+											"column": 34
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 239,
+										"end": 240,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 33
+											},
+											"end": {
+												"line": 12,
+												"column": 34
+											}
+										},
+										"name": "V"
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " With multiple type arguments",
+							"start": 174,
+							"end": 205
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 273,
+					"end": 302,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 30
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 278,
+						"end": 279,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 6
+							},
+							"end": {
+								"line": 15,
+								"column": 7
+							}
+						},
+						"name": "E"
+					},
+					"typeAnnotation": {
+						"type": "TSImportType",
+						"start": 282,
+						"end": 301,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 10
+							},
+							"end": {
+								"line": 15,
+								"column": 29
+							}
+						},
+						"argument": {
+							"type": "Literal",
+							"start": 289,
+							"end": 294,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 17
+								},
+								"end": {
+									"line": 15,
+									"column": 22
+								}
+							},
+							"value": "./e",
+							"raw": "'./e'"
+						},
+						"qualifier": {
+							"type": "TSQualifiedName",
+							"start": 296,
+							"end": 301,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 24
+								},
+								"end": {
+									"line": 15,
+									"column": 29
+								}
+							},
+							"left": {
+								"type": "TSQualifiedName",
+								"start": 296,
+								"end": 299,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 24
+									},
+									"end": {
+										"line": 15,
+										"column": 27
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 296,
+									"end": 297,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 24
+										},
+										"end": {
+											"line": 15,
+											"column": 25
+										}
+									},
+									"name": "A"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 298,
+									"end": 299,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 26
+										},
+										"end": {
+											"line": 15,
+											"column": 27
+										}
+									},
+									"name": "B"
+								}
+							},
+							"right": {
+								"type": "Identifier",
+								"start": 300,
+								"end": 301,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 28
+									},
+									"end": {
+										"line": 15,
+										"column": 29
+									}
+								},
+								"name": "C"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Qualified name (nested)",
+							"start": 245,
+							"end": 271
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 347,
+					"end": 412,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 356,
+						"end": 358,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 10
+							},
+							"end": {
+								"line": 18,
+								"column": 12
+							}
+						},
+						"name": "fn"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 359,
+							"end": 377,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 13
+								},
+								"end": {
+									"line": 18,
+									"column": 31
+								}
+							},
+							"name": "x",
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 360,
+								"end": 377,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 14
+									},
+									"end": {
+										"line": 18,
+										"column": 31
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSImportType",
+									"start": 362,
+									"end": 377,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 16
+										},
+										"end": {
+											"line": 18,
+											"column": 31
+										}
+									},
+									"argument": {
+										"type": "Literal",
+										"start": 369,
+										"end": 374,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 23
+											},
+											"end": {
+												"line": 18,
+												"column": 28
+											}
+										},
+										"value": "./f",
+										"raw": "'./f'"
+									},
+									"qualifier": {
+										"type": "Identifier",
+										"start": 376,
+										"end": 377,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 30
+											},
+											"end": {
+												"line": 18,
+												"column": 31
+											}
+										},
+										"name": "T"
+									}
+								}
+							}
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 378,
+						"end": 395,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 32
+							},
+							"end": {
+								"line": 18,
+								"column": 49
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSImportType",
+							"start": 380,
+							"end": 395,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 34
+								},
+								"end": {
+									"line": 18,
+									"column": 49
+								}
+							},
+							"argument": {
+								"type": "Literal",
+								"start": 387,
+								"end": 392,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 41
+									},
+									"end": {
+										"line": 18,
+										"column": 46
+									}
+								},
+								"value": "./f",
+								"raw": "'./f'"
+							},
+							"qualifier": {
+								"type": "Identifier",
+								"start": 394,
+								"end": 395,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 48
+									},
+									"end": {
+										"line": 18,
+										"column": 49
+									}
+								},
+								"name": "U"
+							}
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 396,
+						"end": 412,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 50
+							},
+							"end": {
+								"line": 20,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 400,
+								"end": 409,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 11
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 407,
+									"end": 408,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 9
+										},
+										"end": {
+											"line": 19,
+											"column": 10
+										}
+									},
+									"name": "x"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " In function parameter and return type",
+							"start": 305,
+							"end": 345
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 441,
+					"end": 491,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 51
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 446,
+						"end": 447,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 6
+							},
+							"end": {
+								"line": 23,
+								"column": 7
+							}
+						},
+						"name": "F"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 447,
+						"end": 477,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 7
+							},
+							"end": {
+								"line": 23,
+								"column": 37
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 448,
+								"end": 476,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 8
+									},
+									"end": {
+										"line": 23,
+										"column": 36
+									}
+								},
+								"name": "T",
+								"constraint": {
+									"type": "TSImportType",
+									"start": 458,
+									"end": 476,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 18
+										},
+										"end": {
+											"line": 23,
+											"column": 36
+										}
+									},
+									"argument": {
+										"type": "Literal",
+										"start": 465,
+										"end": 470,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 25
+											},
+											"end": {
+												"line": 23,
+												"column": 30
+											}
+										},
+										"value": "./g",
+										"raw": "'./g'"
+									},
+									"qualifier": {
+										"type": "Identifier",
+										"start": 472,
+										"end": 476,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 32
+											},
+											"end": {
+												"line": 23,
+												"column": 36
+											}
+										},
+										"name": "Base"
+									}
+								}
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 480,
+						"end": 490,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 40
+							},
+							"end": {
+								"line": 23,
+								"column": 50
+							}
+						},
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 481,
+								"end": 489,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 41
+									},
+									"end": {
+										"line": 23,
+										"column": 49
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 481,
+									"end": 486,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 41
+										},
+										"end": {
+											"line": 23,
+											"column": 46
+										}
+									},
+									"name": "value"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 486,
+									"end": 489,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 46
+										},
+										"end": {
+											"line": 23,
+											"column": 49
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 488,
+										"end": 489,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 48
+											},
+											"end": {
+												"line": 23,
+												"column": 49
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 488,
+											"end": 489,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 48
+												},
+												"end": {
+													"line": 23,
+													"column": 49
+												}
+											},
+											"name": "T"
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " In generic constraint",
+							"start": 415,
+							"end": 439
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 519,
+					"end": 544,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 26
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 524,
+						"end": 525,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 6
+							},
+							"end": {
+								"line": 26,
+								"column": 7
+							}
+						},
+						"name": "G"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 528,
+						"end": 543,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 10
+							},
+							"end": {
+								"line": 26,
+								"column": 25
+							}
+						},
+						"elementType": {
+							"type": "TSImportType",
+							"start": 528,
+							"end": 541,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 10
+								},
+								"end": {
+									"line": 26,
+									"column": 23
+								}
+							},
+							"argument": {
+								"type": "Literal",
+								"start": 535,
+								"end": 538,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 17
+									},
+									"end": {
+										"line": 26,
+										"column": 20
+									}
+								},
+								"value": "h",
+								"raw": "'h'"
+							},
+							"qualifier": {
+								"type": "Identifier",
+								"start": 540,
+								"end": 541,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 22
+									},
+									"end": {
+										"line": 26,
+										"column": 23
+									}
+								},
+								"name": "T"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Array of import type",
+							"start": 494,
+							"end": 517
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 575,
+					"end": 614,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 40
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 580,
+						"end": 581,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 6
+							},
+							"end": {
+								"line": 29,
+								"column": 7
+							}
+						},
+						"name": "H"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 584,
+						"end": 613,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 10
+							},
+							"end": {
+								"line": 29,
+								"column": 39
+							}
+						},
+						"types": [
+							{
+								"type": "TSImportType",
+								"start": 584,
+								"end": 597,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 10
+									},
+									"end": {
+										"line": 29,
+										"column": 23
+									}
+								},
+								"argument": {
+									"type": "Literal",
+									"start": 591,
+									"end": 594,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 17
+										},
+										"end": {
+											"line": 29,
+											"column": 20
+										}
+									},
+									"value": "i",
+									"raw": "'i'"
+								},
+								"qualifier": {
+									"type": "Identifier",
+									"start": 596,
+									"end": 597,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 22
+										},
+										"end": {
+											"line": 29,
+											"column": 23
+										}
+									},
+									"name": "T"
+								}
+							},
+							{
+								"type": "TSImportType",
+								"start": 600,
+								"end": 613,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 26
+									},
+									"end": {
+										"line": 29,
+										"column": 39
+									}
+								},
+								"argument": {
+									"type": "Literal",
+									"start": 607,
+									"end": 610,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 33
+										},
+										"end": {
+											"line": 29,
+											"column": 36
+										}
+									},
+									"value": "j",
+									"raw": "'j'"
+								},
+								"qualifier": {
+									"type": "Identifier",
+									"start": 612,
+									"end": 613,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 38
+										},
+										"end": {
+											"line": 29,
+											"column": 39
+										}
+									},
+									"name": "U"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Union with import types",
+							"start": 547,
+							"end": 573
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 652,
+					"end": 691,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 40
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 657,
+						"end": 658,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 6
+							},
+							"end": {
+								"line": 32,
+								"column": 7
+							}
+						},
+						"name": "I"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 661,
+						"end": 690,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 10
+							},
+							"end": {
+								"line": 32,
+								"column": 39
+							}
+						},
+						"types": [
+							{
+								"type": "TSImportType",
+								"start": 661,
+								"end": 674,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 10
+									},
+									"end": {
+										"line": 32,
+										"column": 23
+									}
+								},
+								"argument": {
+									"type": "Literal",
+									"start": 668,
+									"end": 671,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 17
+										},
+										"end": {
+											"line": 32,
+											"column": 20
+										}
+									},
+									"value": "k",
+									"raw": "'k'"
+								},
+								"qualifier": {
+									"type": "Identifier",
+									"start": 673,
+									"end": 674,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 22
+										},
+										"end": {
+											"line": 32,
+											"column": 23
+										}
+									},
+									"name": "T"
+								}
+							},
+							{
+								"type": "TSImportType",
+								"start": 677,
+								"end": 690,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 26
+									},
+									"end": {
+										"line": 32,
+										"column": 39
+									}
+								},
+								"argument": {
+									"type": "Literal",
+									"start": 684,
+									"end": 687,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 33
+										},
+										"end": {
+											"line": 32,
+											"column": 36
+										}
+									},
+									"value": "l",
+									"raw": "'l'"
+								},
+								"qualifier": {
+									"type": "Identifier",
+									"start": 689,
+									"end": 690,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 38
+										},
+										"end": {
+											"line": 32,
+											"column": 39
+										}
+									},
+									"name": "U"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Intersection with import types",
+							"start": 617,
+							"end": 650
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -1,0 +1,321 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 352,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 46,
+					"end": 54,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 46,
+							"end": 54,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "rect",
+											"start": 46,
+											"end": 54
+										}
+									],
+									"start": 46,
+									"end": 54
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 55,
+					"end": 72,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 59,
+							"end": 68,
+							"property": "fill",
+							"value": "red"
+						}
+					]
+				},
+				"start": 46,
+				"end": 72
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 75,
+					"end": 85,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 75,
+							"end": 85,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "circle",
+											"start": 75,
+											"end": 85
+										}
+									],
+									"start": 75,
+									"end": 85
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 86,
+					"end": 106,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 90,
+							"end": 102,
+							"property": "stroke",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 75,
+				"end": 106
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 109,
+					"end": 116,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 109,
+							"end": 116,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "mi",
+											"start": 109,
+											"end": 116
+										}
+									],
+									"start": 109,
+									"end": 116
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 117,
+					"end": 143,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 121,
+							"end": 139,
+							"property": "font-style",
+							"value": "italic"
+						}
+					]
+				},
+				"start": 109,
+				"end": 143
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 192,
+					"end": 197,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 192,
+							"end": 197,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 192,
+											"end": 197
+										}
+									],
+									"start": 192,
+									"end": 197
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 198,
+					"end": 218,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 202,
+							"end": 214,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 192,
+				"end": 218
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 246,
+					"end": 261,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 246,
+							"end": 261,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "rect",
+											"start": 246,
+											"end": 254
+										},
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 254,
+											"end": 261
+										}
+									],
+									"start": 246,
+									"end": 261
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 262,
+					"end": 291,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 266,
+							"end": 287,
+							"property": "border",
+							"value": "1px solid red"
+						}
+					]
+				},
+				"start": 246,
+				"end": 291
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 294,
+					"end": 308,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 294,
+							"end": 308,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "text",
+											"start": 294,
+											"end": 302
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "hover",
+											"args": null,
+											"start": 302,
+											"end": 308
+										}
+									],
+									"start": 294,
+									"end": 308
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 309,
+					"end": 343,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 313,
+							"end": 339,
+							"property": "text-decoration",
+							"value": "underline"
+						}
+					]
+				},
+				"start": 294,
+				"end": 343
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 344,
+			"styles": "\n\t/* Type selectors with namespace */\n\tsvg|rect {\n\t\tfill: red;\n\t}\n\n\tsvg|circle {\n\t\tstroke: blue;\n\t}\n\n\tmath|mi {\n\t\tfont-style: italic;\n\t}\n\n\t/* Universal namespace with type selector */\n\t*|div {\n\t\tcolor: green;\n\t}\n\n\t/* Combined patterns */\n\tsvg|rect.class1 {\n\t\tborder: 1px solid red;\n\t}\n\n\tsvg|text:hover {\n\t\ttext-decoration: underline;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 353,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

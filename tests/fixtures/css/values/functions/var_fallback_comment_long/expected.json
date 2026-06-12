@@ -1,0 +1,80 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 289,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 280,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 45,
+							"end": 140,
+							"property": "prop",
+							"value": "var(--a,  var(--b) cccccccccccccccccccccccccccccccccccccccccccccccccccccccc)"
+						},
+						{
+							"type": "Declaration",
+							"start": 170,
+							"end": 276,
+							"property": "prop",
+							"value": "var(\n\t\t\t--a,\n\t\t\t var(--b) ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\n\t\t)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 280
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 281,
+			"styles": "\n\tdiv {\n\t\t/* 100 chars - no wrap */\n\t\tprop: var(--a, /* comment */ var(--b) cccccccccccccccccccccccccccccccccccccccccccccccccccccccc);\n\t\t/* 101 chars - wraps */\n\t\tprop: var(\n\t\t\t--a,\n\t\t\t/* comment */ var(--b) ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\n\t\t);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 290,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

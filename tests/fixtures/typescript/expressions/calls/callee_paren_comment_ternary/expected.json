@@ -1,0 +1,244 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 130,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Comment should be outside parens wrapping ternary callee",
+			"start": 20,
+			"end": 79,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 91,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 11
+				},
+				"end": {
+					"line": 3,
+					"column": 24
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 129,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 120,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 81,
+					"end": 119,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 39
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 87,
+							"end": 118,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 38
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 87,
+								"end": 88,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 105,
+								"end": 118,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 25
+									},
+									"end": {
+										"line": 3,
+										"column": 38
+									}
+								},
+								"callee": {
+									"type": "ConditionalExpression",
+									"start": 106,
+									"end": 115,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 26
+										},
+										"end": {
+											"line": 3,
+											"column": 35
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 106,
+										"end": 107,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 26
+											},
+											"end": {
+												"line": 3,
+												"column": 27
+											}
+										},
+										"name": "x"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 110,
+										"end": 111,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 30
+											},
+											"end": {
+												"line": 3,
+												"column": 31
+											}
+										},
+										"name": "y"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 114,
+										"end": 115,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 34
+											},
+											"end": {
+												"line": 3,
+												"column": 35
+											}
+										},
+										"name": "z"
+									}
+								},
+								"arguments": [],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " comment ",
+										"start": 91,
+										"end": 104
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Comment should be outside parens wrapping ternary callee",
+							"start": 20,
+							"end": 79
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

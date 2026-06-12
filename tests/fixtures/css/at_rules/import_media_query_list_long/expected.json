@@ -1,0 +1,82 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 1293,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 79,
+				"end": 190,
+				"name": "import",
+				"prelude": "'aaaaaaaa.css' screen and (min-width: 400px), print and (max-width: 999px), tv,\n\t\tprojection, handheld",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 285,
+				"end": 400,
+				"name": "import",
+				"prelude": "'aaaaaaaa.css' screen and (min-width: 400px) and (max-width: 1200px) and\n\t\t\t(orientation: landscape),\n\t\ttv",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 468,
+				"end": 595,
+				"name": "import",
+				"prelude": "'aaaaaaaa.css' screen and (min-width: 400px) and (max-width: 1200px) and\n\t\t\t(orientation: landscape),\n\t\ttv, print, all",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 668,
+				"end": 728,
+				"name": "import",
+				"prelude": "'aaaaaaaa.css' screen and (min-width: 400px), print",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 816,
+				"end": 921,
+				"name": "import",
+				"prelude": "'list.css' projection, tv, handheld, embossed, speech, aural, braille, tty, screen, print,\n\t\tall",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 997,
+				"end": 1096,
+				"name": "import",
+				"prelude": "'b.css' screen and (min-width: 700px), print and (max-width: 900px), tv, all, aaaaaaaaaaaa",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 1182,
+				"end": 1284,
+				"name": "import",
+				"prelude": "'b.css' screen and (min-width: 700px), print and (max-width: 900px), tv, all,\n\t\taaaaaaaaaaaaa",
+				"block": null
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 1285,
+			"styles": "\n\t/* comma list: packs greedily, breaks before the last query at +1 */\n\t@import 'aaaaaaaa.css' screen and (min-width: 400px), print and (max-width: 999px), tv,\n\t\tprojection, handheld;\n\n\t/* one query overflows: breaks internally at +2, trailing comma forces next query to +1 */\n\t@import 'aaaaaaaa.css' screen and (min-width: 400px) and (max-width: 1200px) and\n\t\t\t(orientation: landscape),\n\t\ttv;\n\n\t/* internal break +2, then short queries pack greedily at +1 */\n\t@import 'aaaaaaaa.css' screen and (min-width: 400px) and (max-width: 1200px) and\n\t\t\t(orientation: landscape),\n\t\ttv, print, all;\n\n\t/* short multi-query: stays inline (both agree, regression guard) */\n\t@import 'aaaaaaaa.css' screen and (min-width: 400px), print;\n\n\t/* comma-only media-type list (no and/or): also fills, breaks at the comma at +1 */\n\t@import 'list.css' projection, tv, handheld, embossed, speech, aural, braille, tty, screen, print,\n\t\tall;\n\n\t/* boundary: 101 chars stays inline (the fill finds no needed break) */\n\t@import 'b.css' screen and (min-width: 700px), print and (max-width: 900px), tv, all, aaaaaaaaaaaa;\n\n\t/* boundary: 102 chars wraps — last query to +1 (one char over the line above) */\n\t@import 'b.css' screen and (min-width: 700px), print and (max-width: 900px), tv, all,\n\t\taaaaaaaaaaaaa;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 1294,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,81 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 64,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 29,
+				"name": "import",
+				"prelude": "'style.css'",
+				"block": null
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 32,
+					"end": 35,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 32,
+							"end": 35,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 32,
+											"end": 35
+										}
+									],
+									"start": 32,
+									"end": 35
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 36,
+					"end": 55,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 40,
+							"end": 51,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 32,
+				"end": 55
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 56,
+			"styles": "\n\t@import 'style.css';\n\n\tdiv {\n\t\tcolor: blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 65,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

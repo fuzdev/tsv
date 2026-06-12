@@ -1,0 +1,632 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 385,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Object destructuring with consecutive comments and blank lines",
+			"start": 20,
+			"end": 85,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " section1",
+			"start": 103,
+			"end": 114,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " section2",
+			"start": 118,
+			"end": 129,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 8,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " section3",
+			"start": 138,
+			"end": 149,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 2
+				},
+				"end": {
+					"line": 11,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * JSDoc section\n ",
+			"start": 153,
+			"end": 181,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Array destructuring with consecutive comments and blank lines",
+			"start": 199,
+			"end": 263,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " section1",
+			"start": 281,
+			"end": 292,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 23,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " section2",
+			"start": 296,
+			"end": 307,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 2
+				},
+				"end": {
+					"line": 25,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " section3",
+			"start": 316,
+			"end": 327,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 2
+				},
+				"end": {
+					"line": 28,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * JSDoc section\n ",
+			"start": 331,
+			"end": 359,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 2
+				},
+				"end": {
+					"line": 32,
+					"column": 5
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 384,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 375,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 35,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 87,
+					"end": 196,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 93,
+							"end": 195,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 17,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 93,
+								"end": 189,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 17,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 97,
+										"end": 98,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 3
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 97,
+											"end": 98,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 2
+												},
+												"end": {
+													"line": 4,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 97,
+											"end": 98,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 2
+												},
+												"end": {
+													"line": 4,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 132,
+										"end": 133,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 3
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 132,
+											"end": 133,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 2
+												},
+												"end": {
+													"line": 9,
+													"column": 3
+												}
+											},
+											"name": "b"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 132,
+											"end": 133,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 2
+												},
+												"end": {
+													"line": 9,
+													"column": 3
+												}
+											},
+											"name": "b"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " section1",
+												"start": 103,
+												"end": 114
+											},
+											{
+												"type": "Line",
+												"value": " section2",
+												"start": 118,
+												"end": 129
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 184,
+										"end": 185,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 2
+											},
+											"end": {
+												"line": 16,
+												"column": 3
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 184,
+											"end": 185,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 2
+												},
+												"end": {
+													"line": 16,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 184,
+											"end": 185,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 2
+												},
+												"end": {
+													"line": 16,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " section3",
+												"start": 138,
+												"end": 149
+											},
+											{
+												"type": "Block",
+												"value": "*\n * JSDoc section\n ",
+												"start": 153,
+												"end": 181
+											}
+										]
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 192,
+								"end": 195,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 5
+									},
+									"end": {
+										"line": 17,
+										"column": 8
+									}
+								},
+								"name": "obj"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Object destructuring with consecutive comments and blank lines",
+							"start": 20,
+							"end": 85
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 265,
+					"end": 374,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 271,
+							"end": 373,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 7
+								},
+								"end": {
+									"line": 34,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "ArrayPattern",
+								"start": 271,
+								"end": 367,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 7
+									},
+									"end": {
+										"line": 34,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 275,
+										"end": 276,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 2
+											},
+											"end": {
+												"line": 21,
+												"column": 3
+											}
+										},
+										"name": "x"
+									},
+									{
+										"type": "Identifier",
+										"start": 310,
+										"end": 311,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 2
+											},
+											"end": {
+												"line": 26,
+												"column": 3
+											}
+										},
+										"name": "y",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " section1",
+												"start": 281,
+												"end": 292
+											},
+											{
+												"type": "Line",
+												"value": " section2",
+												"start": 296,
+												"end": 307
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 362,
+										"end": 363,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 2
+											},
+											"end": {
+												"line": 33,
+												"column": 3
+											}
+										},
+										"name": "z",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " section3",
+												"start": 316,
+												"end": 327
+											},
+											{
+												"type": "Block",
+												"value": "*\n * JSDoc section\n ",
+												"start": 331,
+												"end": 359
+											}
+										]
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 370,
+								"end": 373,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 5
+									},
+									"end": {
+										"line": 34,
+										"column": 8
+									}
+								},
+								"name": "arr"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Array destructuring with consecutive comments and blank lines",
+							"start": 199,
+							"end": 263
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

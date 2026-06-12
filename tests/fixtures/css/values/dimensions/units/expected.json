@@ -1,0 +1,388 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 1437,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 57,
+					"end": 60,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 57,
+							"end": 60,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 57,
+											"end": 60
+										}
+									],
+									"start": 57,
+									"end": 60
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 61,
+					"end": 1428,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 97,
+							"end": 109,
+							"property": "width",
+							"value": "100px"
+						},
+						{
+							"type": "Declaration",
+							"start": 113,
+							"end": 124,
+							"property": "height",
+							"value": "2cm"
+						},
+						{
+							"type": "Declaration",
+							"start": 128,
+							"end": 139,
+							"property": "margin",
+							"value": "1mm"
+						},
+						{
+							"type": "Declaration",
+							"start": 143,
+							"end": 156,
+							"property": "padding",
+							"value": "72pt"
+						},
+						{
+							"type": "Declaration",
+							"start": 160,
+							"end": 177,
+							"property": "border-width",
+							"value": "6pc"
+						},
+						{
+							"type": "Declaration",
+							"start": 181,
+							"end": 189,
+							"property": "top",
+							"value": "1in"
+						},
+						{
+							"type": "Declaration",
+							"start": 193,
+							"end": 202,
+							"property": "left",
+							"value": "10Q"
+						},
+						{
+							"type": "Declaration",
+							"start": 243,
+							"end": 258,
+							"property": "font-size",
+							"value": "16px"
+						},
+						{
+							"type": "Declaration",
+							"start": 262,
+							"end": 280,
+							"property": "line-height",
+							"value": "1.5em"
+						},
+						{
+							"type": "Declaration",
+							"start": 284,
+							"end": 306,
+							"property": "letter-spacing",
+							"value": "0.1rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 310,
+							"end": 327,
+							"property": "word-spacing",
+							"value": "2ex"
+						},
+						{
+							"type": "Declaration",
+							"start": 331,
+							"end": 344,
+							"property": "tab-size",
+							"value": "4ch"
+						},
+						{
+							"type": "Declaration",
+							"start": 389,
+							"end": 404,
+							"property": "max-width",
+							"value": "80vw"
+						},
+						{
+							"type": "Declaration",
+							"start": 408,
+							"end": 424,
+							"property": "max-height",
+							"value": "90vh"
+						},
+						{
+							"type": "Declaration",
+							"start": 428,
+							"end": 445,
+							"property": "min-width",
+							"value": "10vmin"
+						},
+						{
+							"type": "Declaration",
+							"start": 449,
+							"end": 467,
+							"property": "min-height",
+							"value": "10vmax"
+						},
+						{
+							"type": "Declaration",
+							"start": 509,
+							"end": 522,
+							"property": "width",
+							"value": "100svw"
+						},
+						{
+							"type": "Declaration",
+							"start": 526,
+							"end": 540,
+							"property": "height",
+							"value": "100svh"
+						},
+						{
+							"type": "Declaration",
+							"start": 544,
+							"end": 562,
+							"property": "min-width",
+							"value": "10svmin"
+						},
+						{
+							"type": "Declaration",
+							"start": 566,
+							"end": 585,
+							"property": "max-height",
+							"value": "90svmax"
+						},
+						{
+							"type": "Declaration",
+							"start": 627,
+							"end": 640,
+							"property": "width",
+							"value": "100lvw"
+						},
+						{
+							"type": "Declaration",
+							"start": 644,
+							"end": 658,
+							"property": "height",
+							"value": "100lvh"
+						},
+						{
+							"type": "Declaration",
+							"start": 702,
+							"end": 715,
+							"property": "width",
+							"value": "100dvw"
+						},
+						{
+							"type": "Declaration",
+							"start": 719,
+							"end": 733,
+							"property": "height",
+							"value": "100dvh"
+						},
+						{
+							"type": "Declaration",
+							"start": 777,
+							"end": 794,
+							"property": "inline-size",
+							"value": "50vi"
+						},
+						{
+							"type": "Declaration",
+							"start": 798,
+							"end": 814,
+							"property": "block-size",
+							"value": "50vb"
+						},
+						{
+							"type": "Declaration",
+							"start": 848,
+							"end": 866,
+							"property": "padding",
+							"value": "5cqw 5cqh"
+						},
+						{
+							"type": "Declaration",
+							"start": 870,
+							"end": 887,
+							"property": "margin",
+							"value": "2cqi 2cqb"
+						},
+						{
+							"type": "Declaration",
+							"start": 891,
+							"end": 902,
+							"property": "gap",
+							"value": "1cqmin"
+						},
+						{
+							"type": "Declaration",
+							"start": 906,
+							"end": 925,
+							"property": "flex-basis",
+							"value": "10cqmax"
+						},
+						{
+							"type": "Declaration",
+							"start": 964,
+							"end": 979,
+							"property": "font-size",
+							"value": "2cap"
+						},
+						{
+							"type": "Declaration",
+							"start": 983,
+							"end": 994,
+							"property": "width",
+							"value": "10ic"
+						},
+						{
+							"type": "Declaration",
+							"start": 998,
+							"end": 1014,
+							"property": "line-height",
+							"value": "2lh"
+						},
+						{
+							"type": "Declaration",
+							"start": 1018,
+							"end": 1034,
+							"property": "margin-top",
+							"value": "1rlh"
+						},
+						{
+							"type": "Declaration",
+							"start": 1057,
+							"end": 1069,
+							"property": "opacity",
+							"value": "50%"
+						},
+						{
+							"type": "Declaration",
+							"start": 1093,
+							"end": 1117,
+							"property": "transform",
+							"value": "rotate(45deg)"
+						},
+						{
+							"type": "Declaration",
+							"start": 1121,
+							"end": 1144,
+							"property": "transform",
+							"value": "rotate(1rad)"
+						},
+						{
+							"type": "Declaration",
+							"start": 1148,
+							"end": 1174,
+							"property": "transform",
+							"value": "rotate(0.5turn)"
+						},
+						{
+							"type": "Declaration",
+							"start": 1178,
+							"end": 1204,
+							"property": "transform",
+							"value": "rotate(100grad)"
+						},
+						{
+							"type": "Declaration",
+							"start": 1227,
+							"end": 1253,
+							"property": "transition-duration",
+							"value": "300ms"
+						},
+						{
+							"type": "Declaration",
+							"start": 1257,
+							"end": 1279,
+							"property": "animation-duration",
+							"value": "2s"
+						},
+						{
+							"type": "Declaration",
+							"start": 1307,
+							"end": 1319,
+							"property": "pitch",
+							"value": "440Hz"
+						},
+						{
+							"type": "Declaration",
+							"start": 1323,
+							"end": 1334,
+							"property": "pitch",
+							"value": "1kHz"
+						},
+						{
+							"type": "Declaration",
+							"start": 1363,
+							"end": 1381,
+							"property": "resolution",
+							"value": "300dpi"
+						},
+						{
+							"type": "Declaration",
+							"start": 1385,
+							"end": 1402,
+							"property": "resolution",
+							"value": "2dppx"
+						},
+						{
+							"type": "Declaration",
+							"start": 1406,
+							"end": 1424,
+							"property": "resolution",
+							"value": "96dpcm"
+						}
+					]
+				},
+				"start": 57,
+				"end": 1428
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 1429,
+			"styles": "\n\t/* Test dimension values with various units */\n\tdiv {\n\t\t/* Length units - absolute */\n\t\twidth: 100px;\n\t\theight: 2cm;\n\t\tmargin: 1mm;\n\t\tpadding: 72pt;\n\t\tborder-width: 6pc;\n\t\ttop: 1in;\n\t\tleft: 10Q;\n\t\t/* Length units - font-relative */\n\t\tfont-size: 16px;\n\t\tline-height: 1.5em;\n\t\tletter-spacing: 0.1rem;\n\t\tword-spacing: 2ex;\n\t\ttab-size: 4ch;\n\t\t/* Length units - viewport-relative */\n\t\tmax-width: 80vw;\n\t\tmax-height: 90vh;\n\t\tmin-width: 10vmin;\n\t\tmin-height: 10vmax;\n\t\t/* Modern viewport units (small) */\n\t\twidth: 100svw;\n\t\theight: 100svh;\n\t\tmin-width: 10svmin;\n\t\tmax-height: 90svmax;\n\t\t/* Modern viewport units (large) */\n\t\twidth: 100lvw;\n\t\theight: 100lvh;\n\t\t/* Modern viewport units (dynamic) */\n\t\twidth: 100dvw;\n\t\theight: 100dvh;\n\t\t/* Modern viewport units (logical) */\n\t\tinline-size: 50vi;\n\t\tblock-size: 50vb;\n\t\t/* Container query units */\n\t\tpadding: 5cqw 5cqh;\n\t\tmargin: 2cqi 2cqb;\n\t\tgap: 1cqmin;\n\t\tflex-basis: 10cqmax;\n\t\t/* Typography units (Level 4) */\n\t\tfont-size: 2cap;\n\t\twidth: 10ic;\n\t\tline-height: 2lh;\n\t\tmargin-top: 1rlh;\n\t\t/* Percentage */\n\t\topacity: 50%;\n\t\t/* Angle units */\n\t\ttransform: rotate(45deg);\n\t\ttransform: rotate(1rad);\n\t\ttransform: rotate(0.5turn);\n\t\ttransform: rotate(100grad);\n\t\t/* Time units */\n\t\ttransition-duration: 300ms;\n\t\tanimation-duration: 2s;\n\t\t/* Frequency units */\n\t\tpitch: 440Hz;\n\t\tpitch: 1kHz;\n\t\t/* Resolution units */\n\t\tresolution: 300dpi;\n\t\tresolution: 2dppx;\n\t\tresolution: 96dpcm;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 1438,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

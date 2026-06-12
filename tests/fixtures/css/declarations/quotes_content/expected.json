@@ -1,0 +1,129 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 225,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 216,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 29,
+							"property": "quotes",
+							"value": "auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 33,
+							"end": 45,
+							"property": "quotes",
+							"value": "none"
+						},
+						{
+							"type": "Declaration",
+							"start": 49,
+							"end": 72,
+							"property": "quotes",
+							"value": "'\"' '\"' \"'\" \"'\""
+						},
+						{
+							"type": "Declaration",
+							"start": 76,
+							"end": 87,
+							"property": "content",
+							"value": "''"
+						},
+						{
+							"type": "Declaration",
+							"start": 91,
+							"end": 107,
+							"property": "content",
+							"value": "'Hello'"
+						},
+						{
+							"type": "Declaration",
+							"start": 111,
+							"end": 136,
+							"property": "content",
+							"value": "attr(data-label)"
+						},
+						{
+							"type": "Declaration",
+							"start": 140,
+							"end": 165,
+							"property": "content",
+							"value": "counter(section)"
+						},
+						{
+							"type": "Declaration",
+							"start": 169,
+							"end": 188,
+							"property": "content",
+							"value": "open-quote"
+						},
+						{
+							"type": "Declaration",
+							"start": 192,
+							"end": 212,
+							"property": "content",
+							"value": "close-quote"
+						}
+					]
+				},
+				"start": 9,
+				"end": 216
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 217,
+			"styles": "\n\tdiv {\n\t\tquotes: auto;\n\t\tquotes: none;\n\t\tquotes: '\"' '\"' \"'\" \"'\";\n\t\tcontent: '';\n\t\tcontent: 'Hello';\n\t\tcontent: attr(data-label);\n\t\tcontent: counter(section);\n\t\tcontent: open-quote;\n\t\tcontent: close-quote;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 226,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

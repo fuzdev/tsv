@@ -1,0 +1,537 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 655,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 35,
+				"data": " Single shorthand attribute "
+			},
+			{
+				"type": "Text",
+				"start": 35,
+				"end": 37,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 37,
+				"end": 84,
+				"data": " 100 chars - stays inline (at boundary) "
+			},
+			{
+				"type": "Text",
+				"start": 84,
+				"end": 85,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 85,
+				"end": 185,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 86
+					},
+					"end": {
+						"line": 4,
+						"column": 5,
+						"character": 90
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 91,
+						"end": 182,
+						"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"name_loc": {
+							"start": {
+								"line": 4,
+								"column": 7,
+								"character": 92
+							},
+							"end": {
+								"line": 4,
+								"column": 96,
+								"character": 181
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 92,
+							"end": 181,
+							"expression": {
+								"type": "Identifier",
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"start": 92,
+								"end": 181,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7,
+										"character": 92
+									},
+									"end": {
+										"line": 4,
+										"column": 96,
+										"character": 181
+									}
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 185,
+				"end": 187,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 187,
+				"end": 213,
+				"data": " 101 chars - wraps "
+			},
+			{
+				"type": "Text",
+				"start": 213,
+				"end": 214,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 214,
+				"end": 316,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 215
+					},
+					"end": {
+						"line": 7,
+						"column": 5,
+						"character": 219
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 221,
+						"end": 313,
+						"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"name_loc": {
+							"start": {
+								"line": 8,
+								"column": 2,
+								"character": 222
+							},
+							"end": {
+								"line": 8,
+								"column": 92,
+								"character": 312
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 222,
+							"end": 312,
+							"expression": {
+								"type": "Identifier",
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"start": 222,
+								"end": 312,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2,
+										"character": 222
+									},
+									"end": {
+										"line": 8,
+										"column": 92,
+										"character": 312
+									}
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 316,
+				"end": 318,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 318,
+				"end": 356,
+				"data": " Multiple shorthand attributes "
+			},
+			{
+				"type": "Text",
+				"start": 356,
+				"end": 358,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 358,
+				"end": 405,
+				"data": " 100 chars - stays inline (at boundary) "
+			},
+			{
+				"type": "Text",
+				"start": 405,
+				"end": 406,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 406,
+				"end": 506,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 407
+					},
+					"end": {
+						"line": 14,
+						"column": 5,
+						"character": 411
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 412,
+						"end": 441,
+						"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"name_loc": {
+							"start": {
+								"line": 14,
+								"column": 7,
+								"character": 413
+							},
+							"end": {
+								"line": 14,
+								"column": 34,
+								"character": 440
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 413,
+							"end": 440,
+							"expression": {
+								"type": "Identifier",
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"start": 413,
+								"end": 440,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7,
+										"character": 413
+									},
+									"end": {
+										"line": 14,
+										"column": 34,
+										"character": 440
+									}
+								}
+							}
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 442,
+						"end": 471,
+						"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbb",
+						"name_loc": {
+							"start": {
+								"line": 14,
+								"column": 37,
+								"character": 443
+							},
+							"end": {
+								"line": 14,
+								"column": 64,
+								"character": 470
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 443,
+							"end": 470,
+							"expression": {
+								"type": "Identifier",
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbb",
+								"start": 443,
+								"end": 470,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 37,
+										"character": 443
+									},
+									"end": {
+										"line": 14,
+										"column": 64,
+										"character": 470
+									}
+								}
+							}
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 472,
+						"end": 503,
+						"name": "ccccccccccccccccccccccccccccc",
+						"name_loc": {
+							"start": {
+								"line": 14,
+								"column": 67,
+								"character": 473
+							},
+							"end": {
+								"line": 14,
+								"column": 96,
+								"character": 502
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 473,
+							"end": 502,
+							"expression": {
+								"type": "Identifier",
+								"name": "ccccccccccccccccccccccccccccc",
+								"start": 473,
+								"end": 502,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 67,
+										"character": 473
+									},
+									"end": {
+										"line": 14,
+										"column": 96,
+										"character": 502
+									}
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 506,
+				"end": 508,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 508,
+				"end": 549,
+				"data": " 101 chars - wraps all attributes "
+			},
+			{
+				"type": "Text",
+				"start": 549,
+				"end": 550,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 550,
+				"end": 654,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 1,
+						"character": 551
+					},
+					"end": {
+						"line": 17,
+						"column": 5,
+						"character": 555
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 557,
+						"end": 587,
+						"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"name_loc": {
+							"start": {
+								"line": 18,
+								"column": 2,
+								"character": 558
+							},
+							"end": {
+								"line": 18,
+								"column": 30,
+								"character": 586
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 558,
+							"end": 586,
+							"expression": {
+								"type": "Identifier",
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"start": 558,
+								"end": 586,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2,
+										"character": 558
+									},
+									"end": {
+										"line": 18,
+										"column": 30,
+										"character": 586
+									}
+								}
+							}
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 589,
+						"end": 619,
+						"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+						"name_loc": {
+							"start": {
+								"line": 19,
+								"column": 2,
+								"character": 590
+							},
+							"end": {
+								"line": 19,
+								"column": 30,
+								"character": 618
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 590,
+							"end": 618,
+							"expression": {
+								"type": "Identifier",
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+								"start": 590,
+								"end": 618,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2,
+										"character": 590
+									},
+									"end": {
+										"line": 19,
+										"column": 30,
+										"character": 618
+									}
+								}
+							}
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 621,
+						"end": 651,
+						"name": "cccccccccccccccccccccccccccc",
+						"name_loc": {
+							"start": {
+								"line": 20,
+								"column": 2,
+								"character": 622
+							},
+							"end": {
+								"line": 20,
+								"column": 30,
+								"character": 650
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 622,
+							"end": 650,
+							"expression": {
+								"type": "Identifier",
+								"name": "cccccccccccccccccccccccccccc",
+								"start": 622,
+								"end": 650,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2,
+										"character": 622
+									},
+									"end": {
+										"line": 20,
+										"column": 30,
+										"character": 650
+									}
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

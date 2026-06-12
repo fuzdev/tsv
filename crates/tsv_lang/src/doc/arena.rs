@@ -1,0 +1,995 @@
+//! Arena-based document allocation for efficient Doc tree construction and rendering.
+//!
+//! Instead of heap-allocating each Doc node individually (Box<Doc>, Vec<Doc>),
+//! all nodes are stored in a contiguous `Vec<DocNode>` and referenced by `DocId`
+//! (a u32 index). Child lists are stored in a separate flat `Vec<DocId>` and
+//! referenced by `ChildRange { start, len }`.
+//!
+//! Benefits:
+//! - No recursive drop (dropping the arena = dropping two Vecs)
+//! - No deep cloning (DocId is Copy)
+//! - Cache-friendly contiguous storage
+//! - Bulk deallocation
+
+use std::cell::RefCell;
+
+use crate::printing::visual_width;
+
+use super::types::{
+    DocContext, DocText, GroupId, LineKind, Mode, TEXT_WIDTH_HAS_NEWLINE, TEXT_WIDTH_NOT_COMPUTED,
+};
+
+/// Index into `DocArena.nodes`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct DocId(u32);
+
+impl DocId {
+    /// Get the raw index value.
+    #[inline]
+    pub const fn index(self) -> usize {
+        self.0 as usize
+    }
+}
+
+/// Range into `DocArena.children` for multi-child nodes (Concat, Fill, expanded_states).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ChildRange {
+    pub start: u32,
+    pub len: u32,
+}
+
+impl ChildRange {
+    /// An empty range (no children).
+    pub const EMPTY: Self = Self { start: 0, len: 0 };
+
+    /// Check if the range is empty.
+    #[inline]
+    pub const fn is_empty(self) -> bool {
+        self.len == 0
+    }
+
+    /// Resolve to a slice of DocIds.
+    #[inline]
+    pub fn resolve(self, children: &[DocId]) -> &[DocId] {
+        &children[self.start as usize..(self.start + self.len) as usize]
+    }
+}
+
+/// Arena-allocated document node.
+///
+/// Stores children as `DocId` indices and child lists as `ChildRange` ranges.
+#[derive(Debug, Clone)]
+pub enum DocNode {
+    /// Text content to output (static, owned, or symbol)
+    Text(DocText),
+
+    /// Line break - behavior depends on kind and mode
+    Line(LineKind),
+
+    /// Increase indentation level for nested content
+    Indent(DocId),
+
+    /// Decrease indentation level
+    Dedent(DocId),
+
+    /// Set absolute indentation level for nested content
+    Align { n: usize, contents: DocId },
+
+    /// Try to fit content on one line; if doesn't fit, break ALL lines in group.
+    ///
+    /// When `expanded_states` is non-empty, this is a "conditional group" that tries
+    /// multiple alternative layouts. `contents` is state[0], expanded_states contains
+    /// state[1..].
+    Group {
+        contents: DocId,
+        expanded_states: ChildRange,
+        id: Option<GroupId>,
+        should_break: bool,
+    },
+
+    /// Conditional rendering based on whether parent group breaks
+    IfBreak { break_doc: DocId, flat_doc: DocId },
+
+    /// Conditionally indent based on whether a specific group broke
+    IndentIfBreak {
+        contents: DocId,
+        group_id: GroupId,
+        negate: bool,
+    },
+
+    /// Sequence of docs - rendered one after another
+    Concat(ChildRange),
+
+    /// Greedy line packing - fills each line with as much as fits
+    Fill(ChildRange),
+
+    /// Wrap a doc with rendering context (hints for width/punctuation)
+    WithContext { doc: DocId, context: DocContext },
+
+    /// Content to print at the end of the current line
+    LineSuffix(DocId),
+
+    /// Force any pending LineSuffix content to be flushed
+    LineSuffixBoundary,
+
+    /// Force parent group to break
+    BreakParent,
+
+    /// A group that prevents hardline propagation to parent groups
+    IsolatedGroup { contents: DocId },
+}
+
+/// A command in the printer's command stack.
+///
+/// Holds a `DocId` index, making it `Copy` with no lifetime parameter.
+#[derive(Debug, Clone, Copy)]
+pub struct ArenaCommand {
+    pub indent: usize,
+    pub mode: Mode,
+    pub doc: DocId,
+    pub base_indent_override: Option<usize>,
+}
+
+impl ArenaCommand {
+    /// Create a command with the same context but a different doc.
+    #[inline]
+    pub fn with_doc(&self, doc: DocId) -> Self {
+        Self { doc, ..*self }
+    }
+
+    /// Create a command with incremented indent.
+    #[inline]
+    pub fn indented(&self, doc: DocId) -> Self {
+        Self {
+            indent: self.indent + 1,
+            doc,
+            ..*self
+        }
+    }
+
+    /// Create a command with decremented indent.
+    #[inline]
+    pub fn dedented(&self, doc: DocId) -> Self {
+        Self {
+            indent: self.indent.saturating_sub(1),
+            doc,
+            ..*self
+        }
+    }
+
+    /// Create a command with absolute indent level.
+    #[inline]
+    pub fn with_indent(&self, indent: usize, doc: DocId) -> Self {
+        Self {
+            indent,
+            doc,
+            ..*self
+        }
+    }
+
+    /// Create a command with a specific mode.
+    #[inline]
+    pub fn with_mode(&self, mode: Mode, doc: DocId) -> Self {
+        Self { mode, doc, ..*self }
+    }
+
+    /// Create a command with a base indent override.
+    #[inline]
+    pub fn with_base_override(&self, base_indent_override: Option<usize>, doc: DocId) -> Self {
+        Self {
+            doc,
+            base_indent_override,
+            ..*self
+        }
+    }
+}
+
+/// Arena allocator for document nodes.
+///
+/// All doc nodes are stored contiguously in `nodes`. Multi-child nodes
+/// (Concat, Fill, expanded_states) store their children in `children`
+/// and reference them via `ChildRange`.
+///
+/// Uses `RefCell` for interior mutability - builder methods take `&self`
+/// to match the existing printer pattern where methods are `&self`.
+pub struct DocArena {
+    nodes: RefCell<Vec<DocNode>>,
+    children: RefCell<Vec<DocId>>,
+    /// Tab width for visual width calculations (stored for precomputing text widths)
+    tab_width: usize,
+}
+
+impl DocArena {
+    /// Create a new empty arena.
+    pub fn new(tab_width: usize) -> Self {
+        Self {
+            nodes: RefCell::new(Vec::new()),
+            children: RefCell::new(Vec::new()),
+            tab_width,
+        }
+    }
+
+    /// Create an arena with pre-allocated capacity based on source size.
+    ///
+    /// Heuristic: ~4 nodes per source byte for typical formatted code.
+    pub fn with_source_size_hint(source_len: usize, tab_width: usize) -> Self {
+        let estimated_nodes = source_len * 4;
+        let estimated_children = estimated_nodes / 2;
+        Self {
+            nodes: RefCell::new(Vec::with_capacity(estimated_nodes)),
+            children: RefCell::new(Vec::with_capacity(estimated_children)),
+            tab_width,
+        }
+    }
+
+    /// Create an arena sized for `source`, using the default `TAB_WIDTH`.
+    ///
+    /// Equivalent to `with_source_size_hint(source.len(), TAB_WIDTH)`.
+    pub fn for_source(source: &str) -> Self {
+        Self::with_source_size_hint(source.len(), crate::config::TAB_WIDTH)
+    }
+
+    //
+    // Internal helpers
+    //
+
+    /// Allocate a node and return its DocId.
+    #[inline]
+    fn alloc(&self, node: DocNode) -> DocId {
+        let mut nodes = self.nodes.borrow_mut();
+        let id = DocId(nodes.len() as u32);
+        nodes.push(node);
+        id
+    }
+
+    /// Allocate a child range from a slice of DocIds.
+    #[inline]
+    fn alloc_children(&self, ids: &[DocId]) -> ChildRange {
+        if ids.is_empty() {
+            return ChildRange::EMPTY;
+        }
+        let mut children = self.children.borrow_mut();
+        let start = children.len() as u32;
+        let len = ids.len() as u32;
+        children.extend_from_slice(ids);
+        ChildRange { start, len }
+    }
+
+    //
+    // Primitive builders
+    //
+
+    /// Create a text doc from a static string (zero allocation).
+    ///
+    /// Never precomputes width. Static strings are short ASCII punctuation,
+    /// keywords, and operators — `visual_width()`'s ASCII fast path handles
+    /// them in ~3ns, so caching saves nothing vs the construction cost.
+    #[inline]
+    pub fn text(&self, s: &'static str) -> DocId {
+        self.alloc(DocNode::Text(DocText::Static(s, TEXT_WIDTH_NOT_COMPUTED)))
+    }
+
+    /// Create a text doc from an owned string.
+    ///
+    /// Only precomputes width for non-ASCII strings (unicode template text,
+    /// formatted string literals). These trigger expensive grapheme segmentation
+    /// (~100-500ns) and may be measured multiple times in fits.
+    ///
+    /// ASCII owned strings use `visual_width()`'s fast path (~3-5ns per visit),
+    /// making caching unnecessary.
+    #[inline]
+    pub fn text_owned(&self, s: String) -> DocId {
+        let w = if s.is_ascii() {
+            TEXT_WIDTH_NOT_COMPUTED // ASCII is cheap, don't bother
+        } else if s.contains('\n') {
+            TEXT_WIDTH_HAS_NEWLINE
+        } else {
+            visual_width(&s, self.tab_width) as u16
+        };
+        self.alloc(DocNode::Text(DocText::Owned(s, w)))
+    }
+
+    /// Create an empty doc that produces no output.
+    #[inline]
+    pub fn empty(&self) -> DocId {
+        self.alloc(DocNode::Text(DocText::Static("", 0)))
+    }
+
+    /// Create a text doc from a symbol ID (deferred resolution).
+    #[inline]
+    pub fn symbol(&self, id: u32) -> DocId {
+        self.alloc(DocNode::Text(DocText::Symbol(id)))
+    }
+
+    /// Create a normal line break (space if fits, newline if doesn't).
+    #[inline]
+    pub fn line(&self) -> DocId {
+        self.alloc(DocNode::Line(LineKind::Normal))
+    }
+
+    /// Create a soft line that disappears in flat mode.
+    #[inline]
+    pub fn softline(&self) -> DocId {
+        self.alloc(DocNode::Line(LineKind::Soft))
+    }
+
+    /// Create a hard line break (always breaks).
+    #[inline]
+    pub fn hardline(&self) -> DocId {
+        self.alloc(DocNode::Line(LineKind::Hard))
+    }
+
+    /// Create a literal line break (just newline, no indentation).
+    #[inline]
+    pub fn literalline(&self) -> DocId {
+        self.alloc(DocNode::Line(LineKind::Literal))
+    }
+
+    //
+    // Structural builders
+    //
+
+    /// Create a group (try to fit on one line, break all if doesn't fit).
+    pub fn group(&self, doc: DocId) -> DocId {
+        self.alloc(DocNode::Group {
+            contents: doc,
+            expanded_states: ChildRange::EMPTY,
+            id: None,
+            should_break: false,
+        })
+    }
+
+    /// Create a group that forces break mode during rendering.
+    pub fn group_break(&self, doc: DocId) -> DocId {
+        self.alloc(DocNode::Group {
+            contents: doc,
+            expanded_states: ChildRange::EMPTY,
+            id: None,
+            should_break: true,
+        })
+    }
+
+    /// Create a group with an ID for tracking whether it broke.
+    pub fn group_with_id(&self, doc: DocId, id: GroupId) -> DocId {
+        self.alloc(DocNode::Group {
+            contents: doc,
+            expanded_states: ChildRange::EMPTY,
+            id: Some(id),
+            should_break: false,
+        })
+    }
+
+    /// Create a conditional group that tries multiple alternative layouts.
+    ///
+    /// states[0] is tried first (stored as contents), states[1..] stored in expanded_states.
+    pub fn conditional_group(&self, states: &[DocId]) -> DocId {
+        assert!(
+            !states.is_empty(),
+            "conditional_group requires at least one state"
+        );
+        let first = states[0];
+        let expanded = self.alloc_children(&states[1..]);
+        self.alloc(DocNode::Group {
+            contents: first,
+            expanded_states: expanded,
+            id: None,
+            should_break: false,
+        })
+    }
+
+    /// Increase indentation for nested doc.
+    pub fn indent(&self, doc: DocId) -> DocId {
+        self.alloc(DocNode::Indent(doc))
+    }
+
+    /// Decrease indentation for doc.
+    pub fn dedent(&self, doc: DocId) -> DocId {
+        self.alloc(DocNode::Dedent(doc))
+    }
+
+    /// Set absolute indentation level for doc.
+    pub fn align(&self, n: usize, doc: DocId) -> DocId {
+        self.alloc(DocNode::Align { n, contents: doc })
+    }
+
+    /// Conditional rendering based on parent group breaking.
+    pub fn if_break(&self, break_doc: DocId, flat_doc: DocId) -> DocId {
+        self.alloc(DocNode::IfBreak {
+            break_doc,
+            flat_doc,
+        })
+    }
+
+    /// Conditionally indent based on whether a specific group broke.
+    pub fn indent_if_break(&self, doc: DocId, group_id: GroupId, negate: bool) -> DocId {
+        self.alloc(DocNode::IndentIfBreak {
+            contents: doc,
+            group_id,
+            negate,
+        })
+    }
+
+    /// Concatenate multiple docs into a sequence.
+    pub fn concat(&self, docs: &[DocId]) -> DocId {
+        let range = self.alloc_children(docs);
+        self.alloc(DocNode::Concat(range))
+    }
+
+    /// Create a fill doc for greedy line packing.
+    pub fn fill(&self, parts: &[DocId]) -> DocId {
+        let range = self.alloc_children(parts);
+        self.alloc(DocNode::Fill(range))
+    }
+
+    /// Wrap a doc with rendering context.
+    pub fn with_context(&self, doc: DocId, context: DocContext) -> DocId {
+        self.alloc(DocNode::WithContext { doc, context })
+    }
+
+    /// Wrap a doc with a base indent override.
+    pub fn with_base_indent_override(&self, doc: DocId, base_offset: usize) -> DocId {
+        self.alloc(DocNode::WithContext {
+            doc,
+            context: DocContext {
+                trailing_reserve: 0,
+                base_indent_override: Some(base_offset),
+            },
+        })
+    }
+
+    /// Content to print at the end of the current line.
+    pub fn line_suffix(&self, doc: DocId) -> DocId {
+        self.alloc(DocNode::LineSuffix(doc))
+    }
+
+    /// Force pending LineSuffix content to be flushed.
+    pub fn line_suffix_boundary(&self) -> DocId {
+        self.alloc(DocNode::LineSuffixBoundary)
+    }
+
+    /// Force parent group to break.
+    pub fn break_parent(&self) -> DocId {
+        self.alloc(DocNode::BreakParent)
+    }
+
+    /// Create an isolated group that prevents hardline propagation.
+    pub fn isolated_group(&self, doc: DocId) -> DocId {
+        self.alloc(DocNode::IsolatedGroup { contents: doc })
+    }
+
+    //
+    // Convenience builders
+    //
+
+    /// Build a doc from items with a static string separator between them.
+    pub fn join(&self, docs: impl IntoIterator<Item = DocId>, separator: &'static str) -> DocId {
+        let iter = docs.into_iter();
+        let (lower, _) = iter.size_hint();
+        let mut parts = Vec::with_capacity(lower.saturating_mul(2).saturating_sub(1));
+        for (i, doc) in iter.enumerate() {
+            if i > 0 {
+                parts.push(self.text(separator));
+            }
+            parts.push(doc);
+        }
+        if parts.is_empty() {
+            self.empty()
+        } else {
+            self.concat(&parts)
+        }
+    }
+
+    /// Build a doc from items with a Doc separator between them.
+    ///
+    /// Since DocId is Copy, no cloning needed for the separator.
+    pub fn join_doc(&self, docs: impl IntoIterator<Item = DocId>, separator: DocId) -> DocId {
+        let iter = docs.into_iter();
+        let (lower, _) = iter.size_hint();
+        let mut parts = Vec::with_capacity(lower.saturating_mul(2).saturating_sub(1));
+        for (i, doc) in iter.enumerate() {
+            if i > 0 {
+                parts.push(separator); // Copy, no clone needed!
+            }
+            parts.push(doc);
+        }
+        if parts.is_empty() {
+            self.empty()
+        } else {
+            self.concat(&parts)
+        }
+    }
+
+    /// Join docs with separator, adding trailing separator only when breaking.
+    pub fn join_trailing(&self, docs: impl IntoIterator<Item = DocId>, separator: DocId) -> DocId {
+        let iter = docs.into_iter();
+        let (lower, _) = iter.size_hint();
+        let mut parts = Vec::with_capacity(lower.saturating_mul(2));
+        for (i, doc) in iter.enumerate() {
+            if i > 0 {
+                parts.push(separator);
+            }
+            parts.push(doc);
+        }
+        if parts.is_empty() {
+            return self.empty();
+        }
+        // Add trailing separator only when breaking
+        let trailing = self.extract_trailing_punctuation(separator);
+        let empty = self.text("");
+        parts.push(self.if_break(trailing, empty));
+        self.concat(&parts)
+    }
+
+    /// Extract the punctuation part from a separator for trailing comma.
+    fn extract_trailing_punctuation(&self, separator: DocId) -> DocId {
+        // Extract text info while borrowing, then create node after dropping borrows
+        enum TextInfo {
+            Static(&'static str),
+            Owned(String),
+            Symbol(u32),
+        }
+        let text_info = {
+            let nodes = self.nodes.borrow();
+            match &nodes[separator.index()] {
+                DocNode::Concat(range) => {
+                    let children = self.children.borrow();
+                    let kids = range.resolve(&children);
+                    let mut found = None;
+                    for &kid_id in kids {
+                        if let DocNode::Text(doc_text) = &nodes[kid_id.index()] {
+                            found = Some(match doc_text {
+                                DocText::Static(s, _) => TextInfo::Static(s),
+                                DocText::Owned(s, _) => TextInfo::Owned(s.clone()),
+                                DocText::Symbol(id) => TextInfo::Symbol(*id),
+                            });
+                            break;
+                        }
+                    }
+                    found
+                }
+                DocNode::Text(_) => None, // separator itself is fine
+                _ => None,
+            }
+        };
+        match text_info {
+            Some(TextInfo::Static(s)) => self.text(s),
+            Some(TextInfo::Owned(s)) => self.text_owned(s),
+            Some(TextInfo::Symbol(id)) => self.symbol(id),
+            None => separator,
+        }
+    }
+
+    /// Wrap a doc with open and close delimiters.
+    #[inline]
+    pub fn wrap(&self, open: &'static str, inner: DocId, close: &'static str) -> DocId {
+        self.concat(&[self.text(open), inner, self.text(close)])
+    }
+
+    /// Wrap a doc in parentheses.
+    #[inline]
+    pub fn parens(&self, inner: DocId) -> DocId {
+        self.wrap("(", inner, ")")
+    }
+
+    /// Wrap a doc in parentheses with indent-on-break structure.
+    #[inline]
+    pub fn parens_break(&self, inner: DocId) -> DocId {
+        let sl = self.softline();
+        let content = self.concat(&[sl, inner]);
+        let indented = self.indent(content);
+        let sl2 = self.softline();
+        let close = self.text(")");
+        let open = self.text("(");
+        self.group(self.concat(&[open, indented, sl2, close]))
+    }
+
+    /// Wrap a doc in square brackets.
+    #[inline]
+    pub fn brackets(&self, inner: DocId) -> DocId {
+        self.wrap("[", inner, "]")
+    }
+
+    /// Wrap a doc in curly braces.
+    #[inline]
+    pub fn braces(&self, inner: DocId) -> DocId {
+        self.wrap("{", inner, "}")
+    }
+
+    /// Indent with leading line break.
+    #[inline]
+    pub fn indent_line(&self, inner: DocId) -> DocId {
+        let l = self.line();
+        self.indent(self.concat(&[l, inner]))
+    }
+
+    /// Indent with leading softline.
+    #[inline]
+    pub fn indent_softline(&self, inner: DocId) -> DocId {
+        let sl = self.softline();
+        self.indent(self.concat(&[sl, inner]))
+    }
+
+    /// Comma followed by line break.
+    #[inline]
+    pub fn comma_line(&self) -> DocId {
+        self.concat(&[self.text(","), self.line()])
+    }
+
+    /// Comma followed by hardline.
+    #[inline]
+    pub fn comma_hardline(&self) -> DocId {
+        self.concat(&[self.text(","), self.hardline()])
+    }
+
+    /// Trailing comma (only appears in break mode).
+    #[inline]
+    pub fn trailing_comma(&self) -> DocId {
+        self.if_break(self.text(","), self.text(""))
+    }
+
+    /// Apply N levels of indentation to a doc.
+    #[inline]
+    pub fn apply_indent_levels(&self, inner: DocId, levels: usize) -> DocId {
+        let mut result = inner;
+        for _ in 0..levels {
+            result = self.indent(result);
+        }
+        result
+    }
+
+    //
+    // Tree inspection
+    //
+
+    /// Check if a doc will definitely break (contains hardline or should_break group).
+    pub fn will_break(&self, id: DocId) -> bool {
+        let nodes = self.nodes.borrow();
+        self.will_break_inner(id, &nodes)
+    }
+
+    fn will_break_inner(&self, id: DocId, nodes: &[DocNode]) -> bool {
+        match &nodes[id.index()] {
+            DocNode::Text(_) => false,
+            DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
+            DocNode::Indent(inner) | DocNode::Dedent(inner) => self.will_break_inner(*inner, nodes),
+            DocNode::Align { contents, .. } => self.will_break_inner(*contents, nodes),
+            DocNode::IndentIfBreak { contents, .. } => self.will_break_inner(*contents, nodes),
+            DocNode::Group {
+                contents,
+                should_break,
+                ..
+            } => *should_break || self.will_break_inner(*contents, nodes),
+            DocNode::IfBreak { .. } => false,
+            DocNode::Concat(range) | DocNode::Fill(range) => {
+                let children = self.children.borrow();
+                let kids = range.resolve(&children);
+                kids.iter().any(|&kid| self.will_break_inner(kid, nodes))
+            }
+            DocNode::WithContext { doc, .. } => self.will_break_inner(*doc, nodes),
+            DocNode::IsolatedGroup { .. } => false,
+            DocNode::LineSuffix(_) => false,
+            DocNode::LineSuffixBoundary => false,
+            DocNode::BreakParent => true,
+        }
+    }
+
+    /// Like `will_break`, but also traverses into `IsolatedGroup`.
+    ///
+    /// Use this for doc analysis (e.g., chain expansion decisions) where
+    /// rendering isolation is irrelevant — we need to know if the content
+    /// actually contains forced breaks regardless of group isolation.
+    pub fn will_break_deep(&self, id: DocId) -> bool {
+        let nodes = self.nodes.borrow();
+        self.will_break_deep_inner(id, &nodes)
+    }
+
+    fn will_break_deep_inner(&self, id: DocId, nodes: &[DocNode]) -> bool {
+        match &nodes[id.index()] {
+            DocNode::IsolatedGroup { contents, .. } => self.will_break_deep_inner(*contents, nodes),
+            DocNode::Text(_) => false,
+            DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
+            DocNode::Indent(inner) | DocNode::Dedent(inner) => {
+                self.will_break_deep_inner(*inner, nodes)
+            }
+            DocNode::Align { contents, .. } => self.will_break_deep_inner(*contents, nodes),
+            DocNode::IndentIfBreak { contents, .. } => self.will_break_deep_inner(*contents, nodes),
+            DocNode::Group {
+                contents,
+                should_break,
+                ..
+            } => *should_break || self.will_break_deep_inner(*contents, nodes),
+            DocNode::IfBreak { .. } => false,
+            DocNode::Concat(range) | DocNode::Fill(range) => {
+                let children = self.children.borrow();
+                let kids = range.resolve(&children);
+                kids.iter()
+                    .any(|&kid| self.will_break_deep_inner(kid, nodes))
+            }
+            DocNode::WithContext { doc, .. } => self.will_break_deep_inner(*doc, nodes),
+            DocNode::LineSuffix(_) => false,
+            DocNode::LineSuffixBoundary => false,
+            DocNode::BreakParent => true,
+        }
+    }
+
+    /// Check if a doc has forced breaks (hardlines only, no should_break groups).
+    pub fn has_forced_break(&self, id: DocId) -> bool {
+        let nodes = self.nodes.borrow();
+        self.has_forced_break_inner(id, &nodes)
+    }
+
+    fn has_forced_break_inner(&self, id: DocId, nodes: &[DocNode]) -> bool {
+        match &nodes[id.index()] {
+            DocNode::Text(_) => false,
+            DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
+            DocNode::Indent(inner) | DocNode::Dedent(inner) => {
+                self.has_forced_break_inner(*inner, nodes)
+            }
+            DocNode::Align { contents, .. } => self.has_forced_break_inner(*contents, nodes),
+            DocNode::IndentIfBreak { contents, .. } => {
+                self.has_forced_break_inner(*contents, nodes)
+            }
+            DocNode::Group { contents, .. } => self.has_forced_break_inner(*contents, nodes),
+            DocNode::IfBreak { .. } => false,
+            DocNode::Concat(range) | DocNode::Fill(range) => {
+                let children = self.children.borrow();
+                let kids = range.resolve(&children);
+                kids.iter()
+                    .any(|&kid| self.has_forced_break_inner(kid, nodes))
+            }
+            DocNode::WithContext { doc, .. } => self.has_forced_break_inner(*doc, nodes),
+            DocNode::IsolatedGroup { .. } => false,
+            DocNode::LineSuffix(_) => false,
+            DocNode::LineSuffixBoundary => false,
+            DocNode::BreakParent => true,
+        }
+    }
+
+    /// Check if a doc can break (contains any line elements).
+    pub fn can_break(&self, id: DocId) -> bool {
+        let nodes = self.nodes.borrow();
+        self.can_break_inner(id, &nodes)
+    }
+
+    fn can_break_inner(&self, id: DocId, nodes: &[DocNode]) -> bool {
+        match &nodes[id.index()] {
+            DocNode::Line(_) => true,
+            DocNode::Indent(inner) | DocNode::Dedent(inner) => self.can_break_inner(*inner, nodes),
+            DocNode::Align { contents, .. } => self.can_break_inner(*contents, nodes),
+            DocNode::IndentIfBreak { contents, .. } => self.can_break_inner(*contents, nodes),
+            DocNode::Group {
+                contents,
+                expanded_states,
+                ..
+            } => {
+                if self.can_break_inner(*contents, nodes) {
+                    return true;
+                }
+                if !expanded_states.is_empty() {
+                    let children = self.children.borrow();
+                    let kids = expanded_states.resolve(&children);
+                    if kids.iter().any(|&kid| self.can_break_inner(kid, nodes)) {
+                        return true;
+                    }
+                }
+                false
+            }
+            DocNode::IfBreak {
+                break_doc,
+                flat_doc,
+            } => self.can_break_inner(*break_doc, nodes) || self.can_break_inner(*flat_doc, nodes),
+            DocNode::Concat(range) | DocNode::Fill(range) => {
+                let children = self.children.borrow();
+                let kids = range.resolve(&children);
+                kids.iter().any(|&kid| self.can_break_inner(kid, nodes))
+            }
+            DocNode::WithContext { doc, .. } => self.can_break_inner(*doc, nodes),
+            DocNode::IsolatedGroup { contents, .. } => self.can_break_inner(*contents, nodes),
+            DocNode::LineSuffix(inner) => self.can_break_inner(*inner, nodes),
+            DocNode::Text(_) | DocNode::LineSuffixBoundary => false,
+            DocNode::BreakParent => true,
+        }
+    }
+
+    /// Remove all line breaks from a doc, forcing it to stay on a single line.
+    /// Creates new nodes; old nodes remain in the arena (they're just unused).
+    pub fn remove_lines(&self, id: DocId) -> DocId {
+        // Extract node info while borrowing, then release borrow before allocating.
+        // This pattern avoids RefCell conflicts since alloc() needs borrow_mut().
+        enum Info {
+            Keep, // Return id unchanged
+            Line(LineKind),
+            Indent(DocId),
+            Dedent(DocId),
+            Align(usize, DocId),
+            Group {
+                contents: DocId,
+                expanded_states: ChildRange,
+                id: Option<GroupId>,
+                should_break: bool,
+            },
+            IsolatedGroup(DocId),
+            IfBreakFlat(DocId),
+            IndentIfBreakContents(DocId),
+            Concat(Vec<DocId>),
+            Fill(Vec<DocId>),
+            WithContext(DocId, DocContext),
+            LineSuffix(DocId),
+            BreakParent,
+        }
+
+        let info = {
+            let nodes = self.nodes.borrow();
+            match &nodes[id.index()] {
+                DocNode::Text(_) | DocNode::LineSuffixBoundary => Info::Keep,
+                DocNode::Line(kind) => Info::Line(*kind),
+                DocNode::Indent(inner) => Info::Indent(*inner),
+                DocNode::Dedent(inner) => Info::Dedent(*inner),
+                DocNode::Align { n, contents } => Info::Align(*n, *contents),
+                DocNode::Group {
+                    contents,
+                    expanded_states,
+                    id: group_id,
+                    should_break,
+                } => Info::Group {
+                    contents: *contents,
+                    expanded_states: *expanded_states,
+                    id: *group_id,
+                    should_break: *should_break,
+                },
+                DocNode::IsolatedGroup { contents } => Info::IsolatedGroup(*contents),
+                DocNode::IfBreak { flat_doc, .. } => Info::IfBreakFlat(*flat_doc),
+                DocNode::IndentIfBreak { contents, .. } => Info::IndentIfBreakContents(*contents),
+                DocNode::Concat(range) => {
+                    let children = self.children.borrow();
+                    Info::Concat(range.resolve(&children).to_vec())
+                }
+                DocNode::Fill(range) => {
+                    let children = self.children.borrow();
+                    Info::Fill(range.resolve(&children).to_vec())
+                }
+                DocNode::WithContext { doc, context } => Info::WithContext(*doc, context.clone()),
+                DocNode::LineSuffix(inner) => Info::LineSuffix(*inner),
+                DocNode::BreakParent => Info::BreakParent,
+            }
+        }; // nodes borrow dropped here
+
+        match info {
+            Info::Keep => id,
+            Info::Line(kind) => match kind {
+                LineKind::Normal => self.text(" "),
+                LineKind::Soft | LineKind::Hard | LineKind::Literal => self.empty(),
+            },
+            Info::Indent(inner) => {
+                let new_inner = self.remove_lines(inner);
+                self.indent(new_inner)
+            }
+            Info::Dedent(inner) => {
+                let new_inner = self.remove_lines(inner);
+                self.dedent(new_inner)
+            }
+            Info::Align(n, contents) => {
+                let new_contents = self.remove_lines(contents);
+                self.align(n, new_contents)
+            }
+            Info::Group {
+                contents,
+                expanded_states,
+                id: group_id,
+                should_break,
+            } => {
+                let flat_contents = self.remove_lines(contents);
+                if should_break {
+                    self.alloc(DocNode::Group {
+                        contents: flat_contents,
+                        expanded_states, // Keep as-is
+                        id: group_id,
+                        should_break,
+                    })
+                } else {
+                    let flat_states = if expanded_states.is_empty() {
+                        ChildRange::EMPTY
+                    } else {
+                        let kids = {
+                            let children = self.children.borrow();
+                            expanded_states.resolve(&children).to_vec()
+                        };
+                        let new_kids: Vec<DocId> =
+                            kids.into_iter().map(|kid| self.remove_lines(kid)).collect();
+                        self.alloc_children(&new_kids)
+                    };
+                    self.alloc(DocNode::Group {
+                        contents: flat_contents,
+                        expanded_states: flat_states,
+                        id: group_id,
+                        should_break,
+                    })
+                }
+            }
+            Info::IsolatedGroup(contents) => {
+                let new_contents = self.remove_lines(contents);
+                self.isolated_group(new_contents)
+            }
+            Info::IfBreakFlat(flat_doc) => self.remove_lines(flat_doc),
+            Info::IndentIfBreakContents(contents) => self.remove_lines(contents),
+            Info::Concat(kids) => {
+                let flattened: Vec<DocId> =
+                    kids.into_iter().map(|kid| self.remove_lines(kid)).collect();
+                self.concat(&flattened)
+            }
+            Info::Fill(kids) => {
+                // Fill becomes regular concat when flattened
+                let flattened: Vec<DocId> =
+                    kids.into_iter().map(|kid| self.remove_lines(kid)).collect();
+                self.concat(&flattened)
+            }
+            Info::WithContext(doc, context) => {
+                let new_doc = self.remove_lines(doc);
+                self.with_context(new_doc, context)
+            }
+            Info::LineSuffix(inner) => {
+                let new_inner = self.remove_lines(inner);
+                self.line_suffix(new_inner)
+            }
+            Info::BreakParent => self.empty(),
+        }
+    }
+
+    //
+    // Node access (for rendering)
+    //
+
+    /// Get a reference to the node at the given DocId.
+    ///
+    /// For tight loops during rendering, prefer borrowing the full nodes vec
+    /// once with `borrow_nodes()`.
+    #[inline]
+    pub fn get(&self, id: DocId) -> std::cell::Ref<'_, DocNode> {
+        std::cell::Ref::map(self.nodes.borrow(), |nodes| &nodes[id.index()])
+    }
+
+    /// If this DocId points to a Group node, return its contents (unwrapping the group).
+    /// Otherwise return the DocId unchanged.
+    #[inline]
+    pub fn unwrap_group(&self, id: DocId) -> DocId {
+        let nodes = self.nodes.borrow();
+        match &nodes[id.index()] {
+            DocNode::Group { contents, .. } => *contents,
+            _ => id,
+        }
+    }
+
+    /// Borrow the full nodes vec for rendering.
+    #[inline]
+    pub fn borrow_nodes(&self) -> std::cell::Ref<'_, Vec<DocNode>> {
+        self.nodes.borrow()
+    }
+
+    /// Borrow the full children vec for rendering.
+    #[inline]
+    pub fn borrow_children(&self) -> std::cell::Ref<'_, Vec<DocId>> {
+        self.children.borrow()
+    }
+
+    /// Estimate output buffer capacity (bytes) for the rendered string.
+    ///
+    /// Doc trees average ~4 nodes per source byte (see [`with_source_size_hint`]),
+    /// and Prettier-conforming output is within ±10% of source. So output bytes
+    /// ≈ `nodes.len() / 4`. Used to pre-size the render `String` buffer and avoid
+    /// the geometric `realloc` chain that starts from a small default capacity.
+    ///
+    /// Floor: 256 bytes (matches the old hardcoded default for tiny inputs).
+    /// Ceiling: 1 MB (guards against accidental huge initial allocations).
+    ///
+    /// [`with_source_size_hint`]: Self::with_source_size_hint
+    #[inline]
+    pub fn estimated_output_capacity(&self) -> usize {
+        (self.nodes.borrow().len() / 4).clamp(256, 1 << 20)
+    }
+}
+
+impl Default for DocArena {
+    fn default() -> Self {
+        Self::new(crate::TAB_WIDTH)
+    }
+}

@@ -1,0 +1,219 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 755,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 14,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 14,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "root",
+											"args": null,
+											"start": 9,
+											"end": 14
+										}
+									],
+									"start": 9,
+									"end": 14
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 15,
+					"end": 93,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 19,
+							"end": 35,
+							"property": "--prop1",
+							"value": "#007bff"
+						},
+						{
+							"type": "Declaration",
+							"start": 39,
+							"end": 55,
+							"property": "--prop2",
+							"value": "#6c757d"
+						},
+						{
+							"type": "Declaration",
+							"start": 59,
+							"end": 72,
+							"property": "--prop3",
+							"value": "16px"
+						},
+						{
+							"type": "Declaration",
+							"start": 76,
+							"end": 89,
+							"property": "--prop4",
+							"value": "14px"
+						}
+					]
+				},
+				"start": 9,
+				"end": 93
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 96,
+					"end": 103,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 96,
+							"end": 103,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 96,
+											"end": 103
+										}
+									],
+									"start": 96,
+									"end": 103
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 104,
+					"end": 746,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 135,
+							"end": 155,
+							"property": "color",
+							"value": "var(--color1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 159,
+							"end": 181,
+							"property": "background",
+							"value": "var(--bg1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 185,
+							"end": 208,
+							"property": "font-size",
+							"value": "var(--size1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 241,
+							"end": 266,
+							"property": "color",
+							"value": "var(--color2, red)"
+						},
+						{
+							"type": "Declaration",
+							"start": 270,
+							"end": 301,
+							"property": "background",
+							"value": "var(--bg2, #ffffff)"
+						},
+						{
+							"type": "Declaration",
+							"start": 305,
+							"end": 334,
+							"property": "margin",
+							"value": "var(--spacing1, 10px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 375,
+							"end": 416,
+							"property": "color",
+							"value": "var(--color3, var(--color4, blue))"
+						},
+						{
+							"type": "Declaration",
+							"start": 420,
+							"end": 467,
+							"property": "padding",
+							"value": "var(--spacing2, var(--spacing3, 1rem))"
+						},
+						{
+							"type": "Declaration",
+							"start": 508,
+							"end": 565,
+							"property": "margin",
+							"value": "var(--top) var(--right) var(--bottom) var(--left)"
+						},
+						{
+							"type": "Declaration",
+							"start": 569,
+							"end": 623,
+							"property": "box-shadow",
+							"value": "var(--x) var(--y) var(--blur) var(--color)"
+						},
+						{
+							"type": "Declaration",
+							"start": 665,
+							"end": 704,
+							"property": "width",
+							"value": "var(--width1, calc(100% - 2rem))"
+						},
+						{
+							"type": "Declaration",
+							"start": 708,
+							"end": 742,
+							"property": "color",
+							"value": "var(--color5, rgb(255 0 0))"
+						}
+					]
+				},
+				"start": 96,
+				"end": 746
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 747,
+			"styles": "\n\t:root {\n\t\t--prop1: #007bff;\n\t\t--prop2: #6c757d;\n\t\t--prop3: 16px;\n\t\t--prop4: 14px;\n\t}\n\n\t.class1 {\n\t\t/* Simple var() usage */\n\t\tcolor: var(--color1);\n\t\tbackground: var(--bg1);\n\t\tfont-size: var(--size1);\n\n\t\t/* var() with fallback */\n\t\tcolor: var(--color2, red);\n\t\tbackground: var(--bg2, #ffffff);\n\t\tmargin: var(--spacing1, 10px);\n\n\t\t/* Nested fallbacks (2 levels) */\n\t\tcolor: var(--color3, var(--color4, blue));\n\t\tpadding: var(--spacing2, var(--spacing3, 1rem));\n\n\t\t/* Multiple var() in one value */\n\t\tmargin: var(--top) var(--right) var(--bottom) var(--left);\n\t\tbox-shadow: var(--x) var(--y) var(--blur) var(--color);\n\n\t\t/* var() with complex fallbacks */\n\t\twidth: var(--width1, calc(100% - 2rem));\n\t\tcolor: var(--color5, rgb(255 0 0));\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 756,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

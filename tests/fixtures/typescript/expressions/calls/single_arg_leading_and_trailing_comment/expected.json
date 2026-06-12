@@ -1,0 +1,491 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 170,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " lead",
+			"start": 16,
+			"end": 23,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trail",
+			"start": 31,
+			"end": 39,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " lead",
+			"start": 52,
+			"end": 59,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " trail ",
+			"start": 67,
+			"end": 78,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 2
+				},
+				"end": {
+					"line": 11,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " lead ",
+			"start": 91,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trail",
+			"start": 107,
+			"end": 115,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " lead ",
+			"start": 128,
+			"end": 138,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 2
+				},
+				"end": {
+					"line": 20,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " trail ",
+			"start": 144,
+			"end": 155,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 13
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 169,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 160,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 10,
+					"end": 43,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 10,
+						"end": 42,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 10,
+							"end": 12,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 1
+								},
+								"end": {
+									"line": 2,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 26,
+								"end": 27,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 3
+									}
+								},
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " lead",
+										"start": 16,
+										"end": 23
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 46,
+					"end": 82,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 46,
+						"end": 81,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 12,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 46,
+							"end": 48,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 1
+								},
+								"end": {
+									"line": 8,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 62,
+								"end": 63,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 3
+									}
+								},
+								"name": "b",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " lead",
+										"start": 52,
+										"end": 59
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " trail",
+							"start": 31,
+							"end": 39
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 85,
+					"end": 119,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 85,
+						"end": 118,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 17,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 85,
+							"end": 87,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 1
+								},
+								"end": {
+									"line": 14,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 102,
+								"end": 103,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 13
+									},
+									"end": {
+										"line": 15,
+										"column": 14
+									}
+								},
+								"name": "c",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " lead ",
+										"start": 91,
+										"end": 101
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " trail ",
+							"start": 67,
+							"end": 78
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 122,
+					"end": 159,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 122,
+						"end": 158,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 1
+							},
+							"end": {
+								"line": 22,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 122,
+							"end": 124,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 1
+								},
+								"end": {
+									"line": 19,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 139,
+								"end": 140,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 13
+									},
+									"end": {
+										"line": 20,
+										"column": 14
+									}
+								},
+								"name": "d",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " lead ",
+										"start": 128,
+										"end": 138
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " trail",
+							"start": 107,
+							"end": 115
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " trail ",
+							"start": 144,
+							"end": 155
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

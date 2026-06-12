@@ -1,0 +1,1 @@
+  text  <span>inline</span> 

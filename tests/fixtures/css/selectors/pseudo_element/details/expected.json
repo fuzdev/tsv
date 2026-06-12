@@ -1,0 +1,298 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 444,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 40,
+					"end": 64,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 40,
+							"end": 64,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "details",
+											"start": 40,
+											"end": 47
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "details-content",
+											"start": 47,
+											"end": 64
+										}
+									],
+									"start": 40,
+									"end": 64
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 65,
+					"end": 86,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 69,
+							"end": 82,
+							"property": "padding",
+							"value": "1rem"
+						}
+					]
+				},
+				"start": 40,
+				"end": 86
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 118,
+					"end": 139,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 118,
+							"end": 139,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "multi-column",
+											"start": 118,
+											"end": 131
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "column",
+											"start": 131,
+											"end": 139
+										}
+									],
+									"start": 118,
+									"end": 139
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 140,
+					"end": 169,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 144,
+							"end": 165,
+							"property": "background",
+							"value": "lightgray"
+						}
+					]
+				},
+				"start": 118,
+				"end": 169
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 207,
+					"end": 231,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 207,
+							"end": 231,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "details",
+											"start": 207,
+											"end": 214
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "details-content",
+											"start": 214,
+											"end": 231
+										}
+									],
+									"start": 207,
+									"end": 231
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 232,
+					"end": 254,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 236,
+							"end": 250,
+							"property": "margin",
+							"value": "0.5rem"
+						}
+					]
+				},
+				"start": 207,
+				"end": 254
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 282,
+					"end": 311,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 282,
+							"end": 311,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "details",
+											"start": 282,
+											"end": 289
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "open",
+											"args": null,
+											"start": 289,
+											"end": 294
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "details-content",
+											"start": 294,
+											"end": 311
+										}
+									],
+									"start": 282,
+									"end": 311
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 312,
+					"end": 346,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 316,
+							"end": 342,
+							"property": "animation",
+							"value": "slide-down 0.3s"
+						}
+					]
+				},
+				"start": 282,
+				"end": 346
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 383,
+					"end": 398,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 383,
+							"end": 398,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 383,
+											"end": 390
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "column",
+											"start": 390,
+											"end": 398
+										}
+									],
+									"start": 383,
+									"end": 398
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 399,
+					"end": 435,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 403,
+							"end": 431,
+							"property": "border-right",
+							"value": "1px solid gray"
+						}
+					]
+				},
+				"start": 383,
+				"end": 435
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 436,
+			"styles": "\n\t/* Details content styling */\n\tdetails::details-content {\n\t\tpadding: 1rem;\n\t}\n\n\t/* Column pseudo-element */\n\t.multi-column::column {\n\t\tbackground: lightgray;\n\t}\n\n\t/* Combined with type selector */\n\tdetails::details-content {\n\t\tmargin: 0.5rem;\n\t}\n\n\t/* With pseudo-class */\n\tdetails:open::details-content {\n\t\tanimation: slide-down 0.3s;\n\t}\n\n\t/* Column with class selector */\n\t.class1::column {\n\t\tborder-right: 1px solid gray;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 445,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

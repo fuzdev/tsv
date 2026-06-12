@@ -1,0 +1,182 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 42,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "ExpressionTag",
+				"start": 0,
+				"end": 5,
+				"expression": {
+					"type": "Literal",
+					"start": 1,
+					"end": 4,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 1
+						},
+						"end": {
+							"line": 1,
+							"column": 4
+						}
+					},
+					"value": "<",
+					"raw": "'<'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 5,
+				"end": 9,
+				"raw": "code",
+				"data": "code"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 9,
+				"end": 14,
+				"expression": {
+					"type": "Literal",
+					"start": 10,
+					"end": 13,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 10
+						},
+						"end": {
+							"line": 1,
+							"column": 13
+						}
+					},
+					"value": ">",
+					"raw": "'>'"
+				}
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 14,
+				"end": 25,
+				"expression": {
+					"type": "BinaryExpression",
+					"start": 15,
+					"end": 24,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 15
+						},
+						"end": {
+							"line": 1,
+							"column": 24
+						}
+					},
+					"left": {
+						"type": "Literal",
+						"start": 15,
+						"end": 18,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 15
+							},
+							"end": {
+								"line": 1,
+								"column": 18
+							}
+						},
+						"value": "<",
+						"raw": "'<'"
+					},
+					"operator": "+",
+					"right": {
+						"type": "Literal",
+						"start": 21,
+						"end": 24,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 21
+							},
+							"end": {
+								"line": 1,
+								"column": 24
+							}
+						},
+						"value": ">",
+						"raw": "'>'"
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 25,
+				"end": 30,
+				"raw": "/code",
+				"data": "/code"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 30,
+				"end": 41,
+				"expression": {
+					"type": "BinaryExpression",
+					"start": 31,
+					"end": 40,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 31
+						},
+						"end": {
+							"line": 1,
+							"column": 40
+						}
+					},
+					"left": {
+						"type": "Literal",
+						"start": 31,
+						"end": 34,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 31
+							},
+							"end": {
+								"line": 1,
+								"column": 34
+							}
+						},
+						"value": ">",
+						"raw": "'>'"
+					},
+					"operator": "+",
+					"right": {
+						"type": "Literal",
+						"start": 37,
+						"end": 40,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 37
+							},
+							"end": {
+								"line": 1,
+								"column": 40
+							}
+						},
+						"value": ">",
+						"raw": "'>'"
+					}
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

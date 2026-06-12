@@ -1,0 +1,803 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 472,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " line comment trailing a namespace body `{` - single statement",
+			"start": 20,
+			"end": 84,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 101,
+			"end": 106,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 16
+				},
+				"end": {
+					"line": 3,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment trailing a namespace body `{` - multiple statements",
+			"start": 127,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 211,
+			"end": 216,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 16
+				},
+				"end": {
+					"line": 8,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment trailing the body `{`, then own-line leading comment",
+			"start": 252,
+			"end": 321,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " brace ",
+			"start": 338,
+			"end": 349,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 16
+				},
+				"end": {
+					"line": 14,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " lead",
+			"start": 352,
+			"end": 359,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment trailing a `module` body `{`",
+			"start": 380,
+			"end": 424,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 438,
+			"end": 443,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 13
+				},
+				"end": {
+					"line": 20,
+					"column": 18
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 471,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 462,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSModuleDeclaration",
+					"start": 86,
+					"end": 124,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 96,
+						"end": 98,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 11
+							},
+							"end": {
+								"line": 3,
+								"column": 13
+							}
+						},
+						"name": "N1"
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 99,
+						"end": 124,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 14
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "VariableDeclaration",
+								"start": 109,
+								"end": 121,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 14
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 115,
+										"end": 120,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 8
+											},
+											"end": {
+												"line": 4,
+												"column": 13
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 115,
+											"end": 116,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 8
+												},
+												"end": {
+													"line": 4,
+													"column": 9
+												}
+											},
+											"name": "a"
+										},
+										"init": {
+											"type": "Literal",
+											"start": 119,
+											"end": 120,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 12
+												},
+												"end": {
+													"line": 4,
+													"column": 13
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										}
+									}
+								],
+								"kind": "const",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 101,
+										"end": 106
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment trailing a namespace body `{` - single statement",
+							"start": 20,
+							"end": 84
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 196,
+					"end": 249,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 206,
+						"end": 208,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 11
+							},
+							"end": {
+								"line": 8,
+								"column": 13
+							}
+						},
+						"name": "N2"
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 209,
+						"end": 249,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 14
+							},
+							"end": {
+								"line": 11,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "VariableDeclaration",
+								"start": 219,
+								"end": 231,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 14
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 225,
+										"end": 230,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 8
+											},
+											"end": {
+												"line": 9,
+												"column": 13
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 225,
+											"end": 226,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 8
+												},
+												"end": {
+													"line": 9,
+													"column": 9
+												}
+											},
+											"name": "b"
+										},
+										"init": {
+											"type": "Literal",
+											"start": 229,
+											"end": 230,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 12
+												},
+												"end": {
+													"line": 9,
+													"column": 13
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										}
+									}
+								],
+								"kind": "const",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 211,
+										"end": 216
+									}
+								]
+							},
+							{
+								"type": "VariableDeclaration",
+								"start": 234,
+								"end": 246,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 14
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 240,
+										"end": 245,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 8
+											},
+											"end": {
+												"line": 10,
+												"column": 13
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 240,
+											"end": 241,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 8
+												},
+												"end": {
+													"line": 10,
+													"column": 9
+												}
+											},
+											"name": "c"
+										},
+										"init": {
+											"type": "Literal",
+											"start": 244,
+											"end": 245,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 12
+												},
+												"end": {
+													"line": 10,
+													"column": 13
+												}
+											},
+											"value": 3,
+											"raw": "3"
+										}
+									}
+								],
+								"kind": "const"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment trailing a namespace body `{` - multiple statements",
+							"start": 127,
+							"end": 194
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 323,
+					"end": 377,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 333,
+						"end": 335,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 11
+							},
+							"end": {
+								"line": 14,
+								"column": 13
+							}
+						},
+						"name": "N3"
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 336,
+						"end": 377,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 14
+							},
+							"end": {
+								"line": 17,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "VariableDeclaration",
+								"start": 362,
+								"end": 374,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 14
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 368,
+										"end": 373,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 8
+											},
+											"end": {
+												"line": 16,
+												"column": 13
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 368,
+											"end": 369,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 8
+												},
+												"end": {
+													"line": 16,
+													"column": 9
+												}
+											},
+											"name": "d"
+										},
+										"init": {
+											"type": "Literal",
+											"start": 372,
+											"end": 373,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 12
+												},
+												"end": {
+													"line": 16,
+													"column": 13
+												}
+											},
+											"value": 4,
+											"raw": "4"
+										}
+									}
+								],
+								"kind": "const",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " brace ",
+										"start": 338,
+										"end": 349
+									},
+									{
+										"type": "Line",
+										"value": " lead",
+										"start": 352,
+										"end": 359
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment trailing the body `{`, then own-line leading comment",
+							"start": 252,
+							"end": 321
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 426,
+					"end": 461,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 433,
+						"end": 435,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 8
+							},
+							"end": {
+								"line": 20,
+								"column": 10
+							}
+						},
+						"name": "M1"
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 436,
+						"end": 461,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 11
+							},
+							"end": {
+								"line": 22,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "VariableDeclaration",
+								"start": 446,
+								"end": 458,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 2
+									},
+									"end": {
+										"line": 21,
+										"column": 14
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 452,
+										"end": 457,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 8
+											},
+											"end": {
+												"line": 21,
+												"column": 13
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 452,
+											"end": 453,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 8
+												},
+												"end": {
+													"line": 21,
+													"column": 9
+												}
+											},
+											"name": "e"
+										},
+										"init": {
+											"type": "Literal",
+											"start": 456,
+											"end": 457,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 12
+												},
+												"end": {
+													"line": 21,
+													"column": 13
+												}
+											},
+											"value": 5,
+											"raw": "5"
+										}
+									}
+								],
+								"kind": "const",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c3",
+										"start": 438,
+										"end": 443
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment trailing a `module` body `{`",
+							"start": 380,
+							"end": 424
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

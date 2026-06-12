@@ -1,0 +1,136 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 82,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 29,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 29,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class",
+											"start": 9,
+											"end": 15
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "before",
+											"start": 15,
+											"end": 23
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "hover",
+											"args": null,
+											"start": 23,
+											"end": 29
+										}
+									],
+									"start": 9,
+									"end": 29
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 30,
+					"end": 34,
+					"children": []
+				},
+				"start": 9,
+				"end": 34
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 36,
+					"end": 68,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 36,
+							"end": 68,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class",
+											"start": 36,
+											"end": 42
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "slotted",
+											"start": 42,
+											"end": 51
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "hover",
+											"args": null,
+											"start": 54,
+											"end": 60
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "before",
+											"start": 60,
+											"end": 68
+										}
+									],
+									"start": 36,
+									"end": 68
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 69,
+					"end": 73,
+					"children": []
+				},
+				"start": 36,
+				"end": 73
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 74,
+			"styles": "\n\t.class::before:hover {\n\t}\n\t.class::slotted(*):hover::before {\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 83,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

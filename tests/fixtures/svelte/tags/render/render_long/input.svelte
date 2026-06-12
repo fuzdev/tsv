@@ -1,0 +1,21 @@
+<!-- 100 chars - stays inline -->
+{@render fn00000000000000(arg0000000000, arg1111111111, arg2222222222, arg3333333333, arg444444444)}
+
+<!-- 101 chars - wraps arguments -->
+{@render fn00000000000000(
+	arg0000000000,
+	arg1111111111,
+	arg2222222222,
+	arg3333333333,
+	arg4444444444,
+)}
+
+<!-- Very long - wraps arguments -->
+{@render fn00000000000000(
+	arg0000000000,
+	arg1111111111,
+	arg2222222222,
+	arg3333333333,
+	arg4444444444,
+	arg5555555555,
+)}

@@ -1,0 +1,274 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 87,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " trailing comment",
+			"start": 44,
+			"end": 63,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 3
+				},
+				"end": {
+					"line": 6,
+					"column": 22
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 86,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 77,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 10,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 10,
+					"end": 76,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "AssignmentExpression",
+						"start": 18,
+						"end": 23,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 2
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 18,
+							"end": 19,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 2
+								},
+								"end": {
+									"line": 3,
+									"column": 3
+								}
+							},
+							"name": "i"
+						},
+						"right": {
+							"type": "Literal",
+							"start": 22,
+							"end": 23,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 6
+								},
+								"end": {
+									"line": 3,
+									"column": 7
+								}
+							},
+							"value": 0,
+							"raw": "0"
+						}
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 27,
+						"end": 33,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 2
+							},
+							"end": {
+								"line": 4,
+								"column": 8
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 27,
+							"end": 28,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 2
+								},
+								"end": {
+									"line": 4,
+									"column": 3
+								}
+							},
+							"name": "i"
+						},
+						"operator": "<",
+						"right": {
+							"type": "Literal",
+							"start": 31,
+							"end": 33,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 6
+								},
+								"end": {
+									"line": 4,
+									"column": 8
+								}
+							},
+							"value": 10,
+							"raw": "10"
+						}
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 37,
+						"end": 40,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 2
+							},
+							"end": {
+								"line": 5,
+								"column": 5
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 37,
+							"end": 38,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 2
+								},
+								"end": {
+									"line": 5,
+									"column": 3
+								}
+							},
+							"name": "i"
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 65,
+						"end": 76,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 69,
+								"end": 73,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 69,
+									"end": 72,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 69,
+										"end": 70,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 2
+											},
+											"end": {
+												"line": 8,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " trailing comment",
+								"start": 44,
+								"end": 63
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

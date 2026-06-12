@@ -1,0 +1,150 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 836,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 16,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 16,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 9,
+											"end": 16
+										}
+									],
+									"start": 9,
+									"end": 16
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 17,
+					"end": 827,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 45,
+							"end": 73,
+							"property": "width",
+							"value": "calc(var(--var1) * 2)"
+						},
+						{
+							"type": "Declaration",
+							"start": 77,
+							"end": 113,
+							"property": "height",
+							"value": "calc(var(--var1) * 2 + 10px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 117,
+							"end": 148,
+							"property": "margin",
+							"value": "calc(var(--var2) - 5px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 152,
+							"end": 192,
+							"property": "padding",
+							"value": "calc(var(--var3) + var(--var4))"
+						},
+						{
+							"type": "Declaration",
+							"start": 230,
+							"end": 268,
+							"property": "color",
+							"value": "rgb(var(--r) var(--g) var(--b))"
+						},
+						{
+							"type": "Declaration",
+							"start": 272,
+							"end": 331,
+							"property": "background",
+							"value": "rgba(var(--r) var(--g) var(--b) / var(--alpha))"
+						},
+						{
+							"type": "Declaration",
+							"start": 335,
+							"end": 380,
+							"property": "border-color",
+							"value": "hsl(var(--h) var(--s) var(--l))"
+						},
+						{
+							"type": "Declaration",
+							"start": 437,
+							"end": 471,
+							"property": "width",
+							"value": "calc(var(--w, 100%) - 2rem)"
+						},
+						{
+							"type": "Declaration",
+							"start": 475,
+							"end": 529,
+							"property": "margin",
+							"value": "calc(var(--var1, 1rem) * 2 + var(--var5, 0px))"
+						},
+						{
+							"type": "Declaration",
+							"start": 562,
+							"end": 649,
+							"property": "box-shadow",
+							"value": "var(--x, 0) var(--y, 2px) var(--blur, 4px) var(--color, rgba(0, 0, 0, 0.1))"
+						},
+						{
+							"type": "Declaration",
+							"start": 653,
+							"end": 722,
+							"property": "transform",
+							"value": "translate(var(--tx), var(--ty)) rotate(var(--angle, 0deg))"
+						},
+						{
+							"type": "Declaration",
+							"start": 754,
+							"end": 823,
+							"property": "background",
+							"value": "linear-gradient(var(--dir, to right), var(--a), var(--b))"
+						}
+					]
+				},
+				"start": 9,
+				"end": 827
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 828,
+			"styles": "\n\t.class1 {\n\t\t/* var() in calc() */\n\t\twidth: calc(var(--var1) * 2);\n\t\theight: calc(var(--var1) * 2 + 10px);\n\t\tmargin: calc(var(--var2) - 5px);\n\t\tpadding: calc(var(--var3) + var(--var4));\n\n\t\t/* var() in color functions */\n\t\tcolor: rgb(var(--r) var(--g) var(--b));\n\t\tbackground: rgba(var(--r) var(--g) var(--b) / var(--alpha));\n\t\tborder-color: hsl(var(--h) var(--s) var(--l));\n\n\t\t/* var() in functions with fallbacks in calc() */\n\t\twidth: calc(var(--w, 100%) - 2rem);\n\t\tmargin: calc(var(--var1, 1rem) * 2 + var(--var5, 0px));\n\n\t\t/* Complex composition */\n\t\tbox-shadow: var(--x, 0) var(--y, 2px) var(--blur, 4px) var(--color, rgba(0, 0, 0, 0.1));\n\t\ttransform: translate(var(--tx), var(--ty)) rotate(var(--angle, 0deg));\n\n\t\t/* var() in gradients */\n\t\tbackground: linear-gradient(var(--dir, to right), var(--a), var(--b));\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 837,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

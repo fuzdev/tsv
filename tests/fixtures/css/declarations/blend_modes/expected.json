@@ -1,0 +1,122 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 247,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 238,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 39,
+							"property": "mix-blend-mode",
+							"value": "normal"
+						},
+						{
+							"type": "Declaration",
+							"start": 43,
+							"end": 67,
+							"property": "mix-blend-mode",
+							"value": "multiply"
+						},
+						{
+							"type": "Declaration",
+							"start": 71,
+							"end": 93,
+							"property": "mix-blend-mode",
+							"value": "screen"
+						},
+						{
+							"type": "Declaration",
+							"start": 97,
+							"end": 120,
+							"property": "mix-blend-mode",
+							"value": "overlay"
+						},
+						{
+							"type": "Declaration",
+							"start": 124,
+							"end": 146,
+							"property": "mix-blend-mode",
+							"value": "darken"
+						},
+						{
+							"type": "Declaration",
+							"start": 150,
+							"end": 173,
+							"property": "mix-blend-mode",
+							"value": "lighten"
+						},
+						{
+							"type": "Declaration",
+							"start": 177,
+							"end": 204,
+							"property": "mix-blend-mode",
+							"value": "color-dodge"
+						},
+						{
+							"type": "Declaration",
+							"start": 208,
+							"end": 234,
+							"property": "mix-blend-mode",
+							"value": "difference"
+						}
+					]
+				},
+				"start": 9,
+				"end": 238
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 239,
+			"styles": "\n\tdiv {\n\t\tmix-blend-mode: normal;\n\t\tmix-blend-mode: multiply;\n\t\tmix-blend-mode: screen;\n\t\tmix-blend-mode: overlay;\n\t\tmix-blend-mode: darken;\n\t\tmix-blend-mode: lighten;\n\t\tmix-blend-mode: color-dodge;\n\t\tmix-blend-mode: difference;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 248,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

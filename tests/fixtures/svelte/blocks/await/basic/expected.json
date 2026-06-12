@@ -1,0 +1,89 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 43,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "AwaitBlock",
+				"start": 0,
+				"end": 42,
+				"expression": {
+					"type": "Identifier",
+					"start": 8,
+					"end": 15,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 8
+						},
+						"end": {
+							"line": 1,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": null,
+				"error": null,
+				"pending": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 16,
+							"end": 18,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 18,
+							"end": 33,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 19
+								},
+								"end": {
+									"line": 2,
+									"column": 5,
+									"character": 22
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 23,
+										"end": 27,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 33,
+							"end": 34,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"then": null,
+				"catch": null
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

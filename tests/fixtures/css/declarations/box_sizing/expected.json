@@ -1,0 +1,94 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 141,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 132,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 39,
+							"property": "box-sizing",
+							"value": "border-box"
+						},
+						{
+							"type": "Declaration",
+							"start": 43,
+							"end": 66,
+							"property": "box-sizing",
+							"value": "content-box"
+						},
+						{
+							"type": "Declaration",
+							"start": 70,
+							"end": 97,
+							"property": "box-decoration-break",
+							"value": "slice"
+						},
+						{
+							"type": "Declaration",
+							"start": 101,
+							"end": 128,
+							"property": "box-decoration-break",
+							"value": "clone"
+						}
+					]
+				},
+				"start": 9,
+				"end": 132
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 133,
+			"styles": "\n\tdiv {\n\t\tbox-sizing: border-box;\n\t\tbox-sizing: content-box;\n\t\tbox-decoration-break: slice;\n\t\tbox-decoration-break: clone;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 142,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

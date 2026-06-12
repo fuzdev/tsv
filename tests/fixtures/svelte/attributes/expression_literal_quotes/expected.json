@@ -1,0 +1,550 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 191,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 49,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 7,
+						"character": 7
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 8,
+						"end": 36,
+						"name": "title",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 8,
+								"character": 8
+							},
+							"end": {
+								"line": 1,
+								"column": 13,
+								"character": 13
+							}
+						},
+						"value": [
+							{
+								"start": 15,
+								"end": 20,
+								"type": "Text",
+								"raw": "text ",
+								"data": "text "
+							},
+							{
+								"type": "ExpressionTag",
+								"start": 20,
+								"end": 35,
+								"expression": {
+									"type": "BinaryExpression",
+									"start": 21,
+									"end": 34,
+									"loc": {
+										"start": {
+											"line": 1,
+											"column": 21
+										},
+										"end": {
+											"line": 1,
+											"column": 34
+										}
+									},
+									"left": {
+										"type": "BinaryExpression",
+										"start": 21,
+										"end": 28,
+										"loc": {
+											"start": {
+												"line": 1,
+												"column": 21
+											},
+											"end": {
+												"line": 1,
+												"column": 28
+											}
+										},
+										"left": {
+											"type": "Literal",
+											"start": 21,
+											"end": 24,
+											"loc": {
+												"start": {
+													"line": 1,
+													"column": 21
+												},
+												"end": {
+													"line": 1,
+													"column": 24
+												}
+											},
+											"value": "\"",
+											"raw": "'\"'"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 27,
+											"end": 28,
+											"loc": {
+												"start": {
+													"line": 1,
+													"column": 27
+												},
+												"end": {
+													"line": 1,
+													"column": 28
+												}
+											},
+											"name": "a"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Literal",
+										"start": 31,
+										"end": 34,
+										"loc": {
+											"start": {
+												"line": 1,
+												"column": 31
+											},
+											"end": {
+												"line": 1,
+												"column": 34
+											}
+										},
+										"value": "\"",
+										"raw": "'\"'"
+									}
+								}
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 37,
+							"end": 40,
+							"expression": {
+								"type": "Identifier",
+								"start": 38,
+								"end": 39,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 38
+									},
+									"end": {
+										"line": 1,
+										"column": 39
+									}
+								},
+								"name": "a"
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 49,
+				"end": 50,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 50,
+				"end": 94,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 51
+					},
+					"end": {
+						"line": 2,
+						"column": 7,
+						"character": 57
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 58,
+						"end": 81,
+						"name": "title",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 8,
+								"character": 58
+							},
+							"end": {
+								"line": 2,
+								"column": 13,
+								"character": 63
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 64,
+							"end": 81,
+							"expression": {
+								"type": "Literal",
+								"start": 65,
+								"end": 80,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 15
+									},
+									"end": {
+										"line": 2,
+										"column": 30
+									}
+								},
+								"value": "text \"quoted\"",
+								"raw": "'text \"quoted\"'"
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 82,
+							"end": 85,
+							"expression": {
+								"type": "Identifier",
+								"start": 83,
+								"end": 84,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 33
+									},
+									"end": {
+										"line": 2,
+										"column": 34
+									}
+								},
+								"name": "a"
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 94,
+				"end": 95,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 95,
+				"end": 141,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 96
+					},
+					"end": {
+						"line": 3,
+						"column": 7,
+						"character": 102
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 103,
+						"end": 128,
+						"name": "title",
+						"name_loc": {
+							"start": {
+								"line": 3,
+								"column": 8,
+								"character": 103
+							},
+							"end": {
+								"line": 3,
+								"column": 13,
+								"character": 108
+							}
+						},
+						"value": [
+							{
+								"start": 110,
+								"end": 115,
+								"type": "Text",
+								"raw": "text ",
+								"data": "text "
+							},
+							{
+								"type": "ExpressionTag",
+								"start": 115,
+								"end": 127,
+								"expression": {
+									"type": "TemplateLiteral",
+									"start": 116,
+									"end": 126,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 21
+										},
+										"end": {
+											"line": 3,
+											"column": 31
+										}
+									},
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 117,
+											"end": 125,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 22
+												},
+												"end": {
+													"line": 3,
+													"column": 30
+												}
+											},
+											"value": {
+												"raw": "\"quoted\"",
+												"cooked": "\"quoted\""
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 129,
+							"end": 132,
+							"expression": {
+								"type": "Identifier",
+								"start": 130,
+								"end": 131,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 35
+									},
+									"end": {
+										"line": 3,
+										"column": 36
+									}
+								},
+								"name": "a"
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 141,
+				"end": 142,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 142,
+				"end": 190,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 143
+					},
+					"end": {
+						"line": 4,
+						"column": 7,
+						"character": 149
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 150,
+						"end": 177,
+						"name": "title",
+						"name_loc": {
+							"start": {
+								"line": 4,
+								"column": 8,
+								"character": 150
+							},
+							"end": {
+								"line": 4,
+								"column": 13,
+								"character": 155
+							}
+						},
+						"value": [
+							{
+								"start": 157,
+								"end": 162,
+								"type": "Text",
+								"raw": "text ",
+								"data": "text "
+							},
+							{
+								"type": "ExpressionTag",
+								"start": 162,
+								"end": 176,
+								"expression": {
+									"type": "TemplateLiteral",
+									"start": 163,
+									"end": 175,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 21
+										},
+										"end": {
+											"line": 4,
+											"column": 33
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 172,
+											"end": 173,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 30
+												},
+												"end": {
+													"line": 4,
+													"column": 31
+												}
+											},
+											"name": "a"
+										}
+									],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 164,
+											"end": 170,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 22
+												},
+												"end": {
+													"line": 4,
+													"column": 28
+												}
+											},
+											"value": {
+												"raw": "hello ",
+												"cooked": "hello "
+											},
+											"tail": false
+										},
+										{
+											"type": "TemplateElement",
+											"start": 174,
+											"end": 174,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 32
+												},
+												"end": {
+													"line": 4,
+													"column": 32
+												}
+											},
+											"value": {
+												"raw": "",
+												"cooked": ""
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 178,
+							"end": 181,
+							"expression": {
+								"type": "Identifier",
+								"start": 179,
+								"end": 180,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 37
+									},
+									"end": {
+										"line": 4,
+										"column": 38
+									}
+								},
+								"name": "a"
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,333 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 142,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "EachBlock",
+				"start": 0,
+				"end": 42,
+				"expression": {
+					"type": "Identifier",
+					"start": 15,
+					"end": 20,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 15
+						},
+						"end": {
+							"line": 1,
+							"column": 20
+						}
+					},
+					"name": "items",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 7,
+							"end": 14
+						}
+					]
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 29,
+							"end": 35,
+							"expression": {
+								"type": "Identifier",
+								"start": 30,
+								"end": 34,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 30
+									},
+									"end": {
+										"line": 1,
+										"column": 34
+									}
+								},
+								"name": "item"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 24,
+					"end": 28,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 24,
+							"character": 24
+						},
+						"end": {
+							"line": 1,
+							"column": 28,
+							"character": 28
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 42,
+				"end": 43,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 43,
+				"end": 95,
+				"expression": {
+					"type": "Identifier",
+					"start": 50,
+					"end": 55,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 7
+						},
+						"end": {
+							"line": 2,
+							"column": 12
+						}
+					},
+					"name": "items"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 82,
+							"end": 88,
+							"expression": {
+								"type": "Identifier",
+								"start": 83,
+								"end": 87,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 40
+									},
+									"end": {
+										"line": 2,
+										"column": 44
+									}
+								},
+								"name": "item"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 59,
+					"end": 63,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 16,
+							"character": 59
+						},
+						"end": {
+							"line": 2,
+							"column": 20,
+							"character": 63
+						}
+					}
+				},
+				"key": {
+					"type": "MemberExpression",
+					"start": 73,
+					"end": 80,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 30
+						},
+						"end": {
+							"line": 2,
+							"column": 37
+						}
+					},
+					"object": {
+						"type": "Identifier",
+						"start": 73,
+						"end": 77,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 30
+							},
+							"end": {
+								"line": 2,
+								"column": 34
+							}
+						},
+						"name": "item"
+					},
+					"property": {
+						"type": "Identifier",
+						"start": 78,
+						"end": 80,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 35
+							},
+							"end": {
+								"line": 2,
+								"column": 37
+							}
+						},
+						"name": "id"
+					},
+					"computed": false,
+					"optional": false,
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 65,
+							"end": 72
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 95,
+				"end": 96,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 96,
+				"end": 141,
+				"expression": {
+					"type": "Identifier",
+					"start": 103,
+					"end": 108,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 7
+						},
+						"end": {
+							"line": 3,
+							"column": 12
+						}
+					},
+					"name": "items"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 117,
+							"end": 123,
+							"expression": {
+								"type": "Identifier",
+								"start": 118,
+								"end": 122,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 22
+									},
+									"end": {
+										"line": 3,
+										"column": 26
+									}
+								},
+								"name": "item"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 112,
+					"end": 116,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 16,
+							"character": 112
+						},
+						"end": {
+							"line": 3,
+							"column": 20,
+							"character": 116
+						}
+					}
+				},
+				"fallback": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 130,
+							"end": 134,
+							"raw": "none",
+							"data": "none"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 7,
+			"end": 14,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 7
+				},
+				"end": {
+					"line": 1,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 65,
+			"end": 72,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 22
+				},
+				"end": {
+					"line": 2,
+					"column": 29
+				}
+			}
+		}
+	]
+}

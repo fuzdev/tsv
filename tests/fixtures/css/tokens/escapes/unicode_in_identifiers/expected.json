@@ -1,0 +1,167 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 125,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 17,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 17,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "clAss",
+											"start": 9,
+											"end": 17
+										}
+									],
+									"start": 9,
+									"end": 17
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 18,
+					"end": 40,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 22,
+							"end": 36,
+							"property": "content",
+							"value": "'\\41'"
+						}
+					]
+				},
+				"start": 9,
+				"end": 40
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 43,
+					"end": 53,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 43,
+							"end": 53,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "IdSelector",
+											"name": "💩-id",
+											"start": 43,
+											"end": 53
+										}
+									],
+									"start": 43,
+									"end": 53
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 54,
+					"end": 79,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 58,
+							"end": 75,
+							"property": "content",
+							"value": "'\\1F4A9'"
+						}
+					]
+				},
+				"start": 43,
+				"end": 79
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 82,
+					"end": 91,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 82,
+							"end": 91,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "€uro",
+											"start": 82,
+											"end": 91
+										}
+									],
+									"start": 82,
+									"end": 91
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 92,
+					"end": 116,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 96,
+							"end": 112,
+							"property": "content",
+							"value": "'\\20AC'"
+						}
+					]
+				},
+				"start": 82,
+				"end": 116
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 117,
+			"styles": "\n\t.cl\\41ss {\n\t\tcontent: '\\41';\n\t}\n\n\t#\\1F4A9-id {\n\t\tcontent: '\\1F4A9';\n\t}\n\n\t.\\20ACuro {\n\t\tcontent: '\\20AC';\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 126,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,37 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 18,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 17,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 8,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 1,
+					"column": 17
+				}
+			},
+			"body": [],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

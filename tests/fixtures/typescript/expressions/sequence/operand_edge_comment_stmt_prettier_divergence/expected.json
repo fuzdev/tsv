@@ -1,0 +1,529 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 331,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Leading comment on the first operand floats before the sequence parens",
+			"start": 20,
+			"end": 93,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 105,
+			"end": 112,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 11
+				},
+				"end": {
+					"line": 3,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Trailing comment on the last operand stays before the semicolon",
+			"start": 123,
+			"end": 189,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 67
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 208,
+			"end": 215,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 18
+				},
+				"end": {
+					"line": 6,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Both edges float; the trailing one stays before the semicolon",
+			"start": 219,
+			"end": 283,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 295,
+			"end": 303,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 11
+				},
+				"end": {
+					"line": 9,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 311,
+			"end": 319,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 27
+				},
+				"end": {
+					"line": 9,
+					"column": 35
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 330,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 321,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 10,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 95,
+					"end": 120,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 26
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 101,
+							"end": 119,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 25
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 101,
+								"end": 102,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "SequenceExpression",
+								"start": 114,
+								"end": 118,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 20
+									},
+									"end": {
+										"line": 3,
+										"column": 24
+									}
+								},
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 114,
+										"end": 115,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 20
+											},
+											"end": {
+												"line": 3,
+												"column": 21
+											}
+										},
+										"name": "x"
+									},
+									{
+										"type": "Identifier",
+										"start": 117,
+										"end": 118,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 23
+											},
+											"end": {
+												"line": 3,
+												"column": 24
+											}
+										},
+										"name": "y"
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 105,
+										"end": 112
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Leading comment on the first operand floats before the sequence parens",
+							"start": 20,
+							"end": 93
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 191,
+					"end": 216,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 26
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 197,
+							"end": 207,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 17
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 197,
+								"end": 198,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "SequenceExpression",
+								"start": 202,
+								"end": 206,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 12
+									},
+									"end": {
+										"line": 6,
+										"column": 16
+									}
+								},
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 202,
+										"end": 203,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 12
+											},
+											"end": {
+												"line": 6,
+												"column": 13
+											}
+										},
+										"name": "x"
+									},
+									{
+										"type": "Identifier",
+										"start": 205,
+										"end": 206,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 15
+											},
+											"end": {
+												"line": 6,
+												"column": 16
+											}
+										},
+										"name": "y"
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 208,
+										"end": 215
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Trailing comment on the last operand stays before the semicolon",
+							"start": 123,
+							"end": 189
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 285,
+					"end": 320,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 36
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 291,
+							"end": 310,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 26
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 291,
+								"end": 292,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "SequenceExpression",
+								"start": 305,
+								"end": 309,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 21
+									},
+									"end": {
+										"line": 9,
+										"column": 25
+									}
+								},
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 305,
+										"end": 306,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 21
+											},
+											"end": {
+												"line": 9,
+												"column": 22
+											}
+										},
+										"name": "x"
+									},
+									{
+										"type": "Identifier",
+										"start": 308,
+										"end": 309,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 24
+											},
+											"end": {
+												"line": 9,
+												"column": 25
+											}
+										},
+										"name": "y"
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 295,
+										"end": 303
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 311,
+										"end": 319
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Both edges float; the trailing one stays before the semicolon",
+							"start": 219,
+							"end": 283
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

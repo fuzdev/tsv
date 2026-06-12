@@ -1,0 +1,188 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 127,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 16,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 16,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "hover",
+											"args": null,
+											"start": 10,
+											"end": 16
+										}
+									],
+									"start": 9,
+									"end": 16
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 17,
+					"end": 35,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 21,
+							"end": 31,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 9,
+				"end": 35
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 38,
+					"end": 49,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 38,
+							"end": 49,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "input",
+											"start": 38,
+											"end": 43
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "focus",
+											"args": null,
+											"start": 43,
+											"end": 49
+										}
+									],
+									"start": 38,
+									"end": 49
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 50,
+					"end": 81,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 54,
+							"end": 77,
+							"property": "outline",
+							"value": "2px solid blue"
+						}
+					]
+				},
+				"start": 38,
+				"end": 81
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 84,
+					"end": 97,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 84,
+							"end": 97,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "button",
+											"start": 84,
+											"end": 90
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "active",
+											"args": null,
+											"start": 90,
+											"end": 97
+										}
+									],
+									"start": 84,
+									"end": 97
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 98,
+					"end": 118,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 102,
+							"end": 114,
+							"property": "opacity",
+							"value": "0.9"
+						}
+					]
+				},
+				"start": 84,
+				"end": 118
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 119,
+			"styles": "\n\ta:hover {\n\t\tcolor: red;\n\t}\n\n\tinput:focus {\n\t\toutline: 2px solid blue;\n\t}\n\n\tbutton:active {\n\t\topacity: 0.9;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 128,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

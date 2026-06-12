@@ -1,0 +1,203 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 77,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "EachBlock",
+				"start": 0,
+				"end": 76,
+				"expression": {
+					"type": "Identifier",
+					"start": 7,
+					"end": 12,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 7
+						},
+						"end": {
+							"line": 1,
+							"column": 12
+						}
+					},
+					"name": "outer"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 18,
+							"end": 20,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "EachBlock",
+							"start": 20,
+							"end": 68,
+							"expression": {
+								"type": "Identifier",
+								"start": 27,
+								"end": 32,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 8
+									},
+									"end": {
+										"line": 2,
+										"column": 13
+									}
+								},
+								"name": "inner"
+							},
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 38,
+										"end": 41,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 41,
+										"end": 59,
+										"name": "div",
+										"name_loc": {
+											"start": {
+												"line": 3,
+												"column": 3,
+												"character": 42
+											},
+											"end": {
+												"line": 3,
+												"column": 6,
+												"character": 45
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "ExpressionTag",
+													"start": 46,
+													"end": 49,
+													"expression": {
+														"type": "Identifier",
+														"start": 47,
+														"end": 48,
+														"loc": {
+															"start": {
+																"line": 3,
+																"column": 8
+															},
+															"end": {
+																"line": 3,
+																"column": 9
+															}
+														},
+														"name": "a"
+													}
+												},
+												{
+													"type": "Text",
+													"start": 49,
+													"end": 50,
+													"raw": " ",
+													"data": " "
+												},
+												{
+													"type": "ExpressionTag",
+													"start": 50,
+													"end": 53,
+													"expression": {
+														"type": "Identifier",
+														"start": 51,
+														"end": 52,
+														"loc": {
+															"start": {
+																"line": 3,
+																"column": 12
+															},
+															"end": {
+																"line": 3,
+																"column": 13
+															}
+														},
+														"name": "b"
+													}
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 59,
+										"end": 61,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							},
+							"context": {
+								"type": "Identifier",
+								"name": "b",
+								"start": 36,
+								"end": 37,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 17,
+										"character": 36
+									},
+									"end": {
+										"line": 2,
+										"column": 18,
+										"character": 37
+									}
+								}
+							}
+						},
+						{
+							"type": "Text",
+							"start": 68,
+							"end": 69,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "a",
+					"start": 16,
+					"end": 17,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 16,
+							"character": 16
+						},
+						"end": {
+							"line": 1,
+							"column": 17,
+							"character": 17
+						}
+					}
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

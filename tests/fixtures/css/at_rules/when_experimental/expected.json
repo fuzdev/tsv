@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 112,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 103,
+				"name": "when",
+				"prelude": "media(width >= 768px) and supports(display: grid)",
+				"block": {
+					"type": "Block",
+					"start": 65,
+					"end": 103,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 69,
+								"end": 76,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 69,
+										"end": 76,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "layout",
+														"start": 69,
+														"end": 76
+													}
+												],
+												"start": 69,
+												"end": 76
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 77,
+								"end": 100,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 82,
+										"end": 95,
+										"property": "display",
+										"value": "grid"
+									}
+								]
+							},
+							"start": 69,
+							"end": 100
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 104,
+			"styles": "\n\t@when media(width >= 768px) and supports(display: grid) {\n\t\t.layout {\n\t\t\tdisplay: grid;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 113,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

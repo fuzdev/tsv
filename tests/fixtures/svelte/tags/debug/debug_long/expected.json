@@ -1,0 +1,309 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 553,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 83,
+				"data": " @debug NEVER wraps - stays inline regardless of length (prettier behavior) "
+			},
+			{
+				"type": "Text",
+				"start": 83,
+				"end": 85,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 85,
+				"end": 118,
+				"data": " 100 chars - stays inline "
+			},
+			{
+				"type": "Text",
+				"start": 118,
+				"end": 119,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "DebugTag",
+				"start": 119,
+				"end": 219,
+				"identifiers": [
+					{
+						"type": "Identifier",
+						"start": 127,
+						"end": 148,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 8
+							},
+							"end": {
+								"line": 4,
+								"column": 29
+							}
+						},
+						"name": "aaaaaaaaaaaaaaaaaaaaa"
+					},
+					{
+						"type": "Identifier",
+						"start": 150,
+						"end": 171,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 31
+							},
+							"end": {
+								"line": 4,
+								"column": 52
+							}
+						},
+						"name": "bbbbbbbbbbbbbbbbbbbbb"
+					},
+					{
+						"type": "Identifier",
+						"start": 173,
+						"end": 194,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 54
+							},
+							"end": {
+								"line": 4,
+								"column": 75
+							}
+						},
+						"name": "ccccccccccccccccccccc"
+					},
+					{
+						"type": "Identifier",
+						"start": 196,
+						"end": 218,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 77
+							},
+							"end": {
+								"line": 4,
+								"column": 99
+							}
+						},
+						"name": "dddddddddddddddddddddd"
+					}
+				]
+			},
+			{
+				"type": "Text",
+				"start": 219,
+				"end": 221,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 221,
+				"end": 285,
+				"data": " 101 chars - still stays inline (no wrapping for @debug) "
+			},
+			{
+				"type": "Text",
+				"start": 285,
+				"end": 286,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "DebugTag",
+				"start": 286,
+				"end": 387,
+				"identifiers": [
+					{
+						"type": "Identifier",
+						"start": 294,
+						"end": 315,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 8
+							},
+							"end": {
+								"line": 7,
+								"column": 29
+							}
+						},
+						"name": "aaaaaaaaaaaaaaaaaaaaa"
+					},
+					{
+						"type": "Identifier",
+						"start": 317,
+						"end": 338,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 31
+							},
+							"end": {
+								"line": 7,
+								"column": 52
+							}
+						},
+						"name": "bbbbbbbbbbbbbbbbbbbbb"
+					},
+					{
+						"type": "Identifier",
+						"start": 340,
+						"end": 361,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 54
+							},
+							"end": {
+								"line": 7,
+								"column": 75
+							}
+						},
+						"name": "ccccccccccccccccccccc"
+					},
+					{
+						"type": "Identifier",
+						"start": 363,
+						"end": 386,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 77
+							},
+							"end": {
+								"line": 7,
+								"column": 100
+							}
+						},
+						"name": "ddddddddddddddddddddddd"
+					}
+				]
+			},
+			{
+				"type": "Text",
+				"start": 387,
+				"end": 389,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 389,
+				"end": 428,
+				"data": " Very long - still stays inline "
+			},
+			{
+				"type": "Text",
+				"start": 428,
+				"end": 429,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "DebugTag",
+				"start": 429,
+				"end": 552,
+				"identifiers": [
+					{
+						"type": "Identifier",
+						"start": 437,
+						"end": 458,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 8
+							},
+							"end": {
+								"line": 10,
+								"column": 29
+							}
+						},
+						"name": "aaaaaaaaaaaaaaaaaaaaa"
+					},
+					{
+						"type": "Identifier",
+						"start": 460,
+						"end": 481,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 31
+							},
+							"end": {
+								"line": 10,
+								"column": 52
+							}
+						},
+						"name": "bbbbbbbbbbbbbbbbbbbbb"
+					},
+					{
+						"type": "Identifier",
+						"start": 483,
+						"end": 504,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 54
+							},
+							"end": {
+								"line": 10,
+								"column": 75
+							}
+						},
+						"name": "ccccccccccccccccccccc"
+					},
+					{
+						"type": "Identifier",
+						"start": 506,
+						"end": 528,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 77
+							},
+							"end": {
+								"line": 10,
+								"column": 99
+							}
+						},
+						"name": "dddddddddddddddddddddd"
+					},
+					{
+						"type": "Identifier",
+						"start": 530,
+						"end": 551,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 101
+							},
+							"end": {
+								"line": 10,
+								"column": 122
+							}
+						},
+						"name": "eeeeeeeeeeeeeeeeeeeee"
+					}
+				]
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

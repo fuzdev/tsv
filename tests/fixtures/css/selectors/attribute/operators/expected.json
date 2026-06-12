@@ -1,0 +1,426 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 498,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 28,
+					"end": 42,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 28,
+							"end": 42,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 28,
+											"end": 42,
+											"name": "attr",
+											"matcher": "=",
+											"value": "value",
+											"flags": null
+										}
+									],
+									"start": 28,
+									"end": 42
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 43,
+					"end": 61,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 47,
+							"end": 57,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 28,
+				"end": 61
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 84,
+					"end": 99,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 84,
+							"end": 99,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 84,
+											"end": 99,
+											"name": "href",
+											"matcher": "^=",
+											"value": "https",
+											"flags": null
+										}
+									],
+									"start": 84,
+									"end": 99
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 100,
+					"end": 119,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 104,
+							"end": 115,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 84,
+				"end": 119
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 142,
+					"end": 156,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 142,
+							"end": 156,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 142,
+											"end": 156,
+											"name": "href",
+											"matcher": "$=",
+											"value": ".pdf",
+											"flags": null
+										}
+									],
+									"start": 142,
+									"end": 156
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 157,
+					"end": 177,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 161,
+							"end": 173,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 142,
+				"end": 177
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 203,
+					"end": 221,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 203,
+							"end": 221,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 203,
+											"end": 221,
+											"name": "title",
+											"matcher": "*=",
+											"value": "example",
+											"flags": null
+										}
+									],
+									"start": 203,
+									"end": 221
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 222,
+					"end": 243,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 226,
+							"end": 239,
+							"property": "color",
+							"value": "yellow"
+						}
+					]
+				},
+				"start": 203,
+				"end": 243
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 278,
+					"end": 295,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 278,
+							"end": 295,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 278,
+											"end": 295,
+											"name": "class",
+											"matcher": "~=",
+											"value": "active",
+											"flags": null
+										}
+									],
+									"start": 278,
+									"end": 295
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 296,
+					"end": 317,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 300,
+							"end": 313,
+							"property": "color",
+							"value": "purple"
+						}
+					]
+				},
+				"start": 278,
+				"end": 317
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 345,
+					"end": 357,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 345,
+							"end": 357,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 345,
+											"end": 357,
+											"name": "lang",
+											"matcher": "|=",
+											"value": "en",
+											"flags": null
+										}
+									],
+									"start": 345,
+									"end": 357
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 358,
+					"end": 379,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 362,
+							"end": 375,
+							"property": "color",
+							"value": "orange"
+						}
+					]
+				},
+				"start": 345,
+				"end": 379
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 405,
+					"end": 418,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 405,
+							"end": 418,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 405,
+											"end": 418,
+											"name": "type",
+											"matcher": "=",
+											"value": "text",
+											"flags": null
+										}
+									],
+									"start": 405,
+									"end": 418
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 419,
+					"end": 450,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 423,
+							"end": 446,
+							"property": "border",
+							"value": "1px solid black"
+						}
+					]
+				},
+				"start": 405,
+				"end": 450
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 452,
+					"end": 468,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 452,
+							"end": 468,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 452,
+											"end": 468,
+											"name": "data-id",
+											"matcher": "=",
+											"value": "item",
+											"flags": null
+										}
+									],
+									"start": 452,
+									"end": 468
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 469,
+					"end": 489,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 473,
+							"end": 485,
+							"property": "margin",
+							"value": "10px"
+						}
+					]
+				},
+				"start": 452,
+				"end": 489
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 490,
+			"styles": "\n\t/* Exact match */\n\t[attr='value'] {\n\t\tcolor: red;\n\t}\n\n\t/* Prefix match */\n\t[href^='https'] {\n\t\tcolor: blue;\n\t}\n\n\t/* Suffix match */\n\t[href$='.pdf'] {\n\t\tcolor: green;\n\t}\n\n\t/* Substring match */\n\t[title*='example'] {\n\t\tcolor: yellow;\n\t}\n\n\t/* Whitespace list contains */\n\t[class~='active'] {\n\t\tcolor: purple;\n\t}\n\n\t/* Dash prefix match */\n\t[lang|='en'] {\n\t\tcolor: orange;\n\t}\n\n\t/* Unquoted values */\n\t[type='text'] {\n\t\tborder: 1px solid black;\n\t}\n\t[data-id='item'] {\n\t\tmargin: 10px;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 499,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

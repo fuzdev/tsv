@@ -1,0 +1,228 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 148,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 139,
+				"name": "keyframes",
+				"prelude": "anim1",
+				"block": {
+					"type": "Block",
+					"start": 26,
+					"end": 139,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 30,
+								"end": 32,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 30,
+										"end": 32,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "Percentage",
+														"value": "0%",
+														"start": 30,
+														"end": 32
+													}
+												],
+												"start": 30,
+												"end": 32
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 33,
+								"end": 52,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 38,
+										"end": 47,
+										"property": "bottom",
+										"value": "0"
+									}
+								]
+							},
+							"start": 30,
+							"end": 52
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 55,
+								"end": 58,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 55,
+										"end": 58,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "Percentage",
+														"value": "50%",
+														"start": 55,
+														"end": 58
+													}
+												],
+												"start": 55,
+												"end": 58
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 59,
+								"end": 81,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 64,
+										"end": 76,
+										"property": "bottom",
+										"value": "10px"
+									}
+								]
+							},
+							"start": 55,
+							"end": 81
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 84,
+								"end": 87,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 84,
+										"end": 87,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "Percentage",
+														"value": "75%",
+														"start": 84,
+														"end": 87
+													}
+												],
+												"start": 84,
+												"end": 87
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 88,
+								"end": 109,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 93,
+										"end": 104,
+										"property": "bottom",
+										"value": "5px"
+									}
+								]
+							},
+							"start": 84,
+							"end": 109
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 112,
+								"end": 116,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 112,
+										"end": 116,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "Percentage",
+														"value": "100%",
+														"start": 112,
+														"end": 116
+													}
+												],
+												"start": 112,
+												"end": 116
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 117,
+								"end": 136,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 122,
+										"end": 131,
+										"property": "bottom",
+										"value": "0"
+									}
+								]
+							},
+							"start": 112,
+							"end": 136
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 140,
+			"styles": "\n\t@keyframes anim1 {\n\t\t0% {\n\t\t\tbottom: 0;\n\t\t}\n\t\t50% {\n\t\t\tbottom: 10px;\n\t\t}\n\t\t75% {\n\t\t\tbottom: 5px;\n\t\t}\n\t\t100% {\n\t\t\tbottom: 0;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 149,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

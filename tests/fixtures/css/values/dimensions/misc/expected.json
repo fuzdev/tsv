@@ -1,0 +1,122 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 174,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 165,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 26,
+							"property": "margin",
+							"value": "0"
+						},
+						{
+							"type": "Declaration",
+							"start": 30,
+							"end": 41,
+							"property": "margin",
+							"value": "0px"
+						},
+						{
+							"type": "Declaration",
+							"start": 45,
+							"end": 55,
+							"property": "margin",
+							"value": "0%"
+						},
+						{
+							"type": "Declaration",
+							"start": 59,
+							"end": 72,
+							"property": "margin",
+							"value": "-10px"
+						},
+						{
+							"type": "Declaration",
+							"start": 76,
+							"end": 103,
+							"property": "transform",
+							"value": "translateX(-50%)"
+						},
+						{
+							"type": "Declaration",
+							"start": 107,
+							"end": 120,
+							"property": "width",
+							"value": "1e10px"
+						},
+						{
+							"type": "Declaration",
+							"start": 124,
+							"end": 142,
+							"property": "width",
+							"value": "0.000001rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 146,
+							"end": 161,
+							"property": "z-index",
+							"value": "999999"
+						}
+					]
+				},
+				"start": 9,
+				"end": 165
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 166,
+			"styles": "\n\tdiv {\n\t\tmargin: 0;\n\t\tmargin: 0px;\n\t\tmargin: 0%;\n\t\tmargin: -10px;\n\t\ttransform: translateX(-50%);\n\t\twidth: 1e10px;\n\t\twidth: 0.000001rem;\n\t\tz-index: 999999;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 175,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

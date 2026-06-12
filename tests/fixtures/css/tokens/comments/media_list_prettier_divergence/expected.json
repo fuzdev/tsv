@@ -1,0 +1,392 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 723,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 92,
+				"end": 184,
+				"name": "media",
+				"prelude": "screen  and  (min-width: 500px)",
+				"block": {
+					"type": "Block",
+					"start": 153,
+					"end": 184,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 157,
+								"end": 160,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 157,
+										"end": 160,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 157,
+														"end": 160
+													}
+												],
+												"start": 157,
+												"end": 160
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 161,
+								"end": 181,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 166,
+										"end": 176,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 157,
+							"end": 181
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 218,
+				"end": 309,
+				"name": "media",
+				"prelude": "(width > 100px)  or  (height > 200px)",
+				"block": {
+					"type": "Block",
+					"start": 277,
+					"end": 309,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 281,
+								"end": 284,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 281,
+										"end": 284,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 281,
+														"end": 284
+													}
+												],
+												"start": 281,
+												"end": 284
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 285,
+								"end": 306,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 290,
+										"end": 301,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 281,
+							"end": 306
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 350,
+				"end": 420,
+				"name": "media",
+				"prelude": "(min-width:  500px)",
+				"block": {
+					"type": "Block",
+					"start": 387,
+					"end": 420,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 391,
+								"end": 394,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 391,
+										"end": 394,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 391,
+														"end": 394
+													}
+												],
+												"start": 391,
+												"end": 394
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 395,
+								"end": 417,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 400,
+										"end": 412,
+										"property": "color",
+										"value": "green"
+									}
+								]
+							},
+							"start": 391,
+							"end": 417
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 455,
+				"end": 515,
+				"name": "media",
+				"prelude": "not  screen",
+				"block": {
+					"type": "Block",
+					"start": 481,
+					"end": 515,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 485,
+								"end": 488,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 485,
+										"end": 488,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 485,
+														"end": 488
+													}
+												],
+												"start": 485,
+												"end": 488
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 489,
+								"end": 512,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 494,
+										"end": 507,
+										"property": "color",
+										"value": "yellow"
+									}
+								]
+							},
+							"start": 485,
+							"end": 512
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 551,
+				"end": 612,
+				"name": "media",
+				"prelude": "only  screen",
+				"block": {
+					"type": "Block",
+					"start": 578,
+					"end": 612,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 582,
+								"end": 585,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 582,
+										"end": 585,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 582,
+														"end": 585
+													}
+												],
+												"start": 582,
+												"end": 585
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 586,
+								"end": 609,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 591,
+										"end": 604,
+										"property": "color",
+										"value": "purple"
+									}
+								]
+							},
+							"start": 582,
+							"end": 609
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 651,
+				"end": 714,
+				"name": "media",
+				"prelude": "screen , print",
+				"block": {
+					"type": "Block",
+					"start": 680,
+					"end": 714,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 684,
+								"end": 687,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 684,
+										"end": 687,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 684,
+														"end": 687
+													}
+												],
+												"start": 684,
+												"end": 687
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 688,
+								"end": 711,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 693,
+										"end": 706,
+										"property": "color",
+										"value": "orange"
+									}
+								]
+							},
+							"start": 684,
+							"end": 711
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 715,
+			"styles": "\n\t/* Multiple comment positions - we normalize spacing, Prettier preserves input */\n\t@media /* a */ screen /* b */ and /* c */ (min-width: 500px) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* Comment with or keyword */\n\t@media (width > 100px) /* d */ or /* e */ (height > 200px) {\n\t\tdiv {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n\n\t/* Comment inside condition value */\n\t@media (min-width: /* size */ 500px) {\n\t\tdiv {\n\t\t\tcolor: green;\n\t\t}\n\t}\n\n\t/* Comment with not keyword */\n\t@media not /* f */ screen {\n\t\tdiv {\n\t\t\tcolor: yellow;\n\t\t}\n\t}\n\n\t/* Comment with only keyword */\n\t@media only /* g */ screen {\n\t\tdiv {\n\t\t\tcolor: purple;\n\t\t}\n\t}\n\n\t/* Comment before comma in list */\n\t@media screen /* h */, print {\n\t\tdiv {\n\t\t\tcolor: orange;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 724,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

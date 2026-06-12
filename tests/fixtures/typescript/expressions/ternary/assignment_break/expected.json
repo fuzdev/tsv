@@ -1,0 +1,737 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 540,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Dynamic import based on condition (binary)",
+			"start": 10,
+			"end": 55,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Function calls in branches (binary)",
+			"start": 196,
+			"end": 234,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Logical expression in condition",
+			"start": 364,
+			"end": 398,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 35
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 539,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 530,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 19,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 57,
+					"end": 193,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 40
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 63,
+							"end": 192,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 39
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 63,
+								"end": 68,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 12
+									}
+								},
+								"name": "value"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 73,
+								"end": 192,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 39
+									}
+								},
+								"test": {
+									"type": "BinaryExpression",
+									"start": 73,
+									"end": 112,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 41
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 73,
+										"end": 90,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 19
+											}
+										},
+										"name": "conditionVariable"
+									},
+									"operator": "===",
+									"right": {
+										"type": "Literal",
+										"start": 95,
+										"end": 112,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 24
+											},
+											"end": {
+												"line": 4,
+												"column": 41
+											}
+										},
+										"value": "some_long_value",
+										"raw": "'some_long_value'"
+									}
+								},
+								"consequent": {
+									"type": "AwaitExpression",
+									"start": 118,
+									"end": 152,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 5
+										},
+										"end": {
+											"line": 5,
+											"column": 39
+										}
+									},
+									"argument": {
+										"type": "ImportExpression",
+										"start": 124,
+										"end": 152,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 11
+											},
+											"end": {
+												"line": 5,
+												"column": 39
+											}
+										},
+										"source": {
+											"type": "Literal",
+											"start": 131,
+											"end": 151,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 18
+												},
+												"end": {
+													"line": 5,
+													"column": 38
+												}
+											},
+											"value": "./path/to/module/a",
+											"raw": "'./path/to/module/a'"
+										},
+										"options": null
+									}
+								},
+								"alternate": {
+									"type": "AwaitExpression",
+									"start": 158,
+									"end": 192,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 5
+										},
+										"end": {
+											"line": 6,
+											"column": 39
+										}
+									},
+									"argument": {
+										"type": "ImportExpression",
+										"start": 164,
+										"end": 192,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 11
+											},
+											"end": {
+												"line": 6,
+												"column": 39
+											}
+										},
+										"source": {
+											"type": "Literal",
+											"start": 171,
+											"end": 191,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 18
+												},
+												"end": {
+													"line": 6,
+													"column": 38
+												}
+											},
+											"value": "./path/to/module/b",
+											"raw": "'./path/to/module/b'"
+										},
+										"options": null
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Dynamic import based on condition (binary)",
+							"start": 10,
+							"end": 55
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 236,
+					"end": 361,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 30
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 242,
+							"end": 360,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 29
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 242,
+								"end": 252,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 17
+									}
+								},
+								"name": "someResult"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 257,
+								"end": 360,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 29
+									}
+								},
+								"test": {
+									"type": "BinaryExpression",
+									"start": 257,
+									"end": 301,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 46
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 257,
+										"end": 274,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 2
+											},
+											"end": {
+												"line": 10,
+												"column": 19
+											}
+										},
+										"name": "someLongCondition"
+									},
+									"operator": "===",
+									"right": {
+										"type": "Literal",
+										"start": 279,
+										"end": 301,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 24
+											},
+											"end": {
+												"line": 10,
+												"column": 46
+											}
+										},
+										"value": "value_that_is_longer",
+										"raw": "'value_that_is_longer'"
+									}
+								},
+								"consequent": {
+									"type": "AwaitExpression",
+									"start": 307,
+									"end": 330,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 5
+										},
+										"end": {
+											"line": 11,
+											"column": 28
+										}
+									},
+									"argument": {
+										"type": "CallExpression",
+										"start": 313,
+										"end": 330,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 11
+											},
+											"end": {
+												"line": 11,
+												"column": 28
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 313,
+											"end": 328,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 11
+												},
+												"end": {
+													"line": 11,
+													"column": 26
+												}
+											},
+											"name": "firstBranchFunc"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								},
+								"alternate": {
+									"type": "AwaitExpression",
+									"start": 336,
+									"end": 360,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 5
+										},
+										"end": {
+											"line": 12,
+											"column": 29
+										}
+									},
+									"argument": {
+										"type": "CallExpression",
+										"start": 342,
+										"end": 360,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 11
+											},
+											"end": {
+												"line": 12,
+												"column": 29
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 342,
+											"end": 358,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 11
+												},
+												"end": {
+													"line": 12,
+													"column": 27
+												}
+											},
+											"name": "secondBranchFunc"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Function calls in branches (binary)",
+							"start": 196,
+							"end": 234
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 400,
+					"end": 529,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 40
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 406,
+							"end": 528,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 18,
+									"column": 39
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 406,
+								"end": 419,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 20
+									}
+								},
+								"name": "logicalResult"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 424,
+								"end": 528,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 39
+									}
+								},
+								"test": {
+									"type": "LogicalExpression",
+									"start": 424,
+									"end": 448,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 26
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 424,
+										"end": 434,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 2
+											},
+											"end": {
+												"line": 16,
+												"column": 12
+											}
+										},
+										"name": "conditionA"
+									},
+									"operator": "&&",
+									"right": {
+										"type": "Identifier",
+										"start": 438,
+										"end": 448,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 16
+											},
+											"end": {
+												"line": 16,
+												"column": 26
+											}
+										},
+										"name": "conditionB"
+									}
+								},
+								"consequent": {
+									"type": "AwaitExpression",
+									"start": 454,
+									"end": 488,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 5
+										},
+										"end": {
+											"line": 17,
+											"column": 39
+										}
+									},
+									"argument": {
+										"type": "ImportExpression",
+										"start": 460,
+										"end": 488,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 11
+											},
+											"end": {
+												"line": 17,
+												"column": 39
+											}
+										},
+										"source": {
+											"type": "Literal",
+											"start": 467,
+											"end": 487,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 18
+												},
+												"end": {
+													"line": 17,
+													"column": 38
+												}
+											},
+											"value": "./path/to/module/a",
+											"raw": "'./path/to/module/a'"
+										},
+										"options": null
+									}
+								},
+								"alternate": {
+									"type": "AwaitExpression",
+									"start": 494,
+									"end": 528,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 5
+										},
+										"end": {
+											"line": 18,
+											"column": 39
+										}
+									},
+									"argument": {
+										"type": "ImportExpression",
+										"start": 500,
+										"end": 528,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 11
+											},
+											"end": {
+												"line": 18,
+												"column": 39
+											}
+										},
+										"source": {
+											"type": "Literal",
+											"start": 507,
+											"end": 527,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 18
+												},
+												"end": {
+													"line": 18,
+													"column": 38
+												}
+											},
+											"value": "./path/to/module/b",
+											"raw": "'./path/to/module/b'"
+										},
+										"options": null
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Logical expression in condition",
+							"start": 364,
+							"end": 398
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -1,0 +1,80 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 62,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 53,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 32,
+							"property": "font-size",
+							"value": "16px"
+						},
+						{
+							"type": "Declaration",
+							"start": 36,
+							"end": 49,
+							"property": "margin",
+							"value": "1.5em"
+						}
+					]
+				},
+				"start": 9,
+				"end": 53
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 54,
+			"styles": "\n\tdiv {\n\t\tfont-size: 16px;\n\t\tmargin: 1.5em;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 63,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

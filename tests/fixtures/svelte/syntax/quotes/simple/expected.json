@@ -1,0 +1,217 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 98,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 97,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 5,
+						"end": 26,
+						"name": "data-attr1",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 5,
+								"character": 5
+							},
+							"end": {
+								"line": 1,
+								"column": 15,
+								"character": 15
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 16,
+							"end": 26,
+							"expression": {
+								"type": "Literal",
+								"start": 17,
+								"end": 25,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 17
+									},
+									"end": {
+										"line": 1,
+										"column": 25
+									}
+								},
+								"value": "value1",
+								"raw": "'value1'"
+							}
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 27,
+						"end": 42,
+						"name": "data-attr2",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 27,
+								"character": 27
+							},
+							"end": {
+								"line": 1,
+								"column": 37,
+								"character": 37
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 38,
+							"end": 42,
+							"expression": {
+								"type": "Literal",
+								"start": 39,
+								"end": 41,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 39
+									},
+									"end": {
+										"line": 1,
+										"column": 41
+									}
+								},
+								"value": "",
+								"raw": "''"
+							}
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 43,
+						"end": 62,
+						"name": "data-attr3",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 43,
+								"character": 43
+							},
+							"end": {
+								"line": 1,
+								"column": 53,
+								"character": 53
+							}
+						},
+						"value": [
+							{
+								"start": 55,
+								"end": 61,
+								"type": "Text",
+								"raw": "value2",
+								"data": "value2"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 63,
+						"end": 76,
+						"name": "data-attr4",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 63,
+								"character": 63
+							},
+							"end": {
+								"line": 1,
+								"column": 73,
+								"character": 73
+							}
+						},
+						"value": [
+							{
+								"start": 75,
+								"end": 75,
+								"type": "Text",
+								"raw": "",
+								"data": ""
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 77,
+							"end": 87,
+							"expression": {
+								"type": "Literal",
+								"start": 78,
+								"end": 86,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 78
+									},
+									"end": {
+										"line": 1,
+										"column": 86
+									}
+								},
+								"value": "value3",
+								"raw": "'value3'"
+							}
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 87,
+							"end": 91,
+							"expression": {
+								"type": "Literal",
+								"start": 88,
+								"end": 90,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 88
+									},
+									"end": {
+										"line": 1,
+										"column": 90
+									}
+								},
+								"value": "",
+								"raw": "''"
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

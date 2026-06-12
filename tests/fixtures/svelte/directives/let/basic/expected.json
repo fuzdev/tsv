@@ -1,0 +1,78 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 33,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "SlotElement",
+				"start": 0,
+				"end": 32,
+				"name": "slot",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 5,
+						"character": 5
+					}
+				},
+				"attributes": [
+					{
+						"start": 6,
+						"end": 14,
+						"type": "LetDirective",
+						"name": "item",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 6,
+								"character": 6
+							},
+							"end": {
+								"line": 1,
+								"column": 14,
+								"character": 14
+							}
+						},
+						"expression": null,
+						"modifiers": []
+					},
+					{
+						"start": 15,
+						"end": 24,
+						"type": "LetDirective",
+						"name": "index",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 15,
+								"character": 15
+							},
+							"end": {
+								"line": 1,
+								"column": 24,
+								"character": 24
+							}
+						},
+						"expression": null,
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

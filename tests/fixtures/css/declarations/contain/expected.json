@@ -1,0 +1,115 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 201,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 192,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 30,
+							"property": "contain",
+							"value": "none"
+						},
+						{
+							"type": "Declaration",
+							"start": 34,
+							"end": 49,
+							"property": "contain",
+							"value": "strict"
+						},
+						{
+							"type": "Declaration",
+							"start": 53,
+							"end": 69,
+							"property": "contain",
+							"value": "content"
+						},
+						{
+							"type": "Declaration",
+							"start": 73,
+							"end": 99,
+							"property": "contain",
+							"value": "size layout paint"
+						},
+						{
+							"type": "Declaration",
+							"start": 103,
+							"end": 127,
+							"property": "content-visibility",
+							"value": "auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 131,
+							"end": 157,
+							"property": "content-visibility",
+							"value": "hidden"
+						},
+						{
+							"type": "Declaration",
+							"start": 161,
+							"end": 188,
+							"property": "content-visibility",
+							"value": "visible"
+						}
+					]
+				},
+				"start": 9,
+				"end": 192
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 193,
+			"styles": "\n\tdiv {\n\t\tcontain: none;\n\t\tcontain: strict;\n\t\tcontain: content;\n\t\tcontain: size layout paint;\n\t\tcontent-visibility: auto;\n\t\tcontent-visibility: hidden;\n\t\tcontent-visibility: visible;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 202,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

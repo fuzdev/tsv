@@ -1,0 +1,221 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 204,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 22,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 22,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "part",
+											"start": 9,
+											"end": 15
+										}
+									],
+									"start": 9,
+									"end": 22
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 23,
+					"end": 41,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 27,
+							"end": 37,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 9,
+				"end": 41
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 44,
+					"end": 57,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 44,
+							"end": 57,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "part",
+											"start": 44,
+											"end": 50
+										}
+									],
+									"start": 44,
+									"end": 57
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 58,
+					"end": 82,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 62,
+							"end": 78,
+							"property": "background",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 44,
+				"end": 82
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 85,
+					"end": 104,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 85,
+							"end": 104,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "part",
+											"start": 85,
+											"end": 91
+										}
+									],
+									"start": 85,
+									"end": 104
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 105,
+					"end": 131,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 109,
+							"end": 127,
+							"property": "background",
+							"value": "yellow"
+						}
+					]
+				},
+				"start": 85,
+				"end": 131
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 134,
+					"end": 153,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 134,
+							"end": 153,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "part",
+											"start": 134,
+											"end": 140
+										}
+									],
+									"start": 134,
+									"end": 153
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 154,
+					"end": 195,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 158,
+							"end": 170,
+							"property": "color",
+							"value": "white"
+						},
+						{
+							"type": "Declaration",
+							"start": 174,
+							"end": 191,
+							"property": "background",
+							"value": "green"
+						}
+					]
+				},
+				"start": 134,
+				"end": 195
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 196,
+			"styles": "\n\t::part(name1) {\n\t\tcolor: red;\n\t}\n\n\t::part(name2) {\n\t\tbackground: blue;\n\t}\n\n\t::part(name2 name3) {\n\t\tbackground: yellow;\n\t}\n\n\t::part(name4 name5) {\n\t\tcolor: white;\n\t\tbackground: green;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 205,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

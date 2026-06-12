@@ -1,0 +1,688 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 484,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Call breaks in inline quasi after multiline quasi - code context indent preserved",
+			"start": 20,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Deeper nesting - 3 tab code context",
+			"start": 260,
+			"end": 298,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 39
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 483,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 474,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 21,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 106,
+					"end": 257,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 112,
+							"end": 256,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 112,
+								"end": 113,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 116,
+								"end": 256,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 9,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 122,
+									"end": 256,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 17
+										},
+										"end": {
+											"line": 9,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ReturnStatement",
+											"start": 126,
+											"end": 253,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 2
+												},
+												"end": {
+													"line": 8,
+													"column": 6
+												}
+											},
+											"argument": {
+												"type": "TemplateLiteral",
+												"start": 133,
+												"end": 252,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 9
+													},
+													"end": {
+														"line": 8,
+														"column": 5
+													}
+												},
+												"expressions": [
+													{
+														"type": "Identifier",
+														"start": 214,
+														"end": 215,
+														"loc": {
+															"start": {
+																"line": 5,
+																"column": 73
+															},
+															"end": {
+																"line": 5,
+																"column": 74
+															}
+														},
+														"name": "x"
+													},
+													{
+														"type": "CallExpression",
+														"start": 220,
+														"end": 250,
+														"loc": {
+															"start": {
+																"line": 5,
+																"column": 79
+															},
+															"end": {
+																"line": 8,
+																"column": 3
+															}
+														},
+														"callee": {
+															"type": "Identifier",
+															"start": 220,
+															"end": 222,
+															"loc": {
+																"start": {
+																	"line": 5,
+																	"column": 79
+																},
+																"end": {
+																	"line": 5,
+																	"column": 81
+																}
+															},
+															"name": "fn"
+														},
+														"arguments": [
+															{
+																"type": "Identifier",
+																"start": 227,
+																"end": 237,
+																"loc": {
+																	"start": {
+																		"line": 6,
+																		"column": 3
+																	},
+																	"end": {
+																		"line": 6,
+																		"column": 13
+																	}
+																},
+																"name": "aaaaaaaaaa"
+															},
+															{
+																"type": "Identifier",
+																"start": 242,
+																"end": 245,
+																"loc": {
+																	"start": {
+																		"line": 7,
+																		"column": 3
+																	},
+																	"end": {
+																		"line": 7,
+																		"column": 6
+																	}
+																},
+																"name": "bbb"
+															}
+														],
+														"optional": false
+													}
+												],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 134,
+														"end": 212,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 10
+															},
+															"end": {
+																"line": 5,
+																"column": 71
+															}
+														},
+														"value": {
+															"raw": "prefix\ntext text text text text text text text text text text text text text: ",
+															"cooked": "prefix\ntext text text text text text text text text text text text text text: "
+														},
+														"tail": false
+													},
+													{
+														"type": "TemplateElement",
+														"start": 216,
+														"end": 218,
+														"loc": {
+															"start": {
+																"line": 5,
+																"column": 75
+															},
+															"end": {
+																"line": 5,
+																"column": 77
+															}
+														},
+														"value": {
+															"raw": ", ",
+															"cooked": ", "
+														},
+														"tail": false
+													},
+													{
+														"type": "TemplateElement",
+														"start": 251,
+														"end": 251,
+														"loc": {
+															"start": {
+																"line": 8,
+																"column": 4
+															},
+															"end": {
+																"line": 8,
+																"column": 4
+															}
+														},
+														"value": {
+															"raw": "",
+															"cooked": ""
+														},
+														"tail": true
+													}
+												]
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Call breaks in inline quasi after multiline quasi - code context indent preserved",
+							"start": 20,
+							"end": 104
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 300,
+					"end": 473,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 306,
+							"end": 472,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 20,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 306,
+								"end": 307,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 310,
+								"end": 472,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 11
+									},
+									"end": {
+										"line": 20,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 316,
+									"end": 472,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 17
+										},
+										"end": {
+											"line": 20,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "IfStatement",
+											"start": 320,
+											"end": 469,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 2
+												},
+												"end": {
+													"line": 19,
+													"column": 3
+												}
+											},
+											"test": {
+												"type": "Identifier",
+												"start": 324,
+												"end": 328,
+												"loc": {
+													"start": {
+														"line": 13,
+														"column": 6
+													},
+													"end": {
+														"line": 13,
+														"column": 10
+													}
+												},
+												"name": "cond"
+											},
+											"consequent": {
+												"type": "BlockStatement",
+												"start": 330,
+												"end": 469,
+												"loc": {
+													"start": {
+														"line": 13,
+														"column": 12
+													},
+													"end": {
+														"line": 19,
+														"column": 3
+													}
+												},
+												"body": [
+													{
+														"type": "ReturnStatement",
+														"start": 335,
+														"end": 465,
+														"loc": {
+															"start": {
+																"line": 14,
+																"column": 3
+															},
+															"end": {
+																"line": 18,
+																"column": 7
+															}
+														},
+														"argument": {
+															"type": "TemplateLiteral",
+															"start": 342,
+															"end": 464,
+															"loc": {
+																"start": {
+																	"line": 14,
+																	"column": 10
+																},
+																"end": {
+																	"line": 18,
+																	"column": 6
+																}
+															},
+															"expressions": [
+																{
+																	"type": "Identifier",
+																	"start": 423,
+																	"end": 424,
+																	"loc": {
+																		"start": {
+																			"line": 15,
+																			"column": 73
+																		},
+																		"end": {
+																			"line": 15,
+																			"column": 74
+																		}
+																	},
+																	"name": "x"
+																},
+																{
+																	"type": "CallExpression",
+																	"start": 429,
+																	"end": 462,
+																	"loc": {
+																		"start": {
+																			"line": 15,
+																			"column": 79
+																		},
+																		"end": {
+																			"line": 18,
+																			"column": 4
+																		}
+																	},
+																	"callee": {
+																		"type": "Identifier",
+																		"start": 429,
+																		"end": 431,
+																		"loc": {
+																			"start": {
+																				"line": 15,
+																				"column": 79
+																			},
+																			"end": {
+																				"line": 15,
+																				"column": 81
+																			}
+																		},
+																		"name": "fn"
+																	},
+																	"arguments": [
+																		{
+																			"type": "Identifier",
+																			"start": 437,
+																			"end": 447,
+																			"loc": {
+																				"start": {
+																					"line": 16,
+																					"column": 4
+																				},
+																				"end": {
+																					"line": 16,
+																					"column": 14
+																				}
+																			},
+																			"name": "aaaaaaaaaa"
+																		},
+																		{
+																			"type": "Identifier",
+																			"start": 453,
+																			"end": 456,
+																			"loc": {
+																				"start": {
+																					"line": 17,
+																					"column": 4
+																				},
+																				"end": {
+																					"line": 17,
+																					"column": 7
+																				}
+																			},
+																			"name": "bbb"
+																		}
+																	],
+																	"optional": false
+																}
+															],
+															"quasis": [
+																{
+																	"type": "TemplateElement",
+																	"start": 343,
+																	"end": 421,
+																	"loc": {
+																		"start": {
+																			"line": 14,
+																			"column": 11
+																		},
+																		"end": {
+																			"line": 15,
+																			"column": 71
+																		}
+																	},
+																	"value": {
+																		"raw": "prefix\ntext text text text text text text text text text text text text text: ",
+																		"cooked": "prefix\ntext text text text text text text text text text text text text text: "
+																	},
+																	"tail": false
+																},
+																{
+																	"type": "TemplateElement",
+																	"start": 425,
+																	"end": 427,
+																	"loc": {
+																		"start": {
+																			"line": 15,
+																			"column": 75
+																		},
+																		"end": {
+																			"line": 15,
+																			"column": 77
+																		}
+																	},
+																	"value": {
+																		"raw": ", ",
+																		"cooked": ", "
+																	},
+																	"tail": false
+																},
+																{
+																	"type": "TemplateElement",
+																	"start": 463,
+																	"end": 463,
+																	"loc": {
+																		"start": {
+																			"line": 18,
+																			"column": 5
+																		},
+																		"end": {
+																			"line": 18,
+																			"column": 5
+																		}
+																	},
+																	"value": {
+																		"raw": "",
+																		"cooked": ""
+																	},
+																	"tail": true
+																}
+															]
+														}
+													}
+												]
+											},
+											"alternate": null
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Deeper nesting - 3 tab code context",
+							"start": 260,
+							"end": 298
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

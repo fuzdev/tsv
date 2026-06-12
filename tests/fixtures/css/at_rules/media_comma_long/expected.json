@@ -1,0 +1,209 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 459,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 48,
+				"end": 92,
+				"name": "media",
+				"prelude": "screen, print",
+				"block": {
+					"type": "Block",
+					"start": 69,
+					"end": 92,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 73,
+								"end": 74,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 73,
+										"end": 74,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 73,
+														"end": 74
+													}
+												],
+												"start": 73,
+												"end": 74
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 75,
+								"end": 89,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 80,
+										"end": 84,
+										"property": "x",
+										"value": "1"
+									}
+								]
+							},
+							"start": 73,
+							"end": 89
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 144,
+				"end": 264,
+				"name": "media",
+				"prelude": "only screen and (min-width: 1000px), only screen and (orientation: aaaaaaaaaaaaaaaaaaaaa)",
+				"block": {
+					"type": "Block",
+					"start": 241,
+					"end": 264,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 245,
+								"end": 246,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 245,
+										"end": 246,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 245,
+														"end": 246
+													}
+												],
+												"start": 245,
+												"end": 246
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 247,
+								"end": 261,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 252,
+										"end": 256,
+										"property": "x",
+										"value": "1"
+									}
+								]
+							},
+							"start": 245,
+							"end": 261
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 327,
+				"end": 450,
+				"name": "media",
+				"prelude": "only screen and (min-width: 1000px),\n\t\tonly screen and (orientation: aaaaaaaaaaaaaaaaaaaaaa)",
+				"block": {
+					"type": "Block",
+					"start": 427,
+					"end": 450,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 431,
+								"end": 432,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 431,
+										"end": 432,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 431,
+														"end": 432
+													}
+												],
+												"start": 431,
+												"end": 432
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 433,
+								"end": 447,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 438,
+										"end": 442,
+										"property": "x",
+										"value": "1"
+									}
+								]
+							},
+							"start": 431,
+							"end": 447
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 451,
+			"styles": "\n\t/* short comma-list - stays inline */\n\t@media screen, print {\n\t\ta {\n\t\t\tx: 1;\n\t\t}\n\t}\n\t/* 100 chars - stays inline (both formatters) */\n\t@media only screen and (min-width: 1000px), only screen and (orientation: aaaaaaaaaaaaaaaaaaaaa) {\n\t\ta {\n\t\t\tx: 1;\n\t\t}\n\t}\n\t/* 101 chars - breaks at each comma (one query per line) */\n\t@media only screen and (min-width: 1000px),\n\t\tonly screen and (orientation: aaaaaaaaaaaaaaaaaaaaaa) {\n\t\ta {\n\t\t\tx: 1;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 460,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

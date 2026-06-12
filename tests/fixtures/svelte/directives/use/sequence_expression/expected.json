@@ -1,0 +1,622 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 383,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 69,
+				"data": " Sequence expressions in directive values require parentheses "
+			},
+			{
+				"type": "Text",
+				"start": 69,
+				"end": 71,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 71,
+				"end": 106,
+				"data": " Simple sequence expression "
+			},
+			{
+				"type": "Text",
+				"start": 106,
+				"end": 107,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 107,
+				"end": 141,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 108
+					},
+					"end": {
+						"line": 4,
+						"column": 4,
+						"character": 111
+					}
+				},
+				"attributes": [
+					{
+						"start": 112,
+						"end": 134,
+						"type": "UseDirective",
+						"name": "action",
+						"name_loc": {
+							"start": {
+								"line": 4,
+								"column": 5,
+								"character": 112
+							},
+							"end": {
+								"line": 4,
+								"column": 15,
+								"character": 122
+							}
+						},
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 125,
+							"end": 132,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 18
+								},
+								"end": {
+									"line": 4,
+									"column": 25
+								}
+							},
+							"expressions": [
+								{
+									"type": "Identifier",
+									"start": 125,
+									"end": 126,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 18
+										},
+										"end": {
+											"line": 4,
+											"column": 19
+										}
+									},
+									"name": "a"
+								},
+								{
+									"type": "Identifier",
+									"start": 128,
+									"end": 129,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 21
+										},
+										"end": {
+											"line": 4,
+											"column": 22
+										}
+									},
+									"name": "b"
+								},
+								{
+									"type": "Identifier",
+									"start": 131,
+									"end": 132,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 24
+										},
+										"end": {
+											"line": 4,
+											"column": 25
+										}
+									},
+									"name": "c"
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 141,
+				"end": 143,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 143,
+				"end": 178,
+				"data": " Longer sequence expression "
+			},
+			{
+				"type": "Text",
+				"start": 178,
+				"end": 179,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 179,
+				"end": 239,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 180
+					},
+					"end": {
+						"line": 7,
+						"column": 4,
+						"character": 183
+					}
+				},
+				"attributes": [
+					{
+						"start": 184,
+						"end": 232,
+						"type": "UseDirective",
+						"name": "action",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 5,
+								"character": 184
+							},
+							"end": {
+								"line": 7,
+								"column": 15,
+								"character": 194
+							}
+						},
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 197,
+							"end": 230,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 18
+								},
+								"end": {
+									"line": 7,
+									"column": 51
+								}
+							},
+							"expressions": [
+								{
+									"type": "Identifier",
+									"start": 197,
+									"end": 202,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 18
+										},
+										"end": {
+											"line": 7,
+											"column": 23
+										}
+									},
+									"name": "expr1"
+								},
+								{
+									"type": "Identifier",
+									"start": 204,
+									"end": 209,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 25
+										},
+										"end": {
+											"line": 7,
+											"column": 30
+										}
+									},
+									"name": "expr2"
+								},
+								{
+									"type": "Identifier",
+									"start": 211,
+									"end": 216,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 32
+										},
+										"end": {
+											"line": 7,
+											"column": 37
+										}
+									},
+									"name": "expr3"
+								},
+								{
+									"type": "Identifier",
+									"start": 218,
+									"end": 223,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 39
+										},
+										"end": {
+											"line": 7,
+											"column": 44
+										}
+									},
+									"name": "expr4"
+								},
+								{
+									"type": "Identifier",
+									"start": 225,
+									"end": 230,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 46
+										},
+										"end": {
+											"line": 7,
+											"column": 51
+										}
+									},
+									"name": "expr5"
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 239,
+				"end": 241,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 241,
+				"end": 278,
+				"data": " Sequence in other directives "
+			},
+			{
+				"type": "Text",
+				"start": 278,
+				"end": 279,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 279,
+				"end": 330,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 280
+					},
+					"end": {
+						"line": 10,
+						"column": 4,
+						"character": 283
+					}
+				},
+				"attributes": [
+					{
+						"start": 284,
+						"end": 323,
+						"type": "OnDirective",
+						"name": "click",
+						"name_loc": {
+							"start": {
+								"line": 10,
+								"column": 5,
+								"character": 284
+							},
+							"end": {
+								"line": 10,
+								"column": 13,
+								"character": 292
+							}
+						},
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 295,
+							"end": 321,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 16
+								},
+								"end": {
+									"line": 10,
+									"column": 42
+								}
+							},
+							"expressions": [
+								{
+									"type": "CallExpression",
+									"start": 295,
+									"end": 302,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 16
+										},
+										"end": {
+											"line": 10,
+											"column": 23
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 295,
+										"end": 300,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 16
+											},
+											"end": {
+												"line": 10,
+												"column": 21
+											}
+										},
+										"name": "first"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								{
+									"type": "CallExpression",
+									"start": 304,
+									"end": 312,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 25
+										},
+										"end": {
+											"line": 10,
+											"column": 33
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 304,
+										"end": 310,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 25
+											},
+											"end": {
+												"line": 10,
+												"column": 31
+											}
+										},
+										"name": "second"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								{
+									"type": "CallExpression",
+									"start": 314,
+									"end": 321,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 35
+										},
+										"end": {
+											"line": 10,
+											"column": 42
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 314,
+										"end": 319,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 35
+											},
+											"end": {
+												"line": 10,
+												"column": 40
+											}
+										},
+										"name": "third"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 330,
+				"end": 331,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 331,
+				"end": 382,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 1,
+						"character": 332
+					},
+					"end": {
+						"line": 11,
+						"column": 4,
+						"character": 335
+					}
+				},
+				"attributes": [
+					{
+						"start": 336,
+						"end": 375,
+						"type": "TransitionDirective",
+						"name": "fade",
+						"name_loc": {
+							"start": {
+								"line": 11,
+								"column": 5,
+								"character": 336
+							},
+							"end": {
+								"line": 11,
+								"column": 20,
+								"character": 351
+							}
+						},
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 354,
+							"end": 373,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 23
+								},
+								"end": {
+									"line": 11,
+									"column": 42
+								}
+							},
+							"expressions": [
+								{
+									"type": "CallExpression",
+									"start": 354,
+									"end": 360,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 23
+										},
+										"end": {
+											"line": 11,
+											"column": 29
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 354,
+										"end": 358,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 23
+											},
+											"end": {
+												"line": 11,
+												"column": 27
+											}
+										},
+										"name": "prep"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								{
+									"type": "CallExpression",
+									"start": 362,
+									"end": 373,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 31
+										},
+										"end": {
+											"line": 11,
+											"column": 42
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 362,
+										"end": 371,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 31
+											},
+											"end": {
+												"line": 11,
+												"column": 40
+											}
+										},
+										"name": "getConfig"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							]
+						},
+						"modifiers": [],
+						"intro": true,
+						"outro": true
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

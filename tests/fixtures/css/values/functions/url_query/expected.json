@@ -1,0 +1,94 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 290,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 281,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 58,
+							"end": 81,
+							"property": "src",
+							"value": "url(a.ttf?query=1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 120,
+							"end": 145,
+							"property": "src",
+							"value": "url(b.woff2?a=1&b=2)"
+						},
+						{
+							"type": "Declaration",
+							"start": 175,
+							"end": 201,
+							"property": "src",
+							"value": "url(c.ttf?list=a,b,c)"
+						},
+						{
+							"type": "Declaration",
+							"start": 239,
+							"end": 277,
+							"property": "src",
+							"value": "url(d.woff2?foo=rgb\\(255,255,0\\))"
+						}
+					]
+				},
+				"start": 9,
+				"end": 281
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 282,
+			"styles": "\n\ta {\n\t\t/* unquoted url() with a query string */\n\t\tsrc: url(a.ttf?query=1);\n\t\t/* query with multiple params */\n\t\tsrc: url(b.woff2?a=1&b=2);\n\t\t/* query with commas */\n\t\tsrc: url(c.ttf?list=a,b,c);\n\t\t/* query with escaped parens */\n\t\tsrc: url(d.woff2?foo=rgb\\(255,255,0\\));\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 291,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

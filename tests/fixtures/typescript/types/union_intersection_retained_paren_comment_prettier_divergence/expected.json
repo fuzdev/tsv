@@ -1,0 +1,951 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 403,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " trailing comment inside a retained parenthesized union member",
+			"start": 20,
+			"end": 84,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 107,
+			"end": 114,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 22
+				},
+				"end": {
+					"line": 3,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " leading comment inside a retained parenthesized union member",
+			"start": 119,
+			"end": 182,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 199,
+			"end": 206,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 16
+				},
+				"end": {
+					"line": 6,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " retained parenthesized union as the first member",
+			"start": 217,
+			"end": 268,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 287,
+			"end": 294,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 18
+				},
+				"end": {
+					"line": 9,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " retained parenthesized union as an intersection member",
+			"start": 303,
+			"end": 360,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 383,
+			"end": 390,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 22
+				},
+				"end": {
+					"line": 12,
+					"column": 29
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 402,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 393,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 86,
+					"end": 116,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 31
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 91,
+						"end": 93,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 8
+							}
+						},
+						"name": "A1"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 96,
+						"end": 115,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 11
+							},
+							"end": {
+								"line": 3,
+								"column": 30
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 96,
+								"end": 97,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 12
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 96,
+									"end": 97,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 11
+										},
+										"end": {
+											"line": 3,
+											"column": 12
+										}
+									},
+									"name": "a"
+								}
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 100,
+								"end": 115,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 15
+									},
+									"end": {
+										"line": 3,
+										"column": 30
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSUnionType",
+									"start": 101,
+									"end": 106,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 16
+										},
+										"end": {
+											"line": 3,
+											"column": 21
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 101,
+											"end": 102,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 16
+												},
+												"end": {
+													"line": 3,
+													"column": 17
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 101,
+												"end": 102,
+												"loc": {
+													"start": {
+														"line": 3,
+														"column": 16
+													},
+													"end": {
+														"line": 3,
+														"column": 17
+													}
+												},
+												"name": "b"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 105,
+											"end": 106,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 20
+												},
+												"end": {
+													"line": 3,
+													"column": 21
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 105,
+												"end": 106,
+												"loc": {
+													"start": {
+														"line": 3,
+														"column": 20
+													},
+													"end": {
+														"line": 3,
+														"column": 21
+													}
+												},
+												"name": "c"
+											}
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 107,
+											"end": 114
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " trailing comment inside a retained parenthesized union member",
+							"start": 20,
+							"end": 84
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 184,
+					"end": 214,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 31
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 189,
+						"end": 191,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 6
+							},
+							"end": {
+								"line": 6,
+								"column": 8
+							}
+						},
+						"name": "A2"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 194,
+						"end": 213,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 11
+							},
+							"end": {
+								"line": 6,
+								"column": 30
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 194,
+								"end": 195,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 11
+									},
+									"end": {
+										"line": 6,
+										"column": 12
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 194,
+									"end": 195,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 11
+										},
+										"end": {
+											"line": 6,
+											"column": 12
+										}
+									},
+									"name": "a"
+								}
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 198,
+								"end": 213,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 15
+									},
+									"end": {
+										"line": 6,
+										"column": 30
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSUnionType",
+									"start": 207,
+									"end": 212,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 24
+										},
+										"end": {
+											"line": 6,
+											"column": 29
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 207,
+											"end": 208,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 24
+												},
+												"end": {
+													"line": 6,
+													"column": 25
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 207,
+												"end": 208,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 24
+													},
+													"end": {
+														"line": 6,
+														"column": 25
+													}
+												},
+												"name": "b"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 211,
+											"end": 212,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 28
+												},
+												"end": {
+													"line": 6,
+													"column": 29
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 211,
+												"end": 212,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 28
+													},
+													"end": {
+														"line": 6,
+														"column": 29
+													}
+												},
+												"name": "c"
+											}
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 199,
+											"end": 206
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " leading comment inside a retained parenthesized union member",
+							"start": 119,
+							"end": 182
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 270,
+					"end": 300,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 31
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 275,
+						"end": 277,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 6
+							},
+							"end": {
+								"line": 9,
+								"column": 8
+							}
+						},
+						"name": "A3"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 280,
+						"end": 299,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 11
+							},
+							"end": {
+								"line": 9,
+								"column": 30
+							}
+						},
+						"types": [
+							{
+								"type": "TSParenthesizedType",
+								"start": 280,
+								"end": 295,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 11
+									},
+									"end": {
+										"line": 9,
+										"column": 26
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSUnionType",
+									"start": 281,
+									"end": 286,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 12
+										},
+										"end": {
+											"line": 9,
+											"column": 17
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 281,
+											"end": 282,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 12
+												},
+												"end": {
+													"line": 9,
+													"column": 13
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 281,
+												"end": 282,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 12
+													},
+													"end": {
+														"line": 9,
+														"column": 13
+													}
+												},
+												"name": "a"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 285,
+											"end": 286,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 16
+												},
+												"end": {
+													"line": 9,
+													"column": 17
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 285,
+												"end": 286,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 16
+													},
+													"end": {
+														"line": 9,
+														"column": 17
+													}
+												},
+												"name": "b"
+											}
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 287,
+											"end": 294
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 298,
+								"end": 299,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 29
+									},
+									"end": {
+										"line": 9,
+										"column": 30
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 298,
+									"end": 299,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 29
+										},
+										"end": {
+											"line": 9,
+											"column": 30
+										}
+									},
+									"name": "c"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " retained parenthesized union as the first member",
+							"start": 217,
+							"end": 268
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 362,
+					"end": 392,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 31
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 367,
+						"end": 369,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 6
+							},
+							"end": {
+								"line": 12,
+								"column": 8
+							}
+						},
+						"name": "A4"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 372,
+						"end": 391,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 11
+							},
+							"end": {
+								"line": 12,
+								"column": 30
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 372,
+								"end": 373,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 11
+									},
+									"end": {
+										"line": 12,
+										"column": 12
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 372,
+									"end": 373,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 11
+										},
+										"end": {
+											"line": 12,
+											"column": 12
+										}
+									},
+									"name": "a"
+								}
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 376,
+								"end": 391,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 15
+									},
+									"end": {
+										"line": 12,
+										"column": 30
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSUnionType",
+									"start": 377,
+									"end": 382,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 16
+										},
+										"end": {
+											"line": 12,
+											"column": 21
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 377,
+											"end": 378,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 16
+												},
+												"end": {
+													"line": 12,
+													"column": 17
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 377,
+												"end": 378,
+												"loc": {
+													"start": {
+														"line": 12,
+														"column": 16
+													},
+													"end": {
+														"line": 12,
+														"column": 17
+													}
+												},
+												"name": "b"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 381,
+											"end": 382,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 20
+												},
+												"end": {
+													"line": 12,
+													"column": 21
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 381,
+												"end": 382,
+												"loc": {
+													"start": {
+														"line": 12,
+														"column": 20
+													},
+													"end": {
+														"line": 12,
+														"column": 21
+													}
+												},
+												"name": "c"
+											}
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 383,
+											"end": 390
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " retained parenthesized union as an intersection member",
+							"start": 303,
+							"end": 360
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

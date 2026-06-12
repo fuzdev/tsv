@@ -1,0 +1,96 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 285,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 95,
+				"end": 162,
+				"name": "font-feature-values",
+				"prelude": "Font   Name",
+				"block": {
+					"type": "Block",
+					"start": 128,
+					"end": 162,
+					"children": [
+						{
+							"type": "Atrule",
+							"start": 132,
+							"end": 159,
+							"name": "styleset",
+							"prelude": "",
+							"block": {
+								"type": "Block",
+								"start": 142,
+								"end": 159,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 147,
+										"end": 154,
+										"property": "nice",
+										"value": "1"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 212,
+				"end": 276,
+				"name": "font-feature-values",
+				"prelude": "Other Name",
+				"block": {
+					"type": "Block",
+					"start": 244,
+					"end": 276,
+					"children": [
+						{
+							"type": "Atrule",
+							"start": 248,
+							"end": 273,
+							"name": "swash",
+							"prelude": "",
+							"block": {
+								"type": "Block",
+								"start": 255,
+								"end": 273,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 260,
+										"end": 268,
+										"property": "fancy",
+										"value": "2"
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 277,
+			"styles": "\n\t/* multi-ident family name: internal whitespace preserved verbatim, not collapsed */\n\t@font-feature-values Font   Name {\n\t\t@styleset {\n\t\t\tnice: 1;\n\t\t}\n\t}\n\t/* single-space sibling — already canonical */\n\t@font-feature-values Other Name {\n\t\t@swash {\n\t\t\tfancy: 2;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 286,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

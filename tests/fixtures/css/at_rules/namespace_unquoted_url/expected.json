@@ -1,0 +1,50 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 450,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 166,
+				"end": 211,
+				"name": "namespace",
+				"prelude": "url(http://www.w3.org/1999/xhtml)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 213,
+				"end": 260,
+				"name": "namespace",
+				"prelude": "svg url(http://www.w3.org/2000/svg)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 391,
+				"end": 441,
+				"name": "namespace",
+				"prelude": "ns URL(  http://www.w3.org/2000/svg  )",
+				"block": null
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 442,
+			"styles": "\n\t/* Unquoted url() — opaque content preserved verbatim (the `://` colon is not a property\n\tcolon); lowercase url() also has its inner whitespace trimmed. */\n\t@namespace url(http://www.w3.org/1999/xhtml);\n\t@namespace svg url(http://www.w3.org/2000/svg);\n\n\t/* Uppercase URL() is NOT a url-token (lowercase only), so its inner whitespace is\n\tpreserved verbatim rather than trimmed. */\n\t@namespace ns URL(  http://www.w3.org/2000/svg  );\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 451,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

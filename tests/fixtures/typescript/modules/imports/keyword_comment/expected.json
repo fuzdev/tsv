@@ -1,0 +1,898 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 842,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " block comment between import and source (bare import)",
+			"start": 20,
+			"end": 76,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 85,
+			"end": 92,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 8
+				},
+				"end": {
+					"line": 3,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment between import and source (bare import)",
+			"start": 100,
+			"end": 155,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 164,
+			"end": 168,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 8
+				},
+				"end": {
+					"line": 6,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment between from and source (with empty braces)",
+			"start": 177,
+			"end": 237,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 254,
+			"end": 261,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 16
+				},
+				"end": {
+					"line": 10,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment between from and source (with empty braces)",
+			"start": 269,
+			"end": 328,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 345,
+			"end": 349,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 16
+				},
+				"end": {
+					"line": 13,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " empty braces with dangling comment (prettier relocates after from)",
+			"start": 358,
+			"end": 427,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 444,
+			"end": 451,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 16
+				},
+				"end": {
+					"line": 17,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " type import with dangling comment (prettier relocates after from)",
+			"start": 459,
+			"end": 527,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 549,
+			"end": 556,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 21
+				},
+				"end": {
+					"line": 20,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " multiple block comments between from and source",
+			"start": 564,
+			"end": 614,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 631,
+			"end": 639,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 16
+				},
+				"end": {
+					"line": 23,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 640,
+			"end": 648,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 25
+				},
+				"end": {
+					"line": 23,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " multiple line comments between from and source",
+			"start": 656,
+			"end": 705,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 722,
+			"end": 727,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 16
+				},
+				"end": {
+					"line": 26,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 729,
+			"end": 734,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment between from and source (with specifiers)",
+			"start": 743,
+			"end": 801,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 1
+				},
+				"end": {
+					"line": 30,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 819,
+			"end": 826,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 17
+				},
+				"end": {
+					"line": 31,
+					"column": 24
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 841,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 832,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 32,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 78,
+					"end": 97,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 20
+						}
+					},
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 93,
+						"end": 96,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 16
+							},
+							"end": {
+								"line": 3,
+								"column": 19
+							}
+						},
+						"value": "a",
+						"raw": "'a'",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 85,
+								"end": 92
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment between import and source (bare import)",
+							"start": 20,
+							"end": 76
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 157,
+					"end": 174,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 5
+						}
+					},
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 170,
+						"end": 173,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 4
+							}
+						},
+						"value": "b",
+						"raw": "'b'",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 164,
+								"end": 168
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment between import and source (bare import)",
+							"start": 100,
+							"end": 155
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 239,
+					"end": 266,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 28
+						}
+					},
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 262,
+						"end": 265,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 24
+							},
+							"end": {
+								"line": 10,
+								"column": 27
+							}
+						},
+						"value": "c",
+						"raw": "'c'",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 254,
+								"end": 261
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment between from and source (with empty braces)",
+							"start": 177,
+							"end": 237
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 330,
+					"end": 355,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 5
+						}
+					},
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 351,
+						"end": 354,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 4
+							}
+						},
+						"value": "d",
+						"raw": "'d'",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 345,
+								"end": 349
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment between from and source (with empty braces)",
+							"start": 269,
+							"end": 328
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 429,
+					"end": 456,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 28
+						}
+					},
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 452,
+						"end": 455,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 24
+							},
+							"end": {
+								"line": 17,
+								"column": 27
+							}
+						},
+						"value": "e",
+						"raw": "'e'",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 444,
+								"end": 451
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " empty braces with dangling comment (prettier relocates after from)",
+							"start": 358,
+							"end": 427
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 529,
+					"end": 561,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 33
+						}
+					},
+					"importKind": "type",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 557,
+						"end": 560,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 29
+							},
+							"end": {
+								"line": 20,
+								"column": 32
+							}
+						},
+						"value": "f",
+						"raw": "'f'",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 549,
+								"end": 556
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " type import with dangling comment (prettier relocates after from)",
+							"start": 459,
+							"end": 527
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 616,
+					"end": 653,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 38
+						}
+					},
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 649,
+						"end": 652,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 34
+							},
+							"end": {
+								"line": 23,
+								"column": 37
+							}
+						},
+						"value": "g",
+						"raw": "'g'",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 631,
+								"end": 639
+							},
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 640,
+								"end": 648
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " multiple block comments between from and source",
+							"start": 564,
+							"end": 614
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 707,
+					"end": 740,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 5
+						}
+					},
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 736,
+						"end": 739,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 1
+							},
+							"end": {
+								"line": 28,
+								"column": 4
+							}
+						},
+						"value": "h",
+						"raw": "'h'",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 722,
+								"end": 727
+							},
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 729,
+								"end": 734
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " multiple line comments between from and source",
+							"start": 656,
+							"end": 705
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 803,
+					"end": 831,
+					"loc": {
+						"start": {
+							"line": 31,
+							"column": 1
+						},
+						"end": {
+							"line": 31,
+							"column": 29
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 811,
+							"end": 812,
+							"loc": {
+								"start": {
+									"line": 31,
+									"column": 9
+								},
+								"end": {
+									"line": 31,
+									"column": 10
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 811,
+								"end": 812,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 9
+									},
+									"end": {
+										"line": 31,
+										"column": 10
+									}
+								},
+								"name": "a"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 811,
+								"end": 812,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 9
+									},
+									"end": {
+										"line": 31,
+										"column": 10
+									}
+								},
+								"name": "a"
+							},
+							"importKind": "value"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 827,
+						"end": 830,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 25
+							},
+							"end": {
+								"line": 31,
+								"column": 28
+							}
+						},
+						"value": "i",
+						"raw": "'i'",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 819,
+								"end": 826
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment between from and source (with specifiers)",
+							"start": 743,
+							"end": 801
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

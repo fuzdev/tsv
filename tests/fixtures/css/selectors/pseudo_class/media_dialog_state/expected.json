@@ -1,0 +1,1013 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 990,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 38,
+					"end": 51,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 38,
+							"end": 51,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "video",
+											"start": 38,
+											"end": 43
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "playing",
+											"args": null,
+											"start": 43,
+											"end": 51
+										}
+									],
+									"start": 38,
+									"end": 51
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 52,
+					"end": 82,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 56,
+							"end": 78,
+							"property": "border",
+							"value": "2px solid blue"
+						}
+					]
+				},
+				"start": 38,
+				"end": 82
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 85,
+					"end": 97,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 85,
+							"end": 97,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "video",
+											"start": 85,
+											"end": 90
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "paused",
+											"args": null,
+											"start": 90,
+											"end": 97
+										}
+									],
+									"start": 85,
+									"end": 97
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 98,
+					"end": 118,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 102,
+							"end": 114,
+							"property": "opacity",
+							"value": "0.5"
+						}
+					]
+				},
+				"start": 85,
+				"end": 118
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 121,
+					"end": 134,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 121,
+							"end": 134,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "video",
+											"start": 121,
+											"end": 126
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "seeking",
+											"args": null,
+											"start": 126,
+											"end": 134
+										}
+									],
+									"start": 121,
+									"end": 134
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 135,
+					"end": 155,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 139,
+							"end": 151,
+							"property": "opacity",
+							"value": "0.8"
+						}
+					]
+				},
+				"start": 121,
+				"end": 155
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 186,
+					"end": 208,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 186,
+							"end": 208,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "video",
+											"start": 186,
+											"end": 191
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "buffering",
+											"args": null,
+											"start": 191,
+											"end": 201
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "after",
+											"start": 201,
+											"end": 208
+										}
+									],
+									"start": 186,
+									"end": 208
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 209,
+					"end": 238,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 213,
+							"end": 234,
+							"property": "content",
+							"value": "'Loading...'"
+						}
+					]
+				},
+				"start": 186,
+				"end": 238
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 241,
+					"end": 254,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 241,
+							"end": 254,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "video",
+											"start": 241,
+											"end": 246
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "stalled",
+											"args": null,
+											"start": 246,
+											"end": 254
+										}
+									],
+									"start": 241,
+									"end": 254
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 255,
+					"end": 284,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 259,
+							"end": 280,
+							"property": "border",
+							"value": "2px solid red"
+						}
+					]
+				},
+				"start": 241,
+				"end": 284
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 313,
+					"end": 324,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 313,
+							"end": 324,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "audio",
+											"start": 313,
+											"end": 318
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "muted",
+											"args": null,
+											"start": 318,
+											"end": 324
+										}
+									],
+									"start": 313,
+									"end": 324
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 325,
+					"end": 345,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 329,
+							"end": 341,
+							"property": "opacity",
+							"value": "0.5"
+						}
+					]
+				},
+				"start": 313,
+				"end": 345
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 348,
+					"end": 375,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 348,
+							"end": 375,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "audio",
+											"start": 348,
+											"end": 353
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "volume-locked",
+											"args": null,
+											"start": 353,
+											"end": 367
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "before",
+											"start": 367,
+											"end": 375
+										}
+									],
+									"start": 348,
+									"end": 375
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 376,
+					"end": 403,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 380,
+							"end": 399,
+							"property": "content",
+							"value": "'[locked]'"
+						}
+					]
+				},
+				"start": 348,
+				"end": 403
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 441,
+					"end": 452,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 441,
+							"end": 452,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "fullscreen",
+											"args": null,
+											"start": 441,
+											"end": 452
+										}
+									],
+									"start": 441,
+									"end": 452
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 453,
+					"end": 478,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 457,
+							"end": 474,
+							"property": "background",
+							"value": "black"
+						}
+					]
+				},
+				"start": 441,
+				"end": 478
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 481,
+					"end": 500,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 481,
+							"end": 500,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "picture-in-picture",
+											"args": null,
+											"start": 481,
+											"end": 500
+										}
+									],
+									"start": 481,
+									"end": 500
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 501,
+					"end": 531,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 505,
+							"end": 527,
+							"property": "border",
+							"value": "2px solid blue"
+						}
+					]
+				},
+				"start": 481,
+				"end": 531
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 561,
+					"end": 573,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 561,
+							"end": 573,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "dialog",
+											"start": 561,
+											"end": 567
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "modal",
+											"args": null,
+											"start": 567,
+											"end": 573
+										}
+									],
+									"start": 561,
+									"end": 573
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 574,
+					"end": 608,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 578,
+							"end": 604,
+							"property": "backdrop-filter",
+							"value": "blur(5px)"
+						}
+					]
+				},
+				"start": 561,
+				"end": 608
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 611,
+					"end": 627,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 611,
+							"end": 627,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 611,
+											"end": 614
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "popover-open",
+											"args": null,
+											"start": 614,
+											"end": 627
+										}
+									],
+									"start": 611,
+									"end": 627
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 628,
+					"end": 650,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 632,
+							"end": 646,
+							"property": "display",
+							"value": "block"
+						}
+					]
+				},
+				"start": 611,
+				"end": 650
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 681,
+					"end": 703,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 681,
+							"end": 703,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "custom-element",
+											"start": 681,
+											"end": 695
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "defined",
+											"args": null,
+											"start": 695,
+											"end": 703
+										}
+									],
+									"start": 681,
+									"end": 703
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 704,
+					"end": 722,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 708,
+							"end": 718,
+							"property": "opacity",
+							"value": "1"
+						}
+					]
+				},
+				"start": 681,
+				"end": 722
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 765,
+					"end": 778,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 765,
+							"end": 778,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "cue",
+											"start": 765,
+											"end": 770
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "current",
+											"args": null,
+											"start": 770,
+											"end": 778
+										}
+									],
+									"start": 765,
+									"end": 778
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 779,
+					"end": 800,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 783,
+							"end": 796,
+							"property": "color",
+							"value": "yellow"
+						}
+					]
+				},
+				"start": 765,
+				"end": 800
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 803,
+					"end": 813,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 803,
+							"end": 813,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "cue",
+											"start": 803,
+											"end": 808
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "past",
+											"args": null,
+											"start": 808,
+											"end": 813
+										}
+									],
+									"start": 803,
+									"end": 813
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 814,
+					"end": 833,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 818,
+							"end": 829,
+							"property": "color",
+							"value": "gray"
+						}
+					]
+				},
+				"start": 803,
+				"end": 833
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 836,
+					"end": 848,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 836,
+							"end": 848,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "cue",
+											"start": 836,
+											"end": 841
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "future",
+											"args": null,
+											"start": 841,
+											"end": 848
+										}
+									],
+									"start": 836,
+									"end": 848
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 849,
+					"end": 869,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 853,
+							"end": 865,
+							"property": "color",
+							"value": "white"
+						}
+					]
+				},
+				"start": 836,
+				"end": 869
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 895,
+					"end": 904,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 895,
+							"end": 904,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "p",
+											"start": 895,
+											"end": 896
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "current",
+											"args": null,
+											"start": 896,
+											"end": 904
+										}
+									],
+									"start": 895,
+									"end": 904
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 905,
+					"end": 931,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 909,
+							"end": 927,
+							"property": "background",
+							"value": "yellow"
+						}
+					]
+				},
+				"start": 895,
+				"end": 931
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 934,
+					"end": 955,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 934,
+							"end": 955,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "p",
+											"start": 934,
+											"end": 935
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "current",
+											"args": {
+												"type": "SelectorList",
+												"start": 944,
+												"end": 954,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 944,
+														"end": 946,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "li",
+																		"start": 944,
+																		"end": 946
+																	}
+																],
+																"start": 944,
+																"end": 946
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 948,
+														"end": 950,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "dt",
+																		"start": 948,
+																		"end": 950
+																	}
+																],
+																"start": 948,
+																"end": 950
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 952,
+														"end": 954,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "dd",
+																		"start": 952,
+																		"end": 954
+																	}
+																],
+																"start": 952,
+																"end": 954
+															}
+														]
+													}
+												]
+											},
+											"start": 935,
+											"end": 955
+										}
+									],
+									"start": 934,
+									"end": 955
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 956,
+					"end": 981,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 960,
+							"end": 977,
+							"property": "font-weight",
+							"value": "bold"
+						}
+					]
+				},
+				"start": 934,
+				"end": 981
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 982,
+			"styles": "\n\t/* Media playback states */\n\tvideo:playing {\n\t\tborder: 2px solid blue;\n\t}\n\n\tvideo:paused {\n\t\topacity: 0.5;\n\t}\n\n\tvideo:seeking {\n\t\topacity: 0.8;\n\t}\n\n\t/* Media loading states */\n\tvideo:buffering::after {\n\t\tcontent: 'Loading...';\n\t}\n\n\tvideo:stalled {\n\t\tborder: 2px solid red;\n\t}\n\n\t/* Audio sound states */\n\taudio:muted {\n\t\topacity: 0.5;\n\t}\n\n\taudio:volume-locked::before {\n\t\tcontent: '[locked]';\n\t}\n\n\t/* Display presentation states */\n\t:fullscreen {\n\t\tbackground: black;\n\t}\n\n\t:picture-in-picture {\n\t\tborder: 2px solid blue;\n\t}\n\n\t/* Dialog/modal states */\n\tdialog:modal {\n\t\tbackdrop-filter: blur(5px);\n\t}\n\n\tdiv:popover-open {\n\t\tdisplay: block;\n\t}\n\n\t/* Web component states */\n\tcustom-element:defined {\n\t\topacity: 1;\n\t}\n\n\t/* Time-dimensional states (WebVTT) */\n\t::cue:current {\n\t\tcolor: yellow;\n\t}\n\n\t::cue:past {\n\t\tcolor: gray;\n\t}\n\n\t::cue:future {\n\t\tcolor: white;\n\t}\n\n\t/* Functional form */\n\tp:current {\n\t\tbackground: yellow;\n\t}\n\n\tp:current(li, dt, dd) {\n\t\tfont-weight: bold;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 991,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

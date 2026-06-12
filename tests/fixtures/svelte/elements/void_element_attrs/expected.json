@@ -1,0 +1,165 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 116,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 115,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 6,
+						"character": 6
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 8,
+						"end": 19,
+						"name": "type",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 1,
+								"character": 8
+							},
+							"end": {
+								"line": 2,
+								"column": 5,
+								"character": 12
+							}
+						},
+						"value": [
+							{
+								"start": 14,
+								"end": 18,
+								"type": "Text",
+								"raw": "text",
+								"data": "text"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 21,
+						"end": 33,
+						"name": "name",
+						"name_loc": {
+							"start": {
+								"line": 3,
+								"column": 1,
+								"character": 21
+							},
+							"end": {
+								"line": 3,
+								"column": 5,
+								"character": 25
+							}
+						},
+						"value": [
+							{
+								"start": 27,
+								"end": 32,
+								"type": "Text",
+								"raw": "name1",
+								"data": "name1"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 35,
+						"end": 74,
+						"name": "placeholder",
+						"name_loc": {
+							"start": {
+								"line": 4,
+								"column": 1,
+								"character": 35
+							},
+							"end": {
+								"line": 4,
+								"column": 12,
+								"character": 46
+							}
+						},
+						"value": [
+							{
+								"start": 48,
+								"end": 73,
+								"type": "Text",
+								"raw": "placeholder1 placeholder2",
+								"data": "placeholder1 placeholder2"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 76,
+						"end": 102,
+						"name": "aria-label",
+						"name_loc": {
+							"start": {
+								"line": 5,
+								"column": 1,
+								"character": 76
+							},
+							"end": {
+								"line": 5,
+								"column": 11,
+								"character": 86
+							}
+						},
+						"value": [
+							{
+								"start": 88,
+								"end": 101,
+								"type": "Text",
+								"raw": "label1 label2",
+								"data": "label1 label2"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 104,
+						"end": 112,
+						"name": "required",
+						"name_loc": {
+							"start": {
+								"line": 6,
+								"column": 1,
+								"character": 104
+							},
+							"end": {
+								"line": 6,
+								"column": 9,
+								"character": 112
+							}
+						},
+						"value": true
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

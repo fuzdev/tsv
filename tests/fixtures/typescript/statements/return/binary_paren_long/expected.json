@@ -1,0 +1,2727 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 661,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " 100 chars - stays flat, no parens",
+			"start": 20,
+			"end": 56,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars - breaks with parens",
+			"start": 186,
+			"end": 219,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Short control - no parens",
+			"start": 360,
+			"end": 388,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Throw also wraps binary chains in parens when breaking (101 chars)",
+			"start": 444,
+			"end": 513,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 70
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 660,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 651,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 25,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 58,
+					"end": 183,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 67,
+						"end": 69,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 3,
+								"column": 12
+							}
+						},
+						"name": "fn"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 71,
+						"end": 79,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 14
+							},
+							"end": {
+								"line": 3,
+								"column": 22
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSStringKeyword",
+							"start": 73,
+							"end": 79,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 16
+								},
+								"end": {
+									"line": 3,
+									"column": 22
+								}
+							}
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 80,
+						"end": 183,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 23
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 84,
+								"end": 180,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 98
+									}
+								},
+								"argument": {
+									"type": "BinaryExpression",
+									"start": 91,
+									"end": 179,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 9
+										},
+										"end": {
+											"line": 4,
+											"column": 97
+										}
+									},
+									"left": {
+										"type": "BinaryExpression",
+										"start": 91,
+										"end": 172,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 9
+											},
+											"end": {
+												"line": 4,
+												"column": 90
+											}
+										},
+										"left": {
+											"type": "BinaryExpression",
+											"start": 91,
+											"end": 168,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 9
+												},
+												"end": {
+													"line": 4,
+													"column": 86
+												}
+											},
+											"left": {
+												"type": "BinaryExpression",
+												"start": 91,
+												"end": 164,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 9
+													},
+													"end": {
+														"line": 4,
+														"column": 82
+													}
+												},
+												"left": {
+													"type": "BinaryExpression",
+													"start": 91,
+													"end": 160,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 9
+														},
+														"end": {
+															"line": 4,
+															"column": 78
+														}
+													},
+													"left": {
+														"type": "BinaryExpression",
+														"start": 91,
+														"end": 156,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 9
+															},
+															"end": {
+																"line": 4,
+																"column": 74
+															}
+														},
+														"left": {
+															"type": "BinaryExpression",
+															"start": 91,
+															"end": 152,
+															"loc": {
+																"start": {
+																	"line": 4,
+																	"column": 9
+																},
+																"end": {
+																	"line": 4,
+																	"column": 70
+																}
+															},
+															"left": {
+																"type": "BinaryExpression",
+																"start": 91,
+																"end": 148,
+																"loc": {
+																	"start": {
+																		"line": 4,
+																		"column": 9
+																	},
+																	"end": {
+																		"line": 4,
+																		"column": 66
+																	}
+																},
+																"left": {
+																	"type": "BinaryExpression",
+																	"start": 91,
+																	"end": 144,
+																	"loc": {
+																		"start": {
+																			"line": 4,
+																			"column": 9
+																		},
+																		"end": {
+																			"line": 4,
+																			"column": 62
+																		}
+																	},
+																	"left": {
+																		"type": "BinaryExpression",
+																		"start": 91,
+																		"end": 140,
+																		"loc": {
+																			"start": {
+																				"line": 4,
+																				"column": 9
+																			},
+																			"end": {
+																				"line": 4,
+																				"column": 58
+																			}
+																		},
+																		"left": {
+																			"type": "BinaryExpression",
+																			"start": 91,
+																			"end": 136,
+																			"loc": {
+																				"start": {
+																					"line": 4,
+																					"column": 9
+																				},
+																				"end": {
+																					"line": 4,
+																					"column": 54
+																				}
+																			},
+																			"left": {
+																				"type": "BinaryExpression",
+																				"start": 91,
+																				"end": 132,
+																				"loc": {
+																					"start": {
+																						"line": 4,
+																						"column": 9
+																					},
+																					"end": {
+																						"line": 4,
+																						"column": 50
+																					}
+																				},
+																				"left": {
+																					"type": "BinaryExpression",
+																					"start": 91,
+																					"end": 128,
+																					"loc": {
+																						"start": {
+																							"line": 4,
+																							"column": 9
+																						},
+																						"end": {
+																							"line": 4,
+																							"column": 46
+																						}
+																					},
+																					"left": {
+																						"type": "BinaryExpression",
+																						"start": 91,
+																						"end": 124,
+																						"loc": {
+																							"start": {
+																								"line": 4,
+																								"column": 9
+																							},
+																							"end": {
+																								"line": 4,
+																								"column": 42
+																							}
+																						},
+																						"left": {
+																							"type": "BinaryExpression",
+																							"start": 91,
+																							"end": 120,
+																							"loc": {
+																								"start": {
+																									"line": 4,
+																									"column": 9
+																								},
+																								"end": {
+																									"line": 4,
+																									"column": 38
+																								}
+																							},
+																							"left": {
+																								"type": "BinaryExpression",
+																								"start": 91,
+																								"end": 116,
+																								"loc": {
+																									"start": {
+																										"line": 4,
+																										"column": 9
+																									},
+																									"end": {
+																										"line": 4,
+																										"column": 34
+																									}
+																								},
+																								"left": {
+																									"type": "BinaryExpression",
+																									"start": 91,
+																									"end": 112,
+																									"loc": {
+																										"start": {
+																											"line": 4,
+																											"column": 9
+																										},
+																										"end": {
+																											"line": 4,
+																											"column": 30
+																										}
+																									},
+																									"left": {
+																										"type": "BinaryExpression",
+																										"start": 91,
+																										"end": 108,
+																										"loc": {
+																											"start": {
+																												"line": 4,
+																												"column": 9
+																											},
+																											"end": {
+																												"line": 4,
+																												"column": 26
+																											}
+																										},
+																										"left": {
+																											"type": "BinaryExpression",
+																											"start": 91,
+																											"end": 104,
+																											"loc": {
+																												"start": {
+																													"line": 4,
+																													"column": 9
+																												},
+																												"end": {
+																													"line": 4,
+																													"column": 22
+																												}
+																											},
+																											"left": {
+																												"type": "BinaryExpression",
+																												"start": 91,
+																												"end": 100,
+																												"loc": {
+																													"start": {
+																														"line": 4,
+																														"column": 9
+																													},
+																													"end": {
+																														"line": 4,
+																														"column": 18
+																													}
+																												},
+																												"left": {
+																													"type": "BinaryExpression",
+																													"start": 91,
+																													"end": 96,
+																													"loc": {
+																														"start": {
+																															"line": 4,
+																															"column": 9
+																														},
+																														"end": {
+																															"line": 4,
+																															"column": 14
+																														}
+																													},
+																													"left": {
+																														"type": "Identifier",
+																														"start": 91,
+																														"end": 92,
+																														"loc": {
+																															"start": {
+																																"line": 4,
+																																"column": 9
+																															},
+																															"end": {
+																																"line": 4,
+																																"column": 10
+																															}
+																														},
+																														"name": "a"
+																													},
+																													"operator": "+",
+																													"right": {
+																														"type": "Identifier",
+																														"start": 95,
+																														"end": 96,
+																														"loc": {
+																															"start": {
+																																"line": 4,
+																																"column": 13
+																															},
+																															"end": {
+																																"line": 4,
+																																"column": 14
+																															}
+																														},
+																														"name": "b"
+																													}
+																												},
+																												"operator": "+",
+																												"right": {
+																													"type": "Identifier",
+																													"start": 99,
+																													"end": 100,
+																													"loc": {
+																														"start": {
+																															"line": 4,
+																															"column": 17
+																														},
+																														"end": {
+																															"line": 4,
+																															"column": 18
+																														}
+																													},
+																													"name": "c"
+																												}
+																											},
+																											"operator": "+",
+																											"right": {
+																												"type": "Identifier",
+																												"start": 103,
+																												"end": 104,
+																												"loc": {
+																													"start": {
+																														"line": 4,
+																														"column": 21
+																													},
+																													"end": {
+																														"line": 4,
+																														"column": 22
+																													}
+																												},
+																												"name": "d"
+																											}
+																										},
+																										"operator": "+",
+																										"right": {
+																											"type": "Identifier",
+																											"start": 107,
+																											"end": 108,
+																											"loc": {
+																												"start": {
+																													"line": 4,
+																													"column": 25
+																												},
+																												"end": {
+																													"line": 4,
+																													"column": 26
+																												}
+																											},
+																											"name": "e"
+																										}
+																									},
+																									"operator": "+",
+																									"right": {
+																										"type": "Identifier",
+																										"start": 111,
+																										"end": 112,
+																										"loc": {
+																											"start": {
+																												"line": 4,
+																												"column": 29
+																											},
+																											"end": {
+																												"line": 4,
+																												"column": 30
+																											}
+																										},
+																										"name": "f"
+																									}
+																								},
+																								"operator": "+",
+																								"right": {
+																									"type": "Identifier",
+																									"start": 115,
+																									"end": 116,
+																									"loc": {
+																										"start": {
+																											"line": 4,
+																											"column": 33
+																										},
+																										"end": {
+																											"line": 4,
+																											"column": 34
+																										}
+																									},
+																									"name": "g"
+																								}
+																							},
+																							"operator": "+",
+																							"right": {
+																								"type": "Identifier",
+																								"start": 119,
+																								"end": 120,
+																								"loc": {
+																									"start": {
+																										"line": 4,
+																										"column": 37
+																									},
+																									"end": {
+																										"line": 4,
+																										"column": 38
+																									}
+																								},
+																								"name": "h"
+																							}
+																						},
+																						"operator": "+",
+																						"right": {
+																							"type": "Identifier",
+																							"start": 123,
+																							"end": 124,
+																							"loc": {
+																								"start": {
+																									"line": 4,
+																									"column": 41
+																								},
+																								"end": {
+																									"line": 4,
+																									"column": 42
+																								}
+																							},
+																							"name": "i"
+																						}
+																					},
+																					"operator": "+",
+																					"right": {
+																						"type": "Identifier",
+																						"start": 127,
+																						"end": 128,
+																						"loc": {
+																							"start": {
+																								"line": 4,
+																								"column": 45
+																							},
+																							"end": {
+																								"line": 4,
+																								"column": 46
+																							}
+																						},
+																						"name": "j"
+																					}
+																				},
+																				"operator": "+",
+																				"right": {
+																					"type": "Identifier",
+																					"start": 131,
+																					"end": 132,
+																					"loc": {
+																						"start": {
+																							"line": 4,
+																							"column": 49
+																						},
+																						"end": {
+																							"line": 4,
+																							"column": 50
+																						}
+																					},
+																					"name": "k"
+																				}
+																			},
+																			"operator": "+",
+																			"right": {
+																				"type": "Identifier",
+																				"start": 135,
+																				"end": 136,
+																				"loc": {
+																					"start": {
+																						"line": 4,
+																						"column": 53
+																					},
+																					"end": {
+																						"line": 4,
+																						"column": 54
+																					}
+																				},
+																				"name": "l"
+																			}
+																		},
+																		"operator": "+",
+																		"right": {
+																			"type": "Identifier",
+																			"start": 139,
+																			"end": 140,
+																			"loc": {
+																				"start": {
+																					"line": 4,
+																					"column": 57
+																				},
+																				"end": {
+																					"line": 4,
+																					"column": 58
+																				}
+																			},
+																			"name": "m"
+																		}
+																	},
+																	"operator": "+",
+																	"right": {
+																		"type": "Identifier",
+																		"start": 143,
+																		"end": 144,
+																		"loc": {
+																			"start": {
+																				"line": 4,
+																				"column": 61
+																			},
+																			"end": {
+																				"line": 4,
+																				"column": 62
+																			}
+																		},
+																		"name": "n"
+																	}
+																},
+																"operator": "+",
+																"right": {
+																	"type": "Identifier",
+																	"start": 147,
+																	"end": 148,
+																	"loc": {
+																		"start": {
+																			"line": 4,
+																			"column": 65
+																		},
+																		"end": {
+																			"line": 4,
+																			"column": 66
+																		}
+																	},
+																	"name": "o"
+																}
+															},
+															"operator": "+",
+															"right": {
+																"type": "Identifier",
+																"start": 151,
+																"end": 152,
+																"loc": {
+																	"start": {
+																		"line": 4,
+																		"column": 69
+																	},
+																	"end": {
+																		"line": 4,
+																		"column": 70
+																	}
+																},
+																"name": "p"
+															}
+														},
+														"operator": "+",
+														"right": {
+															"type": "Identifier",
+															"start": 155,
+															"end": 156,
+															"loc": {
+																"start": {
+																	"line": 4,
+																	"column": 73
+																},
+																"end": {
+																	"line": 4,
+																	"column": 74
+																}
+															},
+															"name": "q"
+														}
+													},
+													"operator": "+",
+													"right": {
+														"type": "Identifier",
+														"start": 159,
+														"end": 160,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 77
+															},
+															"end": {
+																"line": 4,
+																"column": 78
+															}
+														},
+														"name": "r"
+													}
+												},
+												"operator": "+",
+												"right": {
+													"type": "Identifier",
+													"start": 163,
+													"end": 164,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 81
+														},
+														"end": {
+															"line": 4,
+															"column": 82
+														}
+													},
+													"name": "s"
+												}
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 167,
+												"end": 168,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 85
+													},
+													"end": {
+														"line": 4,
+														"column": 86
+													}
+												},
+												"name": "t"
+											}
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 171,
+											"end": 172,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 89
+												},
+												"end": {
+													"line": 4,
+													"column": 90
+												}
+											},
+											"name": "u"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 175,
+										"end": 179,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 93
+											},
+											"end": {
+												"line": 4,
+												"column": 97
+											}
+										},
+										"name": "vvvv"
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 100 chars - stays flat, no parens",
+							"start": 20,
+							"end": 56
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 221,
+					"end": 357,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 230,
+						"end": 233,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 10
+							},
+							"end": {
+								"line": 8,
+								"column": 13
+							}
+						},
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 235,
+						"end": 243,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 15
+							},
+							"end": {
+								"line": 8,
+								"column": 23
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSStringKeyword",
+							"start": 237,
+							"end": 243,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 17
+								},
+								"end": {
+									"line": 8,
+									"column": 23
+								}
+							}
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 244,
+						"end": 357,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 24
+							},
+							"end": {
+								"line": 12,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 248,
+								"end": 354,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 4
+									}
+								},
+								"argument": {
+									"type": "BinaryExpression",
+									"start": 260,
+									"end": 349,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 3
+										},
+										"end": {
+											"line": 10,
+											"column": 92
+										}
+									},
+									"left": {
+										"type": "BinaryExpression",
+										"start": 260,
+										"end": 341,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 3
+											},
+											"end": {
+												"line": 10,
+												"column": 84
+											}
+										},
+										"left": {
+											"type": "BinaryExpression",
+											"start": 260,
+											"end": 337,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 3
+												},
+												"end": {
+													"line": 10,
+													"column": 80
+												}
+											},
+											"left": {
+												"type": "BinaryExpression",
+												"start": 260,
+												"end": 333,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 3
+													},
+													"end": {
+														"line": 10,
+														"column": 76
+													}
+												},
+												"left": {
+													"type": "BinaryExpression",
+													"start": 260,
+													"end": 329,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 3
+														},
+														"end": {
+															"line": 10,
+															"column": 72
+														}
+													},
+													"left": {
+														"type": "BinaryExpression",
+														"start": 260,
+														"end": 325,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 3
+															},
+															"end": {
+																"line": 10,
+																"column": 68
+															}
+														},
+														"left": {
+															"type": "BinaryExpression",
+															"start": 260,
+															"end": 321,
+															"loc": {
+																"start": {
+																	"line": 10,
+																	"column": 3
+																},
+																"end": {
+																	"line": 10,
+																	"column": 64
+																}
+															},
+															"left": {
+																"type": "BinaryExpression",
+																"start": 260,
+																"end": 317,
+																"loc": {
+																	"start": {
+																		"line": 10,
+																		"column": 3
+																	},
+																	"end": {
+																		"line": 10,
+																		"column": 60
+																	}
+																},
+																"left": {
+																	"type": "BinaryExpression",
+																	"start": 260,
+																	"end": 313,
+																	"loc": {
+																		"start": {
+																			"line": 10,
+																			"column": 3
+																		},
+																		"end": {
+																			"line": 10,
+																			"column": 56
+																		}
+																	},
+																	"left": {
+																		"type": "BinaryExpression",
+																		"start": 260,
+																		"end": 309,
+																		"loc": {
+																			"start": {
+																				"line": 10,
+																				"column": 3
+																			},
+																			"end": {
+																				"line": 10,
+																				"column": 52
+																			}
+																		},
+																		"left": {
+																			"type": "BinaryExpression",
+																			"start": 260,
+																			"end": 305,
+																			"loc": {
+																				"start": {
+																					"line": 10,
+																					"column": 3
+																				},
+																				"end": {
+																					"line": 10,
+																					"column": 48
+																				}
+																			},
+																			"left": {
+																				"type": "BinaryExpression",
+																				"start": 260,
+																				"end": 301,
+																				"loc": {
+																					"start": {
+																						"line": 10,
+																						"column": 3
+																					},
+																					"end": {
+																						"line": 10,
+																						"column": 44
+																					}
+																				},
+																				"left": {
+																					"type": "BinaryExpression",
+																					"start": 260,
+																					"end": 297,
+																					"loc": {
+																						"start": {
+																							"line": 10,
+																							"column": 3
+																						},
+																						"end": {
+																							"line": 10,
+																							"column": 40
+																						}
+																					},
+																					"left": {
+																						"type": "BinaryExpression",
+																						"start": 260,
+																						"end": 293,
+																						"loc": {
+																							"start": {
+																								"line": 10,
+																								"column": 3
+																							},
+																							"end": {
+																								"line": 10,
+																								"column": 36
+																							}
+																						},
+																						"left": {
+																							"type": "BinaryExpression",
+																							"start": 260,
+																							"end": 289,
+																							"loc": {
+																								"start": {
+																									"line": 10,
+																									"column": 3
+																								},
+																								"end": {
+																									"line": 10,
+																									"column": 32
+																								}
+																							},
+																							"left": {
+																								"type": "BinaryExpression",
+																								"start": 260,
+																								"end": 285,
+																								"loc": {
+																									"start": {
+																										"line": 10,
+																										"column": 3
+																									},
+																									"end": {
+																										"line": 10,
+																										"column": 28
+																									}
+																								},
+																								"left": {
+																									"type": "BinaryExpression",
+																									"start": 260,
+																									"end": 281,
+																									"loc": {
+																										"start": {
+																											"line": 10,
+																											"column": 3
+																										},
+																										"end": {
+																											"line": 10,
+																											"column": 24
+																										}
+																									},
+																									"left": {
+																										"type": "BinaryExpression",
+																										"start": 260,
+																										"end": 277,
+																										"loc": {
+																											"start": {
+																												"line": 10,
+																												"column": 3
+																											},
+																											"end": {
+																												"line": 10,
+																												"column": 20
+																											}
+																										},
+																										"left": {
+																											"type": "BinaryExpression",
+																											"start": 260,
+																											"end": 273,
+																											"loc": {
+																												"start": {
+																													"line": 10,
+																													"column": 3
+																												},
+																												"end": {
+																													"line": 10,
+																													"column": 16
+																												}
+																											},
+																											"left": {
+																												"type": "BinaryExpression",
+																												"start": 260,
+																												"end": 269,
+																												"loc": {
+																													"start": {
+																														"line": 10,
+																														"column": 3
+																													},
+																													"end": {
+																														"line": 10,
+																														"column": 12
+																													}
+																												},
+																												"left": {
+																													"type": "BinaryExpression",
+																													"start": 260,
+																													"end": 265,
+																													"loc": {
+																														"start": {
+																															"line": 10,
+																															"column": 3
+																														},
+																														"end": {
+																															"line": 10,
+																															"column": 8
+																														}
+																													},
+																													"left": {
+																														"type": "Identifier",
+																														"start": 260,
+																														"end": 261,
+																														"loc": {
+																															"start": {
+																																"line": 10,
+																																"column": 3
+																															},
+																															"end": {
+																																"line": 10,
+																																"column": 4
+																															}
+																														},
+																														"name": "a"
+																													},
+																													"operator": "+",
+																													"right": {
+																														"type": "Identifier",
+																														"start": 264,
+																														"end": 265,
+																														"loc": {
+																															"start": {
+																																"line": 10,
+																																"column": 7
+																															},
+																															"end": {
+																																"line": 10,
+																																"column": 8
+																															}
+																														},
+																														"name": "b"
+																													}
+																												},
+																												"operator": "+",
+																												"right": {
+																													"type": "Identifier",
+																													"start": 268,
+																													"end": 269,
+																													"loc": {
+																														"start": {
+																															"line": 10,
+																															"column": 11
+																														},
+																														"end": {
+																															"line": 10,
+																															"column": 12
+																														}
+																													},
+																													"name": "c"
+																												}
+																											},
+																											"operator": "+",
+																											"right": {
+																												"type": "Identifier",
+																												"start": 272,
+																												"end": 273,
+																												"loc": {
+																													"start": {
+																														"line": 10,
+																														"column": 15
+																													},
+																													"end": {
+																														"line": 10,
+																														"column": 16
+																													}
+																												},
+																												"name": "d"
+																											}
+																										},
+																										"operator": "+",
+																										"right": {
+																											"type": "Identifier",
+																											"start": 276,
+																											"end": 277,
+																											"loc": {
+																												"start": {
+																													"line": 10,
+																													"column": 19
+																												},
+																												"end": {
+																													"line": 10,
+																													"column": 20
+																												}
+																											},
+																											"name": "e"
+																										}
+																									},
+																									"operator": "+",
+																									"right": {
+																										"type": "Identifier",
+																										"start": 280,
+																										"end": 281,
+																										"loc": {
+																											"start": {
+																												"line": 10,
+																												"column": 23
+																											},
+																											"end": {
+																												"line": 10,
+																												"column": 24
+																											}
+																										},
+																										"name": "f"
+																									}
+																								},
+																								"operator": "+",
+																								"right": {
+																									"type": "Identifier",
+																									"start": 284,
+																									"end": 285,
+																									"loc": {
+																										"start": {
+																											"line": 10,
+																											"column": 27
+																										},
+																										"end": {
+																											"line": 10,
+																											"column": 28
+																										}
+																									},
+																									"name": "g"
+																								}
+																							},
+																							"operator": "+",
+																							"right": {
+																								"type": "Identifier",
+																								"start": 288,
+																								"end": 289,
+																								"loc": {
+																									"start": {
+																										"line": 10,
+																										"column": 31
+																									},
+																									"end": {
+																										"line": 10,
+																										"column": 32
+																									}
+																								},
+																								"name": "h"
+																							}
+																						},
+																						"operator": "+",
+																						"right": {
+																							"type": "Identifier",
+																							"start": 292,
+																							"end": 293,
+																							"loc": {
+																								"start": {
+																									"line": 10,
+																									"column": 35
+																								},
+																								"end": {
+																									"line": 10,
+																									"column": 36
+																								}
+																							},
+																							"name": "i"
+																						}
+																					},
+																					"operator": "+",
+																					"right": {
+																						"type": "Identifier",
+																						"start": 296,
+																						"end": 297,
+																						"loc": {
+																							"start": {
+																								"line": 10,
+																								"column": 39
+																							},
+																							"end": {
+																								"line": 10,
+																								"column": 40
+																							}
+																						},
+																						"name": "j"
+																					}
+																				},
+																				"operator": "+",
+																				"right": {
+																					"type": "Identifier",
+																					"start": 300,
+																					"end": 301,
+																					"loc": {
+																						"start": {
+																							"line": 10,
+																							"column": 43
+																						},
+																						"end": {
+																							"line": 10,
+																							"column": 44
+																						}
+																					},
+																					"name": "k"
+																				}
+																			},
+																			"operator": "+",
+																			"right": {
+																				"type": "Identifier",
+																				"start": 304,
+																				"end": 305,
+																				"loc": {
+																					"start": {
+																						"line": 10,
+																						"column": 47
+																					},
+																					"end": {
+																						"line": 10,
+																						"column": 48
+																					}
+																				},
+																				"name": "l"
+																			}
+																		},
+																		"operator": "+",
+																		"right": {
+																			"type": "Identifier",
+																			"start": 308,
+																			"end": 309,
+																			"loc": {
+																				"start": {
+																					"line": 10,
+																					"column": 51
+																				},
+																				"end": {
+																					"line": 10,
+																					"column": 52
+																				}
+																			},
+																			"name": "m"
+																		}
+																	},
+																	"operator": "+",
+																	"right": {
+																		"type": "Identifier",
+																		"start": 312,
+																		"end": 313,
+																		"loc": {
+																			"start": {
+																				"line": 10,
+																				"column": 55
+																			},
+																			"end": {
+																				"line": 10,
+																				"column": 56
+																			}
+																		},
+																		"name": "n"
+																	}
+																},
+																"operator": "+",
+																"right": {
+																	"type": "Identifier",
+																	"start": 316,
+																	"end": 317,
+																	"loc": {
+																		"start": {
+																			"line": 10,
+																			"column": 59
+																		},
+																		"end": {
+																			"line": 10,
+																			"column": 60
+																		}
+																	},
+																	"name": "o"
+																}
+															},
+															"operator": "+",
+															"right": {
+																"type": "Identifier",
+																"start": 320,
+																"end": 321,
+																"loc": {
+																	"start": {
+																		"line": 10,
+																		"column": 63
+																	},
+																	"end": {
+																		"line": 10,
+																		"column": 64
+																	}
+																},
+																"name": "p"
+															}
+														},
+														"operator": "+",
+														"right": {
+															"type": "Identifier",
+															"start": 324,
+															"end": 325,
+															"loc": {
+																"start": {
+																	"line": 10,
+																	"column": 67
+																},
+																"end": {
+																	"line": 10,
+																	"column": 68
+																}
+															},
+															"name": "q"
+														}
+													},
+													"operator": "+",
+													"right": {
+														"type": "Identifier",
+														"start": 328,
+														"end": 329,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 71
+															},
+															"end": {
+																"line": 10,
+																"column": 72
+															}
+														},
+														"name": "r"
+													}
+												},
+												"operator": "+",
+												"right": {
+													"type": "Identifier",
+													"start": 332,
+													"end": 333,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 75
+														},
+														"end": {
+															"line": 10,
+															"column": 76
+														}
+													},
+													"name": "s"
+												}
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 336,
+												"end": 337,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 79
+													},
+													"end": {
+														"line": 10,
+														"column": 80
+													}
+												},
+												"name": "t"
+											}
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 340,
+											"end": 341,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 83
+												},
+												"end": {
+													"line": 10,
+													"column": 84
+												}
+											},
+											"name": "u"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 344,
+										"end": 349,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 87
+											},
+											"end": {
+												"line": 10,
+												"column": 92
+											}
+										},
+										"name": "vvvvv"
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 chars - breaks with parens",
+							"start": 186,
+							"end": 219
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 390,
+					"end": 441,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 399,
+						"end": 402,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 10
+							},
+							"end": {
+								"line": 15,
+								"column": 13
+							}
+						},
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 404,
+						"end": 412,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 15
+							},
+							"end": {
+								"line": 15,
+								"column": 23
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSNumberKeyword",
+							"start": 406,
+							"end": 412,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 17
+								},
+								"end": {
+									"line": 15,
+									"column": 23
+								}
+							}
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 413,
+						"end": 441,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 24
+							},
+							"end": {
+								"line": 17,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 417,
+								"end": 438,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 23
+									}
+								},
+								"argument": {
+									"type": "BinaryExpression",
+									"start": 424,
+									"end": 437,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 9
+										},
+										"end": {
+											"line": 16,
+											"column": 22
+										}
+									},
+									"left": {
+										"type": "BinaryExpression",
+										"start": 424,
+										"end": 433,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 9
+											},
+											"end": {
+												"line": 16,
+												"column": 18
+											}
+										},
+										"left": {
+											"type": "BinaryExpression",
+											"start": 424,
+											"end": 429,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 9
+												},
+												"end": {
+													"line": 16,
+													"column": 14
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 424,
+												"end": 425,
+												"loc": {
+													"start": {
+														"line": 16,
+														"column": 9
+													},
+													"end": {
+														"line": 16,
+														"column": 10
+													}
+												},
+												"name": "a"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 428,
+												"end": 429,
+												"loc": {
+													"start": {
+														"line": 16,
+														"column": 13
+													},
+													"end": {
+														"line": 16,
+														"column": 14
+													}
+												},
+												"name": "b"
+											}
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 432,
+											"end": 433,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 17
+												},
+												"end": {
+													"line": 16,
+													"column": 18
+												}
+											},
+											"name": "c"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 436,
+										"end": 437,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 21
+											},
+											"end": {
+												"line": 16,
+												"column": 22
+											}
+										},
+										"name": "d"
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Short control - no parens",
+							"start": 360,
+							"end": 388
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 515,
+					"end": 650,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 524,
+						"end": 527,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 10
+							},
+							"end": {
+								"line": 20,
+								"column": 13
+							}
+						},
+						"name": "fn3"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 529,
+						"end": 536,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 15
+							},
+							"end": {
+								"line": 20,
+								"column": 22
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSNeverKeyword",
+							"start": 531,
+							"end": 536,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 17
+								},
+								"end": {
+									"line": 20,
+									"column": 22
+								}
+							}
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 537,
+						"end": 650,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 23
+							},
+							"end": {
+								"line": 24,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ThrowStatement",
+								"start": 541,
+								"end": 647,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 4
+									}
+								},
+								"argument": {
+									"type": "BinaryExpression",
+									"start": 552,
+									"end": 642,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 3
+										},
+										"end": {
+											"line": 22,
+											"column": 93
+										}
+									},
+									"left": {
+										"type": "BinaryExpression",
+										"start": 552,
+										"end": 633,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 3
+											},
+											"end": {
+												"line": 22,
+												"column": 84
+											}
+										},
+										"left": {
+											"type": "BinaryExpression",
+											"start": 552,
+											"end": 629,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 3
+												},
+												"end": {
+													"line": 22,
+													"column": 80
+												}
+											},
+											"left": {
+												"type": "BinaryExpression",
+												"start": 552,
+												"end": 625,
+												"loc": {
+													"start": {
+														"line": 22,
+														"column": 3
+													},
+													"end": {
+														"line": 22,
+														"column": 76
+													}
+												},
+												"left": {
+													"type": "BinaryExpression",
+													"start": 552,
+													"end": 621,
+													"loc": {
+														"start": {
+															"line": 22,
+															"column": 3
+														},
+														"end": {
+															"line": 22,
+															"column": 72
+														}
+													},
+													"left": {
+														"type": "BinaryExpression",
+														"start": 552,
+														"end": 617,
+														"loc": {
+															"start": {
+																"line": 22,
+																"column": 3
+															},
+															"end": {
+																"line": 22,
+																"column": 68
+															}
+														},
+														"left": {
+															"type": "BinaryExpression",
+															"start": 552,
+															"end": 613,
+															"loc": {
+																"start": {
+																	"line": 22,
+																	"column": 3
+																},
+																"end": {
+																	"line": 22,
+																	"column": 64
+																}
+															},
+															"left": {
+																"type": "BinaryExpression",
+																"start": 552,
+																"end": 609,
+																"loc": {
+																	"start": {
+																		"line": 22,
+																		"column": 3
+																	},
+																	"end": {
+																		"line": 22,
+																		"column": 60
+																	}
+																},
+																"left": {
+																	"type": "BinaryExpression",
+																	"start": 552,
+																	"end": 605,
+																	"loc": {
+																		"start": {
+																			"line": 22,
+																			"column": 3
+																		},
+																		"end": {
+																			"line": 22,
+																			"column": 56
+																		}
+																	},
+																	"left": {
+																		"type": "BinaryExpression",
+																		"start": 552,
+																		"end": 601,
+																		"loc": {
+																			"start": {
+																				"line": 22,
+																				"column": 3
+																			},
+																			"end": {
+																				"line": 22,
+																				"column": 52
+																			}
+																		},
+																		"left": {
+																			"type": "BinaryExpression",
+																			"start": 552,
+																			"end": 597,
+																			"loc": {
+																				"start": {
+																					"line": 22,
+																					"column": 3
+																				},
+																				"end": {
+																					"line": 22,
+																					"column": 48
+																				}
+																			},
+																			"left": {
+																				"type": "BinaryExpression",
+																				"start": 552,
+																				"end": 593,
+																				"loc": {
+																					"start": {
+																						"line": 22,
+																						"column": 3
+																					},
+																					"end": {
+																						"line": 22,
+																						"column": 44
+																					}
+																				},
+																				"left": {
+																					"type": "BinaryExpression",
+																					"start": 552,
+																					"end": 589,
+																					"loc": {
+																						"start": {
+																							"line": 22,
+																							"column": 3
+																						},
+																						"end": {
+																							"line": 22,
+																							"column": 40
+																						}
+																					},
+																					"left": {
+																						"type": "BinaryExpression",
+																						"start": 552,
+																						"end": 585,
+																						"loc": {
+																							"start": {
+																								"line": 22,
+																								"column": 3
+																							},
+																							"end": {
+																								"line": 22,
+																								"column": 36
+																							}
+																						},
+																						"left": {
+																							"type": "BinaryExpression",
+																							"start": 552,
+																							"end": 581,
+																							"loc": {
+																								"start": {
+																									"line": 22,
+																									"column": 3
+																								},
+																								"end": {
+																									"line": 22,
+																									"column": 32
+																								}
+																							},
+																							"left": {
+																								"type": "BinaryExpression",
+																								"start": 552,
+																								"end": 577,
+																								"loc": {
+																									"start": {
+																										"line": 22,
+																										"column": 3
+																									},
+																									"end": {
+																										"line": 22,
+																										"column": 28
+																									}
+																								},
+																								"left": {
+																									"type": "BinaryExpression",
+																									"start": 552,
+																									"end": 573,
+																									"loc": {
+																										"start": {
+																											"line": 22,
+																											"column": 3
+																										},
+																										"end": {
+																											"line": 22,
+																											"column": 24
+																										}
+																									},
+																									"left": {
+																										"type": "BinaryExpression",
+																										"start": 552,
+																										"end": 569,
+																										"loc": {
+																											"start": {
+																												"line": 22,
+																												"column": 3
+																											},
+																											"end": {
+																												"line": 22,
+																												"column": 20
+																											}
+																										},
+																										"left": {
+																											"type": "BinaryExpression",
+																											"start": 552,
+																											"end": 565,
+																											"loc": {
+																												"start": {
+																													"line": 22,
+																													"column": 3
+																												},
+																												"end": {
+																													"line": 22,
+																													"column": 16
+																												}
+																											},
+																											"left": {
+																												"type": "BinaryExpression",
+																												"start": 552,
+																												"end": 561,
+																												"loc": {
+																													"start": {
+																														"line": 22,
+																														"column": 3
+																													},
+																													"end": {
+																														"line": 22,
+																														"column": 12
+																													}
+																												},
+																												"left": {
+																													"type": "BinaryExpression",
+																													"start": 552,
+																													"end": 557,
+																													"loc": {
+																														"start": {
+																															"line": 22,
+																															"column": 3
+																														},
+																														"end": {
+																															"line": 22,
+																															"column": 8
+																														}
+																													},
+																													"left": {
+																														"type": "Identifier",
+																														"start": 552,
+																														"end": 553,
+																														"loc": {
+																															"start": {
+																																"line": 22,
+																																"column": 3
+																															},
+																															"end": {
+																																"line": 22,
+																																"column": 4
+																															}
+																														},
+																														"name": "a"
+																													},
+																													"operator": "+",
+																													"right": {
+																														"type": "Identifier",
+																														"start": 556,
+																														"end": 557,
+																														"loc": {
+																															"start": {
+																																"line": 22,
+																																"column": 7
+																															},
+																															"end": {
+																																"line": 22,
+																																"column": 8
+																															}
+																														},
+																														"name": "b"
+																													}
+																												},
+																												"operator": "+",
+																												"right": {
+																													"type": "Identifier",
+																													"start": 560,
+																													"end": 561,
+																													"loc": {
+																														"start": {
+																															"line": 22,
+																															"column": 11
+																														},
+																														"end": {
+																															"line": 22,
+																															"column": 12
+																														}
+																													},
+																													"name": "c"
+																												}
+																											},
+																											"operator": "+",
+																											"right": {
+																												"type": "Identifier",
+																												"start": 564,
+																												"end": 565,
+																												"loc": {
+																													"start": {
+																														"line": 22,
+																														"column": 15
+																													},
+																													"end": {
+																														"line": 22,
+																														"column": 16
+																													}
+																												},
+																												"name": "d"
+																											}
+																										},
+																										"operator": "+",
+																										"right": {
+																											"type": "Identifier",
+																											"start": 568,
+																											"end": 569,
+																											"loc": {
+																												"start": {
+																													"line": 22,
+																													"column": 19
+																												},
+																												"end": {
+																													"line": 22,
+																													"column": 20
+																												}
+																											},
+																											"name": "e"
+																										}
+																									},
+																									"operator": "+",
+																									"right": {
+																										"type": "Identifier",
+																										"start": 572,
+																										"end": 573,
+																										"loc": {
+																											"start": {
+																												"line": 22,
+																												"column": 23
+																											},
+																											"end": {
+																												"line": 22,
+																												"column": 24
+																											}
+																										},
+																										"name": "f"
+																									}
+																								},
+																								"operator": "+",
+																								"right": {
+																									"type": "Identifier",
+																									"start": 576,
+																									"end": 577,
+																									"loc": {
+																										"start": {
+																											"line": 22,
+																											"column": 27
+																										},
+																										"end": {
+																											"line": 22,
+																											"column": 28
+																										}
+																									},
+																									"name": "g"
+																								}
+																							},
+																							"operator": "+",
+																							"right": {
+																								"type": "Identifier",
+																								"start": 580,
+																								"end": 581,
+																								"loc": {
+																									"start": {
+																										"line": 22,
+																										"column": 31
+																									},
+																									"end": {
+																										"line": 22,
+																										"column": 32
+																									}
+																								},
+																								"name": "h"
+																							}
+																						},
+																						"operator": "+",
+																						"right": {
+																							"type": "Identifier",
+																							"start": 584,
+																							"end": 585,
+																							"loc": {
+																								"start": {
+																									"line": 22,
+																									"column": 35
+																								},
+																								"end": {
+																									"line": 22,
+																									"column": 36
+																								}
+																							},
+																							"name": "i"
+																						}
+																					},
+																					"operator": "+",
+																					"right": {
+																						"type": "Identifier",
+																						"start": 588,
+																						"end": 589,
+																						"loc": {
+																							"start": {
+																								"line": 22,
+																								"column": 39
+																							},
+																							"end": {
+																								"line": 22,
+																								"column": 40
+																							}
+																						},
+																						"name": "j"
+																					}
+																				},
+																				"operator": "+",
+																				"right": {
+																					"type": "Identifier",
+																					"start": 592,
+																					"end": 593,
+																					"loc": {
+																						"start": {
+																							"line": 22,
+																							"column": 43
+																						},
+																						"end": {
+																							"line": 22,
+																							"column": 44
+																						}
+																					},
+																					"name": "k"
+																				}
+																			},
+																			"operator": "+",
+																			"right": {
+																				"type": "Identifier",
+																				"start": 596,
+																				"end": 597,
+																				"loc": {
+																					"start": {
+																						"line": 22,
+																						"column": 47
+																					},
+																					"end": {
+																						"line": 22,
+																						"column": 48
+																					}
+																				},
+																				"name": "l"
+																			}
+																		},
+																		"operator": "+",
+																		"right": {
+																			"type": "Identifier",
+																			"start": 600,
+																			"end": 601,
+																			"loc": {
+																				"start": {
+																					"line": 22,
+																					"column": 51
+																				},
+																				"end": {
+																					"line": 22,
+																					"column": 52
+																				}
+																			},
+																			"name": "m"
+																		}
+																	},
+																	"operator": "+",
+																	"right": {
+																		"type": "Identifier",
+																		"start": 604,
+																		"end": 605,
+																		"loc": {
+																			"start": {
+																				"line": 22,
+																				"column": 55
+																			},
+																			"end": {
+																				"line": 22,
+																				"column": 56
+																			}
+																		},
+																		"name": "n"
+																	}
+																},
+																"operator": "+",
+																"right": {
+																	"type": "Identifier",
+																	"start": 608,
+																	"end": 609,
+																	"loc": {
+																		"start": {
+																			"line": 22,
+																			"column": 59
+																		},
+																		"end": {
+																			"line": 22,
+																			"column": 60
+																		}
+																	},
+																	"name": "o"
+																}
+															},
+															"operator": "+",
+															"right": {
+																"type": "Identifier",
+																"start": 612,
+																"end": 613,
+																"loc": {
+																	"start": {
+																		"line": 22,
+																		"column": 63
+																	},
+																	"end": {
+																		"line": 22,
+																		"column": 64
+																	}
+																},
+																"name": "p"
+															}
+														},
+														"operator": "+",
+														"right": {
+															"type": "Identifier",
+															"start": 616,
+															"end": 617,
+															"loc": {
+																"start": {
+																	"line": 22,
+																	"column": 67
+																},
+																"end": {
+																	"line": 22,
+																	"column": 68
+																}
+															},
+															"name": "q"
+														}
+													},
+													"operator": "+",
+													"right": {
+														"type": "Identifier",
+														"start": 620,
+														"end": 621,
+														"loc": {
+															"start": {
+																"line": 22,
+																"column": 71
+															},
+															"end": {
+																"line": 22,
+																"column": 72
+															}
+														},
+														"name": "r"
+													}
+												},
+												"operator": "+",
+												"right": {
+													"type": "Identifier",
+													"start": 624,
+													"end": 625,
+													"loc": {
+														"start": {
+															"line": 22,
+															"column": 75
+														},
+														"end": {
+															"line": 22,
+															"column": 76
+														}
+													},
+													"name": "s"
+												}
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 628,
+												"end": 629,
+												"loc": {
+													"start": {
+														"line": 22,
+														"column": 79
+													},
+													"end": {
+														"line": 22,
+														"column": 80
+													}
+												},
+												"name": "t"
+											}
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 632,
+											"end": 633,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 83
+												},
+												"end": {
+													"line": 22,
+													"column": 84
+												}
+											},
+											"name": "u"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 636,
+										"end": 642,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 87
+											},
+											"end": {
+												"line": 22,
+												"column": 93
+											}
+										},
+										"name": "vvvvvv"
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Throw also wraps binary chains in parens when breaking (101 chars)",
+							"start": 444,
+							"end": 513
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

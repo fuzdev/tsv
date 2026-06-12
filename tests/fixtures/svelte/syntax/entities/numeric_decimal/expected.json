@@ -1,0 +1,159 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 96,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 24,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 2,
+						"character": 2
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 3,
+							"end": 20,
+							"raw": "&#65; &#66; &#67;",
+							"data": "A B C"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 24,
+				"end": 25,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 25,
+				"end": 53,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 26
+					},
+					"end": {
+						"line": 2,
+						"column": 2,
+						"character": 27
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 28,
+							"end": 49,
+							"raw": "&#8364; &#169; &#174;",
+							"data": "€ © ®"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 53,
+				"end": 54,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 54,
+				"end": 80,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 55
+					},
+					"end": {
+						"line": 3,
+						"column": 2,
+						"character": 56
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 57,
+							"end": 76,
+							"raw": "&#128169; &#127881;",
+							"data": "💩 🎉"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 80,
+				"end": 81,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 81,
+				"end": 95,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 82
+					},
+					"end": {
+						"line": 4,
+						"column": 2,
+						"character": 83
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 84,
+							"end": 91,
+							"raw": "&#0065;",
+							"data": "A"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

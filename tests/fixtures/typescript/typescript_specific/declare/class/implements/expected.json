@@ -1,0 +1,958 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 311,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 310,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 301,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 20,
+					"end": 77,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 2
+						}
+					},
+					"declare": true,
+					"id": {
+						"type": "Identifier",
+						"start": 34,
+						"end": 40,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 15
+							},
+							"end": {
+								"line": 2,
+								"column": 21
+							}
+						},
+						"name": "Single"
+					},
+					"superClass": null,
+					"implements": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 52,
+							"end": 56,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 33
+								},
+								"end": {
+									"line": 2,
+									"column": 37
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 52,
+								"end": 56,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 33
+									},
+									"end": {
+										"line": 2,
+										"column": 37
+									}
+								},
+								"name": "Base"
+							}
+						}
+					],
+					"body": {
+						"type": "ClassBody",
+						"start": 57,
+						"end": 77,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 38
+							},
+							"end": {
+								"line": 4,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 61,
+								"end": 74,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 3,
+										"column": 15
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 61,
+									"end": 65,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 2
+										},
+										"end": {
+											"line": 3,
+											"column": 6
+										}
+									},
+									"name": "prop"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 65,
+									"end": 73,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 6
+										},
+										"end": {
+											"line": 3,
+											"column": 14
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 67,
+										"end": 73,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 8
+											},
+											"end": {
+												"line": 3,
+												"column": 14
+											}
+										}
+									}
+								},
+								"value": null
+							}
+						]
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 80,
+					"end": 146,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 2
+						}
+					},
+					"declare": true,
+					"id": {
+						"type": "Identifier",
+						"start": 94,
+						"end": 102,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 15
+							},
+							"end": {
+								"line": 6,
+								"column": 23
+							}
+						},
+						"name": "Multiple"
+					},
+					"superClass": null,
+					"implements": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 114,
+							"end": 118,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 35
+								},
+								"end": {
+									"line": 6,
+									"column": 39
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 114,
+								"end": 118,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 35
+									},
+									"end": {
+										"line": 6,
+										"column": 39
+									}
+								},
+								"name": "Base"
+							}
+						},
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 120,
+							"end": 125,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 41
+								},
+								"end": {
+									"line": 6,
+									"column": 46
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 120,
+								"end": 125,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 41
+									},
+									"end": {
+										"line": 6,
+										"column": 46
+									}
+								},
+								"name": "Other"
+							}
+						}
+					],
+					"body": {
+						"type": "ClassBody",
+						"start": 126,
+						"end": 146,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 47
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 130,
+								"end": 143,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 15
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 130,
+									"end": 134,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 6
+										}
+									},
+									"name": "prop"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 134,
+									"end": 142,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 6
+										},
+										"end": {
+											"line": 7,
+											"column": 14
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 136,
+										"end": 142,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 8
+											},
+											"end": {
+												"line": 7,
+												"column": 14
+											}
+										}
+									}
+								},
+								"value": null
+							}
+						]
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 149,
+					"end": 214,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 2
+						}
+					},
+					"declare": true,
+					"id": {
+						"type": "Identifier",
+						"start": 163,
+						"end": 175,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 15
+							},
+							"end": {
+								"line": 10,
+								"column": 27
+							}
+						},
+						"name": "WithGenerics"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 175,
+						"end": 178,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 27
+							},
+							"end": {
+								"line": 10,
+								"column": 30
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 176,
+								"end": 177,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 28
+									},
+									"end": {
+										"line": 10,
+										"column": 29
+									}
+								},
+								"name": "T"
+							}
+						]
+					},
+					"superClass": null,
+					"implements": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 190,
+							"end": 197,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 42
+								},
+								"end": {
+									"line": 10,
+									"column": 49
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 190,
+								"end": 194,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 42
+									},
+									"end": {
+										"line": 10,
+										"column": 46
+									}
+								},
+								"name": "Base"
+							},
+							"typeParameters": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 194,
+								"end": 197,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 46
+									},
+									"end": {
+										"line": 10,
+										"column": 49
+									}
+								},
+								"params": [
+									{
+										"type": "TSTypeReference",
+										"start": 195,
+										"end": 196,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 47
+											},
+											"end": {
+												"line": 10,
+												"column": 48
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 195,
+											"end": 196,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 47
+												},
+												"end": {
+													"line": 10,
+													"column": 48
+												}
+											},
+											"name": "T"
+										}
+									}
+								]
+							}
+						}
+					],
+					"body": {
+						"type": "ClassBody",
+						"start": 198,
+						"end": 214,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 50
+							},
+							"end": {
+								"line": 12,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 202,
+								"end": 211,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 11
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 202,
+									"end": 207,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 7
+										}
+									},
+									"name": "value"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 207,
+									"end": 210,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 7
+										},
+										"end": {
+											"line": 11,
+											"column": 10
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 209,
+										"end": 210,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 9
+											},
+											"end": {
+												"line": 11,
+												"column": 10
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 209,
+											"end": 210,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 9
+												},
+												"end": {
+													"line": 11,
+													"column": 10
+												}
+											},
+											"name": "T"
+										}
+									}
+								},
+								"value": null
+							}
+						]
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 217,
+					"end": 300,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 2
+						}
+					},
+					"declare": true,
+					"id": {
+						"type": "Identifier",
+						"start": 231,
+						"end": 251,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 15
+							},
+							"end": {
+								"line": 14,
+								"column": 35
+							}
+						},
+						"name": "MultipleWithGenerics"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 251,
+						"end": 254,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 35
+							},
+							"end": {
+								"line": 14,
+								"column": 38
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 252,
+								"end": 253,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 36
+									},
+									"end": {
+										"line": 14,
+										"column": 37
+									}
+								},
+								"name": "T"
+							}
+						]
+					},
+					"superClass": null,
+					"implements": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 266,
+							"end": 273,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 50
+								},
+								"end": {
+									"line": 14,
+									"column": 57
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 266,
+								"end": 270,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 50
+									},
+									"end": {
+										"line": 14,
+										"column": 54
+									}
+								},
+								"name": "Base"
+							},
+							"typeParameters": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 270,
+								"end": 273,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 54
+									},
+									"end": {
+										"line": 14,
+										"column": 57
+									}
+								},
+								"params": [
+									{
+										"type": "TSTypeReference",
+										"start": 271,
+										"end": 272,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 55
+											},
+											"end": {
+												"line": 14,
+												"column": 56
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 271,
+											"end": 272,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 55
+												},
+												"end": {
+													"line": 14,
+													"column": 56
+												}
+											},
+											"name": "T"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 275,
+							"end": 283,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 59
+								},
+								"end": {
+									"line": 14,
+									"column": 67
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 275,
+								"end": 280,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 59
+									},
+									"end": {
+										"line": 14,
+										"column": 64
+									}
+								},
+								"name": "Other"
+							},
+							"typeParameters": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 280,
+								"end": 283,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 64
+									},
+									"end": {
+										"line": 14,
+										"column": 67
+									}
+								},
+								"params": [
+									{
+										"type": "TSTypeReference",
+										"start": 281,
+										"end": 282,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 65
+											},
+											"end": {
+												"line": 14,
+												"column": 66
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 281,
+											"end": 282,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 65
+												},
+												"end": {
+													"line": 14,
+													"column": 66
+												}
+											},
+											"name": "T"
+										}
+									}
+								]
+							}
+						}
+					],
+					"body": {
+						"type": "ClassBody",
+						"start": 284,
+						"end": 300,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 68
+							},
+							"end": {
+								"line": 16,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 288,
+								"end": 297,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 11
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 288,
+									"end": 293,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 7
+										}
+									},
+									"name": "value"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 293,
+									"end": 296,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 7
+										},
+										"end": {
+											"line": 15,
+											"column": 10
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 295,
+										"end": 296,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 9
+											},
+											"end": {
+												"line": 15,
+												"column": 10
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 295,
+											"end": 296,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 9
+												},
+												"end": {
+													"line": 15,
+													"column": 10
+												}
+											},
+											"name": "T"
+										}
+									}
+								},
+								"value": null
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

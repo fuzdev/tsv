@@ -1,0 +1,168 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 83,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "SvelteWindow",
+				"start": 0,
+				"end": 82,
+				"name": "svelte:window",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 14,
+						"character": 14
+					}
+				},
+				"attributes": [
+					{
+						"start": 15,
+						"end": 30,
+						"type": "OnDirective",
+						"name": "keydown",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 15,
+								"character": 15
+							},
+							"end": {
+								"line": 1,
+								"column": 25,
+								"character": 25
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 27,
+							"end": 29,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 27
+								},
+								"end": {
+									"line": 1,
+									"column": 29
+								}
+							},
+							"name": "fn"
+						},
+						"modifiers": []
+					},
+					{
+						"start": 31,
+						"end": 50,
+						"type": "BindDirective",
+						"name": "innerWidth",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 31,
+								"character": 31
+							},
+							"end": {
+								"line": 1,
+								"column": 46,
+								"character": 46
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 48,
+							"end": 49,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 48
+								},
+								"end": {
+									"line": 1,
+									"column": 49
+								}
+							},
+							"name": "w"
+						},
+						"modifiers": []
+					},
+					{
+						"start": 51,
+						"end": 67,
+						"type": "BindDirective",
+						"name": "scrollY",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 51,
+								"character": 51
+							},
+							"end": {
+								"line": 1,
+								"column": 63,
+								"character": 63
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 65,
+							"end": 66,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 65
+								},
+								"end": {
+									"line": 1,
+									"column": 66
+								}
+							},
+							"name": "y"
+						},
+						"modifiers": []
+					},
+					{
+						"start": 68,
+						"end": 79,
+						"type": "BindDirective",
+						"name": "online",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 68,
+								"character": 68
+							},
+							"end": {
+								"line": 1,
+								"column": 79,
+								"character": 79
+							}
+						},
+						"expression": {
+							"start": 73,
+							"end": 79,
+							"type": "Identifier",
+							"name": "online"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

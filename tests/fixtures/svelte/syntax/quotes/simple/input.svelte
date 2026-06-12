@@ -1,0 +1,1 @@
+<div data-attr1={'value1'} data-attr2={''} data-attr3="value2" data-attr4="">{'value3'}{''}</div>

@@ -1,0 +1,7 @@
+<style>
+	@counter-style thumbs {
+		system: cyclic;
+		symbols: '\1F44D';
+		suffix: ' ';
+	}
+</style>

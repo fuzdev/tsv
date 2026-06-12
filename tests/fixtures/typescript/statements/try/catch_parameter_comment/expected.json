@@ -1,0 +1,489 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 204,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " before error",
+			"start": 36,
+			"end": 51,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inline with error",
+			"start": 56,
+			"end": 76,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 4
+				},
+				"end": {
+					"line": 6,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Trailing after parameter",
+			"start": 94,
+			"end": 121,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing after error",
+			"start": 155,
+			"end": 178,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 25
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 203,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 20,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TryStatement",
+					"start": 10,
+					"end": 91,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 2
+						}
+					},
+					"block": {
+						"type": "BlockStatement",
+						"start": 14,
+						"end": 25,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 5
+							},
+							"end": {
+								"line": 4,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 18,
+								"end": 22,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 3,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 18,
+									"end": 21,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 2
+										},
+										"end": {
+											"line": 3,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 18,
+										"end": 19,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 2
+											},
+											"end": {
+												"line": 3,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"handler": {
+						"type": "CatchClause",
+						"start": 26,
+						"end": 91,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 3
+							},
+							"end": {
+								"line": 9,
+								"column": 2
+							}
+						},
+						"param": {
+							"type": "Identifier",
+							"start": 54,
+							"end": 55,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 2
+								},
+								"end": {
+									"line": 6,
+									"column": 3
+								}
+							},
+							"name": "e",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " before error",
+									"start": 36,
+									"end": 51
+								}
+							],
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " inline with error",
+									"start": 56,
+									"end": 76
+								}
+							]
+						},
+						"body": {
+							"type": "BlockStatement",
+							"start": 80,
+							"end": 91,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 3
+								},
+								"end": {
+									"line": 9,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "ExpressionStatement",
+									"start": 84,
+									"end": 88,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 6
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 84,
+										"end": 87,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 2
+											},
+											"end": {
+												"line": 8,
+												"column": 5
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 84,
+											"end": 85,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 2
+												},
+												"end": {
+													"line": 8,
+													"column": 3
+												}
+											},
+											"name": "b"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								}
+							]
+						}
+					},
+					"finalizer": null
+				},
+				{
+					"type": "TryStatement",
+					"start": 123,
+					"end": 193,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 2
+						}
+					},
+					"block": {
+						"type": "BlockStatement",
+						"start": 127,
+						"end": 138,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 5
+							},
+							"end": {
+								"line": 14,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 131,
+								"end": 135,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 131,
+									"end": 134,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 2
+										},
+										"end": {
+											"line": 13,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 131,
+										"end": 132,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 2
+											},
+											"end": {
+												"line": 13,
+												"column": 3
+											}
+										},
+										"name": "c"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"handler": {
+						"type": "CatchClause",
+						"start": 139,
+						"end": 193,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 3
+							},
+							"end": {
+								"line": 19,
+								"column": 2
+							}
+						},
+						"param": {
+							"type": "Identifier",
+							"start": 149,
+							"end": 152,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 2
+								},
+								"end": {
+									"line": 15,
+									"column": 5
+								}
+							},
+							"name": "err"
+						},
+						"body": {
+							"type": "BlockStatement",
+							"start": 182,
+							"end": 193,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 3
+								},
+								"end": {
+									"line": 19,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "ExpressionStatement",
+									"start": 186,
+									"end": 190,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 6
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 186,
+										"end": 189,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 2
+											},
+											"end": {
+												"line": 18,
+												"column": 5
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 186,
+											"end": 187,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 2
+												},
+												"end": {
+													"line": 18,
+													"column": 3
+												}
+											},
+											"name": "d"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " trailing after error",
+									"start": 155,
+									"end": 178
+								}
+							]
+						}
+					},
+					"finalizer": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Trailing after parameter",
+							"start": 94,
+							"end": 121
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

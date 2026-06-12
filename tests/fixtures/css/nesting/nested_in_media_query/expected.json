@@ -1,0 +1,153 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 158,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 50,
+				"end": 149,
+				"name": "media",
+				"prelude": "(min-width: 768px)",
+				"block": {
+					"type": "Block",
+					"start": 76,
+					"end": 149,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 80,
+								"end": 87,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 80,
+										"end": 87,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "class1",
+														"start": 80,
+														"end": 87
+													}
+												],
+												"start": 80,
+												"end": 87
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 88,
+								"end": 146,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 93,
+										"end": 103,
+										"property": "color",
+										"value": "red"
+									},
+									{
+										"type": "Rule",
+										"prelude": {
+											"type": "SelectorList",
+											"start": 109,
+											"end": 118,
+											"children": [
+												{
+													"type": "ComplexSelector",
+													"start": 109,
+													"end": 118,
+													"children": [
+														{
+															"type": "RelativeSelector",
+															"combinator": null,
+															"selectors": [
+																{
+																	"type": "NestingSelector",
+																	"name": "&",
+																	"start": 109,
+																	"end": 110
+																}
+															],
+															"start": 109,
+															"end": 110
+														},
+														{
+															"type": "RelativeSelector",
+															"combinator": {
+																"type": "Combinator",
+																"name": " ",
+																"start": 110,
+																"end": 111
+															},
+															"selectors": [
+																{
+																	"type": "ClassSelector",
+																	"name": "class2",
+																	"start": 111,
+																	"end": 118
+																}
+															],
+															"start": 110,
+															"end": 118
+														}
+													]
+												}
+											]
+										},
+										"block": {
+											"type": "Block",
+											"start": 119,
+											"end": 142,
+											"children": [
+												{
+													"type": "Declaration",
+													"start": 125,
+													"end": 136,
+													"property": "color",
+													"value": "blue"
+												}
+											]
+										},
+										"start": 109,
+										"end": 142
+									}
+								]
+							},
+							"start": 80,
+							"end": 146
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 150,
+			"styles": "\n\t/* Nested rules inside @media blocks */\n\t@media (min-width: 768px) {\n\t\t.class1 {\n\t\t\tcolor: red;\n\n\t\t\t& .class2 {\n\t\t\t\tcolor: blue;\n\t\t\t}\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 159,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

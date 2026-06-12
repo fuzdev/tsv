@@ -1,0 +1,117 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 201,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 192,
+				"name": "page",
+				"prelude": "",
+				"block": {
+					"type": "Block",
+					"start": 15,
+					"end": 192,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 19,
+							"end": 27,
+							"property": "size",
+							"value": "A4"
+						},
+						{
+							"type": "Declaration",
+							"start": 31,
+							"end": 42,
+							"property": "margin",
+							"value": "2cm"
+						},
+						{
+							"type": "Atrule",
+							"start": 47,
+							"end": 89,
+							"name": "top-left",
+							"prelude": "",
+							"block": {
+								"type": "Block",
+								"start": 57,
+								"end": 89,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 62,
+										"end": 84,
+										"property": "content",
+										"value": "'Header Left'"
+									}
+								]
+							}
+						},
+						{
+							"type": "Atrule",
+							"start": 93,
+							"end": 139,
+							"name": "top-center",
+							"prelude": "",
+							"block": {
+								"type": "Block",
+								"start": 105,
+								"end": 139,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 110,
+										"end": 134,
+										"property": "content",
+										"value": "'Header Center'"
+									}
+								]
+							}
+						},
+						{
+							"type": "Atrule",
+							"start": 143,
+							"end": 189,
+							"name": "bottom-right",
+							"prelude": "",
+							"block": {
+								"type": "Block",
+								"start": 157,
+								"end": 189,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 162,
+										"end": 184,
+										"property": "content",
+										"value": "counter(page)"
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 193,
+			"styles": "\n\t@page {\n\t\tsize: A4;\n\t\tmargin: 2cm;\n\n\t\t@top-left {\n\t\t\tcontent: 'Header Left';\n\t\t}\n\n\t\t@top-center {\n\t\t\tcontent: 'Header Center';\n\t\t}\n\n\t\t@bottom-right {\n\t\t\tcontent: counter(page);\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 202,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

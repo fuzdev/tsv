@@ -1,0 +1,164 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 306,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 39,
+				"name": "import",
+				"prelude": "'a.css'",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 56,
+				"end": 99,
+				"name": "namespace",
+				"prelude": "svg url(http://x)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 119,
+				"end": 190,
+				"name": "supports",
+				"prelude": "(display: flex)",
+				"block": {
+					"type": "Block",
+					"start": 159,
+					"end": 190,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 163,
+								"end": 166,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 163,
+										"end": 166,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 163,
+														"end": 166
+													}
+												],
+												"start": 163,
+												"end": 166
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 167,
+								"end": 187,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 172,
+										"end": 182,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 163,
+							"end": 187
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 216,
+				"end": 276,
+				"name": "media",
+				"prelude": "screen",
+				"block": {
+					"type": "Block",
+					"start": 244,
+					"end": 276,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 248,
+								"end": 251,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 248,
+										"end": 251,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 248,
+														"end": 251
+													}
+												],
+												"start": 248,
+												"end": 251
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 252,
+								"end": 273,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 257,
+										"end": 268,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 248,
+							"end": 273
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 298,
+			"styles": "\n\t@import 'a.css' /* prelude */; /* trailing */\n\t@namespace svg url(http://x) /* prelude */; /* ns-trailing */\n\t@supports (display: flex) /* prelude */ {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t} /* supports-trailing */\n\t@media screen /* prelude */ {\n\t\tdiv {\n\t\t\tcolor: blue;\n\t\t}\n\t} /* media-trailing */\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 307,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

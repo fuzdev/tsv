@@ -1,0 +1,74 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 88,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 53,
+					"end": 58,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 53,
+							"end": 58,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "root",
+											"args": null,
+											"start": 53,
+											"end": 58
+										}
+									],
+									"start": 53,
+									"end": 58
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 59,
+					"end": 79,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 63,
+							"end": 75,
+							"property": "--color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 53,
+				"end": 79
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 80,
+			"styles": "\n\t/* first comment */\n\n\t/* second comment */\n\t:root {\n\t\t--color: red;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 89,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

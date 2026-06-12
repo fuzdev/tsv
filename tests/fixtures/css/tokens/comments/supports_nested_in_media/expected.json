@@ -1,0 +1,101 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 127,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 118,
+				"name": "media",
+				"prelude": "screen",
+				"block": {
+					"type": "Block",
+					"start": 23,
+					"end": 118,
+					"children": [
+						{
+							"type": "Atrule",
+							"start": 27,
+							"end": 115,
+							"name": "supports",
+							"prelude": "(display: grid)  and (flex: 1)",
+							"block": {
+								"type": "Block",
+								"start": 80,
+								"end": 115,
+								"children": [
+									{
+										"type": "Rule",
+										"prelude": {
+											"type": "SelectorList",
+											"start": 85,
+											"end": 88,
+											"children": [
+												{
+													"type": "ComplexSelector",
+													"start": 85,
+													"end": 88,
+													"children": [
+														{
+															"type": "RelativeSelector",
+															"combinator": null,
+															"selectors": [
+																{
+																	"type": "TypeSelector",
+																	"name": "div",
+																	"start": 85,
+																	"end": 88
+																}
+															],
+															"start": 85,
+															"end": 88
+														}
+													]
+												}
+											]
+										},
+										"block": {
+											"type": "Block",
+											"start": 89,
+											"end": 111,
+											"children": [
+												{
+													"type": "Declaration",
+													"start": 95,
+													"end": 105,
+													"property": "color",
+													"value": "red"
+												}
+											]
+										},
+										"start": 85,
+										"end": 111
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 119,
+			"styles": "\n\t@media screen {\n\t\t@supports (display: grid) /* nested */ and (flex: 1) {\n\t\t\tdiv {\n\t\t\t\tcolor: red;\n\t\t\t}\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 128,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

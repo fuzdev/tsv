@@ -1,0 +1,114 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 71,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 70,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 5,
+						"character": 5
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 6,
+							"end": 14,
+							"raw": "inline1 ",
+							"data": "inline1 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 14,
+							"end": 55,
+							"name": "strong",
+							"name_loc": {
+								"start": {
+									"line": 1,
+									"column": 15,
+									"character": 15
+								},
+								"end": {
+									"line": 1,
+									"column": 21,
+									"character": 21
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 22,
+										"end": 30,
+										"raw": "inline2 ",
+										"data": "inline2 "
+									},
+									{
+										"type": "RegularElement",
+										"start": 30,
+										"end": 46,
+										"name": "em",
+										"name_loc": {
+											"start": {
+												"line": 1,
+												"column": 31,
+												"character": 31
+											},
+											"end": {
+												"line": 1,
+												"column": 33,
+												"character": 33
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 34,
+													"end": 41,
+													"raw": "inline3",
+													"data": "inline3"
+												}
+											]
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 55,
+							"end": 63,
+							"raw": " inline4",
+							"data": " inline4"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

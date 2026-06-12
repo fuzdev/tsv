@@ -1,0 +1,47 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 59,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 50,
+				"name": "view-transition",
+				"prelude": "",
+				"block": {
+					"type": "Block",
+					"start": 26,
+					"end": 50,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 30,
+							"end": 46,
+							"property": "navigation",
+							"value": "auto"
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 51,
+			"styles": "\n\t@view-transition {\n\t\tnavigation: auto;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 60,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

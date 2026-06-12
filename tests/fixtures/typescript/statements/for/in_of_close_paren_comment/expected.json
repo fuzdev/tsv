@@ -1,0 +1,774 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 371,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Block comment between ) and body (stays inline)",
+			"start": 10,
+			"end": 60,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a ",
+			"start": 77,
+			"end": 84,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 16
+				},
+				"end": {
+					"line": 3,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a ",
+			"start": 108,
+			"end": 115,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 16
+				},
+				"end": {
+					"line": 5,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Line comment between ) and body (indents body)",
+			"start": 124,
+			"end": 173,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a",
+			"start": 190,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 16
+				},
+				"end": {
+					"line": 8,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a",
+			"start": 220,
+			"end": 224,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 16
+				},
+				"end": {
+					"line": 11,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Line comment + block comment between ) and body",
+			"start": 235,
+			"end": 285,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a",
+			"start": 302,
+			"end": 306,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 16
+				},
+				"end": {
+					"line": 15,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b ",
+			"start": 309,
+			"end": 316,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a",
+			"start": 340,
+			"end": 344,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 16
+				},
+				"end": {
+					"line": 18,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b ",
+			"start": 347,
+			"end": 354,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 19,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 370,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 361,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 20,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForInStatement",
+					"start": 62,
+					"end": 90,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 29
+						}
+					},
+					"left": {
+						"type": "Identifier",
+						"start": 67,
+						"end": 68,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "x"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 72,
+						"end": 75,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 11
+							},
+							"end": {
+								"line": 3,
+								"column": 14
+							}
+						},
+						"name": "obj",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " a ",
+								"start": 77,
+								"end": 84
+							}
+						]
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 85,
+						"end": 90,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 24
+							},
+							"end": {
+								"line": 3,
+								"column": 29
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 85,
+							"end": 89,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 24
+								},
+								"end": {
+									"line": 3,
+									"column": 28
+								}
+							},
+							"name": "expr"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block comment between ) and body (stays inline)",
+							"start": 10,
+							"end": 60
+						}
+					]
+				},
+				{
+					"type": "ForOfStatement",
+					"start": 93,
+					"end": 121,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 29
+						}
+					},
+					"await": false,
+					"left": {
+						"type": "Identifier",
+						"start": 98,
+						"end": 99,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 6
+							},
+							"end": {
+								"line": 5,
+								"column": 7
+							}
+						},
+						"name": "x"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 103,
+						"end": 106,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 11
+							},
+							"end": {
+								"line": 5,
+								"column": 14
+							}
+						},
+						"name": "arr",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " a ",
+								"start": 108,
+								"end": 115
+							}
+						]
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 116,
+						"end": 121,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 24
+							},
+							"end": {
+								"line": 5,
+								"column": 29
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 116,
+							"end": 120,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 24
+								},
+								"end": {
+									"line": 5,
+									"column": 28
+								}
+							},
+							"name": "expr"
+						}
+					}
+				},
+				{
+					"type": "ForInStatement",
+					"start": 175,
+					"end": 202,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 7
+						}
+					},
+					"left": {
+						"type": "Identifier",
+						"start": 180,
+						"end": 181,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 6
+							},
+							"end": {
+								"line": 8,
+								"column": 7
+							}
+						},
+						"name": "x"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 185,
+						"end": 188,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 11
+							},
+							"end": {
+								"line": 8,
+								"column": 14
+							}
+						},
+						"name": "obj",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " a",
+								"start": 190,
+								"end": 194
+							}
+						]
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 197,
+						"end": 202,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 2
+							},
+							"end": {
+								"line": 9,
+								"column": 7
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 197,
+							"end": 201,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 2
+								},
+								"end": {
+									"line": 9,
+									"column": 6
+								}
+							},
+							"name": "expr"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment between ) and body (indents body)",
+							"start": 124,
+							"end": 173
+						}
+					]
+				},
+				{
+					"type": "ForOfStatement",
+					"start": 205,
+					"end": 232,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 7
+						}
+					},
+					"await": false,
+					"left": {
+						"type": "Identifier",
+						"start": 210,
+						"end": 211,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 6
+							},
+							"end": {
+								"line": 11,
+								"column": 7
+							}
+						},
+						"name": "x"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 215,
+						"end": 218,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 11
+							},
+							"end": {
+								"line": 11,
+								"column": 14
+							}
+						},
+						"name": "arr",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " a",
+								"start": 220,
+								"end": 224
+							}
+						]
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 227,
+						"end": 232,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 2
+							},
+							"end": {
+								"line": 12,
+								"column": 7
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 227,
+							"end": 231,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 2
+								},
+								"end": {
+									"line": 12,
+									"column": 6
+								}
+							},
+							"name": "expr"
+						}
+					}
+				},
+				{
+					"type": "ForInStatement",
+					"start": 287,
+					"end": 322,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 15
+						}
+					},
+					"left": {
+						"type": "Identifier",
+						"start": 292,
+						"end": 293,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 6
+							},
+							"end": {
+								"line": 15,
+								"column": 7
+							}
+						},
+						"name": "x"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 297,
+						"end": 300,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 11
+							},
+							"end": {
+								"line": 15,
+								"column": 14
+							}
+						},
+						"name": "obj",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " a",
+								"start": 302,
+								"end": 306
+							}
+						]
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 317,
+						"end": 322,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 10
+							},
+							"end": {
+								"line": 16,
+								"column": 15
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 317,
+							"end": 321,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 10
+								},
+								"end": {
+									"line": 16,
+									"column": 14
+								}
+							},
+							"name": "expr"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " b ",
+								"start": 309,
+								"end": 316
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment + block comment between ) and body",
+							"start": 235,
+							"end": 285
+						}
+					]
+				},
+				{
+					"type": "ForOfStatement",
+					"start": 325,
+					"end": 360,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 15
+						}
+					},
+					"await": false,
+					"left": {
+						"type": "Identifier",
+						"start": 330,
+						"end": 331,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 6
+							},
+							"end": {
+								"line": 18,
+								"column": 7
+							}
+						},
+						"name": "x"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 335,
+						"end": 338,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 11
+							},
+							"end": {
+								"line": 18,
+								"column": 14
+							}
+						},
+						"name": "arr",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " a",
+								"start": 340,
+								"end": 344
+							}
+						]
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 355,
+						"end": 360,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 10
+							},
+							"end": {
+								"line": 19,
+								"column": 15
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 355,
+							"end": 359,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 10
+								},
+								"end": {
+									"line": 19,
+									"column": 14
+								}
+							},
+							"name": "expr"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " b ",
+								"start": 347,
+								"end": 354
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

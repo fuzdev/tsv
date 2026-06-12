@@ -1,0 +1,121 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 77,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 76,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 5,
+							"end": 7,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 7,
+							"end": 34,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 8
+								},
+								"end": {
+									"line": 2,
+									"column": 3,
+									"character": 9
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 10,
+										"end": 30,
+										"raw": "multiple spaces here",
+										"data": "multiple spaces here"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 34,
+							"end": 36,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 36,
+							"end": 69,
+							"name": "pre",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 37
+								},
+								"end": {
+									"line": 3,
+									"column": 5,
+									"character": 40
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 41,
+										"end": 63,
+										"raw": "multiple  spaces  here",
+										"data": "multiple  spaces  here"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 69,
+							"end": 70,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

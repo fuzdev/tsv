@@ -1,0 +1,593 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 256,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Short curried arrow - stays inline",
+			"start": 10,
+			"end": 47,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Curried arrow with destructuring param as call arg - hugs body",
+			"start": 71,
+			"end": 136,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Curried arrow with block body",
+			"start": 177,
+			"end": 209,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 33
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 255,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 246,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 14,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 49,
+					"end": 68,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 20
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 49,
+						"end": 67,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 3,
+								"column": 19
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 49,
+							"end": 51,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 52,
+								"end": 66,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 4
+									},
+									"end": {
+										"line": 3,
+										"column": 18
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "ArrowFunctionExpression",
+									"start": 58,
+									"end": 66,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 10
+										},
+										"end": {
+											"line": 3,
+											"column": 18
+										}
+									},
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 59,
+											"end": 60,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 11
+												},
+												"end": {
+													"line": 3,
+													"column": 12
+												}
+											},
+											"name": "x"
+										}
+									],
+									"body": {
+										"type": "Identifier",
+										"start": 65,
+										"end": 66,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 17
+											},
+											"end": {
+												"line": 3,
+												"column": 18
+											}
+										},
+										"name": "x"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Short curried arrow - stays inline",
+							"start": 10,
+							"end": 47
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 138,
+					"end": 174,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 138,
+						"end": 173,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 3
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 138,
+							"end": 140,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 1
+								},
+								"end": {
+									"line": 6,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 141,
+								"end": 172,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 4
+									},
+									"end": {
+										"line": 8,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "ArrowFunctionExpression",
+									"start": 147,
+									"end": 172,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 10
+										},
+										"end": {
+											"line": 8,
+											"column": 2
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "ObjectPattern",
+											"start": 148,
+											"end": 151,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 11
+												},
+												"end": {
+													"line": 6,
+													"column": 14
+												}
+											},
+											"properties": [
+												{
+													"type": "Property",
+													"start": 149,
+													"end": 150,
+													"loc": {
+														"start": {
+															"line": 6,
+															"column": 12
+														},
+														"end": {
+															"line": 6,
+															"column": 13
+														}
+													},
+													"method": false,
+													"shorthand": true,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 149,
+														"end": 150,
+														"loc": {
+															"start": {
+																"line": 6,
+																"column": 12
+															},
+															"end": {
+																"line": 6,
+																"column": 13
+															}
+														},
+														"name": "a"
+													},
+													"value": {
+														"type": "Identifier",
+														"start": 149,
+														"end": 150,
+														"loc": {
+															"start": {
+																"line": 6,
+																"column": 12
+															},
+															"end": {
+																"line": 6,
+																"column": 13
+															}
+														},
+														"name": "a"
+													},
+													"kind": "init"
+												}
+											]
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 156,
+										"end": 172,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 19
+											},
+											"end": {
+												"line": 8,
+												"column": 2
+											}
+										},
+										"body": [
+											{
+												"type": "ReturnStatement",
+												"start": 160,
+												"end": 169,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 2
+													},
+													"end": {
+														"line": 7,
+														"column": 11
+													}
+												},
+												"argument": {
+													"type": "Identifier",
+													"start": 167,
+													"end": 168,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 9
+														},
+														"end": {
+															"line": 7,
+															"column": 10
+														}
+													},
+													"name": "a"
+												}
+											}
+										]
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Curried arrow with destructuring param as call arg - hugs body",
+							"start": 71,
+							"end": 136
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 211,
+					"end": 245,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 211,
+						"end": 244,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 1
+							},
+							"end": {
+								"line": 13,
+								"column": 3
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 211,
+							"end": 213,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 1
+								},
+								"end": {
+									"line": 11,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 214,
+								"end": 243,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 4
+									},
+									"end": {
+										"line": 13,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "ArrowFunctionExpression",
+									"start": 220,
+									"end": 243,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 10
+										},
+										"end": {
+											"line": 13,
+											"column": 2
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 221,
+											"end": 222,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 11
+												},
+												"end": {
+													"line": 11,
+													"column": 12
+												}
+											},
+											"name": "x"
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 227,
+										"end": 243,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 17
+											},
+											"end": {
+												"line": 13,
+												"column": 2
+											}
+										},
+										"body": [
+											{
+												"type": "ReturnStatement",
+												"start": 231,
+												"end": 240,
+												"loc": {
+													"start": {
+														"line": 12,
+														"column": 2
+													},
+													"end": {
+														"line": 12,
+														"column": 11
+													}
+												},
+												"argument": {
+													"type": "Identifier",
+													"start": 238,
+													"end": 239,
+													"loc": {
+														"start": {
+															"line": 12,
+															"column": 9
+														},
+														"end": {
+															"line": 12,
+															"column": 10
+														}
+													},
+													"name": "x"
+												}
+											}
+										]
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Curried arrow with block body",
+							"start": 177,
+							"end": 209
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

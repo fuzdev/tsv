@@ -1,0 +1,431 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 393,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Short template - doesn't wrap",
+			"start": 20,
+			"end": 52,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Long static template - no interpolation",
+			"start": 85,
+			"end": 127,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 43
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Long tagged template - no interpolation",
+			"start": 237,
+			"end": 279,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 43
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 392,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 383,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 10,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 54,
+					"end": 82,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 29
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 60,
+							"end": 81,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 28
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 60,
+								"end": 65,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 12
+									}
+								},
+								"name": "short"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 68,
+								"end": 81,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 15
+									},
+									"end": {
+										"line": 3,
+										"column": 28
+									}
+								},
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 69,
+										"end": 80,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 16
+											},
+											"end": {
+												"line": 3,
+												"column": 27
+											}
+										},
+										"value": {
+											"raw": "text1 text2",
+											"cooked": "text1 text2"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Short template - doesn't wrap",
+							"start": 20,
+							"end": 52
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 129,
+					"end": 234,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 106
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 135,
+							"end": 233,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 105
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 135,
+								"end": 140,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 12
+									}
+								},
+								"name": "long1"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 143,
+								"end": 233,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 15
+									},
+									"end": {
+										"line": 6,
+										"column": 105
+									}
+								},
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 144,
+										"end": 232,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 16
+											},
+											"end": {
+												"line": 6,
+												"column": 104
+											}
+										},
+										"value": {
+											"raw": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14",
+											"cooked": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Long static template - no interpolation",
+							"start": 85,
+							"end": 127
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 281,
+					"end": 382,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 102
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 287,
+							"end": 381,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 101
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 287,
+								"end": 292,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 12
+									}
+								},
+								"name": "long2"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 295,
+								"end": 381,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 15
+									},
+									"end": {
+										"line": 9,
+										"column": 101
+									}
+								},
+								"tag": {
+									"type": "Identifier",
+									"start": 295,
+									"end": 298,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 15
+										},
+										"end": {
+											"line": 9,
+											"column": 18
+										}
+									},
+									"name": "tag"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 298,
+									"end": 381,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 18
+										},
+										"end": {
+											"line": 9,
+											"column": 101
+										}
+									},
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 299,
+											"end": 380,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 19
+												},
+												"end": {
+													"line": 9,
+													"column": 100
+												}
+											},
+											"value": {
+												"raw": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13",
+												"cooked": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Long tagged template - no interpolation",
+							"start": 237,
+							"end": 279
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

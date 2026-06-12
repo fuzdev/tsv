@@ -1,0 +1,446 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 232,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Named export",
+			"start": 37,
+			"end": 52,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Default export (must have name in Svelte)",
+			"start": 113,
+			"end": 157,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 45
+				}
+			}
+		}
+	],
+	"module": {
+		"type": "Script",
+		"start": 0,
+		"end": 231,
+		"context": "module",
+		"content": {
+			"type": "Program",
+			"start": 35,
+			"end": 222,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 54,
+					"end": 110,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 2
+						}
+					},
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassDeclaration",
+						"start": 61,
+						"end": 110,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 8
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"abstract": true,
+						"id": {
+							"type": "Identifier",
+							"start": 76,
+							"end": 82,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 23
+								},
+								"end": {
+									"line": 3,
+									"column": 29
+								}
+							},
+							"name": "Single"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 83,
+							"end": 110,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 30
+								},
+								"end": {
+									"line": 5,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "MethodDefinition",
+									"start": 87,
+									"end": 107,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 22
+										}
+									},
+									"abstract": true,
+									"static": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 96,
+										"end": 98,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 11
+											},
+											"end": {
+												"line": 4,
+												"column": 13
+											}
+										},
+										"name": "fn"
+									},
+									"kind": "method",
+									"value": {
+										"type": "TSDeclareMethod",
+										"start": 98,
+										"end": 107,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 13
+											},
+											"end": {
+												"line": 4,
+												"column": 22
+											}
+										},
+										"id": null,
+										"expression": false,
+										"generator": false,
+										"async": false,
+										"params": [],
+										"returnType": {
+											"type": "TSTypeAnnotation",
+											"start": 100,
+											"end": 106,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 15
+												},
+												"end": {
+													"line": 4,
+													"column": 21
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSVoidKeyword",
+												"start": 102,
+												"end": 106,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 17
+													},
+													"end": {
+														"line": 4,
+														"column": 21
+													}
+												}
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					"specifiers": [],
+					"source": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Named export",
+							"start": 37,
+							"end": 52
+						}
+					]
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 159,
+					"end": 221,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassDeclaration",
+						"start": 174,
+						"end": 221,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 16
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"abstract": true,
+						"id": {
+							"type": "Identifier",
+							"start": 189,
+							"end": 193,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 31
+								},
+								"end": {
+									"line": 8,
+									"column": 35
+								}
+							},
+							"name": "Base"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 194,
+							"end": 221,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 36
+								},
+								"end": {
+									"line": 10,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "MethodDefinition",
+									"start": 198,
+									"end": 218,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 22
+										}
+									},
+									"abstract": true,
+									"static": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 207,
+										"end": 209,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 11
+											},
+											"end": {
+												"line": 9,
+												"column": 13
+											}
+										},
+										"name": "fn"
+									},
+									"kind": "method",
+									"value": {
+										"type": "TSDeclareMethod",
+										"start": 209,
+										"end": 218,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 13
+											},
+											"end": {
+												"line": 9,
+												"column": 22
+											}
+										},
+										"id": null,
+										"expression": false,
+										"generator": false,
+										"async": false,
+										"params": [],
+										"returnType": {
+											"type": "TSTypeAnnotation",
+											"start": 211,
+											"end": 217,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 15
+												},
+												"end": {
+													"line": 9,
+													"column": 21
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSVoidKeyword",
+												"start": 213,
+												"end": 217,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 17
+													},
+													"end": {
+														"line": 9,
+														"column": 21
+													}
+												}
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Default export (must have name in Svelte)",
+							"start": 113,
+							"end": 157
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			},
+			{
+				"type": "Attribute",
+				"start": 18,
+				"end": 34,
+				"name": "context",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 18,
+						"character": 18
+					},
+					"end": {
+						"line": 1,
+						"column": 25,
+						"character": 25
+					}
+				},
+				"value": [
+					{
+						"start": 27,
+						"end": 33,
+						"type": "Text",
+						"raw": "module",
+						"data": "module"
+					}
+				]
+			}
+		]
+	}
+}

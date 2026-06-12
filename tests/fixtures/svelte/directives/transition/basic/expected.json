@@ -1,0 +1,174 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 69,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 68,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [
+					{
+						"start": 5,
+						"end": 44,
+						"type": "TransitionDirective",
+						"name": "fade",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 5,
+								"character": 5
+							},
+							"end": {
+								"line": 1,
+								"column": 26,
+								"character": 26
+							}
+						},
+						"expression": {
+							"type": "ObjectExpression",
+							"start": 28,
+							"end": 43,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 28
+								},
+								"end": {
+									"line": 1,
+									"column": 43
+								}
+							},
+							"properties": [
+								{
+									"type": "Property",
+									"start": 29,
+									"end": 42,
+									"loc": {
+										"start": {
+											"line": 1,
+											"column": 29
+										},
+										"end": {
+											"line": 1,
+											"column": 42
+										}
+									},
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 29,
+										"end": 37,
+										"loc": {
+											"start": {
+												"line": 1,
+												"column": 29
+											},
+											"end": {
+												"line": 1,
+												"column": 37
+											}
+										},
+										"name": "duration"
+									},
+									"value": {
+										"type": "Literal",
+										"start": 39,
+										"end": 42,
+										"loc": {
+											"start": {
+												"line": 1,
+												"column": 39
+											},
+											"end": {
+												"line": 1,
+												"column": 42
+											}
+										},
+										"value": 300,
+										"raw": "300"
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"modifiers": [
+							"local"
+						],
+						"intro": true,
+						"outro": true
+					},
+					{
+						"start": 45,
+						"end": 51,
+						"type": "TransitionDirective",
+						"name": "fly",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 45,
+								"character": 45
+							},
+							"end": {
+								"line": 1,
+								"column": 51,
+								"character": 51
+							}
+						},
+						"expression": null,
+						"modifiers": [],
+						"intro": true,
+						"outro": false
+					},
+					{
+						"start": 52,
+						"end": 61,
+						"type": "TransitionDirective",
+						"name": "slide",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 52,
+								"character": 52
+							},
+							"end": {
+								"line": 1,
+								"column": 61,
+								"character": 61
+							}
+						},
+						"expression": null,
+						"modifiers": [],
+						"intro": false,
+						"outro": true
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

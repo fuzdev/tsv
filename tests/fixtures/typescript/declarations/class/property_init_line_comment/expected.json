@@ -1,0 +1,538 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 481,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Two line comments after `=` stay on separate lines (inline + own-line), not merged.",
+			"start": 34,
+			"end": 120,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inline comment",
+			"start": 127,
+			"end": 144,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 6
+				},
+				"end": {
+					"line": 4,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line comment",
+			"start": 148,
+			"end": 167,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 3
+				},
+				"end": {
+					"line": 5,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Inline `=` line comment is zero-width, so a preceding type union stays inline.",
+			"start": 181,
+			"end": 262,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 8,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inline trailing comment that is intentionally long to exceed the print width",
+			"start": 283,
+			"end": 362,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 20
+				},
+				"end": {
+					"line": 9,
+					"column": 99
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Own-line comment after `=` stays on its own line.",
+			"start": 376,
+			"end": 428,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line comment",
+			"start": 438,
+			"end": 457,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 3
+				},
+				"end": {
+					"line": 14,
+					"column": 22
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 480,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 471,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 20,
+					"end": 470,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 26,
+						"end": 29,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 7
+							},
+							"end": {
+								"line": 2,
+								"column": 10
+							}
+						},
+						"name": "Foo"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 30,
+						"end": 470,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 11
+							},
+							"end": {
+								"line": 16,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 123,
+								"end": 177,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 9
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 123,
+									"end": 124,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"value": {
+									"type": "Identifier",
+									"start": 171,
+									"end": 176,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 3
+										},
+										"end": {
+											"line": 6,
+											"column": 8
+										}
+									},
+									"name": "value",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " inline comment",
+											"start": 127,
+											"end": 144
+										},
+										{
+											"type": "Line",
+											"value": " own-line comment",
+											"start": 148,
+											"end": 167
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " Two line comments after `=` stay on separate lines (inline + own-line), not merged.",
+										"start": 34,
+										"end": 120
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 265,
+								"end": 372,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 9
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 265,
+									"end": 266,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 3
+										}
+									},
+									"name": "b"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 266,
+									"end": 280,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 3
+										},
+										"end": {
+											"line": 9,
+											"column": 17
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 268,
+										"end": 280,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 5
+											},
+											"end": {
+												"line": 9,
+												"column": 17
+											}
+										},
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 268,
+												"end": 269,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 5
+													},
+													"end": {
+														"line": 9,
+														"column": 6
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 268,
+													"end": 269,
+													"loc": {
+														"start": {
+															"line": 9,
+															"column": 5
+														},
+														"end": {
+															"line": 9,
+															"column": 6
+														}
+													},
+													"name": "A"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 272,
+												"end": 273,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 9
+													},
+													"end": {
+														"line": 9,
+														"column": 10
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 272,
+													"end": 273,
+													"loc": {
+														"start": {
+															"line": 9,
+															"column": 9
+														},
+														"end": {
+															"line": 9,
+															"column": 10
+														}
+													},
+													"name": "B"
+												}
+											},
+											{
+												"type": "TSVoidKeyword",
+												"start": 276,
+												"end": 280,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 13
+													},
+													"end": {
+														"line": 9,
+														"column": 17
+													}
+												}
+											}
+										]
+									}
+								},
+								"value": {
+									"type": "Identifier",
+									"start": 366,
+									"end": 371,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 3
+										},
+										"end": {
+											"line": 10,
+											"column": 8
+										}
+									},
+									"name": "value",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " inline trailing comment that is intentionally long to exceed the print width",
+											"start": 283,
+											"end": 362
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " Inline `=` line comment is zero-width, so a preceding type union stays inline.",
+										"start": 181,
+										"end": 262
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 431,
+								"end": 467,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 9
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 431,
+									"end": 432,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 2
+										},
+										"end": {
+											"line": 13,
+											"column": 3
+										}
+									},
+									"name": "c"
+								},
+								"value": {
+									"type": "Identifier",
+									"start": 461,
+									"end": 466,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 3
+										},
+										"end": {
+											"line": 15,
+											"column": 8
+										}
+									},
+									"name": "value",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " own-line comment",
+											"start": 438,
+											"end": 457
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " Own-line comment after `=` stays on its own line.",
+										"start": 376,
+										"end": 428
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 131,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 15,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 15,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class",
+											"start": 9,
+											"end": 15
+										}
+									],
+									"start": 9,
+									"end": 15
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 16,
+					"end": 122,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 37,
+							"end": 47,
+							"property": "color",
+							"value": "red"
+						},
+						{
+							"type": "Declaration",
+							"start": 68,
+							"end": 83,
+							"property": "font-size",
+							"value": "12px"
+						},
+						{
+							"type": "Declaration",
+							"start": 87,
+							"end": 103,
+							"property": "background",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 9,
+				"end": 122
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 123,
+			"styles": "\n\t.class {\n\t\t/* comment1 */\n\t\tcolor: red;\n\t\t/* comment2 */\n\t\tfont-size: 12px;\n\t\tbackground: blue; /* comment3 */\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 132,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

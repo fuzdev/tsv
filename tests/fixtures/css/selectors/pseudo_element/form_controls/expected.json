@@ -1,0 +1,784 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 951,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 34,
+					"end": 74,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 34,
+							"end": 74,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "input",
+											"start": 34,
+											"end": 39
+										},
+										{
+											"type": "AttributeSelector",
+											"start": 39,
+											"end": 52,
+											"name": "type",
+											"matcher": "=",
+											"value": "file",
+											"flags": null
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "file-selector-button",
+											"start": 52,
+											"end": 74
+										}
+									],
+									"start": 34,
+									"end": 74
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 75,
+					"end": 116,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 79,
+							"end": 95,
+							"property": "background",
+							"value": "blue"
+						},
+						{
+							"type": "Declaration",
+							"start": 99,
+							"end": 112,
+							"property": "padding",
+							"value": "10px"
+						}
+					]
+				},
+				"start": 34,
+				"end": 116
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 145,
+					"end": 178,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 145,
+							"end": 178,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "input",
+											"start": 145,
+											"end": 150
+										},
+										{
+											"type": "AttributeSelector",
+											"start": 150,
+											"end": 164,
+											"name": "type",
+											"matcher": "=",
+											"value": "range",
+											"flags": null
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "slider-thumb",
+											"start": 164,
+											"end": 178
+										}
+									],
+									"start": 145,
+									"end": 178
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 179,
+					"end": 214,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 183,
+							"end": 194,
+							"property": "width",
+							"value": "20px"
+						},
+						{
+							"type": "Declaration",
+							"start": 198,
+							"end": 210,
+							"property": "height",
+							"value": "20px"
+						}
+					]
+				},
+				"start": 145,
+				"end": 214
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 217,
+					"end": 250,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 217,
+							"end": 250,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "input",
+											"start": 217,
+											"end": 222
+										},
+										{
+											"type": "AttributeSelector",
+											"start": 222,
+											"end": 236,
+											"name": "type",
+											"matcher": "=",
+											"value": "range",
+											"flags": null
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "slider-track",
+											"start": 236,
+											"end": 250
+										}
+									],
+									"start": 217,
+									"end": 250
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 251,
+					"end": 275,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 255,
+							"end": 271,
+							"property": "background",
+							"value": "gray"
+						}
+					]
+				},
+				"start": 217,
+				"end": 275
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 307,
+					"end": 336,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 307,
+							"end": 336,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "input",
+											"start": 307,
+											"end": 312
+										},
+										{
+											"type": "AttributeSelector",
+											"start": 312,
+											"end": 327,
+											"name": "type",
+											"matcher": "=",
+											"value": "number",
+											"flags": null
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "step-up",
+											"start": 327,
+											"end": 336
+										}
+									],
+									"start": 307,
+									"end": 336
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 337,
+					"end": 360,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 341,
+							"end": 356,
+							"property": "cursor",
+							"value": "pointer"
+						}
+					]
+				},
+				"start": 307,
+				"end": 360
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 389,
+					"end": 420,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 389,
+							"end": 420,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "input",
+											"start": 389,
+											"end": 394
+										},
+										{
+											"type": "AttributeSelector",
+											"start": 394,
+											"end": 407,
+											"name": "type",
+											"matcher": "=",
+											"value": "date",
+											"flags": null
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "picker-icon",
+											"start": 407,
+											"end": 420
+										}
+									],
+									"start": 389,
+									"end": 420
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 421,
+					"end": 440,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 425,
+							"end": 436,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 389,
+				"end": 440
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 443,
+					"end": 476,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 443,
+							"end": 476,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "input",
+											"start": 443,
+											"end": 448
+										},
+										{
+											"type": "AttributeSelector",
+											"start": 448,
+											"end": 465,
+											"name": "type",
+											"matcher": "=",
+											"value": "checkbox",
+											"flags": null
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "checkmark",
+											"start": 465,
+											"end": 476
+										}
+									],
+									"start": 443,
+									"end": 476
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 477,
+					"end": 497,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 481,
+							"end": 493,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 443,
+				"end": 497
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 500,
+					"end": 533,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 500,
+							"end": 533,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "input",
+											"start": 500,
+											"end": 505
+										},
+										{
+											"type": "AttributeSelector",
+											"start": 505,
+											"end": 519,
+											"name": "type",
+											"matcher": "=",
+											"value": "color",
+											"flags": null
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "color-swatch",
+											"start": 519,
+											"end": 533
+										}
+									],
+									"start": 500,
+									"end": 533
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 534,
+					"end": 564,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 538,
+							"end": 560,
+							"property": "border",
+							"value": "1px solid gray"
+						}
+					]
+				},
+				"start": 500,
+				"end": 564
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 567,
+					"end": 599,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 567,
+							"end": 599,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "input",
+											"start": 567,
+											"end": 572
+										},
+										{
+											"type": "AttributeSelector",
+											"start": 572,
+											"end": 587,
+											"name": "type",
+											"matcher": "=",
+											"value": "search",
+											"flags": null
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "clear-icon",
+											"start": 587,
+											"end": 599
+										}
+									],
+									"start": 567,
+									"end": 599
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 600,
+					"end": 623,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 604,
+							"end": 619,
+							"property": "cursor",
+							"value": "pointer"
+						}
+					]
+				},
+				"start": 567,
+				"end": 623
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 626,
+					"end": 661,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 626,
+							"end": 661,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "input",
+											"start": 626,
+											"end": 631
+										},
+										{
+											"type": "AttributeSelector",
+											"start": 631,
+											"end": 648,
+											"name": "type",
+											"matcher": "=",
+											"value": "password",
+											"flags": null
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "reveal-icon",
+											"start": 648,
+											"end": 661
+										}
+									],
+									"start": 626,
+									"end": 661
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 662,
+					"end": 685,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 666,
+							"end": 681,
+							"property": "cursor",
+							"value": "pointer"
+						}
+					]
+				},
+				"start": 626,
+				"end": 685
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 717,
+					"end": 762,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 717,
+							"end": 762,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "input",
+											"start": 717,
+											"end": 722
+										},
+										{
+											"type": "AttributeSelector",
+											"start": 722,
+											"end": 745,
+											"name": "type",
+											"matcher": "=",
+											"value": "datetime-local",
+											"flags": null
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "field-component",
+											"start": 745,
+											"end": 762
+										}
+									],
+									"start": 717,
+									"end": 762
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 763,
+					"end": 805,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 767,
+							"end": 801,
+							"property": "font-variant-numeric",
+							"value": "tabular-nums"
+						}
+					]
+				},
+				"start": 717,
+				"end": 805
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 808,
+					"end": 853,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 808,
+							"end": 853,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "input",
+											"start": 808,
+											"end": 813
+										},
+										{
+											"type": "AttributeSelector",
+											"start": 813,
+											"end": 836,
+											"name": "type",
+											"matcher": "=",
+											"value": "datetime-local",
+											"flags": null
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "field-separator",
+											"start": 836,
+											"end": 853
+										}
+									],
+									"start": 808,
+									"end": 853
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 854,
+					"end": 873,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 858,
+							"end": 869,
+							"property": "color",
+							"value": "gray"
+						}
+					]
+				},
+				"start": 808,
+				"end": 873
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 876,
+					"end": 916,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 876,
+							"end": 916,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "input",
+											"start": 876,
+											"end": 881
+										},
+										{
+											"type": "AttributeSelector",
+											"start": 881,
+											"end": 904,
+											"name": "type",
+											"matcher": "=",
+											"value": "datetime-local",
+											"flags": null
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "field-text",
+											"start": 904,
+											"end": 916
+										}
+									],
+									"start": 876,
+									"end": 916
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 917,
+					"end": 942,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 921,
+							"end": 938,
+							"property": "font-weight",
+							"value": "bold"
+						}
+					]
+				},
+				"start": 876,
+				"end": 942
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 943,
+			"styles": "\n\t/* File input button */\n\tinput[type='file']::file-selector-button {\n\t\tbackground: blue;\n\t\tpadding: 10px;\n\t}\n\n\t/* Range slider parts */\n\tinput[type='range']::slider-thumb {\n\t\twidth: 20px;\n\t\theight: 20px;\n\t}\n\n\tinput[type='range']::slider-track {\n\t\tbackground: gray;\n\t}\n\n\t/* Number input steppers */\n\tinput[type='number']::step-up {\n\t\tcursor: pointer;\n\t}\n\n\t/* Form Control Icons */\n\tinput[type='date']::picker-icon {\n\t\tcolor: blue;\n\t}\n\n\tinput[type='checkbox']::checkmark {\n\t\tcolor: green;\n\t}\n\n\tinput[type='color']::color-swatch {\n\t\tborder: 1px solid gray;\n\t}\n\n\tinput[type='search']::clear-icon {\n\t\tcursor: pointer;\n\t}\n\n\tinput[type='password']::reveal-icon {\n\t\tcursor: pointer;\n\t}\n\n\t/* Form Field Components */\n\tinput[type='datetime-local']::field-component {\n\t\tfont-variant-numeric: tabular-nums;\n\t}\n\n\tinput[type='datetime-local']::field-separator {\n\t\tcolor: gray;\n\t}\n\n\tinput[type='datetime-local']::field-text {\n\t\tfont-weight: bold;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 952,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

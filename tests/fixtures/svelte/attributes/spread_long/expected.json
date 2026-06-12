@@ -1,0 +1,335 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 648,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 32,
+				"data": " Single spread attribute "
+			},
+			{
+				"type": "Text",
+				"start": 32,
+				"end": 34,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 34,
+				"end": 81,
+				"data": " 100 chars - stays inline (at boundary) "
+			},
+			{
+				"type": "Text",
+				"start": 81,
+				"end": 82,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 82,
+				"end": 182,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 83
+					},
+					"end": {
+						"line": 4,
+						"column": 5,
+						"character": 87
+					}
+				},
+				"attributes": [
+					{
+						"type": "SpreadAttribute",
+						"start": 88,
+						"end": 179,
+						"expression": {
+							"type": "Identifier",
+							"start": 92,
+							"end": 178,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 10
+								},
+								"end": {
+									"line": 4,
+									"column": 96
+								}
+							},
+							"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 182,
+				"end": 184,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 184,
+				"end": 210,
+				"data": " 101 chars - wraps "
+			},
+			{
+				"type": "Text",
+				"start": 210,
+				"end": 211,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 211,
+				"end": 313,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 212
+					},
+					"end": {
+						"line": 7,
+						"column": 5,
+						"character": 216
+					}
+				},
+				"attributes": [
+					{
+						"type": "SpreadAttribute",
+						"start": 218,
+						"end": 310,
+						"expression": {
+							"type": "Identifier",
+							"start": 222,
+							"end": 309,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 5
+								},
+								"end": {
+									"line": 8,
+									"column": 92
+								}
+							},
+							"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 313,
+				"end": 315,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 315,
+				"end": 350,
+				"data": " Multiple spread attributes "
+			},
+			{
+				"type": "Text",
+				"start": 350,
+				"end": 352,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 352,
+				"end": 399,
+				"data": " 100 chars - stays inline (at boundary) "
+			},
+			{
+				"type": "Text",
+				"start": 399,
+				"end": 400,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 400,
+				"end": 500,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 401
+					},
+					"end": {
+						"line": 14,
+						"column": 5,
+						"character": 405
+					}
+				},
+				"attributes": [
+					{
+						"type": "SpreadAttribute",
+						"start": 406,
+						"end": 451,
+						"expression": {
+							"type": "Identifier",
+							"start": 410,
+							"end": 450,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 10
+								},
+								"end": {
+									"line": 14,
+									"column": 50
+								}
+							},
+							"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+						}
+					},
+					{
+						"type": "SpreadAttribute",
+						"start": 452,
+						"end": 497,
+						"expression": {
+							"type": "Identifier",
+							"start": 456,
+							"end": 496,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 56
+								},
+								"end": {
+									"line": 14,
+									"column": 96
+								}
+							},
+							"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 500,
+				"end": 502,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 502,
+				"end": 543,
+				"data": " 101 chars - wraps all attributes "
+			},
+			{
+				"type": "Text",
+				"start": 543,
+				"end": 544,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 544,
+				"end": 647,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 1,
+						"character": 545
+					},
+					"end": {
+						"line": 17,
+						"column": 5,
+						"character": 549
+					}
+				},
+				"attributes": [
+					{
+						"type": "SpreadAttribute",
+						"start": 551,
+						"end": 596,
+						"expression": {
+							"type": "Identifier",
+							"start": 555,
+							"end": 595,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 5
+								},
+								"end": {
+									"line": 18,
+									"column": 45
+								}
+							},
+							"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+						}
+					},
+					{
+						"type": "SpreadAttribute",
+						"start": 598,
+						"end": 644,
+						"expression": {
+							"type": "Identifier",
+							"start": 602,
+							"end": 643,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 5
+								},
+								"end": {
+									"line": 19,
+									"column": 46
+								}
+							},
+							"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

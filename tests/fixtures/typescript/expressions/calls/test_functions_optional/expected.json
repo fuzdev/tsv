@@ -1,0 +1,371 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 373,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Optional-chained test callees are NOT kept on one line — they wrap like a",
+			"start": 20,
+			"end": 96,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " normal call when long (prettier excludes optional calls from isTestCall).",
+			"start": 98,
+			"end": 174,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Short optional call still fits on one line.",
+			"start": 290,
+			"end": 336,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 47
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 372,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 363,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 176,
+					"end": 287,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "ChainExpression",
+						"start": 176,
+						"end": 286,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 176,
+							"end": 286,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 7,
+									"column": 2
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 176,
+								"end": 184,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 1
+									},
+									"end": {
+										"line": 4,
+										"column": 9
+									}
+								},
+								"name": "describe"
+							},
+							"arguments": [
+								{
+									"type": "Literal",
+									"start": 190,
+									"end": 270,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 82
+										}
+									},
+									"value": "does something really long and complicated so I have to write a long test name",
+									"raw": "'does something really long and complicated so I have to write a long test name'"
+								},
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 274,
+									"end": 282,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 10
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 280,
+										"end": 282,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 8
+											},
+											"end": {
+												"line": 6,
+												"column": 10
+											}
+										},
+										"body": []
+									}
+								}
+							],
+							"optional": true
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Optional-chained test callees are NOT kept on one line — they wrap like a",
+							"start": 20,
+							"end": 96
+						},
+						{
+							"type": "Line",
+							"value": " normal call when long (prettier excludes optional calls from isTestCall).",
+							"start": 98,
+							"end": 174
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 338,
+					"end": 362,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 25
+						}
+					},
+					"expression": {
+						"type": "ChainExpression",
+						"start": 338,
+						"end": 361,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 24
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 338,
+							"end": 361,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 1
+								},
+								"end": {
+									"line": 10,
+									"column": 24
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 338,
+								"end": 340,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 1
+									},
+									"end": {
+										"line": 10,
+										"column": 3
+									}
+								},
+								"name": "it"
+							},
+							"arguments": [
+								{
+									"type": "Literal",
+									"start": 343,
+									"end": 350,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 6
+										},
+										"end": {
+											"line": 10,
+											"column": 13
+										}
+									},
+									"value": "short",
+									"raw": "'short'"
+								},
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 352,
+									"end": 360,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 15
+										},
+										"end": {
+											"line": 10,
+											"column": 23
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 358,
+										"end": 360,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 21
+											},
+											"end": {
+												"line": 10,
+												"column": 23
+											}
+										},
+										"body": []
+									}
+								}
+							],
+							"optional": true
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Short optional call still fits on one line.",
+							"start": 290,
+							"end": 336
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

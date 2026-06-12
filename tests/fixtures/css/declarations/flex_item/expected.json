@@ -1,0 +1,108 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 135,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 126,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 31,
+							"property": "flex",
+							"value": "1 1 auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 35,
+							"end": 47,
+							"property": "flex-grow",
+							"value": "2"
+						},
+						{
+							"type": "Declaration",
+							"start": 51,
+							"end": 65,
+							"property": "flex-shrink",
+							"value": "0"
+						},
+						{
+							"type": "Declaration",
+							"start": 69,
+							"end": 86,
+							"property": "flex-basis",
+							"value": "100px"
+						},
+						{
+							"type": "Declaration",
+							"start": 90,
+							"end": 110,
+							"property": "align-self",
+							"value": "flex-end"
+						},
+						{
+							"type": "Declaration",
+							"start": 114,
+							"end": 122,
+							"property": "order",
+							"value": "1"
+						}
+					]
+				},
+				"start": 9,
+				"end": 126
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 127,
+			"styles": "\n\tdiv {\n\t\tflex: 1 1 auto;\n\t\tflex-grow: 2;\n\t\tflex-shrink: 0;\n\t\tflex-basis: 100px;\n\t\talign-self: flex-end;\n\t\torder: 1;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 136,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

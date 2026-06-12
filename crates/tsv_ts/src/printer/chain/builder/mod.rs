@@ -1,0 +1,678 @@
+// Chain doc building for TypeScript member chain formatting
+//
+// This module handles the main doc-building logic for chain formatting:
+// - build_chain_doc: main entry point
+// - Submodules handle specific chain patterns
+//
+// ## Architecture
+//
+// - **member_only.rs**: Member-only chains using fill()
+// - **expansion.rs**: Chain expansion analysis helpers
+// - **helpers.rs**: Shared utilities and ChainPartsBuilder
+
+mod expansion;
+mod helpers;
+mod member_only;
+
+use expansion::{
+    call_callback_status, call_has_complex_args, ends_with_member, has_blank_lines_between_methods,
+    has_comments_forcing_expansion, has_param_type_annotation,
+};
+use helpers::{
+    build_expanded_doc, build_first_groups_doc, build_first_groups_expanded_doc,
+    build_rest_parts_with_comments,
+};
+use member_only::build_member_only_chain_doc;
+
+use super::analysis::should_merge_first_groups;
+use super::printing::{
+    ChainPrinter, has_inside_bracket_comments, print_group, print_group_expanded,
+    print_group_standard_expanded, print_node,
+};
+use super::types::{ChainGroup, ChainNode};
+use crate::ast::internal::{ArrowFunctionBody, Expression};
+use crate::printer::calls::arg_predicates::contains_call_expression;
+use tsv_lang::doc::arena::DocId;
+
+/// Cutoff for short chains when groups should NOT be merged
+const SHORT_CHAIN_CUTOFF: usize = 2;
+/// Cutoff for short chains when groups SHOULD be merged (factory pattern)
+const SHORT_CHAIN_CUTOFF_MERGED: usize = 3;
+
+//
+// Helper functions for common patterns
+//
+
+/// Build expanded docs for rest groups (each call uses hardlines)
+fn build_rest_expanded_docs<'a, P: ChainPrinter>(
+    rest_groups: &[ChainGroup<'a>],
+    printer: &P,
+) -> Vec<DocId> {
+    rest_groups
+        .iter()
+        .map(|g| print_group_expanded(g, printer))
+        .collect()
+}
+
+/// Build flat docs for groups
+fn build_groups_flat_docs<'a, P: ChainPrinter>(
+    groups: &[ChainGroup<'a>],
+    printer: &P,
+) -> Vec<DocId> {
+    groups.iter().map(|g| print_group(g, printer)).collect()
+}
+
+/// Check if a single-arg call has an object/array that will break
+fn call_has_breaking_single_arg<P: ChainPrinter>(
+    call: &crate::ast::internal::CallExpression,
+    printer: &P,
+) -> bool {
+    if call.arguments.len() != 1 {
+        return false;
+    }
+    let d = printer.arena();
+    match &call.arguments[0] {
+        Expression::ObjectExpression(_) | Expression::ArrayExpression(_) => {
+            let arg_doc = printer.print_expression(&call.arguments[0]);
+            d.will_break(arg_doc)
+        }
+        // Arrow with type annotations and breaking object/array body
+        Expression::ArrowFunctionExpression(arrow)
+            if arrow.return_type.is_some()
+                || arrow.type_parameters.is_some()
+                || arrow.params.iter().any(has_param_type_annotation) =>
+        {
+            if let ArrowFunctionBody::Expression(body) = &arrow.body
+                && matches!(
+                    &**body,
+                    Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
+                )
+            {
+                let body_doc = printer.print_expression(body);
+                d.will_break(body_doc)
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
+/// Build a doc for a chain from grouped nodes
+///
+/// Implements prettier's chain doc building logic:
+/// - Member-only chains: use fill() for greedy packing
+/// - Chains with calls: use group-based breaking
+/// - Short chains (≤cutoff groups): simple group with softlines
+/// - Longer chains: conditionalGroup([oneLine, expanded])
+/// - 3+ calls with complex args: force expanded (no width-based decision)
+pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> DocId {
+    let d = printer.arena();
+    if groups.is_empty() {
+        return d.empty();
+    }
+
+    // Single group: just print it
+    if groups.len() == 1 {
+        // Clear before printing — call args in this group may contain nested
+        // chains that should not inherit is_expression_statement.
+        printer.clear_expression_statement();
+        return print_group(&groups[0], printer);
+    }
+
+    // Check force expansion early — iterate lazily, the common short-chain path
+    // must not materialize a call-node Vec
+    let has_calls = groups
+        .iter()
+        .flat_map(|g| g.nodes.iter())
+        .any(ChainNode::is_call);
+
+    // Prettier's logic (member-chain.js:351-359):
+    // If groups.length <= cutoff && !nodeHasComment:
+    //   return group(oneLine)  // Simple group, NO fill()
+    // Else:
+    //   return conditionalGroup([oneLine, expanded with hardline breaks])
+    //
+    // We match this: short member-only chains use simple group(), not fill()
+    let should_merge = should_merge_first_groups(groups, printer);
+    // Reset after capturing — sub-expressions (call args, assignment RHS, etc.)
+    // must not inherit this flag. Prettier checks parent per-chain.
+    printer.clear_expression_statement();
+    let cutoff = if should_merge {
+        SHORT_CHAIN_CUTOFF_MERGED
+    } else {
+        SHORT_CHAIN_CUTOFF
+    };
+
+    // When first group has a parenthesized base with indent-on-break softlines,
+    // use conditionalGroup so the chain can break at group boundaries
+    // rather than inside the parenthesized expression.
+    // Binary expressions are excluded — they have natural break points (at operators)
+    // and should break there rather than at the chain.
+    let first_has_parens = groups
+        .first()
+        .and_then(|g| g.nodes.first())
+        .is_some_and(|n| match n {
+            ChainNode::Base {
+                needs_parens: true,
+                expr,
+            } => !matches!(expr, Expression::BinaryExpression(_)),
+            _ => false,
+        });
+
+    // Member-only chains with inside-bracket comments in computed members need the
+    // conditional_group path (not fill), so the bracket content can break when the
+    // chain expands. Fill can't break inside a computed member's brackets.
+    let has_bracket_comments = groups
+        .iter()
+        .flat_map(|g| g.nodes.iter())
+        .any(|n| has_inside_bracket_comments(n, printer));
+
+    if !has_calls && !first_has_parens && !has_bracket_comments {
+        // Member-only chain: use fill for greedy packing
+        return build_member_only_chain_doc(groups, printer);
+    }
+
+    // Split groups into first (merged) and rest based on should_merge
+    let split_at = if should_merge { 2 } else { 1 }.min(groups.len());
+    let (first_groups, rest_groups) = groups.split_at(split_at);
+
+    // Build doc for first group(s) - merged when should_merge
+    let first_doc = build_first_groups_doc(first_groups, printer);
+
+    // Short chains: use group-based breaking
+    // Prettier (member-chain.js:351-359) only checks nodeHasComment for short chains.
+    // Force expand conditions like "2+ callbacks with breaking body" and "3+ calls
+    // with complex args" only apply to long chains (member-chain.js:400-407).
+    // Comments between chain segments DO block the short chain path (matching
+    // Prettier's nodeHasComment check).
+    if groups.len() <= cutoff && !(has_calls && has_comments_forcing_expansion(groups, printer)) {
+        return build_short_chain_doc(
+            first_groups,
+            rest_groups,
+            first_doc,
+            first_has_parens,
+            has_calls,
+            printer,
+        );
+    }
+
+    // Long chains: force expand conditions (Prettier member-chain.js:400-407)
+    let force_expand = has_calls && should_force_chain_expand(groups, printer);
+    build_long_chain_doc(
+        groups,
+        first_groups,
+        rest_groups,
+        should_merge,
+        force_expand,
+        printer,
+    )
+}
+
+/// Check if chain expansion should be forced
+fn should_force_chain_expand<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> bool {
+    // Iterate call nodes in place — no materialized Vec
+    let call_nodes = || {
+        groups
+            .iter()
+            .flat_map(|g| g.nodes.iter())
+            .filter(|n| n.is_call())
+    };
+
+    // Prettier's chain expansion rules (member-chain.js:400-408):
+    // 1. Blank lines BETWEEN methods (not just before first) force expansion
+    // 2. 3+ calls with complex args force expansion
+    // 3. 2+ calls with callbacks, where any callback has a multiline body, force expansion
+    // 4. Inside template expressions with original breaks force expansion
+    let has_blank_lines_between = has_blank_lines_between_methods(groups, printer);
+
+    // Single pass: count calls and callbacks, and check if any callback breaks
+    let line_breaks = printer.get_line_breaks();
+    let (call_count, calls_with_callbacks, any_callback_breaks) = call_nodes().fold(
+        (0usize, 0usize, false),
+        |(calls, count, any_breaks), node| {
+            let status = call_callback_status(node, line_breaks);
+            (
+                calls + 1,
+                count + usize::from(status.has_callback),
+                any_breaks || status.will_break,
+            )
+        },
+    );
+
+    // Comments between chain segments force expansion, EXCEPT for comments before
+    // trailing members (which are handled specially by add_group_no_break)
+    let has_forcing_comments = has_comments_forcing_expansion(groups, printer);
+
+    has_blank_lines_between
+        || has_forcing_comments
+        || (call_count > 2 && call_nodes().any(call_has_complex_args))
+        || (calls_with_callbacks >= 2 && any_callback_breaks)
+        || printer.should_force_expand()
+}
+
+/// Build doc for short chains (groups.len() <= cutoff)
+fn build_short_chain_doc<'a, P: ChainPrinter>(
+    first_groups: &[ChainGroup<'a>],
+    rest_groups: &[ChainGroup<'a>],
+    first_doc: DocId,
+    first_has_parens: bool,
+    has_calls: bool,
+    printer: &P,
+) -> DocId {
+    let d = printer.arena();
+    if rest_groups.is_empty() {
+        return d.group(first_doc);
+    }
+
+    // `base_call(args).a.b...` — a plain base call followed by ONLY trailing member
+    // accesses. Prettier prints this via member.js (printMemberExpression), NOT the
+    // member chain: the call's args group and each trailing member are independent
+    // sibling groups, so the args break only when the call itself overflows and
+    // otherwise the trailing members break individually. The chain conditionalGroup
+    // would instead expand the call args even when the call fits inline.
+    if is_base_call_then_only_members(first_groups, rest_groups, printer) {
+        return build_base_call_then_members_doc(first_groups, rest_groups, printer);
+    }
+
+    // Check if first groups contain calls with multiple args that might need expansion
+    let first_has_multiarg_calls = first_groups.iter().flat_map(|g| g.nodes.iter()).any(|n| {
+        matches!(
+            n,
+            ChainNode::Call { call, .. }
+            if call.arguments.len() > 1
+        )
+    });
+
+    // For short chains, prettier just concatenates groups directly WITHOUT softlines.
+    // This ensures hardlines inside groups don't cause breaks between groups.
+    let rest_docs: Vec<DocId> = rest_groups
+        .iter()
+        .map(|g| print_group(g, printer))
+        .collect();
+    let mut on_line_parts = vec![first_doc];
+    on_line_parts.extend(rest_docs.iter().copied());
+    let on_line = d.concat(&on_line_parts);
+
+    // Check if first groups contain any calls (regardless of arg count)
+    let first_has_calls = first_groups
+        .iter()
+        .flat_map(|g| g.nodes.iter())
+        .any(ChainNode::is_call);
+
+    // If first groups have multi-arg calls, use 4-state conditionalGroup.
+    if first_has_multiarg_calls {
+        return build_multiarg_short_chain_doc(
+            first_groups,
+            rest_groups,
+            first_doc,
+            on_line,
+            &rest_docs,
+            printer,
+        );
+    }
+
+    // Check if chain ends with member (for callback arg breaking preference)
+    let chain_ends_with_member = ends_with_member(rest_groups, first_groups);
+
+    // When chain ends with member and first groups have calls, prefer expanding
+    // first groups' call args over breaking the chain.
+    if first_has_calls && chain_ends_with_member {
+        let first_expanded_doc = build_first_groups_expanded_doc(first_groups, printer);
+        let mut state_first_expanded_parts = vec![first_expanded_doc];
+        state_first_expanded_parts.extend(rest_docs.iter().copied());
+        let state_first_expanded = d.concat(&state_first_expanded_parts);
+        return d.conditional_group(&[on_line, state_first_expanded]);
+    }
+
+    // Prettier's short chain behavior (member-chain.js lines 351-360):
+    // For chains with groups.length <= cutoff, just return group(oneLine).
+    if !first_has_calls {
+        // When first group has a parenthesized base with indent-on-break softlines
+        // and no calls anywhere in the chain, use conditionalGroup to break at
+        // group boundaries rather than inside the parenthesized expression.
+        // When there ARE calls, the inner group breaks naturally via group(oneLine).
+        if first_has_parens && !has_calls {
+            // A single trailing member on a parenthesized base hugs the base's
+            // closing `)` when it fits after the base's last line, and drops to
+            // its own indented line otherwise — Prettier's `printMemberExpression`
+            // (`[objectDoc, group(indent([softline, lookup]))]`, member.js). The
+            // base breaks on its own (parens hang-break or inner call args), so we
+            // must not force the member onto its own line just because the base is
+            // multi-line; the softline lets it hug the `)`.
+            if rest_docs.len() == 1 {
+                let member = d.group(d.indent(d.concat(&[d.softline(), rest_docs[0]])));
+                return d.concat(&[first_doc, member]);
+            }
+            // Multiple trailing members: expand with hardlines between ALL groups.
+            let mut rest_parts = Vec::with_capacity(rest_docs.len() * 2);
+            for &rest_doc in &rest_docs {
+                rest_parts.push(d.hardline());
+                rest_parts.push(rest_doc);
+            }
+            let expanded = d.concat(&[first_doc, d.indent(d.concat(&rest_parts))]);
+            return d.conditional_group(&[on_line, expanded]);
+        }
+        return d.group(on_line);
+    }
+
+    // Check for nested calls in first call's args
+    let first_call_arg_contains_call = first_groups
+        .iter()
+        .flat_map(|g| g.nodes.iter())
+        .filter_map(ChainNode::as_call_expression)
+        .any(|call| call.arguments.iter().any(contains_call_expression));
+
+    if !first_call_arg_contains_call {
+        // Prettier: group(printedGroups.flat()) for short chains (member-chain.js:351-359).
+        // group() lets hardlines in the first call (e.g., multiline array) render
+        // naturally while the second call's inner group handles its own arg layout.
+        return d.group(on_line);
+    }
+
+    // When first call's arg contains calls, try both expansion directions
+    let rest_expanded = build_rest_expanded_docs(rest_groups, printer);
+    let mut state_last_expanded_parts = vec![first_doc];
+    state_last_expanded_parts.extend(rest_expanded);
+    let state_last_expanded = d.concat(&state_last_expanded_parts);
+
+    let first_expanded_doc = build_first_groups_expanded_doc(first_groups, printer);
+    let mut state_first_expanded_parts = vec![first_expanded_doc];
+    state_first_expanded_parts.extend(rest_docs.iter().copied());
+    let state_first_expanded = d.concat(&state_first_expanded_parts);
+
+    d.conditional_group(&[on_line, state_last_expanded, state_first_expanded])
+}
+
+/// Whether the chain is `base_call(args).a.b...` — a bare base call followed by ONLY
+/// plain `.prop` member accesses (no further calls, no computed/private/non-null
+/// nodes, no inter-element comments). This is prettier's `printMemberExpression`
+/// (member.js) territory, not the member chain; other shapes fall back to the chain
+/// conditionalGroup.
+fn is_base_call_then_only_members<'a, P: ChainPrinter>(
+    first_groups: &[ChainGroup<'a>],
+    rest_groups: &[ChainGroup<'a>],
+    printer: &P,
+) -> bool {
+    // TODO: this collect (and the twin in build_base_call_then_members_doc) runs on
+    // every short chain with rest groups — same materialized-Vec shape the
+    // call_nodes collect in build_chain_doc avoided; could iterate lazily or share
+    // one SmallVec between predicate and builder
+    let all_nodes: Vec<&ChainNode<'a>> = first_groups
+        .iter()
+        .chain(rest_groups.iter())
+        .flat_map(|g| g.nodes.iter())
+        .collect();
+    // Need base + one call + at least one trailing member.
+    if all_nodes.len() < 3 {
+        return false;
+    }
+    // Base must be a bare (non-parenthesized) expression directly followed by the call.
+    if !matches!(
+        all_nodes[0],
+        ChainNode::Base {
+            needs_parens: false,
+            ..
+        }
+    ) || !all_nodes[1].is_call()
+    {
+        return false;
+    }
+    // Exactly one call in the whole chain (the base call).
+    if all_nodes.iter().filter(|n| n.is_call()).count() != 1 {
+        return false;
+    }
+    // Everything after the base call must be a plain `.prop` member — computed,
+    // private, and non-null nodes have their own break structure.
+    if !all_nodes[2..]
+        .iter()
+        .all(|n| matches!(n, ChainNode::Member { .. }))
+    {
+        return false;
+    }
+    // No inter-element comments (those need the comment-aware chain path).
+    all_nodes[1..].iter().all(|n| {
+        n.comment_range()
+            .is_none_or(|(start, end)| !printer.has_comments_between(start, end))
+    })
+}
+
+/// Build the member.js sibling-group doc for `base_call(args).a.b...`: the base call
+/// prints inline (its args group breaks only if the call itself overflows) and each
+/// trailing member is `group(indent([softline, .prop]))`, so the overflowing member
+/// drops to its own indented line while earlier members hug the call's `)`.
+fn build_base_call_then_members_doc<'a, P: ChainPrinter>(
+    first_groups: &[ChainGroup<'a>],
+    rest_groups: &[ChainGroup<'a>],
+    printer: &P,
+) -> DocId {
+    let d = printer.arena();
+    let all_nodes: Vec<&ChainNode<'a>> = first_groups
+        .iter()
+        .chain(rest_groups.iter())
+        .flat_map(|g| g.nodes.iter())
+        .collect();
+    // The leading non-member nodes are the base call; the rest are trailing members.
+    let first_member_idx = all_nodes.iter().take_while(|n| !n.is_member()).count();
+    let prefix_docs: Vec<DocId> = all_nodes[..first_member_idx]
+        .iter()
+        .map(|n| print_node(n, printer))
+        .collect();
+    let mut parts = vec![d.concat(&prefix_docs)];
+    for node in &all_nodes[first_member_idx..] {
+        let member = print_node(node, printer);
+        parts.push(d.group(d.indent(d.concat(&[d.softline(), member]))));
+    }
+    d.concat(&parts)
+}
+
+/// Build doc for short chains with multi-arg calls in first groups
+fn build_multiarg_short_chain_doc<'a, P: ChainPrinter>(
+    first_groups: &[ChainGroup<'a>],
+    rest_groups: &[ChainGroup<'a>],
+    first_doc: DocId,
+    on_line: DocId,
+    rest_docs: &[DocId],
+    printer: &P,
+) -> DocId {
+    let d = printer.arena();
+    // State: First args inline, rest groups with arrow-hugging expanded call args
+    // `(sig =>\n  body,\n)` — more compact (fewer lines) but longer first line
+    let rest_expanded = build_rest_expanded_docs(rest_groups, printer);
+    let mut state_last_hugged_parts = vec![first_doc];
+    state_last_hugged_parts.extend(rest_expanded);
+    let state_last_hugged = d.concat(&state_last_hugged_parts);
+
+    // State: First args inline, rest groups with standard expanded call args
+    // `(\n  args,\n)` — shorter first line, used when arrow-hugging doesn't fit
+    let rest_standard_expanded: Vec<DocId> = rest_groups
+        .iter()
+        .map(|g| print_group_standard_expanded(g, printer))
+        .collect();
+    let mut state_last_standard_parts = vec![first_doc];
+    state_last_standard_parts.extend(rest_standard_expanded);
+    let state_last_standard = d.concat(&state_last_standard_parts);
+
+    // State: First call's args expanded, rest groups flexible
+    let first_expanded_doc = build_first_groups_expanded_doc(first_groups, printer);
+    let mut state_first_expanded_parts = vec![first_expanded_doc];
+    state_first_expanded_parts.extend(rest_docs.iter().copied());
+    let state_first_expanded = d.concat(&state_first_expanded_parts);
+
+    // State: Everything expanded (first args broken, chain broken)
+    let rest_parts_hard = build_rest_parts_with_comments(rest_groups, printer, true, true);
+    let state_all_expanded = d.concat(&[first_expanded_doc, d.indent(d.concat(&rest_parts_hard))]);
+
+    d.conditional_group(&[
+        on_line,
+        state_last_hugged,
+        state_last_standard,
+        state_first_expanded,
+        state_all_expanded,
+    ])
+}
+
+/// Build doc for long chains (groups.len() > cutoff)
+fn build_long_chain_doc<'a, P: ChainPrinter>(
+    groups: &[ChainGroup<'a>],
+    first_groups: &[ChainGroup<'a>],
+    rest_groups: &[ChainGroup<'a>],
+    should_merge: bool,
+    force_expand: bool,
+    printer: &P,
+) -> DocId {
+    let d = printer.arena();
+    // Check if any group except the last will break
+    // Use will_break_deep to see through IsolatedGroup wrappers — chain break
+    // detection is a doc analysis concern, not a rendering isolation concern.
+    let any_non_last_breaks = groups[..groups.len() - 1].iter().any(|g| {
+        let doc = print_group(g, printer);
+        d.will_break_deep(doc)
+    });
+
+    // Check if this chain ends with member access (not a call)
+    let chain_ends_with_member = ends_with_member(rest_groups, first_groups);
+
+    // Count calls in rest_groups (for chain_ends_with_member special case)
+    let rest_call_count = rest_groups
+        .iter()
+        .flat_map(|g| g.nodes.iter())
+        .filter(|n| n.is_call())
+        .count();
+
+    // For longer chains (>cutoff), force expanded if any non-last group breaks
+    // EXCEPTION: When chain ends with member AND has exactly one call in rest
+    let force_expand_from_breaking =
+        any_non_last_breaks && !(chain_ends_with_member && rest_call_count == 1);
+
+    // Build expanded variant
+    let expanded = build_expanded_doc(groups, should_merge, printer);
+
+    if force_expand || force_expand_from_breaking {
+        return expanded;
+    }
+
+    // Print all groups inline (for oneLine variant)
+    let on_line: Vec<DocId> = groups.iter().map(|g| print_group(g, printer)).collect();
+    let on_line_doc = d.concat(&on_line);
+
+    // Handle chains ending with member access with exactly one call in rest
+    if chain_ends_with_member && rest_call_count == 1 {
+        return build_member_ending_chain_doc(
+            first_groups,
+            rest_groups,
+            on_line_doc,
+            expanded,
+            printer,
+        );
+    }
+
+    // Handle chains with breaking object in last call
+    if let Some(args_expanded_doc) =
+        build_breaking_object_chain_doc(first_groups, rest_groups, printer)
+    {
+        return d.conditional_group(&[on_line_doc, args_expanded_doc, expanded]);
+    }
+
+    // Default: two-state conditional group
+    d.conditional_group(&[on_line_doc, expanded])
+}
+
+/// Build doc for chains ending with member access (e.g., `.length`)
+fn build_member_ending_chain_doc<'a, P: ChainPrinter>(
+    first_groups: &[ChainGroup<'a>],
+    rest_groups: &[ChainGroup<'a>],
+    on_line_doc: DocId,
+    expanded: DocId,
+    printer: &P,
+) -> DocId {
+    let d = printer.arena();
+    // Check if the call's single arg needs expansion
+    let rest_has_breaking_arg = rest_groups.iter().any(|g| {
+        g.nodes
+            .iter()
+            .filter_map(ChainNode::as_call_expression)
+            .any(|call| call_has_breaking_single_arg(call, printer))
+    });
+
+    // First groups stay flat, rest groups have calls expanded
+    let first_docs = build_groups_flat_docs(first_groups, printer);
+    let rest_expanded = build_rest_expanded_docs(rest_groups, printer);
+    let mut args_expanded_parts = first_docs;
+    args_expanded_parts.extend(rest_expanded);
+    let args_expanded_inner = d.concat(&args_expanded_parts);
+    // Wrap in group_break: when the conditional_group selects this state in Flat
+    // mode, the group forces Break mode during rendering. Without this, hardlines
+    // in the expanded call args create newlines but the mode stays Flat, causing
+    // nested groups (arrow sig groups) to evaluate fits() with Flat-mode rest
+    // commands — body line() = space, not newline — breaking the signature.
+    let args_expanded_doc = d.group_break(args_expanded_inner);
+
+    // When the arg will break internally, directly use args_expanded_doc
+    if rest_has_breaking_arg {
+        return args_expanded_doc;
+    }
+
+    // Try: 1. Everything inline, 2. Args expanded chain inline, 3. Chain expanded
+    d.conditional_group(&[on_line_doc, args_expanded_doc, expanded])
+}
+
+/// Build doc for chains where the last call has a single breaking argument that
+/// prettier keeps flat-chained (oneLine) rather than expanding the chain.
+fn build_breaking_object_chain_doc<'a, P: ChainPrinter>(
+    first_groups: &[ChainGroup<'a>],
+    rest_groups: &[ChainGroup<'a>],
+    printer: &P,
+) -> Option<DocId> {
+    let d = printer.arena();
+    // The last call's single argument breaks and is one prettier keeps on the flat
+    // chain: a direct object/array literal, OR a `new`/call expression wrapping one
+    // (e.g. `new Response(body, {…})`). Callbacks (function/arrow args) are excluded —
+    // for those, prettier expands the chain when other calls also take function args
+    // (member-chain.js `lastGroupWillBreakAndOtherCallsHaveFunctionArguments`).
+    let last_group_will_break_object = rest_groups.last().is_some_and(|g| {
+        g.nodes
+            .iter()
+            .rev()
+            .find_map(ChainNode::as_call_expression)
+            .is_some_and(|call| {
+                call.arguments.len() == 1
+                    && matches!(
+                        &call.arguments[0],
+                        Expression::ObjectExpression(_)
+                            | Expression::ArrayExpression(_)
+                            | Expression::NewExpression(_)
+                            | Expression::CallExpression(_)
+                    )
+                    && {
+                        let arg_doc = printer.print_expression(&call.arguments[0]);
+                        d.will_break(arg_doc)
+                    }
+            })
+    });
+
+    if !last_group_will_break_object {
+        return None;
+    }
+
+    // First groups and all but the last rest group stay flat. Keeping the chain
+    // prefix flat-measurable is load-bearing: arena_fits must see the prefix's true
+    // width so the conditional_group falls through to the fully-expanded chain when
+    // the prefix itself overflows. Wrapping the WHOLE chain in group_break instead
+    // makes fits() inherit Break mode into the prefix's inner call-arg groups and
+    // early-return at their softlines, wrongly selecting this state (and breaking an
+    // earlier call's args) even when the prefix doesn't fit.
+    let rest_len = rest_groups.len();
+    let mut all_parts = build_groups_flat_docs(first_groups, printer);
+    for (i, g) in rest_groups.iter().enumerate() {
+        if i == rest_len - 1 {
+            // Only the last group is force-broken: when this state is selected in
+            // Flat mode, its expanded call args still render in Break mode (so nested
+            // groups, e.g. arrow sigs, evaluate fits() against Break-mode rest commands).
+            all_parts.push(d.group_break(print_group_expanded(g, printer)));
+        } else {
+            all_parts.push(print_group(g, printer));
+        }
+    }
+    Some(d.concat(&all_parts))
+}

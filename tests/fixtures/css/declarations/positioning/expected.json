@@ -1,0 +1,157 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 310,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 301,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 35,
+							"property": "position",
+							"value": "absolute"
+						},
+						{
+							"type": "Declaration",
+							"start": 39,
+							"end": 48,
+							"property": "top",
+							"value": "10px"
+						},
+						{
+							"type": "Declaration",
+							"start": 52,
+							"end": 63,
+							"property": "right",
+							"value": "20px"
+						},
+						{
+							"type": "Declaration",
+							"start": 67,
+							"end": 79,
+							"property": "bottom",
+							"value": "30px"
+						},
+						{
+							"type": "Declaration",
+							"start": 83,
+							"end": 93,
+							"property": "left",
+							"value": "40px"
+						},
+						{
+							"type": "Declaration",
+							"start": 97,
+							"end": 123,
+							"property": "inset",
+							"value": "10px 20px 30px 40px"
+						},
+						{
+							"type": "Declaration",
+							"start": 127,
+							"end": 139,
+							"property": "z-index",
+							"value": "100"
+						},
+						{
+							"type": "Declaration",
+							"start": 143,
+							"end": 165,
+							"property": "inset-block",
+							"value": "10px 20px"
+						},
+						{
+							"type": "Declaration",
+							"start": 169,
+							"end": 192,
+							"property": "inset-inline",
+							"value": "30px 40px"
+						},
+						{
+							"type": "Declaration",
+							"start": 196,
+							"end": 218,
+							"property": "inset-block-start",
+							"value": "5px"
+						},
+						{
+							"type": "Declaration",
+							"start": 222,
+							"end": 243,
+							"property": "inset-block-end",
+							"value": "15px"
+						},
+						{
+							"type": "Declaration",
+							"start": 247,
+							"end": 271,
+							"property": "inset-inline-start",
+							"value": "25px"
+						},
+						{
+							"type": "Declaration",
+							"start": 275,
+							"end": 297,
+							"property": "inset-inline-end",
+							"value": "35px"
+						}
+					]
+				},
+				"start": 9,
+				"end": 301
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 302,
+			"styles": "\n\tdiv {\n\t\tposition: absolute;\n\t\ttop: 10px;\n\t\tright: 20px;\n\t\tbottom: 30px;\n\t\tleft: 40px;\n\t\tinset: 10px 20px 30px 40px;\n\t\tz-index: 100;\n\t\tinset-block: 10px 20px;\n\t\tinset-inline: 30px 40px;\n\t\tinset-block-start: 5px;\n\t\tinset-block-end: 15px;\n\t\tinset-inline-start: 25px;\n\t\tinset-inline-end: 35px;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 311,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

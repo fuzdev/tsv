@@ -1,0 +1,209 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 253,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 77,
+				"name": "media",
+				"prelude": "screen and (min-width: 768px)",
+				"block": {
+					"type": "Block",
+					"start": 46,
+					"end": 77,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 50,
+								"end": 53,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 50,
+										"end": 53,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 50,
+														"end": 53
+													}
+												],
+												"start": 50,
+												"end": 53
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 54,
+								"end": 74,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 59,
+										"end": 69,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 50,
+							"end": 74
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 80,
+				"end": 166,
+				"name": "media",
+				"prelude": "(min-width: 768px) or (orientation: portrait)",
+				"block": {
+					"type": "Block",
+					"start": 133,
+					"end": 166,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 137,
+								"end": 141,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 137,
+										"end": 141,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "span",
+														"start": 137,
+														"end": 141
+													}
+												],
+												"start": 137,
+												"end": 141
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 142,
+								"end": 163,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 147,
+										"end": 158,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 137,
+							"end": 163
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 169,
+				"end": 244,
+				"name": "media",
+				"prelude": "not all and (orientation: landscape)",
+				"block": {
+					"type": "Block",
+					"start": 213,
+					"end": 244,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 217,
+								"end": 218,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 217,
+										"end": 218,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "p",
+														"start": 217,
+														"end": 218
+													}
+												],
+												"start": 217,
+												"end": 218
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 219,
+								"end": 241,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 224,
+										"end": 236,
+										"property": "color",
+										"value": "green"
+									}
+								]
+							},
+							"start": 217,
+							"end": 241
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 245,
+			"styles": "\n\t@media screen and (min-width: 768px) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t@media (min-width: 768px) or (orientation: portrait) {\n\t\tspan {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n\n\t@media not all and (orientation: landscape) {\n\t\tp {\n\t\t\tcolor: green;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 254,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,512 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 199,
+		"end": 322,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 208,
+					"end": 215,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 208,
+							"end": 215,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 208,
+											"end": 215
+										}
+									],
+									"start": 208,
+									"end": 215
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 216,
+					"end": 242,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 220,
+							"end": 238,
+							"property": "content",
+							"value": "'\\10FFFF'"
+						}
+					]
+				},
+				"start": 208,
+				"end": 242
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 245,
+					"end": 252,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 245,
+							"end": 252,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class2",
+											"start": 245,
+											"end": 252
+										}
+									],
+									"start": 245,
+									"end": 252
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 253,
+					"end": 277,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 257,
+							"end": 273,
+							"property": "content",
+							"value": "'\\FFFF'"
+						}
+					]
+				},
+				"start": 245,
+				"end": 277
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 280,
+					"end": 287,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 280,
+							"end": 287,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class3",
+											"start": 280,
+											"end": 287
+										}
+									],
+									"start": 280,
+									"end": 287
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 288,
+					"end": 313,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 292,
+							"end": 309,
+							"property": "content",
+							"value": "'\\1F600'"
+						}
+					]
+				},
+				"start": 280,
+				"end": 313
+			}
+		],
+		"content": {
+			"start": 206,
+			"end": 314,
+			"styles": "\n\t.class1 {\n\t\tcontent: '\\10FFFF';\n\t}\n\n\t.class2 {\n\t\tcontent: '\\FFFF';\n\t}\n\n\t.class3 {\n\t\tcontent: '\\1F600';\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 323,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 110,
+				"end": 112,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 112,
+				"end": 148,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 113
+					},
+					"end": {
+						"line": 7,
+						"column": 2,
+						"character": 114
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 115,
+							"end": 144,
+							"raw": "max valid Unicode: &#x10FFFF;",
+							"data": "max valid Unicode: \u0000"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 148,
+				"end": 149,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 149,
+				"end": 173,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 150
+					},
+					"end": {
+						"line": 8,
+						"column": 2,
+						"character": 151
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 152,
+							"end": 169,
+							"raw": "BMP max: &#65535;",
+							"data": "BMP max: ￿"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 173,
+				"end": 174,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 174,
+				"end": 197,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 175
+					},
+					"end": {
+						"line": 9,
+						"column": 2,
+						"character": 176
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 177,
+							"end": 193,
+							"raw": "emoji: &#x1F600;",
+							"data": "emoji: 😀"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 197,
+				"end": 199,
+				"raw": "\n\n",
+				"data": "\n\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 110,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 40,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 31
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 16,
+							"end": 39,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 2,
+									"column": 30
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 16,
+								"end": 24,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 15
+									}
+								},
+								"name": "maxValid"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 27,
+								"end": 39,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 18
+									},
+									"end": {
+										"line": 2,
+										"column": 30
+									}
+								},
+								"value": "􏿿",
+								"raw": "'\\u{10FFFF}'"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 42,
+					"end": 66,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 25
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 48,
+							"end": 65,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 24
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 48,
+								"end": 54,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 13
+									}
+								},
+								"name": "bmpMax"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 57,
+								"end": 65,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 16
+									},
+									"end": {
+										"line": 3,
+										"column": 24
+									}
+								},
+								"value": "￿",
+								"raw": "'\\uFFFF'"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 68,
+					"end": 100,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 33
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 74,
+							"end": 99,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 32
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 74,
+								"end": 85,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 18
+									}
+								},
+								"name": "astralPlane"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 88,
+								"end": 99,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 21
+									},
+									"end": {
+										"line": 4,
+										"column": 32
+									}
+								},
+								"value": "😀",
+								"raw": "'\\u{1F600}'"
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -1,0 +1,92 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 57,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 56,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 46,
+			"end": 47,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 2,
+					"column": 9
+				}
+			},
+			"body": [],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			},
+			{
+				"type": "Attribute",
+				"start": 18,
+				"end": 45,
+				"name": "generics",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 18,
+						"character": 18
+					},
+					"end": {
+						"line": 1,
+						"column": 26,
+						"character": 26
+					}
+				},
+				"value": [
+					{
+						"start": 28,
+						"end": 44,
+						"type": "Text",
+						"raw": "T extends {a: A}",
+						"data": "T extends {a: A}"
+					}
+				]
+			}
+		]
+	}
+}

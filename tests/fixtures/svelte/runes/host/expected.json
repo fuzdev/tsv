@@ -1,0 +1,558 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 248,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 45,
+				"end": 47,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Text",
+				"start": 188,
+				"end": 190,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 190,
+				"end": 247,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 191
+					},
+					"end": {
+						"line": 9,
+						"column": 7,
+						"character": 197
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 198,
+						"end": 228,
+						"name": "onclick",
+						"name_loc": {
+							"start": {
+								"line": 9,
+								"column": 8,
+								"character": 198
+							},
+							"end": {
+								"line": 9,
+								"column": 15,
+								"character": 205
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 206,
+							"end": 228,
+							"expression": {
+								"type": "ArrowFunctionExpression",
+								"start": 207,
+								"end": 227,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 17
+									},
+									"end": {
+										"line": 9,
+										"column": 37
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "CallExpression",
+									"start": 213,
+									"end": 227,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 23
+										},
+										"end": {
+											"line": 9,
+											"column": 37
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 213,
+										"end": 218,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 23
+											},
+											"end": {
+												"line": 9,
+												"column": 28
+											}
+										},
+										"name": "greet"
+									},
+									"arguments": [
+										{
+											"type": "Literal",
+											"start": 219,
+											"end": 226,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 29
+												},
+												"end": {
+													"line": 9,
+													"column": 36
+												}
+											},
+											"value": "hello",
+											"raw": "'hello'"
+										}
+									],
+									"optional": false
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 229,
+							"end": 238,
+							"raw": "say hello",
+							"data": "say hello"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": {
+		"start": 0,
+		"end": 45,
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 16,
+				"end": 42,
+				"name": "customElement",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 16,
+						"character": 16
+					},
+					"end": {
+						"line": 1,
+						"column": 29,
+						"character": 29
+					}
+				},
+				"value": [
+					{
+						"start": 31,
+						"end": 41,
+						"type": "Text",
+						"raw": "my-element",
+						"data": "my-element"
+					}
+				]
+			}
+		],
+		"customElement": {
+			"tag": "my-element"
+		}
+	},
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 47,
+		"end": 188,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 65,
+			"end": 179,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 67,
+					"end": 178,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 76,
+						"end": 81,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 10
+							},
+							"end": {
+								"line": 4,
+								"column": 15
+							}
+						},
+						"name": "greet"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 82,
+							"end": 98,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 16
+								},
+								"end": {
+									"line": 4,
+									"column": 32
+								}
+							},
+							"name": "greeting",
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 90,
+								"end": 98,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 24
+									},
+									"end": {
+										"line": 4,
+										"column": 32
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSStringKeyword",
+									"start": 92,
+									"end": 98,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 26
+										},
+										"end": {
+											"line": 4,
+											"column": 32
+										}
+									}
+								}
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 100,
+						"end": 178,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 34
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 104,
+								"end": 175,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 73
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 104,
+									"end": 174,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 72
+										}
+									},
+									"callee": {
+										"type": "MemberExpression",
+										"start": 104,
+										"end": 125,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 2
+											},
+											"end": {
+												"line": 5,
+												"column": 23
+											}
+										},
+										"object": {
+											"type": "CallExpression",
+											"start": 104,
+											"end": 111,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 2
+												},
+												"end": {
+													"line": 5,
+													"column": 9
+												}
+											},
+											"callee": {
+												"type": "Identifier",
+												"start": 104,
+												"end": 109,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 2
+													},
+													"end": {
+														"line": 5,
+														"column": 7
+													}
+												},
+												"name": "$host"
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 112,
+											"end": 125,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 10
+												},
+												"end": {
+													"line": 5,
+													"column": 23
+												}
+											},
+											"name": "dispatchEvent"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "NewExpression",
+											"start": 126,
+											"end": 173,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 24
+												},
+												"end": {
+													"line": 5,
+													"column": 71
+												}
+											},
+											"callee": {
+												"type": "Identifier",
+												"start": 130,
+												"end": 141,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 28
+													},
+													"end": {
+														"line": 5,
+														"column": 39
+													}
+												},
+												"name": "CustomEvent"
+											},
+											"arguments": [
+												{
+													"type": "Literal",
+													"start": 142,
+													"end": 152,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 40
+														},
+														"end": {
+															"line": 5,
+															"column": 50
+														}
+													},
+													"value": "greeting",
+													"raw": "'greeting'"
+												},
+												{
+													"type": "ObjectExpression",
+													"start": 154,
+													"end": 172,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 52
+														},
+														"end": {
+															"line": 5,
+															"column": 70
+														}
+													},
+													"properties": [
+														{
+															"type": "Property",
+															"start": 155,
+															"end": 171,
+															"loc": {
+																"start": {
+																	"line": 5,
+																	"column": 53
+																},
+																"end": {
+																	"line": 5,
+																	"column": 69
+																}
+															},
+															"method": false,
+															"shorthand": false,
+															"computed": false,
+															"key": {
+																"type": "Identifier",
+																"start": 155,
+																"end": 161,
+																"loc": {
+																	"start": {
+																		"line": 5,
+																		"column": 53
+																	},
+																	"end": {
+																		"line": 5,
+																		"column": 59
+																	}
+																},
+																"name": "detail"
+															},
+															"value": {
+																"type": "Identifier",
+																"start": 163,
+																"end": 171,
+																"loc": {
+																	"start": {
+																		"line": 5,
+																		"column": 61
+																	},
+																	"end": {
+																		"line": 5,
+																		"column": 69
+																	}
+																},
+																"name": "greeting"
+															},
+															"kind": "init"
+														}
+													]
+												}
+											]
+										}
+									],
+									"optional": false
+								}
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 55,
+				"end": 64,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 8,
+						"character": 55
+					},
+					"end": {
+						"line": 3,
+						"column": 12,
+						"character": 59
+					}
+				},
+				"value": [
+					{
+						"start": 61,
+						"end": 63,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

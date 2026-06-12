@@ -1,0 +1,111 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 113,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 112,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 2,
+						"character": 2
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 3,
+							"end": 27,
+							"raw": "\n\tLook at this example (",
+							"data": "\n\tLook at this example ("
+						},
+						{
+							"type": "Component",
+							"start": 27,
+							"end": 92,
+							"name": "Link",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 24,
+									"character": 28
+								},
+								"end": {
+									"line": 2,
+									"column": 28,
+									"character": 32
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 33,
+									"end": 76,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 2,
+											"column": 29,
+											"character": 33
+										},
+										"end": {
+											"line": 2,
+											"column": 33,
+											"character": 37
+										}
+									},
+									"value": [
+										{
+											"start": 39,
+											"end": 75,
+											"type": "Text",
+											"raw": "https://fuz.dev/docs/getting-started",
+											"data": "https://fuz.dev/docs/getting-started"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 77,
+										"end": 85,
+										"raw": "see docs",
+										"data": "see docs"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 92,
+							"end": 108,
+							"raw": ") for\n\tdetails.\n",
+							"data": ") for\n\tdetails.\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

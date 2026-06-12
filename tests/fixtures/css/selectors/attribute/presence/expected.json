@@ -1,0 +1,132 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 94,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 19,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 19,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 9,
+											"end": 19,
+											"name": "disabled",
+											"matcher": null,
+											"value": null,
+											"flags": null
+										}
+									],
+									"start": 9,
+									"end": 19
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 20,
+					"end": 40,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 24,
+							"end": 36,
+							"property": "opacity",
+							"value": "0.5"
+						}
+					]
+				},
+				"start": 9,
+				"end": 40
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 43,
+					"end": 50,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 43,
+							"end": 50,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 43,
+											"end": 44
+										},
+										{
+											"type": "AttributeSelector",
+											"start": 44,
+											"end": 50,
+											"name": "href",
+											"matcher": null,
+											"value": null,
+											"flags": null
+										}
+									],
+									"start": 43,
+									"end": 50
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 51,
+					"end": 85,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 55,
+							"end": 81,
+							"property": "text-decoration",
+							"value": "underline"
+						}
+					]
+				},
+				"start": 43,
+				"end": 85
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 86,
+			"styles": "\n\t[disabled] {\n\t\topacity: 0.5;\n\t}\n\n\ta[href] {\n\t\ttext-decoration: underline;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 95,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

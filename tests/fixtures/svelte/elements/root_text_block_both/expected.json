@@ -1,0 +1,59 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 29,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 0,
+				"end": 6,
+				"raw": "text1\n",
+				"data": "text1\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 6,
+				"end": 22,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 7
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 10
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 11,
+							"end": 16,
+							"raw": "block",
+							"data": "block"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 22,
+				"end": 28,
+				"raw": "\ntext2",
+				"data": "\ntext2"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

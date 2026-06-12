@@ -1,0 +1,171 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 354,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 345,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 32,
+							"property": "cursor",
+							"value": "pointer"
+						},
+						{
+							"type": "Declaration",
+							"start": 36,
+							"end": 51,
+							"property": "cursor",
+							"value": "default"
+						},
+						{
+							"type": "Declaration",
+							"start": 55,
+							"end": 67,
+							"property": "cursor",
+							"value": "grab"
+						},
+						{
+							"type": "Declaration",
+							"start": 71,
+							"end": 87,
+							"property": "cursor",
+							"value": "grabbing"
+						},
+						{
+							"type": "Declaration",
+							"start": 91,
+							"end": 110,
+							"property": "cursor",
+							"value": "not-allowed"
+						},
+						{
+							"type": "Declaration",
+							"start": 114,
+							"end": 126,
+							"property": "cursor",
+							"value": "wait"
+						},
+						{
+							"type": "Declaration",
+							"start": 130,
+							"end": 147,
+							"property": "cursor",
+							"value": "crosshair"
+						},
+						{
+							"type": "Declaration",
+							"start": 151,
+							"end": 180,
+							"property": "cursor",
+							"value": "url(cursor.png), auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 184,
+							"end": 204,
+							"property": "pointer-events",
+							"value": "auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 208,
+							"end": 228,
+							"property": "pointer-events",
+							"value": "none"
+						},
+						{
+							"type": "Declaration",
+							"start": 232,
+							"end": 249,
+							"property": "user-select",
+							"value": "none"
+						},
+						{
+							"type": "Declaration",
+							"start": 253,
+							"end": 270,
+							"property": "user-select",
+							"value": "text"
+						},
+						{
+							"type": "Declaration",
+							"start": 274,
+							"end": 290,
+							"property": "user-select",
+							"value": "all"
+						},
+						{
+							"type": "Declaration",
+							"start": 294,
+							"end": 312,
+							"property": "touch-action",
+							"value": "none"
+						},
+						{
+							"type": "Declaration",
+							"start": 316,
+							"end": 341,
+							"property": "touch-action",
+							"value": "pan-x pan-y"
+						}
+					]
+				},
+				"start": 9,
+				"end": 345
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 346,
+			"styles": "\n\tdiv {\n\t\tcursor: pointer;\n\t\tcursor: default;\n\t\tcursor: grab;\n\t\tcursor: grabbing;\n\t\tcursor: not-allowed;\n\t\tcursor: wait;\n\t\tcursor: crosshair;\n\t\tcursor: url(cursor.png), auto;\n\t\tpointer-events: auto;\n\t\tpointer-events: none;\n\t\tuser-select: none;\n\t\tuser-select: text;\n\t\tuser-select: all;\n\t\ttouch-action: none;\n\t\ttouch-action: pan-x pan-y;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 355,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

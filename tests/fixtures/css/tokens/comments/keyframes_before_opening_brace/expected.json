@@ -1,0 +1,209 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 363,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 171,
+				"end": 240,
+				"name": "keyframes",
+				"prelude": "anim1",
+				"block": {
+					"type": "Block",
+					"start": 196,
+					"end": 240,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 200,
+								"end": 202,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 200,
+										"end": 202,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "Percentage",
+														"value": "0%",
+														"start": 200,
+														"end": 202
+													}
+												],
+												"start": 200,
+												"end": 202
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 203,
+								"end": 237,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 208,
+										"end": 232,
+										"property": "transform",
+										"value": "translateX(0)"
+									}
+								]
+							},
+							"start": 200,
+							"end": 237
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 242,
+				"end": 296,
+				"name": "keyframes",
+				"prelude": "anim2",
+				"block": {
+					"type": "Block",
+					"start": 266,
+					"end": 296,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 270,
+								"end": 272,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 270,
+										"end": 272,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "Percentage",
+														"value": "0%",
+														"start": 270,
+														"end": 272
+													}
+												],
+												"start": 270,
+												"end": 272
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 273,
+								"end": 293,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 278,
+										"end": 288,
+										"property": "opacity",
+										"value": "0"
+									}
+								]
+							},
+							"start": 270,
+							"end": 293
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 298,
+				"end": 354,
+				"name": "keyframes",
+				"prelude": "anim3",
+				"block": {
+					"type": "Block",
+					"start": 324,
+					"end": 354,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 328,
+								"end": 330,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 328,
+										"end": 330,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "Percentage",
+														"value": "0%",
+														"start": 328,
+														"end": 330
+													}
+												],
+												"start": 328,
+												"end": 330
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 331,
+								"end": 351,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 336,
+										"end": 346,
+										"property": "opacity",
+										"value": "1"
+									}
+								]
+							},
+							"start": 328,
+							"end": 351
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 355,
+			"styles": "\n\t/* comment spacing in a raw at-rule prelude is preserved verbatim (matches prettier);\n\tthe single-space, no-space, and extra-space forms are each dual-stable */\n\t@keyframes anim1 /* c */ {\n\t\t0% {\n\t\t\ttransform: translateX(0);\n\t\t}\n\t}\n\t@keyframes anim2/* c */ {\n\t\t0% {\n\t\t\topacity: 0;\n\t\t}\n\t}\n\t@keyframes anim3  /* c */ {\n\t\t0% {\n\t\t\topacity: 1;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 364,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

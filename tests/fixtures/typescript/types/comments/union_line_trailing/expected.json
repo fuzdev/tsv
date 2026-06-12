@@ -1,0 +1,620 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 316,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Line comment trailing first variant",
+			"start": 20,
+			"end": 58,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing",
+			"start": 75,
+			"end": 86,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 6
+				},
+				"end": {
+					"line": 4,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Line comment trailing multiple variants",
+			"start": 96,
+			"end": 138,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 43
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing A",
+			"start": 155,
+			"end": 168,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 6
+				},
+				"end": {
+					"line": 9,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing B",
+			"start": 175,
+			"end": 188,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 6
+				},
+				"end": {
+					"line": 10,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Multiple consecutive trailing comments (one per line)",
+			"start": 198,
+			"end": 254,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing 1",
+			"start": 271,
+			"end": 284,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 6
+				},
+				"end": {
+					"line": 15,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing 2",
+			"start": 292,
+			"end": 305,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 7
+				},
+				"end": {
+					"line": 16,
+					"column": 20
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 315,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 306,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 60,
+					"end": 93,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 65,
+						"end": 66,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "T"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 71,
+						"end": 92,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 2
+							},
+							"end": {
+								"line": 5,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 73,
+								"end": 74,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 4
+									},
+									"end": {
+										"line": 4,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 73,
+									"end": 74,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 4
+										},
+										"end": {
+											"line": 4,
+											"column": 5
+										}
+									},
+									"name": "A"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " trailing",
+										"start": 75,
+										"end": 86
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 91,
+								"end": 92,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 4
+									},
+									"end": {
+										"line": 5,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 91,
+									"end": 92,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 4
+										},
+										"end": {
+											"line": 5,
+											"column": 5
+										}
+									},
+									"name": "B"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment trailing first variant",
+							"start": 20,
+							"end": 58
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 140,
+					"end": 195,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 145,
+						"end": 146,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 6
+							},
+							"end": {
+								"line": 8,
+								"column": 7
+							}
+						},
+						"name": "U"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 151,
+						"end": 194,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 2
+							},
+							"end": {
+								"line": 11,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 153,
+								"end": 154,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 4
+									},
+									"end": {
+										"line": 9,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 153,
+									"end": 154,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 4
+										},
+										"end": {
+											"line": 9,
+											"column": 5
+										}
+									},
+									"name": "A"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " trailing A",
+										"start": 155,
+										"end": 168
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 173,
+								"end": 174,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 4
+									},
+									"end": {
+										"line": 10,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 173,
+									"end": 174,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 4
+										},
+										"end": {
+											"line": 10,
+											"column": 5
+										}
+									},
+									"name": "B"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " trailing B",
+										"start": 175,
+										"end": 188
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 193,
+								"end": 194,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 4
+									},
+									"end": {
+										"line": 11,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 193,
+									"end": 194,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 4
+										},
+										"end": {
+											"line": 11,
+											"column": 5
+										}
+									},
+									"name": "C"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment trailing multiple variants",
+							"start": 96,
+							"end": 138
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 256,
+					"end": 291,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 261,
+						"end": 262,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 6
+							},
+							"end": {
+								"line": 14,
+								"column": 7
+							}
+						},
+						"name": "V"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 267,
+						"end": 290,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 2
+							},
+							"end": {
+								"line": 16,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 269,
+								"end": 270,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 4
+									},
+									"end": {
+										"line": 15,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 269,
+									"end": 270,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 4
+										},
+										"end": {
+											"line": 15,
+											"column": 5
+										}
+									},
+									"name": "A"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " trailing 1",
+										"start": 271,
+										"end": 284
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 289,
+								"end": 290,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 4
+									},
+									"end": {
+										"line": 16,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 289,
+									"end": 290,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 4
+										},
+										"end": {
+											"line": 16,
+											"column": 5
+										}
+									},
+									"name": "B"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multiple consecutive trailing comments (one per line)",
+							"start": 198,
+							"end": 254
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " trailing 2",
+							"start": 292,
+							"end": 305
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

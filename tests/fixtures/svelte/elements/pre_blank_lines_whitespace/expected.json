@@ -1,0 +1,45 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 32,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 31,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 5,
+							"end": 25,
+							"raw": "\n\ttext1\n\t\t\n\ttext2\n\t ",
+							"data": "\n\ttext1\n\t\t\n\ttext2\n\t "
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 124,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 15,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 15,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class",
+											"start": 9,
+											"end": 15
+										}
+									],
+									"start": 9,
+									"end": 15
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 16,
+					"end": 115,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 20,
+							"end": 30,
+							"property": "color",
+							"value": "red"
+						},
+						{
+							"type": "Declaration",
+							"start": 48,
+							"end": 64,
+							"property": "background",
+							"value": "blue"
+						},
+						{
+							"type": "Declaration",
+							"start": 82,
+							"end": 97,
+							"property": "font-size",
+							"value": "12px"
+						}
+					]
+				},
+				"start": 9,
+				"end": 115
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 116,
+			"styles": "\n\t.class {\n\t\tcolor: red; /* comment */\n\t\tbackground: blue; /* comment */\n\t\tfont-size: 12px; /* comment */\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 125,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

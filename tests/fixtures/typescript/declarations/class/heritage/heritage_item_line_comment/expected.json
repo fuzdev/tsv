@@ -1,0 +1,593 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 321,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Line comment after implements item",
+			"start": 20,
+			"end": 57,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 86,
+			"end": 90,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 6
+				},
+				"end": {
+					"line": 5,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Line comment after implements item with extends",
+			"start": 101,
+			"end": 151,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 192,
+			"end": 196,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 6
+				},
+				"end": {
+					"line": 12,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Multiple implements items with line comment in middle",
+			"start": 207,
+			"end": 263,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 292,
+			"end": 296,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 6
+				},
+				"end": {
+					"line": 18,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 320,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 311,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 21,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 59,
+					"end": 98,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 7
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 65,
+						"end": 66,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 7
+							},
+							"end": {
+								"line": 3,
+								"column": 8
+							}
+						},
+						"name": "A"
+					},
+					"superClass": null,
+					"implements": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 83,
+							"end": 84,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 3
+								},
+								"end": {
+									"line": 5,
+									"column": 4
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 83,
+								"end": 84,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 3
+									},
+									"end": {
+										"line": 5,
+										"column": 4
+									}
+								},
+								"name": "I"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 86,
+									"end": 90
+								}
+							]
+						},
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 94,
+							"end": 95,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 3
+								},
+								"end": {
+									"line": 6,
+									"column": 4
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 94,
+								"end": 95,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 3
+									},
+									"end": {
+										"line": 6,
+										"column": 4
+									}
+								},
+								"name": "J"
+							}
+						}
+					],
+					"body": {
+						"type": "ClassBody",
+						"start": 96,
+						"end": 98,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 5
+							},
+							"end": {
+								"line": 6,
+								"column": 7
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment after implements item",
+							"start": 20,
+							"end": 57
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 153,
+					"end": 204,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 7
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 159,
+						"end": 160,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 7
+							},
+							"end": {
+								"line": 9,
+								"column": 8
+							}
+						},
+						"name": "B"
+					},
+					"superClass": {
+						"type": "Identifier",
+						"start": 171,
+						"end": 172,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 10
+							},
+							"end": {
+								"line": 10,
+								"column": 11
+							}
+						},
+						"name": "C"
+					},
+					"implements": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 189,
+							"end": 190,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 3
+								},
+								"end": {
+									"line": 12,
+									"column": 4
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 189,
+								"end": 190,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 3
+									},
+									"end": {
+										"line": 12,
+										"column": 4
+									}
+								},
+								"name": "I"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 192,
+									"end": 196
+								}
+							]
+						},
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 200,
+							"end": 201,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 3
+								},
+								"end": {
+									"line": 13,
+									"column": 4
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 200,
+								"end": 201,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 3
+									},
+									"end": {
+										"line": 13,
+										"column": 4
+									}
+								},
+								"name": "J"
+							}
+						}
+					],
+					"body": {
+						"type": "ClassBody",
+						"start": 202,
+						"end": 204,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 5
+							},
+							"end": {
+								"line": 13,
+								"column": 7
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment after implements item with extends",
+							"start": 101,
+							"end": 151
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 265,
+					"end": 310,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 7
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 271,
+						"end": 272,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 7
+							},
+							"end": {
+								"line": 16,
+								"column": 8
+							}
+						},
+						"name": "D"
+					},
+					"superClass": null,
+					"implements": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 289,
+							"end": 290,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 3
+								},
+								"end": {
+									"line": 18,
+									"column": 4
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 289,
+								"end": 290,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 3
+									},
+									"end": {
+										"line": 18,
+										"column": 4
+									}
+								},
+								"name": "I"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 292,
+									"end": 296
+								}
+							]
+						},
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 300,
+							"end": 301,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 3
+								},
+								"end": {
+									"line": 19,
+									"column": 4
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 300,
+								"end": 301,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 3
+									},
+									"end": {
+										"line": 19,
+										"column": 4
+									}
+								},
+								"name": "J"
+							}
+						},
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 306,
+							"end": 307,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 3
+								},
+								"end": {
+									"line": 20,
+									"column": 4
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 306,
+								"end": 307,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 3
+									},
+									"end": {
+										"line": 20,
+										"column": 4
+									}
+								},
+								"name": "K"
+							}
+						}
+					],
+					"body": {
+						"type": "ClassBody",
+						"start": 308,
+						"end": 310,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 5
+							},
+							"end": {
+								"line": 20,
+								"column": 7
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multiple implements items with line comment in middle",
+							"start": 207,
+							"end": 263
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

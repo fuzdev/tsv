@@ -1,0 +1,564 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 185,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 184,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 175,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 10,
+					"end": 45,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 14,
+						"end": 15,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 5
+							},
+							"end": {
+								"line": 2,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 17,
+						"end": 45,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 8
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "IfStatement",
+								"start": 21,
+								"end": 42,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 3
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 25,
+									"end": 26,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 6
+										},
+										"end": {
+											"line": 3,
+											"column": 7
+										}
+									},
+									"name": "b"
+								},
+								"consequent": {
+									"type": "BlockStatement",
+									"start": 28,
+									"end": 42,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 9
+										},
+										"end": {
+											"line": 5,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 33,
+											"end": 38,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 3
+												},
+												"end": {
+													"line": 4,
+													"column": 8
+												}
+											},
+											"expression": {
+												"type": "Identifier",
+												"start": 33,
+												"end": 37,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 3
+													},
+													"end": {
+														"line": 4,
+														"column": 7
+													}
+												},
+												"name": "expr"
+											}
+										}
+									]
+								},
+								"alternate": null
+							}
+						]
+					},
+					"alternate": null
+				},
+				{
+					"type": "IfStatement",
+					"start": 48,
+					"end": 82,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 12
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 52,
+						"end": 53,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 5
+							},
+							"end": {
+								"line": 8,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "IfStatement",
+						"start": 57,
+						"end": 82,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 2
+							},
+							"end": {
+								"line": 10,
+								"column": 12
+							}
+						},
+						"test": {
+							"type": "Identifier",
+							"start": 61,
+							"end": 62,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 6
+								},
+								"end": {
+									"line": 9,
+									"column": 7
+								}
+							},
+							"name": "b"
+						},
+						"consequent": {
+							"type": "ExpressionStatement",
+							"start": 64,
+							"end": 69,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 9
+								},
+								"end": {
+									"line": 9,
+									"column": 14
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 64,
+								"end": 68,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 9
+									},
+									"end": {
+										"line": 9,
+										"column": 13
+									}
+								},
+								"name": "expr"
+							}
+						},
+						"alternate": {
+							"type": "ExpressionStatement",
+							"start": 77,
+							"end": 82,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 10,
+									"column": 12
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 77,
+								"end": 81,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 11
+									}
+								},
+								"name": "expr"
+							}
+						}
+					},
+					"alternate": null
+				},
+				{
+					"type": "IfStatement",
+					"start": 85,
+					"end": 174,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 89,
+						"end": 90,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 5
+							},
+							"end": {
+								"line": 12,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 92,
+						"end": 140,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 8
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "IfStatement",
+								"start": 96,
+								"end": 137,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 3
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 100,
+									"end": 101,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 6
+										},
+										"end": {
+											"line": 13,
+											"column": 7
+										}
+									},
+									"name": "b"
+								},
+								"consequent": {
+									"type": "BlockStatement",
+									"start": 103,
+									"end": 117,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 9
+										},
+										"end": {
+											"line": 15,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 108,
+											"end": 113,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 3
+												},
+												"end": {
+													"line": 14,
+													"column": 8
+												}
+											},
+											"expression": {
+												"type": "Identifier",
+												"start": 108,
+												"end": 112,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 3
+													},
+													"end": {
+														"line": 14,
+														"column": 7
+													}
+												},
+												"name": "expr"
+											}
+										}
+									]
+								},
+								"alternate": {
+									"type": "BlockStatement",
+									"start": 123,
+									"end": 137,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 9
+										},
+										"end": {
+											"line": 17,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 128,
+											"end": 133,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 3
+												},
+												"end": {
+													"line": 16,
+													"column": 8
+												}
+											},
+											"expression": {
+												"type": "Identifier",
+												"start": 128,
+												"end": 132,
+												"loc": {
+													"start": {
+														"line": 16,
+														"column": 3
+													},
+													"end": {
+														"line": 16,
+														"column": 7
+													}
+												},
+												"name": "expr"
+											}
+										}
+									]
+								}
+							}
+						]
+					},
+					"alternate": {
+						"type": "BlockStatement",
+						"start": 146,
+						"end": 174,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 8
+							},
+							"end": {
+								"line": 22,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "IfStatement",
+								"start": 150,
+								"end": 171,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 21,
+										"column": 3
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 154,
+									"end": 155,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 6
+										},
+										"end": {
+											"line": 19,
+											"column": 7
+										}
+									},
+									"name": "c"
+								},
+								"consequent": {
+									"type": "BlockStatement",
+									"start": 157,
+									"end": 171,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 9
+										},
+										"end": {
+											"line": 21,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 162,
+											"end": 167,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 3
+												},
+												"end": {
+													"line": 20,
+													"column": 8
+												}
+											},
+											"expression": {
+												"type": "Identifier",
+												"start": 162,
+												"end": 166,
+												"loc": {
+													"start": {
+														"line": 20,
+														"column": 3
+													},
+													"end": {
+														"line": 20,
+														"column": 7
+													}
+												},
+												"name": "expr"
+											}
+										}
+									]
+								},
+								"alternate": null
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

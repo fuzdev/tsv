@@ -1,0 +1,219 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 173,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 172,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 5,
+							"end": 16,
+							"raw": "\n\tNewline: ",
+							"data": "\n\tNewline: "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 16,
+							"end": 31,
+							"expression": {
+								"type": "Literal",
+								"start": 17,
+								"end": 30,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 11
+									},
+									"end": {
+										"line": 2,
+										"column": 24
+									}
+								},
+								"value": "line\nbreak",
+								"raw": "'line\\nbreak'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 31,
+							"end": 38,
+							"raw": "\n\tTab: ",
+							"data": "\n\tTab: "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 38,
+							"end": 51,
+							"expression": {
+								"type": "Literal",
+								"start": 39,
+								"end": 50,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 18
+									}
+								},
+								"value": "tab\there",
+								"raw": "'tab\\there'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 51,
+							"end": 61,
+							"raw": "\n\tQuotes: ",
+							"data": "\n\tQuotes: "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 61,
+							"end": 81,
+							"expression": {
+								"type": "Literal",
+								"start": 62,
+								"end": 80,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 10
+									},
+									"end": {
+										"line": 4,
+										"column": 28
+									}
+								},
+								"value": "{\"key\": \"value\"}",
+								"raw": "'{\"key\": \"value\"}'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 81,
+							"end": 92,
+							"raw": "\n\tUnicode: ",
+							"data": "\n\tUnicode: "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 92,
+							"end": 114,
+							"expression": {
+								"type": "Literal",
+								"start": 93,
+								"end": 113,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 31
+									}
+								},
+								"value": "ABC",
+								"raw": "'\\u0041\\u0042\\u0043'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 114,
+							"end": 121,
+							"raw": "\n\tHex: ",
+							"data": "\n\tHex: "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 121,
+							"end": 137,
+							"expression": {
+								"type": "Literal",
+								"start": 122,
+								"end": 136,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 21
+									}
+								},
+								"value": "ABC",
+								"raw": "'\\x41\\x42\\x43'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 137,
+							"end": 146,
+							"raw": "\n\tMixed: ",
+							"data": "\n\tMixed: "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 146,
+							"end": 165,
+							"expression": {
+								"type": "Literal",
+								"start": 147,
+								"end": 164,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 9
+									},
+									"end": {
+										"line": 7,
+										"column": 26
+									}
+								},
+								"value": "Hello\nWorld\t!",
+								"raw": "'Hello\\nWorld\\t!'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 165,
+							"end": 166,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

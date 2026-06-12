@@ -1,0 +1,124 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 323,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 79,
+				"data": " Prettier allows exceeding print width after inline element closing tag "
+			},
+			{
+				"type": "Text",
+				"start": 79,
+				"end": 80,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 80,
+				"end": 322,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 81
+					},
+					"end": {
+						"line": 2,
+						"column": 2,
+						"character": 82
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 83,
+							"end": 131,
+							"raw": "\n\tThis is a very long paragraph that contains a ",
+							"data": "\n\tThis is a very long paragraph that contains a "
+						},
+						{
+							"type": "Component",
+							"start": 131,
+							"end": 208,
+							"name": "Link",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 48,
+									"character": 132
+								},
+								"end": {
+									"line": 3,
+									"column": 52,
+									"character": 136
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 137,
+									"end": 177,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 3,
+											"column": 53,
+											"character": 137
+										},
+										"end": {
+											"line": 3,
+											"column": 57,
+											"character": 141
+										}
+									},
+									"value": [
+										{
+											"start": 143,
+											"end": 176,
+											"type": "Text",
+											"raw": "https://fuz.dev/aaaaaaaaaaaaaaaaa",
+											"data": "https://fuz.dev/aaaaaaaaaaaaaaaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 181,
+										"end": 199,
+										"raw": "documentation link",
+										"data": "documentation link"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 208,
+							"end": 318,
+							"raw": " in the middle and continues with more text that should wrap naturally across multiple lines when\n\tformatted.\n",
+							"data": " in the middle and continues with more text that should wrap naturally across multiple lines when\n\tformatted.\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

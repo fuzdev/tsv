@@ -1,0 +1,158 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 85,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 15,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 15,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "h1",
+											"start": 9,
+											"end": 11
+										}
+									],
+									"start": 9,
+									"end": 11
+								},
+								{
+									"type": "RelativeSelector",
+									"combinator": {
+										"type": "Combinator",
+										"name": "~",
+										"start": 12,
+										"end": 13
+									},
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "p",
+											"start": 14,
+											"end": 15
+										}
+									],
+									"start": 12,
+									"end": 15
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 16,
+					"end": 35,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 20,
+							"end": 31,
+							"property": "color",
+							"value": "gray"
+						}
+					]
+				},
+				"start": 9,
+				"end": 35
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 38,
+					"end": 55,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 38,
+							"end": 55,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 38,
+											"end": 45
+										}
+									],
+									"start": 38,
+									"end": 45
+								},
+								{
+									"type": "RelativeSelector",
+									"combinator": {
+										"type": "Combinator",
+										"name": "~",
+										"start": 46,
+										"end": 47
+									},
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class2",
+											"start": 48,
+											"end": 55
+										}
+									],
+									"start": 46,
+									"end": 55
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 56,
+					"end": 76,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 60,
+							"end": 72,
+							"property": "opacity",
+							"value": "0.5"
+						}
+					]
+				},
+				"start": 38,
+				"end": 76
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 77,
+			"styles": "\n\th1 ~ p {\n\t\tcolor: gray;\n\t}\n\n\t.class1 ~ .class2 {\n\t\topacity: 0.5;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 86,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

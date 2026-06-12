@@ -1,0 +1,143 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 309,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 300,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 44,
+							"property": "writing-mode",
+							"value": "horizontal-tb"
+						},
+						{
+							"type": "Declaration",
+							"start": 48,
+							"end": 73,
+							"property": "writing-mode",
+							"value": "vertical-rl"
+						},
+						{
+							"type": "Declaration",
+							"start": 77,
+							"end": 102,
+							"property": "writing-mode",
+							"value": "vertical-lr"
+						},
+						{
+							"type": "Declaration",
+							"start": 106,
+							"end": 129,
+							"property": "text-orientation",
+							"value": "mixed"
+						},
+						{
+							"type": "Declaration",
+							"start": 133,
+							"end": 158,
+							"property": "text-orientation",
+							"value": "upright"
+						},
+						{
+							"type": "Declaration",
+							"start": 162,
+							"end": 188,
+							"property": "text-orientation",
+							"value": "sideways"
+						},
+						{
+							"type": "Declaration",
+							"start": 192,
+							"end": 206,
+							"property": "direction",
+							"value": "ltr"
+						},
+						{
+							"type": "Declaration",
+							"start": 210,
+							"end": 224,
+							"property": "direction",
+							"value": "rtl"
+						},
+						{
+							"type": "Declaration",
+							"start": 228,
+							"end": 248,
+							"property": "unicode-bidi",
+							"value": "normal"
+						},
+						{
+							"type": "Declaration",
+							"start": 252,
+							"end": 271,
+							"property": "unicode-bidi",
+							"value": "embed"
+						},
+						{
+							"type": "Declaration",
+							"start": 275,
+							"end": 296,
+							"property": "unicode-bidi",
+							"value": "isolate"
+						}
+					]
+				},
+				"start": 9,
+				"end": 300
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 301,
+			"styles": "\n\tdiv {\n\t\twriting-mode: horizontal-tb;\n\t\twriting-mode: vertical-rl;\n\t\twriting-mode: vertical-lr;\n\t\ttext-orientation: mixed;\n\t\ttext-orientation: upright;\n\t\ttext-orientation: sideways;\n\t\tdirection: ltr;\n\t\tdirection: rtl;\n\t\tunicode-bidi: normal;\n\t\tunicode-bidi: embed;\n\t\tunicode-bidi: isolate;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 310,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

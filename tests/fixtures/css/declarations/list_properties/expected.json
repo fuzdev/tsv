@@ -1,0 +1,129 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 286,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 277,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 40,
+							"property": "list-style",
+							"value": "disc inside"
+						},
+						{
+							"type": "Declaration",
+							"start": 44,
+							"end": 68,
+							"property": "list-style-type",
+							"value": "decimal"
+						},
+						{
+							"type": "Declaration",
+							"start": 72,
+							"end": 95,
+							"property": "list-style-type",
+							"value": "circle"
+						},
+						{
+							"type": "Declaration",
+							"start": 99,
+							"end": 122,
+							"property": "list-style-type",
+							"value": "square"
+						},
+						{
+							"type": "Declaration",
+							"start": 126,
+							"end": 147,
+							"property": "list-style-type",
+							"value": "none"
+						},
+						{
+							"type": "Declaration",
+							"start": 151,
+							"end": 178,
+							"property": "list-style-position",
+							"value": "inside"
+						},
+						{
+							"type": "Declaration",
+							"start": 182,
+							"end": 210,
+							"property": "list-style-position",
+							"value": "outside"
+						},
+						{
+							"type": "Declaration",
+							"start": 214,
+							"end": 247,
+							"property": "list-style-image",
+							"value": "url(marker.png)"
+						},
+						{
+							"type": "Declaration",
+							"start": 251,
+							"end": 273,
+							"property": "list-style-image",
+							"value": "none"
+						}
+					]
+				},
+				"start": 9,
+				"end": 277
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 278,
+			"styles": "\n\tdiv {\n\t\tlist-style: disc inside;\n\t\tlist-style-type: decimal;\n\t\tlist-style-type: circle;\n\t\tlist-style-type: square;\n\t\tlist-style-type: none;\n\t\tlist-style-position: inside;\n\t\tlist-style-position: outside;\n\t\tlist-style-image: url(marker.png);\n\t\tlist-style-image: none;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 287,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

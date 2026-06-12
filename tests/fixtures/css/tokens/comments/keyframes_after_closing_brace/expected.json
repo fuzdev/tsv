@@ -1,0 +1,134 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 156,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 117,
+				"name": "keyframes",
+				"prelude": "anim1",
+				"block": {
+					"type": "Block",
+					"start": 26,
+					"end": 117,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 30,
+								"end": 32,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 30,
+										"end": 32,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "Percentage",
+														"value": "0%",
+														"start": 30,
+														"end": 32
+													}
+												],
+												"start": 30,
+												"end": 32
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 33,
+								"end": 67,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 38,
+										"end": 62,
+										"property": "transform",
+										"value": "translateX(0)"
+									}
+								]
+							},
+							"start": 30,
+							"end": 67
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 71,
+								"end": 75,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 71,
+										"end": 75,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "Percentage",
+														"value": "100%",
+														"start": 71,
+														"end": 75
+													}
+												],
+												"start": 71,
+												"end": 75
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 76,
+								"end": 114,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 81,
+										"end": 109,
+										"property": "transform",
+										"value": "translateX(100px)"
+									}
+								]
+							},
+							"start": 71,
+							"end": 114
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 148,
+			"styles": "\n\t@keyframes anim1 {\n\t\t0% {\n\t\t\ttransform: translateX(0);\n\t\t}\n\n\t\t100% {\n\t\t\ttransform: translateX(100px);\n\t\t}\n\t} /* comment after keyframes */\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 157,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

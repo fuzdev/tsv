@@ -1,0 +1,347 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 122,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 44,
+				"end": 46,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 46,
+				"end": 83,
+				"name": "label",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 47
+					},
+					"end": {
+						"line": 5,
+						"column": 6,
+						"character": 52
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 53,
+						"end": 69,
+						"name": "for",
+						"name_loc": {
+							"start": {
+								"line": 5,
+								"column": 7,
+								"character": 53
+							},
+							"end": {
+								"line": 5,
+								"column": 10,
+								"character": 56
+							}
+						},
+						"value": [
+							{
+								"type": "ExpressionTag",
+								"start": 58,
+								"end": 63,
+								"expression": {
+									"type": "Identifier",
+									"start": 59,
+									"end": 62,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 13
+										},
+										"end": {
+											"line": 5,
+											"column": 16
+										}
+									},
+									"name": "uid"
+								}
+							},
+							{
+								"start": 63,
+								"end": 68,
+								"type": "Text",
+								"raw": "-name",
+								"data": "-name"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 70,
+							"end": 75,
+							"raw": "Name:",
+							"data": "Name:"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 83,
+				"end": 84,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 84,
+				"end": 121,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 85
+					},
+					"end": {
+						"line": 6,
+						"column": 6,
+						"character": 90
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 91,
+						"end": 106,
+						"name": "id",
+						"name_loc": {
+							"start": {
+								"line": 6,
+								"column": 7,
+								"character": 91
+							},
+							"end": {
+								"line": 6,
+								"column": 9,
+								"character": 93
+							}
+						},
+						"value": [
+							{
+								"type": "ExpressionTag",
+								"start": 95,
+								"end": 100,
+								"expression": {
+									"type": "Identifier",
+									"start": 96,
+									"end": 99,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 12
+										},
+										"end": {
+											"line": 6,
+											"column": 15
+										}
+									},
+									"name": "uid"
+								}
+							},
+							{
+								"start": 100,
+								"end": 105,
+								"type": "Text",
+								"raw": "-name",
+								"data": "-name"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 107,
+						"end": 118,
+						"name": "type",
+						"name_loc": {
+							"start": {
+								"line": 6,
+								"column": 23,
+								"character": 107
+							},
+							"end": {
+								"line": 6,
+								"column": 27,
+								"character": 111
+							}
+						},
+						"value": [
+							{
+								"start": 113,
+								"end": 117,
+								"type": "Text",
+								"raw": "text",
+								"data": "text"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 44,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 35,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 34,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 25
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 16,
+							"end": 33,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 2,
+									"column": 24
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 16,
+								"end": 19,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 10
+									}
+								},
+								"name": "uid"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 22,
+								"end": 33,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 13
+									},
+									"end": {
+										"line": 2,
+										"column": 24
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 22,
+									"end": 31,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 13
+										},
+										"end": {
+											"line": 2,
+											"column": 22
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 22,
+										"end": 28,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 13
+											},
+											"end": {
+												"line": 2,
+												"column": 19
+											}
+										},
+										"name": "$props"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 29,
+										"end": 31,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 20
+											},
+											"end": {
+												"line": 2,
+												"column": 22
+											}
+										},
+										"name": "id"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

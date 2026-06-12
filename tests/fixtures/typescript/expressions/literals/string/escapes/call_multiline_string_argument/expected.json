@@ -1,0 +1,104 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 47,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 46,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 37,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 10,
+					"end": 36,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 10,
+						"end": 35,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 1
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 10,
+							"end": 13,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 1
+								},
+								"end": {
+									"line": 2,
+									"column": 4
+								}
+							},
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 17,
+								"end": 31,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 5
+									}
+								},
+								"value": "multi line",
+								"raw": "'multi \\\nline'"
+							}
+						],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -1,0 +1,139 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 87,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "SvelteComponent",
+				"start": 0,
+				"end": 86,
+				"name": "svelte:component",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 17,
+						"character": 17
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 30,
+						"end": 42,
+						"name": "prop",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 30,
+								"character": 30
+							},
+							"end": {
+								"line": 1,
+								"column": 34,
+								"character": 34
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 35,
+							"end": 42,
+							"expression": {
+								"type": "Identifier",
+								"start": 36,
+								"end": 41,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 36
+									},
+									"end": {
+										"line": 1,
+										"column": 41
+									}
+								},
+								"name": "value"
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 43,
+							"end": 45,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 45,
+							"end": 66,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 46
+								},
+								"end": {
+									"line": 2,
+									"column": 6,
+									"character": 50
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 51,
+										"end": 59,
+										"raw": "children",
+										"data": "children"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 66,
+							"end": 67,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"expression": {
+					"type": "Identifier",
+					"start": 24,
+					"end": 28,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 24
+						},
+						"end": {
+							"line": 1,
+							"column": 28
+						}
+					},
+					"name": "Comp"
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

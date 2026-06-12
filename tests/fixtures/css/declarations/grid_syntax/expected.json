@@ -1,0 +1,115 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 402,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 393,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 54,
+							"property": "grid-template-columns",
+							"value": "repeat(3, 1fr)"
+						},
+						{
+							"type": "Declaration",
+							"start": 58,
+							"end": 118,
+							"property": "grid-template-columns",
+							"value": "repeat(auto-fill, minmax(200px, 1fr))"
+						},
+						{
+							"type": "Declaration",
+							"start": 122,
+							"end": 168,
+							"property": "grid-template-columns",
+							"value": "repeat(auto-fit, 100px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 172,
+							"end": 225,
+							"property": "grid-template-columns",
+							"value": "[start] 1fr [middle] 1fr [end]"
+						},
+						{
+							"type": "Declaration",
+							"start": 229,
+							"end": 307,
+							"property": "grid-template-rows",
+							"value": "[header-start] auto [header-end main-start] 1fr [main-end]"
+						},
+						{
+							"type": "Declaration",
+							"start": 311,
+							"end": 352,
+							"property": "grid-template-columns",
+							"value": "minmax(100px, 1fr)"
+						},
+						{
+							"type": "Declaration",
+							"start": 356,
+							"end": 389,
+							"property": "font-size",
+							"value": "clamp(1rem, 2vw, 2rem)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 393
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 394,
+			"styles": "\n\tdiv {\n\t\tgrid-template-columns: repeat(3, 1fr);\n\t\tgrid-template-columns: repeat(auto-fill, minmax(200px, 1fr));\n\t\tgrid-template-columns: repeat(auto-fit, 100px);\n\t\tgrid-template-columns: [start] 1fr [middle] 1fr [end];\n\t\tgrid-template-rows: [header-start] auto [header-end main-start] 1fr [main-end];\n\t\tgrid-template-columns: minmax(100px, 1fr);\n\t\tfont-size: clamp(1rem, 2vw, 2rem);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 403,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

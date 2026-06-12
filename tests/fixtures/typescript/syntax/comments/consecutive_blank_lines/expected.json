@@ -1,0 +1,941 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 509,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Line comments with blank line between (class body)",
+			"start": 20,
+			"end": 73,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " section",
+			"start": 97,
+			"end": 107,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " section2",
+			"start": 111,
+			"end": 122,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 8,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Line comments with blank line between (function body)",
+			"start": 137,
+			"end": 193,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " section",
+			"start": 221,
+			"end": 231,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " section2",
+			"start": 235,
+			"end": 246,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 2
+				},
+				"end": {
+					"line": 18,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Line comment + blank + JSDoc (class body)",
+			"start": 259,
+			"end": 303,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Private",
+			"start": 327,
+			"end": 337,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 2
+				},
+				"end": {
+					"line": 26,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * JSDoc.\n ",
+			"start": 341,
+			"end": 362,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 2
+				},
+				"end": {
+					"line": 30,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Line comment + blank + JSDoc (function body)",
+			"start": 377,
+			"end": 424,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Private",
+			"start": 453,
+			"end": 463,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 2
+				},
+				"end": {
+					"line": 38,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * JSDoc.\n ",
+			"start": 467,
+			"end": 488,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 2
+				},
+				"end": {
+					"line": 42,
+					"column": 5
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 508,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 499,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 45,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 75,
+					"end": 134,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 81,
+						"end": 82,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 7
+							},
+							"end": {
+								"line": 3,
+								"column": 8
+							}
+						},
+						"name": "A"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 83,
+						"end": 134,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 9
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 87,
+								"end": 93,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 87,
+									"end": 88,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 91,
+									"end": 92,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 6
+										},
+										"end": {
+											"line": 4,
+											"column": 7
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 125,
+								"end": 131,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 125,
+									"end": 126,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 3
+										}
+									},
+									"name": "b"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 129,
+									"end": 130,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 6
+										},
+										"end": {
+											"line": 9,
+											"column": 7
+										}
+									},
+									"value": 2,
+									"raw": "2"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " section",
+										"start": 97,
+										"end": 107
+									},
+									{
+										"type": "Line",
+										"value": " section2",
+										"start": 111,
+										"end": 122
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comments with blank line between (class body)",
+							"start": 20,
+							"end": 73
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 195,
+					"end": 256,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 204,
+						"end": 206,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 10
+							},
+							"end": {
+								"line": 13,
+								"column": 12
+							}
+						},
+						"name": "fn"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 209,
+						"end": 256,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 15
+							},
+							"end": {
+								"line": 20,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 213,
+								"end": 217,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 213,
+									"end": 216,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 2
+										},
+										"end": {
+											"line": 14,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 213,
+										"end": 214,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 2
+											},
+											"end": {
+												"line": 14,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 249,
+								"end": 253,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 249,
+									"end": 252,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 2
+										},
+										"end": {
+											"line": 19,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 249,
+										"end": 250,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 2
+											},
+											"end": {
+												"line": 19,
+												"column": 3
+											}
+										},
+										"name": "b"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " section",
+										"start": 221,
+										"end": 231
+									},
+									{
+										"type": "Line",
+										"value": " section2",
+										"start": 235,
+										"end": 246
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comments with blank line between (function body)",
+							"start": 137,
+							"end": 193
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 305,
+					"end": 374,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 311,
+						"end": 312,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 7
+							},
+							"end": {
+								"line": 23,
+								"column": 8
+							}
+						},
+						"name": "B"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 313,
+						"end": 374,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 9
+							},
+							"end": {
+								"line": 32,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 317,
+								"end": 323,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 2
+									},
+									"end": {
+										"line": 24,
+										"column": 8
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 317,
+									"end": 318,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 2
+										},
+										"end": {
+											"line": 24,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 321,
+									"end": 322,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 6
+										},
+										"end": {
+											"line": 24,
+											"column": 7
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 365,
+								"end": 371,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 2
+									},
+									"end": {
+										"line": 31,
+										"column": 8
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 365,
+									"end": 366,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 2
+										},
+										"end": {
+											"line": 31,
+											"column": 3
+										}
+									},
+									"name": "b"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 369,
+									"end": 370,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 6
+										},
+										"end": {
+											"line": 31,
+											"column": 7
+										}
+									},
+									"value": 2,
+									"raw": "2"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " Private",
+										"start": 327,
+										"end": 337
+									},
+									{
+										"type": "Block",
+										"value": "*\n * JSDoc.\n ",
+										"start": 341,
+										"end": 362
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment + blank + JSDoc (class body)",
+							"start": 259,
+							"end": 303
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 426,
+					"end": 498,
+					"loc": {
+						"start": {
+							"line": 35,
+							"column": 1
+						},
+						"end": {
+							"line": 44,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 435,
+						"end": 438,
+						"loc": {
+							"start": {
+								"line": 35,
+								"column": 10
+							},
+							"end": {
+								"line": 35,
+								"column": 13
+							}
+						},
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 441,
+						"end": 498,
+						"loc": {
+							"start": {
+								"line": 35,
+								"column": 16
+							},
+							"end": {
+								"line": 44,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 445,
+								"end": 449,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 2
+									},
+									"end": {
+										"line": 36,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 445,
+									"end": 448,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 2
+										},
+										"end": {
+											"line": 36,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 445,
+										"end": 446,
+										"loc": {
+											"start": {
+												"line": 36,
+												"column": 2
+											},
+											"end": {
+												"line": 36,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 491,
+								"end": 495,
+								"loc": {
+									"start": {
+										"line": 43,
+										"column": 2
+									},
+									"end": {
+										"line": 43,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 491,
+									"end": 494,
+									"loc": {
+										"start": {
+											"line": 43,
+											"column": 2
+										},
+										"end": {
+											"line": 43,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 491,
+										"end": 492,
+										"loc": {
+											"start": {
+												"line": 43,
+												"column": 2
+											},
+											"end": {
+												"line": 43,
+												"column": 3
+											}
+										},
+										"name": "b"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " Private",
+										"start": 453,
+										"end": 463
+									},
+									{
+										"type": "Block",
+										"value": "*\n * JSDoc.\n ",
+										"start": 467,
+										"end": 488
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment + blank + JSDoc (function body)",
+							"start": 377,
+							"end": 424
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

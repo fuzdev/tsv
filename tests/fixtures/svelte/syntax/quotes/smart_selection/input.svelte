@@ -1,0 +1,5 @@
+<div data-attr1={"'"} data-attr2={'"'} data-attr3={'\'"'} data-attr4="&apos;" data-attr5="&quot;">
+	{"'"}
+	{'"'}
+	{'\'"'}
+</div>

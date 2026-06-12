@@ -1,0 +1,444 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 212,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Multiline comment after as const",
+			"start": 20,
+			"end": 55,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "\ncomment\n",
+			"start": 68,
+			"end": 81,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 12
+				},
+				"end": {
+					"line": 5,
+					"column": 2
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Comment between value and as",
+			"start": 85,
+			"end": 116,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 120,
+			"end": 133,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 3
+				},
+				"end": {
+					"line": 8,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Satisfies with comment",
+			"start": 146,
+			"end": 171,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 175,
+			"end": 188,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 3
+				},
+				"end": {
+					"line": 11,
+					"column": 16
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 211,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 202,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 57,
+					"end": 82,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "TSAsExpression",
+						"start": 57,
+						"end": 67,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 3,
+								"column": 11
+							}
+						},
+						"expression": {
+							"type": "Literal",
+							"start": 57,
+							"end": 58,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 2
+								}
+							},
+							"value": 1,
+							"raw": "1"
+						},
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 62,
+							"end": 67,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 6
+								},
+								"end": {
+									"line": 3,
+									"column": 11
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 62,
+								"end": 67,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 6
+									},
+									"end": {
+										"line": 3,
+										"column": 11
+									}
+								},
+								"name": "const"
+							}
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": "\ncomment\n",
+								"start": 68,
+								"end": 81
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multiline comment after as const",
+							"start": 20,
+							"end": 55
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 118,
+					"end": 143,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 26
+						}
+					},
+					"expression": {
+						"type": "TSAsExpression",
+						"start": 118,
+						"end": 142,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 25
+							}
+						},
+						"expression": {
+							"type": "Literal",
+							"start": 118,
+							"end": 119,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 1
+								},
+								"end": {
+									"line": 8,
+									"column": 2
+								}
+							},
+							"value": 1,
+							"raw": "1",
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " comment ",
+									"start": 120,
+									"end": 133
+								}
+							]
+						},
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 137,
+							"end": 142,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 20
+								},
+								"end": {
+									"line": 8,
+									"column": 25
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 137,
+								"end": 142,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 20
+									},
+									"end": {
+										"line": 8,
+										"column": 25
+									}
+								},
+								"name": "const"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Comment between value and as",
+							"start": 85,
+							"end": 116
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 173,
+					"end": 201,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 29
+						}
+					},
+					"expression": {
+						"type": "TSSatisfiesExpression",
+						"start": 173,
+						"end": 200,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 1
+							},
+							"end": {
+								"line": 11,
+								"column": 28
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 173,
+							"end": 174,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 1
+								},
+								"end": {
+									"line": 11,
+									"column": 2
+								}
+							},
+							"name": "x",
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " comment ",
+									"start": 175,
+									"end": 188
+								}
+							]
+						},
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 199,
+							"end": 200,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 27
+								},
+								"end": {
+									"line": 11,
+									"column": 28
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 199,
+								"end": 200,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 27
+									},
+									"end": {
+										"line": 11,
+										"column": 28
+									}
+								},
+								"name": "T"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Satisfies with comment",
+							"start": 146,
+							"end": 171
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

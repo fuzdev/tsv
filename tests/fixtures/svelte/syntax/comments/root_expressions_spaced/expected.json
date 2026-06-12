@@ -1,0 +1,76 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 33,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "ExpressionTag",
+				"start": 0,
+				"end": 7,
+				"expression": {
+					"type": "Identifier",
+					"start": 1,
+					"end": 6,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 1
+						},
+						"end": {
+							"line": 1,
+							"column": 6
+						}
+					},
+					"name": "expr1"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 7,
+				"end": 8,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 8,
+				"end": 24,
+				"data": " comment "
+			},
+			{
+				"type": "Text",
+				"start": 24,
+				"end": 25,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 25,
+				"end": 32,
+				"expression": {
+					"type": "Identifier",
+					"start": 26,
+					"end": 31,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 6
+						}
+					},
+					"name": "expr2"
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

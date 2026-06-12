@@ -1,0 +1,876 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 428,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Basic declare",
+			"start": 20,
+			"end": 36,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Declare with accessibility",
+			"start": 74,
+			"end": 103,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Declare with static",
+			"start": 208,
+			"end": 230,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Declare with readonly",
+			"start": 275,
+			"end": 299,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Declare as property name (not modifier)",
+			"start": 346,
+			"end": 388,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 43
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 427,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 418,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 28,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 38,
+					"end": 71,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 44,
+						"end": 45,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 7
+							},
+							"end": {
+								"line": 3,
+								"column": 8
+							}
+						},
+						"name": "A"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 46,
+						"end": 71,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 9
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 50,
+								"end": 68,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 20
+									}
+								},
+								"declare": true,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 58,
+									"end": 59,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 10
+										},
+										"end": {
+											"line": 4,
+											"column": 11
+										}
+									},
+									"name": "a"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 59,
+									"end": 67,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 11
+										},
+										"end": {
+											"line": 4,
+											"column": 19
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 61,
+										"end": 67,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 13
+											},
+											"end": {
+												"line": 4,
+												"column": 19
+											}
+										}
+									}
+								},
+								"value": null
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Basic declare",
+							"start": 20,
+							"end": 36
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 105,
+					"end": 205,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 111,
+						"end": 112,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 7
+							},
+							"end": {
+								"line": 8,
+								"column": 8
+							}
+						},
+						"name": "B"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 113,
+						"end": 205,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 9
+							},
+							"end": {
+								"line": 12,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 117,
+								"end": 142,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 27
+									}
+								},
+								"declare": true,
+								"accessibility": "public",
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 132,
+									"end": 133,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 17
+										},
+										"end": {
+											"line": 9,
+											"column": 18
+										}
+									},
+									"name": "a"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 133,
+									"end": 141,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 18
+										},
+										"end": {
+											"line": 9,
+											"column": 26
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 135,
+										"end": 141,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 20
+											},
+											"end": {
+												"line": 9,
+												"column": 26
+											}
+										}
+									}
+								},
+								"value": null
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 145,
+								"end": 171,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 28
+									}
+								},
+								"declare": true,
+								"accessibility": "private",
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 161,
+									"end": 162,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 18
+										},
+										"end": {
+											"line": 10,
+											"column": 19
+										}
+									},
+									"name": "b"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 162,
+									"end": 170,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 19
+										},
+										"end": {
+											"line": 10,
+											"column": 27
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 164,
+										"end": 170,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 21
+											},
+											"end": {
+												"line": 10,
+												"column": 27
+											}
+										}
+									}
+								},
+								"value": null
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 174,
+								"end": 202,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 30
+									}
+								},
+								"declare": true,
+								"accessibility": "protected",
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 192,
+									"end": 193,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 20
+										},
+										"end": {
+											"line": 11,
+											"column": 21
+										}
+									},
+									"name": "c"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 193,
+									"end": 201,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 21
+										},
+										"end": {
+											"line": 11,
+											"column": 29
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 195,
+										"end": 201,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 23
+											},
+											"end": {
+												"line": 11,
+												"column": 29
+											}
+										}
+									}
+								},
+								"value": null
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Declare with accessibility",
+							"start": 74,
+							"end": 103
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 232,
+					"end": 272,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 238,
+						"end": 239,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 7
+							},
+							"end": {
+								"line": 15,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 240,
+						"end": 272,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 9
+							},
+							"end": {
+								"line": 17,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 244,
+								"end": 269,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 27
+									}
+								},
+								"declare": true,
+								"static": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 259,
+									"end": 260,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 17
+										},
+										"end": {
+											"line": 16,
+											"column": 18
+										}
+									},
+									"name": "a"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 260,
+									"end": 268,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 18
+										},
+										"end": {
+											"line": 16,
+											"column": 26
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 262,
+										"end": 268,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 20
+											},
+											"end": {
+												"line": 16,
+												"column": 26
+											}
+										}
+									}
+								},
+								"value": null
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Declare with static",
+							"start": 208,
+							"end": 230
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 301,
+					"end": 343,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 307,
+						"end": 308,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 7
+							},
+							"end": {
+								"line": 20,
+								"column": 8
+							}
+						},
+						"name": "D"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 309,
+						"end": 343,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 9
+							},
+							"end": {
+								"line": 22,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 313,
+								"end": 340,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 2
+									},
+									"end": {
+										"line": 21,
+										"column": 29
+									}
+								},
+								"declare": true,
+								"readonly": true,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 330,
+									"end": 331,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 19
+										},
+										"end": {
+											"line": 21,
+											"column": 20
+										}
+									},
+									"name": "a"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 331,
+									"end": 339,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 20
+										},
+										"end": {
+											"line": 21,
+											"column": 28
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 333,
+										"end": 339,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 22
+											},
+											"end": {
+												"line": 21,
+												"column": 28
+											}
+										}
+									}
+								},
+								"value": null
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Declare with readonly",
+							"start": 275,
+							"end": 299
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 390,
+					"end": 417,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 396,
+						"end": 397,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 7
+							},
+							"end": {
+								"line": 25,
+								"column": 8
+							}
+						},
+						"name": "E"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 398,
+						"end": 417,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 9
+							},
+							"end": {
+								"line": 27,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 402,
+								"end": 414,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 14
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 402,
+									"end": 409,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 2
+										},
+										"end": {
+											"line": 26,
+											"column": 9
+										}
+									},
+									"name": "declare"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 412,
+									"end": 413,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 12
+										},
+										"end": {
+											"line": 26,
+											"column": 13
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Declare as property name (not modifier)",
+							"start": 346,
+							"end": 388
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

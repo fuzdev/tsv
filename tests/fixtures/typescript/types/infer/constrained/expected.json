@@ -1,0 +1,1802 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 757,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Constrained infer at the top-level check (parens not needed — TS reads this as the constraint)",
+			"start": 20,
+			"end": 117,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 98
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Inside a type argument",
+			"start": 184,
+			"end": 209,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Inside a tuple element",
+			"start": 290,
+			"end": 315,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Constraint can be an operator type",
+			"start": 393,
+			"end": 430,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Constraint can be a union",
+			"start": 497,
+			"end": 525,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Multiple constrained infers in an object type",
+			"start": 599,
+			"end": 647,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 49
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 756,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 747,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 19,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 119,
+					"end": 181,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 63
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 124,
+						"end": 130,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 12
+							}
+						},
+						"name": "Unwrap"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 130,
+						"end": 133,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 12
+							},
+							"end": {
+								"line": 3,
+								"column": 15
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 131,
+								"end": 132,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 13
+									},
+									"end": {
+										"line": 3,
+										"column": 14
+									}
+								},
+								"name": "T"
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 136,
+						"end": 180,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 18
+							},
+							"end": {
+								"line": 3,
+								"column": 62
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 136,
+							"end": 137,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 18
+								},
+								"end": {
+									"line": 3,
+									"column": 19
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 136,
+								"end": 137,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 18
+									},
+									"end": {
+										"line": 3,
+										"column": 19
+									}
+								},
+								"name": "T"
+							}
+						},
+						"extendsType": {
+							"type": "TSInferType",
+							"start": 146,
+							"end": 168,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 28
+								},
+								"end": {
+									"line": 3,
+									"column": 50
+								}
+							},
+							"typeParameter": {
+								"type": "TSTypeParameter",
+								"start": 152,
+								"end": 168,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 34
+									},
+									"end": {
+										"line": 3,
+										"column": 50
+									}
+								},
+								"name": "U",
+								"constraint": {
+									"type": "TSStringKeyword",
+									"start": 162,
+									"end": 168,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 44
+										},
+										"end": {
+											"line": 3,
+											"column": 50
+										}
+									}
+								}
+							}
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 171,
+							"end": 172,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 53
+								},
+								"end": {
+									"line": 3,
+									"column": 54
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 171,
+								"end": 172,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 53
+									},
+									"end": {
+										"line": 3,
+										"column": 54
+									}
+								},
+								"name": "U"
+							}
+						},
+						"falseType": {
+							"type": "TSNeverKeyword",
+							"start": 175,
+							"end": 180,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 57
+								},
+								"end": {
+									"line": 3,
+									"column": 62
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Constrained infer at the top-level check (parens not needed — TS reads this as the constraint)",
+							"start": 20,
+							"end": 117
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 211,
+					"end": 287,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 77
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 216,
+						"end": 223,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 6
+							},
+							"end": {
+								"line": 6,
+								"column": 13
+							}
+						},
+						"name": "ArrayEl"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 223,
+						"end": 226,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 13
+							},
+							"end": {
+								"line": 6,
+								"column": 16
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 224,
+								"end": 225,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 14
+									},
+									"end": {
+										"line": 6,
+										"column": 15
+									}
+								},
+								"name": "T"
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 229,
+						"end": 286,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 19
+							},
+							"end": {
+								"line": 6,
+								"column": 76
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 229,
+							"end": 230,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 19
+								},
+								"end": {
+									"line": 6,
+									"column": 20
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 229,
+								"end": 230,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 19
+									},
+									"end": {
+										"line": 6,
+										"column": 20
+									}
+								},
+								"name": "T"
+							}
+						},
+						"extendsType": {
+							"type": "TSTypeReference",
+							"start": 239,
+							"end": 271,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 29
+								},
+								"end": {
+									"line": 6,
+									"column": 61
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 239,
+								"end": 244,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 29
+									},
+									"end": {
+										"line": 6,
+										"column": 34
+									}
+								},
+								"name": "Array"
+							},
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 244,
+								"end": 271,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 34
+									},
+									"end": {
+										"line": 6,
+										"column": 61
+									}
+								},
+								"params": [
+									{
+										"type": "TSInferType",
+										"start": 245,
+										"end": 270,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 35
+											},
+											"end": {
+												"line": 6,
+												"column": 60
+											}
+										},
+										"typeParameter": {
+											"type": "TSTypeParameter",
+											"start": 251,
+											"end": 270,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 41
+												},
+												"end": {
+													"line": 6,
+													"column": 60
+												}
+											},
+											"name": "Item",
+											"constraint": {
+												"type": "TSNumberKeyword",
+												"start": 264,
+												"end": 270,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 54
+													},
+													"end": {
+														"line": 6,
+														"column": 60
+													}
+												}
+											}
+										}
+									}
+								]
+							}
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 274,
+							"end": 278,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 64
+								},
+								"end": {
+									"line": 6,
+									"column": 68
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 274,
+								"end": 278,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 64
+									},
+									"end": {
+										"line": 6,
+										"column": 68
+									}
+								},
+								"name": "Item"
+							}
+						},
+						"falseType": {
+							"type": "TSNeverKeyword",
+							"start": 281,
+							"end": 286,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 71
+								},
+								"end": {
+									"line": 6,
+									"column": 76
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Inside a type argument",
+							"start": 184,
+							"end": 209
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 317,
+					"end": 390,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 74
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 322,
+						"end": 327,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 6
+							},
+							"end": {
+								"line": 9,
+								"column": 11
+							}
+						},
+						"name": "First"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 327,
+						"end": 330,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 11
+							},
+							"end": {
+								"line": 9,
+								"column": 14
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 328,
+								"end": 329,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 12
+									},
+									"end": {
+										"line": 9,
+										"column": 13
+									}
+								},
+								"name": "T"
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 333,
+						"end": 389,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 17
+							},
+							"end": {
+								"line": 9,
+								"column": 73
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 333,
+							"end": 334,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 17
+								},
+								"end": {
+									"line": 9,
+									"column": 18
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 333,
+								"end": 334,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 17
+									},
+									"end": {
+										"line": 9,
+										"column": 18
+									}
+								},
+								"name": "T"
+							}
+						},
+						"extendsType": {
+							"type": "TSTupleType",
+							"start": 343,
+							"end": 377,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 27
+								},
+								"end": {
+									"line": 9,
+									"column": 61
+								}
+							},
+							"elementTypes": [
+								{
+									"type": "TSInferType",
+									"start": 344,
+									"end": 366,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 28
+										},
+										"end": {
+											"line": 9,
+											"column": 50
+										}
+									},
+									"typeParameter": {
+										"type": "TSTypeParameter",
+										"start": 350,
+										"end": 366,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 34
+											},
+											"end": {
+												"line": 9,
+												"column": 50
+											}
+										},
+										"name": "F",
+										"constraint": {
+											"type": "TSStringKeyword",
+											"start": 360,
+											"end": 366,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 44
+												},
+												"end": {
+													"line": 9,
+													"column": 50
+												}
+											}
+										}
+									}
+								},
+								{
+									"type": "TSRestType",
+									"start": 368,
+									"end": 376,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 52
+										},
+										"end": {
+											"line": 9,
+											"column": 60
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 371,
+										"end": 376,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 55
+											},
+											"end": {
+												"line": 9,
+												"column": 60
+											}
+										},
+										"elementType": {
+											"type": "TSAnyKeyword",
+											"start": 371,
+											"end": 374,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 55
+												},
+												"end": {
+													"line": 9,
+													"column": 58
+												}
+											}
+										}
+									}
+								}
+							]
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 380,
+							"end": 381,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 64
+								},
+								"end": {
+									"line": 9,
+									"column": 65
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 380,
+								"end": 381,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 64
+									},
+									"end": {
+										"line": 9,
+										"column": 65
+									}
+								},
+								"name": "F"
+							}
+						},
+						"falseType": {
+							"type": "TSNeverKeyword",
+							"start": 384,
+							"end": 389,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 68
+								},
+								"end": {
+									"line": 9,
+									"column": 73
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Inside a tuple element",
+							"start": 290,
+							"end": 315
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 432,
+					"end": 494,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 63
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 437,
+						"end": 442,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 6
+							},
+							"end": {
+								"line": 12,
+								"column": 11
+							}
+						},
+						"name": "KeyOf"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 442,
+						"end": 445,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 11
+							},
+							"end": {
+								"line": 12,
+								"column": 14
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 443,
+								"end": 444,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 12
+									},
+									"end": {
+										"line": 12,
+										"column": 13
+									}
+								},
+								"name": "T"
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 448,
+						"end": 493,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 17
+							},
+							"end": {
+								"line": 12,
+								"column": 62
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 448,
+							"end": 449,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 17
+								},
+								"end": {
+									"line": 12,
+									"column": 18
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 448,
+								"end": 449,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 17
+									},
+									"end": {
+										"line": 12,
+										"column": 18
+									}
+								},
+								"name": "T"
+							}
+						},
+						"extendsType": {
+							"type": "TSInferType",
+							"start": 458,
+							"end": 481,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 27
+								},
+								"end": {
+									"line": 12,
+									"column": 50
+								}
+							},
+							"typeParameter": {
+								"type": "TSTypeParameter",
+								"start": 464,
+								"end": 481,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 33
+									},
+									"end": {
+										"line": 12,
+										"column": 50
+									}
+								},
+								"name": "K",
+								"constraint": {
+									"type": "TSTypeOperator",
+									"start": 474,
+									"end": 481,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 43
+										},
+										"end": {
+											"line": 12,
+											"column": 50
+										}
+									},
+									"operator": "keyof",
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 480,
+										"end": 481,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 49
+											},
+											"end": {
+												"line": 12,
+												"column": 50
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 480,
+											"end": 481,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 49
+												},
+												"end": {
+													"line": 12,
+													"column": 50
+												}
+											},
+											"name": "T"
+										}
+									}
+								}
+							}
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 484,
+							"end": 485,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 53
+								},
+								"end": {
+									"line": 12,
+									"column": 54
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 484,
+								"end": 485,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 53
+									},
+									"end": {
+										"line": 12,
+										"column": 54
+									}
+								},
+								"name": "K"
+							}
+						},
+						"falseType": {
+							"type": "TSNeverKeyword",
+							"start": 488,
+							"end": 493,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 57
+								},
+								"end": {
+									"line": 12,
+									"column": 62
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Constraint can be an operator type",
+							"start": 393,
+							"end": 430
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 527,
+					"end": 596,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 70
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 532,
+						"end": 536,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 6
+							},
+							"end": {
+								"line": 15,
+								"column": 10
+							}
+						},
+						"name": "Wide"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 536,
+						"end": 539,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 10
+							},
+							"end": {
+								"line": 15,
+								"column": 13
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 537,
+								"end": 538,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 11
+									},
+									"end": {
+										"line": 15,
+										"column": 12
+									}
+								},
+								"name": "T"
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 542,
+						"end": 595,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 16
+							},
+							"end": {
+								"line": 15,
+								"column": 69
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 542,
+							"end": 543,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 16
+								},
+								"end": {
+									"line": 15,
+									"column": 17
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 542,
+								"end": 543,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 16
+									},
+									"end": {
+										"line": 15,
+										"column": 17
+									}
+								},
+								"name": "T"
+							}
+						},
+						"extendsType": {
+							"type": "TSInferType",
+							"start": 552,
+							"end": 583,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 26
+								},
+								"end": {
+									"line": 15,
+									"column": 57
+								}
+							},
+							"typeParameter": {
+								"type": "TSTypeParameter",
+								"start": 558,
+								"end": 583,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 32
+									},
+									"end": {
+										"line": 15,
+										"column": 57
+									}
+								},
+								"name": "U",
+								"constraint": {
+									"type": "TSUnionType",
+									"start": 568,
+									"end": 583,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 42
+										},
+										"end": {
+											"line": 15,
+											"column": 57
+										}
+									},
+									"types": [
+										{
+											"type": "TSStringKeyword",
+											"start": 568,
+											"end": 574,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 42
+												},
+												"end": {
+													"line": 15,
+													"column": 48
+												}
+											}
+										},
+										{
+											"type": "TSNumberKeyword",
+											"start": 577,
+											"end": 583,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 51
+												},
+												"end": {
+													"line": 15,
+													"column": 57
+												}
+											}
+										}
+									]
+								}
+							}
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 586,
+							"end": 587,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 60
+								},
+								"end": {
+									"line": 15,
+									"column": 61
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 586,
+								"end": 587,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 60
+									},
+									"end": {
+										"line": 15,
+										"column": 61
+									}
+								},
+								"name": "U"
+							}
+						},
+						"falseType": {
+							"type": "TSNeverKeyword",
+							"start": 590,
+							"end": 595,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 64
+								},
+								"end": {
+									"line": 15,
+									"column": 69
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Constraint can be a union",
+							"start": 497,
+							"end": 525
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 649,
+					"end": 746,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 98
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 654,
+						"end": 658,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 6
+							},
+							"end": {
+								"line": 18,
+								"column": 10
+							}
+						},
+						"name": "Both"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 658,
+						"end": 661,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 10
+							},
+							"end": {
+								"line": 18,
+								"column": 13
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 659,
+								"end": 660,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 11
+									},
+									"end": {
+										"line": 18,
+										"column": 12
+									}
+								},
+								"name": "T"
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 664,
+						"end": 745,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 16
+							},
+							"end": {
+								"line": 18,
+								"column": 97
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 664,
+							"end": 665,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 16
+								},
+								"end": {
+									"line": 18,
+									"column": 17
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 664,
+								"end": 665,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 16
+									},
+									"end": {
+										"line": 18,
+										"column": 17
+									}
+								},
+								"name": "T"
+							}
+						},
+						"extendsType": {
+							"type": "TSTypeLiteral",
+							"start": 674,
+							"end": 728,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 26
+								},
+								"end": {
+									"line": 18,
+									"column": 80
+								}
+							},
+							"members": [
+								{
+									"type": "TSPropertySignature",
+									"start": 675,
+									"end": 701,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 27
+										},
+										"end": {
+											"line": 18,
+											"column": 53
+										}
+									},
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 675,
+										"end": 676,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 27
+											},
+											"end": {
+												"line": 18,
+												"column": 28
+											}
+										},
+										"name": "a"
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 676,
+										"end": 700,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 28
+											},
+											"end": {
+												"line": 18,
+												"column": 52
+											}
+										},
+										"typeAnnotation": {
+											"type": "TSInferType",
+											"start": 678,
+											"end": 700,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 30
+												},
+												"end": {
+													"line": 18,
+													"column": 52
+												}
+											},
+											"typeParameter": {
+												"type": "TSTypeParameter",
+												"start": 684,
+												"end": 700,
+												"loc": {
+													"start": {
+														"line": 18,
+														"column": 36
+													},
+													"end": {
+														"line": 18,
+														"column": 52
+													}
+												},
+												"name": "A",
+												"constraint": {
+													"type": "TSStringKeyword",
+													"start": 694,
+													"end": 700,
+													"loc": {
+														"start": {
+															"line": 18,
+															"column": 46
+														},
+														"end": {
+															"line": 18,
+															"column": 52
+														}
+													}
+												}
+											}
+										}
+									}
+								},
+								{
+									"type": "TSPropertySignature",
+									"start": 702,
+									"end": 727,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 54
+										},
+										"end": {
+											"line": 18,
+											"column": 79
+										}
+									},
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 702,
+										"end": 703,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 54
+											},
+											"end": {
+												"line": 18,
+												"column": 55
+											}
+										},
+										"name": "b"
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 703,
+										"end": 727,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 55
+											},
+											"end": {
+												"line": 18,
+												"column": 79
+											}
+										},
+										"typeAnnotation": {
+											"type": "TSInferType",
+											"start": 705,
+											"end": 727,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 57
+												},
+												"end": {
+													"line": 18,
+													"column": 79
+												}
+											},
+											"typeParameter": {
+												"type": "TSTypeParameter",
+												"start": 711,
+												"end": 727,
+												"loc": {
+													"start": {
+														"line": 18,
+														"column": 63
+													},
+													"end": {
+														"line": 18,
+														"column": 79
+													}
+												},
+												"name": "B",
+												"constraint": {
+													"type": "TSNumberKeyword",
+													"start": 721,
+													"end": 727,
+													"loc": {
+														"start": {
+															"line": 18,
+															"column": 73
+														},
+														"end": {
+															"line": 18,
+															"column": 79
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							]
+						},
+						"trueType": {
+							"type": "TSTupleType",
+							"start": 731,
+							"end": 737,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 83
+								},
+								"end": {
+									"line": 18,
+									"column": 89
+								}
+							},
+							"elementTypes": [
+								{
+									"type": "TSTypeReference",
+									"start": 732,
+									"end": 733,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 84
+										},
+										"end": {
+											"line": 18,
+											"column": 85
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 732,
+										"end": 733,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 84
+											},
+											"end": {
+												"line": 18,
+												"column": 85
+											}
+										},
+										"name": "A"
+									}
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 735,
+									"end": 736,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 87
+										},
+										"end": {
+											"line": 18,
+											"column": 88
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 735,
+										"end": 736,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 87
+											},
+											"end": {
+												"line": 18,
+												"column": 88
+											}
+										},
+										"name": "B"
+									}
+								}
+							]
+						},
+						"falseType": {
+							"type": "TSNeverKeyword",
+							"start": 740,
+							"end": 745,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 92
+								},
+								"end": {
+									"line": 18,
+									"column": 97
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multiple constrained infers in an object type",
+							"start": 599,
+							"end": 647
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

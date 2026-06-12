@@ -1,0 +1,20 @@
+[package]
+name = "tsv_css"
+version.workspace = true
+edition.workspace = true
+description = "CSS parsing and formatting library"
+
+[features]
+default = ["convert"]
+# Public AST + JSON serialization layer. Off in the @fuzdev/tsv_format_wasm
+# build; on for every other consumer.
+convert = ["dep:serde", "dep:serde_json"]
+
+[dependencies]
+tsv_lang.workspace = true
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+phf.workspace = true
+
+[lints]
+workspace = true

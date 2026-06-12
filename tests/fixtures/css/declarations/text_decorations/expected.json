@@ -1,0 +1,143 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 401,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 392,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 53,
+							"property": "text-decoration",
+							"value": "underline solid red"
+						},
+						{
+							"type": "Declaration",
+							"start": 57,
+							"end": 97,
+							"property": "text-decoration-line",
+							"value": "underline overline"
+						},
+						{
+							"type": "Declaration",
+							"start": 101,
+							"end": 128,
+							"property": "text-decoration-style",
+							"value": "wavy"
+						},
+						{
+							"type": "Declaration",
+							"start": 132,
+							"end": 159,
+							"property": "text-decoration-color",
+							"value": "blue"
+						},
+						{
+							"type": "Declaration",
+							"start": 163,
+							"end": 193,
+							"property": "text-decoration-thickness",
+							"value": "2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 197,
+							"end": 223,
+							"property": "text-underline-offset",
+							"value": "3px"
+						},
+						{
+							"type": "Declaration",
+							"start": 227,
+							"end": 257,
+							"property": "text-underline-position",
+							"value": "under"
+						},
+						{
+							"type": "Declaration",
+							"start": 261,
+							"end": 289,
+							"property": "text-emphasis",
+							"value": "filled circle"
+						},
+						{
+							"type": "Declaration",
+							"start": 293,
+							"end": 319,
+							"property": "text-emphasis-color",
+							"value": "green"
+						},
+						{
+							"type": "Declaration",
+							"start": 323,
+							"end": 350,
+							"property": "text-emphasis-style",
+							"value": "sesame"
+						},
+						{
+							"type": "Declaration",
+							"start": 354,
+							"end": 388,
+							"property": "text-emphasis-position",
+							"value": "over right"
+						}
+					]
+				},
+				"start": 9,
+				"end": 392
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 393,
+			"styles": "\n\tdiv {\n\t\ttext-decoration: underline solid red;\n\t\ttext-decoration-line: underline overline;\n\t\ttext-decoration-style: wavy;\n\t\ttext-decoration-color: blue;\n\t\ttext-decoration-thickness: 2px;\n\t\ttext-underline-offset: 3px;\n\t\ttext-underline-position: under;\n\t\ttext-emphasis: filled circle;\n\t\ttext-emphasis-color: green;\n\t\ttext-emphasis-style: sesame;\n\t\ttext-emphasis-position: over right;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 402,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

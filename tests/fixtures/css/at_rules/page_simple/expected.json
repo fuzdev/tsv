@@ -1,0 +1,131 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 223,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 50,
+				"name": "page",
+				"prelude": "",
+				"block": {
+					"type": "Block",
+					"start": 15,
+					"end": 50,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 19,
+							"end": 30,
+							"property": "margin",
+							"value": "1in"
+						},
+						{
+							"type": "Declaration",
+							"start": 34,
+							"end": 46,
+							"property": "size",
+							"value": "letter"
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 53,
+				"end": 89,
+				"name": "page",
+				"prelude": ":first",
+				"block": {
+					"type": "Block",
+					"start": 66,
+					"end": 89,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 70,
+							"end": 85,
+							"property": "margin-top",
+							"value": "2in"
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 92,
+				"end": 151,
+				"name": "page",
+				"prelude": ":left",
+				"block": {
+					"type": "Block",
+					"start": 104,
+					"end": 151,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 108,
+							"end": 126,
+							"property": "margin-left",
+							"value": "1.5in"
+						},
+						{
+							"type": "Declaration",
+							"start": 130,
+							"end": 147,
+							"property": "margin-right",
+							"value": "1in"
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 154,
+				"end": 214,
+				"name": "page",
+				"prelude": ":right",
+				"block": {
+					"type": "Block",
+					"start": 167,
+					"end": 214,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 171,
+							"end": 187,
+							"property": "margin-left",
+							"value": "1in"
+						},
+						{
+							"type": "Declaration",
+							"start": 191,
+							"end": 210,
+							"property": "margin-right",
+							"value": "1.5in"
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 215,
+			"styles": "\n\t@page {\n\t\tmargin: 1in;\n\t\tsize: letter;\n\t}\n\n\t@page :first {\n\t\tmargin-top: 2in;\n\t}\n\n\t@page :left {\n\t\tmargin-left: 1.5in;\n\t\tmargin-right: 1in;\n\t}\n\n\t@page :right {\n\t\tmargin-left: 1in;\n\t\tmargin-right: 1.5in;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 224,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

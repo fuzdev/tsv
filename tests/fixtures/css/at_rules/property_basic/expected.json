@@ -1,0 +1,108 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 136,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 93,
+				"name": "property",
+				"prelude": "--prop1",
+				"block": {
+					"type": "Block",
+					"start": 27,
+					"end": 93,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 31,
+							"end": 48,
+							"property": "syntax",
+							"value": "'<color>'"
+						},
+						{
+							"type": "Declaration",
+							"start": 52,
+							"end": 67,
+							"property": "inherits",
+							"value": "false"
+						},
+						{
+							"type": "Declaration",
+							"start": 71,
+							"end": 89,
+							"property": "initial-value",
+							"value": "red"
+						}
+					]
+				}
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 96,
+					"end": 99,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 96,
+							"end": 99,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 96,
+											"end": 99
+										}
+									],
+									"start": 96,
+									"end": 99
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 100,
+					"end": 127,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 104,
+							"end": 123,
+							"property": "color",
+							"value": "var(--prop1)"
+						}
+					]
+				},
+				"start": 96,
+				"end": 127
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 128,
+			"styles": "\n\t@property --prop1 {\n\t\tsyntax: '<color>';\n\t\tinherits: false;\n\t\tinitial-value: red;\n\t}\n\n\tdiv {\n\t\tcolor: var(--prop1);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 137,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

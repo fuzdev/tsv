@@ -1,0 +1,273 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 145,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 144,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 135,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 20,
+					"end": 134,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 67
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 26,
+							"end": 133,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 66
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 26,
+								"end": 64,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 45
+									}
+								},
+								"name": "result",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 32,
+									"end": 64,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 13
+										},
+										"end": {
+											"line": 2,
+											"column": 45
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 34,
+										"end": 64,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 15
+											},
+											"end": {
+												"line": 2,
+												"column": 45
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 34,
+											"end": 40,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 15
+												},
+												"end": {
+													"line": 2,
+													"column": 21
+												}
+											},
+											"name": "Aaaaaa"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 40,
+											"end": 64,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 21
+												},
+												"end": {
+													"line": 2,
+													"column": 45
+												}
+											},
+											"params": [
+												{
+													"type": "TSTypeReference",
+													"start": 41,
+													"end": 50,
+													"loc": {
+														"start": {
+															"line": 2,
+															"column": 22
+														},
+														"end": {
+															"line": 2,
+															"column": 31
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 41,
+														"end": 50,
+														"loc": {
+															"start": {
+																"line": 2,
+																"column": 22
+															},
+															"end": {
+																"line": 2,
+																"column": 31
+															}
+														},
+														"name": "Bbbbbbbbb"
+													}
+												},
+												{
+													"type": "TSTypeReference",
+													"start": 52,
+													"end": 63,
+													"loc": {
+														"start": {
+															"line": 2,
+															"column": 33
+														},
+														"end": {
+															"line": 2,
+															"column": 44
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 52,
+														"end": 63,
+														"loc": {
+															"start": {
+																"line": 2,
+																"column": 33
+															},
+															"end": {
+																"line": 2,
+																"column": 44
+															}
+														},
+														"name": "Ccccccccccc"
+													}
+												}
+											]
+										}
+									}
+								}
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 69,
+								"end": 133,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 3,
+										"column": 66
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 69,
+									"end": 131,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 2
+										},
+										"end": {
+											"line": 3,
+											"column": 64
+										}
+									},
+									"name": "computeSomeVeryLongValueThatExceedsPrintWidthAndForcesBreaking"
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

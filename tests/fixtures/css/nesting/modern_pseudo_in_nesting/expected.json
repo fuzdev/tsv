@@ -1,0 +1,260 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 347,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 16,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 16,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 9,
+											"end": 16
+										}
+									],
+									"start": 9,
+									"end": 16
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 17,
+					"end": 338,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 21,
+							"end": 34,
+							"property": "padding",
+							"value": "1rem"
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 78,
+								"end": 90,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 78,
+										"end": 90,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "NestingSelector",
+														"name": "&",
+														"start": 78,
+														"end": 79
+													},
+													{
+														"type": "PseudoClassSelector",
+														"name": "user-valid",
+														"args": null,
+														"start": 79,
+														"end": 90
+													}
+												],
+												"start": 78,
+												"end": 90
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 91,
+								"end": 120,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 96,
+										"end": 115,
+										"property": "border-color",
+										"value": "green"
+									}
+								]
+							},
+							"start": 78,
+							"end": 120
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 165,
+								"end": 185,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 165,
+										"end": 185,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "NestingSelector",
+														"name": "&",
+														"start": 165,
+														"end": 166
+													},
+													{
+														"type": "PseudoElementSelector",
+														"name": "highlight",
+														"start": 166,
+														"end": 177
+													}
+												],
+												"start": 165,
+												"end": 185
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 186,
+								"end": 214,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 191,
+										"end": 209,
+										"property": "background",
+										"value": "yellow"
+									}
+								]
+							},
+							"start": 165,
+							"end": 214
+						},
+						{
+							"type": "Atrule",
+							"start": 263,
+							"end": 335,
+							"name": "media",
+							"prelude": "(width >= 768px)",
+							"block": {
+								"type": "Block",
+								"start": 287,
+								"end": 335,
+								"children": [
+									{
+										"type": "Rule",
+										"prelude": {
+											"type": "SelectorList",
+											"start": 292,
+											"end": 303,
+											"children": [
+												{
+													"type": "ComplexSelector",
+													"start": 292,
+													"end": 303,
+													"children": [
+														{
+															"type": "RelativeSelector",
+															"combinator": null,
+															"selectors": [
+																{
+																	"type": "NestingSelector",
+																	"name": "&",
+																	"start": 292,
+																	"end": 293
+																}
+															],
+															"start": 292,
+															"end": 293
+														},
+														{
+															"type": "RelativeSelector",
+															"combinator": {
+																"type": "Combinator",
+																"name": ">",
+																"start": 294,
+																"end": 295
+															},
+															"selectors": [
+																{
+																	"type": "ClassSelector",
+																	"name": "class2",
+																	"start": 296,
+																	"end": 303
+																}
+															],
+															"start": 294,
+															"end": 303
+														}
+													]
+												}
+											]
+										},
+										"block": {
+											"type": "Block",
+											"start": 304,
+											"end": 331,
+											"children": [
+												{
+													"type": "Declaration",
+													"start": 310,
+													"end": 325,
+													"property": "font-size",
+													"value": "2rem"
+												}
+											]
+										},
+										"start": 292,
+										"end": 331
+									}
+								]
+							}
+						}
+					]
+				},
+				"start": 9,
+				"end": 338
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 339,
+			"styles": "\n\t.class1 {\n\t\tpadding: 1rem;\n\n\t\t/* Modern pseudo-class in nesting */\n\t\t&:user-valid {\n\t\t\tborder-color: green;\n\t\t}\n\n\t\t/* Modern pseudo-element in nesting */\n\t\t&::highlight(search) {\n\t\t\tbackground: yellow;\n\t\t}\n\n\t\t/* At-rule nesting with modern features */\n\t\t@media (width >= 768px) {\n\t\t\t& > .class2 {\n\t\t\t\tfont-size: 2rem;\n\t\t\t}\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 348,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

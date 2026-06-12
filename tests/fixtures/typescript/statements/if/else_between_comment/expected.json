@@ -1,0 +1,421 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 209,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Comment between } and else (#17998)",
+			"start": 20,
+			"end": 58,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 84,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 3
+				},
+				"end": {
+					"line": 5,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Inline comment after opening brace (#17998)",
+			"start": 117,
+			"end": 163,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 176,
+			"end": 186,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 12
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 208,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 199,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 60,
+					"end": 114,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 64,
+						"end": 68,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 5
+							},
+							"end": {
+								"line": 3,
+								"column": 9
+							}
+						},
+						"name": "cond"
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 70,
+						"end": 83,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 11
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 74,
+								"end": 80,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 74,
+									"end": 79,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 7
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 74,
+										"end": 77,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 5
+											}
+										},
+										"name": "fn1"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " comment",
+								"start": 84,
+								"end": 94
+							}
+						]
+					},
+					"alternate": {
+						"type": "BlockStatement",
+						"start": 101,
+						"end": 114,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 6
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 105,
+								"end": 111,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 105,
+									"end": 110,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 7
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 105,
+										"end": 108,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 2
+											},
+											"end": {
+												"line": 7,
+												"column": 5
+											}
+										},
+										"name": "fn2"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Comment between } and else (#17998)",
+							"start": 20,
+							"end": 58
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 165,
+					"end": 198,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 169,
+						"end": 170,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 5
+							},
+							"end": {
+								"line": 11,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 172,
+						"end": 198,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 8
+							},
+							"end": {
+								"line": 14,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 189,
+								"end": 195,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 8
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 189,
+									"end": 194,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 2
+										},
+										"end": {
+											"line": 13,
+											"column": 7
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 189,
+										"end": 192,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 2
+											},
+											"end": {
+												"line": 13,
+												"column": 5
+											}
+										},
+										"name": "fn3"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " comment",
+										"start": 176,
+										"end": 186
+									}
+								]
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Inline comment after opening brace (#17998)",
+							"start": 117,
+							"end": 163
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -1,0 +1,101 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 160,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 64,
+					"end": 67,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 64,
+							"end": 67,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 64,
+											"end": 67
+										}
+									],
+									"start": 64,
+									"end": 67
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 68,
+					"end": 151,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 72,
+							"end": 82,
+							"property": "color",
+							"value": "red"
+						},
+						{
+							"type": "Declaration",
+							"start": 86,
+							"end": 101,
+							"property": "font-size",
+							"value": "16px"
+						},
+						{
+							"type": "Declaration",
+							"start": 106,
+							"end": 115,
+							"property": "margin",
+							"value": "0"
+						},
+						{
+							"type": "Declaration",
+							"start": 119,
+							"end": 129,
+							"property": "padding",
+							"value": "0"
+						},
+						{
+							"type": "Declaration",
+							"start": 134,
+							"end": 147,
+							"property": "display",
+							"value": "flex"
+						}
+					]
+				},
+				"start": 64,
+				"end": 151
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 152,
+			"styles": "\n\t/* Blank line between declaration groups preserved */\n\tdiv {\n\t\tcolor: red;\n\t\tfont-size: 16px;\n\n\t\tmargin: 0;\n\t\tpadding: 0;\n\n\t\tdisplay: flex;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 161,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

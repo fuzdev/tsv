@@ -1,0 +1,80 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 142,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 17,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 17,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "element",
+											"start": 9,
+											"end": 17
+										}
+									],
+									"start": 9,
+									"end": 17
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 18,
+					"end": 133,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 55,
+							"end": 93,
+							"property": "animation-timeline",
+							"value": "scroll(root block)"
+						},
+						{
+							"type": "Declaration",
+							"start": 97,
+							"end": 129,
+							"property": "animation-timeline",
+							"value": "view(inline)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 133
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 134,
+			"styles": "\n\t.element {\n\t\t/* Scroll-driven animations */\n\t\tanimation-timeline: scroll(root block);\n\t\tanimation-timeline: view(inline);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 143,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,710 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 425,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " trailing block comment after operand",
+			"start": 35,
+			"end": 74,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 85,
+			"end": 92,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 10
+				},
+				"end": {
+					"line": 4,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing line comment after operand",
+			"start": 97,
+			"end": 135,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 147,
+			"end": 151,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 11
+				},
+				"end": {
+					"line": 7,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing own-line block comment",
+			"start": 155,
+			"end": 189,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 203,
+			"end": 210,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 2
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing block comment after operand",
+			"start": 236,
+			"end": 275,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 286,
+			"end": 293,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 10
+				},
+				"end": {
+					"line": 16,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing line comment after operand",
+			"start": 298,
+			"end": 336,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 2
+				},
+				"end": {
+					"line": 18,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 348,
+			"end": 352,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 11
+				},
+				"end": {
+					"line": 19,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing own-line block comment",
+			"start": 356,
+			"end": 390,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 404,
+			"end": 411,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 424,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 415,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 25,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 10,
+					"end": 213,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 25,
+						"end": 28,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 16
+							},
+							"end": {
+								"line": 2,
+								"column": 19
+							}
+						},
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": true,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 31,
+						"end": 213,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 22
+							},
+							"end": {
+								"line": 12,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 77,
+								"end": 93,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 18
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 77,
+									"end": 84,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 9
+										}
+									},
+									"argument": {
+										"type": "Identifier",
+										"start": 83,
+										"end": 84,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 8
+											},
+											"end": {
+												"line": 4,
+												"column": 9
+											}
+										},
+										"name": "x"
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 85,
+											"end": 92
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " trailing block comment after operand",
+										"start": 35,
+										"end": 74
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 138,
+								"end": 146,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 10
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 138,
+									"end": 145,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 9
+										}
+									},
+									"argument": {
+										"type": "Identifier",
+										"start": 144,
+										"end": 145,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 8
+											},
+											"end": {
+												"line": 7,
+												"column": 9
+											}
+										},
+										"name": "x"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " trailing line comment after operand",
+										"start": 97,
+										"end": 135
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 147,
+										"end": 151
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 192,
+								"end": 200,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 10
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 192,
+									"end": 199,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 9
+										}
+									},
+									"argument": {
+										"type": "Identifier",
+										"start": 198,
+										"end": 199,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 8
+											},
+											"end": {
+												"line": 10,
+												"column": 9
+											}
+										},
+										"name": "x"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " trailing own-line block comment",
+										"start": 155,
+										"end": 189
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 203,
+										"end": 210
+									}
+								]
+							}
+						]
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 216,
+					"end": 414,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 226,
+						"end": 229,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 11
+							},
+							"end": {
+								"line": 14,
+								"column": 14
+							}
+						},
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 232,
+						"end": 414,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 17
+							},
+							"end": {
+								"line": 24,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 278,
+								"end": 294,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 18
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 278,
+									"end": 285,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 9
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 284,
+										"end": 285,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 8
+											},
+											"end": {
+												"line": 16,
+												"column": 9
+											}
+										},
+										"name": "x"
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 286,
+											"end": 293
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " trailing block comment after operand",
+										"start": 236,
+										"end": 275
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 339,
+								"end": 347,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 10
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 339,
+									"end": 346,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 2
+										},
+										"end": {
+											"line": 19,
+											"column": 9
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 345,
+										"end": 346,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 8
+											},
+											"end": {
+												"line": 19,
+												"column": 9
+											}
+										},
+										"name": "x"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " trailing line comment after operand",
+										"start": 298,
+										"end": 336
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 348,
+										"end": 352
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 393,
+								"end": 401,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 10
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 393,
+									"end": 400,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 2
+										},
+										"end": {
+											"line": 22,
+											"column": 9
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 399,
+										"end": 400,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 8
+											},
+											"end": {
+												"line": 22,
+												"column": 9
+											}
+										},
+										"name": "x"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " trailing own-line block comment",
+										"start": 356,
+										"end": 390
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 404,
+										"end": 411
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

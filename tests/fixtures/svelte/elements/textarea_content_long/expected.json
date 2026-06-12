@@ -1,0 +1,482 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 529,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 72,
+				"data": " Textarea with content - closing > moves to new line at boundary "
+			},
+			{
+				"type": "Text",
+				"start": 72,
+				"end": 74,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 74,
+				"end": 117,
+				"data": " 100 chars with >: fits on one line "
+			},
+			{
+				"type": "Text",
+				"start": 117,
+				"end": 118,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 118,
+				"end": 283,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 119
+					},
+					"end": {
+						"line": 4,
+						"column": 4,
+						"character": 122
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 123,
+							"end": 125,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 125,
+							"end": 276,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 2,
+									"character": 126
+								},
+								"end": {
+									"line": 5,
+									"column": 5,
+									"character": 129
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 130,
+										"end": 133,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 133,
+										"end": 268,
+										"name": "label",
+										"name_loc": {
+											"start": {
+												"line": 6,
+												"column": 3,
+												"character": 134
+											},
+											"end": {
+												"line": 6,
+												"column": 8,
+												"character": 139
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 140,
+													"end": 144,
+													"raw": "\n\t\t\t",
+													"data": "\n\t\t\t"
+												},
+												{
+													"type": "RegularElement",
+													"start": 144,
+													"end": 159,
+													"name": "div",
+													"name_loc": {
+														"start": {
+															"line": 7,
+															"column": 4,
+															"character": 145
+														},
+														"end": {
+															"line": 7,
+															"column": 7,
+															"character": 148
+														}
+													},
+													"attributes": [],
+													"fragment": {
+														"type": "Fragment",
+														"nodes": [
+															{
+																"type": "Text",
+																"start": 149,
+																"end": 153,
+																"raw": "text",
+																"data": "text"
+															}
+														]
+													}
+												},
+												{
+													"type": "Text",
+													"start": 159,
+													"end": 163,
+													"raw": "\n\t\t\t",
+													"data": "\n\t\t\t"
+												},
+												{
+													"type": "RegularElement",
+													"start": 163,
+													"end": 257,
+													"name": "textarea",
+													"name_loc": {
+														"start": {
+															"line": 8,
+															"column": 4,
+															"character": 164
+														},
+														"end": {
+															"line": 8,
+															"column": 12,
+															"character": 172
+														}
+													},
+													"attributes": [
+														{
+															"type": "Attribute",
+															"start": 173,
+															"end": 238,
+															"name": "data-attr",
+															"name_loc": {
+																"start": {
+																	"line": 8,
+																	"column": 13,
+																	"character": 173
+																},
+																"end": {
+																	"line": 8,
+																	"column": 22,
+																	"character": 182
+																}
+															},
+															"value": [
+																{
+																	"start": 184,
+																	"end": 237,
+																	"type": "Text",
+																	"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+																	"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+																}
+															]
+														}
+													],
+													"fragment": {
+														"type": "Fragment",
+														"nodes": [
+															{
+																"start": 239,
+																"end": 246,
+																"type": "Text",
+																"raw": "content",
+																"data": "content"
+															}
+														]
+													}
+												},
+												{
+													"type": "Text",
+													"start": 257,
+													"end": 260,
+													"raw": "\n\t\t",
+													"data": "\n\t\t"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 268,
+										"end": 270,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 276,
+							"end": 277,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 283,
+				"end": 285,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 285,
+				"end": 357,
+				"data": " 101 chars with >: attrs and content stay inline, > on next line "
+			},
+			{
+				"type": "Text",
+				"start": 357,
+				"end": 358,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 358,
+				"end": 528,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 359
+					},
+					"end": {
+						"line": 14,
+						"column": 4,
+						"character": 362
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 363,
+							"end": 365,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 365,
+							"end": 521,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 15,
+									"column": 2,
+									"character": 366
+								},
+								"end": {
+									"line": 15,
+									"column": 5,
+									"character": 369
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 370,
+										"end": 373,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 373,
+										"end": 513,
+										"name": "label",
+										"name_loc": {
+											"start": {
+												"line": 16,
+												"column": 3,
+												"character": 374
+											},
+											"end": {
+												"line": 16,
+												"column": 8,
+												"character": 379
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 380,
+													"end": 384,
+													"raw": "\n\t\t\t",
+													"data": "\n\t\t\t"
+												},
+												{
+													"type": "RegularElement",
+													"start": 384,
+													"end": 399,
+													"name": "div",
+													"name_loc": {
+														"start": {
+															"line": 17,
+															"column": 4,
+															"character": 385
+														},
+														"end": {
+															"line": 17,
+															"column": 7,
+															"character": 388
+														}
+													},
+													"attributes": [],
+													"fragment": {
+														"type": "Fragment",
+														"nodes": [
+															{
+																"type": "Text",
+																"start": 389,
+																"end": 393,
+																"raw": "text",
+																"data": "text"
+															}
+														]
+													}
+												},
+												{
+													"type": "Text",
+													"start": 399,
+													"end": 403,
+													"raw": "\n\t\t\t",
+													"data": "\n\t\t\t"
+												},
+												{
+													"type": "RegularElement",
+													"start": 403,
+													"end": 502,
+													"name": "textarea",
+													"name_loc": {
+														"start": {
+															"line": 18,
+															"column": 4,
+															"character": 404
+														},
+														"end": {
+															"line": 18,
+															"column": 12,
+															"character": 412
+														}
+													},
+													"attributes": [
+														{
+															"type": "Attribute",
+															"start": 413,
+															"end": 479,
+															"name": "data-attr",
+															"name_loc": {
+																"start": {
+																	"line": 18,
+																	"column": 13,
+																	"character": 413
+																},
+																"end": {
+																	"line": 18,
+																	"column": 22,
+																	"character": 422
+																}
+															},
+															"value": [
+																{
+																	"start": 424,
+																	"end": 478,
+																	"type": "Text",
+																	"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+																	"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+																}
+															]
+														}
+													],
+													"fragment": {
+														"type": "Fragment",
+														"nodes": [
+															{
+																"start": 480,
+																"end": 487,
+																"type": "Text",
+																"raw": "content",
+																"data": "content"
+															}
+														]
+													}
+												},
+												{
+													"type": "Text",
+													"start": 502,
+													"end": 505,
+													"raw": "\n\t\t",
+													"data": "\n\t\t"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 513,
+										"end": 515,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 521,
+							"end": 522,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

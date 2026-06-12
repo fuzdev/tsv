@@ -1,0 +1,79 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 179,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 93,
+					"end": 107,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 93,
+							"end": 107,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class",
+											"start": 93,
+											"end": 99
+										},
+										{
+											"type": "PseudoElementSelector",
+											"name": "before",
+											"start": 99,
+											"end": 107
+										}
+									],
+									"start": 93,
+									"end": 107
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 108,
+					"end": 128,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 112,
+							"end": 124,
+							"property": "content",
+							"value": "'⟳'"
+						}
+					]
+				},
+				"start": 93,
+				"end": 128
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 171,
+			"styles": "\n\t/* Multi-byte UTF-8: ⟳ (3 bytes), 你好 (6 bytes), 👨‍👩‍👧 (family, ZWJ sequence) */\n\t.class::before {\n\t\tcontent: '⟳';\n\t}\n\t/* Family emoji with ZWJ: 👨‍👩‍👧‍👦 */\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 180,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

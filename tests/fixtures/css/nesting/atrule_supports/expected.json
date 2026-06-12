@@ -1,0 +1,136 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 185,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 16,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 16,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "modern",
+											"start": 9,
+											"end": 16
+										}
+									],
+									"start": 9,
+									"end": 16
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 17,
+					"end": 176,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 21,
+							"end": 34,
+							"property": "display",
+							"value": "flex"
+						},
+						{
+							"type": "Atrule",
+							"start": 39,
+							"end": 88,
+							"name": "supports",
+							"prelude": "(display: grid)",
+							"block": {
+								"type": "Block",
+								"start": 65,
+								"end": 88,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 70,
+										"end": 83,
+										"property": "display",
+										"value": "grid"
+									}
+								]
+							}
+						},
+						{
+							"type": "Atrule",
+							"start": 92,
+							"end": 133,
+							"name": "supports",
+							"prelude": "(gap: 1rem)",
+							"block": {
+								"type": "Block",
+								"start": 114,
+								"end": 133,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 119,
+										"end": 128,
+										"property": "gap",
+										"value": "1rem"
+									}
+								]
+							}
+						},
+						{
+							"type": "Atrule",
+							"start": 137,
+							"end": 173,
+							"name": "layer",
+							"prelude": "utilities",
+							"block": {
+								"type": "Block",
+								"start": 154,
+								"end": 173,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 159,
+										"end": 168,
+										"property": "margin",
+										"value": "0"
+									}
+								]
+							}
+						}
+					]
+				},
+				"start": 9,
+				"end": 176
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 177,
+			"styles": "\n\t.modern {\n\t\tdisplay: flex;\n\n\t\t@supports (display: grid) {\n\t\t\tdisplay: grid;\n\t\t}\n\n\t\t@supports (gap: 1rem) {\n\t\t\tgap: 1rem;\n\t\t}\n\n\t\t@layer utilities {\n\t\t\tmargin: 0;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 186,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

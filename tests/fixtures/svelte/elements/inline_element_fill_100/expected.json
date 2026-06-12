@@ -1,0 +1,124 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 182,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 72,
+				"data": " Test: exactly 100 char line with inline element (boundary case) "
+			},
+			{
+				"type": "Text",
+				"start": 72,
+				"end": 73,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 73,
+				"end": 181,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 74
+					},
+					"end": {
+						"line": 2,
+						"column": 2,
+						"character": 75
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 76,
+							"end": 120,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 ",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 120,
+							"end": 144,
+							"name": "a",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 44,
+									"character": 121
+								},
+								"end": {
+									"line": 3,
+									"column": 45,
+									"character": 122
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 123,
+									"end": 132,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 3,
+											"column": 46,
+											"character": 123
+										},
+										"end": {
+											"line": 3,
+											"column": 50,
+											"character": 127
+										}
+									},
+									"value": [
+										{
+											"start": 129,
+											"end": 131,
+											"type": "Text",
+											"raw": "/a",
+											"data": "/a"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 133,
+										"end": 140,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 144,
+							"end": 177,
+							"raw": " text8 text9 text10 text11abcdef\n",
+							"data": " text8 text9 text10 text11abcdef\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

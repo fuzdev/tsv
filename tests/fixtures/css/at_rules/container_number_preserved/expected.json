@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 81,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 72,
+				"name": "container",
+				"prelude": "sidebar (min-width: 2.50rem)",
+				"block": {
+					"type": "Block",
+					"start": 49,
+					"end": 72,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 53,
+								"end": 54,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 53,
+										"end": 54,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 53,
+														"end": 54
+													}
+												],
+												"start": 53,
+												"end": 54
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 55,
+								"end": 69,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 60,
+										"end": 64,
+										"property": "b",
+										"value": "c"
+									}
+								]
+							},
+							"start": 53,
+							"end": 69
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 73,
+			"styles": "\n\t@container sidebar (min-width: 2.50rem) {\n\t\ta {\n\t\t\tb: c;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 82,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

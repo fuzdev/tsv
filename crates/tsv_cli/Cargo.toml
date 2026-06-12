@@ -1,0 +1,20 @@
+[package]
+name = "tsv_cli"
+version.workspace = true
+edition.workspace = true
+description = "Command-line interface for tsv tools"
+
+[[bin]]
+name = "tsv"
+path = "src/main.rs"
+
+[dependencies]
+tsv_svelte = { workspace = true, features = ["convert"] }
+tsv_ts = { workspace = true, features = ["convert"] }
+tsv_css = { workspace = true, features = ["convert"] }
+argh.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

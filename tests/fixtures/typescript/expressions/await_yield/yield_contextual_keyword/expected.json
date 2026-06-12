@@ -1,0 +1,703 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 321,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " contextual type keywords as identifiers",
+			"start": 30,
+			"end": 72,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " contextual module keywords as identifiers",
+			"start": 218,
+			"end": 262,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 46
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 320,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 311,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 19,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 10,
+					"end": 310,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 20,
+						"end": 23,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 11
+							},
+							"end": {
+								"line": 2,
+								"column": 14
+							}
+						},
+						"name": "gen"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 26,
+						"end": 310,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 17
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 75,
+								"end": 88,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 15
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 75,
+									"end": 87,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 14
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 81,
+										"end": 87,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 8
+											},
+											"end": {
+												"line": 4,
+												"column": 14
+											}
+										},
+										"name": "string"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " contextual type keywords as identifiers",
+										"start": 30,
+										"end": 72
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 91,
+								"end": 104,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 15
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 91,
+									"end": 103,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 14
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 97,
+										"end": 103,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 8
+											},
+											"end": {
+												"line": 5,
+												"column": 14
+											}
+										},
+										"name": "number"
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 107,
+								"end": 121,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 16
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 107,
+									"end": 120,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 15
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 113,
+										"end": 120,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 8
+											},
+											"end": {
+												"line": 6,
+												"column": 15
+											}
+										},
+										"name": "boolean"
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 124,
+								"end": 134,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 12
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 124,
+									"end": 133,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 11
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 130,
+										"end": 133,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 8
+											},
+											"end": {
+												"line": 7,
+												"column": 11
+											}
+										},
+										"name": "any"
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 137,
+								"end": 149,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 14
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 137,
+									"end": 148,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 13
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 143,
+										"end": 148,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 8
+											},
+											"end": {
+												"line": 8,
+												"column": 13
+											}
+										},
+										"name": "never"
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 152,
+								"end": 166,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 16
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 152,
+									"end": 165,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 15
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 158,
+										"end": 165,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 8
+											},
+											"end": {
+												"line": 9,
+												"column": 15
+											}
+										},
+										"name": "unknown"
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 169,
+								"end": 182,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 15
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 169,
+									"end": 181,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 14
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 175,
+										"end": 181,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 8
+											},
+											"end": {
+												"line": 10,
+												"column": 14
+											}
+										},
+										"name": "object"
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 185,
+								"end": 198,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 15
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 185,
+									"end": 197,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 14
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 191,
+										"end": 197,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 8
+											},
+											"end": {
+												"line": 11,
+												"column": 14
+											}
+										},
+										"name": "symbol"
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 201,
+								"end": 214,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 15
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 201,
+									"end": 213,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 14
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 207,
+										"end": 213,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 8
+											},
+											"end": {
+												"line": 12,
+												"column": 14
+											}
+										},
+										"name": "bigint"
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 265,
+								"end": 276,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 13
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 265,
+									"end": 275,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 12
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 271,
+										"end": 275,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 8
+											},
+											"end": {
+												"line": 15,
+												"column": 12
+											}
+										},
+										"name": "from"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " contextual module keywords as identifiers",
+										"start": 218,
+										"end": 262
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 279,
+								"end": 288,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 11
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 279,
+									"end": 287,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 10
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 285,
+										"end": 287,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 8
+											},
+											"end": {
+												"line": 16,
+												"column": 10
+											}
+										},
+										"name": "as"
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 291,
+								"end": 307,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 18
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 291,
+									"end": 306,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 2
+										},
+										"end": {
+											"line": 17,
+											"column": 17
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 297,
+										"end": 306,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 8
+											},
+											"end": {
+												"line": 17,
+												"column": 17
+											}
+										},
+										"name": "satisfies"
+									}
+								}
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

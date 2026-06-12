@@ -1,0 +1,108 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 190,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 181,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 34,
+							"property": "object-fit",
+							"value": "cover"
+						},
+						{
+							"type": "Declaration",
+							"start": 38,
+							"end": 57,
+							"property": "object-fit",
+							"value": "contain"
+						},
+						{
+							"type": "Declaration",
+							"start": 61,
+							"end": 77,
+							"property": "object-fit",
+							"value": "fill"
+						},
+						{
+							"type": "Declaration",
+							"start": 81,
+							"end": 105,
+							"property": "object-position",
+							"value": "50% 50%"
+						},
+						{
+							"type": "Declaration",
+							"start": 109,
+							"end": 135,
+							"property": "object-position",
+							"value": "right top"
+						},
+						{
+							"type": "Declaration",
+							"start": 139,
+							"end": 177,
+							"property": "object-position",
+							"value": "left 20px bottom 10px"
+						}
+					]
+				},
+				"start": 9,
+				"end": 181
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 182,
+			"styles": "\n\tdiv {\n\t\tobject-fit: cover;\n\t\tobject-fit: contain;\n\t\tobject-fit: fill;\n\t\tobject-position: 50% 50%;\n\t\tobject-position: right top;\n\t\tobject-position: left 20px bottom 10px;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 191,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,242 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 64,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " block ",
+			"start": 23,
+			"end": 34,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 14
+				},
+				"end": {
+					"line": 2,
+					"column": 25
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 63,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 54,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 10,
+					"end": 53,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 44
+						}
+					},
+					"init": {
+						"type": "VariableDeclaration",
+						"start": 15,
+						"end": 36,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 6
+							},
+							"end": {
+								"line": 2,
+								"column": 27
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 19,
+								"end": 36,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 10
+									},
+									"end": {
+										"line": 2,
+										"column": 27
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 19,
+									"end": 20,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 10
+										},
+										"end": {
+											"line": 2,
+											"column": 11
+										}
+									},
+									"name": "a"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 35,
+									"end": 36,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 26
+										},
+										"end": {
+											"line": 2,
+											"column": 27
+										}
+									},
+									"value": 1,
+									"raw": "1",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " block ",
+											"start": 23,
+											"end": 34
+										}
+									]
+								}
+							}
+						],
+						"kind": "let"
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 38,
+						"end": 44,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 29
+							},
+							"end": {
+								"line": 2,
+								"column": 35
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 38,
+							"end": 39,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 29
+								},
+								"end": {
+									"line": 2,
+									"column": 30
+								}
+							},
+							"name": "a"
+						},
+						"operator": "<",
+						"right": {
+							"type": "Literal",
+							"start": 42,
+							"end": 44,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 33
+								},
+								"end": {
+									"line": 2,
+									"column": 35
+								}
+							},
+							"value": 10,
+							"raw": "10"
+						}
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 46,
+						"end": 49,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 37
+							},
+							"end": {
+								"line": 2,
+								"column": 40
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 46,
+							"end": 47,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 37
+								},
+								"end": {
+									"line": 2,
+									"column": 38
+								}
+							},
+							"name": "a"
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 51,
+						"end": 53,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 42
+							},
+							"end": {
+								"line": 2,
+								"column": 44
+							}
+						},
+						"body": []
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

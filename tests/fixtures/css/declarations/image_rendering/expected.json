@@ -1,0 +1,101 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 173,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 164,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 38,
+							"property": "image-rendering",
+							"value": "auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 42,
+							"end": 70,
+							"property": "image-rendering",
+							"value": "crisp-edges"
+						},
+						{
+							"type": "Declaration",
+							"start": 74,
+							"end": 100,
+							"property": "image-rendering",
+							"value": "pixelated"
+						},
+						{
+							"type": "Declaration",
+							"start": 104,
+							"end": 133,
+							"property": "image-orientation",
+							"value": "from-image"
+						},
+						{
+							"type": "Declaration",
+							"start": 137,
+							"end": 160,
+							"property": "image-orientation",
+							"value": "none"
+						}
+					]
+				},
+				"start": 9,
+				"end": 164
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 165,
+			"styles": "\n\tdiv {\n\t\timage-rendering: auto;\n\t\timage-rendering: crisp-edges;\n\t\timage-rendering: pixelated;\n\t\timage-orientation: from-image;\n\t\timage-orientation: none;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 174,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

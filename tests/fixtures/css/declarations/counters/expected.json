@@ -1,0 +1,101 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 178,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 169,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 39,
+							"property": "counter-reset",
+							"value": "section"
+						},
+						{
+							"type": "Declaration",
+							"start": 43,
+							"end": 77,
+							"property": "counter-reset",
+							"value": "section 0 chapter 1"
+						},
+						{
+							"type": "Declaration",
+							"start": 81,
+							"end": 107,
+							"property": "counter-increment",
+							"value": "section"
+						},
+						{
+							"type": "Declaration",
+							"start": 111,
+							"end": 139,
+							"property": "counter-increment",
+							"value": "section 2"
+						},
+						{
+							"type": "Declaration",
+							"start": 143,
+							"end": 165,
+							"property": "counter-set",
+							"value": "section 5"
+						}
+					]
+				},
+				"start": 9,
+				"end": 169
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 170,
+			"styles": "\n\tdiv {\n\t\tcounter-reset: section;\n\t\tcounter-reset: section 0 chapter 1;\n\t\tcounter-increment: section;\n\t\tcounter-increment: section 2;\n\t\tcounter-set: section 5;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 179,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

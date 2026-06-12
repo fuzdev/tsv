@@ -1,0 +1,73 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 54,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 20,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 20,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "selection",
+											"start": 9,
+											"end": 20
+										}
+									],
+									"start": 9,
+									"end": 20
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 21,
+					"end": 45,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 25,
+							"end": 41,
+							"property": "background",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 9,
+				"end": 45
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 46,
+			"styles": "\n\t::selection {\n\t\tbackground: blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 55,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

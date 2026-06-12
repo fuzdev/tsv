@@ -1,0 +1,108 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 211,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 202,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 36,
+							"property": "shape-outside",
+							"value": "none"
+						},
+						{
+							"type": "Declaration",
+							"start": 40,
+							"end": 66,
+							"property": "shape-outside",
+							"value": "circle(50%)"
+						},
+						{
+							"type": "Declaration",
+							"start": 70,
+							"end": 101,
+							"property": "shape-outside",
+							"value": "ellipse(50% 40%)"
+						},
+						{
+							"type": "Declaration",
+							"start": 105,
+							"end": 146,
+							"property": "shape-outside",
+							"value": "inset(10px 20px 30px 40px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 150,
+							"end": 168,
+							"property": "shape-margin",
+							"value": "10px"
+						},
+						{
+							"type": "Declaration",
+							"start": 172,
+							"end": 198,
+							"property": "shape-image-threshold",
+							"value": "0.5"
+						}
+					]
+				},
+				"start": 9,
+				"end": 202
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 203,
+			"styles": "\n\tdiv {\n\t\tshape-outside: none;\n\t\tshape-outside: circle(50%);\n\t\tshape-outside: ellipse(50% 40%);\n\t\tshape-outside: inset(10px 20px 30px 40px);\n\t\tshape-margin: 10px;\n\t\tshape-image-threshold: 0.5;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 212,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

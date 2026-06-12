@@ -1,0 +1,108 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 251,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 242,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 41,
+							"property": "transform",
+							"value": "rotate(45deg)"
+						},
+						{
+							"type": "Declaration",
+							"start": 45,
+							"end": 69,
+							"property": "transform",
+							"value": "scale(1.5, 2)"
+						},
+						{
+							"type": "Declaration",
+							"start": 73,
+							"end": 105,
+							"property": "transform",
+							"value": "translate(10px, 20px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 109,
+							"end": 138,
+							"property": "transform",
+							"value": "skew(10deg, 20deg)"
+						},
+						{
+							"type": "Declaration",
+							"start": 142,
+							"end": 177,
+							"property": "transform",
+							"value": "matrix(1, 0, 0, 1, 0, 0)"
+						},
+						{
+							"type": "Declaration",
+							"start": 181,
+							"end": 238,
+							"property": "transform",
+							"value": "rotate(45deg) scale(1.5) translate(10px, 20px)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 242
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 243,
+			"styles": "\n\tdiv {\n\t\ttransform: rotate(45deg);\n\t\ttransform: scale(1.5, 2);\n\t\ttransform: translate(10px, 20px);\n\t\ttransform: skew(10deg, 20deg);\n\t\ttransform: matrix(1, 0, 0, 1, 0, 0);\n\t\ttransform: rotate(45deg) scale(1.5) translate(10px, 20px);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 252,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

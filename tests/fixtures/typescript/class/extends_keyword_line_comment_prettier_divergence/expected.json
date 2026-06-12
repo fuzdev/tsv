@@ -1,0 +1,435 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 290,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Class extends: comment after the keyword, base on the next line",
+			"start": 20,
+			"end": 86,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 67
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 104,
+			"end": 108,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 17
+				},
+				"end": {
+					"line": 3,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Class implements: comment after the keyword",
+			"start": 118,
+			"end": 164,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 185,
+			"end": 189,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 20
+				},
+				"end": {
+					"line": 7,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Interface extends: comment after the keyword",
+			"start": 199,
+			"end": 246,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 268,
+			"end": 272,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 21
+				},
+				"end": {
+					"line": 11,
+					"column": 25
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 289,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 280,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 88,
+					"end": 115,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 94,
+						"end": 95,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 7
+							},
+							"end": {
+								"line": 3,
+								"column": 8
+							}
+						},
+						"name": "A"
+					},
+					"superClass": {
+						"type": "Identifier",
+						"start": 111,
+						"end": 112,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 2
+							},
+							"end": {
+								"line": 4,
+								"column": 3
+							}
+						},
+						"name": "B",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 104,
+								"end": 108
+							}
+						]
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 113,
+						"end": 115,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 4
+							},
+							"end": {
+								"line": 4,
+								"column": 6
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Class extends: comment after the keyword, base on the next line",
+							"start": 20,
+							"end": 86
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 166,
+					"end": 196,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 172,
+						"end": 173,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 7
+							},
+							"end": {
+								"line": 7,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"implements": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 192,
+							"end": 193,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 2
+								},
+								"end": {
+									"line": 8,
+									"column": 3
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 192,
+								"end": 193,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 3
+									}
+								},
+								"name": "D"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 185,
+									"end": 189
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "ClassBody",
+						"start": 194,
+						"end": 196,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 4
+							},
+							"end": {
+								"line": 8,
+								"column": 6
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Class implements: comment after the keyword",
+							"start": 118,
+							"end": 164
+						}
+					]
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 248,
+					"end": 279,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 258,
+						"end": 259,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 11
+							},
+							"end": {
+								"line": 11,
+								"column": 12
+							}
+						},
+						"name": "E"
+					},
+					"extends": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 275,
+							"end": 276,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 2
+								},
+								"end": {
+									"line": 12,
+									"column": 3
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 275,
+								"end": 276,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 3
+									}
+								},
+								"name": "F"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 268,
+									"end": 272
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 277,
+						"end": 279,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 4
+							},
+							"end": {
+								"line": 12,
+								"column": 6
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Interface extends: comment after the keyword",
+							"start": 199,
+							"end": 246
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

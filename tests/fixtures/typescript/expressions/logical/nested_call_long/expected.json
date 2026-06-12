@@ -1,0 +1,900 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 484,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " 100 chars - stays inline",
+			"start": 10,
+			"end": 37,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars - breaks at || not inside call",
+			"start": 150,
+			"end": 193,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Very long - breaks at && and ||",
+			"start": 309,
+			"end": 343,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 35
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 483,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 474,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 39,
+					"end": 147,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 98
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 45,
+							"end": 146,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 97
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 45,
+								"end": 46,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "LogicalExpression",
+								"start": 51,
+								"end": 146,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 97
+									}
+								},
+								"left": {
+									"type": "LogicalExpression",
+									"start": 52,
+									"end": 133,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 3
+										},
+										"end": {
+											"line": 4,
+											"column": 84
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 52,
+										"end": 76,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 3
+											},
+											"end": {
+												"line": 4,
+												"column": 27
+											}
+										},
+										"name": "COND_AAAAAAAAAAAAAAAAAAA"
+									},
+									"operator": "&&",
+									"right": {
+										"type": "CallExpression",
+										"start": 80,
+										"end": 133,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 31
+											},
+											"end": {
+												"line": 4,
+												"column": 84
+											}
+										},
+										"callee": {
+											"type": "MemberExpression",
+											"start": 80,
+											"end": 96,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 31
+												},
+												"end": {
+													"line": 4,
+													"column": 47
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 80,
+												"end": 90,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 31
+													},
+													"end": {
+														"line": 4,
+														"column": 41
+													}
+												},
+												"name": "Fn_bbbbbbb"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 91,
+												"end": 96,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 42
+													},
+													"end": {
+														"line": 4,
+														"column": 47
+													}
+												},
+												"name": "parse"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "CallExpression",
+												"start": 97,
+												"end": 132,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 48
+													},
+													"end": {
+														"line": 4,
+														"column": 83
+													}
+												},
+												"callee": {
+													"type": "MemberExpression",
+													"start": 97,
+													"end": 109,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 48
+														},
+														"end": {
+															"line": 4,
+															"column": 60
+														}
+													},
+													"object": {
+														"type": "Identifier",
+														"start": 97,
+														"end": 103,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 48
+															},
+															"end": {
+																"line": 4,
+																"column": 54
+															}
+														},
+														"name": "Fn_ccc"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 104,
+														"end": 109,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 55
+															},
+															"end": {
+																"line": 4,
+																"column": 60
+															}
+														},
+														"name": "parse"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 110,
+														"end": 131,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 61
+															},
+															"end": {
+																"line": 4,
+																"column": 82
+															}
+														},
+														"name": "valueeeeeeeeeeeeeeeee"
+													}
+												],
+												"optional": false
+											}
+										],
+										"optional": false
+									}
+								},
+								"operator": "||",
+								"right": {
+									"type": "Identifier",
+									"start": 138,
+									"end": 146,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 89
+										},
+										"end": {
+											"line": 4,
+											"column": 97
+										}
+									},
+									"name": "fallback"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 100 chars - stays inline",
+							"start": 10,
+							"end": 37
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 195,
+					"end": 306,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 201,
+							"end": 305,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 201,
+								"end": 202,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "LogicalExpression",
+								"start": 207,
+								"end": 305,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 10
+									}
+								},
+								"left": {
+									"type": "LogicalExpression",
+									"start": 208,
+									"end": 290,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 3
+										},
+										"end": {
+											"line": 8,
+											"column": 85
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 208,
+										"end": 232,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 3
+											},
+											"end": {
+												"line": 8,
+												"column": 27
+											}
+										},
+										"name": "COND_AAAAAAAAAAAAAAAAAAA"
+									},
+									"operator": "&&",
+									"right": {
+										"type": "CallExpression",
+										"start": 236,
+										"end": 290,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 31
+											},
+											"end": {
+												"line": 8,
+												"column": 85
+											}
+										},
+										"callee": {
+											"type": "MemberExpression",
+											"start": 236,
+											"end": 253,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 31
+												},
+												"end": {
+													"line": 8,
+													"column": 48
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 236,
+												"end": 247,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 31
+													},
+													"end": {
+														"line": 8,
+														"column": 42
+													}
+												},
+												"name": "Fn_bbbbbbbb"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 248,
+												"end": 253,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 43
+													},
+													"end": {
+														"line": 8,
+														"column": 48
+													}
+												},
+												"name": "parse"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "CallExpression",
+												"start": 254,
+												"end": 289,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 49
+													},
+													"end": {
+														"line": 8,
+														"column": 84
+													}
+												},
+												"callee": {
+													"type": "MemberExpression",
+													"start": 254,
+													"end": 266,
+													"loc": {
+														"start": {
+															"line": 8,
+															"column": 49
+														},
+														"end": {
+															"line": 8,
+															"column": 61
+														}
+													},
+													"object": {
+														"type": "Identifier",
+														"start": 254,
+														"end": 260,
+														"loc": {
+															"start": {
+																"line": 8,
+																"column": 49
+															},
+															"end": {
+																"line": 8,
+																"column": 55
+															}
+														},
+														"name": "Fn_ccc"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 261,
+														"end": 266,
+														"loc": {
+															"start": {
+																"line": 8,
+																"column": 56
+															},
+															"end": {
+																"line": 8,
+																"column": 61
+															}
+														},
+														"name": "parse"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 267,
+														"end": 288,
+														"loc": {
+															"start": {
+																"line": 8,
+																"column": 62
+															},
+															"end": {
+																"line": 8,
+																"column": 83
+															}
+														},
+														"name": "valueeeeeeeeeeeeeeeee"
+													}
+												],
+												"optional": false
+											}
+										],
+										"optional": false
+									}
+								},
+								"operator": "||",
+								"right": {
+									"type": "Identifier",
+									"start": 297,
+									"end": 305,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 10
+										}
+									},
+									"name": "fallback"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 chars - breaks at || not inside call",
+							"start": 150,
+							"end": 193
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 345,
+					"end": 473,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 351,
+							"end": 472,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 351,
+								"end": 352,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "LogicalExpression",
+								"start": 357,
+								"end": 472,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 10
+									}
+								},
+								"left": {
+									"type": "LogicalExpression",
+									"start": 358,
+									"end": 457,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 3
+										},
+										"end": {
+											"line": 14,
+											"column": 56
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 358,
+										"end": 397,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 3
+											},
+											"end": {
+												"line": 13,
+												"column": 42
+											}
+										},
+										"name": "VERY_LONG_CONDITION_VARIABLE_NAMEEEEEEE"
+									},
+									"operator": "&&",
+									"right": {
+										"type": "CallExpression",
+										"start": 404,
+										"end": 457,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 3
+											},
+											"end": {
+												"line": 14,
+												"column": 56
+											}
+										},
+										"callee": {
+											"type": "MemberExpression",
+											"start": 404,
+											"end": 420,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 3
+												},
+												"end": {
+													"line": 14,
+													"column": 19
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 404,
+												"end": 414,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 3
+													},
+													"end": {
+														"line": 14,
+														"column": 13
+													}
+												},
+												"name": "Fn_bbbbbbb"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 415,
+												"end": 420,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 14
+													},
+													"end": {
+														"line": 14,
+														"column": 19
+													}
+												},
+												"name": "parse"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "CallExpression",
+												"start": 421,
+												"end": 456,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 20
+													},
+													"end": {
+														"line": 14,
+														"column": 55
+													}
+												},
+												"callee": {
+													"type": "MemberExpression",
+													"start": 421,
+													"end": 433,
+													"loc": {
+														"start": {
+															"line": 14,
+															"column": 20
+														},
+														"end": {
+															"line": 14,
+															"column": 32
+														}
+													},
+													"object": {
+														"type": "Identifier",
+														"start": 421,
+														"end": 427,
+														"loc": {
+															"start": {
+																"line": 14,
+																"column": 20
+															},
+															"end": {
+																"line": 14,
+																"column": 26
+															}
+														},
+														"name": "Fn_ccc"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 428,
+														"end": 433,
+														"loc": {
+															"start": {
+																"line": 14,
+																"column": 27
+															},
+															"end": {
+																"line": 14,
+																"column": 32
+															}
+														},
+														"name": "parse"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 434,
+														"end": 455,
+														"loc": {
+															"start": {
+																"line": 14,
+																"column": 33
+															},
+															"end": {
+																"line": 14,
+																"column": 54
+															}
+														},
+														"name": "valueeeeeeeeeeeeeeeee"
+													}
+												],
+												"optional": false
+											}
+										],
+										"optional": false
+									}
+								},
+								"operator": "||",
+								"right": {
+									"type": "Identifier",
+									"start": 464,
+									"end": 472,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 10
+										}
+									},
+									"name": "fallback"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Very long - breaks at && and ||",
+							"start": 309,
+							"end": 343
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

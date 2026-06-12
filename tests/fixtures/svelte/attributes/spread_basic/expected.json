@@ -1,0 +1,213 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 60,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Component",
+				"start": 0,
+				"end": 15,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 5,
+						"character": 5
+					}
+				},
+				"attributes": [
+					{
+						"type": "SpreadAttribute",
+						"start": 6,
+						"end": 12,
+						"expression": {
+							"type": "Identifier",
+							"start": 10,
+							"end": 11,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 10
+								},
+								"end": {
+									"line": 1,
+									"column": 11
+								}
+							},
+							"name": "a"
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 15,
+				"end": 16,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 16,
+				"end": 34,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 17
+					},
+					"end": {
+						"line": 2,
+						"column": 5,
+						"character": 21
+					}
+				},
+				"attributes": [
+					{
+						"type": "SpreadAttribute",
+						"start": 22,
+						"end": 31,
+						"expression": {
+							"type": "CallExpression",
+							"start": 26,
+							"end": 30,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 10
+								},
+								"end": {
+									"line": 2,
+									"column": 14
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 26,
+								"end": 28,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 10
+									},
+									"end": {
+										"line": 2,
+										"column": 12
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 34,
+				"end": 35,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 35,
+				"end": 59,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 36
+					},
+					"end": {
+						"line": 3,
+						"column": 5,
+						"character": 40
+					}
+				},
+				"attributes": [
+					{
+						"type": "SpreadAttribute",
+						"start": 41,
+						"end": 56,
+						"expression": {
+							"type": "MemberExpression",
+							"start": 45,
+							"end": 55,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 10
+								},
+								"end": {
+									"line": 3,
+									"column": 20
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 45,
+								"end": 48,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 10
+									},
+									"end": {
+										"line": 3,
+										"column": 13
+									}
+								},
+								"name": "obj"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 49,
+								"end": 55,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 14
+									},
+									"end": {
+										"line": 3,
+										"column": 20
+									}
+								},
+								"name": "nested"
+							},
+							"computed": false,
+							"optional": false
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

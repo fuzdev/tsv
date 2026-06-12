@@ -1,0 +1,1036 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 686,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Complex type annotation - Map with nested Array",
+			"start": 20,
+			"end": 70,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Complex type annotation - Record with nested Array",
+			"start": 189,
+			"end": 242,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Conditional type as type parameter",
+			"start": 356,
+			"end": 393,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Type alias with constrained type params",
+			"start": 510,
+			"end": 552,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 43
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 685,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 676,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 25,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 72,
+					"end": 186,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 70
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 78,
+							"end": 185,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 69
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 78,
+								"end": 118,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 2
+									}
+								},
+								"name": "myMap",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 83,
+									"end": 118,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 12
+										},
+										"end": {
+											"line": 6,
+											"column": 2
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 85,
+										"end": 118,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 14
+											},
+											"end": {
+												"line": 6,
+												"column": 2
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 85,
+											"end": 88,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 14
+												},
+												"end": {
+													"line": 3,
+													"column": 17
+												}
+											},
+											"name": "Map"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 88,
+											"end": 118,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 17
+												},
+												"end": {
+													"line": 6,
+													"column": 2
+												}
+											},
+											"params": [
+												{
+													"type": "TSStringKeyword",
+													"start": 92,
+													"end": 98,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 2
+														},
+														"end": {
+															"line": 4,
+															"column": 8
+														}
+													}
+												},
+												{
+													"type": "TSTypeReference",
+													"start": 102,
+													"end": 115,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 2
+														},
+														"end": {
+															"line": 5,
+															"column": 15
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 102,
+														"end": 107,
+														"loc": {
+															"start": {
+																"line": 5,
+																"column": 2
+															},
+															"end": {
+																"line": 5,
+																"column": 7
+															}
+														},
+														"name": "Array"
+													},
+													"typeArguments": {
+														"type": "TSTypeParameterInstantiation",
+														"start": 107,
+														"end": 115,
+														"loc": {
+															"start": {
+																"line": 5,
+																"column": 7
+															},
+															"end": {
+																"line": 5,
+																"column": 15
+															}
+														},
+														"params": [
+															{
+																"type": "TSNumberKeyword",
+																"start": 108,
+																"end": 114,
+																"loc": {
+																	"start": {
+																		"line": 5,
+																		"column": 8
+																	},
+																	"end": {
+																		"line": 5,
+																		"column": 14
+																	}
+																}
+															}
+														]
+													}
+												}
+											]
+										}
+									}
+								}
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 121,
+								"end": 185,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 5
+									},
+									"end": {
+										"line": 6,
+										"column": 69
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 121,
+									"end": 183,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 5
+										},
+										"end": {
+											"line": 6,
+											"column": 67
+										}
+									},
+									"name": "getSomeVeryLongValueThatWillDefinitelyExceedThePrintWidthLimit"
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Complex type annotation - Map with nested Array",
+							"start": 20,
+							"end": 70
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 244,
+					"end": 353,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 54
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 250,
+							"end": 352,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 53
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 250,
+								"end": 301,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 2
+									}
+								},
+								"name": "myRecord",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 258,
+									"end": 301,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 15
+										},
+										"end": {
+											"line": 12,
+											"column": 2
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 260,
+										"end": 301,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 17
+											},
+											"end": {
+												"line": 12,
+												"column": 2
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 260,
+											"end": 266,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 17
+												},
+												"end": {
+													"line": 9,
+													"column": 23
+												}
+											},
+											"name": "Record"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 266,
+											"end": 301,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 23
+												},
+												"end": {
+													"line": 12,
+													"column": 2
+												}
+											},
+											"params": [
+												{
+													"type": "TSStringKeyword",
+													"start": 270,
+													"end": 276,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 2
+														},
+														"end": {
+															"line": 10,
+															"column": 8
+														}
+													}
+												},
+												{
+													"type": "TSTypeReference",
+													"start": 280,
+													"end": 298,
+													"loc": {
+														"start": {
+															"line": 11,
+															"column": 2
+														},
+														"end": {
+															"line": 11,
+															"column": 20
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 280,
+														"end": 285,
+														"loc": {
+															"start": {
+																"line": 11,
+																"column": 2
+															},
+															"end": {
+																"line": 11,
+																"column": 7
+															}
+														},
+														"name": "Array"
+													},
+													"typeArguments": {
+														"type": "TSTypeParameterInstantiation",
+														"start": 285,
+														"end": 298,
+														"loc": {
+															"start": {
+																"line": 11,
+																"column": 7
+															},
+															"end": {
+																"line": 11,
+																"column": 20
+															}
+														},
+														"params": [
+															{
+																"type": "TSTypeReference",
+																"start": 286,
+																"end": 297,
+																"loc": {
+																	"start": {
+																		"line": 11,
+																		"column": 8
+																	},
+																	"end": {
+																		"line": 11,
+																		"column": 19
+																	}
+																},
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 286,
+																	"end": 297,
+																	"loc": {
+																		"start": {
+																			"line": 11,
+																			"column": 8
+																		},
+																		"end": {
+																			"line": 11,
+																			"column": 19
+																		}
+																	},
+																	"name": "ComplexType"
+																}
+															}
+														]
+													}
+												}
+											]
+										}
+									}
+								}
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 304,
+								"end": 352,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 5
+									},
+									"end": {
+										"line": 12,
+										"column": 53
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 304,
+									"end": 350,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 5
+										},
+										"end": {
+											"line": 12,
+											"column": 51
+										}
+									},
+									"name": "getVeryLongValueNameThatExceedsPrintWidthLimit"
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Complex type annotation - Record with nested Array",
+							"start": 189,
+							"end": 242
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 395,
+					"end": 507,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 35
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 401,
+							"end": 506,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 18,
+									"column": 34
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 401,
+								"end": 474,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 2
+									}
+								},
+								"name": "value",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 406,
+									"end": 474,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 12
+										},
+										"end": {
+											"line": 18,
+											"column": 2
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 408,
+										"end": 474,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 14
+											},
+											"end": {
+												"line": 18,
+												"column": 2
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 408,
+											"end": 419,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 14
+												},
+												"end": {
+													"line": 15,
+													"column": 25
+												}
+											},
+											"name": "Conditional"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 419,
+											"end": 474,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 25
+												},
+												"end": {
+													"line": 18,
+													"column": 2
+												}
+											},
+											"params": [
+												{
+													"type": "TSConditionalType",
+													"start": 423,
+													"end": 458,
+													"loc": {
+														"start": {
+															"line": 16,
+															"column": 2
+														},
+														"end": {
+															"line": 16,
+															"column": 37
+														}
+													},
+													"checkType": {
+														"type": "TSTypeReference",
+														"start": 423,
+														"end": 424,
+														"loc": {
+															"start": {
+																"line": 16,
+																"column": 2
+															},
+															"end": {
+																"line": 16,
+																"column": 3
+															}
+														},
+														"typeName": {
+															"type": "Identifier",
+															"start": 423,
+															"end": 424,
+															"loc": {
+																"start": {
+																	"line": 16,
+																	"column": 2
+																},
+																"end": {
+																	"line": 16,
+																	"column": 3
+																}
+															},
+															"name": "T"
+														}
+													},
+													"extendsType": {
+														"type": "TSStringKeyword",
+														"start": 433,
+														"end": 439,
+														"loc": {
+															"start": {
+																"line": 16,
+																"column": 12
+															},
+															"end": {
+																"line": 16,
+																"column": 18
+															}
+														}
+													},
+													"trueType": {
+														"type": "TSNumberKeyword",
+														"start": 442,
+														"end": 448,
+														"loc": {
+															"start": {
+																"line": 16,
+																"column": 21
+															},
+															"end": {
+																"line": 16,
+																"column": 27
+															}
+														}
+													},
+													"falseType": {
+														"type": "TSBooleanKeyword",
+														"start": 451,
+														"end": 458,
+														"loc": {
+															"start": {
+																"line": 16,
+																"column": 30
+															},
+															"end": {
+																"line": 16,
+																"column": 37
+															}
+														}
+													}
+												},
+												{
+													"type": "TSTypeReference",
+													"start": 462,
+													"end": 471,
+													"loc": {
+														"start": {
+															"line": 17,
+															"column": 2
+														},
+														"end": {
+															"line": 17,
+															"column": 11
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 462,
+														"end": 471,
+														"loc": {
+															"start": {
+																"line": 17,
+																"column": 2
+															},
+															"end": {
+																"line": 17,
+																"column": 11
+															}
+														},
+														"name": "OtherType"
+													}
+												}
+											]
+										}
+									}
+								}
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 477,
+								"end": 506,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 5
+									},
+									"end": {
+										"line": 18,
+										"column": 34
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 477,
+									"end": 504,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 5
+										},
+										"end": {
+											"line": 18,
+											"column": 32
+										}
+									},
+									"name": "getVeryLongValueThatExceeds"
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Conditional type as type parameter",
+							"start": 356,
+							"end": 393
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 554,
+					"end": 675,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 62
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 559,
+						"end": 577,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 6
+							},
+							"end": {
+								"line": 21,
+								"column": 24
+							}
+						},
+						"name": "MyVeryLongTypeName"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 577,
+						"end": 615,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 24
+							},
+							"end": {
+								"line": 24,
+								"column": 2
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 581,
+								"end": 597,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 18
+									}
+								},
+								"name": "T",
+								"constraint": {
+									"type": "TSStringKeyword",
+									"start": 591,
+									"end": 597,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 12
+										},
+										"end": {
+											"line": 22,
+											"column": 18
+										}
+									}
+								}
+							},
+							{
+								"type": "TSTypeParameter",
+								"start": 601,
+								"end": 611,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 12
+									}
+								},
+								"name": "U",
+								"default": {
+									"type": "TSNumberKeyword",
+									"start": 605,
+									"end": 611,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 6
+										},
+										"end": {
+											"line": 23,
+											"column": 12
+										}
+									}
+								}
+							}
+						],
+						"extra": {
+							"trailingComma": 611
+						}
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 618,
+						"end": 674,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 5
+							},
+							"end": {
+								"line": 24,
+								"column": 61
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 618,
+							"end": 674,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 5
+								},
+								"end": {
+									"line": 24,
+									"column": 61
+								}
+							},
+							"name": "SomeVeryLongTypeNameThatDefinitelyExceedsPrintWidthLimit"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Type alias with constrained type params",
+							"start": 510,
+							"end": 552
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

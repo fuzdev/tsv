@@ -1,0 +1,150 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 506,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 497,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 38,
+							"end": 59,
+							"property": "color",
+							"value": "rgb(255, 0, 0)"
+						},
+						{
+							"type": "Declaration",
+							"start": 63,
+							"end": 89,
+							"property": "background",
+							"value": "rgb(0, 255, 0)"
+						},
+						{
+							"type": "Declaration",
+							"start": 93,
+							"end": 121,
+							"property": "border-color",
+							"value": "rgb(0, 0, 255)"
+						},
+						{
+							"type": "Declaration",
+							"start": 146,
+							"end": 165,
+							"property": "color",
+							"value": "rgb(255 0 0)"
+						},
+						{
+							"type": "Declaration",
+							"start": 169,
+							"end": 193,
+							"property": "background",
+							"value": "rgb(0 255 0)"
+						},
+						{
+							"type": "Declaration",
+							"start": 197,
+							"end": 223,
+							"property": "border-color",
+							"value": "rgb(0 0 255)"
+						},
+						{
+							"type": "Declaration",
+							"start": 259,
+							"end": 286,
+							"property": "color",
+							"value": "rgba(255, 0, 0, 0.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 290,
+							"end": 322,
+							"property": "background",
+							"value": "rgba(0, 255, 0, 0.3)"
+						},
+						{
+							"type": "Declaration",
+							"start": 326,
+							"end": 360,
+							"property": "border-color",
+							"value": "rgba(0, 0, 255, 0.8)"
+						},
+						{
+							"type": "Declaration",
+							"start": 398,
+							"end": 423,
+							"property": "color",
+							"value": "rgb(255 0 0 / 0.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 427,
+							"end": 457,
+							"property": "background",
+							"value": "rgb(0 255 0 / 0.3)"
+						},
+						{
+							"type": "Declaration",
+							"start": 461,
+							"end": 493,
+							"property": "border-color",
+							"value": "rgb(0 0 255 / 0.8)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 497
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 498,
+			"styles": "\n\tdiv {\n\t\t/* comma syntax */\n\t\tcolor: rgb(255, 0, 0);\n\t\tbackground: rgb(0, 255, 0);\n\t\tborder-color: rgb(0, 0, 255);\n\t\t/* space syntax */\n\t\tcolor: rgb(255 0 0);\n\t\tbackground: rgb(0 255 0);\n\t\tborder-color: rgb(0 0 255);\n\t\t/* comma syntax with alpha */\n\t\tcolor: rgba(255, 0, 0, 0.5);\n\t\tbackground: rgba(0, 255, 0, 0.3);\n\t\tborder-color: rgba(0, 0, 255, 0.8);\n\t\t/* space syntax with / alpha */\n\t\tcolor: rgb(255 0 0 / 0.5);\n\t\tbackground: rgb(0 255 0 / 0.3);\n\t\tborder-color: rgb(0 0 255 / 0.8);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 507,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

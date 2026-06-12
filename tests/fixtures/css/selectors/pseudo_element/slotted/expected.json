@@ -1,0 +1,261 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 226,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 21,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 21,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "slotted",
+											"start": 9,
+											"end": 18
+										}
+									],
+									"start": 9,
+									"end": 21
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 22,
+					"end": 40,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 26,
+							"end": 36,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 9,
+				"end": 40
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 43,
+					"end": 57,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 43,
+							"end": 57,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "slotted",
+											"start": 43,
+											"end": 52
+										}
+									],
+									"start": 43,
+									"end": 57
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 58,
+					"end": 77,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 62,
+							"end": 73,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 43,
+				"end": 77
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 80,
+					"end": 98,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 80,
+							"end": 98,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "slotted",
+											"start": 80,
+											"end": 89
+										}
+									],
+									"start": 80,
+									"end": 98
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 99,
+					"end": 119,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 103,
+							"end": 115,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 80,
+				"end": 119
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 122,
+					"end": 153,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 122,
+							"end": 153,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "slotted",
+											"start": 122,
+											"end": 131
+										}
+									],
+									"start": 122,
+									"end": 153
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 154,
+					"end": 175,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 158,
+							"end": 171,
+							"property": "color",
+							"value": "yellow"
+						}
+					]
+				},
+				"start": 122,
+				"end": 175
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 178,
+					"end": 195,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 178,
+							"end": 195,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "slotted",
+											"start": 178,
+											"end": 187
+										}
+									],
+									"start": 178,
+									"end": 195
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 196,
+					"end": 217,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 200,
+							"end": 213,
+							"property": "color",
+							"value": "purple"
+						}
+					]
+				},
+				"start": 178,
+				"end": 217
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 218,
+			"styles": "\n\t::slotted(*) {\n\t\tcolor: red;\n\t}\n\n\t::slotted(div) {\n\t\tcolor: blue;\n\t}\n\n\t::slotted(.class1) {\n\t\tcolor: green;\n\t}\n\n\t::slotted(div.class1#id1:hover) {\n\t\tcolor: yellow;\n\t}\n\n\t::slotted([slot]) {\n\t\tcolor: purple;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 227,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

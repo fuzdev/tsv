@@ -1,0 +1,122 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 186,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 177,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 37,
+							"property": "translate",
+							"value": "10px 20px"
+						},
+						{
+							"type": "Declaration",
+							"start": 41,
+							"end": 66,
+							"property": "translate",
+							"value": "10px 20px 30px"
+						},
+						{
+							"type": "Declaration",
+							"start": 70,
+							"end": 80,
+							"property": "scale",
+							"value": "1.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 84,
+							"end": 96,
+							"property": "scale",
+							"value": "1.5 2"
+						},
+						{
+							"type": "Declaration",
+							"start": 100,
+							"end": 114,
+							"property": "scale",
+							"value": "1 1 1.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 118,
+							"end": 131,
+							"property": "rotate",
+							"value": "45deg"
+						},
+						{
+							"type": "Declaration",
+							"start": 135,
+							"end": 150,
+							"property": "rotate",
+							"value": "x 45deg"
+						},
+						{
+							"type": "Declaration",
+							"start": 154,
+							"end": 173,
+							"property": "rotate",
+							"value": "1 0 0 45deg"
+						}
+					]
+				},
+				"start": 9,
+				"end": 177
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 178,
+			"styles": "\n\tdiv {\n\t\ttranslate: 10px 20px;\n\t\ttranslate: 10px 20px 30px;\n\t\tscale: 1.5;\n\t\tscale: 1.5 2;\n\t\tscale: 1 1 1.5;\n\t\trotate: 45deg;\n\t\trotate: x 45deg;\n\t\trotate: 1 0 0 45deg;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 187,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,249 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 169,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 168,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 159,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 10,
+					"end": 158,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 3
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 17,
+							"end": 18,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 8
+								},
+								"end": {
+									"line": 2,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 17,
+								"end": 18,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 8
+									},
+									"end": {
+										"line": 2,
+										"column": 9
+									}
+								},
+								"name": "a"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 24,
+						"end": 64,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 15
+							},
+							"end": {
+								"line": 2,
+								"column": 55
+							}
+						},
+						"value": "@some/long-package-name/with/deep/path",
+						"raw": "'@some/long-package-name/with/deep/path'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 74,
+							"end": 97,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 2
+								},
+								"end": {
+									"line": 3,
+									"column": 25
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 74,
+								"end": 87,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 3,
+										"column": 15
+									}
+								},
+								"name": "LONG_ATTR_ONE"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 89,
+								"end": 97,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 17
+									},
+									"end": {
+										"line": 3,
+										"column": 25
+									}
+								},
+								"value": "value1",
+								"raw": "'value1'"
+							}
+						},
+						{
+							"type": "ImportAttribute",
+							"start": 101,
+							"end": 124,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 2
+								},
+								"end": {
+									"line": 4,
+									"column": 25
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 101,
+								"end": 114,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 15
+									}
+								},
+								"name": "LONG_ATTR_TWO"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 116,
+								"end": 124,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 17
+									},
+									"end": {
+										"line": 4,
+										"column": 25
+									}
+								},
+								"value": "value2",
+								"raw": "'value2'"
+							}
+						},
+						{
+							"type": "ImportAttribute",
+							"start": 128,
+							"end": 153,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 2
+								},
+								"end": {
+									"line": 5,
+									"column": 27
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 128,
+								"end": 143,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 17
+									}
+								},
+								"name": "LONG_ATTR_THREE"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 145,
+								"end": 153,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 19
+									},
+									"end": {
+										"line": 5,
+										"column": 27
+									}
+								},
+								"value": "value3",
+								"raw": "'value3'"
+							}
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

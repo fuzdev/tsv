@@ -1,0 +1,1596 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 944,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " block comment after a regex value, before a sibling property",
+			"start": 10,
+			"end": 73,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 97,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 23
+				},
+				"end": {
+					"line": 3,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " consecutive block comments after a regex value (the collection loop must take both)",
+			"start": 115,
+			"end": 201,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 225,
+			"end": 233,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 23
+				},
+				"end": {
+					"line": 6,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 234,
+			"end": 242,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 32
+				},
+				"end": {
+					"line": 6,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment after the sole regex value, before the closing brace",
+			"start": 253,
+			"end": 322,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 346,
+			"end": 353,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 23
+				},
+				"end": {
+					"line": 9,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment after a flagged regex value (pattern/flags split, then comment)",
+			"start": 358,
+			"end": 438,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 463,
+			"end": 470,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 24
+				},
+				"end": {
+					"line": 12,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment after a regex literal starting with `=` (the /= relex branch)",
+			"start": 481,
+			"end": 559,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 584,
+			"end": 591,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 24
+				},
+				"end": {
+					"line": 15,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment after a regex call argument, before the closing paren",
+			"start": 602,
+			"end": 672,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 682,
+			"end": 689,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 9
+				},
+				"end": {
+					"line": 18,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment after a regex array element, before the closing bracket",
+			"start": 694,
+			"end": 766,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 786,
+			"end": 793,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 19
+				},
+				"end": {
+					"line": 21,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " multiline block comment after a regex value (sets the line-terminator flag)",
+			"start": 798,
+			"end": 876,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " multi\n\tline ",
+			"start": 903,
+			"end": 920,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 10
+				},
+				"end": {
+					"line": 26,
+					"column": 8
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 943,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 934,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 29,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 75,
+					"end": 112,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 38
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 81,
+							"end": 111,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 37
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 81,
+								"end": 85,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 11
+									}
+								},
+								"name": "obj1"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 88,
+								"end": 111,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 14
+									},
+									"end": {
+										"line": 3,
+										"column": 37
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 89,
+										"end": 96,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 15
+											},
+											"end": {
+												"line": 3,
+												"column": 22
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 89,
+											"end": 90,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 15
+												},
+												"end": {
+													"line": 3,
+													"column": 16
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 92,
+											"end": 96,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 18
+												},
+												"end": {
+													"line": 3,
+													"column": 22
+												}
+											},
+											"value": {},
+											"raw": "/re/",
+											"regex": {
+												"pattern": "re",
+												"flags": ""
+											}
+										},
+										"kind": "init",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 97,
+												"end": 104
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 106,
+										"end": 110,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 32
+											},
+											"end": {
+												"line": 3,
+												"column": 36
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 106,
+											"end": 107,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 32
+												},
+												"end": {
+													"line": 3,
+													"column": 33
+												}
+											},
+											"name": "b"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 109,
+											"end": 110,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 35
+												},
+												"end": {
+													"line": 3,
+													"column": 36
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment after a regex value, before a sibling property",
+							"start": 10,
+							"end": 73
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 203,
+					"end": 250,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 48
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 209,
+							"end": 249,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 47
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 209,
+								"end": 213,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 11
+									}
+								},
+								"name": "obj2"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 216,
+								"end": 249,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 14
+									},
+									"end": {
+										"line": 6,
+										"column": 47
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 217,
+										"end": 224,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 15
+											},
+											"end": {
+												"line": 6,
+												"column": 22
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 217,
+											"end": 218,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 15
+												},
+												"end": {
+													"line": 6,
+													"column": 16
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 220,
+											"end": 224,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 18
+												},
+												"end": {
+													"line": 6,
+													"column": 22
+												}
+											},
+											"value": {},
+											"raw": "/re/",
+											"regex": {
+												"pattern": "re",
+												"flags": ""
+											}
+										},
+										"kind": "init",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 225,
+												"end": 233
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 244,
+										"end": 248,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 42
+											},
+											"end": {
+												"line": 6,
+												"column": 46
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 244,
+											"end": 245,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 42
+												},
+												"end": {
+													"line": 6,
+													"column": 43
+												}
+											},
+											"name": "b"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 247,
+											"end": 248,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 45
+												},
+												"end": {
+													"line": 6,
+													"column": 46
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c2 ",
+												"start": 234,
+												"end": 242
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " consecutive block comments after a regex value (the collection loop must take both)",
+							"start": 115,
+							"end": 201
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 324,
+					"end": 355,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 330,
+							"end": 354,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 330,
+								"end": 334,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 11
+									}
+								},
+								"name": "obj3"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 337,
+								"end": 354,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 14
+									},
+									"end": {
+										"line": 9,
+										"column": 31
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 338,
+										"end": 345,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 15
+											},
+											"end": {
+												"line": 9,
+												"column": 22
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 338,
+											"end": 339,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 15
+												},
+												"end": {
+													"line": 9,
+													"column": 16
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 341,
+											"end": 345,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 18
+												},
+												"end": {
+													"line": 9,
+													"column": 22
+												}
+											},
+											"value": {},
+											"raw": "/re/",
+											"regex": {
+												"pattern": "re",
+												"flags": ""
+											}
+										},
+										"kind": "init",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 346,
+												"end": 353
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment after the sole regex value, before the closing brace",
+							"start": 253,
+							"end": 322
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 440,
+					"end": 478,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 39
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 446,
+							"end": 477,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 38
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 446,
+								"end": 450,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 11
+									}
+								},
+								"name": "obj4"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 453,
+								"end": 477,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 14
+									},
+									"end": {
+										"line": 12,
+										"column": 38
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 454,
+										"end": 462,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 15
+											},
+											"end": {
+												"line": 12,
+												"column": 23
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 454,
+											"end": 455,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 15
+												},
+												"end": {
+													"line": 12,
+													"column": 16
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 457,
+											"end": 462,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 18
+												},
+												"end": {
+													"line": 12,
+													"column": 23
+												}
+											},
+											"value": {},
+											"raw": "/re/g",
+											"regex": {
+												"pattern": "re",
+												"flags": "g"
+											}
+										},
+										"kind": "init",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 463,
+												"end": 470
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 472,
+										"end": 476,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 33
+											},
+											"end": {
+												"line": 12,
+												"column": 37
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 472,
+											"end": 473,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 33
+												},
+												"end": {
+													"line": 12,
+													"column": 34
+												}
+											},
+											"name": "b"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 475,
+											"end": 476,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 36
+												},
+												"end": {
+													"line": 12,
+													"column": 37
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment after a flagged regex value (pattern/flags split, then comment)",
+							"start": 358,
+							"end": 438
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 561,
+					"end": 599,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 39
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 567,
+							"end": 598,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 38
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 567,
+								"end": 571,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 11
+									}
+								},
+								"name": "obj5"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 574,
+								"end": 598,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 14
+									},
+									"end": {
+										"line": 15,
+										"column": 38
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 575,
+										"end": 583,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 15
+											},
+											"end": {
+												"line": 15,
+												"column": 23
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 575,
+											"end": 576,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 15
+												},
+												"end": {
+													"line": 15,
+													"column": 16
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 578,
+											"end": 583,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 18
+												},
+												"end": {
+													"line": 15,
+													"column": 23
+												}
+											},
+											"value": {},
+											"raw": "/=re/",
+											"regex": {
+												"pattern": "=re",
+												"flags": ""
+											}
+										},
+										"kind": "init",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 584,
+												"end": 591
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 593,
+										"end": 597,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 33
+											},
+											"end": {
+												"line": 15,
+												"column": 37
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 593,
+											"end": 594,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 33
+												},
+												"end": {
+													"line": 15,
+													"column": 34
+												}
+											},
+											"name": "b"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 596,
+											"end": 597,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 36
+												},
+												"end": {
+													"line": 15,
+													"column": 37
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment after a regex literal starting with `=` (the /= relex branch)",
+							"start": 481,
+							"end": 559
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 674,
+					"end": 691,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 18
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 674,
+						"end": 690,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 1
+							},
+							"end": {
+								"line": 18,
+								"column": 17
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 674,
+							"end": 676,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 1
+								},
+								"end": {
+									"line": 18,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 677,
+								"end": 681,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 4
+									},
+									"end": {
+										"line": 18,
+										"column": 8
+									}
+								},
+								"value": {},
+								"raw": "/re/",
+								"regex": {
+									"pattern": "re",
+									"flags": ""
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 682,
+										"end": 689
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment after a regex call argument, before the closing paren",
+							"start": 602,
+							"end": 672
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 768,
+					"end": 795,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 28
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 774,
+							"end": 794,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 7
+								},
+								"end": {
+									"line": 21,
+									"column": 27
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 774,
+								"end": 777,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 7
+									},
+									"end": {
+										"line": 21,
+										"column": 10
+									}
+								},
+								"name": "arr"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 780,
+								"end": 794,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 13
+									},
+									"end": {
+										"line": 21,
+										"column": 27
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 781,
+										"end": 785,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 14
+											},
+											"end": {
+												"line": 21,
+												"column": 18
+											}
+										},
+										"value": {},
+										"raw": "/re/",
+										"regex": {
+											"pattern": "re",
+											"flags": ""
+										},
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 786,
+												"end": 793
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment after a regex array element, before the closing bracket",
+							"start": 694,
+							"end": 766
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 878,
+					"end": 933,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 884,
+							"end": 932,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 7
+								},
+								"end": {
+									"line": 28,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 884,
+								"end": 888,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 7
+									},
+									"end": {
+										"line": 24,
+										"column": 11
+									}
+								},
+								"name": "obj6"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 891,
+								"end": 932,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 14
+									},
+									"end": {
+										"line": 28,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 895,
+										"end": 902,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 2
+											},
+											"end": {
+												"line": 25,
+												"column": 9
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 895,
+											"end": 896,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 2
+												},
+												"end": {
+													"line": 25,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 898,
+											"end": 902,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 5
+												},
+												"end": {
+													"line": 25,
+													"column": 9
+												}
+											},
+											"value": {},
+											"raw": "/re/",
+											"regex": {
+												"pattern": "re",
+												"flags": ""
+											}
+										},
+										"kind": "init",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " multi\n\tline ",
+												"start": 903,
+												"end": 920
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 924,
+										"end": 928,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 2
+											},
+											"end": {
+												"line": 27,
+												"column": 6
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 924,
+											"end": 925,
+											"loc": {
+												"start": {
+													"line": 27,
+													"column": 2
+												},
+												"end": {
+													"line": 27,
+													"column": 3
+												}
+											},
+											"name": "b"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 927,
+											"end": 928,
+											"loc": {
+												"start": {
+													"line": 27,
+													"column": 5
+												},
+												"end": {
+													"line": 27,
+													"column": 6
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " multiline block comment after a regex value (sets the line-terminator flag)",
+							"start": 798,
+							"end": 876
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

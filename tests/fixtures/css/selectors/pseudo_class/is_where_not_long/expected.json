@@ -1,0 +1,1520 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 1160,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 71,
+					"end": 167,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 71,
+							"end": 167,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 71,
+											"end": 74
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "is",
+											"args": {
+												"type": "SelectorList",
+												"start": 78,
+												"end": 166,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 78,
+														"end": 85,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "aaaaaa",
+																		"start": 78,
+																		"end": 85
+																	}
+																],
+																"start": 78,
+																"end": 85
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 87,
+														"end": 94,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "bbbbbb",
+																		"start": 87,
+																		"end": 94
+																	}
+																],
+																"start": 87,
+																"end": 94
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 96,
+														"end": 103,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "cccccc",
+																		"start": 96,
+																		"end": 103
+																	}
+																],
+																"start": 96,
+																"end": 103
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 105,
+														"end": 112,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "dddddd",
+																		"start": 105,
+																		"end": 112
+																	}
+																],
+																"start": 105,
+																"end": 112
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 114,
+														"end": 121,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "eeeeee",
+																		"start": 114,
+																		"end": 121
+																	}
+																],
+																"start": 114,
+																"end": 121
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 123,
+														"end": 130,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "ffffff",
+																		"start": 123,
+																		"end": 130
+																	}
+																],
+																"start": 123,
+																"end": 130
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 132,
+														"end": 139,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "gggggg",
+																		"start": 132,
+																		"end": 139
+																	}
+																],
+																"start": 132,
+																"end": 139
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 141,
+														"end": 148,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "hhhhhh",
+																		"start": 141,
+																		"end": 148
+																	}
+																],
+																"start": 141,
+																"end": 148
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 150,
+														"end": 166,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "iiiiiiiiiiiiiii",
+																		"start": 150,
+																		"end": 166
+																	}
+																],
+																"start": 150,
+																"end": 166
+															}
+														]
+													}
+												]
+											},
+											"start": 74,
+											"end": 167
+										}
+									],
+									"start": 71,
+									"end": 167
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 168,
+					"end": 186,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 172,
+							"end": 182,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 71,
+				"end": 186
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 244,
+					"end": 362,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 244,
+							"end": 362,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 244,
+											"end": 247
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "is",
+											"args": {
+												"type": "SelectorList",
+												"start": 254,
+												"end": 359,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 254,
+														"end": 261,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "aaaaaa",
+																		"start": 254,
+																		"end": 261
+																	}
+																],
+																"start": 254,
+																"end": 261
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 265,
+														"end": 272,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "bbbbbb",
+																		"start": 265,
+																		"end": 272
+																	}
+																],
+																"start": 265,
+																"end": 272
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 276,
+														"end": 283,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "cccccc",
+																		"start": 276,
+																		"end": 283
+																	}
+																],
+																"start": 276,
+																"end": 283
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 287,
+														"end": 294,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "dddddd",
+																		"start": 287,
+																		"end": 294
+																	}
+																],
+																"start": 287,
+																"end": 294
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 298,
+														"end": 305,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "eeeeee",
+																		"start": 298,
+																		"end": 305
+																	}
+																],
+																"start": 298,
+																"end": 305
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 309,
+														"end": 316,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "ffffff",
+																		"start": 309,
+																		"end": 316
+																	}
+																],
+																"start": 309,
+																"end": 316
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 320,
+														"end": 327,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "gggggg",
+																		"start": 320,
+																		"end": 327
+																	}
+																],
+																"start": 320,
+																"end": 327
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 331,
+														"end": 338,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "hhhhhh",
+																		"start": 331,
+																		"end": 338
+																	}
+																],
+																"start": 331,
+																"end": 338
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 342,
+														"end": 359,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "iiiiiiiiiiiiiiii",
+																		"start": 342,
+																		"end": 359
+																	}
+																],
+																"start": 342,
+																"end": 359
+															}
+														]
+													}
+												]
+											},
+											"start": 247,
+											"end": 362
+										}
+									],
+									"start": 244,
+									"end": 362
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 363,
+					"end": 382,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 367,
+							"end": 378,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 244,
+				"end": 382
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 448,
+					"end": 544,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 448,
+							"end": 544,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 448,
+											"end": 451
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "not",
+											"args": {
+												"type": "SelectorList",
+												"start": 456,
+												"end": 543,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 456,
+														"end": 463,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "aaaaaa",
+																		"start": 456,
+																		"end": 463
+																	}
+																],
+																"start": 456,
+																"end": 463
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 465,
+														"end": 472,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "bbbbbb",
+																		"start": 465,
+																		"end": 472
+																	}
+																],
+																"start": 465,
+																"end": 472
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 474,
+														"end": 481,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "cccccc",
+																		"start": 474,
+																		"end": 481
+																	}
+																],
+																"start": 474,
+																"end": 481
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 483,
+														"end": 490,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "dddddd",
+																		"start": 483,
+																		"end": 490
+																	}
+																],
+																"start": 483,
+																"end": 490
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 492,
+														"end": 499,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "eeeeee",
+																		"start": 492,
+																		"end": 499
+																	}
+																],
+																"start": 492,
+																"end": 499
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 501,
+														"end": 508,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "ffffff",
+																		"start": 501,
+																		"end": 508
+																	}
+																],
+																"start": 501,
+																"end": 508
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 510,
+														"end": 517,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "gggggg",
+																		"start": 510,
+																		"end": 517
+																	}
+																],
+																"start": 510,
+																"end": 517
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 519,
+														"end": 526,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "hhhhhh",
+																		"start": 519,
+																		"end": 526
+																	}
+																],
+																"start": 519,
+																"end": 526
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 528,
+														"end": 543,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "iiiiiiiiiiiiii",
+																		"start": 528,
+																		"end": 543
+																	}
+																],
+																"start": 528,
+																"end": 543
+															}
+														]
+													}
+												]
+											},
+											"start": 451,
+											"end": 544
+										}
+									],
+									"start": 448,
+									"end": 544
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 545,
+					"end": 565,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 549,
+							"end": 561,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 448,
+				"end": 565
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 624,
+					"end": 742,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 624,
+							"end": 742,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 624,
+											"end": 627
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "not",
+											"args": {
+												"type": "SelectorList",
+												"start": 635,
+												"end": 739,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 635,
+														"end": 642,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "aaaaaa",
+																		"start": 635,
+																		"end": 642
+																	}
+																],
+																"start": 635,
+																"end": 642
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 646,
+														"end": 653,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "bbbbbb",
+																		"start": 646,
+																		"end": 653
+																	}
+																],
+																"start": 646,
+																"end": 653
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 657,
+														"end": 664,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "cccccc",
+																		"start": 657,
+																		"end": 664
+																	}
+																],
+																"start": 657,
+																"end": 664
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 668,
+														"end": 675,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "dddddd",
+																		"start": 668,
+																		"end": 675
+																	}
+																],
+																"start": 668,
+																"end": 675
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 679,
+														"end": 686,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "eeeeee",
+																		"start": 679,
+																		"end": 686
+																	}
+																],
+																"start": 679,
+																"end": 686
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 690,
+														"end": 697,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "ffffff",
+																		"start": 690,
+																		"end": 697
+																	}
+																],
+																"start": 690,
+																"end": 697
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 701,
+														"end": 708,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "gggggg",
+																		"start": 701,
+																		"end": 708
+																	}
+																],
+																"start": 701,
+																"end": 708
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 712,
+														"end": 719,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "hhhhhh",
+																		"start": 712,
+																		"end": 719
+																	}
+																],
+																"start": 712,
+																"end": 719
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 723,
+														"end": 739,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "iiiiiiiiiiiiiii",
+																		"start": 723,
+																		"end": 739
+																	}
+																],
+																"start": 723,
+																"end": 739
+															}
+														]
+													}
+												]
+											},
+											"start": 627,
+											"end": 742
+										}
+									],
+									"start": 624,
+									"end": 742
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 743,
+					"end": 764,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 747,
+							"end": 760,
+							"property": "color",
+							"value": "yellow"
+						}
+					]
+				},
+				"start": 624,
+				"end": 764
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 832,
+					"end": 928,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 832,
+							"end": 928,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 832,
+											"end": 835
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "where",
+											"args": {
+												"type": "SelectorList",
+												"start": 842,
+												"end": 927,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 842,
+														"end": 849,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "aaaaaa",
+																		"start": 842,
+																		"end": 849
+																	}
+																],
+																"start": 842,
+																"end": 849
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 851,
+														"end": 858,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "bbbbbb",
+																		"start": 851,
+																		"end": 858
+																	}
+																],
+																"start": 851,
+																"end": 858
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 860,
+														"end": 867,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "cccccc",
+																		"start": 860,
+																		"end": 867
+																	}
+																],
+																"start": 860,
+																"end": 867
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 869,
+														"end": 876,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "dddddd",
+																		"start": 869,
+																		"end": 876
+																	}
+																],
+																"start": 869,
+																"end": 876
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 878,
+														"end": 885,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "eeeeee",
+																		"start": 878,
+																		"end": 885
+																	}
+																],
+																"start": 878,
+																"end": 885
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 887,
+														"end": 894,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "ffffff",
+																		"start": 887,
+																		"end": 894
+																	}
+																],
+																"start": 887,
+																"end": 894
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 896,
+														"end": 903,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "gggggg",
+																		"start": 896,
+																		"end": 903
+																	}
+																],
+																"start": 896,
+																"end": 903
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 905,
+														"end": 912,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "hhhhhh",
+																		"start": 905,
+																		"end": 912
+																	}
+																],
+																"start": 905,
+																"end": 912
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 914,
+														"end": 927,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "iiiiiiiiiiii",
+																		"start": 914,
+																		"end": 927
+																	}
+																],
+																"start": 914,
+																"end": 927
+															}
+														]
+													}
+												]
+											},
+											"start": 835,
+											"end": 928
+										}
+									],
+									"start": 832,
+									"end": 928
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 929,
+					"end": 950,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 933,
+							"end": 946,
+							"property": "color",
+							"value": "purple"
+						}
+					]
+				},
+				"start": 832,
+				"end": 950
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 1011,
+					"end": 1129,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 1011,
+							"end": 1129,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 1011,
+											"end": 1014
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "where",
+											"args": {
+												"type": "SelectorList",
+												"start": 1024,
+												"end": 1126,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 1024,
+														"end": 1031,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "aaaaaa",
+																		"start": 1024,
+																		"end": 1031
+																	}
+																],
+																"start": 1024,
+																"end": 1031
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 1035,
+														"end": 1042,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "bbbbbb",
+																		"start": 1035,
+																		"end": 1042
+																	}
+																],
+																"start": 1035,
+																"end": 1042
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 1046,
+														"end": 1053,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "cccccc",
+																		"start": 1046,
+																		"end": 1053
+																	}
+																],
+																"start": 1046,
+																"end": 1053
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 1057,
+														"end": 1064,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "dddddd",
+																		"start": 1057,
+																		"end": 1064
+																	}
+																],
+																"start": 1057,
+																"end": 1064
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 1068,
+														"end": 1075,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "eeeeee",
+																		"start": 1068,
+																		"end": 1075
+																	}
+																],
+																"start": 1068,
+																"end": 1075
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 1079,
+														"end": 1086,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "ffffff",
+																		"start": 1079,
+																		"end": 1086
+																	}
+																],
+																"start": 1079,
+																"end": 1086
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 1090,
+														"end": 1097,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "gggggg",
+																		"start": 1090,
+																		"end": 1097
+																	}
+																],
+																"start": 1090,
+																"end": 1097
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 1101,
+														"end": 1108,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "hhhhhh",
+																		"start": 1101,
+																		"end": 1108
+																	}
+																],
+																"start": 1101,
+																"end": 1108
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 1112,
+														"end": 1126,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "iiiiiiiiiiiii",
+																		"start": 1112,
+																		"end": 1126
+																	}
+																],
+																"start": 1112,
+																"end": 1126
+															}
+														]
+													}
+												]
+											},
+											"start": 1014,
+											"end": 1129
+										}
+									],
+									"start": 1011,
+									"end": 1129
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 1130,
+					"end": 1151,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 1134,
+							"end": 1147,
+							"property": "color",
+							"value": "orange"
+						}
+					]
+				},
+				"start": 1011,
+				"end": 1151
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 1152,
+			"styles": "\n\t/* :is() - 100 chars exactly - stays inline (at boundary) */\n\tdiv:is(.aaaaaa, .bbbbbb, .cccccc, .dddddd, .eeeeee, .ffffff, .gggggg, .hhhhhh, .iiiiiiiiiiiiiii) {\n\t\tcolor: red;\n\t}\n\n\t/* :is() - 101 chars - wraps (exceeds print_width) */\n\tdiv:is(\n\t\t.aaaaaa,\n\t\t.bbbbbb,\n\t\t.cccccc,\n\t\t.dddddd,\n\t\t.eeeeee,\n\t\t.ffffff,\n\t\t.gggggg,\n\t\t.hhhhhh,\n\t\t.iiiiiiiiiiiiiiii\n\t) {\n\t\tcolor: blue;\n\t}\n\n\t/* :not() - 100 chars exactly - stays inline (at boundary) */\n\tdiv:not(.aaaaaa, .bbbbbb, .cccccc, .dddddd, .eeeeee, .ffffff, .gggggg, .hhhhhh, .iiiiiiiiiiiiii) {\n\t\tcolor: green;\n\t}\n\n\t/* :not() - 101 chars - wraps (exceeds print_width) */\n\tdiv:not(\n\t\t.aaaaaa,\n\t\t.bbbbbb,\n\t\t.cccccc,\n\t\t.dddddd,\n\t\t.eeeeee,\n\t\t.ffffff,\n\t\t.gggggg,\n\t\t.hhhhhh,\n\t\t.iiiiiiiiiiiiiii\n\t) {\n\t\tcolor: yellow;\n\t}\n\n\t/* :where() - 100 chars exactly - stays inline (at boundary) */\n\tdiv:where(.aaaaaa, .bbbbbb, .cccccc, .dddddd, .eeeeee, .ffffff, .gggggg, .hhhhhh, .iiiiiiiiiiii) {\n\t\tcolor: purple;\n\t}\n\n\t/* :where() - 101 chars - wraps (exceeds print_width) */\n\tdiv:where(\n\t\t.aaaaaa,\n\t\t.bbbbbb,\n\t\t.cccccc,\n\t\t.dddddd,\n\t\t.eeeeee,\n\t\t.ffffff,\n\t\t.gggggg,\n\t\t.hhhhhh,\n\t\t.iiiiiiiiiiiii\n\t) {\n\t\tcolor: orange;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 1161,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

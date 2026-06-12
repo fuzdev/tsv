@@ -1,0 +1,489 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 275,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " leading comment1",
+			"start": 10,
+			"end": 29,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " leading comment2 ",
+			"start": 31,
+			"end": 53,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " inline1 ",
+			"start": 69,
+			"end": 82,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 14
+				},
+				"end": {
+					"line": 5,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " inline2 ",
+			"start": 85,
+			"end": 98,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 30
+				},
+				"end": {
+					"line": 5,
+					"column": 43
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing1",
+			"start": 102,
+			"end": 114,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 47
+				},
+				"end": {
+					"line": 5,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "\n * block comment1\n * block comment2\n ",
+			"start": 117,
+			"end": 162,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inner comment1",
+			"start": 183,
+			"end": 200,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing2",
+			"start": 213,
+			"end": 225,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 12
+				},
+				"end": {
+					"line": 13,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " inner comment2 ",
+			"start": 228,
+			"end": 248,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 22
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 274,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 265,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 56,
+					"end": 101,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 46
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 62,
+							"end": 100,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 45
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 62,
+								"end": 68,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 13
+									}
+								},
+								"name": "value1",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " inline1 ",
+										"start": 69,
+										"end": 82
+									}
+								]
+							},
+							"init": {
+								"type": "Literal",
+								"start": 99,
+								"end": 100,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 44
+									},
+									"end": {
+										"line": 5,
+										"column": 45
+									}
+								},
+								"value": 1,
+								"raw": "1",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " inline2 ",
+										"start": 85,
+										"end": 98
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " leading comment1",
+							"start": 10,
+							"end": 29
+						},
+						{
+							"type": "Block",
+							"value": " leading comment2 ",
+							"start": 31,
+							"end": 53
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " trailing1",
+							"start": 102,
+							"end": 114
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 164,
+					"end": 264,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 170,
+							"end": 263,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 16,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 170,
+								"end": 176,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 13
+									}
+								},
+								"name": "value2"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 179,
+								"end": 263,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 16
+									},
+									"end": {
+										"line": 16,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 203,
+										"end": 211,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 2
+											},
+											"end": {
+												"line": 13,
+												"column": 10
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 203,
+											"end": 208,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 2
+												},
+												"end": {
+													"line": 13,
+													"column": 7
+												}
+											},
+											"name": "prop1"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 210,
+											"end": 211,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 9
+												},
+												"end": {
+													"line": 13,
+													"column": 10
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " inner comment1",
+												"start": 183,
+												"end": 200
+											}
+										],
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " trailing2",
+												"start": 213,
+												"end": 225
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 251,
+										"end": 259,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 2
+											},
+											"end": {
+												"line": 15,
+												"column": 10
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 251,
+											"end": 256,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 2
+												},
+												"end": {
+													"line": 15,
+													"column": 7
+												}
+											},
+											"name": "prop2"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 258,
+											"end": 259,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 9
+												},
+												"end": {
+													"line": 15,
+													"column": 10
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " inner comment2 ",
+												"start": 228,
+												"end": 248
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": "\n * block comment1\n * block comment2\n ",
+							"start": 117,
+							"end": 162
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -1,0 +1,108 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 111,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 102,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 31,
+							"property": "flex",
+							"value": "0 0 auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 35,
+							"end": 42,
+							"property": "flex",
+							"value": "1"
+						},
+						{
+							"type": "Declaration",
+							"start": 46,
+							"end": 56,
+							"property": "flex",
+							"value": "auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 60,
+							"end": 70,
+							"property": "flex",
+							"value": "none"
+						},
+						{
+							"type": "Declaration",
+							"start": 74,
+							"end": 80,
+							"property": "gap",
+							"value": "0"
+						},
+						{
+							"type": "Declaration",
+							"start": 84,
+							"end": 98,
+							"property": "gap",
+							"value": "1rem 2rem"
+						}
+					]
+				},
+				"start": 9,
+				"end": 102
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 103,
+			"styles": "\n\tdiv {\n\t\tflex: 0 0 auto;\n\t\tflex: 1;\n\t\tflex: auto;\n\t\tflex: none;\n\t\tgap: 0;\n\t\tgap: 1rem 2rem;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 112,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,115 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 268,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 259,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 52,
+							"property": "background",
+							"value": "url('path/to/file.png')"
+						},
+						{
+							"type": "Declaration",
+							"start": 56,
+							"end": 83,
+							"property": "background",
+							"value": "url('file.png')"
+						},
+						{
+							"type": "Declaration",
+							"start": 87,
+							"end": 112,
+							"property": "background",
+							"value": "url(file.png)"
+						},
+						{
+							"type": "Declaration",
+							"start": 116,
+							"end": 143,
+							"property": "background-position",
+							"value": "center"
+						},
+						{
+							"type": "Declaration",
+							"start": 147,
+							"end": 176,
+							"property": "background-position",
+							"value": "left top"
+						},
+						{
+							"type": "Declaration",
+							"start": 180,
+							"end": 208,
+							"property": "background-position",
+							"value": "50% 50%"
+						},
+						{
+							"type": "Declaration",
+							"start": 212,
+							"end": 255,
+							"property": "background-position",
+							"value": "right 20px bottom 10px"
+						}
+					]
+				},
+				"start": 9,
+				"end": 259
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 260,
+			"styles": "\n\tdiv {\n\t\tbackground: url('path/to/file.png');\n\t\tbackground: url('file.png');\n\t\tbackground: url(file.png);\n\t\tbackground-position: center;\n\t\tbackground-position: left top;\n\t\tbackground-position: 50% 50%;\n\t\tbackground-position: right 20px bottom 10px;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 269,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

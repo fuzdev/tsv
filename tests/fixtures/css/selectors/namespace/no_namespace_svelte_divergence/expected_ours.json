@@ -1,0 +1,227 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 268,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 43,
+					"end": 47,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 43,
+							"end": 47,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 43,
+											"end": 47
+										}
+									],
+									"start": 43,
+									"end": 47
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 48,
+					"end": 66,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 52,
+							"end": 62,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 43,
+				"end": 66
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 108,
+					"end": 110,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 108,
+							"end": 110,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "*",
+											"start": 108,
+											"end": 110
+										}
+									],
+									"start": 108,
+									"end": 110
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 111,
+					"end": 135,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 115,
+							"end": 131,
+							"property": "background",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 108,
+				"end": 135
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 175,
+					"end": 187,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 175,
+							"end": 187,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "span",
+											"start": 175,
+											"end": 180
+										},
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 180,
+											"end": 187
+										}
+									],
+									"start": 175,
+									"end": 187
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 188,
+					"end": 213,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 192,
+							"end": 209,
+							"property": "font-weight",
+							"value": "bold"
+						}
+					]
+				},
+				"start": 175,
+				"end": 213
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 216,
+					"end": 224,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 216,
+							"end": 224,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 216,
+											"end": 218
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "hover",
+											"args": null,
+											"start": 218,
+											"end": 224
+										}
+									],
+									"start": 216,
+									"end": 224
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 225,
+					"end": 259,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 229,
+							"end": 255,
+							"property": "text-decoration",
+							"value": "underline"
+						}
+					]
+				},
+				"start": 216,
+				"end": 259
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 260,
+			"styles": "\n\t/* No-namespace type selector */\n\t|div {\n\t\tcolor: red;\n\t}\n\n\t/* No-namespace universal selector */\n\t|* {\n\t\tbackground: blue;\n\t}\n\n\t/* Combined with other selectors */\n\t|span.class1 {\n\t\tfont-weight: bold;\n\t}\n\n\t|a:hover {\n\t\ttext-decoration: underline;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 269,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

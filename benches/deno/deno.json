@@ -1,0 +1,24 @@
+{
+	"imports": {
+		"acorn": "npm:acorn@8.16.0",
+		"svelte": "npm:svelte@5.56.1",
+		"svelte/compiler": "npm:svelte@5.56.1/compiler",
+		"@sveltejs/acorn-typescript": "npm:@sveltejs/acorn-typescript@1.0.10",
+		"prettier": "npm:prettier@3.8.3",
+		"prettier-plugin-svelte": "npm:prettier-plugin-svelte@3.5.2",
+		"@biomejs/js-api": "npm:@biomejs/js-api@4.0.0",
+		"@biomejs/wasm-bundler": "npm:@biomejs/wasm-bundler@2.4.16",
+		"oxc-parser": "npm:oxc-parser@0.134.0",
+		"@oxc-parser/binding-wasm32-wasi/parser.wasi-browser.js": "npm:@oxc-parser/binding-wasm32-wasi@0.134.0/parser.wasi-browser.js",
+		"oxfmt": "npm:oxfmt@0.53.0",
+		"zod": "npm:zod@^4.4.3",
+		"@fuzdev/fuz_util": "npm:@fuzdev/fuz_util@0.64.0",
+		"@std/fs": "jsr:@std/fs@^1.0.24"
+	},
+	"fmt": {
+		"useTabs": true,
+		"lineWidth": 100,
+		"singleQuote": true,
+		"proseWrap": "preserve"
+	}
+}

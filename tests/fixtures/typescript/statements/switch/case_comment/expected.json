@@ -1,0 +1,857 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 496,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " before first case",
+			"start": 44,
+			"end": 64,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 3
+				},
+				"end": {
+					"line": 4,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " before first stmt",
+			"start": 80,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 4
+				},
+				"end": {
+					"line": 6,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " before second stmt",
+			"start": 114,
+			"end": 135,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 4
+				},
+				"end": {
+					"line": 8,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " between case 1 and case 2",
+			"start": 159,
+			"end": 187,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 3
+				},
+				"end": {
+					"line": 11,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inline after case label",
+			"start": 199,
+			"end": 225,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 11
+				},
+				"end": {
+					"line": 12,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " before throw",
+			"start": 230,
+			"end": 245,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 4
+				},
+				"end": {
+					"line": 13,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " between case 2 and default",
+			"start": 275,
+			"end": 304,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 3
+				},
+				"end": {
+					"line": 15,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " before return",
+			"start": 321,
+			"end": 337,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 4
+				},
+				"end": {
+					"line": 17,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing after last case",
+			"start": 353,
+			"end": 380,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 3
+				},
+				"end": {
+					"line": 19,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " fallthrough",
+			"start": 433,
+			"end": 447,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 11
+				},
+				"end": {
+					"line": 25,
+					"column": 25
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 495,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 486,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 31,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 10,
+					"end": 387,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 19,
+						"end": 21,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 10
+							},
+							"end": {
+								"line": 2,
+								"column": 12
+							}
+						},
+						"name": "fn"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 24,
+						"end": 387,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 15
+							},
+							"end": {
+								"line": 21,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "SwitchStatement",
+								"start": 28,
+								"end": 384,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 3
+									}
+								},
+								"discriminant": {
+									"type": "Identifier",
+									"start": 36,
+									"end": 37,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 10
+										},
+										"end": {
+											"line": 3,
+											"column": 11
+										}
+									},
+									"name": "x"
+								},
+								"cases": [
+									{
+										"type": "SwitchCase",
+										"start": 68,
+										"end": 155,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 3
+											},
+											"end": {
+												"line": 10,
+												"column": 10
+											}
+										},
+										"consequent": [
+											{
+												"type": "ExpressionStatement",
+												"start": 105,
+												"end": 109,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 4
+													},
+													"end": {
+														"line": 7,
+														"column": 8
+													}
+												},
+												"expression": {
+													"type": "CallExpression",
+													"start": 105,
+													"end": 108,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 4
+														},
+														"end": {
+															"line": 7,
+															"column": 7
+														}
+													},
+													"callee": {
+														"type": "Identifier",
+														"start": 105,
+														"end": 106,
+														"loc": {
+															"start": {
+																"line": 7,
+																"column": 4
+															},
+															"end": {
+																"line": 7,
+																"column": 5
+															}
+														},
+														"name": "a"
+													},
+													"arguments": [],
+													"optional": false
+												},
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " before first stmt",
+														"start": 80,
+														"end": 100
+													}
+												]
+											},
+											{
+												"type": "ExpressionStatement",
+												"start": 140,
+												"end": 144,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 4
+													},
+													"end": {
+														"line": 9,
+														"column": 8
+													}
+												},
+												"expression": {
+													"type": "CallExpression",
+													"start": 140,
+													"end": 143,
+													"loc": {
+														"start": {
+															"line": 9,
+															"column": 4
+														},
+														"end": {
+															"line": 9,
+															"column": 7
+														}
+													},
+													"callee": {
+														"type": "Identifier",
+														"start": 140,
+														"end": 141,
+														"loc": {
+															"start": {
+																"line": 9,
+																"column": 4
+															},
+															"end": {
+																"line": 9,
+																"column": 5
+															}
+														},
+														"name": "b"
+													},
+													"arguments": [],
+													"optional": false
+												},
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " before second stmt",
+														"start": 114,
+														"end": 135
+													}
+												]
+											},
+											{
+												"type": "BreakStatement",
+												"start": 149,
+												"end": 155,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 4
+													},
+													"end": {
+														"line": 10,
+														"column": 10
+													}
+												},
+												"label": null
+											}
+										],
+										"test": {
+											"type": "Literal",
+											"start": 73,
+											"end": 74,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 8
+												},
+												"end": {
+													"line": 5,
+													"column": 9
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " before first case",
+												"start": 44,
+												"end": 64
+											}
+										]
+									},
+									{
+										"type": "SwitchCase",
+										"start": 191,
+										"end": 271,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 3
+											},
+											"end": {
+												"line": 14,
+												"column": 25
+											}
+										},
+										"consequent": [
+											{
+												"type": "ThrowStatement",
+												"start": 250,
+												"end": 271,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 4
+													},
+													"end": {
+														"line": 14,
+														"column": 25
+													}
+												},
+												"argument": {
+													"type": "NewExpression",
+													"start": 256,
+													"end": 270,
+													"loc": {
+														"start": {
+															"line": 14,
+															"column": 10
+														},
+														"end": {
+															"line": 14,
+															"column": 24
+														}
+													},
+													"callee": {
+														"type": "Identifier",
+														"start": 260,
+														"end": 265,
+														"loc": {
+															"start": {
+																"line": 14,
+																"column": 14
+															},
+															"end": {
+																"line": 14,
+																"column": 19
+															}
+														},
+														"name": "Error"
+													},
+													"arguments": [
+														{
+															"type": "Literal",
+															"start": 266,
+															"end": 269,
+															"loc": {
+																"start": {
+																	"line": 14,
+																	"column": 20
+																},
+																"end": {
+																	"line": 14,
+																	"column": 23
+																}
+															},
+															"value": "x",
+															"raw": "'x'"
+														}
+													]
+												},
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " inline after case label",
+														"start": 199,
+														"end": 225
+													},
+													{
+														"type": "Line",
+														"value": " before throw",
+														"start": 230,
+														"end": 245
+													}
+												]
+											}
+										],
+										"test": {
+											"type": "Literal",
+											"start": 196,
+											"end": 197,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 8
+												},
+												"end": {
+													"line": 12,
+													"column": 9
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " between case 1 and case 2",
+												"start": 159,
+												"end": 187
+											}
+										]
+									},
+									{
+										"type": "SwitchCase",
+										"start": 308,
+										"end": 349,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 3
+											},
+											"end": {
+												"line": 18,
+												"column": 11
+											}
+										},
+										"consequent": [
+											{
+												"type": "ReturnStatement",
+												"start": 342,
+												"end": 349,
+												"loc": {
+													"start": {
+														"line": 18,
+														"column": 4
+													},
+													"end": {
+														"line": 18,
+														"column": 11
+													}
+												},
+												"argument": null,
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " before return",
+														"start": 321,
+														"end": 337
+													}
+												]
+											}
+										],
+										"test": null,
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " between case 2 and default",
+												"start": 275,
+												"end": 304
+											}
+										]
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " trailing after last case",
+										"start": 353,
+										"end": 380
+									}
+								]
+							}
+						]
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 390,
+					"end": 485,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 399,
+						"end": 402,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 10
+							},
+							"end": {
+								"line": 23,
+								"column": 13
+							}
+						},
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 405,
+						"end": 485,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 16
+							},
+							"end": {
+								"line": 30,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "SwitchStatement",
+								"start": 409,
+								"end": 482,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 3
+									}
+								},
+								"discriminant": {
+									"type": "Identifier",
+									"start": 417,
+									"end": 418,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 10
+										},
+										"end": {
+											"line": 24,
+											"column": 11
+										}
+									},
+									"name": "y"
+								},
+								"cases": [
+									{
+										"type": "SwitchCase",
+										"start": 425,
+										"end": 432,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 3
+											},
+											"end": {
+												"line": 25,
+												"column": 10
+											}
+										},
+										"consequent": [],
+										"test": {
+											"type": "Literal",
+											"start": 430,
+											"end": 431,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 8
+												},
+												"end": {
+													"line": 25,
+													"column": 9
+												}
+											},
+											"value": 3,
+											"raw": "3"
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " fallthrough",
+												"start": 433,
+												"end": 447
+											}
+										]
+									},
+									{
+										"type": "SwitchCase",
+										"start": 451,
+										"end": 478,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 3
+											},
+											"end": {
+												"line": 28,
+												"column": 10
+											}
+										},
+										"consequent": [
+											{
+												"type": "ExpressionStatement",
+												"start": 463,
+												"end": 467,
+												"loc": {
+													"start": {
+														"line": 27,
+														"column": 4
+													},
+													"end": {
+														"line": 27,
+														"column": 8
+													}
+												},
+												"expression": {
+													"type": "CallExpression",
+													"start": 463,
+													"end": 466,
+													"loc": {
+														"start": {
+															"line": 27,
+															"column": 4
+														},
+														"end": {
+															"line": 27,
+															"column": 7
+														}
+													},
+													"callee": {
+														"type": "Identifier",
+														"start": 463,
+														"end": 464,
+														"loc": {
+															"start": {
+																"line": 27,
+																"column": 4
+															},
+															"end": {
+																"line": 27,
+																"column": 5
+															}
+														},
+														"name": "c"
+													},
+													"arguments": [],
+													"optional": false
+												}
+											},
+											{
+												"type": "BreakStatement",
+												"start": 472,
+												"end": 478,
+												"loc": {
+													"start": {
+														"line": 28,
+														"column": 4
+													},
+													"end": {
+														"line": 28,
+														"column": 10
+													}
+												},
+												"label": null
+											}
+										],
+										"test": {
+											"type": "Literal",
+											"start": 456,
+											"end": 457,
+											"loc": {
+												"start": {
+													"line": 26,
+													"column": 8
+												},
+												"end": {
+													"line": 26,
+													"column": 9
+												}
+											},
+											"value": 4,
+											"raw": "4"
+										}
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

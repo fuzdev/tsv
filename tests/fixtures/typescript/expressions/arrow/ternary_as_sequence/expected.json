@@ -1,0 +1,315 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 89,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 88,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 79,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 20,
+					"end": 57,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 38
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 26,
+							"end": 56,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 2,
+									"column": 37
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 26,
+								"end": 27,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 30,
+								"end": 56,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 11
+									},
+									"end": {
+										"line": 2,
+										"column": 37
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "ConditionalExpression",
+									"start": 37,
+									"end": 55,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 18
+										},
+										"end": {
+											"line": 2,
+											"column": 36
+										}
+									},
+									"test": {
+										"type": "Literal",
+										"start": 37,
+										"end": 38,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 18
+											},
+											"end": {
+												"line": 2,
+												"column": 19
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									},
+									"consequent": {
+										"type": "TSAsExpression",
+										"start": 42,
+										"end": 50,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 23
+											},
+											"end": {
+												"line": 2,
+												"column": 31
+											}
+										},
+										"expression": {
+											"type": "Identifier",
+											"start": 42,
+											"end": 43,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 23
+												},
+												"end": {
+													"line": 2,
+													"column": 24
+												}
+											},
+											"name": "v"
+										},
+										"typeAnnotation": {
+											"type": "TSAnyKeyword",
+											"start": 47,
+											"end": 50,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 28
+												},
+												"end": {
+													"line": 2,
+													"column": 31
+												}
+											}
+										}
+									},
+									"alternate": {
+										"type": "Literal",
+										"start": 54,
+										"end": 55,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 35
+											},
+											"end": {
+												"line": 2,
+												"column": 36
+											}
+										},
+										"value": 0,
+										"raw": "0"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 59,
+					"end": 78,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 20
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 65,
+							"end": 77,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 19
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 65,
+								"end": 66,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 69,
+								"end": 77,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 19
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 75,
+									"end": 77,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 17
+										},
+										"end": {
+											"line": 3,
+											"column": 19
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -1,0 +1,80 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 184,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 175,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 51,
+							"end": 75,
+							"property": "grid-template-areas",
+							"value": "'a'"
+						},
+						{
+							"type": "Declaration",
+							"start": 124,
+							"end": 171,
+							"property": "grid-template-areas",
+							"value": "'a a'\n\t\t\t'b c'\n\t\t\t'd d'"
+						}
+					]
+				},
+				"start": 9,
+				"end": 175
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 176,
+			"styles": "\n\tdiv {\n\t\t/* single row - stays inline */\n\t\tgrid-template-areas: 'a';\n\t\t/* multiple rows - each on its own line */\n\t\tgrid-template-areas:\n\t\t\t'a a'\n\t\t\t'b c'\n\t\t\t'd d';\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 185,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

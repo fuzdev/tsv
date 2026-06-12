@@ -1,0 +1,671 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 357,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Empty consequent, empty alternate",
+			"start": 10,
+			"end": 46,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Empty consequent, block alternate",
+			"start": 65,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Empty consequent, expression alternate",
+			"start": 132,
+			"end": 173,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Chained: all empty",
+			"start": 197,
+			"end": 218,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Chained: empty consequent, blocks after",
+			"start": 251,
+			"end": 293,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 43
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 356,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 347,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 28,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 48,
+					"end": 62,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 6
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 52,
+						"end": 53,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 5
+							},
+							"end": {
+								"line": 3,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "EmptyStatement",
+						"start": 54,
+						"end": 55,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 7
+							},
+							"end": {
+								"line": 3,
+								"column": 8
+							}
+						}
+					},
+					"alternate": {
+						"type": "EmptyStatement",
+						"start": 61,
+						"end": 62,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 5
+							},
+							"end": {
+								"line": 4,
+								"column": 6
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Empty consequent, empty alternate",
+							"start": 10,
+							"end": 46
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 103,
+					"end": 129,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 107,
+						"end": 108,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 5
+							},
+							"end": {
+								"line": 7,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "EmptyStatement",
+						"start": 109,
+						"end": 110,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 7
+							},
+							"end": {
+								"line": 7,
+								"column": 8
+							}
+						}
+					},
+					"alternate": {
+						"type": "BlockStatement",
+						"start": 117,
+						"end": 129,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 6
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 121,
+								"end": 126,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 121,
+									"end": 125,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 6
+										}
+									},
+									"name": "expr"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Empty consequent, block alternate",
+							"start": 65,
+							"end": 101
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 175,
+					"end": 194,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 11
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 179,
+						"end": 180,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 5
+							},
+							"end": {
+								"line": 13,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "EmptyStatement",
+						"start": 181,
+						"end": 182,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 7
+							},
+							"end": {
+								"line": 13,
+								"column": 8
+							}
+						}
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 189,
+						"end": 194,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 6
+							},
+							"end": {
+								"line": 14,
+								"column": 11
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 189,
+							"end": 193,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 6
+								},
+								"end": {
+									"line": 14,
+									"column": 10
+								}
+							},
+							"name": "expr"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Empty consequent, expression alternate",
+							"start": 132,
+							"end": 173
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 220,
+					"end": 248,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 6
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 224,
+						"end": 225,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 5
+							},
+							"end": {
+								"line": 17,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "EmptyStatement",
+						"start": 226,
+						"end": 227,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 7
+							},
+							"end": {
+								"line": 17,
+								"column": 8
+							}
+						}
+					},
+					"alternate": {
+						"type": "IfStatement",
+						"start": 234,
+						"end": 248,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 6
+							},
+							"end": {
+								"line": 19,
+								"column": 6
+							}
+						},
+						"test": {
+							"type": "Identifier",
+							"start": 238,
+							"end": 239,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 10
+								},
+								"end": {
+									"line": 18,
+									"column": 11
+								}
+							},
+							"name": "b"
+						},
+						"consequent": {
+							"type": "EmptyStatement",
+							"start": 240,
+							"end": 241,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 12
+								},
+								"end": {
+									"line": 18,
+									"column": 13
+								}
+							}
+						},
+						"alternate": {
+							"type": "EmptyStatement",
+							"start": 247,
+							"end": 248,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 5
+								},
+								"end": {
+									"line": 19,
+									"column": 6
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Chained: all empty",
+							"start": 197,
+							"end": 218
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 295,
+					"end": 346,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 299,
+						"end": 300,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 5
+							},
+							"end": {
+								"line": 22,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "EmptyStatement",
+						"start": 301,
+						"end": 302,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 7
+							},
+							"end": {
+								"line": 22,
+								"column": 8
+							}
+						}
+					},
+					"alternate": {
+						"type": "IfStatement",
+						"start": 309,
+						"end": 346,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 6
+							},
+							"end": {
+								"line": 27,
+								"column": 2
+							}
+						},
+						"test": {
+							"type": "Identifier",
+							"start": 313,
+							"end": 314,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 10
+								},
+								"end": {
+									"line": 23,
+									"column": 11
+								}
+							},
+							"name": "b"
+						},
+						"consequent": {
+							"type": "BlockStatement",
+							"start": 316,
+							"end": 328,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 13
+								},
+								"end": {
+									"line": 25,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "ExpressionStatement",
+									"start": 320,
+									"end": 325,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 2
+										},
+										"end": {
+											"line": 24,
+											"column": 7
+										}
+									},
+									"expression": {
+										"type": "Identifier",
+										"start": 320,
+										"end": 324,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 2
+											},
+											"end": {
+												"line": 24,
+												"column": 6
+											}
+										},
+										"name": "expr"
+									}
+								}
+							]
+						},
+						"alternate": {
+							"type": "BlockStatement",
+							"start": 334,
+							"end": 346,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 8
+								},
+								"end": {
+									"line": 27,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "ExpressionStatement",
+									"start": 338,
+									"end": 343,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 2
+										},
+										"end": {
+											"line": 26,
+											"column": 7
+										}
+									},
+									"expression": {
+										"type": "Identifier",
+										"start": 338,
+										"end": 342,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 2
+											},
+											"end": {
+												"line": 26,
+												"column": 6
+											}
+										},
+										"name": "expr"
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Chained: empty consequent, blocks after",
+							"start": 251,
+							"end": 293
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

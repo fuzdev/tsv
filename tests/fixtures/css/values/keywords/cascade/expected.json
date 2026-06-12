@@ -1,0 +1,162 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 179,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 114,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 31,
+							"property": "color",
+							"value": "inherit"
+						},
+						{
+							"type": "Declaration",
+							"start": 35,
+							"end": 53,
+							"property": "font-size",
+							"value": "initial"
+						},
+						{
+							"type": "Declaration",
+							"start": 57,
+							"end": 71,
+							"property": "display",
+							"value": "unset"
+						},
+						{
+							"type": "Declaration",
+							"start": 75,
+							"end": 86,
+							"property": "all",
+							"value": "revert"
+						},
+						{
+							"type": "Declaration",
+							"start": 90,
+							"end": 110,
+							"property": "margin",
+							"value": "revert-layer"
+						}
+					]
+				},
+				"start": 9,
+				"end": 114
+			},
+			{
+				"type": "Atrule",
+				"start": 117,
+				"end": 170,
+				"name": "layer",
+				"prelude": "base",
+				"block": {
+					"type": "Block",
+					"start": 129,
+					"end": 170,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 133,
+								"end": 137,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 133,
+										"end": 137,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "span",
+														"start": 133,
+														"end": 137
+													}
+												],
+												"start": 133,
+												"end": 137
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 138,
+								"end": 167,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 143,
+										"end": 162,
+										"property": "color",
+										"value": "revert-layer"
+									}
+								]
+							},
+							"start": 133,
+							"end": 167
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 171,
+			"styles": "\n\tdiv {\n\t\tcolor: inherit;\n\t\tfont-size: initial;\n\t\tdisplay: unset;\n\t\tall: revert;\n\t\tmargin: revert-layer;\n\t}\n\n\t@layer base {\n\t\tspan {\n\t\t\tcolor: revert-layer;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 180,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

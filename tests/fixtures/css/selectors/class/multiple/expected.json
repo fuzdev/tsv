@@ -1,0 +1,85 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 65,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 30,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 30,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 9,
+											"end": 16
+										},
+										{
+											"type": "ClassSelector",
+											"name": "class2",
+											"start": 16,
+											"end": 23
+										},
+										{
+											"type": "ClassSelector",
+											"name": "class3",
+											"start": 23,
+											"end": 30
+										}
+									],
+									"start": 9,
+									"end": 30
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 31,
+					"end": 56,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 35,
+							"end": 52,
+							"property": "background",
+							"value": "white"
+						}
+					]
+				},
+				"start": 9,
+				"end": 56
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 57,
+			"styles": "\n\t.class1.class2.class3 {\n\t\tbackground: white;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 66,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

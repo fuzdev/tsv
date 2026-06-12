@@ -1,0 +1,107 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 47,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "AwaitBlock",
+				"start": 0,
+				"end": 46,
+				"expression": {
+					"type": "Identifier",
+					"start": 16,
+					"end": 23,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 16
+						},
+						"end": {
+							"line": 1,
+							"column": 23
+						}
+					},
+					"name": "promise",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 8,
+							"end": 15
+						}
+					]
+				},
+				"value": {
+					"type": "Identifier",
+					"name": "val",
+					"start": 29,
+					"end": 32,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 29,
+							"character": 29
+						},
+						"end": {
+							"line": 1,
+							"column": 32,
+							"character": 32
+						}
+					}
+				},
+				"error": null,
+				"pending": null,
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 33,
+							"end": 38,
+							"expression": {
+								"type": "Identifier",
+								"start": 34,
+								"end": 37,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 34
+									},
+									"end": {
+										"line": 1,
+										"column": 37
+									}
+								},
+								"name": "val"
+							}
+						}
+					]
+				},
+				"catch": null
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 8,
+			"end": 15,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 8
+				},
+				"end": {
+					"line": 1,
+					"column": 15
+				}
+			}
+		}
+	]
+}

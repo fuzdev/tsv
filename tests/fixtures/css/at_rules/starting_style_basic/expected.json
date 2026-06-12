@@ -1,0 +1,134 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 98,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 60,
+				"name": "starting-style",
+				"prelude": "",
+				"block": {
+					"type": "Block",
+					"start": 25,
+					"end": 60,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 29,
+								"end": 36,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 29,
+										"end": 36,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "class1",
+														"start": 29,
+														"end": 36
+													}
+												],
+												"start": 29,
+												"end": 36
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 37,
+								"end": 57,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 42,
+										"end": 52,
+										"property": "opacity",
+										"value": "0"
+									}
+								]
+							},
+							"start": 29,
+							"end": 57
+						}
+					]
+				}
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 63,
+					"end": 70,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 63,
+							"end": 70,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 63,
+											"end": 70
+										}
+									],
+									"start": 63,
+									"end": 70
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 71,
+					"end": 89,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 75,
+							"end": 85,
+							"property": "opacity",
+							"value": "1"
+						}
+					]
+				},
+				"start": 63,
+				"end": 89
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 90,
+			"styles": "\n\t@starting-style {\n\t\t.class1 {\n\t\t\topacity: 0;\n\t\t}\n\t}\n\n\t.class1 {\n\t\topacity: 1;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 99,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

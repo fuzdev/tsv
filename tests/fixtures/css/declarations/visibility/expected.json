@@ -1,0 +1,122 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 180,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 171,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 36,
+							"property": "visibility",
+							"value": "visible"
+						},
+						{
+							"type": "Declaration",
+							"start": 40,
+							"end": 58,
+							"property": "visibility",
+							"value": "hidden"
+						},
+						{
+							"type": "Declaration",
+							"start": 62,
+							"end": 82,
+							"property": "visibility",
+							"value": "collapse"
+						},
+						{
+							"type": "Declaration",
+							"start": 86,
+							"end": 96,
+							"property": "opacity",
+							"value": "1"
+						},
+						{
+							"type": "Declaration",
+							"start": 100,
+							"end": 112,
+							"property": "opacity",
+							"value": "0.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 116,
+							"end": 126,
+							"property": "opacity",
+							"value": "0"
+						},
+						{
+							"type": "Declaration",
+							"start": 130,
+							"end": 145,
+							"property": "isolation",
+							"value": "auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 149,
+							"end": 167,
+							"property": "isolation",
+							"value": "isolate"
+						}
+					]
+				},
+				"start": 9,
+				"end": 171
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 172,
+			"styles": "\n\tdiv {\n\t\tvisibility: visible;\n\t\tvisibility: hidden;\n\t\tvisibility: collapse;\n\t\topacity: 1;\n\t\topacity: 0.5;\n\t\topacity: 0;\n\t\tisolation: auto;\n\t\tisolation: isolate;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 181,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

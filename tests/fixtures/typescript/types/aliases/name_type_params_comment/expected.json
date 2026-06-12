@@ -1,0 +1,210 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 111,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Block comment between type alias name and type params",
+			"start": 20,
+			"end": 76,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 84,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 7
+				},
+				"end": {
+					"line": 3,
+					"column": 14
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 110,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 78,
+					"end": 100,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 23
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 83,
+						"end": 84,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "A",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 84,
+								"end": 91
+							}
+						]
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 92,
+						"end": 95,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 15
+							},
+							"end": {
+								"line": 3,
+								"column": 18
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 93,
+								"end": 94,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 16
+									},
+									"end": {
+										"line": 3,
+										"column": 17
+									}
+								},
+								"name": "T"
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 98,
+						"end": 99,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 21
+							},
+							"end": {
+								"line": 3,
+								"column": 22
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 98,
+							"end": 99,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 21
+								},
+								"end": {
+									"line": 3,
+									"column": 22
+								}
+							},
+							"name": "T"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block comment between type alias name and type params",
+							"start": 20,
+							"end": 76
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

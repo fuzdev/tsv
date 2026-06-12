@@ -1,0 +1,233 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 34,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Component",
+				"start": 0,
+				"end": 12,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 5,
+						"character": 5
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 6,
+						"end": 9,
+						"name": "a",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 7,
+								"character": 7
+							},
+							"end": {
+								"line": 1,
+								"column": 8,
+								"character": 8
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 7,
+							"end": 8,
+							"expression": {
+								"type": "Identifier",
+								"name": "a",
+								"start": 7,
+								"end": 8,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 7,
+										"character": 7
+									},
+									"end": {
+										"line": 1,
+										"column": 8,
+										"character": 8
+									}
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 12,
+				"end": 13,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 13,
+				"end": 33,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 14
+					},
+					"end": {
+						"line": 2,
+						"column": 5,
+						"character": 18
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 19,
+						"end": 22,
+						"name": "a",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 7,
+								"character": 20
+							},
+							"end": {
+								"line": 2,
+								"column": 8,
+								"character": 21
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 20,
+							"end": 21,
+							"expression": {
+								"type": "Identifier",
+								"name": "a",
+								"start": 20,
+								"end": 21,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7,
+										"character": 20
+									},
+									"end": {
+										"line": 2,
+										"column": 8,
+										"character": 21
+									}
+								}
+							}
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 23,
+						"end": 26,
+						"name": "b",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 11,
+								"character": 24
+							},
+							"end": {
+								"line": 2,
+								"column": 12,
+								"character": 25
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 24,
+							"end": 25,
+							"expression": {
+								"type": "Identifier",
+								"name": "b",
+								"start": 24,
+								"end": 25,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 11,
+										"character": 24
+									},
+									"end": {
+										"line": 2,
+										"column": 12,
+										"character": 25
+									}
+								}
+							}
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 27,
+						"end": 30,
+						"name": "c",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 15,
+								"character": 28
+							},
+							"end": {
+								"line": 2,
+								"column": 16,
+								"character": 29
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 28,
+							"end": 29,
+							"expression": {
+								"type": "Identifier",
+								"name": "c",
+								"start": 28,
+								"end": 29,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 15,
+										"character": 28
+									},
+									"end": {
+										"line": 2,
+										"column": 16,
+										"character": 29
+									}
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

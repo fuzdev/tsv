@@ -1,0 +1,61 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 98,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 89,
+				"name": "counter-style",
+				"prelude": "thumbs",
+				"block": {
+					"type": "Block",
+					"start": 31,
+					"end": 89,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 35,
+							"end": 49,
+							"property": "system",
+							"value": "cyclic"
+						},
+						{
+							"type": "Declaration",
+							"start": 53,
+							"end": 70,
+							"property": "symbols",
+							"value": "'\\1F44D'"
+						},
+						{
+							"type": "Declaration",
+							"start": 74,
+							"end": 85,
+							"property": "suffix",
+							"value": "' '"
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 90,
+			"styles": "\n\t@counter-style thumbs {\n\t\tsystem: cyclic;\n\t\tsymbols: '\\1F44D';\n\t\tsuffix: ' ';\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 99,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

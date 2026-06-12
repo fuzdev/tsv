@@ -1,0 +1,148 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 170,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 84,
+				"name": "supports",
+				"prelude": "not  (display: grid)",
+				"block": {
+					"type": "Block",
+					"start": 53,
+					"end": 84,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 57,
+								"end": 60,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 57,
+										"end": 60,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 57,
+														"end": 60
+													}
+												],
+												"start": 57,
+												"end": 60
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 61,
+								"end": 81,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 66,
+										"end": 76,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 57,
+							"end": 81
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 87,
+				"end": 161,
+				"name": "supports",
+				"prelude": "not  selector(:has(div))",
+				"block": {
+					"type": "Block",
+					"start": 129,
+					"end": 161,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 133,
+								"end": 136,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 133,
+										"end": 136,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 133,
+														"end": 136
+													}
+												],
+												"start": 133,
+												"end": 136
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 137,
+								"end": 158,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 142,
+										"end": 153,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 133,
+							"end": 158
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 162,
+			"styles": "\n\t@supports not /* comment */ (display: grid) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t@supports not /* a */ selector(:has(div)) {\n\t\tdiv {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 171,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,575 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 952,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Long items - blank lines preserved when wrapped",
+			"start": 10,
+			"end": 60,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Multiple blank lines collapse to one",
+			"start": 331,
+			"end": 370,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Blank line only between some items",
+			"start": 557,
+			"end": 594,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Short items - blank lines removed (fits on one line)",
+			"start": 864,
+			"end": 919,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 56
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 951,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 942,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 28,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 62,
+					"end": 328,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 68,
+							"end": 327,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 68,
+								"end": 69,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 72,
+								"end": 327,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 9,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 76,
+										"end": 155,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 81
+											}
+										},
+										"name": "Item000000000000000000000000000000000000000000000000000000000000000000000000000"
+									},
+									{
+										"type": "Identifier",
+										"start": 160,
+										"end": 239,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 81
+											}
+										},
+										"name": "Item111111111111111111111111111111111111111111111111111111111111111111111111111"
+									},
+									{
+										"type": "Identifier",
+										"start": 244,
+										"end": 323,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 2
+											},
+											"end": {
+												"line": 8,
+												"column": 81
+											}
+										},
+										"name": "Item222222222222222222222222222222222222222222222222222222222222222222222222222"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Long items - blank lines preserved when wrapped",
+							"start": 10,
+							"end": 60
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 372,
+					"end": 554,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 378,
+							"end": 553,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 16,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 378,
+								"end": 379,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 382,
+								"end": 553,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 11
+									},
+									"end": {
+										"line": 16,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 386,
+										"end": 465,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 2
+											},
+											"end": {
+												"line": 13,
+												"column": 81
+											}
+										},
+										"name": "Item000000000000000000000000000000000000000000000000000000000000000000000000000"
+									},
+									{
+										"type": "Identifier",
+										"start": 470,
+										"end": 549,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 2
+											},
+											"end": {
+												"line": 15,
+												"column": 81
+											}
+										},
+										"name": "Item111111111111111111111111111111111111111111111111111111111111111111111111111"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multiple blank lines collapse to one",
+							"start": 331,
+							"end": 370
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 596,
+					"end": 861,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 602,
+							"end": 860,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 7
+								},
+								"end": {
+									"line": 24,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 602,
+								"end": 603,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 7
+									},
+									"end": {
+										"line": 19,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 606,
+								"end": 860,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 11
+									},
+									"end": {
+										"line": 24,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 610,
+										"end": 689,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 2
+											},
+											"end": {
+												"line": 20,
+												"column": 81
+											}
+										},
+										"name": "Item000000000000000000000000000000000000000000000000000000000000000000000000000"
+									},
+									{
+										"type": "Identifier",
+										"start": 694,
+										"end": 773,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 2
+											},
+											"end": {
+												"line": 22,
+												"column": 81
+											}
+										},
+										"name": "Item111111111111111111111111111111111111111111111111111111111111111111111111111"
+									},
+									{
+										"type": "Identifier",
+										"start": 777,
+										"end": 856,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 2
+											},
+											"end": {
+												"line": 23,
+												"column": 81
+											}
+										},
+										"name": "Item222222222222222222222222222222222222222222222222222222222222222222222222222"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Blank line only between some items",
+							"start": 557,
+							"end": 594
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 921,
+					"end": 941,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 21
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 927,
+							"end": 940,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 7
+								},
+								"end": {
+									"line": 27,
+									"column": 20
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 927,
+								"end": 928,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 7
+									},
+									"end": {
+										"line": 27,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 931,
+								"end": 940,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 11
+									},
+									"end": {
+										"line": 27,
+										"column": 20
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 932,
+										"end": 933,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 12
+											},
+											"end": {
+												"line": 27,
+												"column": 13
+											}
+										},
+										"name": "A"
+									},
+									{
+										"type": "Identifier",
+										"start": 935,
+										"end": 936,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 15
+											},
+											"end": {
+												"line": 27,
+												"column": 16
+											}
+										},
+										"name": "B"
+									},
+									{
+										"type": "Identifier",
+										"start": 938,
+										"end": 939,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 18
+											},
+											"end": {
+												"line": 27,
+												"column": 19
+											}
+										},
+										"name": "C"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Short items - blank lines removed (fits on one line)",
+							"start": 864,
+							"end": 919
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

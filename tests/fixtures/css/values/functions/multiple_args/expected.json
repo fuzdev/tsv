@@ -1,0 +1,101 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 328,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 319,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 62,
+							"property": "background",
+							"value": "linear-gradient(90deg, red, blue)"
+						},
+						{
+							"type": "Declaration",
+							"start": 66,
+							"end": 139,
+							"property": "background",
+							"value": "linear-gradient(45deg, #ff0000 0%, #00ff00 50%, #0000ff 100%)"
+						},
+						{
+							"type": "Declaration",
+							"start": 143,
+							"end": 182,
+							"property": "filter",
+							"value": "drop-shadow(5px 5px 10px black)"
+						},
+						{
+							"type": "Declaration",
+							"start": 186,
+							"end": 235,
+							"property": "background",
+							"value": "radial-gradient(circle, white, black)"
+						},
+						{
+							"type": "Declaration",
+							"start": 239,
+							"end": 315,
+							"property": "box-shadow",
+							"value": "0 2px 4px rgba(0, 0, 0, 0.1),\n\t\t\t0 4px 8px rgba(0, 0, 0, 0.2)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 319
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 320,
+			"styles": "\n\tdiv {\n\t\tbackground: linear-gradient(90deg, red, blue);\n\t\tbackground: linear-gradient(45deg, #ff0000 0%, #00ff00 50%, #0000ff 100%);\n\t\tfilter: drop-shadow(5px 5px 10px black);\n\t\tbackground: radial-gradient(circle, white, black);\n\t\tbox-shadow:\n\t\t\t0 2px 4px rgba(0, 0, 0, 0.1),\n\t\t\t0 4px 8px rgba(0, 0, 0, 0.2);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 329,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

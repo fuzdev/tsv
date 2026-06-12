@@ -1,0 +1,129 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 68,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 26,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 7,
+						"character": 7
+					}
+				},
+				"attributes": [
+					{
+						"start": 8,
+						"end": 16,
+						"type": "OnDirective",
+						"name": "click",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 8,
+								"character": 8
+							},
+							"end": {
+								"line": 1,
+								"column": 16,
+								"character": 16
+							}
+						},
+						"expression": null,
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 26,
+				"end": 27,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 27,
+				"end": 67,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 28
+					},
+					"end": {
+						"line": 2,
+						"column": 7,
+						"character": 34
+					}
+				},
+				"attributes": [
+					{
+						"start": 35,
+						"end": 43,
+						"type": "OnDirective",
+						"name": "click",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 8,
+								"character": 35
+							},
+							"end": {
+								"line": 2,
+								"column": 16,
+								"character": 43
+							}
+						},
+						"expression": null,
+						"modifiers": []
+					},
+					{
+						"start": 44,
+						"end": 57,
+						"type": "OnDirective",
+						"name": "mouseenter",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 17,
+								"character": 44
+							},
+							"end": {
+								"line": 2,
+								"column": 30,
+								"character": 57
+							}
+						},
+						"expression": null,
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

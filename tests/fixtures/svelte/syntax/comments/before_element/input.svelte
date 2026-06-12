@@ -1,0 +1,2 @@
+<!-- comment -->
+<div>text</div>

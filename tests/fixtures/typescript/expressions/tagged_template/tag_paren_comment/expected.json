@@ -1,0 +1,798 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 350,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Tagged template with comment in removed parens",
+			"start": 20,
+			"end": 69,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 81,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 11
+				},
+				"end": {
+					"line": 3,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Call expression as tag with comment",
+			"start": 112,
+			"end": 150,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 162,
+			"end": 175,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 11
+				},
+				"end": {
+					"line": 6,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Tagged template in chain",
+			"start": 194,
+			"end": 221,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 233,
+			"end": 246,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 11
+				},
+				"end": {
+					"line": 9,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Nested call in tag",
+			"start": 271,
+			"end": 292,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " @__PURE__ ",
+			"start": 304,
+			"end": 319,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 11
+				},
+				"end": {
+					"line": 12,
+					"column": 26
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 349,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 340,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 71,
+					"end": 109,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 39
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 77,
+							"end": 108,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 38
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 77,
+								"end": 78,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 95,
+								"end": 108,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 25
+									},
+									"end": {
+										"line": 3,
+										"column": 38
+									}
+								},
+								"tag": {
+									"type": "Identifier",
+									"start": 95,
+									"end": 98,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 25
+										},
+										"end": {
+											"line": 3,
+											"column": 28
+										}
+									},
+									"name": "tag"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 98,
+									"end": 108,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 28
+										},
+										"end": {
+											"line": 3,
+											"column": 38
+										}
+									},
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 99,
+											"end": 107,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 29
+												},
+												"end": {
+													"line": 3,
+													"column": 37
+												}
+											},
+											"value": {
+												"raw": "template",
+												"cooked": "template"
+											},
+											"tail": true
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " comment ",
+										"start": 81,
+										"end": 94
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Tagged template with comment in removed parens",
+							"start": 20,
+							"end": 69
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 152,
+					"end": 191,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 40
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 158,
+							"end": 190,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 39
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 158,
+								"end": 159,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 176,
+								"end": 190,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 25
+									},
+									"end": {
+										"line": 6,
+										"column": 39
+									}
+								},
+								"tag": {
+									"type": "CallExpression",
+									"start": 176,
+									"end": 180,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 25
+										},
+										"end": {
+											"line": 6,
+											"column": 29
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 176,
+										"end": 178,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 25
+											},
+											"end": {
+												"line": 6,
+												"column": 27
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 180,
+									"end": 190,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 29
+										},
+										"end": {
+											"line": 6,
+											"column": 39
+										}
+									},
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 181,
+											"end": 189,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 30
+												},
+												"end": {
+													"line": 6,
+													"column": 38
+												}
+											},
+											"value": {
+												"raw": "template",
+												"cooked": "template"
+											},
+											"tail": true
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " comment ",
+										"start": 162,
+										"end": 175
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Call expression as tag with comment",
+							"start": 112,
+							"end": 150
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 223,
+					"end": 268,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 46
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 229,
+							"end": 267,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 45
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 229,
+								"end": 230,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 247,
+								"end": 267,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 25
+									},
+									"end": {
+										"line": 9,
+										"column": 45
+									}
+								},
+								"object": {
+									"type": "TaggedTemplateExpression",
+									"start": 247,
+									"end": 260,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 25
+										},
+										"end": {
+											"line": 9,
+											"column": 38
+										}
+									},
+									"tag": {
+										"type": "Identifier",
+										"start": 247,
+										"end": 250,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 25
+											},
+											"end": {
+												"line": 9,
+												"column": 28
+											}
+										},
+										"name": "tag"
+									},
+									"quasi": {
+										"type": "TemplateLiteral",
+										"start": 250,
+										"end": 260,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 28
+											},
+											"end": {
+												"line": 9,
+												"column": 38
+											}
+										},
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 251,
+												"end": 259,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 29
+													},
+													"end": {
+														"line": 9,
+														"column": 37
+													}
+												},
+												"value": {
+													"raw": "template",
+													"cooked": "template"
+												},
+												"tail": true
+											}
+										]
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 261,
+									"end": 267,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 39
+										},
+										"end": {
+											"line": 9,
+											"column": 45
+										}
+									},
+									"name": "length"
+								},
+								"computed": false,
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " comment ",
+										"start": 233,
+										"end": 246
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Tagged template in chain",
+							"start": 194,
+							"end": 221
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 294,
+					"end": 339,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 46
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 300,
+							"end": 338,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 45
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 300,
+								"end": 301,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 320,
+								"end": 338,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 27
+									},
+									"end": {
+										"line": 12,
+										"column": 45
+									}
+								},
+								"tag": {
+									"type": "CallExpression",
+									"start": 320,
+									"end": 328,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 27
+										},
+										"end": {
+											"line": 12,
+											"column": 35
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 320,
+										"end": 326,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 27
+											},
+											"end": {
+												"line": 12,
+												"column": 33
+											}
+										},
+										"name": "getTag"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 328,
+									"end": 338,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 35
+										},
+										"end": {
+											"line": 12,
+											"column": 45
+										}
+									},
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 329,
+											"end": 337,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 36
+												},
+												"end": {
+													"line": 12,
+													"column": 44
+												}
+											},
+											"value": {
+												"raw": "template",
+												"cooked": "template"
+											},
+											"tail": true
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " @__PURE__ ",
+										"start": 304,
+										"end": 319
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Nested call in tag",
+							"start": 271,
+							"end": 292
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

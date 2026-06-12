@@ -1,0 +1,73 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 35,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "SvelteBody",
+				"start": 0,
+				"end": 34,
+				"name": "svelte:body",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"attributes": [
+					{
+						"start": 13,
+						"end": 31,
+						"type": "OnDirective",
+						"name": "mouseenter",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 13,
+								"character": 13
+							},
+							"end": {
+								"line": 1,
+								"column": 26,
+								"character": 26
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 28,
+							"end": 30,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 28
+								},
+								"end": {
+									"line": 1,
+									"column": 30
+								}
+							},
+							"name": "fn"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,73 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 307,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 11,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 11,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "a",
+											"start": 9,
+											"end": 11
+										}
+									],
+									"start": 9,
+									"end": 11
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 12,
+					"end": 298,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 91,
+							"end": 294,
+							"property": "prop",
+							"value": "var(\n\t\t\t--a,\n\t\t\t\n\t\t\tvar(--aaaaaaaaaaaaaaaa)\n\t\t\t\tcolor-mix(in hsl, var(--aaaaaaaaaaaa) var(--aaaaaaaaaaaaaa), transparent)\n\t\t)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 298
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 299,
+			"styles": "\n\t.a {\n\t\t/* Long comment that forces separate line aaaaaaaaaaaaaaaaaaaaaaaaaaa */\n\t\tprop: var(\n\t\t\t--a,\n\t\t\t/* Long comment that forces separate line aaaaaaaaaaaaaaaaaaaaaaaaaaa */\n\t\t\tvar(--aaaaaaaaaaaaaaaa)\n\t\t\t\tcolor-mix(in hsl, var(--aaaaaaaaaaaa) var(--aaaaaaaaaaaaaa), transparent)\n\t\t);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 308,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 165,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 156,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 70,
+							"property": "background",
+							"value": "linear-gradient(90deg, red 01%, blue 02%)"
+						},
+						{
+							"type": "Declaration",
+							"start": 74,
+							"end": 106,
+							"property": "transform",
+							"value": "translate(01px, 02px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 110,
+							"end": 152,
+							"property": "box-shadow",
+							"value": "0 01px 02px rgba(0, 0, 0, 0.1)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 156
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 157,
+			"styles": "\n\tdiv {\n\t\tbackground: linear-gradient(90deg, red 01%, blue 02%);\n\t\ttransform: translate(01px, 02px);\n\t\tbox-shadow: 0 01px 02px rgba(0, 0, 0, 0.1);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 166,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

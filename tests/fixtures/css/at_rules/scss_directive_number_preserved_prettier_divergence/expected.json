@@ -1,0 +1,63 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 331,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 237,
+				"end": 271,
+				"name": "include",
+				"prelude": "foo(transform, .5s ease)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 273,
+				"end": 292,
+				"name": "include",
+				"prelude": "baz(1.50)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 294,
+				"end": 322,
+				"name": "mixin",
+				"prelude": "bar(.5s)",
+				"block": {
+					"type": "Block",
+					"start": 310,
+					"end": 322,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 314,
+							"end": 318,
+							"property": "a",
+							"value": "b"
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 323,
+			"styles": "\n\t/* @include/@mixin are SCSS directives, not standard CSS: per CSS Syntax 3 an unknown at-rule's prelude is an opaque token stream, so tsv keeps it verbatim — prettier recognizes SCSS and normalizes the numbers (see README). */\n\t@include foo(transform, .5s ease);\n\t@include baz(1.50);\n\t@mixin bar(.5s) {\n\t\ta: b;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 332,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

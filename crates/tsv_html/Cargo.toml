@@ -1,0 +1,15 @@
+[package]
+name = "tsv_html"
+version.workspace = true
+edition.workspace = true
+description = "HTML-specific classification and whitespace rules for tsv"
+
+[dependencies]
+phf.workspace = true
+# May add tsv_lang later if needed
+
+[build-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

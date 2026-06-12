@@ -1,0 +1,671 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 288,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Comment before arrow paren - should NOT be duplicated inside",
+			"start": 10,
+			"end": 73,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 83,
+			"end": 90,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 9
+				},
+				"end": {
+					"line": 3,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Async variant",
+			"start": 103,
+			"end": 119,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 129,
+			"end": 136,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 9
+				},
+				"end": {
+					"line": 6,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Multiple params with comment before paren",
+			"start": 155,
+			"end": 199,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 209,
+			"end": 216,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 9
+				},
+				"end": {
+					"line": 9,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Empty params",
+			"start": 236,
+			"end": 251,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 261,
+			"end": 268,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 9
+				},
+				"end": {
+					"line": 12,
+					"column": 16
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 287,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 278,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 75,
+					"end": 100,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 26
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 79,
+							"end": 99,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 5
+								},
+								"end": {
+									"line": 3,
+									"column": 25
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 79,
+								"end": 80,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 5
+									},
+									"end": {
+										"line": 3,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 91,
+								"end": 99,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 17
+									},
+									"end": {
+										"line": 3,
+										"column": 25
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 92,
+										"end": 93,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 18
+											},
+											"end": {
+												"line": 3,
+												"column": 19
+											}
+										},
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 98,
+									"end": 99,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 24
+										},
+										"end": {
+											"line": 3,
+											"column": 25
+										}
+									},
+									"name": "x"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 83,
+										"end": 90
+									}
+								]
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Comment before arrow paren - should NOT be duplicated inside",
+							"start": 10,
+							"end": 73
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 121,
+					"end": 152,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 125,
+							"end": 151,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 5
+								},
+								"end": {
+									"line": 6,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 125,
+								"end": 126,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 5
+									},
+									"end": {
+										"line": 6,
+										"column": 6
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 137,
+								"end": 151,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 17
+									},
+									"end": {
+										"line": 6,
+										"column": 31
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": true,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 144,
+										"end": 145,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 24
+											},
+											"end": {
+												"line": 6,
+												"column": 25
+											}
+										},
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 150,
+									"end": 151,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 30
+										},
+										"end": {
+											"line": 6,
+											"column": 31
+										}
+									},
+									"name": "x"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 129,
+										"end": 136
+									}
+								]
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Async variant",
+							"start": 103,
+							"end": 119
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 201,
+					"end": 233,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 33
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 205,
+							"end": 232,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 5
+								},
+								"end": {
+									"line": 9,
+									"column": 32
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 205,
+								"end": 206,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 5
+									},
+									"end": {
+										"line": 9,
+										"column": 6
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 217,
+								"end": 232,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 17
+									},
+									"end": {
+										"line": 9,
+										"column": 32
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 218,
+										"end": 219,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 18
+											},
+											"end": {
+												"line": 9,
+												"column": 19
+											}
+										},
+										"name": "x"
+									},
+									{
+										"type": "Identifier",
+										"start": 221,
+										"end": 222,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 21
+											},
+											"end": {
+												"line": 9,
+												"column": 22
+											}
+										},
+										"name": "y"
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 227,
+									"end": 232,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 27
+										},
+										"end": {
+											"line": 9,
+											"column": 32
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 227,
+										"end": 228,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 27
+											},
+											"end": {
+												"line": 9,
+												"column": 28
+											}
+										},
+										"name": "x"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 231,
+										"end": 232,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 31
+											},
+											"end": {
+												"line": 9,
+												"column": 32
+											}
+										},
+										"name": "y"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 209,
+										"end": 216
+									}
+								]
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multiple params with comment before paren",
+							"start": 155,
+							"end": 199
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 253,
+					"end": 277,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 25
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 257,
+							"end": 276,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 5
+								},
+								"end": {
+									"line": 12,
+									"column": 24
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 257,
+								"end": 258,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 5
+									},
+									"end": {
+										"line": 12,
+										"column": 6
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 269,
+								"end": 276,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 17
+									},
+									"end": {
+										"line": 12,
+										"column": 24
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "Literal",
+									"start": 275,
+									"end": 276,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 23
+										},
+										"end": {
+											"line": 12,
+											"column": 24
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 261,
+										"end": 268
+									}
+								]
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Empty params",
+							"start": 236,
+							"end": 251
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -1,0 +1,238 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 79,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " before ",
+			"start": 18,
+			"end": 30,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 9
+				},
+				"end": {
+					"line": 2,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a ",
+			"start": 35,
+			"end": 42,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 26
+				},
+				"end": {
+					"line": 2,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b ",
+			"start": 46,
+			"end": 53,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 37
+				},
+				"end": {
+					"line": 2,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " after ",
+			"start": 57,
+			"end": 68,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 48
+				},
+				"end": {
+					"line": 2,
+					"column": 59
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 78,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 69,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 56,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 47
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 14,
+							"end": 55,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 5
+								},
+								"end": {
+									"line": 2,
+									"column": 46
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 14,
+								"end": 15,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 5
+									},
+									"end": {
+										"line": 2,
+										"column": 6
+									}
+								},
+								"name": "h"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 31,
+								"end": 55,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 22
+									},
+									"end": {
+										"line": 2,
+										"column": 46
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 32,
+										"end": 33,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 23
+											},
+											"end": {
+												"line": 2,
+												"column": 24
+											}
+										},
+										"name": "a",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " a ",
+												"start": 35,
+												"end": 42
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "Literal",
+									"start": 54,
+									"end": 55,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 45
+										},
+										"end": {
+											"line": 2,
+											"column": 46
+										}
+									},
+									"value": 0,
+									"raw": "0",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " b ",
+											"start": 46,
+											"end": 53
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " before ",
+										"start": 18,
+										"end": 30
+									}
+								]
+							}
+						}
+					],
+					"kind": "let",
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " after ",
+							"start": 57,
+							"end": 68
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

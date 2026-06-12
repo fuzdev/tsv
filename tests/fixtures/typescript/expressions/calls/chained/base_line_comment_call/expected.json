@@ -1,0 +1,206 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 67,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 36,
+			"end": 46,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 17
+				},
+				"end": {
+					"line": 2,
+					"column": 27
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 66,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 57,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 20,
+					"end": 56,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 26,
+							"end": 55,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 26,
+								"end": 27,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 30,
+								"end": 55,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 30,
+									"end": 53,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 11
+										},
+										"end": {
+											"line": 3,
+											"column": 6
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 30,
+										"end": 35,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 11
+											},
+											"end": {
+												"line": 2,
+												"column": 16
+											}
+										},
+										"name": "items",
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " comment",
+												"start": 36,
+												"end": 46
+											}
+										]
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 50,
+										"end": 53,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 3
+											},
+											"end": {
+												"line": 3,
+												"column": 6
+											}
+										},
+										"name": "foo"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

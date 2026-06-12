@@ -1,0 +1,584 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 305,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Call and new expressions format consistently (PR #18206)",
+			"start": 10,
+			"end": 69,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 60
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 304,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 295,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 10,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 71,
+					"end": 179,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 71,
+						"end": 178,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 71,
+							"end": 92,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 22
+								}
+							},
+							"name": "TelemetryTrustedValue"
+						},
+						"arguments": [
+							{
+								"type": "ChainExpression",
+								"start": 96,
+								"end": 174,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 80
+									}
+								},
+								"expression": {
+									"type": "MemberExpression",
+									"start": 96,
+									"end": 174,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 80
+										}
+									},
+									"object": {
+										"type": "CallExpression",
+										"start": 96,
+										"end": 162,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 68
+											}
+										},
+										"callee": {
+											"type": "MemberExpression",
+											"start": 96,
+											"end": 121,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 2
+												},
+												"end": {
+													"line": 4,
+													"column": 27
+												}
+											},
+											"object": {
+												"type": "MemberExpression",
+												"start": 96,
+												"end": 117,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 2
+													},
+													"end": {
+														"line": 4,
+														"column": 23
+													}
+												},
+												"object": {
+													"type": "Identifier",
+													"start": 96,
+													"end": 104,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 2
+														},
+														"end": {
+															"line": 4,
+															"column": 10
+														}
+													},
+													"name": "instance"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 105,
+													"end": 117,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 11
+														},
+														"end": {
+															"line": 4,
+															"column": 23
+														}
+													},
+													"name": "capabilities"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 118,
+												"end": 121,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 24
+													},
+													"end": {
+														"line": 4,
+														"column": 27
+													}
+												},
+												"name": "get"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "ChainExpression",
+												"start": 122,
+												"end": 161,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 28
+													},
+													"end": {
+														"line": 4,
+														"column": 67
+													}
+												},
+												"expression": {
+													"type": "MemberExpression",
+													"start": 122,
+													"end": 161,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 28
+														},
+														"end": {
+															"line": 4,
+															"column": 67
+														}
+													},
+													"object": {
+														"type": "Identifier",
+														"start": 122,
+														"end": 140,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 28
+															},
+															"end": {
+																"line": 4,
+																"column": 46
+															}
+														},
+														"name": "TerminalCapability"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 142,
+														"end": 161,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 48
+															},
+															"end": {
+																"line": 4,
+																"column": 67
+															}
+														},
+														"name": "PromptTypeDetection"
+													},
+													"computed": false,
+													"optional": true
+												}
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 164,
+										"end": 174,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 70
+											},
+											"end": {
+												"line": 4,
+												"column": 80
+											}
+										},
+										"name": "promptType"
+									},
+									"computed": false,
+									"optional": true
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Call and new expressions format consistently (PR #18206)",
+							"start": 10,
+							"end": 69
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 182,
+					"end": 294,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 182,
+						"end": 293,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 186,
+							"end": 207,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 5
+								},
+								"end": {
+									"line": 7,
+									"column": 26
+								}
+							},
+							"name": "TelemetryTrustedValue"
+						},
+						"arguments": [
+							{
+								"type": "ChainExpression",
+								"start": 211,
+								"end": 289,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 80
+									}
+								},
+								"expression": {
+									"type": "MemberExpression",
+									"start": 211,
+									"end": 289,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 80
+										}
+									},
+									"object": {
+										"type": "CallExpression",
+										"start": 211,
+										"end": 277,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 2
+											},
+											"end": {
+												"line": 8,
+												"column": 68
+											}
+										},
+										"callee": {
+											"type": "MemberExpression",
+											"start": 211,
+											"end": 236,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 2
+												},
+												"end": {
+													"line": 8,
+													"column": 27
+												}
+											},
+											"object": {
+												"type": "MemberExpression",
+												"start": 211,
+												"end": 232,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 2
+													},
+													"end": {
+														"line": 8,
+														"column": 23
+													}
+												},
+												"object": {
+													"type": "Identifier",
+													"start": 211,
+													"end": 219,
+													"loc": {
+														"start": {
+															"line": 8,
+															"column": 2
+														},
+														"end": {
+															"line": 8,
+															"column": 10
+														}
+													},
+													"name": "instance"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 220,
+													"end": 232,
+													"loc": {
+														"start": {
+															"line": 8,
+															"column": 11
+														},
+														"end": {
+															"line": 8,
+															"column": 23
+														}
+													},
+													"name": "capabilities"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 233,
+												"end": 236,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 24
+													},
+													"end": {
+														"line": 8,
+														"column": 27
+													}
+												},
+												"name": "get"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "ChainExpression",
+												"start": 237,
+												"end": 276,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 28
+													},
+													"end": {
+														"line": 8,
+														"column": 67
+													}
+												},
+												"expression": {
+													"type": "MemberExpression",
+													"start": 237,
+													"end": 276,
+													"loc": {
+														"start": {
+															"line": 8,
+															"column": 28
+														},
+														"end": {
+															"line": 8,
+															"column": 67
+														}
+													},
+													"object": {
+														"type": "Identifier",
+														"start": 237,
+														"end": 255,
+														"loc": {
+															"start": {
+																"line": 8,
+																"column": 28
+															},
+															"end": {
+																"line": 8,
+																"column": 46
+															}
+														},
+														"name": "TerminalCapability"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 257,
+														"end": 276,
+														"loc": {
+															"start": {
+																"line": 8,
+																"column": 48
+															},
+															"end": {
+																"line": 8,
+																"column": 67
+															}
+														},
+														"name": "PromptTypeDetection"
+													},
+													"computed": false,
+													"optional": true
+												}
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 279,
+										"end": 289,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 70
+											},
+											"end": {
+												"line": 8,
+												"column": 80
+											}
+										},
+										"name": "promptType"
+									},
+									"computed": false,
+									"optional": true
+								}
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

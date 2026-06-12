@@ -1,0 +1,205 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 236,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 52,
+					"end": 59,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 52,
+							"end": 59,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 52,
+											"end": 59
+										}
+									],
+									"start": 52,
+									"end": 59
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 60,
+					"end": 227,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 88,
+							"end": 98,
+							"property": "color",
+							"value": "red"
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 103,
+								"end": 112,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 103,
+										"end": 112,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "NestingSelector",
+														"name": "&",
+														"start": 103,
+														"end": 104
+													}
+												],
+												"start": 103,
+												"end": 104
+											},
+											{
+												"type": "RelativeSelector",
+												"combinator": {
+													"type": "Combinator",
+													"name": " ",
+													"start": 104,
+													"end": 105
+												},
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "class2",
+														"start": 105,
+														"end": 112
+													}
+												],
+												"start": 104,
+												"end": 112
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 113,
+								"end": 224,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 143,
+										"end": 154,
+										"property": "color",
+										"value": "blue"
+									},
+									{
+										"type": "Rule",
+										"prelude": {
+											"type": "SelectorList",
+											"start": 160,
+											"end": 169,
+											"children": [
+												{
+													"type": "ComplexSelector",
+													"start": 160,
+													"end": 169,
+													"children": [
+														{
+															"type": "RelativeSelector",
+															"combinator": null,
+															"selectors": [
+																{
+																	"type": "NestingSelector",
+																	"name": "&",
+																	"start": 160,
+																	"end": 161
+																}
+															],
+															"start": 160,
+															"end": 161
+														},
+														{
+															"type": "RelativeSelector",
+															"combinator": {
+																"type": "Combinator",
+																"name": " ",
+																"start": 161,
+																"end": 162
+															},
+															"selectors": [
+																{
+																	"type": "ClassSelector",
+																	"name": "class3",
+																	"start": 162,
+																	"end": 169
+																}
+															],
+															"start": 161,
+															"end": 169
+														}
+													]
+												}
+											]
+										},
+										"block": {
+											"type": "Block",
+											"start": 170,
+											"end": 220,
+											"children": [
+												{
+													"type": "Declaration",
+													"start": 202,
+													"end": 214,
+													"property": "color",
+													"value": "green"
+												}
+											]
+										},
+										"start": 160,
+										"end": 220
+									}
+								]
+							},
+							"start": 103,
+							"end": 224
+						}
+					]
+				},
+				"start": 52,
+				"end": 227
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 228,
+			"styles": "\n\t/* Comments at multiple nesting levels */\n\t.class1 {\n\t\t/* level 1 comment */\n\t\tcolor: red;\n\n\t\t& .class2 {\n\t\t\t/* level 2 comment */\n\t\t\tcolor: blue;\n\n\t\t\t& .class3 {\n\t\t\t\t/* level 3 comment */\n\t\t\t\tcolor: green;\n\t\t\t}\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 237,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

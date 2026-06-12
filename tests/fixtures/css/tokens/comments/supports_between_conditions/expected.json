@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 155,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 59,
+				"end": 146,
+				"name": "supports",
+				"prelude": "(display: grid)  and  (flex: 1)",
+				"block": {
+					"type": "Block",
+					"start": 115,
+					"end": 146,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 119,
+								"end": 122,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 119,
+										"end": 122,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 119,
+														"end": 122
+													}
+												],
+												"start": 119,
+												"end": 122
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 123,
+								"end": 143,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 128,
+										"end": 138,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 119,
+							"end": 143
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 147,
+			"styles": "\n\t/* Comments between @supports condition parts */\n\t@supports (display: grid) /* a */ and /* b */ (flex: 1) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 156,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

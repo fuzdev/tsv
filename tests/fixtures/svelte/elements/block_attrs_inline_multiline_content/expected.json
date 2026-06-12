@@ -1,0 +1,627 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 386,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 64,
+				"data": " Attrs fit on one line, expression child on its own line "
+			},
+			{
+				"type": "Text",
+				"start": 64,
+				"end": 65,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 65,
+				"end": 196,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 66
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 69
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 70,
+							"end": 72,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 72,
+							"end": 189,
+							"name": "button",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 73
+								},
+								"end": {
+									"line": 3,
+									"column": 8,
+									"character": 79
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 80,
+									"end": 93,
+									"name": "type",
+									"name_loc": {
+										"start": {
+											"line": 3,
+											"column": 9,
+											"character": 80
+										},
+										"end": {
+											"line": 3,
+											"column": 13,
+											"character": 84
+										}
+									},
+									"value": [
+										{
+											"start": 86,
+											"end": 92,
+											"type": "Text",
+											"raw": "button",
+											"data": "button"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 94,
+									"end": 128,
+									"name": "class",
+									"name_loc": {
+										"start": {
+											"line": 3,
+											"column": 23,
+											"character": 94
+										},
+										"end": {
+											"line": 3,
+											"column": 28,
+											"character": 99
+										}
+									},
+									"value": [
+										{
+											"start": 101,
+											"end": 127,
+											"type": "Text",
+											"raw": "plain selectable width_100",
+											"data": "plain selectable width_100"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 129,
+									"end": 159,
+									"name": "onclick",
+									"name_loc": {
+										"start": {
+											"line": 3,
+											"column": 58,
+											"character": 129
+										},
+										"end": {
+											"line": 3,
+											"column": 65,
+											"character": 136
+										}
+									},
+									"value": {
+										"type": "ExpressionTag",
+										"start": 137,
+										"end": 159,
+										"expression": {
+											"type": "ArrowFunctionExpression",
+											"start": 138,
+											"end": 158,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 67
+												},
+												"end": {
+													"line": 3,
+													"column": 87
+												}
+											},
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [],
+											"body": {
+												"type": "CallExpression",
+												"start": 144,
+												"end": 158,
+												"loc": {
+													"start": {
+														"line": 3,
+														"column": 73
+													},
+													"end": {
+														"line": 3,
+														"column": 87
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 144,
+													"end": 148,
+													"loc": {
+														"start": {
+															"line": 3,
+															"column": 73
+														},
+														"end": {
+															"line": 3,
+															"column": 77
+														}
+													},
+													"name": "init"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 149,
+														"end": 157,
+														"loc": {
+															"start": {
+																"line": 3,
+																"column": 78
+															},
+															"end": {
+																"line": 3,
+																"column": 86
+															}
+														},
+														"name": "template"
+													}
+												],
+												"optional": false
+											}
+										}
+									}
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 160,
+										"end": 163,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "ExpressionTag",
+										"start": 163,
+										"end": 178,
+										"expression": {
+											"type": "MemberExpression",
+											"start": 164,
+											"end": 177,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 3
+												},
+												"end": {
+													"line": 4,
+													"column": 16
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 164,
+												"end": 172,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 3
+													},
+													"end": {
+														"line": 4,
+														"column": 11
+													}
+												},
+												"name": "template"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 173,
+												"end": 177,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 12
+													},
+													"end": {
+														"line": 4,
+														"column": 16
+													}
+												},
+												"name": "name"
+											},
+											"computed": false,
+											"optional": false
+										}
+									},
+									{
+										"type": "Text",
+										"start": 178,
+										"end": 180,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 189,
+							"end": 190,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 196,
+				"end": 198,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 198,
+				"end": 242,
+				"data": " Block child (should work correctly) "
+			},
+			{
+				"type": "Text",
+				"start": 242,
+				"end": 243,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 243,
+				"end": 385,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 244
+					},
+					"end": {
+						"line": 9,
+						"column": 4,
+						"character": 247
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 248,
+							"end": 250,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 250,
+							"end": 378,
+							"name": "button",
+							"name_loc": {
+								"start": {
+									"line": 10,
+									"column": 2,
+									"character": 251
+								},
+								"end": {
+									"line": 10,
+									"column": 8,
+									"character": 257
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 258,
+									"end": 271,
+									"name": "type",
+									"name_loc": {
+										"start": {
+											"line": 10,
+											"column": 9,
+											"character": 258
+										},
+										"end": {
+											"line": 10,
+											"column": 13,
+											"character": 262
+										}
+									},
+									"value": [
+										{
+											"start": 264,
+											"end": 270,
+											"type": "Text",
+											"raw": "button",
+											"data": "button"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 272,
+									"end": 306,
+									"name": "class",
+									"name_loc": {
+										"start": {
+											"line": 10,
+											"column": 23,
+											"character": 272
+										},
+										"end": {
+											"line": 10,
+											"column": 28,
+											"character": 277
+										}
+									},
+									"value": [
+										{
+											"start": 279,
+											"end": 305,
+											"type": "Text",
+											"raw": "plain selectable width_100",
+											"data": "plain selectable width_100"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 307,
+									"end": 337,
+									"name": "onclick",
+									"name_loc": {
+										"start": {
+											"line": 10,
+											"column": 58,
+											"character": 307
+										},
+										"end": {
+											"line": 10,
+											"column": 65,
+											"character": 314
+										}
+									},
+									"value": {
+										"type": "ExpressionTag",
+										"start": 315,
+										"end": 337,
+										"expression": {
+											"type": "ArrowFunctionExpression",
+											"start": 316,
+											"end": 336,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 67
+												},
+												"end": {
+													"line": 10,
+													"column": 87
+												}
+											},
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [],
+											"body": {
+												"type": "CallExpression",
+												"start": 322,
+												"end": 336,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 73
+													},
+													"end": {
+														"line": 10,
+														"column": 87
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 322,
+													"end": 326,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 73
+														},
+														"end": {
+															"line": 10,
+															"column": 77
+														}
+													},
+													"name": "init"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 327,
+														"end": 335,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 78
+															},
+															"end": {
+																"line": 10,
+																"column": 86
+															}
+														},
+														"name": "template"
+													}
+												],
+												"optional": false
+											}
+										}
+									}
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 338,
+										"end": 341,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 341,
+										"end": 367,
+										"name": "div",
+										"name_loc": {
+											"start": {
+												"line": 11,
+												"column": 3,
+												"character": 342
+											},
+											"end": {
+												"line": 11,
+												"column": 6,
+												"character": 345
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "ExpressionTag",
+													"start": 346,
+													"end": 361,
+													"expression": {
+														"type": "MemberExpression",
+														"start": 347,
+														"end": 360,
+														"loc": {
+															"start": {
+																"line": 11,
+																"column": 8
+															},
+															"end": {
+																"line": 11,
+																"column": 21
+															}
+														},
+														"object": {
+															"type": "Identifier",
+															"start": 347,
+															"end": 355,
+															"loc": {
+																"start": {
+																	"line": 11,
+																	"column": 8
+																},
+																"end": {
+																	"line": 11,
+																	"column": 16
+																}
+															},
+															"name": "template"
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 356,
+															"end": 360,
+															"loc": {
+																"start": {
+																	"line": 11,
+																	"column": 17
+																},
+																"end": {
+																	"line": 11,
+																	"column": 21
+																}
+															},
+															"name": "name"
+														},
+														"computed": false,
+														"optional": false
+													}
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 367,
+										"end": 369,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 378,
+							"end": 379,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

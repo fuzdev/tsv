@@ -1,0 +1,794 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 529,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Ternary with binaryish test: inline comment should use break-after-operator",
+			"start": 32,
+			"end": 110,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " @type {string | ArrayBufferView} ",
+			"start": 123,
+			"end": 161,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 3
+				},
+				"end": {
+					"line": 5,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Without comment: same ternary, also breaks after = (binaryish test)",
+			"start": 218,
+			"end": 288,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Short case without comment: fits inline",
+			"start": 410,
+			"end": 452,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 44
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 528,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 519,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 20,
+					"end": 518,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 26,
+						"end": 27,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 7
+							},
+							"end": {
+								"line": 2,
+								"column": 8
+							}
+						},
+						"name": "A"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 28,
+						"end": 518,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 9
+							},
+							"end": {
+								"line": 15,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 113,
+								"end": 214,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 94
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 113,
+									"end": 117,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 6
+										}
+									},
+									"name": "prop"
+								},
+								"value": {
+									"type": "ConditionalExpression",
+									"start": 162,
+									"end": 213,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 42
+										},
+										"end": {
+											"line": 5,
+											"column": 93
+										}
+									},
+									"test": {
+										"type": "LogicalExpression",
+										"start": 162,
+										"end": 201,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 42
+											},
+											"end": {
+												"line": 5,
+												"column": 81
+											}
+										},
+										"left": {
+											"type": "BinaryExpression",
+											"start": 162,
+											"end": 186,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 42
+												},
+												"end": {
+													"line": 5,
+													"column": 66
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 162,
+												"end": 167,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 42
+													},
+													"end": {
+														"line": 5,
+														"column": 47
+													}
+												},
+												"name": "input"
+											},
+											"operator": "instanceof",
+											"right": {
+												"type": "Identifier",
+												"start": 179,
+												"end": 186,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 59
+													},
+													"end": {
+														"line": 5,
+														"column": 66
+													}
+												},
+												"name": "Request"
+											}
+										},
+										"operator": "&&",
+										"right": {
+											"type": "Identifier",
+											"start": 190,
+											"end": 201,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 70
+												},
+												"end": {
+													"line": 5,
+													"column": 81
+												}
+											},
+											"name": "cloned_body"
+										}
+									},
+									"consequent": {
+										"type": "CallExpression",
+										"start": 204,
+										"end": 209,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 84
+											},
+											"end": {
+												"line": 5,
+												"column": 89
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 204,
+											"end": 206,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 84
+												},
+												"end": {
+													"line": 5,
+													"column": 86
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 207,
+												"end": 208,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 87
+													},
+													"end": {
+														"line": 5,
+														"column": 88
+													}
+												},
+												"name": "a"
+											}
+										],
+										"optional": false
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 212,
+										"end": 213,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 92
+											},
+											"end": {
+												"line": 5,
+												"column": 93
+											}
+										},
+										"name": "b"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " @type {string | ArrayBufferView} ",
+											"start": 123,
+											"end": 161
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " Ternary with binaryish test: inline comment should use break-after-operator",
+										"start": 32,
+										"end": 110
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 291,
+								"end": 406,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 291,
+									"end": 296,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 7
+										}
+									},
+									"name": "prop2"
+								},
+								"value": {
+									"type": "ConditionalExpression",
+									"start": 302,
+									"end": 405,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 3
+										},
+										"end": {
+											"line": 11,
+											"column": 7
+										}
+									},
+									"test": {
+										"type": "LogicalExpression",
+										"start": 302,
+										"end": 385,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 3
+											},
+											"end": {
+												"line": 9,
+												"column": 86
+											}
+										},
+										"left": {
+											"type": "BinaryExpression",
+											"start": 302,
+											"end": 331,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 3
+												},
+												"end": {
+													"line": 9,
+													"column": 32
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 302,
+												"end": 312,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 3
+													},
+													"end": {
+														"line": 9,
+														"column": 13
+													}
+												},
+												"name": "input_abcd"
+											},
+											"operator": "instanceof",
+											"right": {
+												"type": "Identifier",
+												"start": 324,
+												"end": 331,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 25
+													},
+													"end": {
+														"line": 9,
+														"column": 32
+													}
+												},
+												"name": "Request"
+											}
+										},
+										"operator": "&&",
+										"right": {
+											"type": "Identifier",
+											"start": 335,
+											"end": 385,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 36
+												},
+												"end": {
+													"line": 9,
+													"column": 86
+												}
+											},
+											"name": "cloned_body_abcdefghijklmnopqrstuvwxyzabcdefghijkl"
+										}
+									},
+									"consequent": {
+										"type": "CallExpression",
+										"start": 392,
+										"end": 397,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 6
+											},
+											"end": {
+												"line": 10,
+												"column": 11
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 392,
+											"end": 394,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 6
+												},
+												"end": {
+													"line": 10,
+													"column": 8
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 395,
+												"end": 396,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 9
+													},
+													"end": {
+														"line": 10,
+														"column": 10
+													}
+												},
+												"name": "a"
+											}
+										],
+										"optional": false
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 404,
+										"end": 405,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 6
+											},
+											"end": {
+												"line": 11,
+												"column": 7
+											}
+										},
+										"name": "b"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " Without comment: same ternary, also breaks after = (binaryish test)",
+										"start": 218,
+										"end": 288
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 455,
+								"end": 515,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 62
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 455,
+									"end": 460,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 2
+										},
+										"end": {
+											"line": 14,
+											"column": 7
+										}
+									},
+									"name": "prop3"
+								},
+								"value": {
+									"type": "ConditionalExpression",
+									"start": 463,
+									"end": 514,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 10
+										},
+										"end": {
+											"line": 14,
+											"column": 61
+										}
+									},
+									"test": {
+										"type": "LogicalExpression",
+										"start": 463,
+										"end": 502,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 10
+											},
+											"end": {
+												"line": 14,
+												"column": 49
+											}
+										},
+										"left": {
+											"type": "BinaryExpression",
+											"start": 463,
+											"end": 487,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 10
+												},
+												"end": {
+													"line": 14,
+													"column": 34
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 463,
+												"end": 468,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 10
+													},
+													"end": {
+														"line": 14,
+														"column": 15
+													}
+												},
+												"name": "input"
+											},
+											"operator": "instanceof",
+											"right": {
+												"type": "Identifier",
+												"start": 480,
+												"end": 487,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 27
+													},
+													"end": {
+														"line": 14,
+														"column": 34
+													}
+												},
+												"name": "Request"
+											}
+										},
+										"operator": "&&",
+										"right": {
+											"type": "Identifier",
+											"start": 491,
+											"end": 502,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 38
+												},
+												"end": {
+													"line": 14,
+													"column": 49
+												}
+											},
+											"name": "cloned_body"
+										}
+									},
+									"consequent": {
+										"type": "CallExpression",
+										"start": 505,
+										"end": 510,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 52
+											},
+											"end": {
+												"line": 14,
+												"column": 57
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 505,
+											"end": 507,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 52
+												},
+												"end": {
+													"line": 14,
+													"column": 54
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 508,
+												"end": 509,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 55
+													},
+													"end": {
+														"line": 14,
+														"column": 56
+													}
+												},
+												"name": "a"
+											}
+										],
+										"optional": false
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 513,
+										"end": 514,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 60
+											},
+											"end": {
+												"line": 14,
+												"column": 61
+											}
+										},
+										"name": "b"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " Short case without comment: fits inline",
+										"start": 410,
+										"end": 452
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

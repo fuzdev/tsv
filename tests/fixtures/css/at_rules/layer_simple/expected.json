@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 62,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 53,
+				"name": "layer",
+				"prelude": "layer1",
+				"block": {
+					"type": "Block",
+					"start": 23,
+					"end": 53,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 27,
+								"end": 30,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 27,
+										"end": 30,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 27,
+														"end": 30
+													}
+												],
+												"start": 27,
+												"end": 30
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 31,
+								"end": 50,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 36,
+										"end": 45,
+										"property": "margin",
+										"value": "0"
+									}
+								]
+							},
+							"start": 27,
+							"end": 50
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 54,
+			"styles": "\n\t@layer layer1 {\n\t\tdiv {\n\t\t\tmargin: 0;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 63,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

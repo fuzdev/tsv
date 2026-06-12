@@ -1,0 +1,331 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 475,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 104,
+				"name": "media",
+				"prelude": "screen and (min-width: 768px) and (max-width: 1024px)",
+				"block": {
+					"type": "Block",
+					"start": 70,
+					"end": 104,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 74,
+								"end": 77,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 74,
+										"end": 77,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 74,
+														"end": 77
+													}
+												],
+												"start": 74,
+												"end": 77
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 78,
+								"end": 101,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 83,
+										"end": 96,
+										"property": "display",
+										"value": "flex"
+									}
+								]
+							},
+							"start": 74,
+							"end": 101
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 106,
+				"end": 186,
+				"name": "media",
+				"prelude": "(min-width: 768px), (max-width: 1024px)",
+				"block": {
+					"type": "Block",
+					"start": 153,
+					"end": 186,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 157,
+								"end": 161,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 157,
+										"end": 161,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "span",
+														"start": 157,
+														"end": 161
+													}
+												],
+												"start": 157,
+												"end": 161
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 162,
+								"end": 183,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 167,
+										"end": 178,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 157,
+							"end": 183
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 188,
+				"end": 276,
+				"name": "media",
+				"prelude": "(min-width: 768px) or (orientation: portrait)",
+				"block": {
+					"type": "Block",
+					"start": 241,
+					"end": 276,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 245,
+								"end": 247,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 245,
+										"end": 247,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "h1",
+														"start": 245,
+														"end": 247
+													}
+												],
+												"start": 245,
+												"end": 247
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 248,
+								"end": 273,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 253,
+										"end": 268,
+										"property": "font-size",
+										"value": "2rem"
+									}
+								]
+							},
+							"start": 245,
+							"end": 273
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 278,
+				"end": 350,
+				"name": "media",
+				"prelude": "not all and (min-width: 768px)",
+				"block": {
+					"type": "Block",
+					"start": 316,
+					"end": 350,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 320,
+								"end": 321,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 320,
+										"end": 321,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "p",
+														"start": 320,
+														"end": 321
+													}
+												],
+												"start": 320,
+												"end": 321
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 322,
+								"end": 347,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 327,
+										"end": 342,
+										"property": "font-size",
+										"value": "14px"
+									}
+								]
+							},
+							"start": 320,
+							"end": 347
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 352,
+				"end": 466,
+				"name": "media",
+				"prelude": "(min-width: 768px) and (orientation: landscape), (min-width: 1024px)",
+				"block": {
+					"type": "Block",
+					"start": 428,
+					"end": 466,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 432,
+								"end": 439,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 432,
+										"end": 439,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "section",
+														"start": 432,
+														"end": 439
+													}
+												],
+												"start": 432,
+												"end": 439
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 440,
+								"end": 463,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 445,
+										"end": 458,
+										"property": "padding",
+										"value": "2rem"
+									}
+								]
+							},
+							"start": 432,
+							"end": 463
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 467,
+			"styles": "\n\t@media screen and (min-width: 768px) and (max-width: 1024px) {\n\t\tdiv {\n\t\t\tdisplay: flex;\n\t\t}\n\t}\n\t@media (min-width: 768px), (max-width: 1024px) {\n\t\tspan {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n\t@media (min-width: 768px) or (orientation: portrait) {\n\t\th1 {\n\t\t\tfont-size: 2rem;\n\t\t}\n\t}\n\t@media not all and (min-width: 768px) {\n\t\tp {\n\t\t\tfont-size: 14px;\n\t\t}\n\t}\n\t@media (min-width: 768px) and (orientation: landscape), (min-width: 1024px) {\n\t\tsection {\n\t\t\tpadding: 2rem;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 476,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

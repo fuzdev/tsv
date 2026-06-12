@@ -1,0 +1,73 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 128,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 11,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 11,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "c",
+											"start": 9,
+											"end": 11
+										}
+									],
+									"start": 9,
+									"end": 11
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 12,
+					"end": 119,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 99,
+							"end": 115,
+							"property": "color",
+							"value": "var(--a,)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 119
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 120,
+			"styles": "\n\t.c {\n\t\t/* A value-less var() fallback collapses to the canonical empty-fallback form */\n\t\tcolor: var(--a,);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 129,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

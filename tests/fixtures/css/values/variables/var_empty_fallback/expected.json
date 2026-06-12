@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 256,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 16,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 16,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 9,
+											"end": 16
+										}
+									],
+									"start": 9,
+									"end": 16
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 17,
+					"end": 247,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 100,
+							"end": 116,
+							"property": "color",
+							"value": "var(--a,)"
+						},
+						{
+							"type": "Declaration",
+							"start": 158,
+							"end": 183,
+							"property": "background",
+							"value": "var(--b, red)"
+						},
+						{
+							"type": "Declaration",
+							"start": 217,
+							"end": 243,
+							"property": "width",
+							"value": "var(--c, var(--d,))"
+						}
+					]
+				},
+				"start": 9,
+				"end": 247
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 248,
+			"styles": "\n\t.class1 {\n\t\t/* Empty var() fallback — the trailing comma is significant and preserved */\n\t\tcolor: var(--a,);\n\t\t/* Normal fallback is unaffected */\n\t\tbackground: var(--b, red);\n\t\t/* Nested empty fallback */\n\t\twidth: var(--c, var(--d,));\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 257,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,307 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 129,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 128,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 5,
+						"end": 21,
+						"name": "data-attr1",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 5,
+								"character": 5
+							},
+							"end": {
+								"line": 1,
+								"column": 15,
+								"character": 15
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 16,
+							"end": 21,
+							"expression": {
+								"type": "Literal",
+								"start": 17,
+								"end": 20,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 17
+									},
+									"end": {
+										"line": 1,
+										"column": 20
+									}
+								},
+								"value": "'",
+								"raw": "\"'\""
+							}
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 22,
+						"end": 38,
+						"name": "data-attr2",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 22,
+								"character": 22
+							},
+							"end": {
+								"line": 1,
+								"column": 32,
+								"character": 32
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 33,
+							"end": 38,
+							"expression": {
+								"type": "Literal",
+								"start": 34,
+								"end": 37,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 34
+									},
+									"end": {
+										"line": 1,
+										"column": 37
+									}
+								},
+								"value": "\"",
+								"raw": "'\"'"
+							}
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 39,
+						"end": 57,
+						"name": "data-attr3",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 39,
+								"character": 39
+							},
+							"end": {
+								"line": 1,
+								"column": 49,
+								"character": 49
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 50,
+							"end": 57,
+							"expression": {
+								"type": "Literal",
+								"start": 51,
+								"end": 56,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 51
+									},
+									"end": {
+										"line": 1,
+										"column": 56
+									}
+								},
+								"value": "'\"",
+								"raw": "'\\'\"'"
+							}
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 58,
+						"end": 77,
+						"name": "data-attr4",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 58,
+								"character": 58
+							},
+							"end": {
+								"line": 1,
+								"column": 68,
+								"character": 68
+							}
+						},
+						"value": [
+							{
+								"start": 70,
+								"end": 76,
+								"type": "Text",
+								"raw": "&apos;",
+								"data": "'"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 78,
+						"end": 97,
+						"name": "data-attr5",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 78,
+								"character": 78
+							},
+							"end": {
+								"line": 1,
+								"column": 88,
+								"character": 88
+							}
+						},
+						"value": [
+							{
+								"start": 90,
+								"end": 96,
+								"type": "Text",
+								"raw": "&quot;",
+								"data": "\""
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 98,
+							"end": 100,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 100,
+							"end": 105,
+							"expression": {
+								"type": "Literal",
+								"start": 101,
+								"end": 104,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 2
+									},
+									"end": {
+										"line": 2,
+										"column": 5
+									}
+								},
+								"value": "'",
+								"raw": "\"'\""
+							}
+						},
+						{
+							"type": "Text",
+							"start": 105,
+							"end": 107,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 107,
+							"end": 112,
+							"expression": {
+								"type": "Literal",
+								"start": 108,
+								"end": 111,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 3,
+										"column": 5
+									}
+								},
+								"value": "\"",
+								"raw": "'\"'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 112,
+							"end": 114,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 114,
+							"end": 121,
+							"expression": {
+								"type": "Literal",
+								"start": 115,
+								"end": 120,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 7
+									}
+								},
+								"value": "'\"",
+								"raw": "'\\'\"'"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 121,
+							"end": 122,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,135 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 60,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 59,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 5,
+							"end": 25,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 1,
+									"column": 6,
+									"character": 6
+								},
+								"end": {
+									"line": 1,
+									"column": 10,
+									"character": 10
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 11,
+										"end": 18,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 25,
+							"end": 26,
+							"raw": " ",
+							"data": " "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 26,
+							"end": 32,
+							"expression": {
+								"type": "Identifier",
+								"start": 27,
+								"end": 31,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 27
+									},
+									"end": {
+										"line": 1,
+										"column": 31
+									}
+								},
+								"name": "expr"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 32,
+							"end": 33,
+							"raw": " ",
+							"data": " "
+						},
+						{
+							"type": "RegularElement",
+							"start": 33,
+							"end": 53,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 1,
+									"column": 34,
+									"character": 34
+								},
+								"end": {
+									"line": 1,
+									"column": 38,
+									"character": 38
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 39,
+										"end": 46,
+										"raw": "inline2",
+										"data": "inline2"
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

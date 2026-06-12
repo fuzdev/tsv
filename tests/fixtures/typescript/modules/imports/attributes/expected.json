@@ -1,0 +1,890 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 320,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 319,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 310,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 10,
+					"end": 48,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 39
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 17,
+							"end": 18,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 8
+								},
+								"end": {
+									"line": 2,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 17,
+								"end": 18,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 8
+									},
+									"end": {
+										"line": 2,
+										"column": 9
+									}
+								},
+								"name": "a"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 24,
+						"end": 27,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 15
+							},
+							"end": {
+								"line": 2,
+								"column": 18
+							}
+						},
+						"value": "a",
+						"raw": "'a'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 34,
+							"end": 46,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 25
+								},
+								"end": {
+									"line": 2,
+									"column": 37
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 34,
+								"end": 38,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 25
+									},
+									"end": {
+										"line": 2,
+										"column": 29
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 40,
+								"end": 46,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 31
+									},
+									"end": {
+										"line": 2,
+										"column": 37
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							}
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 50,
+					"end": 90,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 41
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 58,
+							"end": 59,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 9
+								},
+								"end": {
+									"line": 3,
+									"column": 10
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 58,
+								"end": 59,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 9
+									},
+									"end": {
+										"line": 3,
+										"column": 10
+									}
+								},
+								"name": "b"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 58,
+								"end": 59,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 9
+									},
+									"end": {
+										"line": 3,
+										"column": 10
+									}
+								},
+								"name": "b"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 66,
+						"end": 69,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 17
+							},
+							"end": {
+								"line": 3,
+								"column": 20
+							}
+						},
+						"value": "b",
+						"raw": "'b'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 76,
+							"end": 88,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 27
+								},
+								"end": {
+									"line": 3,
+									"column": 39
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 76,
+								"end": 80,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 27
+									},
+									"end": {
+										"line": 3,
+										"column": 31
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 82,
+								"end": 88,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 33
+									},
+									"end": {
+										"line": 3,
+										"column": 39
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							}
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 92,
+					"end": 135,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 44
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportNamespaceSpecifier",
+							"start": 99,
+							"end": 105,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 8
+								},
+								"end": {
+									"line": 4,
+									"column": 14
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 104,
+								"end": 105,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 13
+									},
+									"end": {
+										"line": 4,
+										"column": 14
+									}
+								},
+								"name": "c"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 111,
+						"end": 114,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 20
+							},
+							"end": {
+								"line": 4,
+								"column": 23
+							}
+						},
+						"value": "c",
+						"raw": "'c'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 121,
+							"end": 133,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 30
+								},
+								"end": {
+									"line": 4,
+									"column": 42
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 121,
+								"end": 125,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 30
+									},
+									"end": {
+										"line": 4,
+										"column": 34
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 127,
+								"end": 133,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 36
+									},
+									"end": {
+										"line": 4,
+										"column": 42
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							}
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 137,
+					"end": 180,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 44
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 144,
+							"end": 145,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 8
+								},
+								"end": {
+									"line": 5,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 144,
+								"end": 145,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 8
+									},
+									"end": {
+										"line": 5,
+										"column": 9
+									}
+								},
+								"name": "d"
+							}
+						},
+						{
+							"type": "ImportSpecifier",
+							"start": 148,
+							"end": 149,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 12
+								},
+								"end": {
+									"line": 5,
+									"column": 13
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 148,
+								"end": 149,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 12
+									},
+									"end": {
+										"line": 5,
+										"column": 13
+									}
+								},
+								"name": "e"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 148,
+								"end": 149,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 12
+									},
+									"end": {
+										"line": 5,
+										"column": 13
+									}
+								},
+								"name": "e"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 156,
+						"end": 159,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 20
+							},
+							"end": {
+								"line": 5,
+								"column": 23
+							}
+						},
+						"value": "d",
+						"raw": "'d'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 166,
+							"end": 178,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 30
+								},
+								"end": {
+									"line": 5,
+									"column": 42
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 166,
+								"end": 170,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 30
+									},
+									"end": {
+										"line": 5,
+										"column": 34
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 172,
+								"end": 178,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 36
+									},
+									"end": {
+										"line": 5,
+										"column": 42
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							}
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 182,
+					"end": 213,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 32
+						}
+					},
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 189,
+						"end": 192,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 8
+							},
+							"end": {
+								"line": 6,
+								"column": 11
+							}
+						},
+						"value": "e",
+						"raw": "'e'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 199,
+							"end": 211,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 18
+								},
+								"end": {
+									"line": 6,
+									"column": 30
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 199,
+								"end": 203,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 18
+									},
+									"end": {
+										"line": 6,
+										"column": 22
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 205,
+								"end": 211,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 24
+									},
+									"end": {
+										"line": 6,
+										"column": 30
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							}
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 215,
+					"end": 254,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 40
+						}
+					},
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 230,
+						"end": 233,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 16
+							},
+							"end": {
+								"line": 7,
+								"column": 19
+							}
+						},
+						"value": "f",
+						"raw": "'f'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 240,
+							"end": 252,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 26
+								},
+								"end": {
+									"line": 7,
+									"column": 38
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 240,
+								"end": 244,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 26
+									},
+									"end": {
+										"line": 7,
+										"column": 30
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 246,
+								"end": 252,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 32
+									},
+									"end": {
+										"line": 7,
+										"column": 38
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							}
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 256,
+					"end": 309,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 54
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 263,
+							"end": 264,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 8
+								},
+								"end": {
+									"line": 8,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 263,
+								"end": 264,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 8
+									},
+									"end": {
+										"line": 8,
+										"column": 9
+									}
+								},
+								"name": "f"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 270,
+						"end": 273,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 15
+							},
+							"end": {
+								"line": 8,
+								"column": 18
+							}
+						},
+						"value": "f",
+						"raw": "'f'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 280,
+							"end": 292,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 25
+								},
+								"end": {
+									"line": 8,
+									"column": 37
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 280,
+								"end": 284,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 25
+									},
+									"end": {
+										"line": 8,
+										"column": 29
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 286,
+								"end": 292,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 31
+									},
+									"end": {
+										"line": 8,
+										"column": 37
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							}
+						},
+						{
+							"type": "ImportAttribute",
+							"start": 294,
+							"end": 307,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 39
+								},
+								"end": {
+									"line": 8,
+									"column": 52
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 294,
+								"end": 298,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 39
+									},
+									"end": {
+										"line": 8,
+										"column": 43
+									}
+								},
+								"name": "attr"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 300,
+								"end": 307,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 45
+									},
+									"end": {
+										"line": 8,
+										"column": 52
+									}
+								},
+								"value": "value",
+								"raw": "'value'"
+							}
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

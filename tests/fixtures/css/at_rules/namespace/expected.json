@@ -1,0 +1,160 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 501,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 46,
+				"end": 88,
+				"name": "namespace",
+				"prelude": "'http://www.w3.org/1999/xhtml'",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 122,
+				"end": 166,
+				"name": "namespace",
+				"prelude": "svg 'http://www.w3.org/2000/svg'",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 203,
+				"end": 256,
+				"name": "namespace",
+				"prelude": "math 'http://www.w3.org/1998/Math/MathML'",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 282,
+				"end": 302,
+				"name": "namespace",
+				"prelude": "empty ''",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 340,
+				"end": 393,
+				"name": "namespace",
+				"prelude": "xlink url('http://www.w3.org/1999/xlink')",
+				"block": null
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 439,
+					"end": 447,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 439,
+							"end": 447,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "rect",
+											"start": 439,
+											"end": 447
+										}
+									],
+									"start": 439,
+									"end": 447
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 448,
+					"end": 466,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 452,
+							"end": 462,
+							"property": "fill",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 439,
+				"end": 466
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 469,
+					"end": 474,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 469,
+							"end": 474,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 469,
+											"end": 474
+										}
+									],
+									"start": 469,
+									"end": 474
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 475,
+					"end": 492,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 479,
+							"end": 488,
+							"property": "margin",
+							"value": "0"
+						}
+					]
+				},
+				"start": 469,
+				"end": 492
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 493,
+			"styles": "\n\t/* Default namespace declaration */\n\t@namespace 'http://www.w3.org/1999/xhtml';\n\n\t/* Named namespace for SVG */\n\t@namespace svg 'http://www.w3.org/2000/svg';\n\n\t/* Named namespace for MathML */\n\t@namespace math 'http://www.w3.org/1998/Math/MathML';\n\n\t/* Empty namespace */\n\t@namespace empty '';\n\n\t/* Namespace with URL function */\n\t@namespace xlink url('http://www.w3.org/1999/xlink');\n\n\t/* Example usage with namespace prefix */\n\tsvg|rect {\n\t\tfill: blue;\n\t}\n\n\t*|div {\n\t\tmargin: 0;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 502,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

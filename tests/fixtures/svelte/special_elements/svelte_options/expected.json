@@ -1,0 +1,38 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 25,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": {
+		"start": 0,
+		"end": 24,
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 16,
+				"end": 21,
+				"name": "runes",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 16,
+						"character": 16
+					},
+					"end": {
+						"line": 1,
+						"column": 21,
+						"character": 21
+					}
+				},
+				"value": true
+			}
+		],
+		"runes": true
+	},
+	"comments": []
+}

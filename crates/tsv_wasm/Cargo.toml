@@ -1,0 +1,45 @@
+[package]
+name = "tsv_wasm"
+version.workspace = true
+edition.workspace = true
+description = "a formatter, parser, and future linter + more for TypeScript, Svelte, and CSS"
+license.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[package.metadata.wasm-pack.profile.release]
+# Rust 2024 emits `memory.copy` (bulk-memory) and `i64.trunc_sat_f64_s`
+# (nontrapping-float-to-int) — both shipped in every browser since 2021
+# and in Node 16+. Enabling them by name lets wasm-opt run on Rust 2024 output.
+wasm-opt = ['-O3', '--enable-bulk-memory', '--enable-nontrapping-float-to-int']
+
+[features]
+# Default build: everything (@fuzdev/tsv_wasm). Subset packages build with
+# `--no-default-features --features format|parse`.
+default = ["format", "parse"]
+# `format_*` exports (@fuzdev/tsv_format_wasm when alone).
+format = []
+# `parse_*` exports + convert layer (@fuzdev/tsv_parse_wasm when alone).
+# The parse-only build drops the printers via link-level dead-code
+# elimination — no printer feature gates in the language crates.
+parse = [
+    "tsv_ts/convert",
+    "tsv_css/convert",
+    "tsv_svelte/convert",
+    "dep:js-sys",
+]
+
+[dependencies]
+tsv_svelte.workspace = true
+tsv_ts.workspace = true
+tsv_css.workspace = true
+wasm-bindgen = "0.2"
+# Engine-native JSON.parse for the parse_* exports: the AST crosses the
+# boundary as one JSON string instead of a serde_wasm_bindgen-built object
+# graph (measurably faster materialization).
+js-sys = { version = "0.3", optional = true }
+
+[lints]
+workspace = true

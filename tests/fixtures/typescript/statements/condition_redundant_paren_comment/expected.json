@@ -1,0 +1,623 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 168,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 16,
+			"end": 23,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 7
+				},
+				"end": {
+					"line": 2,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 41,
+			"end": 48,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 10
+				},
+				"end": {
+					"line": 4,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 67,
+			"end": 74,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 11
+				},
+				"end": {
+					"line": 6,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 114,
+			"end": 121,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 14
+				},
+				"end": {
+					"line": 11,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 148,
+			"end": 155,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 10
+				},
+				"end": {
+					"line": 14,
+					"column": 17
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 167,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 158,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 10,
+					"end": 29,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 20
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 14,
+						"end": 15,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 5
+							},
+							"end": {
+								"line": 2,
+								"column": 6
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 16,
+								"end": 23
+							}
+						]
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 25,
+						"end": 29,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 16
+							},
+							"end": {
+								"line": 2,
+								"column": 20
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 25,
+							"end": 28,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 16
+								},
+								"end": {
+									"line": 2,
+									"column": 19
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 25,
+								"end": 26,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 16
+									},
+									"end": {
+										"line": 2,
+										"column": 17
+									}
+								},
+								"name": "b"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": null
+				},
+				{
+					"type": "WhileStatement",
+					"start": 32,
+					"end": 54,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 23
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 39,
+						"end": 40,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 8
+							},
+							"end": {
+								"line": 4,
+								"column": 9
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 41,
+								"end": 48
+							}
+						]
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 50,
+						"end": 54,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 19
+							},
+							"end": {
+								"line": 4,
+								"column": 23
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 50,
+							"end": 53,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 19
+								},
+								"end": {
+									"line": 4,
+									"column": 22
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 50,
+								"end": 51,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 19
+									},
+									"end": {
+										"line": 4,
+										"column": 20
+									}
+								},
+								"name": "b"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 57,
+					"end": 98,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 65,
+						"end": 66,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 9
+							},
+							"end": {
+								"line": 6,
+								"column": 10
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 67,
+								"end": 74
+							}
+						]
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 80,
+							"end": 95,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 2
+								},
+								"end": {
+									"line": 8,
+									"column": 7
+								}
+							},
+							"consequent": [
+								{
+									"type": "ExpressionStatement",
+									"start": 91,
+									"end": 95,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 3
+										},
+										"end": {
+											"line": 8,
+											"column": 7
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 91,
+										"end": 94,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 3
+											},
+											"end": {
+												"line": 8,
+												"column": 6
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 91,
+											"end": 92,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 3
+												},
+												"end": {
+													"line": 8,
+													"column": 4
+												}
+											},
+											"name": "b"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 85,
+								"end": 86,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 101,
+					"end": 127,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 27
+						}
+					},
+					"init": {
+						"type": "Identifier",
+						"start": 106,
+						"end": 107,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 6
+							},
+							"end": {
+								"line": 11,
+								"column": 7
+							}
+						},
+						"name": "a"
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 109,
+						"end": 110,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 9
+							},
+							"end": {
+								"line": 11,
+								"column": 10
+							}
+						},
+						"name": "b"
+					},
+					"update": {
+						"type": "Identifier",
+						"start": 112,
+						"end": 113,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 12
+							},
+							"end": {
+								"line": 11,
+								"column": 13
+							}
+						},
+						"name": "c",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 114,
+								"end": 121
+							}
+						]
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 123,
+						"end": 127,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 23
+							},
+							"end": {
+								"line": 11,
+								"column": 27
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 123,
+							"end": 126,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 23
+								},
+								"end": {
+									"line": 11,
+									"column": 26
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 123,
+								"end": 124,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 23
+									},
+									"end": {
+										"line": 11,
+										"column": 24
+									}
+								},
+								"name": "d"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 130,
+					"end": 157,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 19
+						}
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 133,
+						"end": 137,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 4
+							},
+							"end": {
+								"line": 13,
+								"column": 8
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 133,
+							"end": 136,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 4
+								},
+								"end": {
+									"line": 13,
+									"column": 7
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 133,
+								"end": 134,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 4
+									},
+									"end": {
+										"line": 13,
+										"column": 5
+									}
+								},
+								"name": "b"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 146,
+						"end": 147,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 8
+							},
+							"end": {
+								"line": 14,
+								"column": 9
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 148,
+								"end": 155
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

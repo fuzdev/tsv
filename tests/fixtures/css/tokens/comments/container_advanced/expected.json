@@ -1,0 +1,209 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 357,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 35,
+				"end": 121,
+				"name": "container",
+				"prelude": "sidebar  (min-width: 100px)",
+				"block": {
+					"type": "Block",
+					"start": 90,
+					"end": 121,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 94,
+								"end": 97,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 94,
+										"end": 97,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 94,
+														"end": 97
+													}
+												],
+												"start": 94,
+												"end": 97
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 98,
+								"end": 118,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 103,
+										"end": 113,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 94,
+							"end": 118
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 144,
+				"end": 242,
+				"name": "container",
+				"prelude": "(min-width: 100px) or  (max-width: 200px)",
+				"block": {
+					"type": "Block",
+					"start": 210,
+					"end": 242,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 214,
+								"end": 217,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 214,
+										"end": 217,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 214,
+														"end": 217
+													}
+												],
+												"start": 214,
+												"end": 217
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 218,
+								"end": 239,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 223,
+										"end": 234,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 214,
+							"end": 239
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 264,
+				"end": 348,
+				"name": "container",
+				"prelude": "not (min-width: 100px)",
+				"block": {
+					"type": "Block",
+					"start": 315,
+					"end": 348,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 319,
+								"end": 322,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 319,
+										"end": 322,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 319,
+														"end": 322
+													}
+												],
+												"start": 319,
+												"end": 322
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 323,
+								"end": 345,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 328,
+										"end": 340,
+										"property": "color",
+										"value": "green"
+									}
+								]
+							},
+							"start": 319,
+							"end": 345
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 349,
+			"styles": "\n\t/* named with comment */\n\t@container sidebar /* after name */ (min-width: 100px) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* or connector */\n\t@container (min-width: 100px) or /* comment */ (max-width: 200px) {\n\t\tdiv {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n\n\t/* not keyword */\n\t@container /* before not */ not (min-width: 100px) {\n\t\tdiv {\n\t\t\tcolor: green;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 358,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

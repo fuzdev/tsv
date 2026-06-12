@@ -1,0 +1,80 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 333,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 324,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 64,
+							"end": 159,
+							"property": "clip-path",
+							"value": "polygon(0% 0%, 10% 0%, 20% 0%, 30% 0%, 40% 0%, 50% 0%, 60% 0%, 70% 0%, 80% 0%, 900%)"
+						},
+						{
+							"type": "Declaration",
+							"start": 190,
+							"end": 320,
+							"property": "clip-path",
+							"value": "polygon(\n\t\t\t0% 0%,\n\t\t\t10% 0%,\n\t\t\t20% 0%,\n\t\t\t30% 0%,\n\t\t\t40% 0%,\n\t\t\t50% 0%,\n\t\t\t60% 0%,\n\t\t\t70% 0%,\n\t\t\t80% 0%,\n\t\t\t9000%\n\t\t)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 324
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 325,
+			"styles": "\n\tdiv {\n\t\t/* 100 chars - stays inline (at boundary) */\n\t\tclip-path: polygon(0% 0%, 10% 0%, 20% 0%, 30% 0%, 40% 0%, 50% 0%, 60% 0%, 70% 0%, 80% 0%, 900%);\n\n\t\t/* 101 chars - wraps */\n\t\tclip-path: polygon(\n\t\t\t0% 0%,\n\t\t\t10% 0%,\n\t\t\t20% 0%,\n\t\t\t30% 0%,\n\t\t\t40% 0%,\n\t\t\t50% 0%,\n\t\t\t60% 0%,\n\t\t\t70% 0%,\n\t\t\t80% 0%,\n\t\t\t9000%\n\t\t);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 334,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,162 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 223,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 214,
+				"name": "media",
+				"prelude": "(prefers-reduced-motion: no-preference)",
+				"block": {
+					"type": "Block",
+					"start": 56,
+					"end": 214,
+					"children": [
+						{
+							"type": "Atrule",
+							"start": 60,
+							"end": 150,
+							"name": "starting-style",
+							"prelude": "",
+							"block": {
+								"type": "Block",
+								"start": 76,
+								"end": 150,
+								"children": [
+									{
+										"type": "Rule",
+										"prelude": {
+											"type": "SelectorList",
+											"start": 81,
+											"end": 88,
+											"children": [
+												{
+													"type": "ComplexSelector",
+													"start": 81,
+													"end": 88,
+													"children": [
+														{
+															"type": "RelativeSelector",
+															"combinator": null,
+															"selectors": [
+																{
+																	"type": "ClassSelector",
+																	"name": "class1",
+																	"start": 81,
+																	"end": 88
+																}
+															],
+															"start": 81,
+															"end": 88
+														}
+													]
+												}
+											]
+										},
+										"block": {
+											"type": "Block",
+											"start": 89,
+											"end": 146,
+											"children": [
+												{
+													"type": "Declaration",
+													"start": 95,
+													"end": 105,
+													"property": "opacity",
+													"value": "0"
+												},
+												{
+													"type": "Declaration",
+													"start": 111,
+													"end": 140,
+													"property": "transform",
+													"value": "translateY(-100px)"
+												}
+											]
+										},
+										"start": 81,
+										"end": 146
+									}
+								]
+							}
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 154,
+								"end": 161,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 154,
+										"end": 161,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "class1",
+														"start": 154,
+														"end": 161
+													}
+												],
+												"start": 154,
+												"end": 161
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 162,
+								"end": 211,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 167,
+										"end": 177,
+										"property": "opacity",
+										"value": "1"
+									},
+									{
+										"type": "Declaration",
+										"start": 182,
+										"end": 206,
+										"property": "transform",
+										"value": "translateY(0)"
+									}
+								]
+							},
+							"start": 154,
+							"end": 211
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 215,
+			"styles": "\n\t@media (prefers-reduced-motion: no-preference) {\n\t\t@starting-style {\n\t\t\t.class1 {\n\t\t\t\topacity: 0;\n\t\t\t\ttransform: translateY(-100px);\n\t\t\t}\n\t\t}\n\n\t\t.class1 {\n\t\t\topacity: 1;\n\t\t\ttransform: translateY(0);\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 224,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

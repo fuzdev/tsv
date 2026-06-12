@@ -1,0 +1,400 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 274,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " await with JSDoc comment in stripped grouping parens",
+			"start": 10,
+			"end": 65,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {Promise<A>} ",
+			"start": 108,
+			"end": 133,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 18
+				},
+				"end": {
+					"line": 4,
+					"column": 43
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " yield with JSDoc comment in stripped grouping parens",
+			"start": 145,
+			"end": 200,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 238,
+			"end": 254,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 18
+				},
+				"end": {
+					"line": 9,
+					"column": 34
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 273,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 264,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 67,
+					"end": 142,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 82,
+						"end": 85,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 16
+							},
+							"end": {
+								"line": 3,
+								"column": 19
+							}
+						},
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": true,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 88,
+						"end": 142,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 22
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "VariableDeclaration",
+								"start": 92,
+								"end": 139,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 49
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 98,
+										"end": 138,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 8
+											},
+											"end": {
+												"line": 4,
+												"column": 48
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 98,
+											"end": 99,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 8
+												},
+												"end": {
+													"line": 4,
+													"column": 9
+												}
+											},
+											"name": "a"
+										},
+										"init": {
+											"type": "AwaitExpression",
+											"start": 102,
+											"end": 138,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 12
+												},
+												"end": {
+													"line": 4,
+													"column": 48
+												}
+											},
+											"argument": {
+												"type": "Identifier",
+												"start": 134,
+												"end": 138,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 44
+													},
+													"end": {
+														"line": 4,
+														"column": 48
+													}
+												},
+												"name": "expr",
+												"leadingComments": [
+													{
+														"type": "Block",
+														"value": "* @type {Promise<A>} ",
+														"start": 108,
+														"end": 133
+													}
+												]
+											}
+										}
+									}
+								],
+								"kind": "const"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " await with JSDoc comment in stripped grouping parens",
+							"start": 10,
+							"end": 65
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 202,
+					"end": 263,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 212,
+						"end": 215,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 11
+							},
+							"end": {
+								"line": 8,
+								"column": 14
+							}
+						},
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 218,
+						"end": 263,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 17
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "VariableDeclaration",
+								"start": 222,
+								"end": 260,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 40
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 228,
+										"end": 259,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 8
+											},
+											"end": {
+												"line": 9,
+												"column": 39
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 228,
+											"end": 229,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 8
+												},
+												"end": {
+													"line": 9,
+													"column": 9
+												}
+											},
+											"name": "b"
+										},
+										"init": {
+											"type": "YieldExpression",
+											"start": 232,
+											"end": 259,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 12
+												},
+												"end": {
+													"line": 9,
+													"column": 39
+												}
+											},
+											"delegate": false,
+											"argument": {
+												"type": "Identifier",
+												"start": 255,
+												"end": 259,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 35
+													},
+													"end": {
+														"line": 9,
+														"column": 39
+													}
+												},
+												"name": "expr",
+												"leadingComments": [
+													{
+														"type": "Block",
+														"value": "* @type {A} ",
+														"start": 238,
+														"end": 254
+													}
+												]
+											}
+										}
+									}
+								],
+								"kind": "const"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " yield with JSDoc comment in stripped grouping parens",
+							"start": 145,
+							"end": 200
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

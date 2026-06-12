@@ -1,0 +1,837 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 383,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " parenthesized decorator expressions ride the full expression grammar",
+			"start": 37,
+			"end": 108,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " unparenthesized decorators use the restricted ident/member/call grammar",
+			"start": 133,
+			"end": 207,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a parenthesized optional-chain callee normalizes to parens around the",
+			"start": 256,
+			"end": 328,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " whole expression",
+			"start": 331,
+			"end": 350,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 2
+				},
+				"end": {
+					"line": 18,
+					"column": 21
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 382,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 373,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 22,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 20,
+					"end": 372,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 26,
+						"end": 32,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 7
+							},
+							"end": {
+								"line": 2,
+								"column": 13
+							}
+						},
+						"name": "Parens"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 33,
+						"end": 372,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 14
+							},
+							"end": {
+								"line": 21,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 111,
+								"end": 129,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 4
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 127,
+									"end": 128,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"value": null,
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 111,
+										"end": 124,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 15
+											}
+										},
+										"expression": {
+											"type": "CallExpression",
+											"start": 113,
+											"end": 123,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 4
+												},
+												"end": {
+													"line": 4,
+													"column": 14
+												}
+											},
+											"callee": {
+												"type": "MemberExpression",
+												"start": 113,
+												"end": 121,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 4
+													},
+													"end": {
+														"line": 4,
+														"column": 12
+													}
+												},
+												"object": {
+													"type": "CallExpression",
+													"start": 113,
+													"end": 117,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 4
+														},
+														"end": {
+															"line": 4,
+															"column": 8
+														}
+													},
+													"callee": {
+														"type": "Identifier",
+														"start": 113,
+														"end": 115,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 4
+															},
+															"end": {
+																"line": 4,
+																"column": 6
+															}
+														},
+														"name": "fn"
+													},
+													"arguments": [],
+													"optional": false
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 118,
+													"end": 121,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 9
+														},
+														"end": {
+															"line": 4,
+															"column": 12
+														}
+													},
+													"name": "fn1"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										}
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " parenthesized decorator expressions ride the full expression grammar",
+										"start": 37,
+										"end": 108
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 210,
+								"end": 225,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 4
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 223,
+									"end": 224,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 3
+										}
+									},
+									"name": "b"
+								},
+								"value": null,
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 210,
+										"end": 220,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 2
+											},
+											"end": {
+												"line": 8,
+												"column": 12
+											}
+										},
+										"expression": {
+											"type": "CallExpression",
+											"start": 211,
+											"end": 220,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 3
+												},
+												"end": {
+													"line": 8,
+													"column": 12
+												}
+											},
+											"callee": {
+												"type": "MemberExpression",
+												"start": 211,
+												"end": 218,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 3
+													},
+													"end": {
+														"line": 8,
+														"column": 10
+													}
+												},
+												"object": {
+													"type": "MemberExpression",
+													"start": 211,
+													"end": 216,
+													"loc": {
+														"start": {
+															"line": 8,
+															"column": 3
+														},
+														"end": {
+															"line": 8,
+															"column": 8
+														}
+													},
+													"object": {
+														"type": "MemberExpression",
+														"start": 211,
+														"end": 214,
+														"loc": {
+															"start": {
+																"line": 8,
+																"column": 3
+															},
+															"end": {
+																"line": 8,
+																"column": 6
+															}
+														},
+														"object": {
+															"type": "Identifier",
+															"start": 211,
+															"end": 212,
+															"loc": {
+																"start": {
+																	"line": 8,
+																	"column": 3
+																},
+																"end": {
+																	"line": 8,
+																	"column": 4
+																}
+															},
+															"name": "a"
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 213,
+															"end": 214,
+															"loc": {
+																"start": {
+																	"line": 8,
+																	"column": 5
+																},
+																"end": {
+																	"line": 8,
+																	"column": 6
+																}
+															},
+															"name": "b"
+														},
+														"computed": false
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 215,
+														"end": 216,
+														"loc": {
+															"start": {
+																"line": 8,
+																"column": 7
+															},
+															"end": {
+																"line": 8,
+																"column": 8
+															}
+														},
+														"name": "c"
+													},
+													"computed": false
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 217,
+													"end": 218,
+													"loc": {
+														"start": {
+															"line": 8,
+															"column": 9
+														},
+														"end": {
+															"line": 8,
+															"column": 10
+														}
+													},
+													"name": "d"
+												},
+												"computed": false
+											},
+											"arguments": []
+										}
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " unparenthesized decorators use the restricted ident/member/call grammar",
+										"start": 133,
+										"end": 207
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 229,
+								"end": 239,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 4
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 237,
+									"end": 238,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 3
+										}
+									},
+									"name": "c"
+								},
+								"value": null,
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 229,
+										"end": 234,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
+												"column": 7
+											}
+										},
+										"expression": {
+											"type": "CallExpression",
+											"start": 230,
+											"end": 234,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 3
+												},
+												"end": {
+													"line": 11,
+													"column": 7
+												}
+											},
+											"callee": {
+												"type": "Identifier",
+												"start": 230,
+												"end": 232,
+												"loc": {
+													"start": {
+														"line": 11,
+														"column": 3
+													},
+													"end": {
+														"line": 11,
+														"column": 5
+													}
+												},
+												"name": "fn"
+											},
+											"arguments": []
+										}
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 243,
+								"end": 252,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 4
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 250,
+									"end": 251,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 3
+										}
+									},
+									"name": "d"
+								},
+								"value": null,
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 243,
+										"end": 247,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 2
+											},
+											"end": {
+												"line": 14,
+												"column": 6
+											}
+										},
+										"expression": {
+											"type": "MemberExpression",
+											"start": 244,
+											"end": 247,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 3
+												},
+												"end": {
+													"line": 14,
+													"column": 6
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 244,
+												"end": 245,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 3
+													},
+													"end": {
+														"line": 14,
+														"column": 4
+													}
+												},
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 246,
+												"end": 247,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 5
+													},
+													"end": {
+														"line": 14,
+														"column": 6
+													}
+												},
+												"name": "b"
+											},
+											"computed": false
+										}
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 353,
+								"end": 369,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 4
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 367,
+									"end": 368,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 2
+										},
+										"end": {
+											"line": 20,
+											"column": 3
+										}
+									},
+									"name": "e"
+								},
+								"value": null,
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 353,
+										"end": 364,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 2
+											},
+											"end": {
+												"line": 19,
+												"column": 13
+											}
+										},
+										"expression": {
+											"type": "CallExpression",
+											"start": 355,
+											"end": 363,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 4
+												},
+												"end": {
+													"line": 19,
+													"column": 12
+												}
+											},
+											"callee": {
+												"type": "ChainExpression",
+												"start": 356,
+												"end": 360,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 5
+													},
+													"end": {
+														"line": 19,
+														"column": 9
+													}
+												},
+												"expression": {
+													"type": "MemberExpression",
+													"start": 356,
+													"end": 360,
+													"loc": {
+														"start": {
+															"line": 19,
+															"column": 5
+														},
+														"end": {
+															"line": 19,
+															"column": 9
+														}
+													},
+													"object": {
+														"type": "Identifier",
+														"start": 356,
+														"end": 357,
+														"loc": {
+															"start": {
+																"line": 19,
+																"column": 5
+															},
+															"end": {
+																"line": 19,
+																"column": 6
+															}
+														},
+														"name": "a"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 359,
+														"end": 360,
+														"loc": {
+															"start": {
+																"line": 19,
+																"column": 8
+															},
+															"end": {
+																"line": 19,
+																"column": 9
+															}
+														},
+														"name": "b"
+													},
+													"computed": false,
+													"optional": true
+												}
+											},
+											"arguments": [],
+											"optional": false
+										}
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " a parenthesized optional-chain callee normalizes to parens around the",
+										"start": 256,
+										"end": 328
+									},
+									{
+										"type": "Line",
+										"value": " whole expression",
+										"start": 331,
+										"end": 350
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

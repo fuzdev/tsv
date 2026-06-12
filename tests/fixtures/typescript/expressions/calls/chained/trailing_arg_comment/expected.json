@@ -1,0 +1,483 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 239,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Member chain with trailing comment on last call",
+			"start": 10,
+			"end": 60,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing comment",
+			"start": 96,
+			"end": 115,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 11
+				},
+				"end": {
+					"line": 4,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Longer chain with trailing comment",
+			"start": 122,
+			"end": 159,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing comment",
+			"start": 205,
+			"end": 224,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 11
+				},
+				"end": {
+					"line": 9,
+					"column": 30
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 238,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 229,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 62,
+					"end": 119,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 62,
+						"end": 118,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 62,
+							"end": 83,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 22
+								}
+							},
+							"object": {
+								"type": "CallExpression",
+								"start": 62,
+								"end": 75,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 1
+									},
+									"end": {
+										"line": 3,
+										"column": 14
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 62,
+									"end": 73,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 1
+										},
+										"end": {
+											"line": 3,
+											"column": 12
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 62,
+										"end": 65,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 1
+											},
+											"end": {
+												"line": 3,
+												"column": 4
+											}
+										},
+										"name": "obj"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 66,
+										"end": 73,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 5
+											},
+											"end": {
+												"line": 3,
+												"column": 12
+											}
+										},
+										"name": "method1"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 76,
+								"end": 83,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 15
+									},
+									"end": {
+										"line": 3,
+										"column": 22
+									}
+								},
+								"name": "method2"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 87,
+								"end": 94,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 9
+									}
+								},
+								"value": "value",
+								"raw": "'value'",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " trailing comment",
+										"start": 96,
+										"end": 115
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Member chain with trailing comment on last call",
+							"start": 10,
+							"end": 60
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 161,
+					"end": 228,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 161,
+						"end": 227,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 161,
+							"end": 192,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 1
+								},
+								"end": {
+									"line": 8,
+									"column": 32
+								}
+							},
+							"object": {
+								"type": "CallExpression",
+								"start": 161,
+								"end": 184,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 1
+									},
+									"end": {
+										"line": 8,
+										"column": 24
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 161,
+									"end": 182,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 1
+										},
+										"end": {
+											"line": 8,
+											"column": 22
+										}
+									},
+									"object": {
+										"type": "CallExpression",
+										"start": 161,
+										"end": 174,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 1
+											},
+											"end": {
+												"line": 8,
+												"column": 14
+											}
+										},
+										"callee": {
+											"type": "MemberExpression",
+											"start": 161,
+											"end": 172,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 1
+												},
+												"end": {
+													"line": 8,
+													"column": 12
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 161,
+												"end": 164,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 1
+													},
+													"end": {
+														"line": 8,
+														"column": 4
+													}
+												},
+												"name": "obj"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 165,
+												"end": 172,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 5
+													},
+													"end": {
+														"line": 8,
+														"column": 12
+													}
+												},
+												"name": "method1"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 175,
+										"end": 182,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 15
+											},
+											"end": {
+												"line": 8,
+												"column": 22
+											}
+										},
+										"name": "method2"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 185,
+								"end": 192,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 25
+									},
+									"end": {
+										"line": 8,
+										"column": 32
+									}
+								},
+								"name": "method3"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 196,
+								"end": 203,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 9
+									}
+								},
+								"value": "value",
+								"raw": "'value'",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " trailing comment",
+										"start": 205,
+										"end": 224
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Longer chain with trailing comment",
+							"start": 122,
+							"end": 159
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

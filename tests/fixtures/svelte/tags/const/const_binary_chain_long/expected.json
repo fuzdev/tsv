@@ -1,0 +1,297 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 263,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 84,
+				"data": " Binary chain in @const - continuation lines at same indent as first operand "
+			},
+			{
+				"type": "Text",
+				"start": 84,
+				"end": 85,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 85,
+				"end": 262,
+				"expression": {
+					"type": "Identifier",
+					"start": 92,
+					"end": 97,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 7
+						},
+						"end": {
+							"line": 2,
+							"column": 12
+						}
+					},
+					"name": "items"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 106,
+							"end": 108,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ConstTag",
+							"start": 108,
+							"end": 249,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "Identifier",
+											"name": "a",
+											"start": 116,
+											"end": 117,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 9,
+													"character": 116
+												},
+												"end": {
+													"line": 3,
+													"column": 10,
+													"character": 117
+												}
+											}
+										},
+										"init": {
+											"type": "BinaryExpression",
+											"start": 122,
+											"end": 248,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 2
+												},
+												"end": {
+													"line": 8,
+													"column": 28
+												}
+											},
+											"left": {
+												"type": "BinaryExpression",
+												"start": 122,
+												"end": 217,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 2
+													},
+													"end": {
+														"line": 7,
+														"column": 24
+													}
+												},
+												"left": {
+													"type": "BinaryExpression",
+													"start": 122,
+													"end": 190,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 2
+														},
+														"end": {
+															"line": 6,
+															"column": 29
+														}
+													},
+													"left": {
+														"type": "BinaryExpression",
+														"start": 122,
+														"end": 158,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 2
+															},
+															"end": {
+																"line": 5,
+																"column": 29
+															}
+														},
+														"left": {
+															"type": "Identifier",
+															"start": 122,
+															"end": 126,
+															"loc": {
+																"start": {
+																	"line": 4,
+																	"column": 2
+																},
+																"end": {
+																	"line": 4,
+																	"column": 6
+																}
+															},
+															"name": "item"
+														},
+														"operator": "+",
+														"right": {
+															"type": "Literal",
+															"start": 131,
+															"end": 158,
+															"loc": {
+																"start": {
+																	"line": 5,
+																	"column": 2
+																},
+																"end": {
+																	"line": 5,
+																	"column": 29
+																}
+															},
+															"value": "aaaaaaaaaaaaaaaaaaaaaaaaa",
+															"raw": "'aaaaaaaaaaaaaaaaaaaaaaaaa'"
+														}
+													},
+													"operator": "+",
+													"right": {
+														"type": "Literal",
+														"start": 163,
+														"end": 190,
+														"loc": {
+															"start": {
+																"line": 6,
+																"column": 2
+															},
+															"end": {
+																"line": 6,
+																"column": 29
+															}
+														},
+														"value": "bbbbbbbbbbbbbbbbbbbbbbbbb",
+														"raw": "'bbbbbbbbbbbbbbbbbbbbbbbbb'"
+													}
+												},
+												"operator": "+",
+												"right": {
+													"type": "Literal",
+													"start": 195,
+													"end": 217,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 2
+														},
+														"end": {
+															"line": 7,
+															"column": 24
+														}
+													},
+													"value": "cccccccccccccccccccc",
+													"raw": "'cccccccccccccccccccc'"
+												}
+											},
+											"operator": "+",
+											"right": {
+												"type": "Literal",
+												"start": 222,
+												"end": 248,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 2
+													},
+													"end": {
+														"line": 8,
+														"column": 28
+													}
+												},
+												"value": "dddddddddddddddddddddddd",
+												"raw": "'dddddddddddddddddddddddd'"
+											}
+										},
+										"start": 116,
+										"end": 248
+									}
+								],
+								"start": 110,
+								"end": 248
+							}
+						},
+						{
+							"type": "Text",
+							"start": 249,
+							"end": 251,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 251,
+							"end": 254,
+							"expression": {
+								"type": "Identifier",
+								"start": 252,
+								"end": 253,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 3
+									}
+								},
+								"name": "a"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 254,
+							"end": 255,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 101,
+					"end": 105,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 16,
+							"character": 101
+						},
+						"end": {
+							"line": 2,
+							"column": 20,
+							"character": 105
+						}
+					}
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

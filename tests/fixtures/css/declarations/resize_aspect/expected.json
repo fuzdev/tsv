@@ -1,0 +1,115 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 165,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 156,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 29,
+							"property": "resize",
+							"value": "none"
+						},
+						{
+							"type": "Declaration",
+							"start": 33,
+							"end": 45,
+							"property": "resize",
+							"value": "both"
+						},
+						{
+							"type": "Declaration",
+							"start": 49,
+							"end": 67,
+							"property": "resize",
+							"value": "horizontal"
+						},
+						{
+							"type": "Declaration",
+							"start": 71,
+							"end": 87,
+							"property": "resize",
+							"value": "vertical"
+						},
+						{
+							"type": "Declaration",
+							"start": 91,
+							"end": 111,
+							"property": "aspect-ratio",
+							"value": "16 / 9"
+						},
+						{
+							"type": "Declaration",
+							"start": 115,
+							"end": 130,
+							"property": "aspect-ratio",
+							"value": "1"
+						},
+						{
+							"type": "Declaration",
+							"start": 134,
+							"end": 152,
+							"property": "aspect-ratio",
+							"value": "auto"
+						}
+					]
+				},
+				"start": 9,
+				"end": 156
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 157,
+			"styles": "\n\tdiv {\n\t\tresize: none;\n\t\tresize: both;\n\t\tresize: horizontal;\n\t\tresize: vertical;\n\t\taspect-ratio: 16 / 9;\n\t\taspect-ratio: 1;\n\t\taspect-ratio: auto;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 166,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

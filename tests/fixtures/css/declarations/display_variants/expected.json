@@ -1,0 +1,157 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 293,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 284,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 31,
+							"property": "display",
+							"value": "block"
+						},
+						{
+							"type": "Declaration",
+							"start": 35,
+							"end": 50,
+							"property": "display",
+							"value": "inline"
+						},
+						{
+							"type": "Declaration",
+							"start": 54,
+							"end": 75,
+							"property": "display",
+							"value": "inline-block"
+						},
+						{
+							"type": "Declaration",
+							"start": 79,
+							"end": 92,
+							"property": "display",
+							"value": "flex"
+						},
+						{
+							"type": "Declaration",
+							"start": 96,
+							"end": 116,
+							"property": "display",
+							"value": "inline-flex"
+						},
+						{
+							"type": "Declaration",
+							"start": 120,
+							"end": 133,
+							"property": "display",
+							"value": "grid"
+						},
+						{
+							"type": "Declaration",
+							"start": 137,
+							"end": 157,
+							"property": "display",
+							"value": "inline-grid"
+						},
+						{
+							"type": "Declaration",
+							"start": 161,
+							"end": 179,
+							"property": "display",
+							"value": "flow-root"
+						},
+						{
+							"type": "Declaration",
+							"start": 183,
+							"end": 200,
+							"property": "display",
+							"value": "contents"
+						},
+						{
+							"type": "Declaration",
+							"start": 204,
+							"end": 217,
+							"property": "display",
+							"value": "none"
+						},
+						{
+							"type": "Declaration",
+							"start": 221,
+							"end": 235,
+							"property": "display",
+							"value": "table"
+						},
+						{
+							"type": "Declaration",
+							"start": 239,
+							"end": 257,
+							"property": "display",
+							"value": "table-row"
+						},
+						{
+							"type": "Declaration",
+							"start": 261,
+							"end": 280,
+							"property": "display",
+							"value": "table-cell"
+						}
+					]
+				},
+				"start": 9,
+				"end": 284
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 285,
+			"styles": "\n\tdiv {\n\t\tdisplay: block;\n\t\tdisplay: inline;\n\t\tdisplay: inline-block;\n\t\tdisplay: flex;\n\t\tdisplay: inline-flex;\n\t\tdisplay: grid;\n\t\tdisplay: inline-grid;\n\t\tdisplay: flow-root;\n\t\tdisplay: contents;\n\t\tdisplay: none;\n\t\tdisplay: table;\n\t\tdisplay: table-row;\n\t\tdisplay: table-cell;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 294,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

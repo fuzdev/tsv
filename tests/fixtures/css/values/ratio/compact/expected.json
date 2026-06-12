@@ -1,0 +1,162 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 208,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 131,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 35,
+							"property": "aspect-ratio",
+							"value": "16/9"
+						},
+						{
+							"type": "Declaration",
+							"start": 39,
+							"end": 56,
+							"property": "aspect-ratio",
+							"value": "4/3"
+						},
+						{
+							"type": "Declaration",
+							"start": 60,
+							"end": 77,
+							"property": "aspect-ratio",
+							"value": "1/1"
+						},
+						{
+							"type": "Declaration",
+							"start": 81,
+							"end": 100,
+							"property": "aspect-ratio",
+							"value": "1.777"
+						},
+						{
+							"type": "Declaration",
+							"start": 104,
+							"end": 127,
+							"property": "aspect-ratio",
+							"value": "auto 16/9"
+						}
+					]
+				},
+				"start": 9,
+				"end": 131
+			},
+			{
+				"type": "Atrule",
+				"start": 134,
+				"end": 199,
+				"name": "media",
+				"prelude": "(aspect-ratio: 16/9)",
+				"block": {
+					"type": "Block",
+					"start": 162,
+					"end": 199,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 166,
+								"end": 170,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 166,
+										"end": 170,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "body",
+														"start": 166,
+														"end": 170
+													}
+												],
+												"start": 166,
+												"end": 170
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 171,
+								"end": 196,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 176,
+										"end": 191,
+										"property": "background",
+										"value": "red"
+									}
+								]
+							},
+							"start": 166,
+							"end": 196
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 200,
+			"styles": "\n\tdiv {\n\t\taspect-ratio: 16/9;\n\t\taspect-ratio: 4/3;\n\t\taspect-ratio: 1/1;\n\t\taspect-ratio: 1.777;\n\t\taspect-ratio: auto 16/9;\n\t}\n\n\t@media (aspect-ratio: 16/9) {\n\t\tbody {\n\t\t\tbackground: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 209,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

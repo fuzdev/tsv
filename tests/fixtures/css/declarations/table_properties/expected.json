@@ -1,0 +1,136 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 266,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 257,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 35,
+							"property": "table-layout",
+							"value": "auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 39,
+							"end": 58,
+							"property": "table-layout",
+							"value": "fixed"
+						},
+						{
+							"type": "Declaration",
+							"start": 62,
+							"end": 87,
+							"property": "border-collapse",
+							"value": "collapse"
+						},
+						{
+							"type": "Declaration",
+							"start": 91,
+							"end": 116,
+							"property": "border-collapse",
+							"value": "separate"
+						},
+						{
+							"type": "Declaration",
+							"start": 120,
+							"end": 139,
+							"property": "border-spacing",
+							"value": "2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 143,
+							"end": 166,
+							"property": "border-spacing",
+							"value": "2px 4px"
+						},
+						{
+							"type": "Declaration",
+							"start": 170,
+							"end": 187,
+							"property": "caption-side",
+							"value": "top"
+						},
+						{
+							"type": "Declaration",
+							"start": 191,
+							"end": 211,
+							"property": "caption-side",
+							"value": "bottom"
+						},
+						{
+							"type": "Declaration",
+							"start": 215,
+							"end": 232,
+							"property": "empty-cells",
+							"value": "show"
+						},
+						{
+							"type": "Declaration",
+							"start": 236,
+							"end": 253,
+							"property": "empty-cells",
+							"value": "hide"
+						}
+					]
+				},
+				"start": 9,
+				"end": 257
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 258,
+			"styles": "\n\tdiv {\n\t\ttable-layout: auto;\n\t\ttable-layout: fixed;\n\t\tborder-collapse: collapse;\n\t\tborder-collapse: separate;\n\t\tborder-spacing: 2px;\n\t\tborder-spacing: 2px 4px;\n\t\tcaption-side: top;\n\t\tcaption-side: bottom;\n\t\tempty-cells: show;\n\t\tempty-cells: hide;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 267,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

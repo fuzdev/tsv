@@ -1,0 +1,1978 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 987,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " With braces",
+			"start": 20,
+			"end": 34,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 100 chars exactly - stays inline (at boundary)",
+			"start": 37,
+			"end": 86,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars - wraps (exceeds print_width)",
+			"start": 192,
+			"end": 234,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 43
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " No braces, body on same line (entire statement fits)",
+			"start": 364,
+			"end": 419,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 100 chars exactly - entire statement stays on one line",
+			"start": 422,
+			"end": 479,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " No braces, body on next line (condition too long for body to fit)",
+			"start": 582,
+			"end": 650,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 100 chars for condition only - body goes to next line",
+			"start": 653,
+			"end": 709,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 1
+				},
+				"end": {
+					"line": 30,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars - condition wraps",
+			"start": 817,
+			"end": 847,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 31
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 986,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 977,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 48,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 88,
+					"end": 189,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "LogicalExpression",
+						"start": 92,
+						"end": 183,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 5
+							},
+							"end": {
+								"line": 5,
+								"column": 96
+							}
+						},
+						"left": {
+							"type": "LogicalExpression",
+							"start": 92,
+							"end": 169,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 5
+								},
+								"end": {
+									"line": 5,
+									"column": 82
+								}
+							},
+							"left": {
+								"type": "LogicalExpression",
+								"start": 92,
+								"end": 160,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 5
+									},
+									"end": {
+										"line": 5,
+										"column": 73
+									}
+								},
+								"left": {
+									"type": "LogicalExpression",
+									"start": 92,
+									"end": 151,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 5
+										},
+										"end": {
+											"line": 5,
+											"column": 64
+										}
+									},
+									"left": {
+										"type": "LogicalExpression",
+										"start": 92,
+										"end": 142,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 5
+											},
+											"end": {
+												"line": 5,
+												"column": 55
+											}
+										},
+										"left": {
+											"type": "LogicalExpression",
+											"start": 92,
+											"end": 133,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 5
+												},
+												"end": {
+													"line": 5,
+													"column": 46
+												}
+											},
+											"left": {
+												"type": "LogicalExpression",
+												"start": 92,
+												"end": 124,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 5
+													},
+													"end": {
+														"line": 5,
+														"column": 37
+													}
+												},
+												"left": {
+													"type": "LogicalExpression",
+													"start": 92,
+													"end": 115,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 5
+														},
+														"end": {
+															"line": 5,
+															"column": 28
+														}
+													},
+													"left": {
+														"type": "LogicalExpression",
+														"start": 92,
+														"end": 106,
+														"loc": {
+															"start": {
+																"line": 5,
+																"column": 5
+															},
+															"end": {
+																"line": 5,
+																"column": 19
+															}
+														},
+														"left": {
+															"type": "Identifier",
+															"start": 92,
+															"end": 97,
+															"loc": {
+																"start": {
+																	"line": 5,
+																	"column": 5
+																},
+																"end": {
+																	"line": 5,
+																	"column": 10
+																}
+															},
+															"name": "condA"
+														},
+														"operator": "&&",
+														"right": {
+															"type": "Identifier",
+															"start": 101,
+															"end": 106,
+															"loc": {
+																"start": {
+																	"line": 5,
+																	"column": 14
+																},
+																"end": {
+																	"line": 5,
+																	"column": 19
+																}
+															},
+															"name": "condB"
+														}
+													},
+													"operator": "&&",
+													"right": {
+														"type": "Identifier",
+														"start": 110,
+														"end": 115,
+														"loc": {
+															"start": {
+																"line": 5,
+																"column": 23
+															},
+															"end": {
+																"line": 5,
+																"column": 28
+															}
+														},
+														"name": "condC"
+													}
+												},
+												"operator": "&&",
+												"right": {
+													"type": "Identifier",
+													"start": 119,
+													"end": 124,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 32
+														},
+														"end": {
+															"line": 5,
+															"column": 37
+														}
+													},
+													"name": "condD"
+												}
+											},
+											"operator": "&&",
+											"right": {
+												"type": "Identifier",
+												"start": 128,
+												"end": 133,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 41
+													},
+													"end": {
+														"line": 5,
+														"column": 46
+													}
+												},
+												"name": "condE"
+											}
+										},
+										"operator": "&&",
+										"right": {
+											"type": "Identifier",
+											"start": 137,
+											"end": 142,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 50
+												},
+												"end": {
+													"line": 5,
+													"column": 55
+												}
+											},
+											"name": "condF"
+										}
+									},
+									"operator": "&&",
+									"right": {
+										"type": "Identifier",
+										"start": 146,
+										"end": 151,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 59
+											},
+											"end": {
+												"line": 5,
+												"column": 64
+											}
+										},
+										"name": "condG"
+									}
+								},
+								"operator": "&&",
+								"right": {
+									"type": "Identifier",
+									"start": 155,
+									"end": 160,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 68
+										},
+										"end": {
+											"line": 5,
+											"column": 73
+										}
+									},
+									"name": "condH"
+								}
+							},
+							"operator": "&&",
+							"right": {
+								"type": "Identifier",
+								"start": 164,
+								"end": 169,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 77
+									},
+									"end": {
+										"line": 5,
+										"column": 82
+									}
+								},
+								"name": "condI"
+							}
+						},
+						"operator": "&&",
+						"right": {
+							"type": "Identifier",
+							"start": 173,
+							"end": 183,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 86
+								},
+								"end": {
+									"line": 5,
+									"column": 96
+								}
+							},
+							"name": "condJJJJJJ"
+						}
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 185,
+						"end": 189,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 98
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"body": []
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " With braces",
+							"start": 20,
+							"end": 34
+						},
+						{
+							"type": "Line",
+							"value": " 100 chars exactly - stays inline (at boundary)",
+							"start": 37,
+							"end": 86
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 236,
+					"end": 361,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "LogicalExpression",
+						"start": 243,
+						"end": 353,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 2
+							},
+							"end": {
+								"line": 19,
+								"column": 13
+							}
+						},
+						"left": {
+							"type": "LogicalExpression",
+							"start": 243,
+							"end": 336,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 2
+								},
+								"end": {
+									"line": 18,
+									"column": 7
+								}
+							},
+							"left": {
+								"type": "LogicalExpression",
+								"start": 243,
+								"end": 325,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 7
+									}
+								},
+								"left": {
+									"type": "LogicalExpression",
+									"start": 243,
+									"end": 314,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 7
+										}
+									},
+									"left": {
+										"type": "LogicalExpression",
+										"start": 243,
+										"end": 303,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 2
+											},
+											"end": {
+												"line": 15,
+												"column": 7
+											}
+										},
+										"left": {
+											"type": "LogicalExpression",
+											"start": 243,
+											"end": 292,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 2
+												},
+												"end": {
+													"line": 14,
+													"column": 7
+												}
+											},
+											"left": {
+												"type": "LogicalExpression",
+												"start": 243,
+												"end": 281,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 2
+													},
+													"end": {
+														"line": 13,
+														"column": 7
+													}
+												},
+												"left": {
+													"type": "LogicalExpression",
+													"start": 243,
+													"end": 270,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 2
+														},
+														"end": {
+															"line": 12,
+															"column": 7
+														}
+													},
+													"left": {
+														"type": "LogicalExpression",
+														"start": 243,
+														"end": 259,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 2
+															},
+															"end": {
+																"line": 11,
+																"column": 7
+															}
+														},
+														"left": {
+															"type": "Identifier",
+															"start": 243,
+															"end": 248,
+															"loc": {
+																"start": {
+																	"line": 10,
+																	"column": 2
+																},
+																"end": {
+																	"line": 10,
+																	"column": 7
+																}
+															},
+															"name": "condA"
+														},
+														"operator": "&&",
+														"right": {
+															"type": "Identifier",
+															"start": 254,
+															"end": 259,
+															"loc": {
+																"start": {
+																	"line": 11,
+																	"column": 2
+																},
+																"end": {
+																	"line": 11,
+																	"column": 7
+																}
+															},
+															"name": "condB"
+														}
+													},
+													"operator": "&&",
+													"right": {
+														"type": "Identifier",
+														"start": 265,
+														"end": 270,
+														"loc": {
+															"start": {
+																"line": 12,
+																"column": 2
+															},
+															"end": {
+																"line": 12,
+																"column": 7
+															}
+														},
+														"name": "condC"
+													}
+												},
+												"operator": "&&",
+												"right": {
+													"type": "Identifier",
+													"start": 276,
+													"end": 281,
+													"loc": {
+														"start": {
+															"line": 13,
+															"column": 2
+														},
+														"end": {
+															"line": 13,
+															"column": 7
+														}
+													},
+													"name": "condD"
+												}
+											},
+											"operator": "&&",
+											"right": {
+												"type": "Identifier",
+												"start": 287,
+												"end": 292,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 2
+													},
+													"end": {
+														"line": 14,
+														"column": 7
+													}
+												},
+												"name": "condE"
+											}
+										},
+										"operator": "&&",
+										"right": {
+											"type": "Identifier",
+											"start": 298,
+											"end": 303,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 2
+												},
+												"end": {
+													"line": 15,
+													"column": 7
+												}
+											},
+											"name": "condF"
+										}
+									},
+									"operator": "&&",
+									"right": {
+										"type": "Identifier",
+										"start": 309,
+										"end": 314,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 2
+											},
+											"end": {
+												"line": 16,
+												"column": 7
+											}
+										},
+										"name": "condG"
+									}
+								},
+								"operator": "&&",
+								"right": {
+									"type": "Identifier",
+									"start": 320,
+									"end": 325,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 2
+										},
+										"end": {
+											"line": 17,
+											"column": 7
+										}
+									},
+									"name": "condH"
+								}
+							},
+							"operator": "&&",
+							"right": {
+								"type": "Identifier",
+								"start": 331,
+								"end": 336,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 7
+									}
+								},
+								"name": "condI"
+							}
+						},
+						"operator": "&&",
+						"right": {
+							"type": "Identifier",
+							"start": 342,
+							"end": 353,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 2
+								},
+								"end": {
+									"line": 19,
+									"column": 13
+								}
+							},
+							"name": "condJJJJJJJ"
+						}
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 357,
+						"end": 361,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 3
+							},
+							"end": {
+								"line": 21,
+								"column": 2
+							}
+						},
+						"body": []
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 chars - wraps (exceeds print_width)",
+							"start": 192,
+							"end": 234
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 481,
+					"end": 579,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 99
+						}
+					},
+					"test": {
+						"type": "LogicalExpression",
+						"start": 485,
+						"end": 575,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 5
+							},
+							"end": {
+								"line": 26,
+								"column": 95
+							}
+						},
+						"left": {
+							"type": "LogicalExpression",
+							"start": 485,
+							"end": 562,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 5
+								},
+								"end": {
+									"line": 26,
+									"column": 82
+								}
+							},
+							"left": {
+								"type": "LogicalExpression",
+								"start": 485,
+								"end": 553,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 5
+									},
+									"end": {
+										"line": 26,
+										"column": 73
+									}
+								},
+								"left": {
+									"type": "LogicalExpression",
+									"start": 485,
+									"end": 544,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 5
+										},
+										"end": {
+											"line": 26,
+											"column": 64
+										}
+									},
+									"left": {
+										"type": "LogicalExpression",
+										"start": 485,
+										"end": 535,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 5
+											},
+											"end": {
+												"line": 26,
+												"column": 55
+											}
+										},
+										"left": {
+											"type": "LogicalExpression",
+											"start": 485,
+											"end": 526,
+											"loc": {
+												"start": {
+													"line": 26,
+													"column": 5
+												},
+												"end": {
+													"line": 26,
+													"column": 46
+												}
+											},
+											"left": {
+												"type": "LogicalExpression",
+												"start": 485,
+												"end": 517,
+												"loc": {
+													"start": {
+														"line": 26,
+														"column": 5
+													},
+													"end": {
+														"line": 26,
+														"column": 37
+													}
+												},
+												"left": {
+													"type": "LogicalExpression",
+													"start": 485,
+													"end": 508,
+													"loc": {
+														"start": {
+															"line": 26,
+															"column": 5
+														},
+														"end": {
+															"line": 26,
+															"column": 28
+														}
+													},
+													"left": {
+														"type": "LogicalExpression",
+														"start": 485,
+														"end": 499,
+														"loc": {
+															"start": {
+																"line": 26,
+																"column": 5
+															},
+															"end": {
+																"line": 26,
+																"column": 19
+															}
+														},
+														"left": {
+															"type": "Identifier",
+															"start": 485,
+															"end": 490,
+															"loc": {
+																"start": {
+																	"line": 26,
+																	"column": 5
+																},
+																"end": {
+																	"line": 26,
+																	"column": 10
+																}
+															},
+															"name": "condA"
+														},
+														"operator": "&&",
+														"right": {
+															"type": "Identifier",
+															"start": 494,
+															"end": 499,
+															"loc": {
+																"start": {
+																	"line": 26,
+																	"column": 14
+																},
+																"end": {
+																	"line": 26,
+																	"column": 19
+																}
+															},
+															"name": "condB"
+														}
+													},
+													"operator": "&&",
+													"right": {
+														"type": "Identifier",
+														"start": 503,
+														"end": 508,
+														"loc": {
+															"start": {
+																"line": 26,
+																"column": 23
+															},
+															"end": {
+																"line": 26,
+																"column": 28
+															}
+														},
+														"name": "condC"
+													}
+												},
+												"operator": "&&",
+												"right": {
+													"type": "Identifier",
+													"start": 512,
+													"end": 517,
+													"loc": {
+														"start": {
+															"line": 26,
+															"column": 32
+														},
+														"end": {
+															"line": 26,
+															"column": 37
+														}
+													},
+													"name": "condD"
+												}
+											},
+											"operator": "&&",
+											"right": {
+												"type": "Identifier",
+												"start": 521,
+												"end": 526,
+												"loc": {
+													"start": {
+														"line": 26,
+														"column": 41
+													},
+													"end": {
+														"line": 26,
+														"column": 46
+													}
+												},
+												"name": "condE"
+											}
+										},
+										"operator": "&&",
+										"right": {
+											"type": "Identifier",
+											"start": 530,
+											"end": 535,
+											"loc": {
+												"start": {
+													"line": 26,
+													"column": 50
+												},
+												"end": {
+													"line": 26,
+													"column": 55
+												}
+											},
+											"name": "condF"
+										}
+									},
+									"operator": "&&",
+									"right": {
+										"type": "Identifier",
+										"start": 539,
+										"end": 544,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 59
+											},
+											"end": {
+												"line": 26,
+												"column": 64
+											}
+										},
+										"name": "condG"
+									}
+								},
+								"operator": "&&",
+								"right": {
+									"type": "Identifier",
+									"start": 548,
+									"end": 553,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 68
+										},
+										"end": {
+											"line": 26,
+											"column": 73
+										}
+									},
+									"name": "condH"
+								}
+							},
+							"operator": "&&",
+							"right": {
+								"type": "Identifier",
+								"start": 557,
+								"end": 562,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 77
+									},
+									"end": {
+										"line": 26,
+										"column": 82
+									}
+								},
+								"name": "condI"
+							}
+						},
+						"operator": "&&",
+						"right": {
+							"type": "Identifier",
+							"start": 566,
+							"end": 575,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 86
+								},
+								"end": {
+									"line": 26,
+									"column": 95
+								}
+							},
+							"name": "condJJJJJ"
+						}
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 577,
+						"end": 579,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 97
+							},
+							"end": {
+								"line": 26,
+								"column": 99
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 577,
+							"end": 578,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 97
+								},
+								"end": {
+									"line": 26,
+									"column": 98
+								}
+							},
+							"name": "a"
+						}
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " No braces, body on same line (entire statement fits)",
+							"start": 364,
+							"end": 419
+						},
+						{
+							"type": "Line",
+							"value": " 100 chars exactly - entire statement stays on one line",
+							"start": 422,
+							"end": 479
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 711,
+					"end": 814,
+					"loc": {
+						"start": {
+							"line": 31,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 4
+						}
+					},
+					"test": {
+						"type": "LogicalExpression",
+						"start": 715,
+						"end": 808,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 5
+							},
+							"end": {
+								"line": 31,
+								"column": 98
+							}
+						},
+						"left": {
+							"type": "LogicalExpression",
+							"start": 715,
+							"end": 792,
+							"loc": {
+								"start": {
+									"line": 31,
+									"column": 5
+								},
+								"end": {
+									"line": 31,
+									"column": 82
+								}
+							},
+							"left": {
+								"type": "LogicalExpression",
+								"start": 715,
+								"end": 783,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 5
+									},
+									"end": {
+										"line": 31,
+										"column": 73
+									}
+								},
+								"left": {
+									"type": "LogicalExpression",
+									"start": 715,
+									"end": 774,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 5
+										},
+										"end": {
+											"line": 31,
+											"column": 64
+										}
+									},
+									"left": {
+										"type": "LogicalExpression",
+										"start": 715,
+										"end": 765,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 5
+											},
+											"end": {
+												"line": 31,
+												"column": 55
+											}
+										},
+										"left": {
+											"type": "LogicalExpression",
+											"start": 715,
+											"end": 756,
+											"loc": {
+												"start": {
+													"line": 31,
+													"column": 5
+												},
+												"end": {
+													"line": 31,
+													"column": 46
+												}
+											},
+											"left": {
+												"type": "LogicalExpression",
+												"start": 715,
+												"end": 747,
+												"loc": {
+													"start": {
+														"line": 31,
+														"column": 5
+													},
+													"end": {
+														"line": 31,
+														"column": 37
+													}
+												},
+												"left": {
+													"type": "LogicalExpression",
+													"start": 715,
+													"end": 738,
+													"loc": {
+														"start": {
+															"line": 31,
+															"column": 5
+														},
+														"end": {
+															"line": 31,
+															"column": 28
+														}
+													},
+													"left": {
+														"type": "LogicalExpression",
+														"start": 715,
+														"end": 729,
+														"loc": {
+															"start": {
+																"line": 31,
+																"column": 5
+															},
+															"end": {
+																"line": 31,
+																"column": 19
+															}
+														},
+														"left": {
+															"type": "Identifier",
+															"start": 715,
+															"end": 720,
+															"loc": {
+																"start": {
+																	"line": 31,
+																	"column": 5
+																},
+																"end": {
+																	"line": 31,
+																	"column": 10
+																}
+															},
+															"name": "condA"
+														},
+														"operator": "&&",
+														"right": {
+															"type": "Identifier",
+															"start": 724,
+															"end": 729,
+															"loc": {
+																"start": {
+																	"line": 31,
+																	"column": 14
+																},
+																"end": {
+																	"line": 31,
+																	"column": 19
+																}
+															},
+															"name": "condB"
+														}
+													},
+													"operator": "&&",
+													"right": {
+														"type": "Identifier",
+														"start": 733,
+														"end": 738,
+														"loc": {
+															"start": {
+																"line": 31,
+																"column": 23
+															},
+															"end": {
+																"line": 31,
+																"column": 28
+															}
+														},
+														"name": "condC"
+													}
+												},
+												"operator": "&&",
+												"right": {
+													"type": "Identifier",
+													"start": 742,
+													"end": 747,
+													"loc": {
+														"start": {
+															"line": 31,
+															"column": 32
+														},
+														"end": {
+															"line": 31,
+															"column": 37
+														}
+													},
+													"name": "condD"
+												}
+											},
+											"operator": "&&",
+											"right": {
+												"type": "Identifier",
+												"start": 751,
+												"end": 756,
+												"loc": {
+													"start": {
+														"line": 31,
+														"column": 41
+													},
+													"end": {
+														"line": 31,
+														"column": 46
+													}
+												},
+												"name": "condE"
+											}
+										},
+										"operator": "&&",
+										"right": {
+											"type": "Identifier",
+											"start": 760,
+											"end": 765,
+											"loc": {
+												"start": {
+													"line": 31,
+													"column": 50
+												},
+												"end": {
+													"line": 31,
+													"column": 55
+												}
+											},
+											"name": "condF"
+										}
+									},
+									"operator": "&&",
+									"right": {
+										"type": "Identifier",
+										"start": 769,
+										"end": 774,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 59
+											},
+											"end": {
+												"line": 31,
+												"column": 64
+											}
+										},
+										"name": "condG"
+									}
+								},
+								"operator": "&&",
+								"right": {
+									"type": "Identifier",
+									"start": 778,
+									"end": 783,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 68
+										},
+										"end": {
+											"line": 31,
+											"column": 73
+										}
+									},
+									"name": "condH"
+								}
+							},
+							"operator": "&&",
+							"right": {
+								"type": "Identifier",
+								"start": 787,
+								"end": 792,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 77
+									},
+									"end": {
+										"line": 31,
+										"column": 82
+									}
+								},
+								"name": "condI"
+							}
+						},
+						"operator": "&&",
+						"right": {
+							"type": "Identifier",
+							"start": 796,
+							"end": 808,
+							"loc": {
+								"start": {
+									"line": 31,
+									"column": 86
+								},
+								"end": {
+									"line": 31,
+									"column": 98
+								}
+							},
+							"name": "condJJJJJJJJ"
+						}
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 812,
+						"end": 814,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 2
+							},
+							"end": {
+								"line": 32,
+								"column": 4
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 812,
+							"end": 813,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 2
+								},
+								"end": {
+									"line": 32,
+									"column": 3
+								}
+							},
+							"name": "a"
+						}
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " No braces, body on next line (condition too long for body to fit)",
+							"start": 582,
+							"end": 650
+						},
+						{
+							"type": "Line",
+							"value": " 100 chars for condition only - body goes to next line",
+							"start": 653,
+							"end": 709
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 849,
+					"end": 976,
+					"loc": {
+						"start": {
+							"line": 35,
+							"column": 1
+						},
+						"end": {
+							"line": 47,
+							"column": 4
+						}
+					},
+					"test": {
+						"type": "LogicalExpression",
+						"start": 856,
+						"end": 968,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 2
+							},
+							"end": {
+								"line": 45,
+								"column": 15
+							}
+						},
+						"left": {
+							"type": "LogicalExpression",
+							"start": 856,
+							"end": 949,
+							"loc": {
+								"start": {
+									"line": 36,
+									"column": 2
+								},
+								"end": {
+									"line": 44,
+									"column": 7
+								}
+							},
+							"left": {
+								"type": "LogicalExpression",
+								"start": 856,
+								"end": 938,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 2
+									},
+									"end": {
+										"line": 43,
+										"column": 7
+									}
+								},
+								"left": {
+									"type": "LogicalExpression",
+									"start": 856,
+									"end": 927,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 2
+										},
+										"end": {
+											"line": 42,
+											"column": 7
+										}
+									},
+									"left": {
+										"type": "LogicalExpression",
+										"start": 856,
+										"end": 916,
+										"loc": {
+											"start": {
+												"line": 36,
+												"column": 2
+											},
+											"end": {
+												"line": 41,
+												"column": 7
+											}
+										},
+										"left": {
+											"type": "LogicalExpression",
+											"start": 856,
+											"end": 905,
+											"loc": {
+												"start": {
+													"line": 36,
+													"column": 2
+												},
+												"end": {
+													"line": 40,
+													"column": 7
+												}
+											},
+											"left": {
+												"type": "LogicalExpression",
+												"start": 856,
+												"end": 894,
+												"loc": {
+													"start": {
+														"line": 36,
+														"column": 2
+													},
+													"end": {
+														"line": 39,
+														"column": 7
+													}
+												},
+												"left": {
+													"type": "LogicalExpression",
+													"start": 856,
+													"end": 883,
+													"loc": {
+														"start": {
+															"line": 36,
+															"column": 2
+														},
+														"end": {
+															"line": 38,
+															"column": 7
+														}
+													},
+													"left": {
+														"type": "LogicalExpression",
+														"start": 856,
+														"end": 872,
+														"loc": {
+															"start": {
+																"line": 36,
+																"column": 2
+															},
+															"end": {
+																"line": 37,
+																"column": 7
+															}
+														},
+														"left": {
+															"type": "Identifier",
+															"start": 856,
+															"end": 861,
+															"loc": {
+																"start": {
+																	"line": 36,
+																	"column": 2
+																},
+																"end": {
+																	"line": 36,
+																	"column": 7
+																}
+															},
+															"name": "condA"
+														},
+														"operator": "&&",
+														"right": {
+															"type": "Identifier",
+															"start": 867,
+															"end": 872,
+															"loc": {
+																"start": {
+																	"line": 37,
+																	"column": 2
+																},
+																"end": {
+																	"line": 37,
+																	"column": 7
+																}
+															},
+															"name": "condB"
+														}
+													},
+													"operator": "&&",
+													"right": {
+														"type": "Identifier",
+														"start": 878,
+														"end": 883,
+														"loc": {
+															"start": {
+																"line": 38,
+																"column": 2
+															},
+															"end": {
+																"line": 38,
+																"column": 7
+															}
+														},
+														"name": "condC"
+													}
+												},
+												"operator": "&&",
+												"right": {
+													"type": "Identifier",
+													"start": 889,
+													"end": 894,
+													"loc": {
+														"start": {
+															"line": 39,
+															"column": 2
+														},
+														"end": {
+															"line": 39,
+															"column": 7
+														}
+													},
+													"name": "condD"
+												}
+											},
+											"operator": "&&",
+											"right": {
+												"type": "Identifier",
+												"start": 900,
+												"end": 905,
+												"loc": {
+													"start": {
+														"line": 40,
+														"column": 2
+													},
+													"end": {
+														"line": 40,
+														"column": 7
+													}
+												},
+												"name": "condE"
+											}
+										},
+										"operator": "&&",
+										"right": {
+											"type": "Identifier",
+											"start": 911,
+											"end": 916,
+											"loc": {
+												"start": {
+													"line": 41,
+													"column": 2
+												},
+												"end": {
+													"line": 41,
+													"column": 7
+												}
+											},
+											"name": "condF"
+										}
+									},
+									"operator": "&&",
+									"right": {
+										"type": "Identifier",
+										"start": 922,
+										"end": 927,
+										"loc": {
+											"start": {
+												"line": 42,
+												"column": 2
+											},
+											"end": {
+												"line": 42,
+												"column": 7
+											}
+										},
+										"name": "condG"
+									}
+								},
+								"operator": "&&",
+								"right": {
+									"type": "Identifier",
+									"start": 933,
+									"end": 938,
+									"loc": {
+										"start": {
+											"line": 43,
+											"column": 2
+										},
+										"end": {
+											"line": 43,
+											"column": 7
+										}
+									},
+									"name": "condH"
+								}
+							},
+							"operator": "&&",
+							"right": {
+								"type": "Identifier",
+								"start": 944,
+								"end": 949,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 2
+									},
+									"end": {
+										"line": 44,
+										"column": 7
+									}
+								},
+								"name": "condI"
+							}
+						},
+						"operator": "&&",
+						"right": {
+							"type": "Identifier",
+							"start": 955,
+							"end": 968,
+							"loc": {
+								"start": {
+									"line": 45,
+									"column": 2
+								},
+								"end": {
+									"line": 45,
+									"column": 15
+								}
+							},
+							"name": "condJJJJJJJJJ"
+						}
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 974,
+						"end": 976,
+						"loc": {
+							"start": {
+								"line": 47,
+								"column": 2
+							},
+							"end": {
+								"line": 47,
+								"column": 4
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 974,
+							"end": 975,
+							"loc": {
+								"start": {
+									"line": 47,
+									"column": 2
+								},
+								"end": {
+									"line": 47,
+									"column": 3
+								}
+							},
+							"name": "a"
+						}
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 chars - condition wraps",
+							"start": 817,
+							"end": 847
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

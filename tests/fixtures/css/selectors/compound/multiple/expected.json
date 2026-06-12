@@ -1,0 +1,306 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 335,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 66,
+					"end": 85,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 66,
+							"end": 85,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 66,
+											"end": 67
+										},
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 67,
+											"end": 74
+										},
+										{
+											"type": "ClassSelector",
+											"name": "class2",
+											"start": 74,
+											"end": 81
+										},
+										{
+											"type": "IdSelector",
+											"name": "id1",
+											"start": 81,
+											"end": 85
+										}
+									],
+									"start": 66,
+									"end": 85
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 86,
+					"end": 135,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 90,
+							"end": 101,
+							"property": "color",
+							"value": "blue"
+						},
+						{
+							"type": "Declaration",
+							"start": 105,
+							"end": 131,
+							"property": "text-decoration",
+							"value": "underline"
+						}
+					]
+				},
+				"start": 66,
+				"end": 135
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 138,
+					"end": 161,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 138,
+							"end": 161,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "input",
+											"start": 138,
+											"end": 143
+										},
+										{
+											"type": "ClassSelector",
+											"name": "class3",
+											"start": 143,
+											"end": 150
+										},
+										{
+											"type": "ClassSelector",
+											"name": "class4",
+											"start": 150,
+											"end": 157
+										},
+										{
+											"type": "IdSelector",
+											"name": "id2",
+											"start": 157,
+											"end": 161
+										}
+									],
+									"start": 138,
+									"end": 161
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 162,
+					"end": 191,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 166,
+							"end": 187,
+							"property": "border",
+							"value": "1px solid red"
+						}
+					]
+				},
+				"start": 138,
+				"end": 191
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 194,
+					"end": 219,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 194,
+							"end": 219,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class5",
+											"start": 194,
+											"end": 201
+										},
+										{
+											"type": "ClassSelector",
+											"name": "class6",
+											"start": 201,
+											"end": 208
+										},
+										{
+											"type": "ClassSelector",
+											"name": "class7",
+											"start": 208,
+											"end": 215
+										},
+										{
+											"type": "IdSelector",
+											"name": "id3",
+											"start": 215,
+											"end": 219
+										}
+									],
+									"start": 194,
+									"end": 219
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 220,
+					"end": 246,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 224,
+							"end": 242,
+							"property": "padding",
+							"value": "10px 20px"
+						}
+					]
+				},
+				"start": 194,
+				"end": 246
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 249,
+					"end": 278,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 249,
+							"end": 278,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 249,
+											"end": 252
+										},
+										{
+											"type": "ClassSelector",
+											"name": "class8",
+											"start": 252,
+											"end": 259
+										},
+										{
+											"type": "ClassSelector",
+											"name": "class9",
+											"start": 259,
+											"end": 266
+										},
+										{
+											"type": "ClassSelector",
+											"name": "class10",
+											"start": 266,
+											"end": 274
+										},
+										{
+											"type": "IdSelector",
+											"name": "id4",
+											"start": 274,
+											"end": 278
+										}
+									],
+									"start": 249,
+									"end": 278
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 279,
+					"end": 326,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 283,
+							"end": 296,
+							"property": "display",
+							"value": "flex"
+						},
+						{
+							"type": "Declaration",
+							"start": 300,
+							"end": 322,
+							"property": "flex-direction",
+							"value": "column"
+						}
+					]
+				},
+				"start": 249,
+				"end": 326
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 327,
+			"styles": "\n\t/* Test multiple compound selectors chained together */\n\ta.class1.class2#id1 {\n\t\tcolor: blue;\n\t\ttext-decoration: underline;\n\t}\n\n\tinput.class3.class4#id2 {\n\t\tborder: 1px solid red;\n\t}\n\n\t.class5.class6.class7#id3 {\n\t\tpadding: 10px 20px;\n\t}\n\n\tdiv.class8.class9.class10#id4 {\n\t\tdisplay: flex;\n\t\tflex-direction: column;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 336,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

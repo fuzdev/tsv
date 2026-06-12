@@ -1,0 +1,342 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 151,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 45,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 2,
+						"character": 2
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 3,
+							"end": 7,
+							"raw": "&lt;",
+							"data": "<"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 7,
+							"end": 14,
+							"expression": {
+								"type": "Identifier",
+								"start": 8,
+								"end": 13,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 8
+									},
+									"end": {
+										"line": 1,
+										"column": 13
+									}
+								},
+								"name": "expr1"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 14,
+							"end": 18,
+							"raw": "&gt;",
+							"data": ">"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 18,
+							"end": 25,
+							"expression": {
+								"type": "Identifier",
+								"start": 19,
+								"end": 24,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 19
+									},
+									"end": {
+										"line": 1,
+										"column": 24
+									}
+								},
+								"name": "expr2"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 25,
+							"end": 30,
+							"raw": "&lt;/",
+							"data": "</"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 30,
+							"end": 37,
+							"expression": {
+								"type": "Identifier",
+								"start": 31,
+								"end": 36,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 31
+									},
+									"end": {
+										"line": 1,
+										"column": 36
+									}
+								},
+								"name": "expr1"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 37,
+							"end": 41,
+							"raw": "&gt;",
+							"data": ">"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 45,
+				"end": 47,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 47,
+				"end": 80,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 48
+					},
+					"end": {
+						"line": 3,
+						"column": 2,
+						"character": 49
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 50,
+							"end": 57,
+							"raw": "&copy; ",
+							"data": "© "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 57,
+							"end": 63,
+							"expression": {
+								"type": "Literal",
+								"start": 58,
+								"end": 62,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 15
+									}
+								},
+								"value": 2024,
+								"raw": "2024"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 63,
+							"end": 76,
+							"raw": " &ndash; text",
+							"data": " – text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 80,
+				"end": 82,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 82,
+				"end": 117,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 83
+					},
+					"end": {
+						"line": 5,
+						"column": 2,
+						"character": 84
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 85,
+							"end": 92,
+							"expression": {
+								"type": "Identifier",
+								"start": 86,
+								"end": 91,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 4
+									},
+									"end": {
+										"line": 5,
+										"column": 9
+									}
+								},
+								"name": "expr1"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 92,
+							"end": 100,
+							"raw": ": &quot;",
+							"data": ": \""
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 100,
+							"end": 107,
+							"expression": {
+								"type": "Identifier",
+								"start": 101,
+								"end": 106,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 19
+									},
+									"end": {
+										"line": 5,
+										"column": 24
+									}
+								},
+								"name": "expr2"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 107,
+							"end": 113,
+							"raw": "&quot;",
+							"data": "\""
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 117,
+				"end": 119,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 119,
+				"end": 150,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 120
+					},
+					"end": {
+						"line": 7,
+						"column": 2,
+						"character": 121
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 122,
+							"end": 139,
+							"raw": "&amp; text &amp; ",
+							"data": "& text & "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 139,
+							"end": 146,
+							"expression": {
+								"type": "Identifier",
+								"start": 140,
+								"end": 145,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 21
+									},
+									"end": {
+										"line": 7,
+										"column": 26
+									}
+								},
+								"name": "expr1"
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

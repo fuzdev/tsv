@@ -1,0 +1,15 @@
+[package]
+name = "tsv_lang"
+version.workspace = true
+edition.workspace = true
+description = "Language-agnostic foundation primitives for tsv"
+
+[dependencies]
+smallvec.workspace = true
+string-interner.workspace = true
+thiserror.workspace = true
+unicode-segmentation.workspace = true
+unicode-width.workspace = true
+
+[lints]
+workspace = true

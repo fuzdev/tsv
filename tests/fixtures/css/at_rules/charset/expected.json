@@ -1,0 +1,34 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 35,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 26,
+				"name": "charset",
+				"prelude": "\"UTF-8\"",
+				"block": null
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 27,
+			"styles": "\n\t@charset \"UTF-8\";\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 36,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

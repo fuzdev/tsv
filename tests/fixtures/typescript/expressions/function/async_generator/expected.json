@@ -1,0 +1,1967 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 925,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Anonymous async generator function expression",
+			"start": 20,
+			"end": 68,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 49
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Named async generator function expression",
+			"start": 187,
+			"end": 231,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Async generator with await and yield",
+			"start": 365,
+			"end": 404,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Async generator expression in assignment",
+			"start": 516,
+			"end": 559,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Async generator with parameters and return type",
+			"start": 636,
+			"end": 686,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " For await inside async generator",
+			"start": 771,
+			"end": 806,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 1
+				},
+				"end": {
+					"line": 37,
+					"column": 36
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 924,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 915,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 43,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 70,
+					"end": 104,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 35
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 74,
+							"end": 103,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 5
+								},
+								"end": {
+									"line": 3,
+									"column": 34
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 74,
+								"end": 79,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 5
+									},
+									"end": {
+										"line": 3,
+										"column": 10
+									}
+								},
+								"name": "empty"
+							},
+							"init": {
+								"type": "FunctionExpression",
+								"start": 82,
+								"end": 103,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 13
+									},
+									"end": {
+										"line": 3,
+										"column": 34
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": true,
+								"async": true,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 101,
+									"end": 103,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 32
+										},
+										"end": {
+											"line": 3,
+											"column": 34
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Anonymous async generator function expression",
+							"start": 20,
+							"end": 68
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 106,
+					"end": 184,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 110,
+							"end": 183,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 5
+								},
+								"end": {
+									"line": 8,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 110,
+								"end": 115,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 5
+									},
+									"end": {
+										"line": 4,
+										"column": 10
+									}
+								},
+								"name": "basic"
+							},
+							"init": {
+								"type": "FunctionExpression",
+								"start": 118,
+								"end": 183,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 13
+									},
+									"end": {
+										"line": 8,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": true,
+								"async": true,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 137,
+									"end": 183,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 32
+										},
+										"end": {
+											"line": 8,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 141,
+											"end": 149,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 2
+												},
+												"end": {
+													"line": 5,
+													"column": 10
+												}
+											},
+											"expression": {
+												"type": "YieldExpression",
+												"start": 141,
+												"end": 148,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 2
+													},
+													"end": {
+														"line": 5,
+														"column": 9
+													}
+												},
+												"delegate": false,
+												"argument": {
+													"type": "Literal",
+													"start": 147,
+													"end": 148,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 8
+														},
+														"end": {
+															"line": 5,
+															"column": 9
+														}
+													},
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										},
+										{
+											"type": "ExpressionStatement",
+											"start": 152,
+											"end": 169,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 2
+												},
+												"end": {
+													"line": 6,
+													"column": 19
+												}
+											},
+											"expression": {
+												"type": "AwaitExpression",
+												"start": 152,
+												"end": 168,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 2
+													},
+													"end": {
+														"line": 6,
+														"column": 18
+													}
+												},
+												"argument": {
+													"type": "CallExpression",
+													"start": 158,
+													"end": 168,
+													"loc": {
+														"start": {
+															"line": 6,
+															"column": 8
+														},
+														"end": {
+															"line": 6,
+															"column": 18
+														}
+													},
+													"callee": {
+														"type": "Identifier",
+														"start": 158,
+														"end": 163,
+														"loc": {
+															"start": {
+																"line": 6,
+																"column": 8
+															},
+															"end": {
+																"line": 6,
+																"column": 13
+															}
+														},
+														"name": "delay"
+													},
+													"arguments": [
+														{
+															"type": "Literal",
+															"start": 164,
+															"end": 167,
+															"loc": {
+																"start": {
+																	"line": 6,
+																	"column": 14
+																},
+																"end": {
+																	"line": 6,
+																	"column": 17
+																}
+															},
+															"value": 100,
+															"raw": "100"
+														}
+													],
+													"optional": false
+												}
+											}
+										},
+										{
+											"type": "ExpressionStatement",
+											"start": 172,
+											"end": 180,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 2
+												},
+												"end": {
+													"line": 7,
+													"column": 10
+												}
+											},
+											"expression": {
+												"type": "YieldExpression",
+												"start": 172,
+												"end": 179,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 2
+													},
+													"end": {
+														"line": 7,
+														"column": 9
+													}
+												},
+												"delegate": false,
+												"argument": {
+													"type": "Literal",
+													"start": 178,
+													"end": 179,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 8
+														},
+														"end": {
+															"line": 7,
+															"column": 9
+														}
+													},
+													"value": 2,
+													"raw": "2"
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "let"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 233,
+					"end": 285,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 237,
+							"end": 284,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 5
+								},
+								"end": {
+									"line": 13,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 237,
+								"end": 242,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 5
+									},
+									"end": {
+										"line": 11,
+										"column": 10
+									}
+								},
+								"name": "named"
+							},
+							"init": {
+								"type": "FunctionExpression",
+								"start": 245,
+								"end": 284,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 13
+									},
+									"end": {
+										"line": 13,
+										"column": 2
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 261,
+									"end": 266,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 29
+										},
+										"end": {
+											"line": 11,
+											"column": 34
+										}
+									},
+									"name": "myGen"
+								},
+								"expression": false,
+								"generator": true,
+								"async": true,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 269,
+									"end": 284,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 37
+										},
+										"end": {
+											"line": 13,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 273,
+											"end": 281,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 2
+												},
+												"end": {
+													"line": 12,
+													"column": 10
+												}
+											},
+											"expression": {
+												"type": "YieldExpression",
+												"start": 273,
+												"end": 280,
+												"loc": {
+													"start": {
+														"line": 12,
+														"column": 2
+													},
+													"end": {
+														"line": 12,
+														"column": 9
+													}
+												},
+												"delegate": false,
+												"argument": {
+													"type": "Literal",
+													"start": 279,
+													"end": 280,
+													"loc": {
+														"start": {
+															"line": 12,
+															"column": 8
+														},
+														"end": {
+															"line": 12,
+															"column": 9
+														}
+													},
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Named async generator function expression",
+							"start": 187,
+							"end": 231
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 287,
+					"end": 362,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 291,
+							"end": 361,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 5
+								},
+								"end": {
+									"line": 17,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 291,
+								"end": 306,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 5
+									},
+									"end": {
+										"line": 14,
+										"column": 20
+									}
+								},
+								"name": "namedWithParams"
+							},
+							"init": {
+								"type": "FunctionExpression",
+								"start": 309,
+								"end": 361,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 23
+									},
+									"end": {
+										"line": 17,
+										"column": 2
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 325,
+									"end": 328,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 39
+										},
+										"end": {
+											"line": 14,
+											"column": 42
+										}
+									},
+									"name": "gen"
+								},
+								"expression": false,
+								"generator": true,
+								"async": true,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 329,
+										"end": 330,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 43
+											},
+											"end": {
+												"line": 14,
+												"column": 44
+											}
+										},
+										"name": "a"
+									},
+									{
+										"type": "Identifier",
+										"start": 332,
+										"end": 333,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 46
+											},
+											"end": {
+												"line": 14,
+												"column": 47
+											}
+										},
+										"name": "b"
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 335,
+									"end": 361,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 49
+										},
+										"end": {
+											"line": 17,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 339,
+											"end": 347,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 2
+												},
+												"end": {
+													"line": 15,
+													"column": 10
+												}
+											},
+											"expression": {
+												"type": "YieldExpression",
+												"start": 339,
+												"end": 346,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 2
+													},
+													"end": {
+														"line": 15,
+														"column": 9
+													}
+												},
+												"delegate": false,
+												"argument": {
+													"type": "Identifier",
+													"start": 345,
+													"end": 346,
+													"loc": {
+														"start": {
+															"line": 15,
+															"column": 8
+														},
+														"end": {
+															"line": 15,
+															"column": 9
+														}
+													},
+													"name": "a"
+												}
+											}
+										},
+										{
+											"type": "ExpressionStatement",
+											"start": 350,
+											"end": 358,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 2
+												},
+												"end": {
+													"line": 16,
+													"column": 10
+												}
+											},
+											"expression": {
+												"type": "YieldExpression",
+												"start": 350,
+												"end": 357,
+												"loc": {
+													"start": {
+														"line": 16,
+														"column": 2
+													},
+													"end": {
+														"line": 16,
+														"column": 9
+													}
+												},
+												"delegate": false,
+												"argument": {
+													"type": "Identifier",
+													"start": 356,
+													"end": 357,
+													"loc": {
+														"start": {
+															"line": 16,
+															"column": 8
+														},
+														"end": {
+															"line": 16,
+															"column": 9
+														}
+													},
+													"name": "b"
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "let"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 406,
+					"end": 513,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 410,
+							"end": 512,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 5
+								},
+								"end": {
+									"line": 24,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 410,
+								"end": 418,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 5
+									},
+									"end": {
+										"line": 20,
+										"column": 13
+									}
+								},
+								"name": "combined"
+							},
+							"init": {
+								"type": "FunctionExpression",
+								"start": 421,
+								"end": 512,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 16
+									},
+									"end": {
+										"line": 24,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": true,
+								"async": true,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 440,
+									"end": 512,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 35
+										},
+										"end": {
+											"line": 24,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "VariableDeclaration",
+											"start": 444,
+											"end": 474,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 2
+												},
+												"end": {
+													"line": 21,
+													"column": 32
+												}
+											},
+											"declarations": [
+												{
+													"type": "VariableDeclarator",
+													"start": 450,
+													"end": 473,
+													"loc": {
+														"start": {
+															"line": 21,
+															"column": 8
+														},
+														"end": {
+															"line": 21,
+															"column": 31
+														}
+													},
+													"id": {
+														"type": "Identifier",
+														"start": 450,
+														"end": 454,
+														"loc": {
+															"start": {
+																"line": 21,
+																"column": 8
+															},
+															"end": {
+																"line": 21,
+																"column": 12
+															}
+														},
+														"name": "data"
+													},
+													"init": {
+														"type": "AwaitExpression",
+														"start": 457,
+														"end": 473,
+														"loc": {
+															"start": {
+																"line": 21,
+																"column": 15
+															},
+															"end": {
+																"line": 21,
+																"column": 31
+															}
+														},
+														"argument": {
+															"type": "CallExpression",
+															"start": 463,
+															"end": 473,
+															"loc": {
+																"start": {
+																	"line": 21,
+																	"column": 21
+																},
+																"end": {
+																	"line": 21,
+																	"column": 31
+																}
+															},
+															"callee": {
+																"type": "Identifier",
+																"start": 463,
+																"end": 468,
+																"loc": {
+																	"start": {
+																		"line": 21,
+																		"column": 21
+																	},
+																	"end": {
+																		"line": 21,
+																		"column": 26
+																	}
+																},
+																"name": "fetch"
+															},
+															"arguments": [
+																{
+																	"type": "Identifier",
+																	"start": 469,
+																	"end": 472,
+																	"loc": {
+																		"start": {
+																			"line": 21,
+																			"column": 27
+																		},
+																		"end": {
+																			"line": 21,
+																			"column": 30
+																		}
+																	},
+																	"name": "url"
+																}
+															],
+															"optional": false
+														}
+													}
+												}
+											],
+											"kind": "const"
+										},
+										{
+											"type": "ExpressionStatement",
+											"start": 477,
+											"end": 488,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 2
+												},
+												"end": {
+													"line": 22,
+													"column": 13
+												}
+											},
+											"expression": {
+												"type": "YieldExpression",
+												"start": 477,
+												"end": 487,
+												"loc": {
+													"start": {
+														"line": 22,
+														"column": 2
+													},
+													"end": {
+														"line": 22,
+														"column": 12
+													}
+												},
+												"delegate": false,
+												"argument": {
+													"type": "Identifier",
+													"start": 483,
+													"end": 487,
+													"loc": {
+														"start": {
+															"line": 22,
+															"column": 8
+														},
+														"end": {
+															"line": 22,
+															"column": 12
+														}
+													},
+													"name": "data"
+												}
+											}
+										},
+										{
+											"type": "ExpressionStatement",
+											"start": 491,
+											"end": 509,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 2
+												},
+												"end": {
+													"line": 23,
+													"column": 20
+												}
+											},
+											"expression": {
+												"type": "YieldExpression",
+												"start": 491,
+												"end": 508,
+												"loc": {
+													"start": {
+														"line": 23,
+														"column": 2
+													},
+													"end": {
+														"line": 23,
+														"column": 19
+													}
+												},
+												"delegate": true,
+												"argument": {
+													"type": "CallExpression",
+													"start": 498,
+													"end": 508,
+													"loc": {
+														"start": {
+															"line": 23,
+															"column": 9
+														},
+														"end": {
+															"line": 23,
+															"column": 19
+														}
+													},
+													"callee": {
+														"type": "Identifier",
+														"start": 498,
+														"end": 506,
+														"loc": {
+															"start": {
+																"line": 23,
+																"column": 9
+															},
+															"end": {
+																"line": 23,
+																"column": 17
+															}
+														},
+														"name": "otherGen"
+													},
+													"arguments": [],
+													"optional": false
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Async generator with await and yield",
+							"start": 365,
+							"end": 404
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 561,
+					"end": 587,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 27
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 561,
+						"end": 586,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 1
+							},
+							"end": {
+								"line": 27,
+								"column": 26
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 561,
+							"end": 562,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 1
+								},
+								"end": {
+									"line": 27,
+									"column": 2
+								}
+							},
+							"name": "x"
+						},
+						"right": {
+							"type": "FunctionExpression",
+							"start": 565,
+							"end": 586,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 5
+								},
+								"end": {
+									"line": 27,
+									"column": 26
+								}
+							},
+							"id": null,
+							"expression": false,
+							"generator": true,
+							"async": true,
+							"params": [],
+							"body": {
+								"type": "BlockStatement",
+								"start": 584,
+								"end": 586,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 24
+									},
+									"end": {
+										"line": 27,
+										"column": 26
+									}
+								},
+								"body": []
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Async generator expression in assignment",
+							"start": 516,
+							"end": 559
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 589,
+					"end": 633,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 589,
+						"end": 632,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 1
+							},
+							"end": {
+								"line": 30,
+								"column": 2
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 589,
+							"end": 590,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 1
+								},
+								"end": {
+									"line": 28,
+									"column": 2
+								}
+							},
+							"name": "y"
+						},
+						"right": {
+							"type": "FunctionExpression",
+							"start": 593,
+							"end": 632,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 5
+								},
+								"end": {
+									"line": 30,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 609,
+								"end": 614,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 21
+									},
+									"end": {
+										"line": 28,
+										"column": 26
+									}
+								},
+								"name": "named"
+							},
+							"expression": false,
+							"generator": true,
+							"async": true,
+							"params": [],
+							"body": {
+								"type": "BlockStatement",
+								"start": 617,
+								"end": 632,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 29
+									},
+									"end": {
+										"line": 30,
+										"column": 2
+									}
+								},
+								"body": [
+									{
+										"type": "ExpressionStatement",
+										"start": 621,
+										"end": 629,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 2
+											},
+											"end": {
+												"line": 29,
+												"column": 10
+											}
+										},
+										"expression": {
+											"type": "YieldExpression",
+											"start": 621,
+											"end": 628,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 2
+												},
+												"end": {
+													"line": 29,
+													"column": 9
+												}
+											},
+											"delegate": false,
+											"argument": {
+												"type": "Literal",
+												"start": 627,
+												"end": 628,
+												"loc": {
+													"start": {
+														"line": 29,
+														"column": 8
+													},
+													"end": {
+														"line": 29,
+														"column": 9
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									}
+								]
+							}
+						}
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 688,
+					"end": 768,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 35,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 692,
+							"end": 767,
+							"loc": {
+								"start": {
+									"line": 33,
+									"column": 5
+								},
+								"end": {
+									"line": 35,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 692,
+								"end": 697,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 5
+									},
+									"end": {
+										"line": 33,
+										"column": 10
+									}
+								},
+								"name": "typed"
+							},
+							"init": {
+								"type": "FunctionExpression",
+								"start": 700,
+								"end": 767,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 13
+									},
+									"end": {
+										"line": 35,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": true,
+								"async": true,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 717,
+										"end": 726,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 30
+											},
+											"end": {
+												"line": 33,
+												"column": 39
+											}
+										},
+										"name": "x",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 718,
+											"end": 726,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 31
+												},
+												"end": {
+													"line": 33,
+													"column": 39
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSNumberKeyword",
+												"start": 720,
+												"end": 726,
+												"loc": {
+													"start": {
+														"line": 33,
+														"column": 33
+													},
+													"end": {
+														"line": 33,
+														"column": 39
+													}
+												}
+											}
+										}
+									}
+								],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 727,
+									"end": 751,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 40
+										},
+										"end": {
+											"line": 33,
+											"column": 64
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 729,
+										"end": 751,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 42
+											},
+											"end": {
+												"line": 33,
+												"column": 64
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 729,
+											"end": 743,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 42
+												},
+												"end": {
+													"line": 33,
+													"column": 56
+												}
+											},
+											"name": "AsyncGenerator"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 743,
+											"end": 751,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 56
+												},
+												"end": {
+													"line": 33,
+													"column": 64
+												}
+											},
+											"params": [
+												{
+													"type": "TSNumberKeyword",
+													"start": 744,
+													"end": 750,
+													"loc": {
+														"start": {
+															"line": 33,
+															"column": 57
+														},
+														"end": {
+															"line": 33,
+															"column": 63
+														}
+													}
+												}
+											]
+										}
+									}
+								},
+								"body": {
+									"type": "BlockStatement",
+									"start": 752,
+									"end": 767,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 65
+										},
+										"end": {
+											"line": 35,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 756,
+											"end": 764,
+											"loc": {
+												"start": {
+													"line": 34,
+													"column": 2
+												},
+												"end": {
+													"line": 34,
+													"column": 10
+												}
+											},
+											"expression": {
+												"type": "YieldExpression",
+												"start": 756,
+												"end": 763,
+												"loc": {
+													"start": {
+														"line": 34,
+														"column": 2
+													},
+													"end": {
+														"line": 34,
+														"column": 9
+													}
+												},
+												"delegate": false,
+												"argument": {
+													"type": "Identifier",
+													"start": 762,
+													"end": 763,
+													"loc": {
+														"start": {
+															"line": 34,
+															"column": 8
+														},
+														"end": {
+															"line": 34,
+															"column": 9
+														}
+													},
+													"name": "x"
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Async generator with parameters and return type",
+							"start": 636,
+							"end": 686
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 808,
+					"end": 914,
+					"loc": {
+						"start": {
+							"line": 38,
+							"column": 1
+						},
+						"end": {
+							"line": 42,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 812,
+							"end": 913,
+							"loc": {
+								"start": {
+									"line": 38,
+									"column": 5
+								},
+								"end": {
+									"line": 42,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 812,
+								"end": 824,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 5
+									},
+									"end": {
+										"line": 38,
+										"column": 17
+									}
+								},
+								"name": "withForAwait"
+							},
+							"init": {
+								"type": "FunctionExpression",
+								"start": 827,
+								"end": 913,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 20
+									},
+									"end": {
+										"line": 42,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": true,
+								"async": true,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 846,
+									"end": 913,
+									"loc": {
+										"start": {
+											"line": 38,
+											"column": 39
+										},
+										"end": {
+											"line": 42,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ForOfStatement",
+											"start": 850,
+											"end": 910,
+											"loc": {
+												"start": {
+													"line": 39,
+													"column": 2
+												},
+												"end": {
+													"line": 41,
+													"column": 3
+												}
+											},
+											"await": true,
+											"left": {
+												"type": "VariableDeclaration",
+												"start": 861,
+												"end": 871,
+												"loc": {
+													"start": {
+														"line": 39,
+														"column": 13
+													},
+													"end": {
+														"line": 39,
+														"column": 23
+													}
+												},
+												"declarations": [
+													{
+														"type": "VariableDeclarator",
+														"start": 867,
+														"end": 871,
+														"loc": {
+															"start": {
+																"line": 39,
+																"column": 19
+															},
+															"end": {
+																"line": 39,
+																"column": 23
+															}
+														},
+														"id": {
+															"type": "Identifier",
+															"start": 867,
+															"end": 871,
+															"loc": {
+																"start": {
+																	"line": 39,
+																	"column": 19
+																},
+																"end": {
+																	"line": 39,
+																	"column": 23
+																}
+															},
+															"name": "item"
+														},
+														"init": null
+													}
+												],
+												"kind": "const"
+											},
+											"right": {
+												"type": "Identifier",
+												"start": 875,
+												"end": 888,
+												"loc": {
+													"start": {
+														"line": 39,
+														"column": 27
+													},
+													"end": {
+														"line": 39,
+														"column": 40
+													}
+												},
+												"name": "asyncIterable"
+											},
+											"body": {
+												"type": "BlockStatement",
+												"start": 890,
+												"end": 910,
+												"loc": {
+													"start": {
+														"line": 39,
+														"column": 42
+													},
+													"end": {
+														"line": 41,
+														"column": 3
+													}
+												},
+												"body": [
+													{
+														"type": "ExpressionStatement",
+														"start": 895,
+														"end": 906,
+														"loc": {
+															"start": {
+																"line": 40,
+																"column": 3
+															},
+															"end": {
+																"line": 40,
+																"column": 14
+															}
+														},
+														"expression": {
+															"type": "YieldExpression",
+															"start": 895,
+															"end": 905,
+															"loc": {
+																"start": {
+																	"line": 40,
+																	"column": 3
+																},
+																"end": {
+																	"line": 40,
+																	"column": 13
+																}
+															},
+															"delegate": false,
+															"argument": {
+																"type": "Identifier",
+																"start": 901,
+																"end": 905,
+																"loc": {
+																	"start": {
+																		"line": 40,
+																		"column": 9
+																	},
+																	"end": {
+																		"line": 40,
+																		"column": 13
+																	}
+																},
+																"name": "item"
+															}
+														}
+													}
+												]
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " For await inside async generator",
+							"start": 771,
+							"end": 806
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

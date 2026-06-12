@@ -1,0 +1,27 @@
+[package]
+name = "tsv_debug"
+version.workspace = true
+edition.workspace = true
+description = "Development utilities for tsv (AST debugging, printer comparison)"
+
+[[bin]]
+name = "tsv_debug"
+path = "src/main.rs"
+
+[dependencies]
+tsv_cli = { path = "../tsv_cli" }
+tsv_lang.workspace = true
+tsv_svelte = { workspace = true, features = ["convert"] }
+tsv_ts = { workspace = true, features = ["convert"] }
+tsv_css = { workspace = true, features = ["convert"] }
+argh.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "process", "io-util", "sync", "macros", "time"] }
+thiserror.workspace = true
+similar = "2.7"
+futures-util.workspace = true
+tempfile = "3"
+
+[lints]
+workspace = true

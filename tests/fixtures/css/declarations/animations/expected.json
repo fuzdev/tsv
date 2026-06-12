@@ -1,0 +1,129 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 393,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 384,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 77,
+							"property": "animation",
+							"value": "slide 1s ease-in-out 0.5s infinite alternate both"
+						},
+						{
+							"type": "Declaration",
+							"start": 81,
+							"end": 108,
+							"property": "animation-name",
+							"value": "fade, slide"
+						},
+						{
+							"type": "Declaration",
+							"start": 112,
+							"end": 138,
+							"property": "animation-duration",
+							"value": "1s, 2s"
+						},
+						{
+							"type": "Declaration",
+							"start": 142,
+							"end": 181,
+							"property": "animation-timing-function",
+							"value": "ease, linear"
+						},
+						{
+							"type": "Declaration",
+							"start": 185,
+							"end": 210,
+							"property": "animation-delay",
+							"value": "0s, 0.5s"
+						},
+						{
+							"type": "Declaration",
+							"start": 214,
+							"end": 252,
+							"property": "animation-iteration-count",
+							"value": "infinite, 3"
+						},
+						{
+							"type": "Declaration",
+							"start": 256,
+							"end": 295,
+							"property": "animation-direction",
+							"value": "alternate, reverse"
+						},
+						{
+							"type": "Declaration",
+							"start": 299,
+							"end": 339,
+							"property": "animation-fill-mode",
+							"value": "forwards, backwards"
+						},
+						{
+							"type": "Declaration",
+							"start": 343,
+							"end": 380,
+							"property": "animation-play-state",
+							"value": "running, paused"
+						}
+					]
+				},
+				"start": 9,
+				"end": 384
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 385,
+			"styles": "\n\tdiv {\n\t\tanimation: slide 1s ease-in-out 0.5s infinite alternate both;\n\t\tanimation-name: fade, slide;\n\t\tanimation-duration: 1s, 2s;\n\t\tanimation-timing-function: ease, linear;\n\t\tanimation-delay: 0s, 0.5s;\n\t\tanimation-iteration-count: infinite, 3;\n\t\tanimation-direction: alternate, reverse;\n\t\tanimation-fill-mode: forwards, backwards;\n\t\tanimation-play-state: running, paused;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 394,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

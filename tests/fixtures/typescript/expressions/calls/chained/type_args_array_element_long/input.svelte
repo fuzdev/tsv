@@ -1,0 +1,20 @@
+<script lang="ts">
+	// Chain with type args in array element - inline at exactly 100
+	const a1 = [
+		b.fn1<{c: string}>(`aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`).fn2(() => [{c: '0'}]),
+	];
+
+	// Chain with type args in array element - chain breaks at 101
+	const a2 = [
+		b
+			.fn1<{c: string}>(`aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`)
+			.fn2(() => [{c: '0'}]),
+	];
+
+	// Same with simple type arg - chain breaks at 101
+	const a3 = [
+		b
+			.fn1<string>(`aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`)
+			.fn2(() => [{c: '0'}]),
+	];
+</script>

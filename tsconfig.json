@@ -1,0 +1,33 @@
+{
+	"compilerOptions": {
+		"noEmit": true,
+		"target": "esnext",
+		"verbatimModuleSyntax": true,
+		"isolatedModules": true,
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
+		"strict": true,
+		"useUnknownInCatchVariables": false,
+		"exactOptionalPropertyTypes": false,
+		"forceConsistentCasingInFileNames": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"noImplicitReturns": true,
+		"noImplicitOverride": true,
+		"noFallthroughCasesInSwitch": true,
+		"noUncheckedIndexedAccess": true,
+		"resolveJsonModule": true,
+		"sourceMap": true,
+		"declaration": true,
+		"declarationMap": true,
+		"sourceRoot": "../src/lib/",
+		"importHelpers": true,
+		"skipLibCheck": true,
+		"allowJs": true,
+		"erasableSyntaxOnly": true,
+		"allowImportingTsExtensions": false,
+		"checkJs": true
+	},
+	"include": ["tests/**/*.js", "tests/**/*.ts", "tests/**/*.svelte"],
+	"exclude": ["tests/fixtures/**"]
+}

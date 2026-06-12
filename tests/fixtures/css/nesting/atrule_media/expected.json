@@ -1,0 +1,115 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 154,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 20,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 20,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "responsive",
+											"start": 9,
+											"end": 20
+										}
+									],
+									"start": 9,
+									"end": 20
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 21,
+					"end": 145,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 25,
+							"end": 36,
+							"property": "width",
+							"value": "100%"
+						},
+						{
+							"type": "Atrule",
+							"start": 41,
+							"end": 89,
+							"name": "media",
+							"prelude": "(min-width: 768px)",
+							"block": {
+								"type": "Block",
+								"start": 67,
+								"end": 89,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 72,
+										"end": 84,
+										"property": "width",
+										"value": "750px"
+									}
+								]
+							}
+						},
+						{
+							"type": "Atrule",
+							"start": 93,
+							"end": 142,
+							"name": "media",
+							"prelude": "(min-width: 1024px)",
+							"block": {
+								"type": "Block",
+								"start": 120,
+								"end": 142,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 125,
+										"end": 137,
+										"property": "width",
+										"value": "960px"
+									}
+								]
+							}
+						}
+					]
+				},
+				"start": 9,
+				"end": 145
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 146,
+			"styles": "\n\t.responsive {\n\t\twidth: 100%;\n\n\t\t@media (min-width: 768px) {\n\t\t\twidth: 750px;\n\t\t}\n\n\t\t@media (min-width: 1024px) {\n\t\t\twidth: 960px;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 155,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

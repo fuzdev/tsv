@@ -1,0 +1,1874 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 946,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Array as last arg with trailing comment - should stay expanded",
+			"start": 20,
+			"end": 85,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 110,
+			"end": 120,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 9
+				},
+				"end": {
+					"line": 6,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Object as last arg with trailing comment - should stay expanded",
+			"start": 127,
+			"end": 193,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 67
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 216,
+			"end": 226,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 7
+				},
+				"end": {
+					"line": 13,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Multiple arrays with trailing comment on last",
+			"start": 233,
+			"end": 281,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 49
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 314,
+			"end": 324,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 9
+				},
+				"end": {
+					"line": 20,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Mixed types, array last with comment",
+			"start": 331,
+			"end": 370,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 397,
+			"end": 407,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 9
+				},
+				"end": {
+					"line": 27,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Single arg call - array with comment",
+			"start": 414,
+			"end": 453,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 1
+				},
+				"end": {
+					"line": 30,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 468,
+			"end": 478,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 9
+				},
+				"end": {
+					"line": 32,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Type assertion with trailing comment",
+			"start": 485,
+			"end": 524,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 553,
+			"end": 563,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 18
+				},
+				"end": {
+					"line": 38,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Satisfies with trailing comment",
+			"start": 570,
+			"end": 604,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 1
+				},
+				"end": {
+					"line": 41,
+					"column": 35
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 643,
+			"end": 653,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 28
+				},
+				"end": {
+					"line": 44,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " New expression with trailing comment",
+			"start": 660,
+			"end": 699,
+			"loc": {
+				"start": {
+					"line": 47,
+					"column": 1
+				},
+				"end": {
+					"line": 47,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 726,
+			"end": 736,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 9
+				},
+				"end": {
+					"line": 50,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Empty array with comment",
+			"start": 743,
+			"end": 770,
+			"loc": {
+				"start": {
+					"line": 53,
+					"column": 1
+				},
+				"end": {
+					"line": 53,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 787,
+			"end": 797,
+			"loc": {
+				"start": {
+					"line": 56,
+					"column": 6
+				},
+				"end": {
+					"line": 56,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Empty object with comment",
+			"start": 804,
+			"end": 832,
+			"loc": {
+				"start": {
+					"line": 59,
+					"column": 1
+				},
+				"end": {
+					"line": 59,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 849,
+			"end": 859,
+			"loc": {
+				"start": {
+					"line": 62,
+					"column": 6
+				},
+				"end": {
+					"line": 62,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Nested array with comment",
+			"start": 866,
+			"end": 894,
+			"loc": {
+				"start": {
+					"line": 65,
+					"column": 1
+				},
+				"end": {
+					"line": 65,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 921,
+			"end": 931,
+			"loc": {
+				"start": {
+					"line": 68,
+					"column": 16
+				},
+				"end": {
+					"line": 68,
+					"column": 26
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 945,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 936,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 70,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 87,
+					"end": 124,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 87,
+						"end": 123,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 87,
+							"end": 89,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 93,
+								"end": 94,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "Identifier",
+								"start": 98,
+								"end": 99,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 3
+									}
+								},
+								"name": "b"
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 103,
+								"end": 108,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 7
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 104,
+										"end": 107,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 3
+											},
+											"end": {
+												"line": 6,
+												"column": 6
+											}
+										},
+										"value": "c",
+										"raw": "'c'"
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " comment",
+										"start": 110,
+										"end": 120
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Array as last arg with trailing comment - should stay expanded",
+							"start": 20,
+							"end": 85
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 195,
+					"end": 230,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 195,
+						"end": 229,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 195,
+							"end": 197,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 1
+								},
+								"end": {
+									"line": 10,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 201,
+								"end": 202,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "Identifier",
+								"start": 206,
+								"end": 207,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 3
+									}
+								},
+								"name": "b"
+							},
+							{
+								"type": "ObjectExpression",
+								"start": 211,
+								"end": 214,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 5
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 212,
+										"end": 213,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 3
+											},
+											"end": {
+												"line": 13,
+												"column": 4
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 212,
+											"end": 213,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 3
+												},
+												"end": {
+													"line": 13,
+													"column": 4
+												}
+											},
+											"name": "c"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 212,
+											"end": 213,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 3
+												},
+												"end": {
+													"line": 13,
+													"column": 4
+												}
+											},
+											"name": "c"
+										},
+										"kind": "init"
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " comment",
+										"start": 216,
+										"end": 226
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Object as last arg with trailing comment - should stay expanded",
+							"start": 127,
+							"end": 193
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 283,
+					"end": 328,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 283,
+						"end": 327,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 1
+							},
+							"end": {
+								"line": 21,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 283,
+							"end": 285,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 1
+								},
+								"end": {
+									"line": 17,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrayExpression",
+								"start": 289,
+								"end": 294,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 7
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 290,
+										"end": 293,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 3
+											},
+											"end": {
+												"line": 18,
+												"column": 6
+											}
+										},
+										"value": "a",
+										"raw": "'a'"
+									}
+								]
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 298,
+								"end": 303,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 7
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 299,
+										"end": 302,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 3
+											},
+											"end": {
+												"line": 19,
+												"column": 6
+											}
+										},
+										"value": "b",
+										"raw": "'b'"
+									}
+								]
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 307,
+								"end": 312,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 7
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 308,
+										"end": 311,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 3
+											},
+											"end": {
+												"line": 20,
+												"column": 6
+											}
+										},
+										"value": "c",
+										"raw": "'c'"
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " comment",
+										"start": 314,
+										"end": 324
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multiple arrays with trailing comment on last",
+							"start": 233,
+							"end": 281
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 372,
+					"end": 411,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 372,
+						"end": 410,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 1
+							},
+							"end": {
+								"line": 28,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 372,
+							"end": 374,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 1
+								},
+								"end": {
+									"line": 24,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 378,
+								"end": 381,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 2
+									},
+									"end": {
+										"line": 25,
+										"column": 5
+									}
+								},
+								"value": "a",
+								"raw": "'a'"
+							},
+							{
+								"type": "Identifier",
+								"start": 385,
+								"end": 386,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 3
+									}
+								},
+								"name": "b"
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 390,
+								"end": 395,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 2
+									},
+									"end": {
+										"line": 27,
+										"column": 7
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 391,
+										"end": 394,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 3
+											},
+											"end": {
+												"line": 27,
+												"column": 6
+											}
+										},
+										"value": "c",
+										"raw": "'c'"
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " comment",
+										"start": 397,
+										"end": 407
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Mixed types, array last with comment",
+							"start": 331,
+							"end": 370
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 455,
+					"end": 482,
+					"loc": {
+						"start": {
+							"line": 31,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 455,
+						"end": 481,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 1
+							},
+							"end": {
+								"line": 33,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 455,
+							"end": 457,
+							"loc": {
+								"start": {
+									"line": 31,
+									"column": 1
+								},
+								"end": {
+									"line": 31,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrayExpression",
+								"start": 461,
+								"end": 466,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 2
+									},
+									"end": {
+										"line": 32,
+										"column": 7
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 462,
+										"end": 465,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 3
+											},
+											"end": {
+												"line": 32,
+												"column": 6
+											}
+										},
+										"value": "a",
+										"raw": "'a'"
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " comment",
+										"start": 468,
+										"end": 478
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Single arg call - array with comment",
+							"start": 414,
+							"end": 453
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 526,
+					"end": 567,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 526,
+						"end": 566,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 1
+							},
+							"end": {
+								"line": 39,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 526,
+							"end": 528,
+							"loc": {
+								"start": {
+									"line": 36,
+									"column": 1
+								},
+								"end": {
+									"line": 36,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 532,
+								"end": 533,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 2
+									},
+									"end": {
+										"line": 37,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "TSAsExpression",
+								"start": 537,
+								"end": 551,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 2
+									},
+									"end": {
+										"line": 38,
+										"column": 16
+									}
+								},
+								"expression": {
+									"type": "ArrayExpression",
+									"start": 537,
+									"end": 542,
+									"loc": {
+										"start": {
+											"line": 38,
+											"column": 2
+										},
+										"end": {
+											"line": 38,
+											"column": 7
+										}
+									},
+									"elements": [
+										{
+											"type": "Literal",
+											"start": 538,
+											"end": 541,
+											"loc": {
+												"start": {
+													"line": 38,
+													"column": 3
+												},
+												"end": {
+													"line": 38,
+													"column": 6
+												}
+											},
+											"value": "b",
+											"raw": "'b'"
+										}
+									]
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 546,
+									"end": 551,
+									"loc": {
+										"start": {
+											"line": 38,
+											"column": 11
+										},
+										"end": {
+											"line": 38,
+											"column": 16
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 546,
+										"end": 551,
+										"loc": {
+											"start": {
+												"line": 38,
+												"column": 11
+											},
+											"end": {
+												"line": 38,
+												"column": 16
+											}
+										},
+										"name": "const"
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " comment",
+										"start": 553,
+										"end": 563
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Type assertion with trailing comment",
+							"start": 485,
+							"end": 524
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 606,
+					"end": 657,
+					"loc": {
+						"start": {
+							"line": 42,
+							"column": 1
+						},
+						"end": {
+							"line": 45,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 606,
+						"end": 656,
+						"loc": {
+							"start": {
+								"line": 42,
+								"column": 1
+							},
+							"end": {
+								"line": 45,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 606,
+							"end": 608,
+							"loc": {
+								"start": {
+									"line": 42,
+									"column": 1
+								},
+								"end": {
+									"line": 42,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 612,
+								"end": 613,
+								"loc": {
+									"start": {
+										"line": 43,
+										"column": 2
+									},
+									"end": {
+										"line": 43,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "TSSatisfiesExpression",
+								"start": 617,
+								"end": 641,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 2
+									},
+									"end": {
+										"line": 44,
+										"column": 26
+									}
+								},
+								"expression": {
+									"type": "ArrayExpression",
+									"start": 617,
+									"end": 622,
+									"loc": {
+										"start": {
+											"line": 44,
+											"column": 2
+										},
+										"end": {
+											"line": 44,
+											"column": 7
+										}
+									},
+									"elements": [
+										{
+											"type": "Literal",
+											"start": 618,
+											"end": 621,
+											"loc": {
+												"start": {
+													"line": 44,
+													"column": 3
+												},
+												"end": {
+													"line": 44,
+													"column": 6
+												}
+											},
+											"value": "b",
+											"raw": "'b'"
+										}
+									]
+								},
+								"typeAnnotation": {
+									"type": "TSArrayType",
+									"start": 633,
+									"end": 641,
+									"loc": {
+										"start": {
+											"line": 44,
+											"column": 18
+										},
+										"end": {
+											"line": 44,
+											"column": 26
+										}
+									},
+									"elementType": {
+										"type": "TSStringKeyword",
+										"start": 633,
+										"end": 639,
+										"loc": {
+											"start": {
+												"line": 44,
+												"column": 18
+											},
+											"end": {
+												"line": 44,
+												"column": 24
+											}
+										}
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " comment",
+										"start": 643,
+										"end": 653
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Satisfies with trailing comment",
+							"start": 570,
+							"end": 604
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 701,
+					"end": 740,
+					"loc": {
+						"start": {
+							"line": 48,
+							"column": 1
+						},
+						"end": {
+							"line": 51,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 701,
+						"end": 739,
+						"loc": {
+							"start": {
+								"line": 48,
+								"column": 1
+							},
+							"end": {
+								"line": 51,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 705,
+							"end": 710,
+							"loc": {
+								"start": {
+									"line": 48,
+									"column": 5
+								},
+								"end": {
+									"line": 48,
+									"column": 10
+								}
+							},
+							"name": "Class"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 714,
+								"end": 715,
+								"loc": {
+									"start": {
+										"line": 49,
+										"column": 2
+									},
+									"end": {
+										"line": 49,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 719,
+								"end": 724,
+								"loc": {
+									"start": {
+										"line": 50,
+										"column": 2
+									},
+									"end": {
+										"line": 50,
+										"column": 7
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 720,
+										"end": 723,
+										"loc": {
+											"start": {
+												"line": 50,
+												"column": 3
+											},
+											"end": {
+												"line": 50,
+												"column": 6
+											}
+										},
+										"value": "b",
+										"raw": "'b'"
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " comment",
+										"start": 726,
+										"end": 736
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " New expression with trailing comment",
+							"start": 660,
+							"end": 699
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 772,
+					"end": 801,
+					"loc": {
+						"start": {
+							"line": 54,
+							"column": 1
+						},
+						"end": {
+							"line": 57,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 772,
+						"end": 800,
+						"loc": {
+							"start": {
+								"line": 54,
+								"column": 1
+							},
+							"end": {
+								"line": 57,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 772,
+							"end": 774,
+							"loc": {
+								"start": {
+									"line": 54,
+									"column": 1
+								},
+								"end": {
+									"line": 54,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 778,
+								"end": 779,
+								"loc": {
+									"start": {
+										"line": 55,
+										"column": 2
+									},
+									"end": {
+										"line": 55,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 783,
+								"end": 785,
+								"loc": {
+									"start": {
+										"line": 56,
+										"column": 2
+									},
+									"end": {
+										"line": 56,
+										"column": 4
+									}
+								},
+								"elements": [],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " comment",
+										"start": 787,
+										"end": 797
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Empty array with comment",
+							"start": 743,
+							"end": 770
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 834,
+					"end": 863,
+					"loc": {
+						"start": {
+							"line": 60,
+							"column": 1
+						},
+						"end": {
+							"line": 63,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 834,
+						"end": 862,
+						"loc": {
+							"start": {
+								"line": 60,
+								"column": 1
+							},
+							"end": {
+								"line": 63,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 834,
+							"end": 836,
+							"loc": {
+								"start": {
+									"line": 60,
+									"column": 1
+								},
+								"end": {
+									"line": 60,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 840,
+								"end": 841,
+								"loc": {
+									"start": {
+										"line": 61,
+										"column": 2
+									},
+									"end": {
+										"line": 61,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "ObjectExpression",
+								"start": 845,
+								"end": 847,
+								"loc": {
+									"start": {
+										"line": 62,
+										"column": 2
+									},
+									"end": {
+										"line": 62,
+										"column": 4
+									}
+								},
+								"properties": [],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " comment",
+										"start": 849,
+										"end": 859
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Empty object with comment",
+							"start": 804,
+							"end": 832
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 896,
+					"end": 935,
+					"loc": {
+						"start": {
+							"line": 66,
+							"column": 1
+						},
+						"end": {
+							"line": 69,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 896,
+						"end": 934,
+						"loc": {
+							"start": {
+								"line": 66,
+								"column": 1
+							},
+							"end": {
+								"line": 69,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 896,
+							"end": 898,
+							"loc": {
+								"start": {
+									"line": 66,
+									"column": 1
+								},
+								"end": {
+									"line": 66,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 902,
+								"end": 903,
+								"loc": {
+									"start": {
+										"line": 67,
+										"column": 2
+									},
+									"end": {
+										"line": 67,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 907,
+								"end": 919,
+								"loc": {
+									"start": {
+										"line": 68,
+										"column": 2
+									},
+									"end": {
+										"line": 68,
+										"column": 14
+									}
+								},
+								"elements": [
+									{
+										"type": "ArrayExpression",
+										"start": 908,
+										"end": 918,
+										"loc": {
+											"start": {
+												"line": 68,
+												"column": 3
+											},
+											"end": {
+												"line": 68,
+												"column": 13
+											}
+										},
+										"elements": [
+											{
+												"type": "Literal",
+												"start": 909,
+												"end": 917,
+												"loc": {
+													"start": {
+														"line": 68,
+														"column": 4
+													},
+													"end": {
+														"line": 68,
+														"column": 12
+													}
+												},
+												"value": "nested",
+												"raw": "'nested'"
+											}
+										]
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " comment",
+										"start": 921,
+										"end": 931
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Nested array with comment",
+							"start": 866,
+							"end": 894
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -1,0 +1,122 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 273,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 264,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 36,
+							"property": "mask",
+							"value": "url(mask.svg)"
+						},
+						{
+							"type": "Declaration",
+							"start": 40,
+							"end": 87,
+							"property": "mask-image",
+							"value": "linear-gradient(black, transparent)"
+						},
+						{
+							"type": "Declaration",
+							"start": 91,
+							"end": 107,
+							"property": "mask-mode",
+							"value": "alpha"
+						},
+						{
+							"type": "Declaration",
+							"start": 111,
+							"end": 133,
+							"property": "mask-repeat",
+							"value": "no-repeat"
+						},
+						{
+							"type": "Declaration",
+							"start": 137,
+							"end": 158,
+							"property": "mask-position",
+							"value": "center"
+						},
+						{
+							"type": "Declaration",
+							"start": 162,
+							"end": 180,
+							"property": "mask-size",
+							"value": "contain"
+						},
+						{
+							"type": "Declaration",
+							"start": 184,
+							"end": 206,
+							"property": "clip-path",
+							"value": "circle(50%)"
+						},
+						{
+							"type": "Declaration",
+							"start": 210,
+							"end": 260,
+							"property": "clip-path",
+							"value": "polygon(0 0, 100% 0, 100% 100%, 0 100%)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 264
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 265,
+			"styles": "\n\tdiv {\n\t\tmask: url(mask.svg);\n\t\tmask-image: linear-gradient(black, transparent);\n\t\tmask-mode: alpha;\n\t\tmask-repeat: no-repeat;\n\t\tmask-position: center;\n\t\tmask-size: contain;\n\t\tclip-path: circle(50%);\n\t\tclip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 274,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

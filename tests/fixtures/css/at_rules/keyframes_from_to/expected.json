@@ -1,0 +1,134 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 93,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 84,
+				"name": "keyframes",
+				"prelude": "anim1",
+				"block": {
+					"type": "Block",
+					"start": 26,
+					"end": 84,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 30,
+								"end": 34,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 30,
+										"end": 34,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "from",
+														"start": 30,
+														"end": 34
+													}
+												],
+												"start": 30,
+												"end": 34
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 35,
+								"end": 55,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 40,
+										"end": 50,
+										"property": "opacity",
+										"value": "0"
+									}
+								]
+							},
+							"start": 30,
+							"end": 55
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 58,
+								"end": 60,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 58,
+										"end": 60,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "to",
+														"start": 58,
+														"end": 60
+													}
+												],
+												"start": 58,
+												"end": 60
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 61,
+								"end": 81,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 66,
+										"end": 76,
+										"property": "opacity",
+										"value": "1"
+									}
+								]
+							},
+							"start": 58,
+							"end": 81
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 85,
+			"styles": "\n\t@keyframes anim1 {\n\t\tfrom {\n\t\t\topacity: 0;\n\t\t}\n\t\tto {\n\t\t\topacity: 1;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 94,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

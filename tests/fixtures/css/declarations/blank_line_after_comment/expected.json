@@ -1,0 +1,267 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 448,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 70,
+					"end": 74,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 70,
+							"end": 74,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "span",
+											"start": 70,
+											"end": 74
+										}
+									],
+									"start": 70,
+									"end": 74
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 75,
+					"end": 130,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 96,
+								"end": 104,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 96,
+										"end": 104,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "NestingSelector",
+														"name": "&",
+														"start": 96,
+														"end": 97
+													},
+													{
+														"type": "PseudoElementSelector",
+														"name": "after",
+														"start": 97,
+														"end": 104
+													}
+												],
+												"start": 96,
+												"end": 104
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 105,
+								"end": 127,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 110,
+										"end": 122,
+										"property": "content",
+										"value": "' '"
+									}
+								]
+							},
+							"start": 96,
+							"end": 127
+						}
+					]
+				},
+				"start": 70,
+				"end": 130
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 194,
+					"end": 197,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 194,
+							"end": 197,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 194,
+											"end": 197
+										}
+									],
+									"start": 194,
+									"end": 197
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 198,
+					"end": 233,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 219,
+							"end": 229,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 194,
+				"end": 233
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 287,
+					"end": 288,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 287,
+							"end": 288,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "p",
+											"start": 287,
+											"end": 288
+										}
+									],
+									"start": 287,
+									"end": 288
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 289,
+					"end": 323,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 309,
+							"end": 319,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 287,
+				"end": 323
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 389,
+					"end": 390,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 389,
+							"end": 390,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 389,
+											"end": 390
+										}
+									],
+									"start": 389,
+									"end": 390
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 391,
+					"end": 439,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 395,
+							"end": 405,
+							"property": "color",
+							"value": "red"
+						},
+						{
+							"type": "Declaration",
+							"start": 426,
+							"end": 435,
+							"property": "margin",
+							"value": "0"
+						}
+					]
+				},
+				"start": 389,
+				"end": 439
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 440,
+			"styles": "\n\t/* Blank line after comment before nested rule preserved */\n\tspan {\n\t\t/* comment */\n\n\t\t&::after {\n\t\t\tcontent: ' ';\n\t\t}\n\t}\n\n\t/* Blank line after comment before declaration preserved */\n\tdiv {\n\t\t/* comment */\n\n\t\tcolor: red;\n\t}\n\n\t/* No blank line after comment - stays compact */\n\tp {\n\t\t/* comment */\n\t\tcolor: red;\n\t}\n\n\t/* Blank line after comment between declarations preserved */\n\ta {\n\t\tcolor: red;\n\t\t/* comment */\n\n\t\tmargin: 0;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 449,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

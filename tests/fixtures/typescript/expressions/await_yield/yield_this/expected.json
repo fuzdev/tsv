@@ -1,0 +1,618 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 176,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 175,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 166,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 10,
+					"end": 81,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 20,
+						"end": 23,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 11
+							},
+							"end": {
+								"line": 2,
+								"column": 14
+							}
+						},
+						"name": "gen"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 26,
+						"end": 81,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 17
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 30,
+								"end": 41,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 3,
+										"column": 13
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 30,
+									"end": 40,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 2
+										},
+										"end": {
+											"line": 3,
+											"column": 12
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "ThisExpression",
+										"start": 36,
+										"end": 40,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 8
+											},
+											"end": {
+												"line": 3,
+												"column": 12
+											}
+										}
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 44,
+								"end": 57,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 15
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 44,
+									"end": 56,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 14
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "MemberExpression",
+										"start": 50,
+										"end": 56,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 8
+											},
+											"end": {
+												"line": 4,
+												"column": 14
+											}
+										},
+										"object": {
+											"type": "ThisExpression",
+											"start": 50,
+											"end": 54,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 8
+												},
+												"end": {
+													"line": 4,
+													"column": 12
+												}
+											}
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 55,
+											"end": 56,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 13
+												},
+												"end": {
+													"line": 4,
+													"column": 14
+												}
+											},
+											"name": "x"
+										},
+										"computed": false,
+										"optional": false
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 60,
+								"end": 78,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 20
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 60,
+									"end": 77,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 19
+										}
+									},
+									"delegate": true,
+									"argument": {
+										"type": "MemberExpression",
+										"start": 67,
+										"end": 77,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 9
+											},
+											"end": {
+												"line": 5,
+												"column": 19
+											}
+										},
+										"object": {
+											"type": "ThisExpression",
+											"start": 67,
+											"end": 71,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 9
+												},
+												"end": {
+													"line": 5,
+													"column": 13
+												}
+											}
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 72,
+											"end": 77,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 14
+												},
+												"end": {
+													"line": 5,
+													"column": 19
+												}
+											},
+											"name": "items"
+										},
+										"computed": false,
+										"optional": false
+									}
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 84,
+					"end": 165,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 90,
+						"end": 91,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 7
+							},
+							"end": {
+								"line": 8,
+								"column": 8
+							}
+						},
+						"name": "A"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 92,
+						"end": 165,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 9
+							},
+							"end": {
+								"line": 14,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 96,
+								"end": 162,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 3
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 97,
+									"end": 100,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 3
+										},
+										"end": {
+											"line": 9,
+											"column": 6
+										}
+									},
+									"name": "gen"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 100,
+									"end": 162,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 6
+										},
+										"end": {
+											"line": 13,
+											"column": 3
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": true,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 103,
+										"end": 162,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 9
+											},
+											"end": {
+												"line": 13,
+												"column": 3
+											}
+										},
+										"body": [
+											{
+												"type": "ExpressionStatement",
+												"start": 108,
+												"end": 119,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 3
+													},
+													"end": {
+														"line": 10,
+														"column": 14
+													}
+												},
+												"expression": {
+													"type": "YieldExpression",
+													"start": 108,
+													"end": 118,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 3
+														},
+														"end": {
+															"line": 10,
+															"column": 13
+														}
+													},
+													"delegate": false,
+													"argument": {
+														"type": "ThisExpression",
+														"start": 114,
+														"end": 118,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 9
+															},
+															"end": {
+																"line": 10,
+																"column": 13
+															}
+														}
+													}
+												}
+											},
+											{
+												"type": "ExpressionStatement",
+												"start": 123,
+												"end": 136,
+												"loc": {
+													"start": {
+														"line": 11,
+														"column": 3
+													},
+													"end": {
+														"line": 11,
+														"column": 16
+													}
+												},
+												"expression": {
+													"type": "YieldExpression",
+													"start": 123,
+													"end": 135,
+													"loc": {
+														"start": {
+															"line": 11,
+															"column": 3
+														},
+														"end": {
+															"line": 11,
+															"column": 15
+														}
+													},
+													"delegate": false,
+													"argument": {
+														"type": "MemberExpression",
+														"start": 129,
+														"end": 135,
+														"loc": {
+															"start": {
+																"line": 11,
+																"column": 9
+															},
+															"end": {
+																"line": 11,
+																"column": 15
+															}
+														},
+														"object": {
+															"type": "ThisExpression",
+															"start": 129,
+															"end": 133,
+															"loc": {
+																"start": {
+																	"line": 11,
+																	"column": 9
+																},
+																"end": {
+																	"line": 11,
+																	"column": 13
+																}
+															}
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 134,
+															"end": 135,
+															"loc": {
+																"start": {
+																	"line": 11,
+																	"column": 14
+																},
+																"end": {
+																	"line": 11,
+																	"column": 15
+																}
+															},
+															"name": "x"
+														},
+														"computed": false,
+														"optional": false
+													}
+												}
+											},
+											{
+												"type": "ExpressionStatement",
+												"start": 140,
+												"end": 158,
+												"loc": {
+													"start": {
+														"line": 12,
+														"column": 3
+													},
+													"end": {
+														"line": 12,
+														"column": 21
+													}
+												},
+												"expression": {
+													"type": "YieldExpression",
+													"start": 140,
+													"end": 157,
+													"loc": {
+														"start": {
+															"line": 12,
+															"column": 3
+														},
+														"end": {
+															"line": 12,
+															"column": 20
+														}
+													},
+													"delegate": true,
+													"argument": {
+														"type": "MemberExpression",
+														"start": 147,
+														"end": 157,
+														"loc": {
+															"start": {
+																"line": 12,
+																"column": 10
+															},
+															"end": {
+																"line": 12,
+																"column": 20
+															}
+														},
+														"object": {
+															"type": "ThisExpression",
+															"start": 147,
+															"end": 151,
+															"loc": {
+																"start": {
+																	"line": 12,
+																	"column": 10
+																},
+																"end": {
+																	"line": 12,
+																	"column": 14
+																}
+															}
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 152,
+															"end": 157,
+															"loc": {
+																"start": {
+																	"line": 12,
+																	"column": 15
+																},
+																"end": {
+																	"line": 12,
+																	"column": 20
+																}
+															},
+															"name": "items"
+														},
+														"computed": false,
+														"optional": false
+													}
+												}
+											}
+										]
+									}
+								}
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

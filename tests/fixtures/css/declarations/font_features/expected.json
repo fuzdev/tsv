@@ -1,0 +1,136 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 401,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 392,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 41,
+							"property": "font-variant",
+							"value": "small-caps"
+						},
+						{
+							"type": "Declaration",
+							"start": 45,
+							"end": 78,
+							"property": "font-variant-caps",
+							"value": "all-small-caps"
+						},
+						{
+							"type": "Declaration",
+							"start": 82,
+							"end": 116,
+							"property": "font-variant-numeric",
+							"value": "tabular-nums"
+						},
+						{
+							"type": "Declaration",
+							"start": 120,
+							"end": 160,
+							"property": "font-variant-ligatures",
+							"value": "common-ligatures"
+						},
+						{
+							"type": "Declaration",
+							"start": 164,
+							"end": 200,
+							"property": "font-variant-east-asian",
+							"value": "traditional"
+						},
+						{
+							"type": "Declaration",
+							"start": 204,
+							"end": 251,
+							"property": "font-feature-settings",
+							"value": "'liga' 1,\n\t\t\t'kern' 1"
+						},
+						{
+							"type": "Declaration",
+							"start": 255,
+							"end": 308,
+							"property": "font-variation-settings",
+							"value": "'wght' 400,\n\t\t\t'wdth' 100"
+						},
+						{
+							"type": "Declaration",
+							"start": 312,
+							"end": 337,
+							"property": "font-optical-sizing",
+							"value": "auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 341,
+							"end": 364,
+							"property": "font-stretch",
+							"value": "condensed"
+						},
+						{
+							"type": "Declaration",
+							"start": 368,
+							"end": 388,
+							"property": "font-kerning",
+							"value": "normal"
+						}
+					]
+				},
+				"start": 9,
+				"end": 392
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 393,
+			"styles": "\n\tdiv {\n\t\tfont-variant: small-caps;\n\t\tfont-variant-caps: all-small-caps;\n\t\tfont-variant-numeric: tabular-nums;\n\t\tfont-variant-ligatures: common-ligatures;\n\t\tfont-variant-east-asian: traditional;\n\t\tfont-feature-settings:\n\t\t\t'liga' 1,\n\t\t\t'kern' 1;\n\t\tfont-variation-settings:\n\t\t\t'wght' 400,\n\t\t\t'wdth' 100;\n\t\tfont-optical-sizing: auto;\n\t\tfont-stretch: condensed;\n\t\tfont-kerning: normal;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 402,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

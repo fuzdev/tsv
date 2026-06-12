@@ -1,0 +1,344 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 209,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Expanded call with trailing comment in assignment - callee stays on same line as =",
+			"start": 10,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing comment",
+			"start": 122,
+			"end": 141,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 11
+				},
+				"end": {
+					"line": 4,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing comment",
+			"start": 175,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 11
+				},
+				"end": {
+					"line": 8,
+					"column": 30
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 208,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 199,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 10,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 97,
+					"end": 145,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 103,
+							"end": 144,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 103,
+								"end": 104,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "x"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 107,
+								"end": 144,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 107,
+									"end": 109,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 11
+										},
+										"end": {
+											"line": 3,
+											"column": 13
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 113,
+										"end": 120,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 9
+											}
+										},
+										"value": "value",
+										"raw": "'value'",
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " trailing comment",
+												"start": 122,
+												"end": 141
+											}
+										]
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Expanded call with trailing comment in assignment - callee stays on same line as =",
+							"start": 10,
+							"end": 95
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 148,
+					"end": 198,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 154,
+							"end": 197,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 154,
+								"end": 155,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"name": "y"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 158,
+								"end": 197,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 11
+									},
+									"end": {
+										"line": 9,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 158,
+									"end": 162,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 11
+										},
+										"end": {
+											"line": 7,
+											"column": 15
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 158,
+										"end": 159,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 11
+											},
+											"end": {
+												"line": 7,
+												"column": 12
+											}
+										},
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 160,
+										"end": 162,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 13
+											},
+											"end": {
+												"line": 7,
+												"column": 15
+											}
+										},
+										"name": "fn"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 166,
+										"end": 173,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 2
+											},
+											"end": {
+												"line": 8,
+												"column": 9
+											}
+										},
+										"value": "value",
+										"raw": "'value'",
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " trailing comment",
+												"start": 175,
+												"end": 194
+											}
+										]
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

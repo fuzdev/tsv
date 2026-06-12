@@ -1,0 +1,119 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 370,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 97,
+				"end": 122,
+				"name": "layer",
+				"prelude": "base,  components",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 124,
+				"end": 146,
+				"name": "layer",
+				"prelude": "theme , layout",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 148,
+				"end": 159,
+				"name": "layer",
+				"prelude": "a,b",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 250,
+				"end": 280,
+				"name": "layer",
+				"prelude": "reset, base, utilities",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 314,
+				"end": 361,
+				"name": "layer",
+				"prelude": "base",
+				"block": {
+					"type": "Block",
+					"start": 326,
+					"end": 361,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 330,
+								"end": 332,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 330,
+										"end": 332,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "h1",
+														"start": 330,
+														"end": 332
+													}
+												],
+												"start": 330,
+												"end": 332
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 333,
+								"end": 358,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 338,
+										"end": 353,
+										"property": "font-size",
+										"value": "2rem"
+									}
+								]
+							},
+							"start": 330,
+							"end": 358
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 362,
+			"styles": "\n\t/* comma spacing preserved verbatim (matches prettier + Svelte AST), not normalized */\n\t@layer base,  components;\n\t@layer theme , layout;\n\t@layer a,b;\n\t/* single-space form is already canonical — non-diverging sibling / regression guard */\n\t@layer reset, base, utilities;\n\t/* block form is unaffected */\n\t@layer base {\n\t\th1 {\n\t\t\tfont-size: 2rem;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 371,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

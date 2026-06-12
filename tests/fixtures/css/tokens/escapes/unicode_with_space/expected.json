@@ -1,0 +1,214 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 160,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 15,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 15,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "test1",
+											"start": 9,
+											"end": 15
+										}
+									],
+									"start": 9,
+									"end": 15
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 16,
+					"end": 40,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 20,
+							"end": 36,
+							"property": "content",
+							"value": "'\\41 B'"
+						}
+					]
+				},
+				"start": 9,
+				"end": 40
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 43,
+					"end": 49,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 43,
+							"end": 49,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "test2",
+											"start": 43,
+											"end": 49
+										}
+									],
+									"start": 43,
+									"end": 49
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 50,
+					"end": 73,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 54,
+							"end": 69,
+							"property": "content",
+							"value": "'\\41B'"
+						}
+					]
+				},
+				"start": 43,
+				"end": 73
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 76,
+					"end": 82,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 76,
+							"end": 82,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "test3",
+											"start": 76,
+											"end": 82
+										}
+									],
+									"start": 76,
+									"end": 82
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 83,
+					"end": 112,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 87,
+							"end": 108,
+							"property": "content",
+							"value": "'\\20AC euro'"
+						}
+					]
+				},
+				"start": 76,
+				"end": 112
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 115,
+					"end": 121,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 115,
+							"end": 121,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "test4",
+											"start": 115,
+											"end": 121
+										}
+									],
+									"start": 115,
+									"end": 121
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 122,
+					"end": 151,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 126,
+							"end": 147,
+							"property": "content",
+							"value": "'\\1F4A9\ttab'"
+						}
+					]
+				},
+				"start": 115,
+				"end": 151
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 152,
+			"styles": "\n\t.test1 {\n\t\tcontent: '\\41 B';\n\t}\n\n\t.test2 {\n\t\tcontent: '\\41B';\n\t}\n\n\t.test3 {\n\t\tcontent: '\\20AC euro';\n\t}\n\n\t.test4 {\n\t\tcontent: '\\1F4A9\ttab';\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 161,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

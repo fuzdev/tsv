@@ -1,0 +1,209 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 181,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 52,
+				"name": "media",
+				"prelude": "(foo: 'bar')",
+				"block": {
+					"type": "Block",
+					"start": 29,
+					"end": 52,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 33,
+								"end": 34,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 33,
+										"end": 34,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 33,
+														"end": 34
+													}
+												],
+												"start": 33,
+												"end": 34
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 35,
+								"end": 49,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 40,
+										"end": 44,
+										"property": "x",
+										"value": "1"
+									}
+								]
+							},
+							"start": 33,
+							"end": 49
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 54,
+				"end": 110,
+				"name": "supports",
+				"prelude": "(font-family: 'Arial')",
+				"block": {
+					"type": "Block",
+					"start": 87,
+					"end": 110,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 91,
+								"end": 92,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 91,
+										"end": 92,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 91,
+														"end": 92
+													}
+												],
+												"start": 91,
+												"end": 92
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 93,
+								"end": 107,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 98,
+										"end": 102,
+										"property": "x",
+										"value": "1"
+									}
+								]
+							},
+							"start": 91,
+							"end": 107
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 112,
+				"end": 172,
+				"name": "supports",
+				"prelude": "(background: url('x.png'))",
+				"block": {
+					"type": "Block",
+					"start": 149,
+					"end": 172,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 153,
+								"end": 154,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 153,
+										"end": 154,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 153,
+														"end": 154
+													}
+												],
+												"start": 153,
+												"end": 154
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 155,
+								"end": 169,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 160,
+										"end": 164,
+										"property": "x",
+										"value": "1"
+									}
+								]
+							},
+							"start": 153,
+							"end": 169
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 173,
+			"styles": "\n\t@media (foo: 'bar') {\n\t\ta {\n\t\t\tx: 1;\n\t\t}\n\t}\n\t@supports (font-family: 'Arial') {\n\t\ta {\n\t\t\tx: 1;\n\t\t}\n\t}\n\t@supports (background: url('x.png')) {\n\t\ta {\n\t\t\tx: 1;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 182,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

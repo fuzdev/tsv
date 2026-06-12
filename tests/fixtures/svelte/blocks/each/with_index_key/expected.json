@@ -1,0 +1,195 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 67,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "EachBlock",
+				"start": 0,
+				"end": 66,
+				"expression": {
+					"type": "Identifier",
+					"start": 7,
+					"end": 12,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 7
+						},
+						"end": {
+							"line": 1,
+							"column": 12
+						}
+					},
+					"name": "items"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 34,
+							"end": 36,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 36,
+							"end": 58,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 37
+								},
+								"end": {
+									"line": 2,
+									"column": 5,
+									"character": 40
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 41,
+										"end": 44,
+										"expression": {
+											"type": "Identifier",
+											"start": 42,
+											"end": 43,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 7
+												},
+												"end": {
+													"line": 2,
+													"column": 8
+												}
+											},
+											"name": "i"
+										}
+									},
+									{
+										"type": "Text",
+										"start": 44,
+										"end": 46,
+										"raw": ": ",
+										"data": ": "
+									},
+									{
+										"type": "ExpressionTag",
+										"start": 46,
+										"end": 52,
+										"expression": {
+											"type": "Identifier",
+											"start": 47,
+											"end": 51,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 12
+												},
+												"end": {
+													"line": 2,
+													"column": 16
+												}
+											},
+											"name": "item"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 58,
+							"end": 59,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 16,
+					"end": 20,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 16,
+							"character": 16
+						},
+						"end": {
+							"line": 1,
+							"column": 20,
+							"character": 20
+						}
+					}
+				},
+				"index": "i",
+				"key": {
+					"type": "MemberExpression",
+					"start": 25,
+					"end": 32,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 25
+						},
+						"end": {
+							"line": 1,
+							"column": 32
+						}
+					},
+					"object": {
+						"type": "Identifier",
+						"start": 25,
+						"end": 29,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 25
+							},
+							"end": {
+								"line": 1,
+								"column": 29
+							}
+						},
+						"name": "item"
+					},
+					"property": {
+						"type": "Identifier",
+						"start": 30,
+						"end": 32,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 30
+							},
+							"end": {
+								"line": 1,
+								"column": 32
+							}
+						},
+						"name": "id"
+					},
+					"computed": false,
+					"optional": false
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

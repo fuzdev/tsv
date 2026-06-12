@@ -1,0 +1,271 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 169,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "SvelteFragment",
+				"start": 0,
+				"end": 35,
+				"name": "svelte:fragment",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 16,
+						"character": 16
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 35,
+				"end": 36,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteFragment",
+				"start": 36,
+				"end": 100,
+				"name": "svelte:fragment",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 37
+					},
+					"end": {
+						"line": 2,
+						"column": 16,
+						"character": 52
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 53,
+						"end": 64,
+						"name": "slot",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 17,
+								"character": 53
+							},
+							"end": {
+								"line": 2,
+								"column": 21,
+								"character": 57
+							}
+						},
+						"value": [
+							{
+								"start": 59,
+								"end": 63,
+								"type": "Text",
+								"raw": "name",
+								"data": "name"
+							}
+						]
+					},
+					{
+						"start": 65,
+						"end": 70,
+						"type": "LetDirective",
+						"name": "a",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 29,
+								"character": 65
+							},
+							"end": {
+								"line": 2,
+								"column": 34,
+								"character": 70
+							}
+						},
+						"expression": null,
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 71,
+							"end": 82,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 36,
+									"character": 72
+								},
+								"end": {
+									"line": 2,
+									"column": 37,
+									"character": 73
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 74,
+										"end": 78,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 100,
+				"end": 101,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteFragment",
+				"start": 101,
+				"end": 168,
+				"name": "svelte:fragment",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 102
+					},
+					"end": {
+						"line": 3,
+						"column": 16,
+						"character": 117
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 118,
+						"end": 129,
+						"name": "slot",
+						"name_loc": {
+							"start": {
+								"line": 3,
+								"column": 17,
+								"character": 118
+							},
+							"end": {
+								"line": 3,
+								"column": 21,
+								"character": 122
+							}
+						},
+						"value": [
+							{
+								"start": 124,
+								"end": 128,
+								"type": "Text",
+								"raw": "name",
+								"data": "name"
+							}
+						]
+					},
+					{
+						"start": 130,
+						"end": 135,
+						"type": "LetDirective",
+						"name": "a",
+						"name_loc": {
+							"start": {
+								"line": 3,
+								"column": 29,
+								"character": 130
+							},
+							"end": {
+								"line": 3,
+								"column": 34,
+								"character": 135
+							}
+						},
+						"expression": null,
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 136,
+							"end": 138,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 138,
+							"end": 149,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 2,
+									"character": 139
+								},
+								"end": {
+									"line": 4,
+									"column": 3,
+									"character": 140
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 141,
+										"end": 145,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 149,
+							"end": 150,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

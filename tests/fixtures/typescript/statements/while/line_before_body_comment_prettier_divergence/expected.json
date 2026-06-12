@@ -1,0 +1,471 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 316,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Trailing comment after ) - preserved, prettier absorbs into block",
+			"start": 10,
+			"end": 78,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing",
+			"start": 90,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 11
+				},
+				"end": {
+					"line": 3,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Own-line comment before { - preserved on own line",
+			"start": 118,
+			"end": 170,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own line",
+			"start": 183,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Blank line before comment - blank line preserved",
+			"start": 211,
+			"end": 262,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " blank before",
+			"start": 276,
+			"end": 291,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 16
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 315,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 306,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 22,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "WhileStatement",
+					"start": 80,
+					"end": 115,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 87,
+						"end": 88,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 8
+							},
+							"end": {
+								"line": 3,
+								"column": 9
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " trailing",
+								"start": 90,
+								"end": 101
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 103,
+						"end": 115,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 107,
+								"end": 112,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 107,
+									"end": 111,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 107,
+										"end": 109,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 2
+											},
+											"end": {
+												"line": 5,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Trailing comment after ) - preserved, prettier absorbs into block",
+							"start": 10,
+							"end": 78
+						}
+					]
+				},
+				{
+					"type": "WhileStatement",
+					"start": 172,
+					"end": 208,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 179,
+						"end": 180,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 8
+							},
+							"end": {
+								"line": 9,
+								"column": 9
+							}
+						},
+						"name": "a"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 196,
+						"end": 208,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 1
+							},
+							"end": {
+								"line": 13,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 200,
+								"end": 205,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 200,
+									"end": 204,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 200,
+										"end": 202,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 2
+											},
+											"end": {
+												"line": 12,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " own line",
+								"start": 183,
+								"end": 194
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Own-line comment before { - preserved on own line",
+							"start": 118,
+							"end": 170
+						}
+					]
+				},
+				{
+					"type": "WhileStatement",
+					"start": 264,
+					"end": 305,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 271,
+						"end": 272,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 8
+							},
+							"end": {
+								"line": 16,
+								"column": 9
+							}
+						},
+						"name": "a"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 293,
+						"end": 305,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 1
+							},
+							"end": {
+								"line": 21,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 297,
+								"end": 302,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 297,
+									"end": 301,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 2
+										},
+										"end": {
+											"line": 20,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 297,
+										"end": 299,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 2
+											},
+											"end": {
+												"line": 20,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " blank before",
+								"start": 276,
+								"end": 291
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Blank line before comment - blank line preserved",
+							"start": 211,
+							"end": 262
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

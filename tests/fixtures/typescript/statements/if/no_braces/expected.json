@@ -1,0 +1,349 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 109,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 108,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 99,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 10,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 10,
+					"end": 25,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 16
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 14,
+						"end": 18,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 5
+							},
+							"end": {
+								"line": 2,
+								"column": 9
+							}
+						},
+						"name": "cond"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 20,
+						"end": 25,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 11
+							},
+							"end": {
+								"line": 2,
+								"column": 16
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 20,
+							"end": 24,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 11
+								},
+								"end": {
+									"line": 2,
+									"column": 15
+								}
+							},
+							"name": "expr"
+						}
+					},
+					"alternate": null
+				},
+				{
+					"type": "IfStatement",
+					"start": 28,
+					"end": 52,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 11
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 32,
+						"end": 33,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 5
+							},
+							"end": {
+								"line": 4,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 35,
+						"end": 40,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 8
+							},
+							"end": {
+								"line": 4,
+								"column": 13
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 35,
+							"end": 39,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 8
+								},
+								"end": {
+									"line": 4,
+									"column": 12
+								}
+							},
+							"name": "expr"
+						}
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 47,
+						"end": 52,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 6
+							},
+							"end": {
+								"line": 5,
+								"column": 11
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 47,
+							"end": 51,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 6
+								},
+								"end": {
+									"line": 5,
+									"column": 10
+								}
+							},
+							"name": "expr"
+						}
+					}
+				},
+				{
+					"type": "IfStatement",
+					"start": 55,
+					"end": 98,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 11
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 59,
+						"end": 60,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 5
+							},
+							"end": {
+								"line": 7,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 62,
+						"end": 67,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 8
+							},
+							"end": {
+								"line": 7,
+								"column": 13
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 62,
+							"end": 66,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 8
+								},
+								"end": {
+									"line": 7,
+									"column": 12
+								}
+							},
+							"name": "expr"
+						}
+					},
+					"alternate": {
+						"type": "IfStatement",
+						"start": 74,
+						"end": 98,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 6
+							},
+							"end": {
+								"line": 9,
+								"column": 11
+							}
+						},
+						"test": {
+							"type": "Identifier",
+							"start": 78,
+							"end": 79,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 10
+								},
+								"end": {
+									"line": 8,
+									"column": 11
+								}
+							},
+							"name": "b"
+						},
+						"consequent": {
+							"type": "ExpressionStatement",
+							"start": 81,
+							"end": 86,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 13
+								},
+								"end": {
+									"line": 8,
+									"column": 18
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 81,
+								"end": 85,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 13
+									},
+									"end": {
+										"line": 8,
+										"column": 17
+									}
+								},
+								"name": "expr"
+							}
+						},
+						"alternate": {
+							"type": "ExpressionStatement",
+							"start": 93,
+							"end": 98,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 6
+								},
+								"end": {
+									"line": 9,
+									"column": 11
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 93,
+								"end": 97,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 6
+									},
+									"end": {
+										"line": 9,
+										"column": 10
+									}
+								},
+								"name": "expr"
+							}
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

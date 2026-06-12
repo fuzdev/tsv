@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 67,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 58,
+				"name": "scope",
+				"prelude": "(.x, .y)",
+				"block": {
+					"type": "Block",
+					"start": 25,
+					"end": 58,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 29,
+								"end": 33,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 29,
+										"end": 33,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "span",
+														"start": 29,
+														"end": 33
+													}
+												],
+												"start": 29,
+												"end": 33
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 34,
+								"end": 55,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 39,
+										"end": 50,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 29,
+							"end": 55
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 59,
+			"styles": "\n\t@scope (.x, .y) {\n\t\tspan {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 68,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

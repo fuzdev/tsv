@@ -1,0 +1,220 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 74,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 46,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 11,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "a",
+											"start": 9,
+											"end": 11
+										}
+									],
+									"start": 9,
+									"end": 11
+								}
+							]
+						},
+						{
+							"type": "ComplexSelector",
+							"start": 14,
+							"end": 16,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "b",
+											"start": 14,
+											"end": 16
+										}
+									],
+									"start": 14,
+									"end": 16
+								}
+							]
+						},
+						{
+							"type": "ComplexSelector",
+							"start": 19,
+							"end": 21,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "c",
+											"start": 19,
+											"end": 21
+										}
+									],
+									"start": 19,
+									"end": 21
+								}
+							]
+						},
+						{
+							"type": "ComplexSelector",
+							"start": 24,
+							"end": 26,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "d",
+											"start": 24,
+											"end": 26
+										}
+									],
+									"start": 24,
+									"end": 26
+								}
+							]
+						},
+						{
+							"type": "ComplexSelector",
+							"start": 29,
+							"end": 31,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "e",
+											"start": 29,
+											"end": 31
+										}
+									],
+									"start": 29,
+									"end": 31
+								}
+							]
+						},
+						{
+							"type": "ComplexSelector",
+							"start": 34,
+							"end": 36,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "f",
+											"start": 34,
+											"end": 36
+										}
+									],
+									"start": 34,
+									"end": 36
+								}
+							]
+						},
+						{
+							"type": "ComplexSelector",
+							"start": 39,
+							"end": 41,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "g",
+											"start": 39,
+											"end": 41
+										}
+									],
+									"start": 39,
+									"end": 41
+								}
+							]
+						},
+						{
+							"type": "ComplexSelector",
+							"start": 44,
+							"end": 46,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "h",
+											"start": 44,
+											"end": 46
+										}
+									],
+									"start": 44,
+									"end": 46
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 47,
+					"end": 65,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 51,
+							"end": 61,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 9,
+				"end": 65
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 66,
+			"styles": "\n\t.a,\n\t.b,\n\t.c,\n\t.d,\n\t.e,\n\t.f,\n\t.g,\n\t.h {\n\t\tcolor: red;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 75,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

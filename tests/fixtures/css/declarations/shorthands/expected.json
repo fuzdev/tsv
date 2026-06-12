@@ -1,0 +1,115 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 233,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 224,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 30,
+							"property": "border",
+							"value": "solid"
+						},
+						{
+							"type": "Declaration",
+							"start": 34,
+							"end": 51,
+							"property": "border",
+							"value": "1px solid"
+						},
+						{
+							"type": "Declaration",
+							"start": 55,
+							"end": 76,
+							"property": "border",
+							"value": "1px solid red"
+						},
+						{
+							"type": "Declaration",
+							"start": 80,
+							"end": 106,
+							"property": "border-radius",
+							"value": "10px / 20px"
+						},
+						{
+							"type": "Declaration",
+							"start": 110,
+							"end": 146,
+							"property": "border-radius",
+							"value": "10px 20px / 30px 40px"
+						},
+						{
+							"type": "Declaration",
+							"start": 150,
+							"end": 170,
+							"property": "transition",
+							"value": "all 0.3s"
+						},
+						{
+							"type": "Declaration",
+							"start": 174,
+							"end": 220,
+							"property": "transition",
+							"value": "opacity 0.3s,\n\t\t\ttransform 0.5s"
+						}
+					]
+				},
+				"start": 9,
+				"end": 224
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 225,
+			"styles": "\n\tdiv {\n\t\tborder: solid;\n\t\tborder: 1px solid;\n\t\tborder: 1px solid red;\n\t\tborder-radius: 10px / 20px;\n\t\tborder-radius: 10px 20px / 30px 40px;\n\t\ttransition: all 0.3s;\n\t\ttransition:\n\t\t\topacity 0.3s,\n\t\t\ttransform 0.5s;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 234,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

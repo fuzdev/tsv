@@ -1,0 +1,878 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 533,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " single specifier with trailing line comment",
+			"start": 10,
+			"end": 56,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 72,
+			"end": 82,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 5
+				},
+				"end": {
+					"line": 4,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " last specifier trailing line comment",
+			"start": 100,
+			"end": 139,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 160,
+			"end": 170,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 5
+				},
+				"end": {
+					"line": 10,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " all specifiers with trailing line comments",
+			"start": 188,
+			"end": 233,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment1",
+			"start": 249,
+			"end": 260,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 5
+				},
+				"end": {
+					"line": 15,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment2",
+			"start": 266,
+			"end": 277,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 5
+				},
+				"end": {
+					"line": 16,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " hardline path (expanding comment) + last trailing line comment",
+			"start": 295,
+			"end": 360,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " group",
+			"start": 373,
+			"end": 381,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 392,
+			"end": 402,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 5
+				},
+				"end": {
+					"line": 23,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment on last specifier (should work - contrast case)",
+			"start": 420,
+			"end": 484,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 496,
+			"end": 509,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 11
+				},
+				"end": {
+					"line": 27,
+					"column": 24
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 532,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 523,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 28,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 58,
+					"end": 97,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 14
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 69,
+							"end": 70,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 2
+								},
+								"end": {
+									"line": 4,
+									"column": 3
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 69,
+								"end": 70,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 69,
+								"end": 70,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " comment",
+									"start": 72,
+									"end": 82
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 91,
+						"end": 96,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 8
+							},
+							"end": {
+								"line": 5,
+								"column": 13
+							}
+						},
+						"value": "./a",
+						"raw": "'./a'"
+					},
+					"attributes": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " single specifier with trailing line comment",
+							"start": 10,
+							"end": 56
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 141,
+					"end": 185,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 14
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 152,
+							"end": 153,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 2
+								},
+								"end": {
+									"line": 9,
+									"column": 3
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 152,
+								"end": 153,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 3
+									}
+								},
+								"name": "b"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 152,
+								"end": 153,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 3
+									}
+								},
+								"name": "b"
+							}
+						},
+						{
+							"type": "ImportSpecifier",
+							"start": 157,
+							"end": 158,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 2
+								},
+								"end": {
+									"line": 10,
+									"column": 3
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 157,
+								"end": 158,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 3
+									}
+								},
+								"name": "c"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 157,
+								"end": 158,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 3
+									}
+								},
+								"name": "c"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " comment",
+									"start": 160,
+									"end": 170
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 179,
+						"end": 184,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 8
+							},
+							"end": {
+								"line": 11,
+								"column": 13
+							}
+						},
+						"value": "./b",
+						"raw": "'./b'"
+					},
+					"attributes": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " last specifier trailing line comment",
+							"start": 100,
+							"end": 139
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 235,
+					"end": 292,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 14
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 246,
+							"end": 247,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 2
+								},
+								"end": {
+									"line": 15,
+									"column": 3
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 246,
+								"end": 247,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 3
+									}
+								},
+								"name": "d"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 246,
+								"end": 247,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 3
+									}
+								},
+								"name": "d"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " comment1",
+									"start": 249,
+									"end": 260
+								}
+							]
+						},
+						{
+							"type": "ImportSpecifier",
+							"start": 263,
+							"end": 264,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 2
+								},
+								"end": {
+									"line": 16,
+									"column": 3
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 263,
+								"end": 264,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 3
+									}
+								},
+								"name": "e"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 263,
+								"end": 264,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 3
+									}
+								},
+								"name": "e"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " comment2",
+									"start": 266,
+									"end": 277
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 286,
+						"end": 291,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 8
+							},
+							"end": {
+								"line": 17,
+								"column": 13
+							}
+						},
+						"value": "./c",
+						"raw": "'./c'"
+					},
+					"attributes": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " all specifiers with trailing line comments",
+							"start": 188,
+							"end": 233
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 362,
+					"end": 417,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 14
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 384,
+							"end": 385,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 2
+								},
+								"end": {
+									"line": 22,
+									"column": 3
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 384,
+								"end": 385,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 3
+									}
+								},
+								"name": "f"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 384,
+								"end": 385,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 3
+									}
+								},
+								"name": "f"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " group",
+									"start": 373,
+									"end": 381
+								}
+							]
+						},
+						{
+							"type": "ImportSpecifier",
+							"start": 389,
+							"end": 390,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 2
+								},
+								"end": {
+									"line": 23,
+									"column": 3
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 389,
+								"end": 390,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 3
+									}
+								},
+								"name": "g"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 389,
+								"end": 390,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 3
+									}
+								},
+								"name": "g"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " comment",
+									"start": 392,
+									"end": 402
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 411,
+						"end": 416,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 8
+							},
+							"end": {
+								"line": 24,
+								"column": 13
+							}
+						},
+						"value": "./d",
+						"raw": "'./d'"
+					},
+					"attributes": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " hardline path (expanding comment) + last trailing line comment",
+							"start": 295,
+							"end": 360
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 486,
+					"end": 522,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 37
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 494,
+							"end": 495,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 9
+								},
+								"end": {
+									"line": 27,
+									"column": 10
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 494,
+								"end": 495,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 9
+									},
+									"end": {
+										"line": 27,
+										"column": 10
+									}
+								},
+								"name": "h"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 494,
+								"end": 495,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 9
+									},
+									"end": {
+										"line": 27,
+										"column": 10
+									}
+								},
+								"name": "h"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " comment ",
+									"start": 496,
+									"end": 509
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 516,
+						"end": 521,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 31
+							},
+							"end": {
+								"line": 27,
+								"column": 36
+							}
+						},
+						"value": "./e",
+						"raw": "'./e'"
+					},
+					"attributes": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment on last specifier (should work - contrast case)",
+							"start": 420,
+							"end": 484
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

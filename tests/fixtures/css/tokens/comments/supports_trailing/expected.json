@@ -1,0 +1,148 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 227,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 33,
+				"end": 105,
+				"name": "supports",
+				"prelude": "(display: grid)",
+				"block": {
+					"type": "Block",
+					"start": 74,
+					"end": 105,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 78,
+								"end": 81,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 78,
+										"end": 81,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 78,
+														"end": 81
+													}
+												],
+												"start": 78,
+												"end": 81
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 82,
+								"end": 102,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 87,
+										"end": 97,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 78,
+							"end": 102
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 131,
+				"end": 218,
+				"name": "supports",
+				"prelude": "(display: grid) and (flex: 1)",
+				"block": {
+					"type": "Block",
+					"start": 186,
+					"end": 218,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 190,
+								"end": 193,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 190,
+										"end": 193,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 190,
+														"end": 193
+													}
+												],
+												"start": 190,
+												"end": 193
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 194,
+								"end": 215,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 199,
+										"end": 210,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 190,
+							"end": 215
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 219,
+			"styles": "\n\t/* single condition */\n\t@supports (display: grid) /* trailing */ {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* multi-condition */\n\t@supports (display: grid) and (flex: 1) /* trailing */ {\n\t\tdiv {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 228,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

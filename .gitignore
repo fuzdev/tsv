@@ -1,0 +1,59 @@
+# Deps
+node_modules
+.deno
+
+# Output
+/target
+/.svelte-kit
+/build
+/dist
+/dist_*
+/.gro
+/.zzz
+
+# WASM build output
+/crates/tsv_wasm/pkg
+
+# Publish retry sentinel (scripts/publish.ts)
+/.publish-in-progress
+
+# Drift-check generated file (left on failure for inspection)
+/scripts/.drift_check.gen.ts
+
+# Benchmark results (report.json and report.md are committed; baseline.json lives here too)
+/benches/deno/results/*.json
+/benches/deno/results/*.md
+!/benches/deno/results/report.json
+!/benches/deno/results/report.md
+
+# Env
+.env*
+!.env.example
+!.env.*.example
+!.env.test
+!.env.*.test
+
+# Secrets
+*.pem
+id_rsa
+
+# Ignore
+*.ignore
+*.ignore.*
+ignore
+
+# Temporary files
+tmp/
+*.tmp
+.tmp*
+*.bak
+
+# Log files
+*.log
+
+# Workflow
+/worktree
+
+# Os
+.DS_Store
+Thumbs.db

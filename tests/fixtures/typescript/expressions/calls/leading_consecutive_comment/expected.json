@@ -1,0 +1,627 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 436,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Two consecutive line comments before first arg",
+			"start": 10,
+			"end": 59,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment 1",
+			"start": 67,
+			"end": 79,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment 2",
+			"start": 82,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Three consecutive line comments before first arg",
+			"start": 111,
+			"end": 162,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment 1",
+			"start": 170,
+			"end": 182,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment 2",
+			"start": 185,
+			"end": 197,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment 3",
+			"start": 200,
+			"end": 212,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Mixed: line then block comment before first arg",
+			"start": 224,
+			"end": 274,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment 1",
+			"start": 282,
+			"end": 294,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 2
+				},
+				"end": {
+					"line": 20,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment 2 ",
+			"start": 297,
+			"end": 312,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Single line comment before first arg (baseline - should work)",
+			"start": 329,
+			"end": 393,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 401,
+			"end": 411,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 2
+				},
+				"end": {
+					"line": 28,
+					"column": 12
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 435,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 426,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 32,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 61,
+					"end": 108,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 61,
+						"end": 107,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 61,
+							"end": 63,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 97,
+								"end": 98,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 3
+									}
+								},
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " comment 1",
+										"start": 67,
+										"end": 79
+									},
+									{
+										"type": "Line",
+										"value": " comment 2",
+										"start": 82,
+										"end": 94
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 102,
+								"end": 103,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 3
+									}
+								},
+								"name": "b"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Two consecutive line comments before first arg",
+							"start": 10,
+							"end": 59
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 164,
+					"end": 221,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 164,
+						"end": 220,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 1
+							},
+							"end": {
+								"line": 16,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 164,
+							"end": 166,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 1
+								},
+								"end": {
+									"line": 11,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 215,
+								"end": 216,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 3
+									}
+								},
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " comment 1",
+										"start": 170,
+										"end": 182
+									},
+									{
+										"type": "Line",
+										"value": " comment 2",
+										"start": 185,
+										"end": 197
+									},
+									{
+										"type": "Line",
+										"value": " comment 3",
+										"start": 200,
+										"end": 212
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Three consecutive line comments before first arg",
+							"start": 111,
+							"end": 162
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 276,
+					"end": 326,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 276,
+						"end": 325,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 1
+							},
+							"end": {
+								"line": 24,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 276,
+							"end": 278,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 1
+								},
+								"end": {
+									"line": 19,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 315,
+								"end": 316,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 3
+									}
+								},
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " comment 1",
+										"start": 282,
+										"end": 294
+									},
+									{
+										"type": "Block",
+										"value": " comment 2 ",
+										"start": 297,
+										"end": 312
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 320,
+								"end": 321,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 3
+									}
+								},
+								"name": "b"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Mixed: line then block comment before first arg",
+							"start": 224,
+							"end": 274
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 395,
+					"end": 425,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 31,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 395,
+						"end": 424,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 1
+							},
+							"end": {
+								"line": 31,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 395,
+							"end": 397,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 1
+								},
+								"end": {
+									"line": 27,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 414,
+								"end": 415,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 3
+									}
+								},
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " comment",
+										"start": 401,
+										"end": 411
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 419,
+								"end": 420,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 2
+									},
+									"end": {
+										"line": 30,
+										"column": 3
+									}
+								},
+								"name": "b"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Single line comment before first arg (baseline - should work)",
+							"start": 329,
+							"end": 393
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

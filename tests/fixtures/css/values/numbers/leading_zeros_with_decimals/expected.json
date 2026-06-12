@@ -1,0 +1,94 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 99,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 90,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 30,
+							"property": "width",
+							"value": "01.5px"
+						},
+						{
+							"type": "Declaration",
+							"start": 34,
+							"end": 50,
+							"property": "height",
+							"value": "007.25em"
+						},
+						{
+							"type": "Declaration",
+							"start": 54,
+							"end": 67,
+							"property": "margin",
+							"value": "01rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 71,
+							"end": 86,
+							"property": "padding",
+							"value": "0.5rem"
+						}
+					]
+				},
+				"start": 9,
+				"end": 90
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 91,
+			"styles": "\n\tdiv {\n\t\twidth: 01.5px;\n\t\theight: 007.25em;\n\t\tmargin: 01rem;\n\t\tpadding: 0.5rem;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 100,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,1009 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 937,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " assignment 100 chars - stays inline ",
+			"start": 10,
+			"end": 51,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " assignment 101 chars - breaks at + ",
+			"start": 164,
+			"end": 204,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " call arg 100 chars - stays inline ",
+			"start": 320,
+			"end": 359,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " call arg 101 chars - breaks at + ",
+			"start": 470,
+			"end": 508,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " template 100 chars - stays inline ",
+			"start": 623,
+			"end": 662,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " template 101 chars - breaks at + ",
+			"start": 775,
+			"end": 813,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 39
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 936,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 927,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 30,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 53,
+					"end": 161,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 98
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 59,
+							"end": 160,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 97
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 59,
+								"end": 60,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 65,
+								"end": 160,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 97
+									}
+								},
+								"left": {
+									"type": "Literal",
+									"start": 65,
+									"end": 113,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 50
+										}
+									},
+									"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+									"raw": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 116,
+									"end": 160,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 53
+										},
+										"end": {
+											"line": 4,
+											"column": 97
+										}
+									},
+									"value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+									"raw": "'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " assignment 100 chars - stays inline ",
+							"start": 10,
+							"end": 51
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 206,
+					"end": 317,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 48
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 212,
+							"end": 316,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 47
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 212,
+								"end": 213,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 218,
+								"end": 316,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 47
+									}
+								},
+								"left": {
+									"type": "Literal",
+									"start": 218,
+									"end": 266,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 50
+										}
+									},
+									"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+									"raw": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 271,
+									"end": 316,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 47
+										}
+									},
+									"value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+									"raw": "'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " assignment 101 chars - breaks at + ",
+							"start": 164,
+							"end": 204
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 361,
+					"end": 467,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 361,
+						"end": 466,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 361,
+							"end": 363,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 1
+								},
+								"end": {
+									"line": 12,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 367,
+								"end": 462,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 97
+									}
+								},
+								"left": {
+									"type": "Literal",
+									"start": 367,
+									"end": 415,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 2
+										},
+										"end": {
+											"line": 13,
+											"column": 50
+										}
+									},
+									"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+									"raw": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 418,
+									"end": 462,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 53
+										},
+										"end": {
+											"line": 13,
+											"column": 97
+										}
+									},
+									"value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb1",
+									"raw": "'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb1'"
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " call arg 100 chars - stays inline ",
+							"start": 320,
+							"end": 359
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 510,
+					"end": 620,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 510,
+						"end": 619,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 1
+							},
+							"end": {
+								"line": 20,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 510,
+							"end": 512,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 1
+								},
+								"end": {
+									"line": 17,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 516,
+								"end": 615,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 48
+									}
+								},
+								"left": {
+									"type": "Literal",
+									"start": 516,
+									"end": 564,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 50
+										}
+									},
+									"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+									"raw": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 570,
+									"end": 615,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 3
+										},
+										"end": {
+											"line": 19,
+											"column": 48
+										}
+									},
+									"value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb12",
+									"raw": "'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb12'"
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " call arg 101 chars - breaks at + ",
+							"start": 470,
+							"end": 508
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 664,
+					"end": 772,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 98
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 670,
+							"end": 771,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 7
+								},
+								"end": {
+									"line": 24,
+									"column": 97
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 670,
+								"end": 671,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 7
+									},
+									"end": {
+										"line": 23,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 676,
+								"end": 771,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 2
+									},
+									"end": {
+										"line": 24,
+										"column": 97
+									}
+								},
+								"left": {
+									"type": "TemplateLiteral",
+									"start": 676,
+									"end": 723,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 2
+										},
+										"end": {
+											"line": 24,
+											"column": 49
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 683,
+											"end": 687,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 9
+												},
+												"end": {
+													"line": 24,
+													"column": 13
+												}
+											},
+											"name": "expr"
+										}
+									],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 677,
+											"end": 681,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 3
+												},
+												"end": {
+													"line": 24,
+													"column": 7
+												}
+											},
+											"value": {
+												"raw": "aaa ",
+												"cooked": "aaa "
+											},
+											"tail": false
+										},
+										{
+											"type": "TemplateElement",
+											"start": 688,
+											"end": 722,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 14
+												},
+												"end": {
+													"line": 24,
+													"column": 48
+												}
+											},
+											"value": {
+												"raw": " aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+												"cooked": " aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+											},
+											"tail": true
+										}
+									]
+								},
+								"operator": "+",
+								"right": {
+									"type": "TemplateLiteral",
+									"start": 726,
+									"end": 771,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 52
+										},
+										"end": {
+											"line": 24,
+											"column": 97
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 733,
+											"end": 737,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 59
+												},
+												"end": {
+													"line": 24,
+													"column": 63
+												}
+											},
+											"name": "expr"
+										}
+									],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 727,
+											"end": 731,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 53
+												},
+												"end": {
+													"line": 24,
+													"column": 57
+												}
+											},
+											"value": {
+												"raw": "bbb ",
+												"cooked": "bbb "
+											},
+											"tail": false
+										},
+										{
+											"type": "TemplateElement",
+											"start": 738,
+											"end": 770,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 64
+												},
+												"end": {
+													"line": 24,
+													"column": 96
+												}
+											},
+											"value": {
+												"raw": " bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+												"cooked": " bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " template 100 chars - stays inline ",
+							"start": 623,
+							"end": 662
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 815,
+					"end": 926,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 49
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 821,
+							"end": 925,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 7
+								},
+								"end": {
+									"line": 29,
+									"column": 48
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 821,
+								"end": 822,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 7
+									},
+									"end": {
+										"line": 27,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 827,
+								"end": 925,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 48
+									}
+								},
+								"left": {
+									"type": "TemplateLiteral",
+									"start": 827,
+									"end": 874,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 2
+										},
+										"end": {
+											"line": 28,
+											"column": 49
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 834,
+											"end": 838,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 9
+												},
+												"end": {
+													"line": 28,
+													"column": 13
+												}
+											},
+											"name": "expr"
+										}
+									],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 828,
+											"end": 832,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 3
+												},
+												"end": {
+													"line": 28,
+													"column": 7
+												}
+											},
+											"value": {
+												"raw": "aaa ",
+												"cooked": "aaa "
+											},
+											"tail": false
+										},
+										{
+											"type": "TemplateElement",
+											"start": 839,
+											"end": 873,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 14
+												},
+												"end": {
+													"line": 28,
+													"column": 48
+												}
+											},
+											"value": {
+												"raw": " aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+												"cooked": " aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+											},
+											"tail": true
+										}
+									]
+								},
+								"operator": "+",
+								"right": {
+									"type": "TemplateLiteral",
+									"start": 879,
+									"end": 925,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 2
+										},
+										"end": {
+											"line": 29,
+											"column": 48
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 886,
+											"end": 890,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 9
+												},
+												"end": {
+													"line": 29,
+													"column": 13
+												}
+											},
+											"name": "expr"
+										}
+									],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 880,
+											"end": 884,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 3
+												},
+												"end": {
+													"line": 29,
+													"column": 7
+												}
+											},
+											"value": {
+												"raw": "bbb ",
+												"cooked": "bbb "
+											},
+											"tail": false
+										},
+										{
+											"type": "TemplateElement",
+											"start": 891,
+											"end": 924,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 14
+												},
+												"end": {
+													"line": 29,
+													"column": 47
+												}
+											},
+											"value": {
+												"raw": " bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+												"cooked": " bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " template 101 chars - breaks at + ",
+							"start": 775,
+							"end": 813
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

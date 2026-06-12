@@ -1,0 +1,630 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 254,
+		"end": 483,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 263,
+					"end": 276,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 263,
+							"end": 276,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "test-unicode",
+											"start": 263,
+											"end": 276
+										}
+									],
+									"start": 263,
+									"end": 276
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 277,
+					"end": 305,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 281,
+							"end": 301,
+							"property": "content",
+							"value": "'\\41\\42\\43'"
+						}
+					]
+				},
+				"start": 263,
+				"end": 305
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 308,
+					"end": 320,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 308,
+							"end": 320,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "test-6digit",
+											"start": 308,
+											"end": 320
+										}
+									],
+									"start": 308,
+									"end": 320
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 321,
+					"end": 347,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 325,
+							"end": 343,
+							"property": "content",
+							"value": "'\\01F4A9'"
+						}
+					]
+				},
+				"start": 308,
+				"end": 347
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 350,
+					"end": 366,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 350,
+							"end": 366,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "test-with-space",
+											"start": 350,
+											"end": 366
+										}
+									],
+									"start": 350,
+									"end": 366
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 367,
+					"end": 391,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 371,
+							"end": 387,
+							"property": "content",
+							"value": "'\\41 B'"
+						}
+					]
+				},
+				"start": 350,
+				"end": 391
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 394,
+					"end": 409,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 394,
+							"end": 409,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "test-backslash",
+											"start": 394,
+											"end": 409
+										}
+									],
+									"start": 394,
+									"end": 409
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 410,
+					"end": 431,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 414,
+							"end": 427,
+							"property": "content",
+							"value": "'\\\\'"
+						}
+					]
+				},
+				"start": 394,
+				"end": 431
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 434,
+					"end": 448,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 434,
+							"end": 448,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "test-adjacent",
+											"start": 434,
+											"end": 448
+										}
+									],
+									"start": 434,
+									"end": 448
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 449,
+					"end": 474,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 453,
+							"end": 470,
+							"property": "content",
+							"value": "'\\41\\42'"
+						}
+					]
+				},
+				"start": 434,
+				"end": 474
+			}
+		],
+		"content": {
+			"start": 261,
+			"end": 475,
+			"styles": "\n\t.test-unicode {\n\t\tcontent: '\\41\\42\\43';\n\t}\n\n\t.test-6digit {\n\t\tcontent: '\\01F4A9';\n\t}\n\n\t.test-with-space {\n\t\tcontent: '\\41 B';\n\t}\n\n\t.test-backslash {\n\t\tcontent: '\\\\';\n\t}\n\n\t.test-adjacent {\n\t\tcontent: '\\41\\42';\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 484,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 252,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 5,
+							"end": 26,
+							"raw": "\n\tCSS escape tests:\n\t",
+							"data": "\n\tCSS escape tests:\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 26,
+							"end": 67,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 27
+								},
+								"end": {
+									"line": 3,
+									"column": 6,
+									"character": 31
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 32,
+									"end": 52,
+									"name": "class",
+									"name_loc": {
+										"start": {
+											"line": 3,
+											"column": 7,
+											"character": 32
+										},
+										"end": {
+											"line": 3,
+											"column": 12,
+											"character": 37
+										}
+									},
+									"value": [
+										{
+											"start": 39,
+											"end": 51,
+											"type": "Text",
+											"raw": "test-unicode",
+											"data": "test-unicode"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 53,
+										"end": 60,
+										"raw": "Unicode",
+										"data": "Unicode"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 67,
+							"end": 69,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 69,
+							"end": 109,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 2,
+									"character": 70
+								},
+								"end": {
+									"line": 4,
+									"column": 6,
+									"character": 74
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 75,
+									"end": 94,
+									"name": "class",
+									"name_loc": {
+										"start": {
+											"line": 4,
+											"column": 7,
+											"character": 75
+										},
+										"end": {
+											"line": 4,
+											"column": 12,
+											"character": 80
+										}
+									},
+									"value": [
+										{
+											"start": 82,
+											"end": 93,
+											"type": "Text",
+											"raw": "test-6digit",
+											"data": "test-6digit"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 95,
+										"end": 102,
+										"raw": "6-digit",
+										"data": "6-digit"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 109,
+							"end": 111,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 111,
+							"end": 153,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 2,
+									"character": 112
+								},
+								"end": {
+									"line": 5,
+									"column": 6,
+									"character": 116
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 117,
+									"end": 140,
+									"name": "class",
+									"name_loc": {
+										"start": {
+											"line": 5,
+											"column": 7,
+											"character": 117
+										},
+										"end": {
+											"line": 5,
+											"column": 12,
+											"character": 122
+										}
+									},
+									"value": [
+										{
+											"start": 124,
+											"end": 139,
+											"type": "Text",
+											"raw": "test-with-space",
+											"data": "test-with-space"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 141,
+										"end": 146,
+										"raw": "Space",
+										"data": "Space"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 153,
+							"end": 155,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 155,
+							"end": 200,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 6,
+									"column": 2,
+									"character": 156
+								},
+								"end": {
+									"line": 6,
+									"column": 6,
+									"character": 160
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 161,
+									"end": 183,
+									"name": "class",
+									"name_loc": {
+										"start": {
+											"line": 6,
+											"column": 7,
+											"character": 161
+										},
+										"end": {
+											"line": 6,
+											"column": 12,
+											"character": 166
+										}
+									},
+									"value": [
+										{
+											"start": 168,
+											"end": 182,
+											"type": "Text",
+											"raw": "test-backslash",
+											"data": "test-backslash"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 184,
+										"end": 193,
+										"raw": "Backslash",
+										"data": "Backslash"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 200,
+							"end": 202,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 202,
+							"end": 245,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 7,
+									"column": 2,
+									"character": 203
+								},
+								"end": {
+									"line": 7,
+									"column": 6,
+									"character": 207
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 208,
+									"end": 229,
+									"name": "class",
+									"name_loc": {
+										"start": {
+											"line": 7,
+											"column": 7,
+											"character": 208
+										},
+										"end": {
+											"line": 7,
+											"column": 12,
+											"character": 213
+										}
+									},
+									"value": [
+										{
+											"start": 215,
+											"end": 228,
+											"type": "Text",
+											"raw": "test-adjacent",
+											"data": "test-adjacent"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 230,
+										"end": 238,
+										"raw": "Adjacent",
+										"data": "Adjacent"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 245,
+							"end": 246,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 252,
+				"end": 254,
+				"raw": "\n\n",
+				"data": "\n\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,148 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 181,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 85,
+				"name": "container",
+				"prelude": "not  (width > 100px)",
+				"block": {
+					"type": "Block",
+					"start": 54,
+					"end": 85,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 58,
+								"end": 61,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 58,
+										"end": 61,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 58,
+														"end": 61
+													}
+												],
+												"start": 58,
+												"end": 61
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 62,
+								"end": 82,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 67,
+										"end": 77,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 58,
+							"end": 82
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 88,
+				"end": 172,
+				"name": "container",
+				"prelude": "sidebar not  style(--theme: dark)",
+				"block": {
+					"type": "Block",
+					"start": 140,
+					"end": 172,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 144,
+								"end": 147,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 144,
+										"end": 147,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 144,
+														"end": 147
+													}
+												],
+												"start": 144,
+												"end": 147
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 148,
+								"end": 169,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 153,
+										"end": 164,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 144,
+							"end": 169
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 173,
+			"styles": "\n\t@container not /* comment */ (width > 100px) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t@container sidebar not /* a */ style(--theme: dark) {\n\t\tdiv {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 182,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

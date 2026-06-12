@@ -1,0 +1,644 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 271,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Double block comment - inner comment creates mid-chain comment",
+			"start": 20,
+			"end": 85,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " outer ",
+			"start": 107,
+			"end": 118,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " inner ",
+			"start": 121,
+			"end": 132,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 16
+				},
+				"end": {
+					"line": 4,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Double block comment on deeper chain member",
+			"start": 150,
+			"end": 196,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " outer ",
+			"start": 218,
+			"end": 229,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " inner ",
+			"start": 234,
+			"end": 245,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 18
+				},
+				"end": {
+					"line": 10,
+					"column": 29
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 270,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 261,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 87,
+					"end": 147,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 96,
+						"end": 99,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 3,
+								"column": 13
+							}
+						},
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 100,
+							"end": 101,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 14
+								},
+								"end": {
+									"line": 3,
+									"column": 15
+								}
+							},
+							"name": "a"
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 103,
+						"end": 147,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 17
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 119,
+								"end": 144,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 14
+									},
+									"end": {
+										"line": 5,
+										"column": 9
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 119,
+									"end": 143,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 14
+										},
+										"end": {
+											"line": 5,
+											"column": 8
+										}
+									},
+									"callee": {
+										"type": "MemberExpression",
+										"start": 119,
+										"end": 140,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 14
+											},
+											"end": {
+												"line": 5,
+												"column": 5
+											}
+										},
+										"object": {
+											"type": "MemberExpression",
+											"start": 119,
+											"end": 134,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 14
+												},
+												"end": {
+													"line": 4,
+													"column": 29
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 119,
+												"end": 120,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 14
+													},
+													"end": {
+														"line": 4,
+														"column": 15
+													}
+												},
+												"name": "a",
+												"trailingComments": [
+													{
+														"type": "Block",
+														"value": " inner ",
+														"start": 121,
+														"end": 132
+													}
+												]
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 133,
+												"end": 134,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 28
+													},
+													"end": {
+														"line": 4,
+														"column": 29
+													}
+												},
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 139,
+											"end": 140,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 4
+												},
+												"end": {
+													"line": 5,
+													"column": 5
+												}
+											},
+											"name": "c"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 141,
+											"end": 142,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 6
+												},
+												"end": {
+													"line": 5,
+													"column": 7
+												}
+											},
+											"name": "a"
+										}
+									],
+									"optional": false
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " outer ",
+										"start": 107,
+										"end": 118
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Double block comment - inner comment creates mid-chain comment",
+							"start": 20,
+							"end": 85
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 198,
+					"end": 260,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 207,
+						"end": 210,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 10
+							},
+							"end": {
+								"line": 9,
+								"column": 13
+							}
+						},
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 211,
+							"end": 212,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 14
+								},
+								"end": {
+									"line": 9,
+									"column": 15
+								}
+							},
+							"name": "a"
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 214,
+						"end": 260,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 17
+							},
+							"end": {
+								"line": 12,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 230,
+								"end": 257,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 14
+									},
+									"end": {
+										"line": 11,
+										"column": 9
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 230,
+									"end": 256,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 14
+										},
+										"end": {
+											"line": 11,
+											"column": 8
+										}
+									},
+									"callee": {
+										"type": "MemberExpression",
+										"start": 230,
+										"end": 253,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 14
+											},
+											"end": {
+												"line": 11,
+												"column": 5
+											}
+										},
+										"object": {
+											"type": "MemberExpression",
+											"start": 230,
+											"end": 247,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 14
+												},
+												"end": {
+													"line": 10,
+													"column": 31
+												}
+											},
+											"object": {
+												"type": "MemberExpression",
+												"start": 230,
+												"end": 233,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 14
+													},
+													"end": {
+														"line": 10,
+														"column": 17
+													}
+												},
+												"object": {
+													"type": "Identifier",
+													"start": 230,
+													"end": 231,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 14
+														},
+														"end": {
+															"line": 10,
+															"column": 15
+														}
+													},
+													"name": "a"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 232,
+													"end": 233,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 16
+														},
+														"end": {
+															"line": 10,
+															"column": 17
+														}
+													},
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false,
+												"trailingComments": [
+													{
+														"type": "Block",
+														"value": " inner ",
+														"start": 234,
+														"end": 245
+													}
+												]
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 246,
+												"end": 247,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 30
+													},
+													"end": {
+														"line": 10,
+														"column": 31
+													}
+												},
+												"name": "c"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 252,
+											"end": 253,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 4
+												},
+												"end": {
+													"line": 11,
+													"column": 5
+												}
+											},
+											"name": "d"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 254,
+											"end": 255,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 6
+												},
+												"end": {
+													"line": 11,
+													"column": 7
+												}
+											},
+											"name": "a"
+										}
+									],
+									"optional": false
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " outer ",
+										"start": 218,
+										"end": 229
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Double block comment on deeper chain member",
+							"start": 150,
+							"end": 196
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

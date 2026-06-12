@@ -1,0 +1,178 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 542,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 16,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 16,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 9,
+											"end": 16
+										}
+									],
+									"start": 9,
+									"end": 16
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 17,
+					"end": 533,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 54,
+							"end": 67,
+							"property": "--color1",
+							"value": "red"
+						},
+						{
+							"type": "Declaration",
+							"start": 71,
+							"end": 88,
+							"property": "--color2",
+							"value": "#ff0000"
+						},
+						{
+							"type": "Declaration",
+							"start": 92,
+							"end": 114,
+							"property": "--color3",
+							"value": "rgb(255 0 0)"
+						},
+						{
+							"type": "Declaration",
+							"start": 142,
+							"end": 170,
+							"property": "--spacing1",
+							"value": "calc(1rem + 5px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 174,
+							"end": 213,
+							"property": "--shadow1",
+							"value": "0 2px 4px rgba(0, 0, 0, 0.1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 217,
+							"end": 266,
+							"property": "--gradient1",
+							"value": "linear-gradient(to right, red, blue)"
+						},
+						{
+							"type": "Declaration",
+							"start": 315,
+							"end": 325,
+							"property": "--",
+							"value": "value1"
+						},
+						{
+							"type": "Declaration",
+							"start": 329,
+							"end": 342,
+							"property": "--123",
+							"value": "value2"
+						},
+						{
+							"type": "Declaration",
+							"start": 346,
+							"end": 360,
+							"property": "---foo",
+							"value": "value3"
+						},
+						{
+							"type": "Declaration",
+							"start": 364,
+							"end": 382,
+							"property": "--_private",
+							"value": "value4"
+						},
+						{
+							"type": "Declaration",
+							"start": 386,
+							"end": 406,
+							"property": "--kebab-case",
+							"value": "value5"
+						},
+						{
+							"type": "Declaration",
+							"start": 442,
+							"end": 455,
+							"property": "--size1",
+							"value": "16px"
+						},
+						{
+							"type": "Declaration",
+							"start": 459,
+							"end": 474,
+							"property": "--size2",
+							"value": "1.5rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 478,
+							"end": 493,
+							"property": "--percent1",
+							"value": "50%"
+						},
+						{
+							"type": "Declaration",
+							"start": 497,
+							"end": 512,
+							"property": "--angle1",
+							"value": "45deg"
+						},
+						{
+							"type": "Declaration",
+							"start": 516,
+							"end": 529,
+							"property": "--time1",
+							"value": "0.3s"
+						}
+					]
+				},
+				"start": 9,
+				"end": 533
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 534,
+			"styles": "\n\t.class1 {\n\t\t/* Simple custom properties */\n\t\t--color1: red;\n\t\t--color2: #ff0000;\n\t\t--color3: rgb(255 0 0);\n\n\t\t/* Complex values */\n\t\t--spacing1: calc(1rem + 5px);\n\t\t--shadow1: 0 2px 4px rgba(0, 0, 0, 0.1);\n\t\t--gradient1: linear-gradient(to right, red, blue);\n\n\t\t/* Edge cases - all valid per CSS spec */\n\t\t--: value1;\n\t\t--123: value2;\n\t\t---foo: value3;\n\t\t--_private: value4;\n\t\t--kebab-case: value5;\n\n\t\t/* Using other CSS values */\n\t\t--size1: 16px;\n\t\t--size2: 1.5rem;\n\t\t--percent1: 50%;\n\t\t--angle1: 45deg;\n\t\t--time1: 0.3s;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 543,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

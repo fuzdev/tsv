@@ -1,0 +1,132 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 84,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 19,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 19,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										},
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 12,
+											"end": 19
+										}
+									],
+									"start": 9,
+									"end": 19
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 20,
+					"end": 39,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 24,
+							"end": 35,
+							"property": "width",
+							"value": "100%"
+						}
+					]
+				},
+				"start": 9,
+				"end": 39
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 42,
+					"end": 53,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 42,
+							"end": 53,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "span",
+											"start": 42,
+											"end": 46
+										},
+										{
+											"type": "ClassSelector",
+											"name": "class2",
+											"start": 46,
+											"end": 53
+										}
+									],
+									"start": 42,
+									"end": 53
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 54,
+					"end": 75,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 58,
+							"end": 71,
+							"property": "color",
+							"value": "yellow"
+						}
+					]
+				},
+				"start": 42,
+				"end": 75
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 76,
+			"styles": "\n\tdiv.class1 {\n\t\twidth: 100%;\n\t}\n\n\tspan.class2 {\n\t\tcolor: yellow;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 85,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

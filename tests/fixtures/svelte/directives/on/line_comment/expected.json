@@ -1,0 +1,273 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 123,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 65,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 7,
+						"character": 7
+					}
+				},
+				"attributes": [
+					{
+						"start": 9,
+						"end": 50,
+						"type": "OnDirective",
+						"name": "click",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 1,
+								"character": 9
+							},
+							"end": {
+								"line": 2,
+								"column": 9,
+								"character": 17
+							}
+						},
+						"expression": {
+							"type": "ArrowFunctionExpression",
+							"start": 31,
+							"end": 49,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 5,
+									"column": 2
+								}
+							},
+							"id": null,
+							"expression": false,
+							"generator": false,
+							"async": false,
+							"params": [],
+							"body": {
+								"type": "BlockStatement",
+								"start": 37,
+								"end": 49,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 2
+									}
+								},
+								"body": [
+									{
+										"type": "ExpressionStatement",
+										"start": 41,
+										"end": 46,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 7
+											}
+										},
+										"expression": {
+											"type": "CallExpression",
+											"start": 41,
+											"end": 45,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 2
+												},
+												"end": {
+													"line": 4,
+													"column": 6
+												}
+											},
+											"callee": {
+												"type": "Identifier",
+												"start": 41,
+												"end": 43,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 2
+													},
+													"end": {
+														"line": 4,
+														"column": 4
+													}
+												},
+												"name": "fn"
+											},
+											"arguments": [],
+											"optional": false
+										}
+									}
+								]
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " comment",
+									"start": 19,
+									"end": 29
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 51,
+							"end": 55,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 65,
+				"end": 67,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 67,
+				"end": 122,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 68
+					},
+					"end": {
+						"line": 8,
+						"column": 7,
+						"character": 74
+					}
+				},
+				"attributes": [
+					{
+						"start": 75,
+						"end": 108,
+						"type": "OnDirective",
+						"name": "click",
+						"name_loc": {
+							"start": {
+								"line": 8,
+								"column": 8,
+								"character": 75
+							},
+							"end": {
+								"line": 8,
+								"column": 16,
+								"character": 83
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 105,
+							"end": 107,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 38
+								},
+								"end": {
+									"line": 8,
+									"column": 40
+								}
+							},
+							"name": "fn",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " block comment ",
+									"start": 85,
+									"end": 104
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 109,
+							"end": 113,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 19,
+			"end": 29,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 11
+				},
+				"end": {
+					"line": 2,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " block comment ",
+			"start": 85,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 18
+				},
+				"end": {
+					"line": 8,
+					"column": 37
+				}
+			}
+		}
+	]
+}

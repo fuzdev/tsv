@@ -1,0 +1,136 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 265,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 256,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 33,
+							"property": "columns",
+							"value": "3 200px"
+						},
+						{
+							"type": "Declaration",
+							"start": 37,
+							"end": 52,
+							"property": "column-count",
+							"value": "3"
+						},
+						{
+							"type": "Declaration",
+							"start": 56,
+							"end": 75,
+							"property": "column-width",
+							"value": "200px"
+						},
+						{
+							"type": "Declaration",
+							"start": 79,
+							"end": 95,
+							"property": "column-gap",
+							"value": "2rem"
+						},
+						{
+							"type": "Declaration",
+							"start": 99,
+							"end": 126,
+							"property": "column-rule",
+							"value": "1px solid gray"
+						},
+						{
+							"type": "Declaration",
+							"start": 130,
+							"end": 152,
+							"property": "column-rule-width",
+							"value": "2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 156,
+							"end": 181,
+							"property": "column-rule-style",
+							"value": "dashed"
+						},
+						{
+							"type": "Declaration",
+							"start": 185,
+							"end": 208,
+							"property": "column-rule-color",
+							"value": "blue"
+						},
+						{
+							"type": "Declaration",
+							"start": 212,
+							"end": 228,
+							"property": "column-span",
+							"value": "all"
+						},
+						{
+							"type": "Declaration",
+							"start": 232,
+							"end": 252,
+							"property": "column-fill",
+							"value": "balance"
+						}
+					]
+				},
+				"start": 9,
+				"end": 256
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 257,
+			"styles": "\n\tdiv {\n\t\tcolumns: 3 200px;\n\t\tcolumn-count: 3;\n\t\tcolumn-width: 200px;\n\t\tcolumn-gap: 2rem;\n\t\tcolumn-rule: 1px solid gray;\n\t\tcolumn-rule-width: 2px;\n\t\tcolumn-rule-style: dashed;\n\t\tcolumn-rule-color: blue;\n\t\tcolumn-span: all;\n\t\tcolumn-fill: balance;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 266,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,80 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 191,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 25,
+					"end": 31,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 25,
+							"end": 31,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class",
+											"start": 25,
+											"end": 31
+										}
+									],
+									"start": 25,
+									"end": 31
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 47,
+					"end": 167,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 85,
+							"end": 95,
+							"property": "color",
+							"value": "red"
+						},
+						{
+							"type": "Declaration",
+							"start": 131,
+							"end": 146,
+							"property": "font-size",
+							"value": "12px"
+						}
+					]
+				},
+				"start": 25,
+				"end": 167
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 183,
+			"styles": "\n\t/* comment1 */\n\t.class /* comment2 */ {\n\t\t/* comment3 */\n\t\t/* comment4 */\n\t\tcolor: red; /* comment5 */\n\t\t/* comment6 */\n\t\tfont-size: 12px;\n\t\t/* comment7 */\n\t} /* comment8 */\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 192,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

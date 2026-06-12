@@ -1,0 +1,500 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 272,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Block body — comment preserved between `for` and `(`",
+			"start": 10,
+			"end": 65,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " k ",
+			"start": 71,
+			"end": 78,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 5
+				},
+				"end": {
+					"line": 3,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Empty body — attaches directly: `);` (no space before the semicolon)",
+			"start": 103,
+			"end": 174,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " k ",
+			"start": 180,
+			"end": 187,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 5
+				},
+				"end": {
+					"line": 8,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Non-block body — stays inline",
+			"start": 201,
+			"end": 233,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " k ",
+			"start": 239,
+			"end": 246,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 5
+				},
+				"end": {
+					"line": 11,
+					"column": 12
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 271,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 262,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 67,
+					"end": 100,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "Identifier",
+						"start": 80,
+						"end": 81,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 14
+							},
+							"end": {
+								"line": 3,
+								"column": 15
+							}
+						},
+						"name": "a",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " k ",
+								"start": 71,
+								"end": 78
+							}
+						]
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 83,
+						"end": 84,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 17
+							},
+							"end": {
+								"line": 3,
+								"column": 18
+							}
+						},
+						"name": "b"
+					},
+					"update": {
+						"type": "Identifier",
+						"start": 86,
+						"end": 87,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 20
+							},
+							"end": {
+								"line": 3,
+								"column": 21
+							}
+						},
+						"name": "c"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 89,
+						"end": 100,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 23
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 93,
+								"end": 97,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 93,
+									"end": 96,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 93,
+										"end": 94,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 3
+											}
+										},
+										"name": "d"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block body — comment preserved between `for` and `(`",
+							"start": 10,
+							"end": 65
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 176,
+					"end": 198,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 23
+						}
+					},
+					"init": {
+						"type": "Identifier",
+						"start": 189,
+						"end": 190,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 14
+							},
+							"end": {
+								"line": 8,
+								"column": 15
+							}
+						},
+						"name": "a",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " k ",
+								"start": 180,
+								"end": 187
+							}
+						]
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 192,
+						"end": 193,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 17
+							},
+							"end": {
+								"line": 8,
+								"column": 18
+							}
+						},
+						"name": "b"
+					},
+					"update": {
+						"type": "Identifier",
+						"start": 195,
+						"end": 196,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 20
+							},
+							"end": {
+								"line": 8,
+								"column": 21
+							}
+						},
+						"name": "c"
+					},
+					"body": {
+						"type": "EmptyStatement",
+						"start": 197,
+						"end": 198,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 22
+							},
+							"end": {
+								"line": 8,
+								"column": 23
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Empty body — attaches directly: `);` (no space before the semicolon)",
+							"start": 103,
+							"end": 174
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 235,
+					"end": 261,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 27
+						}
+					},
+					"init": {
+						"type": "Identifier",
+						"start": 248,
+						"end": 249,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 14
+							},
+							"end": {
+								"line": 11,
+								"column": 15
+							}
+						},
+						"name": "a",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " k ",
+								"start": 239,
+								"end": 246
+							}
+						]
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 251,
+						"end": 252,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 17
+							},
+							"end": {
+								"line": 11,
+								"column": 18
+							}
+						},
+						"name": "b"
+					},
+					"update": {
+						"type": "Identifier",
+						"start": 254,
+						"end": 255,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 20
+							},
+							"end": {
+								"line": 11,
+								"column": 21
+							}
+						},
+						"name": "c"
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 257,
+						"end": 261,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 23
+							},
+							"end": {
+								"line": 11,
+								"column": 27
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 257,
+							"end": 260,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 23
+								},
+								"end": {
+									"line": 11,
+									"column": 26
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 257,
+								"end": 258,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 23
+									},
+									"end": {
+										"line": 11,
+										"column": 24
+									}
+								},
+								"name": "d"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Non-block body — stays inline",
+							"start": 201,
+							"end": 233
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

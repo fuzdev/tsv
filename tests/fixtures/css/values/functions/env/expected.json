@@ -1,0 +1,108 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 288,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 279,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 54,
+							"property": "padding-top",
+							"value": "env(safe-area-inset-top)"
+						},
+						{
+							"type": "Declaration",
+							"start": 58,
+							"end": 99,
+							"property": "padding-right",
+							"value": "env(safe-area-inset-right)"
+						},
+						{
+							"type": "Declaration",
+							"start": 103,
+							"end": 146,
+							"property": "padding-bottom",
+							"value": "env(safe-area-inset-bottom)"
+						},
+						{
+							"type": "Declaration",
+							"start": 150,
+							"end": 189,
+							"property": "padding-left",
+							"value": "env(safe-area-inset-left)"
+						},
+						{
+							"type": "Declaration",
+							"start": 193,
+							"end": 232,
+							"property": "margin",
+							"value": "env(titlebar-area-height, 20px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 236,
+							"end": 275,
+							"property": "height",
+							"value": "env(keyboard-inset-height, 0px)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 279
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 280,
+			"styles": "\n\tdiv {\n\t\tpadding-top: env(safe-area-inset-top);\n\t\tpadding-right: env(safe-area-inset-right);\n\t\tpadding-bottom: env(safe-area-inset-bottom);\n\t\tpadding-left: env(safe-area-inset-left);\n\t\tmargin: env(titlebar-area-height, 20px);\n\t\theight: env(keyboard-inset-height, 0px);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 289,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

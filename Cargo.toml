@@ -1,0 +1,171 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/tsv_lang",
+    "crates/tsv_html",
+    "crates/tsv_ts",
+    "crates/tsv_css",
+    "crates/tsv_svelte",
+    "crates/tsv_cli",
+    "crates/tsv_debug",
+    "crates/tsv_wasm",
+    "crates/tsv_ffi",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+authors = ["tsv contributors"]
+license = "MIT"
+repository = "https://github.com/fuzdev/tsv"
+
+[workspace.dependencies]
+# Foundation
+tsv_lang = { path = "crates/tsv_lang" }
+tsv_html = { path = "crates/tsv_html" }
+
+# Language implementations
+# Default-features off ships parse + format only; consumers opt into the
+# public AST + JSON layer with `features = ["convert"]`. Only the
+# @fuzdev/tsv_format_wasm build leaves it off.
+tsv_ts = { path = "crates/tsv_ts", default-features = false }
+tsv_css = { path = "crates/tsv_css", default-features = false }
+tsv_svelte = { path = "crates/tsv_svelte", default-features = false }
+
+# External dependencies
+argh = "0.1"
+# Async runtime + combinators — dev/debug tooling only (tsv_debug, integration tests)
+tokio = { version = "1" }
+futures-util = "0.3"
+phf = { version = "0.13", features = ["macros"] }
+serde = { version = "1", features = ["derive"] }
+# float_roundtrip: exact f64 parsing so big literal values (e.g. integral
+# doubles beyond u64) survive the expected.json round-trip byte-faithfully
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+smallvec = "1.11"
+string-interner = "0.20"
+thiserror = "2"
+unicode-ident = "1.0"
+unicode-segmentation = "1.12.0"
+unicode-width = "0.2.2"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+# Allow missing Debug - some types contain non-Debug fields (Chars, RefCell<Interner>, etc.)
+# TODO: Consider adding manual Debug impls for key public types (Lexer, Printer, etc.)
+missing_debug_implementations = "allow"
+trivial_casts = "warn"
+trivial_numeric_casts = "warn"
+unused_lifetimes = "warn"
+unused_qualifications = "warn"
+
+[workspace.lints.clippy]
+# Enable lint groups (priority -1 so individual lints can override)
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+
+# Pedantic overrides
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+similar_names = "allow"
+too_many_lines = "allow"
+# Style preferences - explicit can be clearer
+use_self = "allow"
+doc_markdown = "allow"
+unreadable_literal = "allow"
+option_if_let_else = "allow"
+if_not_else = "allow"
+match_same_arms = "allow"
+single_match_else = "allow"
+# These are style choices that can go either way
+wildcard_imports = "allow"
+unused_self = "allow"
+unnested_or_patterns = "allow"
+explicit_iter_loop = "allow"
+match_wildcard_for_single_variants = "allow"
+needless_pass_by_value = "allow"
+bool_to_int_with_if = "allow"
+unnecessary_wraps = "allow"
+fn_params_excessive_bools = "allow"
+comparison_chain = "allow"
+large_enum_variant = "allow"
+too_long_first_doc_paragraph = "allow"
+struct_field_names = "allow"
+items_after_statements = "allow"
+implicit_hasher = "allow"
+doc_link_with_quotes = "allow"
+return_self_not_must_use = "allow"
+case_sensitive_file_extension_comparisons = "allow"
+needless_continue = "allow"
+unnecessary_debug_formatting = "allow"
+# Documentation lints - allow for flexibility
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+# Parser-specific: common pattern with u32 positions
+cast_possible_truncation = "allow"
+cast_lossless = "allow"
+cast_possible_wrap = "allow"
+
+# Nursery overrides
+significant_drop_tightening = "allow"
+missing_const_for_fn = "allow"
+redundant_pub_crate = "allow"
+branches_sharing_code = "allow"
+cognitive_complexity = "allow"
+future_not_send = "allow"
+unnecessary_literal_bound = "allow"
+equatable_if_let = "allow"
+useless_let_if_seq = "allow"
+# Lifetimes - explicit can be clearer
+elidable_lifetime_names = "allow"
+
+# Cargo overrides
+cargo_common_metadata = "allow"      # internal crates, not published to crates.io
+
+# Restriction lints (panic points need explicit #[allow] with justification)
+clone_on_ref_ptr = "warn"
+dbg_macro = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
+unwrap_used = "warn"
+
+# Root package for integration tests
+[package]
+name = "tsv"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tsv_lang.workspace = true
+tsv_ts = { workspace = true, features = ["convert"] }
+tsv_css = { workspace = true, features = ["convert"] }
+tsv_svelte = { workspace = true, features = ["convert"] }
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tsv_debug = { path = "crates/tsv_debug" }
+tsv_cli = { path = "crates/tsv_cli" }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+futures-util.workspace = true
+
+[lints]
+workspace = true
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.corpus]
+inherits = "release"
+panic = "unwind"
+
+[profile.profiling]
+inherits = "release"
+debug = true
+strip = false

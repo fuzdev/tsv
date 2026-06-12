@@ -1,0 +1,11 @@
+<button on:click|preventDefault={fn}></button>
+<button on:click|stopPropagation={fn}></button>
+<button on:click|stopImmediatePropagation={fn}></button>
+<button on:click|passive={fn}></button>
+<button on:click|nonpassive={fn}></button>
+<button on:click|capture={fn}></button>
+<button on:click|once={fn}></button>
+<button on:click|self={fn}></button>
+<button on:click|trusted={fn}></button>
+<button on:click|preventDefault|stopPropagation={fn}></button>
+<button on:click|passive|once|capture={fn}></button>
