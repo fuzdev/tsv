@@ -2,8 +2,8 @@
 /**
  * `tsv` bin for `@fuzdev/tsv_wasm` — mirrors the native `tsv_cli` contract
  * (subcommands, flags, exit codes, output streams, traversal rules) over the
- * WASM build. Single-threaded (no `--jobs`); the native CLI is the fast path
- * for large trees.
+ * WASM build. Single-threaded — `--jobs` is accepted for drop-in parity and
+ * ignored; the native CLI is the fast path for large trees.
  *
  * Exit codes: `format` — 0 clean, 1 would-change (`--check`), 2 errors;
  * `parse` — 0 ok, 1 error. Argument-parsing errors exit 1 (both commands).
@@ -36,13 +36,18 @@ const PARSERS = {
 	css: parse_css_json,
 };
 
+/** Valid `--parser` values (shared by `format` and `parse` — `FORMATTERS` and
+ * `PARSERS` are keyed by the same names). */
+const PARSER_NAMES = new Set(['svelte', 'typescript', 'css']);
+
 const HELP = `Usage: tsv <command> [<args>]
 
 formatter and parser for TypeScript, Svelte, and CSS (WASM build)
 
 Commands:
-  format            Format source code in place (matches Prettier output)
+  format            Format source code in place (near-Prettier output)
   parse             Parse source code into AST JSON
+  help              Print help for a command
 
 Run \`tsv <command> --help\` for command flags.
 `;
@@ -50,7 +55,7 @@ Run \`tsv <command> --help\` for command flags.
 const FORMAT_HELP =
 	`Usage: tsv format [<paths...>] [--check] [--content <s> | --stdin] [--parser <p>]
 
-Format source code in place (matches Prettier output).
+Format source code in place (near-Prettier output).
 
 Paths are formatted in place (written only when the output differs) and
 changed paths print to stdout; directories recurse over .ts/.svelte/.css.
@@ -61,6 +66,7 @@ Options:
   --stdin           read from stdin, print to stdout (requires --parser)
   --parser <p>      parser type: svelte | typescript | css (--content/--stdin only)
   --check           check instead of writing/printing: exit 1 if any input would change
+  --jobs <n>        accepted for native-CLI parity and ignored (single-threaded)
 
 Exit codes: 0 clean, 1 would change (--check), 2 errors.
 `;
@@ -87,8 +93,10 @@ function main() {
 		case 'parse':
 			run_parse(rest);
 			break;
+		case 'help':
+			run_help(rest);
+			break;
 		case '--help':
-		case '-h':
 			print(HELP);
 			break;
 		case undefined:
@@ -97,6 +105,24 @@ function main() {
 			break;
 		default:
 			eprint(`Error: unknown command '${command}'\n\n${HELP}`);
+			process.exit(1);
+	}
+}
+
+/** `tsv help [command]` — mirrors the native CLI's argh-generated help subcommand. */
+function run_help(args) {
+	switch (args[0]) {
+		case undefined:
+			print(HELP);
+			break;
+		case 'format':
+			print(FORMAT_HELP);
+			break;
+		case 'parse':
+			print(PARSE_HELP);
+			break;
+		default:
+			eprint(`Unrecognized argument: ${args[0]}\n`);
 			process.exit(1);
 	}
 }
@@ -117,14 +143,14 @@ function parse_argv(args, options, help) {
 	return parsed;
 }
 
-/** Resolve a `--parser` value (`ts` is an accepted alias), or exit. */
-function resolve_parser(name, exit_code) {
+/** Resolve a `--parser` value (`ts` is an accepted alias), or exit 1 — the
+ * native CLI validates the value at the argument-parsing layer (argh), so a
+ * bad value is an argument-parsing error in every mode of both commands. */
+function resolve_parser(name) {
 	const resolved = name === 'ts' ? 'typescript' : name;
-	if (!(resolved in FORMATTERS)) {
-		eprint(
-			`Error: Unknown parser type: '${name}'. Valid types: svelte, typescript, css\n`,
-		);
-		process.exit(exit_code);
+	if (!PARSER_NAMES.has(resolved)) {
+		eprint(`Error: Unknown parser type: '${name}'. Valid types: svelte, typescript, css\n`);
+		process.exit(1);
 	}
 	return resolved;
 }
@@ -144,31 +170,45 @@ function run_format(args) {
 			stdin: { type: 'boolean' },
 			parser: { type: 'string' },
 			check: { type: 'boolean' },
-			help: { type: 'boolean', short: 'h' },
+			jobs: { type: 'string' },
+			help: { type: 'boolean' },
 		},
 		FORMAT_HELP,
 	);
 
+	// validated before mode dispatch — a bad value exits 1 in every mode (argh parity)
+	const parser = values.parser === undefined ? undefined : resolve_parser(values.parser);
+	// --jobs is accepted for drop-in parity with the native CLI and otherwise
+	// ignored (single-threaded): a non-integer value is an argument-parsing
+	// error (exit 1, argh parity), and combining it with --content/--stdin is
+	// rejected in format_single like the native CLI (exit 2)
+	if (values.jobs !== undefined && !/^\d+$/.test(values.jobs)) {
+		eprint(`Error: --jobs expects an integer, got '${values.jobs}'\n`);
+		process.exit(1);
+	}
 	if (values.content !== undefined || values.stdin) {
-		format_single(values, positionals);
+		format_single(values, positionals, parser);
 	} else {
 		format_paths(values, positionals);
 	}
 }
 
 /** `--content`/`--stdin` mode — format one input to stdout (or `--check` it). */
-function format_single(values, positionals) {
+function format_single(values, positionals, parser) {
 	if (positionals.length > 0) {
 		eprint('Error: --content/--stdin cannot be combined with file paths\n');
 		process.exit(2);
 	}
+	if (values.jobs !== undefined) {
+		eprint('Error: --jobs applies to file paths; --content/--stdin format a single input\n');
+		process.exit(2);
+	}
 	const flag = values.content !== undefined ? '--content' : '--stdin';
-	if (values.parser === undefined) {
+	if (parser === undefined) {
 		eprint(`Error: ${flag} requires --parser <svelte|typescript|css>\n`);
 		process.exit(2);
 	}
-	const parser = resolve_parser(values.parser, 2);
-	const input = values.content !== undefined ? values.content : read_stdin();
+	const input = values.content !== undefined ? values.content : read_stdin(2);
 	let formatted;
 	try {
 		formatted = FORMATTERS[parser](input);
@@ -261,33 +301,38 @@ function run_parse(args) {
 			content: { type: 'string' },
 			stdin: { type: 'boolean' },
 			parser: { type: 'string' },
-			help: { type: 'boolean', short: 'h' },
+			help: { type: 'boolean' },
 		},
 		PARSE_HELP,
 	);
+
+	// validated before mode dispatch — a bad value exits 1 in every mode (argh parity)
+	const flag_parser = values.parser === undefined ? undefined : resolve_parser(values.parser);
+	if (positionals.length > 1) {
+		eprint(`Unrecognized argument: ${positionals[1]}\n`);
+		process.exit(1);
+	}
 
 	// Input precedence mirrors the native `InputArgs::resolve`: --content > --stdin > file.
 	let input;
 	let parser;
 	if (values.content !== undefined) {
-		if (values.parser === undefined) {
+		if (flag_parser === undefined) {
 			eprint('Error: --content requires --parser <svelte|typescript|css>\n');
 			process.exit(1);
 		}
-		parser = resolve_parser(values.parser, 1);
+		parser = flag_parser;
 		input = values.content;
 	} else if (values.stdin) {
-		if (values.parser === undefined) {
+		if (flag_parser === undefined) {
 			eprint('Error: --stdin requires --parser <svelte|typescript|css>\n');
 			process.exit(1);
 		}
-		parser = resolve_parser(values.parser, 1);
-		input = read_stdin();
+		parser = flag_parser;
+		input = read_stdin(1);
 	} else if (positionals.length > 0) {
 		const path = positionals[0];
-		parser = values.parser === undefined
-			? parser_from_extension(path)
-			: resolve_parser(values.parser, 1);
+		parser = flag_parser === undefined ? parser_from_extension(path) : flag_parser;
 		try {
 			input = readFileSync(path, 'utf-8');
 		} catch (error) {
@@ -307,13 +352,20 @@ function run_parse(args) {
 		process.exit(1);
 	}
 	if (values.pretty) {
+		// re-serializing through the engine isn't guaranteed byte-identical to the
+		// native CLI's to_json_with_tabs: number formatting diverges at extremes
+		// (ryu emits `1e21`, ECMA-262 emits `1e+21`); compact output (the default)
+		// is the verbatim wire string from Rust and exact
 		json = JSON.stringify(JSON.parse(json), null, '\t');
 	}
 	print(`${json}\n`);
 }
 
 /** Synchronous stdout write — `process.stdout.write` is async on pipes, so a
- * `process.exit` right after it can truncate output. */
+ * `process.exit` right after it can truncate output. Safe from EAGAIN only
+ * while nothing in the process initializes the `process.stdout`/`process.stderr`
+ * streams (including via `console.*`) — stream init flips the fd to
+ * non-blocking, after which a sync write to a full pipe can throw. */
 function print(text) {
 	writeFileSync(1, text);
 }
@@ -323,19 +375,23 @@ function eprint(text) {
 	writeFileSync(2, text);
 }
 
-function read_stdin() {
+/** Read all of stdin, exiting with the calling command's error code on
+ * failure (`format` uses 2, `parse` uses 1 — mirroring the native CLI). */
+function read_stdin(exit_code) {
 	try {
 		return readFileSync(0, 'utf-8');
 	} catch (error) {
 		eprint(`Error: Error reading from stdin: ${error.message}\n`);
-		process.exit(2);
+		process.exit(exit_code);
 	}
 }
 
-/** Whether a path has a formattable extension (compound forms like
- * `.svelte.ts` are covered by the `.ts` match). */
-function is_formattable(path) {
-	return /\.(ts|svelte|css)$/.test(path);
+/** Whether a file name has a formattable extension (compound forms like
+ * `.svelte.ts` are covered by the `.ts` match). A leading dot is part of the
+ * stem, not an extension — a file named exactly `.ts` doesn't match, same as
+ * Rust's `Path::extension`. */
+function is_formattable(name) {
+	return /.\.(ts|svelte|css)$/.test(name);
 }
 
 /**
@@ -372,7 +428,7 @@ function discover_files(paths) {
 			collect_recursive(paths[i], files, errors);
 		}
 	}
-	files.sort();
+	files.sort(compare_paths);
 	files = files.filter((path, i) => path !== files[i - 1]);
 	if (paths.length > 1) {
 		const seen = new Set();
@@ -392,6 +448,24 @@ function discover_files(paths) {
 	return { files, errors };
 }
 
+/** Component-wise path ordering matching Rust's `PathBuf` ordering — `/`
+ * splits components and a shorter prefix sorts first, so `a/y.ts` precedes
+ * `a-b/x.ts` (plain string order would invert them: `-` < `/`). The parity
+ * claim is scoped to ASCII/BMP names and `/`-separated paths: JS compares
+ * UTF-16 code units while Rust compares UTF-8 bytes, so astral-plane names
+ * (≥ U+10000) order differently, and a backslash-spelled Windows root
+ * doesn't split into components. */
+function compare_paths(a, b) {
+	if (a === b) return 0;
+	const as = a.split('/');
+	const bs = b.split('/');
+	const len = Math.min(as.length, bs.length);
+	for (let i = 0; i < len; i++) {
+		if (as[i] !== bs[i]) return as[i] < bs[i] ? -1 : 1;
+	}
+	return as.length - bs.length;
+}
+
 function collect_recursive(dir, files, errors) {
 	let entries;
 	try {
@@ -401,7 +475,10 @@ function collect_recursive(dir, files, errors) {
 		return;
 	}
 	for (const entry of entries) {
-		const path = `${dir}/${entry.name}`;
+		// PathBuf::push parity: only insert a separator when the dir doesn't
+		// already end with one, so a trailing-slash root (`tsv format src/`)
+		// yields `src/a.ts`, not `src//a.ts`
+		const path = dir.endsWith('/') ? `${dir}${entry.name}` : `${dir}/${entry.name}`;
 		if (entry.isDirectory()) {
 			if (entry.name.startsWith('.') || EXCLUDED_DIRS.has(entry.name)) continue;
 			collect_recursive(path, files, errors);

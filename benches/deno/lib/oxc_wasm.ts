@@ -4,7 +4,7 @@
  * Uses the browser entry point of @oxc-parser/binding-wasm32-wasi which
  * works in Deno (the default CJS entry uses node:wasi which Deno doesn't support).
  *
- * Supports: Parse only (TypeScript, JavaScript). No formatting (oxfmt has no WASM variant).
+ * Supports: Parse only (TypeScript, JS). No formatting (oxfmt has no WASM variant).
  */
 
 import { type Language, LANGUAGE_EXTENSIONS, type TsvImplementation } from './types.ts';
@@ -19,7 +19,7 @@ interface OxcParserWasmModule {
  * OXC WASM implementation using @oxc-parser/binding-wasm32-wasi.
  *
  * Supports:
- * - Parse: TypeScript, JavaScript (NOT Svelte, NOT CSS)
+ * - Parse: TypeScript, JS (NOT Svelte, NOT CSS)
  * - Format: None (oxfmt has no WASM variant)
  */
 export class OxcWasmImplementation implements TsvImplementation {

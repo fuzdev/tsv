@@ -83,7 +83,7 @@ export interface PrivateIdentifier {
 }
 
 /**
- * Acorn `Program` node — root of a TypeScript/JavaScript source file.
+ * Acorn `Program` node — root of a TypeScript/JS source file.
  *
  * When the source is a Svelte `<script>` block (non-`lang="ts"`), some
  * import/export fields use the SvelteScript schema variant (notably

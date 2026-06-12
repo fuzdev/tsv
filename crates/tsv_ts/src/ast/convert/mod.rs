@@ -57,7 +57,7 @@ pub use expressions::convert_expression;
 
 /// Translate all byte-based positions in a JSON AST to UTF-16 code-unit positions
 ///
-/// JavaScript (acorn/Svelte) uses UTF-16 code-unit offsets (JS string indices),
+/// JS (acorn/Svelte) uses UTF-16 code-unit offsets (JS string indices),
 /// while Rust strings are byte-indexed. This function post-processes a serialized
 /// JSON AST to convert all `start`, `end`, `loc.*.column`, `character`, and
 /// `name_loc` positions from byte offsets to UTF-16 code-unit offsets.

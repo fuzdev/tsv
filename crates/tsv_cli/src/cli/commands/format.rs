@@ -10,7 +10,7 @@ use std::process;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 
-/// Format source code in place (matches Prettier output).
+/// Format source code in place (near-Prettier output).
 ///
 /// Paths are formatted in place (written only when the output differs);
 /// `--content`/`--stdin` print to stdout. Exit codes: 0 clean, 1 would

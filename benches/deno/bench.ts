@@ -5,7 +5,7 @@
  * All benchmarks are single-threaded: files processed sequentially, no parallelism.
  *
  * Implementations:
- * - Canonical: prettier + svelte/compiler (JavaScript baseline)
+ * - Canonical: prettier + svelte/compiler (JS baseline)
  * - Native: tsv via FFI (Rust, maximum performance)
  * - WASM: tsv compiled to WASM (portable, near-native)
  * - Alternatives: oxc-parser, oxfmt, biome-wasm (for comparison)

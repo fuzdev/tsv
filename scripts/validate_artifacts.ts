@@ -9,8 +9,8 @@
  * The smoke test covers what `scripts/test_npm.ts` (Node) can't:
  * - the npm packages' `index.js` entry running under Deno (the package
  *   README claims zero-config Node/Bun/Deno)
- * - the `pkg/<variant>/deno/` bundles (the format one feeds nothing else
- *   that executes it — benches run only the parse build)
+ * - the `pkg/<variant>/deno/` bundles (the format/parse subset bundles feed
+ *   nothing else that executes them — benches run only the `all` build)
  *
  * Only validates artifacts that exist (skips unbuilt targets), but fails
  * if nothing was found at all.

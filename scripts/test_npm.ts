@@ -192,10 +192,11 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 // the JS CLI mirrors from the native tsv_cli: flags, exit codes, output streams.
 describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	const cli_path = new URL(`../${pkg_dir}/cli.js`, import.meta.url).pathname;
-	const run_cli = (args: Array<string>, stdin?: string) =>
+	const run_cli = (args: Array<string>, stdin?: string, cwd?: string) =>
 		spawnSync(process.execPath, [cli_path, ...args], {
 			encoding: 'utf-8',
 			input: stdin,
+			cwd,
 		});
 
 	it('format --content prints formatted source', () => {
@@ -242,6 +243,14 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	it('unknown flags exit 1', () => {
 		const result = run_cli(['format', '--bogus']);
 		assert.equal(result.status, 1);
+	});
+
+	it('a bad --parser value exits 1 in both commands (argument-parsing error)', () => {
+		for (const command of ['format', 'parse']) {
+			const result = run_cli([command, '--content', 'const x = 1;', '--parser', 'bogus']);
+			assert.equal(result.status, 1);
+			assert.match(result.stderr, /Unknown parser type/);
+		}
 	});
 
 	it('format paths writes in place, recurses, and skips excluded dirs', () => {
@@ -293,6 +302,93 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.match(result.stderr, /not a file or directory/);
 	});
 
+	it('format --content combined with a path exits 2', () => {
+		const result = run_cli(['format', '--content', 'const x = 1;', '--parser', 'ts', 'a.ts']);
+		assert.equal(result.status, 2);
+		assert.match(result.stderr, /cannot be combined with file paths/);
+	});
+
+	it('format --parser with paths exits 2 (paths use extension detection)', () => {
+		const result = run_cli(['format', '--parser', 'ts', 'a.ts']);
+		assert.equal(result.status, 2);
+		assert.match(result.stderr, /applies to --content/);
+	});
+
+	it('format --jobs is accepted in path mode and ignored', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			writeFileSync(join(dir, 'a.ts'), 'const x = 1;\n');
+			const result = run_cli(['format', '--check', '--jobs', '4', dir]);
+			assert.equal(result.status, 0);
+			assert.match(result.stderr, /0 would change, 1 unchanged/);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it('format --jobs with --content exits 2 (path mode only)', () => {
+		const result = run_cli([
+			'format',
+			'--jobs',
+			'4',
+			'--content',
+			'const x = 1;',
+			'--parser',
+			'ts',
+		]);
+		assert.equal(result.status, 2);
+		assert.match(result.stderr, /--jobs applies to file paths/);
+	});
+
+	it('format --jobs with a non-integer value exits 1 (argument-parsing error)', () => {
+		const result = run_cli(['format', '--jobs', 'many', 'a.ts']);
+		assert.equal(result.status, 1);
+		assert.match(result.stderr, /--jobs expects an integer/);
+	});
+
+	it('format on a trailing-slash root reports single-slash paths (PathBuf::push parity)', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			writeFileSync(join(dir, 'a.ts'), 'const   x=1');
+			const result = run_cli(['format', '--check', `${dir}/`]);
+			assert.equal(result.status, 1);
+			assert.equal(result.stdout, `${dir}/a.ts\n`);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it('format dedupes overlapping root spellings by canonical path', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			writeFileSync(join(dir, 'a.ts'), 'const   x=1');
+			// the same file via a relative traversal ('.') and an absolute explicit arg
+			const result = run_cli(['format', '.', join(dir, 'a.ts')], undefined, dir);
+			assert.equal(result.status, 0);
+			assert.match(result.stderr, /1 formatted, 0 unchanged/);
+			assert.equal(result.stdout.trim().split('\n').length, 1);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it('format trusts an explicit file arg regardless of extension', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			writeFileSync(join(dir, 'a.txt'), 'const   x=1');
+			// traversal skips it (no supported extension)…
+			const traversed = run_cli(['format', dir]);
+			assert.equal(traversed.status, 2);
+			assert.match(traversed.stderr, /No supported files found/);
+			// …but the explicit arg is formatted (extension default: typescript)
+			const explicit = run_cli(['format', join(dir, 'a.txt')]);
+			assert.equal(explicit.status, 0);
+			assert.equal(readFileSync(join(dir, 'a.txt'), 'utf-8'), 'const x = 1;\n');
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
 	it('parse --content prints compact JSON with trailing newline', () => {
 		const result = run_cli(['parse', '--content', 'const x = 1;', '--parser', 'typescript']);
 		assert.equal(result.status, 0);
@@ -325,10 +421,28 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	});
 
+	it('parse --parser overrides the file extension', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			writeFileSync(join(dir, 'data.ts'), '<div>x</div>');
+			const result = run_cli(['parse', '--parser', 'svelte', join(dir, 'data.ts')]);
+			assert.equal(result.status, 0);
+			assert.equal(JSON.parse(result.stdout).type, 'Root');
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
 	it('parse on invalid syntax exits 1', () => {
 		const result = run_cli(['parse', '--content', 'const =', '--parser', 'ts']);
 		assert.equal(result.status, 1);
 		assert.match(result.stderr, /Parse error/);
+	});
+
+	it('parse rejects a second positional', () => {
+		const result = run_cli(['parse', 'a.ts', 'b.ts']);
+		assert.equal(result.status, 1);
+		assert.match(result.stderr, /Unrecognized argument/);
 	});
 
 	it('no command prints usage and exits 1', () => {
@@ -341,5 +455,11 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		const result = run_cli(['--help']);
 		assert.equal(result.status, 0);
 		assert.match(result.stdout, /Usage: tsv/);
+	});
+
+	it('help subcommand exits 0 (mirrors argh)', () => {
+		const result = run_cli(['help', 'format']);
+		assert.equal(result.status, 0);
+		assert.match(result.stdout, /Usage: tsv format/);
 	});
 });

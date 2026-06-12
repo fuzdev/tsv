@@ -242,8 +242,6 @@ if (wetrun) {
 	// Sync Cargo.lock's workspace member versions
 	run('cargo update --workspace', 'cargo', ['update', '--workspace']);
 	stamp_changelog(version);
-	// Normalize formatting of the stamped changelog so `deno fmt --check` passes
-	run('deno fmt CHANGELOG.md', 'deno', ['fmt', CHANGELOG_PATH]);
 } else {
 	console.log('\n=== Step 2: Read version (dry-run) ===');
 	version = version_before;

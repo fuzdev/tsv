@@ -32,8 +32,8 @@ interface OxfmtModule {
  * OXC implementation using oxc-parser and oxfmt.
  *
  * Supports:
- * - Parse: TypeScript, JavaScript (NOT Svelte, NOT CSS)
- * - Format: TypeScript, JavaScript, CSS, Svelte (Svelte is experimental, expect partial coverage)
+ * - Parse: TypeScript, JS (NOT Svelte, NOT CSS)
+ * - Format: TypeScript, JS, CSS, Svelte (Svelte is experimental, expect partial coverage)
  */
 export class OxcImplementation implements TsvImplementation {
 	name = 'oxc' as const;

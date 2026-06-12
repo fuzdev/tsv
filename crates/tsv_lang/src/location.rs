@@ -20,9 +20,9 @@ pub struct SourceLocation {
     pub end: Position,
 }
 
-/// Maps byte offsets to JavaScript-compatible character offsets (UTF-16 code units)
+/// Maps byte offsets to JS-compatible character offsets (UTF-16 code units)
 ///
-/// Rust strings are byte-indexed, but JavaScript (and Svelte/acorn) uses UTF-16
+/// Rust strings are byte-indexed, but JS (and Svelte/acorn) uses UTF-16
 /// code unit indices. For ASCII-only sources, byte == char offset, so the map is empty.
 /// For sources with multibyte UTF-8 characters, the map stores the UTF-16 code unit
 /// offset for each byte position.

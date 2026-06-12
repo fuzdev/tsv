@@ -16,9 +16,8 @@
 		"typecheck": "cargo check --workspace",
 		"test": "cargo test --workspace",
 		"lint": "cargo clippy --workspace",
-		"check": "deno task typecheck && deno task test && deno task test:deno && deno task lint && deno task conformance:audit && deno fmt --check && deno task check:ast-types",
+		"check": "deno task typecheck && deno task test && deno task test:deno && deno task lint && deno task conformance:audit && cargo fmt --check && deno task check:ast-types",
 		"check:ast-types": "deno run --allow-read --allow-write=scripts --allow-run=cargo,deno scripts/check_ast_types.ts",
-		"format": "cargo fmt && deno fmt",
 
 		"fixture:init": "cargo run -p tsv_debug --quiet fixture_init",
 		"fixtures:list": "cargo run -p tsv_debug --quiet fixtures_update_parsed --list",
@@ -49,12 +48,6 @@
 		"validate:artifacts": "deno run --allow-read scripts/validate_artifacts.ts",
 
 		"publish": "deno run --allow-read --allow-write --allow-run --allow-env --allow-net scripts/publish.ts"
-	},
-	"fmt": {
-		"useTabs": true,
-		"lineWidth": 100,
-		"singleQuote": true,
-		"proseWrap": "preserve"
 	},
 	"exclude": ["node_modules", "target", "tests/fixtures", ".claude"]
 }

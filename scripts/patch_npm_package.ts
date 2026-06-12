@@ -8,9 +8,9 @@
  *
  * Also patches package.json (name, description, conditional exports, npm
  * metadata) and copies the variant README + repo LICENSE into the package
- * root. The crate has no `README.md` at its root — `README_format.md` and
- * `README_parse.md` are the canonical sources and ship as the package's
- * `README.md`.
+ * root. The crate has no `README.md` at its root — `README_format.md`,
+ * `README_parse.md`, and `README_all.md` are the canonical sources and ship
+ * as each package's `README.md`.
  *
  * The exported function list is extracted from the generated `tsv_wasm.js`
  * (every `export function format_*` / `parse_*`), so adding a language to

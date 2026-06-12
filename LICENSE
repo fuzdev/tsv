@@ -1,9 +1,12 @@
 MIT License
 
-Copyright (c) Ryan Atkinson <mail@ryanatkn.com> with assistance from Claude Code
+Copyright (c) fuz.dev
+
+The code for the following projects was sometimes read by AI agents while producing tsv,
+so their license information is included for completeness:
 
 Svelte
-Copyright (c) 2016-2025 [Svelte Contributors](https://github.com/sveltejs/svelte/graphs/contributors)
+Copyright (c) 2016-2026 [Svelte Contributors](https://github.com/sveltejs/svelte/graphs/contributors)
 MIT - https://github.com/sveltejs/svelte/blob/main/LICENSE.md
 
 Prettier

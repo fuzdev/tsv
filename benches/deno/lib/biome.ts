@@ -1,7 +1,7 @@
 /**
  * Biome implementation wrapper (via WASM)
  *
- * Supports: TypeScript, JavaScript, CSS, Svelte
+ * Supports: TypeScript, JS, CSS, Svelte
  */
 
 import { type Language, LANGUAGE_EXTENSIONS, type TsvImplementation } from './types.ts';
@@ -15,7 +15,7 @@ import { Biome } from '@biomejs/js-api/bundler';
  * Biome implementation using WASM.
  *
  * Supports:
- * - Format: Svelte, TypeScript, JavaScript, CSS
+ * - Format: Svelte, TypeScript, JS, CSS
  * - Parse: Not implemented in benchmarks
  */
 export class BiomeImplementation implements TsvImplementation {
