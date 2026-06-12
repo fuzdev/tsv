@@ -1,0 +1,302 @@
+# Performance
+
+Profiling methodology and tracking for the TypeScript/Svelte/CSS formatter.
+
+**Goal:** Identify where time is spent, make targeted improvements, and measure before/after.
+
+## Formatter Pipeline
+
+```
+source → Parse → AST → Format → formatted string
+         lexer    │      per-statement:
+         parser   │        build_statement_doc() → DocId (arena-allocated)
+                  │        write_arena_doc() → arena_print_doc_with_indent_resolved()
+                  │          └── arena_fits() (line-breaking decisions)
+                  │
+              tsv_ts::parse()                      tsv_ts::format()
+```
+
+Doc building and rendering are **interleaved** per-statement inside `format()` — each statement's Doc is built as arena-allocated `DocId` nodes and immediately rendered. This means the cleanest measurable phase split is **parse vs format**. Within format, `perf` can break down time further by function.
+
+**Key files:**
+
+| Component              | Crate      | Entry point                                                 |
+| ---------------------- | ---------- | ----------------------------------------------------------- |
+| Parse                  | `tsv_ts`   | `parser::parse_typescript()`                                |
+| Format (orchestration) | `tsv_ts`   | `printer::Printer::print_program()`                         |
+| Doc building           | `tsv_ts`   | `printer::Printer::build_statement_doc()` → `DocId`         |
+| Doc rendering          | `tsv_lang` | `doc::arena_render::arena_print_doc_with_indent_resolved()` |
+| Line-break decisions   | `tsv_lang` | `doc::arena_fits::arena_fits()`                             |
+
+## Tooling
+
+Four tools, in order of use:
+
+### 1. `tsv_debug profile` — phase timing
+
+Measures parse vs format timing across files. Pure Rust, no external dependencies.
+
+```bash
+# Profile a directory
+cargo run --release -p tsv_debug -- profile ~/dev/zzz/src/lib
+
+# Profile specific files
+cargo run --release -p tsv_debug -- profile file1.ts file2.svelte
+
+# More iterations for stability
+cargo run --release -p tsv_debug -- profile ~/dev/zzz/src/lib --iterations 20
+
+# JSON output for scripting
+cargo run --release -p tsv_debug -- profile ~/dev/zzz/src/lib --json
+```
+
+Output shows per-file and aggregate timing, plus normalized rates. The
+`split` column is parse time as a percentage of total (lower =
+format-dominated, higher = parse-dominated); `us/KB` is the per-byte rate.
+The summary block adds per-language totals (when languages are mixed) and
+`per file` / `per KB` rows. Wall totals move with corpus growth/shrink, so
+compare the rates across runs — on a quiet machine; rates normalize corpus
+changes, not machine state (see the wall-clock caveat below):
+
+```
+                                   file    lang     size       parse      format       total  split    us/KB
+                                   ----    ----     ----       -----      ------       -----  -----    -----
+ .../src/lib/CapabilityWebsocket.svelte  svelte   12.3KB       608us     10.22ms     10.83ms     6%    876.9
+  .../src/lib/SocketMessageQueue.svelte  svelte   10.1KB       502us      7.21ms      7.71ms     7%    763.1
+          .../src/lib/socket_helpers.ts      ts     248B         6us         8us        14us    44%     57.7
+                                                    ----       -----      ------       -----
+                             (89 files)      ts  369.9KB     12.81ms     31.89ms     44.70ms    29%    120.8
+                            (123 files)  svelte  250.1KB     11.67ms     70.81ms     82.49ms    14%    329.8
+                            (212 files)          620.0KB     24.48ms    102.70ms    127.18ms    19%    205.1
+                               per file            2.9KB       115us       484us       600us
+                                 per KB                       39.5us     165.6us     205.1us
+
+iterations: 30 (median shown)
+```
+
+The table above is illustrative sample output — absolute wall times are
+machine-dependent (current baselines are tracked with the project's planning
+notes); compare per-byte rates across runs, not wall totals. Uses median of N
+iterations to reduce noise from OS scheduling.
+The same aggregates (including the per-language breakdown under `langs`) are in
+the `--json` output as `*_us_per_kb` / `*_us_per_file` fields.
+
+### 2. `tsv_debug json_profile` — parse→JSON materialization sub-steps
+
+Splits the FFI parse path (`parse` + `convert_ast_json_string`) into the
+`Value` pipeline's per-language sub-steps (convert / to_value / attach /
+translate / to_string), times the direct typed pipeline (typed offset
+translation + `serde_json::to_string(&public_ast)`, skipping the
+intermediate `Value`; per-language eligibility:
+[architecture.md §Closed Scope, Open Convention](./architecture.md#closed-scope-open-convention)),
+and times the `Value` pipeline and the shipped `convert_ast_json_string` as
+whole calls. The shipped function's
+output is byte-identity-checked against the `Value` pipeline's on every
+file; for TypeScript the direct path is identity-checked on every file too
+(multibyte included), for Svelte on ASCII files only. Pure Rust, no
+external dependencies.
+
+```bash
+# Profile a directory (aggregate report per language)
+cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib
+
+# JSON output with per-file data (e.g. to split costs by multibyte flag)
+cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib --json
+```
+
+Output shows, per language: parse vs materialization, the sub-step shares,
+the shipped typed pipeline's sub-step sum for TypeScript ("typed pipeline"
+= convert + typed translate + direct), and the whole-call "value baseline"
+vs "shipped" pair, plus both identity-check counts.
+
+**Sub-step timings exclude drop costs** — each intermediate outlives its
+timed region, and recursively freeing a large tree/`Value` is a
+substantial share of a whole call (visible as the gap between the
+sub-step sum and the whole-call rows). The whole-call "value baseline" /
+"shipped" rows include the drops and are the apples-to-apples comparison
+for what the FFI boundary pays; ratio the sub-steps only against each
+other.
+
+### 3. `[profile.profiling]` — cargo profile for perf
+
+The release profile strips debug symbols (`strip = true`), making `perf` useless. The `profiling` profile keeps symbols at release speed:
+
+```toml
+# Already configured in Cargo.toml
+[profile.profiling]
+inherits = "release"
+debug = true
+strip = false
+```
+
+Build with: `cargo build --profile profiling -p tsv_debug`
+
+### 4. `perf` — function-level and line-level hotspots
+
+Once phase timing identifies _which_ phase to optimize, `perf` identifies _which functions_ within that phase.
+
+```bash
+# Record samples while profiling a workload
+cargo build --profile profiling -p tsv_debug
+perf record --call-graph=dwarf -- target/profiling/tsv_debug profile ~/dev/zzz/src/lib
+
+# Function-level hotspots (text output)
+perf report --stdio
+
+# Line-level hotspots within a specific function (exact demangled name from perf report)
+perf annotate --stdio -s 'tsv_lang::doc::arena::DocArena::will_break_inner'
+
+# Collapsed stacks (greppable text, one line per unique stack; cargo install inferno)
+perf script | inferno-collapse-perf > stacks.txt
+grep fits_with_lookahead stacks.txt | head
+```
+
+`perf annotate -s` matches the **exact demangled name** as shown in
+`perf report` — a substring silently annotates nothing. It also comes up
+empty for functions with multiple monomorphizations sharing one demangled
+name (e.g. `arena_fits_with_lookahead`, instantiated per `TextResolver`).
+For those, dump everything and search by source line instead:
+
+```bash
+perf annotate --stdio > annotate.txt   # then search for the fn's source lines
+```
+
+For visual flamegraphs (useful for humans, not Claude):
+
+```bash
+cargo install flamegraph
+cargo flamegraph --profile profiling -p tsv_debug -- profile ~/dev/zzz/src/lib
+```
+
+On Debian, `perf` ships in the `linux-perf` package (there is no package named
+`perf`), and unprivileged profiling additionally requires
+`kernel.perf_event_paranoid <= 2` — Debian patches the kernel default to 3,
+which blocks unprivileged perf entirely:
+
+```bash
+sudo apt install linux-perf
+sudo sysctl kernel.perf_event_paranoid=2  # persist via a drop-in in /etc/sysctl.d/
+```
+
+Both steps are automated in ~/dev/setup (`setup_zap/zap.ts`).
+
+### 5. `heaptrack` — allocation-site profiling
+
+When `perf` shows time inside malloc/free internals, it can't say _which_
+allocation sites are responsible — glibc's allocator is diffuse from the CPU
+side. `heaptrack` attributes every allocation to its call site, answering
+"swap the allocator" vs "fix the hot sites" and sizing what an arena would
+eliminate.
+
+```bash
+# Record (build with the profiling profile for symbols)
+cargo build --profile profiling -p tsv_debug
+heaptrack -o /tmp/heaptrack_tsv target/profiling/tsv_debug profile ~/dev/zzz/src/lib --iterations 2
+
+# Bounded textual report (top allocators / peaks / temporaries)
+heaptrack_print /tmp/heaptrack_tsv.zst -n 30 > report.txt
+
+# Collapsed stacks for custom aggregation (by crate, phase, container kind)
+heaptrack_print /tmp/heaptrack_tsv.zst -F allocs.folded --flamegraph-cost-type allocations -p0 -a0 -T0
+
+# Full file:line backtraces for one site
+heaptrack_print /tmp/heaptrack_tsv.zst -a1 -p0 -T0 -n3 -s8 --filter-bt-function build_chain_doc
+```
+
+Notes:
+
+- **Allocation counts are machine-load-independent** — unlike wall time, they
+  are stable across machine states. **Never read wall times off a heaptrack
+  run**; the instrumentation inflates them severalfold.
+- Low `--iterations` is fine: attribution is ratio-based, and heaptrack
+  overhead scales with allocation count.
+- Cost types are `allocations`, `temporary`, `peak`, `leaked` — there is **no
+  total-bytes-allocated axis**, so use counts as the churn metric (malloc/free
+  internal cost scales with call count at typical allocation sizes) and peak
+  as the footprint metric. `temporary` (freed with no intervening allocation)
+  isolates pure churn.
+- Folded exports are **multi-GB** (full Rust symbols × distinct stacks) —
+  write them to a filesystem with room (e.g. `target/`), not tmpfs.
+- The folded lines are root-first `frame;frame;...;leaf count`. Aggregating
+  by the nearest first-party frame above the `alloc::`/`raw_vec` plumbing
+  gives a per-site table; classifying by the plumbing frames distinguishes
+  `Vec` growth / `String` / `Box`. With `--profile profiling` many small
+  allocations inline the plumbing entirely, so a first-party leaf usually
+  means an inlined `Vec`/`Box` alloc.
+
+**Bounding an allocator swap without adding the dependency**: `LD_PRELOAD`
+an alternative allocator and A/B it against glibc with paired interleaved
+runs — alternate baseline/preload within each pair so machine drift cancels,
+and compare pair medians, not absolute readings:
+
+```bash
+LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libmimalloc.so.3 \
+  target/profiling/tsv_debug profile ~/dev/zzz/src/lib --iterations 20 --json
+```
+
+Run an A/A control (same binary on both sides of each pair) to calibrate the
+noise floor before trusting any delta; on this workload the floor is roughly
+±1–3% per metric even on a quiet machine.
+
+## Measurement Process
+
+### Before an optimization
+
+1. **`tsv_debug profile`** on the target workload — note the phase split
+2. **`perf report --stdio`** — identify which functions are hot
+3. **Record baseline** with corpus benchmarks: `deno task bench`
+
+### After an optimization
+
+1. **`tsv_debug profile`** — same workload, compare phase split
+2. **`deno task bench`** — measure overall corpus impact
+3. **Record results** — for regression detection, use `deno task bench:run --save-baseline` / `--compare-baseline`
+
+## WASM bundle size
+
+The `tsv_wasm` crate produces three WASM binaries via the `format` +
+`parse` cargo features, each published as a separate npm package:
+
+- `--no-default-features --features format` → `@fuzdev/tsv_format_wasm` (format only)
+- `--no-default-features --features parse` → `@fuzdev/tsv_parse_wasm` (parse only)
+- default build (both) → `@fuzdev/tsv_wasm` (full tool + `tsv` bin)
+
+`binary_sizes.ts` in the bench runner reads the three
+`pkg/<variant>/deno/tsv_wasm_bg.wasm` files and reports them side-by-side, with
+gzipped wire size alongside raw on-disk size; current numbers land in the bench
+report (`benches/deno/results/report.md`).
+
+Gzipped numbers come from `gzip -c` (system default level 6), matching
+npm-tarball wire reality and `scripts/patch_npm_package.ts`. The parse feature
+adds the parser convert+serde path and the typed offset-translation walk; the
+format feature adds the printers (which the parse-only build drops at link
+time); the AST crosses the JS boundary as a JSON string handed to the engine's
+native `JSON.parse` (no `serde_wasm_bindgen`). All builds run wasm-opt with
+explicit bulk-memory + nontrapping-float-to-int flags.
+
+Build all three before running benches so the sizes appear in the report:
+
+```bash
+deno task build:wasm:deno         # format-only → pkg/format/deno/
+deno task build:wasm:parse:deno   # parse-only → pkg/parse/deno/
+deno task build:wasm:all:deno     # full (executed by the bench) → pkg/all/deno/
+```
+
+## Future tools (reach for when needed)
+
+These aren't set up yet but may be useful for specific investigations:
+
+- **Criterion microbenchmarks** — statistical rigor for isolated hot functions
+- **Custom counters** — `fits()` call counts, doc node counts (when investigating algorithmic issues)
+
+## Baselines and tracking
+
+Methodology and tooling above are evergreen. Current baselines, the hotspot
+table, the optimization tier list, and open measurement questions are tracked
+with the project's planning notes, not in this doc; corpus benchmark results
+land in `benches/deno/results/report.{json,md}`.
+
+Wall-clock readings vary several-fold with machine state (CPU frequency scaling
+and concurrent load) — trust only quiet-machine runs, and prefer per-byte rates
+and relative profile shares as the portable metrics. Because the corpus changes
+over time, compare per-byte rates rather than wall totals across runs.

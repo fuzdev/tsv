@@ -1,0 +1,40 @@
+# tsv_css
+
+> CSS parser and formatter — drop-in for Svelte's `parseCss` (AST), near-Prettier formatting
+
+## Architecture Position
+
+Depends on `tsv_lang` for shared primitives (spans, doc builder, comments, embedding config). Consumed by `tsv_svelte` for `<style>` block embedding, and by `tsv_cli` / `tsv_wasm` / `tsv_ffi` for top-level CSS files.
+
+**Sources of truth**: Svelte's `parseCss` defines the public AST shape; Prettier's `css` printer defines formatter output. Both are checked at fixture-validation time.
+
+Standard `ast/lexer/parser/printer` crate layout — see [root CLAUDE.md §Project Structure](../../CLAUDE.md#project-structure) and [`tsv_lang/CLAUDE.md`](../tsv_lang/CLAUDE.md) for the cross-cutting types (`DocArena`, `Span`, `PrintConfig`, `EmbedContext`). Public/internal AST split follows the workspace convention — see [root CLAUDE.md §AST Architecture](../../CLAUDE.md#ast-architecture-internal-vs-public).
+
+## Public API
+
+**Standalone** (top-level CSS files):
+
+- `parse(source) -> Result<CssStyleSheet>` — parse a full CSS file
+- `format(&stylesheet, source) -> String` — format with default config
+- `convert_ast(&stylesheet, source) -> StyleSheet` — internal → public JSON-ready AST (gated on `convert` feature)
+- `convert_ast_json(&stylesheet, source) -> serde_json::Value` — public AST with byte-to-char offset translation; matches Svelte's `parseCss()` JSON shape
+- `convert_ast_json_string(&stylesheet, source) -> String` — `convert_ast_json` serialized compactly into a pre-sized buffer (`tsv_lang::estimated_json_capacity`); a thin wrapper otherwise (CSS conversion builds the `Value` directly, so there's no direct-serialization fast path) kept so the FFI/WASM bindings have a uniform string entry point per language
+
+**Embedding** (used by `tsv_svelte` for `<style>` blocks):
+
+- `parse_embedded(source, base_offset) -> Result<CssStyleSheet>` — same parser, but span positions are shifted by `base_offset` so they index into the parent Svelte file
+- `format_with_config(&stylesheet, source, PrintConfig, EmbedContext)` — formats with `EmbedContext::base_indent_offset` so wrapped lines respect outer Svelte indentation
+
+The two `StyleSheet` / `StyleContent` types (re-exported only with `convert`) are the public-AST envelopes `tsv_svelte` uses when embedding CSS in a `<style>` element's JSON. Distinct from `CssStyleSheet` (the internal AST root) and `CssNode` (the top-level statement enum).
+
+## Distinctives
+
+- **No canonical CSS parser of our own** — fixture validation parses through Svelte's `parseCss`, not a standalone CSS reference parser. Practical implication: AST _shape_ questions go to Svelte, not the CSS Syntax spec directly. _Validity_ (what to accept/reject) is a different axis: the north star is CSS-spec compliance, the near-term enforced goal is parity with `parseCss`, and where Svelte over-accepts invalid CSS the spec wins (tsv rejects). The parser currently **hard-fails** on the first invalid construct; spec-style error recovery is a committed post-v0.1 goal. See [`../../docs/conformance_svelte.md`](../../docs/conformance_svelte.md) §CSS Parser Scope & Error Model.
+- **`escapes` module is its own thing**, unlike `tsv_lang::escapes` (which handles JS-style quote swapping). CSS escapes are positional Unicode (`\XXXXXX` with optional whitespace terminator) and live entirely in `escapes.rs`. `tsv_ts` has its own `lexer/escapes.rs` for the same reason; `tsv_svelte` has none and delegates.
+- **`convert` feature flag** (default-on) — gates the entire `ast::public` + `ast::convert` layer plus `serde`/`serde_json` deps. Disabled in the `@fuzdev/tsv_format_wasm` build, which only needs to format. See [`tsv_wasm/CLAUDE.md`](../tsv_wasm/CLAUDE.md).
+- **Comments live on `CssStyleSheet`**, not on nodes. Value comments (e.g., `color: /* x */ red;`) are detected by scanning source text directly in `printer/mod.rs::has_value_comments_in_decl`, since they're not stored as `Comment` entries.
+- **Printer is organized by CSS spec hierarchy** (`rules.rs` → `declarations.rs` → `values.rs`, plus `atrules.rs` and `selectors.rs`), not by node kind. `selectors.rs` is shared between rules and at-rules; `value_normalization.rs` normalizes value text to prettier's form (numbers, hex colors, whitespace).
+
+## Checklist
+
+See [`docs/checklist_css.md`](../../docs/checklist_css.md) for the language feature checklist.
