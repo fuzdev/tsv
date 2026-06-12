@@ -231,8 +231,8 @@ Web Standards:
 - [TC39 test262](https://github.com/tc39/test262) - ECMAScript conformance tests
 - [W3C webref](https://github.com/w3c/webref) - Machine-readable web specs
 
-Claude Code was instrumental to this project, tsv wouldn't exist without it.
-Source code of projects similar to tsv was not used by the agent unless listed above.
+Claude Code was instrumental to this project, and tsv wouldn't exist without LLMs.
+Source code of projects similar to tsv was not used by agents unless listed above.
 
 ## License
 
