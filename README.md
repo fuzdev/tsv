@@ -76,8 +76,8 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
   layers (incremental parsing, CST for LSP) will be feature-gated so they
   don't regress the artifacts that exist today
 - non-configurable: formatter settings are fixed at Prettier's defaults except
-  `print_width: 100`, `use_tabs: true`, and `bracketSpacing: false` (`tab_width`
-  keeps Prettier's default of 2), and there are no config files or CLI options -
+  `print_width: 100`, `use_tabs: true`, and `bracketSpacing: false` (maybe controversial),
+  and there are no config files or CLI options -
   tsv is opinionated like `gofmt` and Python's Black,
   see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
 - JS and TS always parse as modules in strict mode - sloppy-mode-only syntax
@@ -107,6 +107,8 @@ tool set, instead of more frameworks. Hard non-goals:
   tsv parses standard and Svelte CSS only
 - JS plugins - follows from never embedding a JS runtime; linter extensibility,
   if any, will be WASM plugins and/or pattern-based rules
+- no config settings, simplifying things and
+  making it so hidden state in directories never changes its behavior
 
 Deferred rather than refused:
 
