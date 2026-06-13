@@ -140,7 +140,11 @@ deno task check          # typecheck + test + lint + fmt (full validation)
 deno task typecheck      # cargo check
 deno task test           # cargo test
 deno task lint           # cargo clippy
-cargo fmt                # format Rust code
+cargo fmt                # format Rust code — the only autoformatter in this repo
+# Non-Rust files (TS/MD/JSON) are hand-maintained: tsv ships NO prettier or deno
+# fmt config. Never run `deno fmt` or `prettier` on the repo — with no config they
+# reformat to their own defaults (spaces, double quotes) and churn every file. The
+# fixture/corpus prettier oracles pass options inline, so they're unaffected.
 
 cargo test --workspace test_typescript_parser_literal  # run specific test by name
 cargo test --workspace --test fixtures_tests           # fixture validation tests

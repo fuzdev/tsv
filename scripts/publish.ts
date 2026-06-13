@@ -557,6 +557,15 @@ function unreleased_section(changelog: string): string | null {
 	return next === -1 ? after : after.slice(0, next);
 }
 
+/** The `<!-- bump: <level> -->` marker, recognized ONLY on the line directly
+ * after the `## Unreleased` heading — the exact position `stamp_changelog`'s
+ * `with_marker` rewrites. `unreleased_section` returns the body starting at the
+ * newline after the heading, so the leading `\n` here anchors that placement.
+ * A marker anywhere else in the section is ignored, so validation can't accept
+ * a changelog whose marker the stamper would fail to strip. Kept in sync with
+ * `with_marker`. */
+const UNRELEASED_BUMP_MARKER = /^\n<!-- bump: (patch|minor|major) -->(?:\n|$)/;
+
 /** Unreleased content with the bump marker + surrounding whitespace stripped.
  * `''` means an empty section; `null` means no section (or no CHANGELOG). */
 function changelog_unreleased_content(): string | null {
@@ -568,10 +577,11 @@ function changelog_unreleased_content(): string | null {
 	}
 	const section = unreleased_section(changelog);
 	if (section === null) return null;
-	return section.replace(/^<!-- bump: (?:patch|minor|major) -->$/m, '').trim();
+	return section.replace(UNRELEASED_BUMP_MARKER, '').trim();
 }
 
-/** The `<!-- bump: <level> -->` marker declared in the Unreleased section, or null. */
+/** The `<!-- bump: <level> -->` marker declared directly after the `## Unreleased`
+ * heading, or null. */
 function changelog_declared_bump(): BumpLevel | null {
 	let changelog: string;
 	try {
@@ -581,7 +591,7 @@ function changelog_declared_bump(): BumpLevel | null {
 	}
 	const section = unreleased_section(changelog);
 	if (section === null) return null;
-	const m = /^<!-- bump: (patch|minor|major) -->$/m.exec(section);
+	const m = UNRELEASED_BUMP_MARKER.exec(section);
 	return m ? (m[1] as BumpLevel) : null;
 }
 
