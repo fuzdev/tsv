@@ -19,7 +19,7 @@ AI disclosure: this codebase was generated with machine agents.
 The first release took 7 months and ~1800 manual commits.
 Significant effort went into design and quality
 (I think refactoring and quality were well over half of the token spend),
-but the docs are in rough shape and the usual LLM caveats apply.
+but the usual LLM caveats apply.
 
 ## Install
 
