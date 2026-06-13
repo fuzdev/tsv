@@ -75,33 +75,32 @@ pub fn format(stylesheet: &CssStyleSheet, source: &str) -> String {
     printer::format_css(stylesheet, source)
 }
 
-/// Format CSS stylesheet with custom configuration
+/// Format a CSS stylesheet embedded in another language (e.g., Svelte).
 ///
-/// Use this when CSS is nested inside another language (e.g., Svelte)
-/// with base_indent_offset to account for wrapper indentation.
+/// Pass an [`EmbedContext`](tsv_lang::EmbedContext) with `base_indent_offset`
+/// so wrapped lines respect the host's indentation.
 ///
 /// # Arguments
 /// * `stylesheet` - CSS stylesheet (nodes + value comments)
 /// * `source` - Original CSS source code (for blank line preservation)
-/// * `config` - Print configuration with optional base_indent_offset
+/// * `embed` - Embedding context (e.g., `base_indent_offset`)
 ///
 /// # Example
 /// ```
-/// use tsv_css::{parse, format_with_config};
-/// use tsv_lang::{EmbedContext, PrintConfig};
+/// use tsv_css::{parse, format_embedded};
+/// use tsv_lang::EmbedContext;
 ///
 /// let css = "div{color:red;}";
 /// let stylesheet = parse(css).expect("Failed to parse CSS");
 /// let embed = EmbedContext { base_indent_offset: 1, ..EmbedContext::default() };
-/// let formatted = format_with_config(&stylesheet, css, PrintConfig::default(), embed);
+/// let formatted = format_embedded(&stylesheet, css, embed);
 /// ```
-pub fn format_with_config(
+pub fn format_embedded(
     stylesheet: &CssStyleSheet,
     source: &str,
-    config: tsv_lang::PrintConfig,
     embed: tsv_lang::EmbedContext,
 ) -> String {
-    printer::format_css_with_config(stylesheet, source, config, embed)
+    printer::format_css_embedded(stylesheet, source, embed)
 }
 
 /// Convert CSS AST to public JSON-compatible AST

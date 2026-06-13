@@ -24,12 +24,12 @@ mod lexer;
 mod parser;
 mod printer;
 
-pub use config::TsConfig;
+pub use config::TsContext;
 
 use std::rc::Rc;
 
+use tsv_lang::EmbedContext;
 use tsv_lang::doc::arena::{DocArena, DocId};
-use tsv_lang::{EmbedContext, PrintConfig};
 pub use tsv_lang::{ParseError, Result, SharedInterner};
 
 /// Build a fully-configured printer borrowing the given arena/source/state.
@@ -43,19 +43,17 @@ fn make_printer<'a>(
     interner: SharedInterner,
     comments: &'a [ast::Comment],
     line_breaks: &'a [u32],
-    config: PrintConfig,
     embed: EmbedContext,
-    ts_config: TsConfig,
+    ts_context: TsContext,
 ) -> printer::Printer<'a> {
-    printer::Printer::with_config(
+    printer::Printer::with_context(
         arena,
         interner,
         source,
         comments,
         line_breaks,
-        config,
         embed,
-        ts_config,
+        ts_context,
     )
 }
 
@@ -98,15 +96,15 @@ pub fn parse(source: &str) -> Result<Program> {
 /// assert_eq!(formatted, "const x = 42;\n");
 /// ```
 pub fn format(program: &Program, source: &str) -> String {
-    format_with_config(program, source, TsConfig::default())
+    format_with_context(program, source, TsContext::Standalone)
 }
 
-/// Format an internal AST back to source code with custom TypeScript-specific
-/// configuration (e.g., trailing-comma behavior on arrow type params).
+/// Format an internal AST back to source code in a given [`TsContext`].
 ///
-/// Pure-TS callers (CLI/debug) pass `TsConfig { arrow_type_param_trailing_comma: false, .. }`
-/// to suppress the Svelte-template disambiguation.
-pub fn format_with_config(program: &Program, source: &str, ts_config: TsConfig) -> String {
+/// Standalone `.ts` callers use [`format`] ([`TsContext::Standalone`]);
+/// `tsv_svelte` passes [`TsContext::Svelte`] when formatting embedded
+/// TypeScript so `<T>` arrow type params get the disambiguating trailing comma.
+pub fn format_with_context(program: &Program, source: &str, ts_context: TsContext) -> String {
     let arena = DocArena::for_source(source);
     let mut printer = make_printer(
         &arena,
@@ -114,9 +112,8 @@ pub fn format_with_config(program: &Program, source: &str, ts_config: TsConfig) 
         Rc::clone(&program.interner),
         &program.comments,
         &program.line_breaks,
-        PrintConfig::default(),
         EmbedContext::default(),
-        ts_config,
+        ts_context,
     );
     printer.print_program(program);
     printer.into_string()
@@ -243,9 +240,8 @@ pub fn format_expression(
     interner: SharedInterner,
     comments: &[ast::Comment],
     line_breaks: &[u32],
-    config: PrintConfig,
     embed: EmbedContext,
-    ts_config: TsConfig,
+    ts_context: TsContext,
 ) -> String {
     let arena = DocArena::for_source(source);
     let mut printer = make_printer(
@@ -254,9 +250,8 @@ pub fn format_expression(
         interner,
         comments,
         line_breaks,
-        config,
         embed,
-        ts_config,
+        ts_context,
     );
     printer.set_indent_level(embed.base_indent_offset);
     printer.print_expression(expression);
@@ -362,11 +357,10 @@ pub fn build_expression_doc_with_comments(
     expression: &Expression,
     source: &str,
     interner: SharedInterner,
-    config: &PrintConfig,
     embed: &EmbedContext,
     comments: &[ast::Comment],
     line_breaks: &[u32],
-    ts_config: TsConfig,
+    ts_context: TsContext,
 ) -> DocId {
     let printer = make_printer(
         arena,
@@ -374,9 +368,8 @@ pub fn build_expression_doc_with_comments(
         interner,
         comments,
         line_breaks,
-        *config,
         *embed,
-        ts_config,
+        ts_context,
     );
     printer.build_expression_doc(expression)
 }
@@ -390,7 +383,7 @@ pub fn build_program_doc(
     program: &Program,
     source: &str,
     embed: EmbedContext,
-    ts_config: TsConfig,
+    ts_context: TsContext,
 ) -> DocId {
     let printer = make_printer(
         arena,
@@ -398,9 +391,8 @@ pub fn build_program_doc(
         Rc::clone(&program.interner),
         &program.comments,
         &program.line_breaks,
-        PrintConfig::default(),
         embed,
-        ts_config,
+        ts_context,
     );
     printer.build_program_doc(program)
 }

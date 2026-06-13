@@ -28,7 +28,7 @@ mod values;
 
 use crate::ast::internal::{Comment, CssBlockChild, CssNode, CssStyleSheet, CssValue};
 use tsv_lang::{
-    CommentPosition, EmbedContext, OutputBuffer, PrintConfig, classify_comment_fast,
+    CommentPosition, EmbedContext, OutputBuffer, classify_comment_fast,
     doc::{
         self,
         arena::{DocArena, DocId},
@@ -53,10 +53,6 @@ pub(crate) struct Printer<'a> {
     buffer: OutputBuffer,
     /// Current indentation level
     pub(crate) indent_level: usize,
-    /// Workspace-wide doc-builder configuration (reserved slot for future
-    /// cross-language toggles — empty today).
-    #[allow(dead_code)]
-    pub(crate) config: PrintConfig,
     /// Embedding context (base indent offset, first-line offset, layout mode, etc.).
     pub(crate) embed: EmbedContext,
     /// Arena allocator for doc nodes
@@ -72,27 +68,19 @@ pub(crate) struct Printer<'a> {
 impl<'a> Printer<'a> {
     /// Create a new printer with source, comments, and line_breaks
     pub(crate) fn new(source: &'a str, comments: &'a [Comment], line_breaks: &'a [u32]) -> Self {
-        Self::with_config(
-            source,
-            comments,
-            line_breaks,
-            PrintConfig::default(),
-            EmbedContext::default(),
-        )
+        Self::with_embed(source, comments, line_breaks, EmbedContext::default())
     }
 
-    /// Create a new printer with the given doc-builder config and embed context.
-    pub(crate) fn with_config(
+    /// Create a new printer with the given embedding context.
+    pub(crate) fn with_embed(
         source: &'a str,
         comments: &'a [Comment],
         line_breaks: &'a [u32],
-        config: PrintConfig,
         embed: EmbedContext,
     ) -> Self {
         Self {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
-            config,
             embed,
             arena: DocArena::for_source(source),
             source,
@@ -585,22 +573,15 @@ pub(crate) fn format_css(stylesheet: &CssStyleSheet, source: &str) -> String {
     printer.into_string()
 }
 
-/// Format CSS stylesheet with custom configuration
-/// Use this when CSS is nested inside another language (e.g., Svelte)
-/// with `embed.base_indent_offset` to account for wrapper indentation.
-pub(crate) fn format_css_with_config(
+/// Format a CSS stylesheet embedded in another language (e.g., Svelte), using
+/// `embed.base_indent_offset` to account for the host's wrapper indentation.
+pub(crate) fn format_css_embedded(
     stylesheet: &CssStyleSheet,
     source: &str,
-    config: PrintConfig,
     embed: EmbedContext,
 ) -> String {
-    let mut printer = Printer::with_config(
-        source,
-        &stylesheet.comments,
-        &stylesheet.line_breaks,
-        config,
-        embed,
-    );
+    let mut printer =
+        Printer::with_embed(source, &stylesheet.comments, &stylesheet.line_breaks, embed);
     printer.print_css_nodes(&stylesheet.nodes);
     printer.into_string()
 }

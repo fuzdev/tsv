@@ -42,7 +42,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_const_tag_doc(&self, tag: &internal::ConstTag) -> DocId {
         let d = self.d();
         let id_doc = self.build_ts_expression_doc_no_comments(&tag.id);
-        // Build init with is_embedded_expression=false so binary chains use Grouped style
+        // Build init with LayoutMode::Standalone so binary chains use Grouped style
         // (not ContinuationIndent). The assignment layout handles indentation —
         // ContinuationIndent would double-indent continuation lines.
         let init_doc = self.build_const_init_doc(
@@ -145,11 +145,10 @@ impl<'a> Printer<'a> {
             expr,
             self.source,
             Rc::clone(&self.interner),
-            &self.config,
             &embed,
             self.comments,
             &self.line_breaks,
-            tsv_ts::TsConfig::svelte(),
+            tsv_ts::TsContext::Svelte,
         );
 
         let trailing_docs: Vec<DocId> =

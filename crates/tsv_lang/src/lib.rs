@@ -5,7 +5,7 @@
 //! - `LocationTracker` - line/column information
 //! - `ParseError` - error types and result aliases
 //! - `OutputBuffer` - shared printer output utilities
-//! - `PrintConfig` - shared printer configuration
+//! - `config` - hardcoded formatter settings (`PRINT_WIDTH` / `TAB_WIDTH` / `INDENT`)
 //! - `Comment` - shared comment type
 //! - `doc` - document builder primitives for prettier-compatible formatting
 //! - `escapes` - escape sequence utilities for printers
@@ -34,7 +34,7 @@ pub use comment::{
     has_line_comments_in_range, has_multiline_block_comments_in_range, leading_comments,
     trailing_comments,
 };
-pub use config::{EmbedContext, INDENT, LayoutMode, PRINT_WIDTH, PrintConfig, TAB_WIDTH};
+pub use config::{EmbedContext, INDENT, LayoutMode, PRINT_WIDTH, TAB_WIDTH};
 pub use error::{ErrorContext, ParseError, Result};
 pub use interner::{InfallibleResolve, SharedInterner, SymbolResolver, SymbolToU32};
 pub use json::estimated_json_capacity;

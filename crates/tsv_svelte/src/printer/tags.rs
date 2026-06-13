@@ -57,9 +57,8 @@ impl<'a> Printer<'a> {
             Rc::clone(&self.interner),
             self.comments,
             &self.line_breaks,
-            tsv_lang::PrintConfig::default(),
             embed,
-            tsv_ts::TsConfig::svelte(),
+            tsv_ts::TsContext::Svelte,
         );
         self.write(&formatted_id);
         self.write(" = ");
@@ -76,9 +75,8 @@ impl<'a> Printer<'a> {
             Rc::clone(&self.interner),
             self.comments,
             &self.line_breaks,
-            tsv_lang::PrintConfig::default(),
             embed,
-            tsv_ts::TsConfig::svelte(),
+            tsv_ts::TsContext::Svelte,
         );
         self.write(&formatted_init);
 

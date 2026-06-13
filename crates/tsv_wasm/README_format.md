@@ -41,7 +41,7 @@ const formatted = format_svelte('<script>\nconst   x=1\n</script>');
 
 `init_sync({ module })` is also exported for Workers and custom loading.
 
-Settings are hardcoded to match Prettier defaults: `print_width: 100`, `tab_width: 2`, `use_tabs: true`.
+tsv is non-configurable: settings are fixed at Prettier's defaults (`print_width: 100`, `tab_width: 2`, `use_tabs: true`) — no options, like `gofmt` and Black.
 
 ## Status
 

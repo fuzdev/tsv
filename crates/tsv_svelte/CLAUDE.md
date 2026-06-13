@@ -11,7 +11,7 @@ Depends on:
 - `tsv_css` — embedded CSS: `<style>` blocks
 - `tsv_html` — element classification (block / inline / void), whitespace rules
 
-Sources of truth: Svelte's compiler for AST shape, Prettier (`svelte` plugin) for formatting. Scope is `.svelte` files only — `.svelte.ts` rune modules are pure TypeScript and go through `tsv_ts` with `TsConfig::svelte()` (this crate does not handle them).
+Sources of truth: Svelte's compiler for AST shape, Prettier (`svelte` plugin) for formatting. Scope is `.svelte` files only — `.svelte.ts` rune modules are pure TypeScript and go through `tsv_ts` (this crate does not handle them).
 
 See [../../CLAUDE.md §Project Structure](../../CLAUDE.md#project-structure) for the standard crate layout (`ast/` / `lexer/` / `parser/` / `printer/`) and project-wide conventions.
 

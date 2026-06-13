@@ -13,7 +13,7 @@ use crate::printer::Printer;
 use crate::printer::analysis;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::printing::{StringFormatOptions, format_string_literal};
+use tsv_lang::printing::format_string_literal;
 
 /// Format a string literal from the AST to its printed form.
 ///
@@ -28,7 +28,7 @@ pub(crate) fn format_string_literal_from_ast(literal: &internal::Literal, source
         _ => unreachable!("format_string_literal_from_ast called on non-string literal"),
     };
 
-    format_string_literal(raw_content, quote, StringFormatOptions::default())
+    format_string_literal(raw_content, quote)
 }
 
 /// Format a directive prologue string (`'use strict'`) for printing.
@@ -47,7 +47,7 @@ pub(crate) fn format_directive(raw: &str) -> String {
     if content.contains('\'') || content.contains('"') {
         raw.to_string()
     } else {
-        // Preferred quote is single (matches `StringFormatOptions::default`).
+        // Preferred quote is single (matches `format_string_literal`'s hardcoded tie-breaker).
         format!("'{content}'")
     }
 }

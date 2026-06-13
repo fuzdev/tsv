@@ -1,10 +1,21 @@
-// Shared print configuration across all formatters
+//! Hardcoded formatter settings shared across all language printers.
+//!
+//! tsv is **non-configurable**: formatting options are fixed at Prettier's
+//! defaults and cannot be changed — there are no config files, CLI flags, or
+//! runtime options (like `gofmt` or Black). The constants below are the single
+//! source of truth for those fixed options; the renderer reads them directly,
+//! so nothing is threaded through call signatures.
+//!
+//! Runtime *state* that genuinely varies per input is not configuration and
+//! lives on dedicated context types: embedding offsets / layout mode on
+//! [`EmbedContext`] here, and the standalone-vs-Svelte TypeScript distinction
+//! on `tsv_ts::TsContext`.
 
 /// Maximum line width used by the formatter (matches Prettier default).
 ///
-/// Hardcoded — see [`crate::config`] module docs and the project README.
-/// The renderer reads this constant directly; tests override widths via
-/// the `*_with_widths` rendering helpers.
+/// The renderer reads this constant directly; the doc-builder unit tests
+/// exercise the layout at smaller widths via the internal `RenderConfig` seam
+/// (`doc::render_config`), never at runtime.
 pub const PRINT_WIDTH: usize = 100;
 
 /// Visual width of a single tab character, used for column calculations.
@@ -15,21 +26,7 @@ pub const TAB_WIDTH: usize = 2;
 /// `"\t"` matches the project's tabs-only indentation policy.
 pub const INDENT: &str = "\t";
 
-/// Workspace-wide doc-builder configuration.
-///
-/// Currently empty: the renderer reads compile-time globals ([`PRINT_WIDTH`] /
-/// [`TAB_WIDTH`] / [`INDENT`]) directly, embedding state lives on
-/// [`EmbedContext`], and language-specific knobs live on the language's own
-/// config (e.g., `tsv_ts::TsConfig`). This type is the reserved slot for
-/// cross-language doc-builder toggles that will appear when the hardcoded
-/// pre-v0.1 posture relaxes — future Prettier-style options that apply to
-/// every language go here.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct PrintConfig {}
-
 /// How the renderer should treat the doc tree at its outer boundary.
-///
-/// Replaces the old `PrintConfig::is_embedded_expression: bool`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LayoutMode {
     /// The doc tree is the entire document (e.g., a standalone TS/CSS file,
@@ -43,14 +40,10 @@ pub enum LayoutMode {
     Embedded,
 }
 
-/// Embedding state for a render. Threaded into the renderer alongside the
-/// doc tree; replaces the `base_indent_offset` / `first_line_offset` /
-/// `suffix_width` / `is_embedded_expression` fields previously on
-/// [`PrintConfig`].
-///
-/// Constructed by the host language (e.g., tsv_svelte) when invoking an
-/// embedded language's printer; defaults to a standalone, column-0,
-/// no-suffix, no-base-offset layout.
+/// Embedding state for a render, threaded into the renderer alongside the doc
+/// tree. This is per-input *state*, not configuration: the host language (e.g.
+/// tsv_svelte) constructs it when invoking an embedded language's printer.
+/// Defaults to a standalone, column-0, no-suffix, no-base-offset layout.
 #[derive(Debug, Clone, Copy)]
 pub struct EmbedContext {
     /// Base indent offset for width calculations.

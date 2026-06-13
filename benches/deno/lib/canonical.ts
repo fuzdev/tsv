@@ -17,50 +17,28 @@ interface PrettierModule {
 	format: (source: string, options: Record<string, unknown>) => Promise<string>;
 }
 
-/** Prettier config options we care about */
-interface PrettierConfig {
-	useTabs?: boolean;
-	printWidth?: number;
-	singleQuote?: boolean;
-	bracketSpacing?: boolean;
-}
-
 /** Parser function type */
 type ParserFn = (source: string) => unknown;
 
 /**
- * Load prettier config from .prettierrc.json at project root.
- * Falls back to defaults if file not found.
+ * Prettier formatting options, fixed to tsv's settings and passed explicitly on
+ * every call. Mirrors the inline options in the fixture oracle
+ * (`crates/tsv_debug/src/deno/sidecar.ts`), the source of truth for fixture
+ * correctness — tsv ships no prettier config file, so the corpus oracle reads
+ * none either. Keep these two option sets identical.
  */
-async function load_prettier_config(): Promise<PrettierConfig> {
-	const config_path = new URL('../../../.prettierrc.json', import.meta.url).pathname;
-	try {
-		const content = await Deno.readTextFile(config_path);
-		const config = JSON.parse(content);
-		// Extract only the options we care about (not plugins - we handle those separately)
-		return {
-			useTabs: config.useTabs,
-			printWidth: config.printWidth,
-			singleQuote: config.singleQuote,
-			bracketSpacing: config.bracketSpacing,
-		};
-	} catch {
-		// Fall back to defaults matching our .prettierrc.json
-		return {
-			useTabs: true,
-			printWidth: 100,
-			singleQuote: true,
-			bracketSpacing: false,
-		};
-	}
-}
+const PRETTIER_OPTIONS = {
+	useTabs: true,
+	printWidth: 100,
+	singleQuote: true,
+	bracketSpacing: false,
+} as const;
 
 export class CanonicalImplementation implements TsvImplementation {
 	name = 'canonical' as const;
 	readonly versions: CanonicalVersions;
 
 	#prettier: PrettierModule | null = null;
-	#prettier_config: PrettierConfig = {};
 	// deno-lint-ignore no-explicit-any
 	#prettier_svelte: any = null;
 	// deno-lint-ignore no-explicit-any
@@ -85,23 +63,20 @@ export class CanonicalImplementation implements TsvImplementation {
 	}
 
 	async init(): Promise<void> {
-		// Load config and dependencies in parallel
+		// Load dependencies in parallel
 		const [
-			prettier_config,
 			prettier_mod,
 			prettier_svelte_mod,
 			svelte_mod,
 			acorn_mod,
 			acorn_ts_mod,
 		] = await Promise.all([
-			load_prettier_config(),
 			import('prettier'),
 			import('prettier-plugin-svelte'),
 			import('svelte/compiler'),
 			import('acorn'),
 			import('@sveltejs/acorn-typescript'),
 		]);
-		this.#prettier_config = prettier_config;
 		this.#prettier = prettier_mod as PrettierModule;
 		this.#prettier_svelte = prettier_svelte_mod;
 		this.#svelte_compiler = svelte_mod;
@@ -160,7 +135,7 @@ export class CanonicalImplementation implements TsvImplementation {
 			parser: LANGUAGE_PRETTIER_PARSERS[language],
 			filepath: `file${LANGUAGE_EXTENSIONS[language]}`,
 			plugins,
-			...this.#prettier_config,
+			...PRETTIER_OPTIONS,
 		});
 	}
 

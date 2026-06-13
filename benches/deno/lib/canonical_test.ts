@@ -47,7 +47,7 @@ Deno.test('canonical: single-type-param arrow keeps `<T,>` in .svelte (JSX disam
 	const impl = await make_canonical();
 	try {
 		// In a Svelte `<script lang="ts">`, `<T>` is ambiguous with template syntax, so the
-		// disambiguating comma is correct — mirroring tsv's `TsConfig::svelte()`.
+		// disambiguating comma is correct — mirroring tsv's `TsContext::Svelte`.
 		const out = await impl.format_async(
 			'<script lang="ts">\n\tconst f = <T>(x: T) => x;\n</script>\n',
 			'svelte',

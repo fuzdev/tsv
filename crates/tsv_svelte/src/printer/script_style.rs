@@ -41,7 +41,7 @@ impl<'a> Printer<'a> {
             &script.content,
             self.source(),
             embed,
-            tsv_ts::TsConfig::svelte(),
+            tsv_ts::TsContext::Svelte,
         );
 
         // Render with indent
@@ -186,13 +186,12 @@ impl<'a> Printer<'a> {
             // Pass the entire source to CSS printer (CSS node spans are absolute)
             // The CSS printer will use the spans to detect blank lines correctly
             // Use base_indent_offset=1 to account for the Svelte wrapper indent
-            let config = tsv_lang::PrintConfig::default();
             let embed = tsv_lang::EmbedContext {
                 base_indent_offset: 1,
                 ..tsv_lang::EmbedContext::default()
             };
             let formatted_css =
-                tsv_css::format_with_config(&style.css_stylesheet, self.source(), config, embed);
+                tsv_css::format_embedded(&style.css_stylesheet, self.source(), embed);
 
             // Indent each line - trim trailing newlines first to avoid extra blank lines
             // Note: CSS formatter adds trailing newline, we need to remove it before line processing

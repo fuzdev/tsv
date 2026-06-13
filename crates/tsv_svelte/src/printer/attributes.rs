@@ -227,7 +227,7 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for an expression tag inside an attribute value.
     fn build_attribute_expression_doc(&self, expr_tag: &internal::ExpressionTag) -> DocId {
-        self.build_expression_tag_doc_with_config(expr_tag, tsv_lang::PrintConfig::default())
+        self.build_expression_tag_doc(expr_tag)
     }
 
     /// Build a Doc for attribute text content, handling newlines as literallines.
@@ -428,12 +428,11 @@ impl<'a> Printer<'a> {
 
     /// Build expression doc for attribute context (embedded expression).
     ///
-    /// Sets `is_embedded_expression = true` so binary expressions use ContinuationIndent style.
+    /// Sets `LayoutMode::Embedded` so binary expressions use ContinuationIndent style.
     /// Assignment expressions get wrapped in parens: `prop={(a = b)}`.
     fn build_expression_doc_for_attribute(
         &self,
         expr: &tsv_ts::ast::internal::Expression,
-        config: tsv_lang::PrintConfig,
     ) -> DocId {
         let d = self.d();
         let embedded = tsv_lang::EmbedContext {
@@ -448,11 +447,10 @@ impl<'a> Printer<'a> {
                 expr,
                 self.source,
                 Rc::clone(&self.interner),
-                &config,
                 &embedded,
                 self.comments,
                 &self.line_breaks,
-                tsv_ts::TsConfig::svelte(),
+                tsv_ts::TsContext::Svelte,
             );
             return d.parens(inner);
         }
@@ -462,11 +460,10 @@ impl<'a> Printer<'a> {
             expr,
             self.source,
             Rc::clone(&self.interner),
-            &config,
             &embedded,
             self.comments,
             &self.line_breaks,
-            tsv_ts::TsConfig::svelte(),
+            tsv_ts::TsContext::Svelte,
         )
     }
 
@@ -551,7 +548,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        let expr_doc = self.build_expression_doc_for_attribute(expr, self.config);
+        let expr_doc = self.build_expression_doc_for_attribute(expr);
 
         // Collect trailing comments
         let mut trailing_comments = Vec::new();
@@ -666,11 +663,6 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an expression tag: `{expr}`
-    pub(super) fn build_expression_tag_doc(&self, tag: &internal::ExpressionTag) -> DocId {
-        self.build_expression_tag_doc_with_config(tag, self.config)
-    }
-
-    /// Build a Doc for an expression tag with a specific config
     ///
     /// For binary expressions, uses continuation indent so wrapped lines are indented
     /// relative to the opening `{`:
@@ -679,11 +671,7 @@ impl<'a> Printer<'a> {
     ///   condB &&
     ///   condC}
     /// ```
-    fn build_expression_tag_doc_with_config(
-        &self,
-        tag: &internal::ExpressionTag,
-        config: tsv_lang::PrintConfig,
-    ) -> DocId {
+    pub(super) fn build_expression_tag_doc(&self, tag: &internal::ExpressionTag) -> DocId {
         let d = self.d();
         let mut parts = vec![d.text("{")];
 
@@ -695,7 +683,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        parts.push(self.build_expression_doc_for_attribute(&tag.expression, config));
+        parts.push(self.build_expression_doc_for_attribute(&tag.expression));
 
         // Add trailing comments (block comments only in expression tags)
         let expr_end = tag.expression.span().end;

@@ -6,7 +6,7 @@
 
 use crate::ast::internal::{Color, ColorChannel};
 use tsv_lang::Span;
-use tsv_lang::printing::{StringFormatOptions, format_string_literal};
+use tsv_lang::printing::format_string_literal;
 
 /// Format an identifier value semantically
 ///
@@ -467,7 +467,7 @@ pub(crate) fn format_color_from_source(color: &Color, source: &str, span: Span) 
 /// assert_eq!(format_string_value("world", '"'), "\"world\"");
 /// ```
 pub(crate) fn format_string_value(content: &str, quote: char) -> String {
-    format_string_literal(content, quote, StringFormatOptions::default())
+    format_string_literal(content, quote)
 }
 
 /// Extract and normalize property name from declaration source
@@ -550,8 +550,7 @@ pub(crate) fn extract_string_value(decl_source: &str, quote: char) -> Option<Str
         // String should be quoted
         if value_part.len() >= 2 {
             let raw_content = &value_part[1..value_part.len() - 1];
-            let formatted =
-                format_string_literal(raw_content, quote, StringFormatOptions::default());
+            let formatted = format_string_literal(raw_content, quote);
             return Some(formatted);
         }
     }

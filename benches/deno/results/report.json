@@ -19,7 +19,7 @@
 	},
 	"binary_sizes": [
 		{
-			"label": "tsv",
+			"label": "tsv (native)",
 			"bytes": 3861760,
 			"kind": "native",
 			"gzip_bytes": 1622771
