@@ -161,7 +161,7 @@ impl<'a> SvelteParser<'a> {
                 Some(Fragment {
                     nodes: vec![elseif_block],
                 })
-            } else if keyword == "else" {
+            } else if keyword_normalized == "else" {
                 // {:else} - parse else branch
                 let else_tag_start = self.current_end;
                 let (_, else_content_start) = self.scan_block_tag_content(else_tag_start)?; // consume "else}"
@@ -189,7 +189,7 @@ impl<'a> SvelteParser<'a> {
         let end = if let Some(end_pos) = elseif_end {
             end_pos
         } else {
-            self.expect_block_close_keyword("if")?
+            self.expect_block_close_keyword("if", start)?
         };
 
         Ok(FragmentNode::IfBlock(IfBlock {
@@ -299,7 +299,7 @@ impl<'a> SvelteParser<'a> {
         };
 
         // Expect closing {/each}
-        let end = self.expect_block_close_keyword("each")?;
+        let end = self.expect_block_close_keyword("each", start)?;
 
         Ok(FragmentNode::EachBlock(EachBlock {
             expression,
@@ -585,7 +585,7 @@ impl<'a> SvelteParser<'a> {
                 (None, None)
             };
 
-            let block_end = self.expect_block_close_keyword("await")?;
+            let block_end = self.expect_block_close_keyword("await", start)?;
 
             (
                 None,
@@ -616,7 +616,7 @@ impl<'a> SvelteParser<'a> {
                 (None, None)
             };
 
-            let block_end = self.expect_block_close_keyword("await")?;
+            let block_end = self.expect_block_close_keyword("await", start)?;
 
             (
                 None,
@@ -666,7 +666,7 @@ impl<'a> SvelteParser<'a> {
                 }
             }
 
-            let block_end = self.expect_block_close_keyword("await")?;
+            let block_end = self.expect_block_close_keyword("await", start)?;
 
             (
                 pending,
@@ -813,14 +813,22 @@ impl<'a> SvelteParser<'a> {
     }
 
     /// Consume the closing `{/expected}` tag and return the position after it.
+    /// `block_start` is the byte offset of the opening `{#expected`, used to
+    /// locate the unclosed-block error.
     ///
-    /// Errors if a closing tag is present but names a different block — a
-    /// mismatched close like `{#if x}…{/each}`, which the canonical parser
-    /// rejects. When no closing tag is present, returns the current position
-    /// without erroring (unclosed-block leniency is unchanged here).
-    fn expect_block_close_keyword(&mut self, expected: &str) -> Result<usize, ParseError> {
+    /// Three failure modes, all rejected by the canonical parser:
+    /// - the block is left unclosed (`{#if x}a`) — reported at `block_start`;
+    /// - the close names a different block — a mismatch like `{#if x}…{/each}`;
+    /// - the close carries trailing junk (`{/each foo}`) — only whitespace may
+    ///   follow the keyword before `}`.
+    fn expect_block_close_keyword(
+        &mut self,
+        expected: &str,
+        block_start: usize,
+    ) -> Result<usize, ParseError> {
+        // Unclosed block: Svelte requires a matching `{/expected}`.
         if !self.check(TokenKind::BlockClose) {
-            return Ok(self.current_start);
+            return Err(self.error_unclosed_at(&format!("{{#{expected}}} block"), block_start));
         }
 
         // The keyword after `{/` must match the open block.
@@ -829,7 +837,16 @@ impl<'a> SvelteParser<'a> {
         }
 
         let close_tag_start = self.current_end;
-        let (_, after_close) = self.scan_block_tag_content(close_tag_start)?;
+        let (close_content, after_close) = self.scan_block_tag_content(close_tag_start)?;
+
+        // Only whitespace may follow the keyword: `{/each foo}` is rejected.
+        // The keyword matched above, so `close_content` starts with `expected`.
+        let trailing = close_content[expected.len()..].trim_start();
+        if !trailing.is_empty() {
+            let trailing_start = close_tag_start + (close_content.len() - trailing.len());
+            return Err(self.error_expected_at("'}'", trailing_start));
+        }
+
         Ok(after_close)
     }
 
@@ -859,7 +876,7 @@ impl<'a> SvelteParser<'a> {
         let fragment = self.parse_block_children(&["key"], content_start)?;
 
         // Expect closing {/key}
-        let end = self.expect_block_close_keyword("key")?;
+        let end = self.expect_block_close_keyword("key", start)?;
 
         Ok(FragmentNode::KeyBlock(KeyBlock {
             expression,
@@ -957,7 +974,7 @@ impl<'a> SvelteParser<'a> {
         let body = self.parse_block_children(&["snippet"], content_start)?;
 
         // Expect closing {/snippet}
-        let end = self.expect_block_close_keyword("snippet")?;
+        let end = self.expect_block_close_keyword("snippet", start)?;
 
         Ok(FragmentNode::SnippetBlock(SnippetBlock {
             expression,
@@ -1386,10 +1403,9 @@ impl<'a> SvelteParser<'a> {
             if self.check(TokenKind::BlockContinue) {
                 let keyword = self.continuation_keyword_at(self.current_end);
 
-                // Check if any stop keyword starts with or matches this keyword
-                let should_stop = stop_keywords
-                    .iter()
-                    .any(|sk| keyword.starts_with(sk) || keyword == *sk);
+                // Stop when the continuation keyword begins with a stop keyword,
+                // so the two-word `{:else if}` matches the `else` stop.
+                let should_stop = stop_keywords.iter().any(|sk| keyword.starts_with(sk));
 
                 if should_stop {
                     break;
