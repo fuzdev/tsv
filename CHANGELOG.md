@@ -2,8 +2,11 @@
 
 Covers the npm packages published from this repo — `@fuzdev/tsv_format_wasm`,
 `@fuzdev/tsv_parse_wasm`, and `@fuzdev/tsv_wasm`. All move together at the
-`Cargo.toml [workspace.package]` version. `deno task publish --wetrun --bump <level>`
-converts the `## Unreleased` section into the released version's section.
+`Cargo.toml [workspace.package]` version. Each `## Unreleased` section must be
+non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publish
+--wetrun --bump <level>` requires `<level>` to match it, then stamps the section
+(marker removed) into the released version's section and seeds a fresh empty
+`## Unreleased` (reset to `bump: patch`) for the next cycle.
 
 ## Unreleased
 <!-- bump: minor -->

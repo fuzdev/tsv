@@ -503,7 +503,9 @@ function bump_version(current: string, level: 'patch' | 'minor' | 'major'): stri
 	return `${major}.${minor}.${patch + 1}`;
 }
 
-/** Convert CHANGELOG.md's `## Unreleased` section into `## <version>`. */
+/** Stamp CHANGELOG.md's `## Unreleased` section into `## <version>` (dropping its
+ * bump marker) and seed a fresh empty `## Unreleased` reset to `bump: patch` for
+ * the next cycle. Idempotent: a no-op if `## <version>` is already present. */
 function stamp_changelog(new_version: string): void {
 	let changelog: string;
 	try {
@@ -513,14 +515,29 @@ function stamp_changelog(new_version: string): void {
 		console.warn(`  WARN: no ${CHANGELOG_PATH} — skipping changelog stamp`);
 		return;
 	}
-	if (/^## Unreleased$/m.test(changelog)) {
-		const stamped = changelog
-			.replace(/^## Unreleased$/m, `## ${new_version}`)
-			.replace(/^<!-- bump: (?:patch|minor|major) -->\n/m, '');
-		Deno.writeTextFileSync(CHANGELOG_PATH, stamped);
-		console.log(`  Stamped ${CHANGELOG_PATH}: ## Unreleased -> ## ${new_version}`);
-	} else if (version_heading_re(new_version).test(changelog)) {
+	// Already stamped this version (retry after a failed wetrun) — the seeded
+	// fresh `## Unreleased` is expected; leave everything as-is.
+	if (version_heading_re(new_version).test(changelog)) {
 		console.log(`  ${CHANGELOG_PATH} already stamped with ## ${new_version}`);
+		return;
+	}
+	// Rename `## Unreleased` to the version (dropping its bump marker) and seed a
+	// fresh empty `## Unreleased` reset to `bump: patch` for the next cycle.
+	const fresh = '## Unreleased\n<!-- bump: patch -->\n\n';
+	const with_marker = /^## Unreleased\n<!-- bump: (?:patch|minor|major) -->\n/m;
+	if (with_marker.test(changelog)) {
+		const stamped = changelog.replace(with_marker, `${fresh}## ${new_version}\n`);
+		Deno.writeTextFileSync(CHANGELOG_PATH, stamped);
+		console.log(
+			`  Stamped ${CHANGELOG_PATH}: ## Unreleased -> ## ${new_version}; seeded fresh ## Unreleased (bump: patch)`,
+		);
+	} else if (/^## Unreleased$/m.test(changelog)) {
+		// No marker (defensive — a wetrun would have failed earlier). Rename + seed.
+		const stamped = changelog.replace(/^## Unreleased$/m, `${fresh}## ${new_version}`);
+		Deno.writeTextFileSync(CHANGELOG_PATH, stamped);
+		console.log(
+			`  Stamped ${CHANGELOG_PATH}: ## Unreleased -> ## ${new_version}; seeded fresh ## Unreleased (bump: patch)`,
+		);
 	} else {
 		console.warn(`  WARN: no "## Unreleased" section in ${CHANGELOG_PATH} — nothing to stamp`);
 	}
