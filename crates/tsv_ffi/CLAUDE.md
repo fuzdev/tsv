@@ -32,7 +32,13 @@ All return-pointer functions share the signature `(source_ptr: *const u8, source
 
 ## Files
 
-| File         | Purpose                                                                     |
-| ------------ | --------------------------------------------------------------------------- |
-| `src/lib.rs` | All bindings: `lang_bindings!` macro, source-extraction helpers, `tsv_free` |
-| `Cargo.toml` | `crate-type = ["cdylib"]`; `unsafe_code = "allow"` (FFI requires it)        |
+| File         | Purpose                                                                                                            |
+| ------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `src/lib.rs` | All bindings: `lang_bindings!` macro, source-extraction helpers, `tsv_free`, and a `#[cfg(test)]` module           |
+| `Cargo.toml` | `crate-type = ["cdylib"]`; `unsafe_code = "allow"` (FFI requires it)                                               |
+
+The in-crate test module drives every entry point in-process (real
+alloc → write `out_len` → `tsv_free` round-trip), covering the happy path per
+language, JSON-error returns on invalid syntax, the invalid-UTF-8 path, empty
+input, and `tsv_free` null/zero no-ops. It runs under `cargo test` (so CI's
+`check` job exercises the native binding — the Deno/WASM smoke paths don't).

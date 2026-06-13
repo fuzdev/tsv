@@ -227,3 +227,173 @@ pub unsafe extern "C" fn tsv_free(ptr: *mut u8, len: usize) {
         }
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+
+    /// The shared signature of every return-pointer FFI entry point.
+    type FfiFn = unsafe extern "C" fn(*const u8, usize, *mut usize) -> *mut u8;
+
+    /// Drive an FFI entry point end to end: pass `source`, read the returned
+    /// buffer back into a `String`, then free it via `tsv_free`. Every call
+    /// exercises the real alloc → write `out_len` → free round-trip, so a
+    /// mismatch between the returned length and the buffer is caught here.
+    fn call(f: FfiFn, source: &str) -> String {
+        call_bytes(f, source.as_bytes())
+    }
+
+    /// Like `call` but takes raw bytes, so tests can pass invalid UTF-8.
+    fn call_bytes(f: FfiFn, bytes: &[u8]) -> String {
+        let mut out_len: usize = 0;
+        // Safety: `bytes` is a valid slice; `out_len` is a live `usize`.
+        let ptr = unsafe { f(bytes.as_ptr(), bytes.len(), &raw mut out_len) };
+        assert!(!ptr.is_null(), "FFI returned a null pointer");
+        // Safety: the call wrote `out_len` bytes starting at `ptr`.
+        let out = unsafe { slice::from_raw_parts(ptr, out_len) };
+        let s = std::str::from_utf8(out)
+            .expect("FFI output must be valid UTF-8")
+            .to_owned();
+        assert_eq!(
+            out_len,
+            s.len(),
+            "out_len must match the returned byte count"
+        );
+        // Safety: `ptr`/`out_len` came from the call above; freed exactly once.
+        unsafe { tsv_free(ptr, out_len) };
+        s
+    }
+
+    /// Return the `error` message if `output` is an `{"error": "..."}` object.
+    fn error_message(output: &str) -> Option<String> {
+        let value: serde_json::Value = serde_json::from_str(output).ok()?;
+        value.get("error")?.as_str().map(str::to_owned)
+    }
+
+    // --- format: happy path (one per language exercises the macro expansion) ---
+
+    #[test]
+    fn format_typescript_normalizes() {
+        assert_eq!(call(tsv_format_typescript, "const   x=1"), "const x = 1;\n");
+    }
+
+    #[test]
+    fn format_css_normalizes() {
+        assert_eq!(
+            call(tsv_format_css, "a{color:red}"),
+            "a {\n\tcolor: red;\n}\n"
+        );
+    }
+
+    #[test]
+    fn format_svelte_normalizes() {
+        assert_eq!(
+            call(tsv_format_svelte, "<div   >x</div   >"),
+            "<div>x</div>\n"
+        );
+    }
+
+    // --- parse: returns a JSON AST keyed by `type`, no error ---
+
+    #[test]
+    fn parse_returns_json_ast() {
+        // Annotate the array type so the fn items coerce to `FfiFn` (no casts).
+        let cases: [(&str, FfiFn, &str); 3] = [
+            ("typescript", tsv_parse_typescript, "const x = 1;\n"),
+            ("svelte", tsv_parse_svelte, "<div>x</div>\n"),
+            ("css", tsv_parse_css, "a {\n\tcolor: red;\n}\n"),
+        ];
+        for (label, f, src) in cases {
+            let out = call(f, src);
+            let value: serde_json::Value =
+                serde_json::from_str(&out).unwrap_or_else(|e| panic!("{label}: not JSON: {e}"));
+            assert!(
+                value
+                    .get("type")
+                    .and_then(serde_json::Value::as_str)
+                    .is_some(),
+                "{label}: AST root missing a string `type` field: {out}"
+            );
+            assert!(
+                error_message(&out).is_none(),
+                "{label}: unexpected error: {out}"
+            );
+        }
+    }
+
+    // --- parse_internal: empty string on success, error JSON on failure ---
+
+    #[test]
+    fn parse_internal_empty_on_success() {
+        assert_eq!(call(tsv_parse_internal_typescript, "const x = 1;\n"), "");
+        assert_eq!(call(tsv_parse_internal_svelte, "<div>x</div>\n"), "");
+        assert_eq!(call(tsv_parse_internal_css, "a {\n\tcolor: red;\n}\n"), "");
+    }
+
+    #[test]
+    fn parse_internal_reports_errors() {
+        let out = call(tsv_parse_internal_typescript, "const =");
+        assert!(
+            error_message(&out).is_some(),
+            "expected error JSON, got: {out}"
+        );
+    }
+
+    // --- error path: invalid syntax surfaces as JSON error (and still frees) ---
+
+    #[test]
+    fn invalid_syntax_returns_json_error() {
+        let cases: [(&str, FfiFn, FfiFn, &str); 2] = [
+            (
+                "typescript",
+                tsv_parse_typescript,
+                tsv_format_typescript,
+                "const =",
+            ),
+            ("css", tsv_parse_css, tsv_format_css, "a {"),
+        ];
+        for (label, parse_fn, format_fn, src) in cases {
+            assert!(
+                error_message(&call(parse_fn, src)).is_some(),
+                "{label} parse: expected error JSON for {src:?}"
+            );
+            assert!(
+                error_message(&call(format_fn, src)).is_some(),
+                "{label} format: expected error JSON for {src:?}"
+            );
+        }
+    }
+
+    // --- invalid UTF-8 is reported, not a crash (module safety contract) ---
+
+    #[test]
+    fn invalid_utf8_returns_error() {
+        // 0xFF is never valid in UTF-8.
+        let out = call_bytes(tsv_format_typescript, &[b'a', 0xFF, b'b']);
+        let msg = error_message(&out).expect("expected an error object");
+        assert!(
+            msg.starts_with("Invalid UTF-8"),
+            "expected a UTF-8 error, got: {msg}"
+        );
+    }
+
+    // --- empty input formats to empty output and round-trips through free ---
+
+    #[test]
+    fn empty_input_is_handled() {
+        assert_eq!(call(tsv_format_typescript, ""), "");
+    }
+
+    // --- tsv_free tolerates null / zero-length (documented no-op) ---
+
+    #[test]
+    fn tsv_free_null_and_zero_are_noops() {
+        // Safety: null and zero-length are the explicit no-op cases.
+        unsafe {
+            tsv_free(std::ptr::null_mut(), 0);
+            tsv_free(std::ptr::null_mut(), 8);
+            tsv_free(std::ptr::dangling_mut(), 0);
+        }
+    }
+}
