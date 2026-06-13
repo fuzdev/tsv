@@ -82,16 +82,8 @@ impl<'a> SvelteParser<'a> {
             return Err(self.error_expected_found("'{#'"));
         }
 
-        // Look at the source to determine the block type
-        // After {# we expect a keyword: if, each, await, key
-        let after_open = self.current_end;
-        let remaining = &self.source[after_open..];
-
-        // Find the keyword
-        let keyword_end = remaining
-            .find(|c: char| !c.is_alphabetic())
-            .unwrap_or(remaining.len());
-        let keyword = &remaining[..keyword_end];
+        // After {# we expect a block keyword: if, each, await, key, snippet
+        let keyword = self.keyword_at(self.current_end);
 
         match keyword {
             "if" => self.parse_if_block(start),
@@ -771,6 +763,17 @@ impl<'a> SvelteParser<'a> {
         Ok((Some(then_fragment), value))
     }
 
+    /// Read the leading alphabetic keyword at `pos` in the source — the `if` in
+    /// `{#if}`, the `each` in `{/each}`, the `html` in `{@html}`. Stops at the
+    /// first non-alphabetic byte (space, `}`, …); returns `""` when there is none.
+    fn keyword_at(&self, pos: usize) -> &'a str {
+        let remaining = &self.source[pos..];
+        let end = remaining
+            .find(|c: char| !c.is_alphabetic())
+            .unwrap_or(remaining.len());
+        &remaining[..end]
+    }
+
     /// Consume the closing `{/expected}` tag and return the position after it.
     ///
     /// Errors if a closing tag is present but names a different block — a
@@ -782,14 +785,8 @@ impl<'a> SvelteParser<'a> {
             return Ok(self.current_start);
         }
 
-        // Read the keyword after `{/` and require it to match the open block.
-        let after_open = self.current_end;
-        let remaining = &self.source[after_open..];
-        let keyword_end = remaining
-            .find(|c: char| !c.is_alphabetic())
-            .unwrap_or(remaining.len());
-        let keyword = &remaining[..keyword_end];
-        if keyword != expected {
+        // The keyword after `{/` must match the open block.
+        if self.keyword_at(self.current_end) != expected {
             return Err(self.error_expected_at(&format!("{{/{expected}}}"), self.current_start));
         }
 
@@ -1022,15 +1019,8 @@ impl<'a> SvelteParser<'a> {
             return Err(self.error_expected_found("'{@'"));
         }
 
-        // Look at the source to determine the tag type
-        let after_open = self.current_end;
-        let remaining = &self.source[after_open..];
-
-        // Find the keyword
-        let keyword_end = remaining
-            .find(|c: char| !c.is_alphabetic())
-            .unwrap_or(remaining.len());
-        let keyword = &remaining[..keyword_end];
+        // After {@ we expect a tag keyword: html, const, debug, render
+        let keyword = self.keyword_at(self.current_end);
 
         match keyword {
             "html" => self.parse_html_tag(start),
@@ -1365,17 +1355,10 @@ impl<'a> SvelteParser<'a> {
             }
 
             // Check for block close {/keyword}
-            if self.check(TokenKind::BlockClose) {
-                let after_close = self.current_end;
-                let remaining = &self.source[after_close..];
-                let keyword_end = remaining
-                    .find(|c: char| !c.is_alphabetic())
-                    .unwrap_or(remaining.len());
-                let keyword = &remaining[..keyword_end];
-
-                if stop_keywords.contains(&keyword) {
-                    break;
-                }
+            if self.check(TokenKind::BlockClose)
+                && stop_keywords.contains(&self.keyword_at(self.current_end))
+            {
+                break;
             }
 
             // Check for block continue {:keyword}
