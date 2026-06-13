@@ -8,7 +8,7 @@ Depends on `tsv_lang` for shared primitives (spans, doc builder, comments, embed
 
 **Sources of truth**: Svelte's `parseCss` defines the public AST shape; Prettier's `css` printer defines formatter output. Both are checked at fixture-validation time.
 
-Standard `ast/lexer/parser/printer` crate layout — see [root CLAUDE.md §Project Structure](../../CLAUDE.md#project-structure) and [`tsv_lang/CLAUDE.md`](../tsv_lang/CLAUDE.md) for the cross-cutting types (`DocArena`, `Span`, `PrintConfig`, `EmbedContext`). Public/internal AST split follows the workspace convention — see [root CLAUDE.md §AST Architecture](../../CLAUDE.md#ast-architecture-internal-vs-public).
+Standard `ast/lexer/parser/printer` crate layout — see [root CLAUDE.md §Project Structure](../../CLAUDE.md#project-structure) and [`tsv_lang/CLAUDE.md`](../tsv_lang/CLAUDE.md) for the cross-cutting types (`DocArena`, `Span`, `EmbedContext`). Public/internal AST split follows the workspace convention — see [root CLAUDE.md §AST Architecture](../../CLAUDE.md#ast-architecture-internal-vs-public).
 
 ## Public API
 
@@ -23,7 +23,7 @@ Standard `ast/lexer/parser/printer` crate layout — see [root CLAUDE.md §Proje
 **Embedding** (used by `tsv_svelte` for `<style>` blocks):
 
 - `parse_embedded(source, base_offset) -> Result<CssStyleSheet>` — same parser, but span positions are shifted by `base_offset` so they index into the parent Svelte file
-- `format_with_config(&stylesheet, source, PrintConfig, EmbedContext)` — formats with `EmbedContext::base_indent_offset` so wrapped lines respect outer Svelte indentation
+- `format_embedded(&stylesheet, source, EmbedContext)` — formats with `EmbedContext::base_indent_offset` so wrapped lines respect outer Svelte indentation
 
 The two `StyleSheet` / `StyleContent` types (re-exported only with `convert`) are the public-AST envelopes `tsv_svelte` uses when embedding CSS in a `<style>` element's JSON. Distinct from `CssStyleSheet` (the internal AST root) and `CssNode` (the top-level statement enum).
 

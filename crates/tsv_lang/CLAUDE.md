@@ -13,7 +13,7 @@ The Visibility column reflects `pub use`-only modules (private) vs directly-impo
 | `span`        | `span.rs`        | private    | `Span { start: u32, end: u32 }` — compact source positions                                      |
 | `location`    | `location.rs`    | private    | `LocationTracker` — lazy line/column via O(log n) binary search                                 |
 | `error`       | `error.rs`       | private    | `ParseError` with context extraction and caret formatting                                       |
-| `config`      | `config.rs`      | private    | `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts + `PrintConfig` + `EmbedContext` / `LayoutMode`   |
+| `config`      | `config.rs`      | private    | `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts + `EmbedContext` / `LayoutMode` (no runtime config) |
 | `doc`         | `doc/*.rs`       | **pub**    | **Document builder** — arena-based Prettier-compatible IR                                       |
 | `comment`     | `comment.rs`     | private    | Comment type, classification, and O(log n) range lookup                                         |
 | `printing`    | `printing.rs`    | **pub**    | String literal formatting, same-line detection, visual width                                    |
@@ -147,6 +147,6 @@ String interning deduplicates identifiers across all languages in a file. Symbol
 
 ## Config Types
 
-`PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts, `PrintConfig`, `EmbedContext`, and `LayoutMode` are covered in [../../CLAUDE.md §Internal Configuration](../../CLAUDE.md#internal-configuration-rust-library-only). Per-language knobs live on the language crate's own config (e.g., `tsv_ts::TsConfig`).
+`PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts, `EmbedContext`, and `LayoutMode` are covered in [../../CLAUDE.md §Internal Configuration](../../CLAUDE.md#internal-configuration-rust-library-only). tsv has no runtime configuration; the standalone-vs-Svelte TypeScript distinction lives on `tsv_ts::TsContext`.
 
 **Embedding knobs**: `base_indent_offset` and `first_line_offset` are how tsv_svelte tells tsv_ts/tsv_css to format at the right indentation level within a Svelte component. `LayoutMode::Embedded` selects ContinuationIndent style for binary expressions (matches Prettier's `JsExpressionRoot` parent → `shouldNotIndent = true` semantics).

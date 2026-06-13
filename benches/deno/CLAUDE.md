@@ -442,6 +442,16 @@ Things the published numbers measure that aren't quite what they look like:
 
 ## Corpus
 
+~5,500 files (~15 MB) of real `.svelte`, `.ts`/`.js`, and `.css` from three
+sources (this framing is the source of truth for the public benchmark page's
+"What's measured" prose — keep them in sync):
+
+1. **Application & library source** — the fuz.dev repos (`src/` of real projects).
+2. **Upstream framework source** — Svelte, SvelteKit, and the svelte.dev site.
+3. **Formatter conformance fixtures** — Prettier's and prettier-plugin-svelte's
+   own test suites (deliberately tricky edge cases, not typical code — they skew
+   the corpus toward hard cases).
+
 Paths defined in `lib/corpus.ts` `DEFAULT_CORPUS_PATHS`, relative to project root:
 
 - zzz (large apps)

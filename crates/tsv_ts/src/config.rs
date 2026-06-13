@@ -1,32 +1,36 @@
-//! TypeScript-specific printer configuration.
+//! TypeScript formatting context.
 //!
-//! Concerns that only apply when formatting TypeScript live here, separate
-//! from the language-agnostic [`tsv_lang::PrintConfig`].
+//! tsv is non-configurable — there are no user-facing TypeScript options. This
+//! type is not configuration: it records whether the TypeScript being formatted
+//! is standalone or embedded in a Svelte file, a distinction derived from the
+//! file kind that selects context-dependent formatting required for Prettier
+//! parity. It is the only such knob today (arrow-type-param disambiguation), so
+//! it stays separate from the language-agnostic [`tsv_lang::EmbedContext`].
 
-/// TypeScript-only formatter configuration.
+/// Whether TypeScript is being formatted on its own or embedded in a Svelte
+/// file.
 ///
-/// Holds knobs whose only meaning is in a TS context, kept out of the
-/// foundation crate so it doesn't carry language-specific concerns.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct TsConfig {
-    /// Whether to add a trailing comma for arrow function type params for
-    /// disambiguation. Default: false (pure-TS behavior).
-    ///
-    /// When true, single type params in arrow functions get a trailing comma:
-    /// `<T,>` instead of `<T>`. Set this when formatting TS embedded in a
-    /// Svelte template, where `<T>` could be parsed as an HTML-style tag.
-    /// Pure `.ts` and `.svelte.ts` files use the default `false`.
-    pub arrow_type_param_trailing_comma: bool,
+/// Not user configuration — the host picks the variant from the file kind. The
+/// only behavior it currently gates is arrow-function type-param trailing-comma
+/// disambiguation (`<T>` vs `<T,>`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TsContext {
+    /// A standalone `.ts` / `.svelte.ts` file. Single arrow type params stay
+    /// bare (`<T>`), matching Prettier's pure-TypeScript output.
+    #[default]
+    Standalone,
+    /// TypeScript embedded in a Svelte file (`<script>` blocks, template
+    /// `{expr}` slots). Single arrow type params get a trailing comma (`<T,>`)
+    /// so `<T>` isn't ambiguous with Svelte's template/element syntax. Used by
+    /// `tsv_svelte` when formatting embedded TypeScript.
+    Svelte,
 }
 
-impl TsConfig {
-    /// Config for TypeScript embedded in a Svelte file. Enables
-    /// arrow-type-param trailing commas so `<T>` isn't ambiguous with template
-    /// syntax. Used by `tsv_svelte` when formatting `<script>` blocks and
-    /// template expressions.
-    pub fn svelte() -> Self {
-        Self {
-            arrow_type_param_trailing_comma: true,
-        }
+impl TsContext {
+    /// Whether a single arrow-function type param needs the `<T,>` trailing
+    /// comma for Svelte disambiguation. True only for [`TsContext::Svelte`].
+    #[inline]
+    pub(crate) fn arrow_type_param_trailing_comma(self) -> bool {
+        matches!(self, TsContext::Svelte)
     }
 }

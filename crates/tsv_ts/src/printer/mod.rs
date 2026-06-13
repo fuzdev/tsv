@@ -58,10 +58,10 @@ pub(crate) use needs_parens::{ParenContext, needs_parens};
 pub(crate) use types::{should_hug_union_type, unwrap_parenthesized};
 
 use crate::ast::internal;
-use crate::config::TsConfig;
+use crate::config::TsContext;
 use std::cell::Cell;
 use tsv_lang::{
-    EmbedContext, OutputBuffer, PrintConfig, SharedInterner, SymbolResolver, comments_in_range,
+    EmbedContext, OutputBuffer, SharedInterner, SymbolResolver, comments_in_range,
     doc::{
         self,
         arena::{DocArena, DocId},
@@ -99,14 +99,10 @@ pub struct Printer<'a> {
     buffer: OutputBuffer,
     /// Current indentation level
     pub(crate) indent_level: usize,
-    /// Workspace-wide doc-builder configuration (reserved slot for future
-    /// cross-language toggles — empty today).
-    #[allow(dead_code)]
-    pub(crate) config: PrintConfig,
     /// Embedding context (base indent offset, first-line offset, layout mode, etc.).
     pub(crate) embed: EmbedContext,
-    /// TypeScript-specific configuration (arrow type param trailing comma).
-    pub(crate) ts_config: TsConfig,
+    /// Whether this TypeScript is standalone or embedded in a Svelte file.
+    pub(crate) ts_context: TsContext,
     /// Arena allocator for doc nodes (borrowed from caller or locally owned)
     pub(crate) arena: &'a DocArena,
     /// Shared string interner for resolving symbols
@@ -177,24 +173,22 @@ pub struct Printer<'a> {
 
 impl<'a> Printer<'a> {
     /// Create a new printer with the given arena, interner, source, comments,
-    /// line_breaks, doc-builder config, embedding context, and TS config.
+    /// line_breaks, embedding context, and TS context.
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn with_config(
+    pub(crate) fn with_context(
         arena: &'a DocArena,
         interner: SharedInterner,
         source: &'a str,
         comments: &'a [internal::Comment],
         line_breaks: &'a [u32],
-        config: PrintConfig,
         embed: EmbedContext,
-        ts_config: TsConfig,
+        ts_context: TsContext,
     ) -> Self {
         Self {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
-            config,
             embed,
-            ts_config,
+            ts_context,
             arena,
             interner,
             source,

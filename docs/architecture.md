@@ -211,7 +211,7 @@ Language-agnostic primitives shared across all implementations:
 | `doc`             | **Document builder for prettier-compatible formatting**                                    |
 | `printing`        | Shared formatting utilities (string literals, whitespace)                                  |
 | `OutputBuffer`    | Pre-allocated output string building with column tracking                                  |
-| `config`          | `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts, `PrintConfig`, `EmbedContext`, `LayoutMode` |
+| `config`          | `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts, `EmbedContext`, `LayoutMode` (no runtime config)     |
 | `comment`         | Comment type and lookup utilities (see Comment Handling below)                             |
 | `escapes`         | Escape sequence handling                                                                   |
 | `interner`        | String interner utilities (`SymbolResolver` trait)                                         |

@@ -4,7 +4,7 @@
 
 High-performance Rust parser as a drop-in replacement for Svelte's modern parser (acorn + acorn-typescript) with a near-Prettier formatter that tracks Prettier closely.
 
-**Formatter configuration**: Hardcoded (print_width=100, tab_width=2, use_tabs=true). No config files or CLI flags. See [Configuration](#configuration).
+**Non-configurable by design**: formatting options are fixed at Prettier's defaults (print_width=100, tab_width=2, use_tabs=true) — no config files, CLI flags, or runtime options, ever (opinionated like `gofmt` and Black). See [Configuration](#configuration).
 
 ## Committing
 
@@ -140,7 +140,11 @@ deno task check          # typecheck + test + lint + fmt (full validation)
 deno task typecheck      # cargo check
 deno task test           # cargo test
 deno task lint           # cargo clippy
-cargo fmt                # format Rust code
+cargo fmt                # format Rust code — the only autoformatter in this repo
+# Non-Rust files (TS/MD/JSON) are hand-maintained: tsv ships NO prettier or deno
+# fmt config. Never run `deno fmt` or `prettier` on the repo — with no config they
+# reformat to their own defaults (spaces, double quotes) and churn every file. The
+# fixture/corpus prettier oracles pass options inline, so they're unaffected.
 
 cargo test --workspace test_typescript_parser_literal  # run specific test by name
 cargo test --workspace --test fixtures_tests           # fixture validation tests
@@ -216,11 +220,11 @@ Version source of truth: `Cargo.toml` `[workspace.package] version` (read direct
 
 Package shape: built from the wasm-pack `web` target, then `scripts/patch_npm_package.ts` adds a Node/Bun entry (`index.js`, sync auto-init), a browser entry (`browser.js`, guarded `await init()`), `index.d.ts`, conditional `exports`, npm metadata, and the variant README. The export list is extracted from the generated JS, so new `lang_bindings!` languages flow through automatically.
 
-`scripts/publish.ts` orchestrates the release end to end (preflight → bump → check → build (npm packages + deno bundles, so artifact validation never sees stale bundles) → verify → artifact validation: size bounds + Deno smoke + Node tests → idempotent npm publish → git commit + tag + push), printing a wasm size summary (raw + gzipped) at the end. It converts CHANGELOG.md's `## Unreleased` section into the released version's section — keep that section updated as work lands. A failed wetrun is resumable: re-run `--wetrun` without `--bump`.
+`scripts/publish.ts` orchestrates the release end to end (preflight → bump → check → build (npm packages + deno bundles, so artifact validation never sees stale bundles) → verify → artifact validation: size bounds + Deno smoke + Node tests → idempotent npm publish → git commit + tag + push), printing a wasm size summary (raw + gzipped) at the end. It stamps CHANGELOG.md's `## Unreleased` section into the released version's section — that section must be non-empty and carry a `<!-- bump: <level> -->` marker that matches `--bump` (the bump is required in **both** places and they must agree; on stamp the marker is dropped and a fresh empty `## Unreleased` reset to `bump: patch` is seeded for the next cycle). Keep it updated as work lands. A failed wetrun is resumable: re-run `--wetrun` without `--bump`.
 
 ```bash
 deno task publish                        # dry-run: validate everything, no mutation
-deno task publish --wetrun --bump patch  # release: bump + publish + git finalize (--bump required)
+deno task publish --wetrun --bump patch  # release: bump + publish + git finalize (--bump required, must match CHANGELOG marker)
 deno task publish --wetrun               # resume a failed wetrun (sentinel retry only)
 # Flags: --bump patch|minor|major, --no-check, --no-git
 deno task test:npm[:parse|:all]          # Node tests against a built pkg/{format,parse,all}/npm/ (:all includes CLI tests)
@@ -305,7 +309,7 @@ See ./docs/performance.md.
 
 ## Configuration
 
-**No external configuration in 0.1.** All settings are hardcoded to match Prettier defaults. User-facing options (a narrower subset than Prettier's, but the same shape) are planned for a later release.
+**Non-configurable by design.** Formatting options are fixed at Prettier's defaults and cannot be changed — there are no config files, CLI flags, or runtime options, and none are planned. tsv is opinionated like `gofmt` and Black: one canonical style, always. A narrower user-facing option set may be revisited far down the road, but the 0.x contract is no configuration at all.
 
 | Setting       | Value | Notes                |
 | ------------- | ----- | -------------------- |
@@ -317,17 +321,18 @@ See ./docs/performance.md.
 
 ### Internal Configuration (Rust Library Only)
 
-Print width / tab width / indent are compile-time `pub const`s in `tsv_lang::config` (`PRINT_WIDTH`, `TAB_WIDTH`, `INDENT`) — not config struct fields. Programmatic customization is split across three types:
+There is no runtime configuration. Print width / tab width / indent are compile-time `pub const`s in `tsv_lang::config` (`PRINT_WIDTH`, `TAB_WIDTH`, `INDENT`), read directly by the renderer — not threaded through any signature. Quote preference is likewise hardcoded (single quotes) inside `tsv_lang::printing::format_string_literal`. The doc-builder unit tests exercise the layout at smaller widths via the internal `RenderConfig` seam (`doc::render_config`, `pub(crate)`), never at runtime.
 
-- `tsv_lang::PrintConfig` — reserved slot for future workspace-wide doc-builder toggles. Empty today; the type and its threading are in place so future cross-language options slot in without signature churn.
+Two types carry genuine per-input *state* (not configuration), threaded only where they vary:
+
 - `tsv_lang::EmbedContext { base_indent_offset, first_line_offset, suffix_width, mode: LayoutMode }` — embedding state for nested formatting (CSS in `<style>`, Svelte template expressions). `LayoutMode { Standalone, Embedded }` controls binary-expression indent style.
-- `tsv_ts::TsConfig` — TypeScript-specific knobs (`arrow_type_param_trailing_comma`). Default is pure-TS (`false`); use `TsConfig::svelte()` when embedding TS in a Svelte file so `<T>` arrow type params get the disambiguating trailing comma.
+- `tsv_ts::TsContext { Standalone, Svelte }` — whether the TypeScript is standalone or embedded in a Svelte file. Derived from the file kind, not a user option; `TsContext::Svelte` enables `<T,>` arrow-type-param disambiguation. `tsv_svelte` passes it when embedding TS.
 
 ```rust
-use tsv_ts::{TsConfig, format, format_with_config};
+use tsv_ts::{TsContext, format, format_with_context};
 
-let formatted = format(&ast, source);                                   // pure TS
-let formatted = format_with_config(&ast, source, TsConfig::svelte());   // Svelte context
+let formatted = format(&ast, source);                                   // pure TS (Standalone)
+let formatted = format_with_context(&ast, source, TsContext::Svelte);   // Svelte-embedded TS
 ```
 
 ## Project Structure

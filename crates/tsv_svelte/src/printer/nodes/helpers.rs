@@ -116,7 +116,6 @@ impl<'a> Printer<'a> {
         let first_line_offset = self.buffer.current_column(tsv_lang::TAB_WIDTH);
         // Pass current indent level so wrapped lines get proper indentation
         let base_indent_offset = self.indent_level;
-        let config = tsv_lang::PrintConfig::default();
         let embed = tsv_lang::EmbedContext {
             first_line_offset,
             suffix_width,
@@ -131,9 +130,8 @@ impl<'a> Printer<'a> {
             Rc::clone(&self.interner),
             self.comments,
             &self.line_breaks,
-            config,
             embed,
-            tsv_ts::TsConfig::svelte(),
+            tsv_ts::TsContext::Svelte,
         );
         self.write(&formatted);
 
@@ -370,7 +368,7 @@ impl<'a> Printer<'a> {
     /// - Trailing comments: between expr.span().end and span_end
     ///
     /// Builds the expression doc directly in the shared arena using
-    /// `build_expression_doc_with_comments` with `is_embedded_expression = true`
+    /// `build_expression_doc_with_comments` with `LayoutMode::Embedded`
     /// so binary chains use ContinuationIndent style. The surrounding Svelte doc tree
     /// (e.g., the closing `}`) provides natural lookahead for fits checks — no
     /// `suffix_width` estimation needed.
@@ -409,11 +407,10 @@ impl<'a> Printer<'a> {
             expr,
             self.source,
             Rc::clone(&self.interner),
-            &self.config,
             &embed,
             self.comments,
             &self.line_breaks,
-            tsv_ts::TsConfig::svelte(),
+            tsv_ts::TsContext::Svelte,
         );
 
         // Build docs for trailing comments (between expression end and span_end)
@@ -444,7 +441,7 @@ impl<'a> Printer<'a> {
     ///
     /// - **Multiline context** (`in_multiline_context=true`): The condition is on its own line.
     ///   No `remove_lines()` is applied, allowing long chains to wrap naturally.
-    ///   Uses `is_embedded_expression` for proper continuation indent on wrapped binary expressions.
+    ///   Uses `LayoutMode::Embedded` for proper continuation indent on wrapped binary expressions.
     ///
     /// # Parameters
     /// - `opening_offset` - Characters before the expression (e.g., 5 for `{#if `). Used to
@@ -490,11 +487,10 @@ impl<'a> Printer<'a> {
                 expr,
                 self.source,
                 Rc::clone(&self.interner),
-                &self.config,
                 &embed,
                 self.comments,
                 &self.line_breaks,
-                tsv_ts::TsConfig::svelte(),
+                tsv_ts::TsContext::Svelte,
             );
             d.parens(inner)
         } else {
@@ -503,11 +499,10 @@ impl<'a> Printer<'a> {
                 expr,
                 self.source,
                 Rc::clone(&self.interner),
-                &self.config,
                 &embed,
                 self.comments,
                 &self.line_breaks,
-                tsv_ts::TsConfig::svelte(),
+                tsv_ts::TsContext::Svelte,
             )
         };
 
