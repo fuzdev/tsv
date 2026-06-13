@@ -849,10 +849,10 @@ impl<'a> Printer<'a> {
         // This gives: `(first &&\n\t\tsecond)` not `(first &&\n\tsecond)`
         //
         // Context-dependent behavior:
-        // - Script contexts (is_embedded_expression = false): Use group with parens INSIDE
+        // - Script contexts (LayoutMode::Standalone): Use group with parens INSIDE
         //   so the fit calculation includes `)`. This ensures `(A + B) *` at 101 chars
         //   breaks inside the parens, not just at `*`.
-        // - Embedded expression contexts (is_embedded_expression = true): Use the grouped
+        // - Embedded expression contexts (LayoutMode::Embedded): Use the grouped
         //   approach from build_binary_chain_doc_with_continuation_indent, which keeps
         //   short 2-operand binaries flat (Prettier's behavior for template expressions).
         if needs_parens(operand, ctx) {

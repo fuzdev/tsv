@@ -42,7 +42,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_const_tag_doc(&self, tag: &internal::ConstTag) -> DocId {
         let d = self.d();
         let id_doc = self.build_ts_expression_doc_no_comments(&tag.id);
-        // Build init with is_embedded_expression=false so binary chains use Grouped style
+        // Build init with LayoutMode::Standalone so binary chains use Grouped style
         // (not ContinuationIndent). The assignment layout handles indentation —
         // ContinuationIndent would double-indent continuation lines.
         let init_doc = self.build_const_init_doc(

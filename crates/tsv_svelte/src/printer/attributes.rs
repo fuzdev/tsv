@@ -428,7 +428,7 @@ impl<'a> Printer<'a> {
 
     /// Build expression doc for attribute context (embedded expression).
     ///
-    /// Sets `is_embedded_expression = true` so binary expressions use ContinuationIndent style.
+    /// Sets `LayoutMode::Embedded` so binary expressions use ContinuationIndent style.
     /// Assignment expressions get wrapped in parens: `prop={(a = b)}`.
     fn build_expression_doc_for_attribute(
         &self,

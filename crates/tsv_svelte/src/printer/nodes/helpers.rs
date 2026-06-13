@@ -368,7 +368,7 @@ impl<'a> Printer<'a> {
     /// - Trailing comments: between expr.span().end and span_end
     ///
     /// Builds the expression doc directly in the shared arena using
-    /// `build_expression_doc_with_comments` with `is_embedded_expression = true`
+    /// `build_expression_doc_with_comments` with `LayoutMode::Embedded`
     /// so binary chains use ContinuationIndent style. The surrounding Svelte doc tree
     /// (e.g., the closing `}`) provides natural lookahead for fits checks — no
     /// `suffix_width` estimation needed.
@@ -441,7 +441,7 @@ impl<'a> Printer<'a> {
     ///
     /// - **Multiline context** (`in_multiline_context=true`): The condition is on its own line.
     ///   No `remove_lines()` is applied, allowing long chains to wrap naturally.
-    ///   Uses `is_embedded_expression` for proper continuation indent on wrapped binary expressions.
+    ///   Uses `LayoutMode::Embedded` for proper continuation indent on wrapped binary expressions.
     ///
     /// # Parameters
     /// - `opening_offset` - Characters before the expression (e.g., 5 for `{#if `). Used to
