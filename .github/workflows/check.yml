@@ -1,0 +1,48 @@
+# Checks the workspace: mirrors the local `deno task check` gate exactly
+# (typecheck, cargo test + fixtures, deno tests, conformance audit,
+# rustfmt --check, AST-type drift, clippy with -D warnings).
+#
+# Needs Rust *and* Deno: the fixture suite drives prettier + svelte through a
+# Deno sidecar (npm: specifiers pinned in crates/tsv_debug/src/deno/sidecar.ts
+# and locked in deno.lock), so `cargo test --workspace` panics without Deno —
+# tests/fixtures_tests.rs health-checks the sidecar first. wasm-pack is not
+# needed here (no WASM build in `check`).
+
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: ['**']
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned, not `stable`: the workspace runs clippy::nursery at warn and the
+      # `lint` task denies warnings, so a floating toolchain would fail CI
+      # whenever a new Rust release adds a nursery lint. Edition 2024 needs
+      # >= 1.85. Bump deliberately.
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.1
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Check
+        run: deno task check
