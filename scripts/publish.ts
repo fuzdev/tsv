@@ -20,8 +20,11 @@
  *
  * Flags:
  *   --wetrun         actually mutate: bump, publish, commit, tag, push
- *   --bump <level>   patch | minor | major — how to bump the version.
- *                    Required for a fresh wetrun; only a sentinel retry runs without it.
+ *   --bump <level>   patch | minor | major — how to bump the version. Required,
+ *                    and must match the CHANGELOG `## Unreleased` `<!-- bump:
+ *                    <level> -->` marker (also required). A fresh wetrun needs
+ *                    both, plus a non-empty `## Unreleased` section; a sentinel
+ *                    retry runs without either.
  *   --no-check       skip `deno task check` (faster retries)
  *   --no-git         skip the git commit + tag + push finalization
  *
@@ -57,6 +60,8 @@ if (bump !== null && bump !== 'patch' && bump !== 'minor' && bump !== 'major') {
 	console.error(`FAIL: --bump must be patch, minor, or major (got ${JSON.stringify(bump)})`);
 	Deno.exit(1);
 }
+
+type BumpLevel = 'patch' | 'minor' | 'major';
 
 const SENTINEL_PATH = '.publish-in-progress';
 const CARGO_PATH = 'Cargo.toml';
@@ -222,16 +227,26 @@ if (wetrun) {
 			console.warn(`  WARN: removing stale sentinel (v${initial_sentinel})`);
 			Deno.removeSync(SENTINEL_PATH);
 		}
-		if (bump) {
-			version = bump_version(version_before, bump);
-			const cargo = Deno.readTextFileSync(CARGO_PATH);
-			Deno.writeTextFileSync(CARGO_PATH, cargo.replace(workspace_pkg_re, `$1"${version}"`));
-			console.log(`  Version bumped (${bump}): ${version_before} -> ${version}`);
-		} else {
-			console.error('  FAIL: --bump patch|minor|major is required for a fresh wetrun');
-			console.error('  (only a sentinel retry — resuming a failed wetrun — runs without it)');
+		// A release must ship notes — require a non-empty `## Unreleased`
+		// section before mutating anything (the bump level can live there too).
+		const content = changelog_unreleased_content();
+		if (content === null) {
+			console.error(
+				`  FAIL: no "## Unreleased" section in ${CHANGELOG_PATH} — add release notes before publishing`,
+			);
 			Deno.exit(1);
 		}
+		if (content === '') {
+			console.error(
+				`  FAIL: "## Unreleased" section in ${CHANGELOG_PATH} is empty — add release notes before publishing`,
+			);
+			Deno.exit(1);
+		}
+		const level = resolve_bump(bump as BumpLevel | null, changelog_declared_bump());
+		version = bump_version(version_before, level);
+		const cargo = Deno.readTextFileSync(CARGO_PATH);
+		Deno.writeTextFileSync(CARGO_PATH, cargo.replace(workspace_pkg_re, `$1"${version}"`));
+		console.log(`  Version bumped (${level}): ${version_before} -> ${version}`);
 		// Sentinel immediately after the version write — everything below is
 		// idempotent and re-runs on retry, so any later failure is resumable.
 		Deno.writeTextFileSync(SENTINEL_PATH, version);
@@ -247,25 +262,39 @@ if (wetrun) {
 	version = version_before;
 	console.log(`  Current version: v${version}`);
 	const would_retry = initial_sentinel === version;
+	const declared = changelog_declared_bump();
 	if (would_retry) {
 		// Mirrors wetrun precedence: retry wins over --bump
 		console.log(`  Sentinel found at v${version} — wetrun would retry from it`);
 		if (bump) {
 			console.warn(`  WARN: --bump ${bump} would be ignored — wetrun would resume v${version}`);
 		}
-	} else if (bump) {
-		console.log(`  Wetrun would bump (${bump}) to: v${bump_version(version, bump)}`);
 	} else {
-		console.warn(
-			'  WARN: no --bump given — a fresh wetrun would fail (--bump is required except on sentinel retry)',
-		);
-	}
-	// Warn whenever the eventual wetrun would have nothing to stamp.
-	const stamp_version = bump ? bump_version(version, bump) : version;
-	if (!would_retry && !changelog_has_unreleased() && !changelog_has_version(stamp_version)) {
-		console.warn(
-			`  WARN: no "## Unreleased" section in ${CHANGELOG_PATH} — wetrun would have nothing to stamp`,
-		);
+		// Mirror the wetrun's requirements without exiting — report what it would do.
+		const content = changelog_unreleased_content();
+		if (content === null) {
+			console.warn(`  WARN: no "## Unreleased" section in ${CHANGELOG_PATH} — a fresh wetrun would FAIL`);
+		} else if (content === '') {
+			console.warn(`  WARN: "## Unreleased" section is empty — a fresh wetrun would FAIL`);
+		}
+		if (!bump) {
+			console.warn(
+				'  WARN: no --bump given — a fresh wetrun would FAIL (required, and must match the CHANGELOG marker)',
+			);
+		}
+		if (!declared) {
+			console.warn(
+				`  WARN: no "<!-- bump: <level> -->" marker in ${CHANGELOG_PATH} — a fresh wetrun would FAIL`,
+			);
+		}
+		if (bump && declared && bump !== declared) {
+			console.warn(
+				`  WARN: --bump ${bump} disagrees with CHANGELOG marker <!-- bump: ${declared} --> — a fresh wetrun would FAIL`,
+			);
+		}
+		if (bump && declared && bump === declared) {
+			console.log(`  Wetrun would bump (${bump}) to: v${bump_version(version, bump)}`);
+		}
 	}
 }
 
@@ -348,12 +377,24 @@ for (let i = 0; i < packages.length; i++) {
 		console.log(`  Published ${label}@${version}`);
 	} else {
 		console.log(`  [dry-run] ${label}:`);
-		run(
-			`npm publish --dry-run ${label}`,
-			'npm',
-			['publish', '--dry-run', '--access', 'public'],
-			dir,
-		);
+		const res = capture('npm', ['publish', '--dry-run', '--access', 'public'], dir);
+		// npm prints the tarball notice to stderr — surface it regardless.
+		if (res.stderr) console.log(res.stderr);
+		if (res.success) {
+			console.log(`  PASS: ${label} packs cleanly`);
+		} else if (/cannot publish over|previously published version/i.test(res.stderr)) {
+			// Dry-run never bumps, so it dry-publishes the CURRENT (already-published)
+			// version. The real wetrun bumps first, so this isn't a real failure.
+			const preview = (bump as BumpLevel | null) ?? changelog_declared_bump();
+			const target = preview ? `v${bump_version(version, preview)}` : 'the bumped version';
+			console.log(
+				`  PASS: ${label} packs cleanly (v${version} already published — a real run publishes ${target})`,
+			);
+		} else {
+			if (res.stdout) console.error(res.stdout);
+			console.error(`  FAIL: npm publish --dry-run ${label}`);
+			Deno.exit(1);
+		}
 	}
 }
 
@@ -420,9 +461,11 @@ console.log('');
 function capture(
 	cmd: string,
 	args: string[],
+	cwd?: string,
 ): { success: boolean; stdout: string; stderr: string } {
 	const result = new Deno.Command(cmd, {
 		args,
+		cwd,
 		stdout: 'piped',
 		stderr: 'piped',
 	}).outputSync();
@@ -471,10 +514,10 @@ function stamp_changelog(new_version: string): void {
 		return;
 	}
 	if (/^## Unreleased$/m.test(changelog)) {
-		Deno.writeTextFileSync(
-			CHANGELOG_PATH,
-			changelog.replace(/^## Unreleased$/m, `## ${new_version}`),
-		);
+		const stamped = changelog
+			.replace(/^## Unreleased$/m, `## ${new_version}`)
+			.replace(/^<!-- bump: (?:patch|minor|major) -->\n/m, '');
+		Deno.writeTextFileSync(CHANGELOG_PATH, stamped);
 		console.log(`  Stamped ${CHANGELOG_PATH}: ## Unreleased -> ## ${new_version}`);
 	} else if (version_heading_re(new_version).test(changelog)) {
 		console.log(`  ${CHANGELOG_PATH} already stamped with ## ${new_version}`);
@@ -483,24 +526,68 @@ function stamp_changelog(new_version: string): void {
 	}
 }
 
-function changelog_has_version(target_version: string): boolean {
-	try {
-		return version_heading_re(target_version).test(Deno.readTextFileSync(CHANGELOG_PATH));
-	} catch {
-		return false;
-	}
-}
-
 function version_heading_re(target_version: string): RegExp {
 	return new RegExp(`^## ${target_version.replaceAll('.', '\\.')}$`, 'm');
 }
 
-function changelog_has_unreleased(): boolean {
+/** Body of the `## Unreleased` section (after the heading, up to the next `## `
+ * heading or EOF), or null if there's no such heading. */
+function unreleased_section(changelog: string): string | null {
+	const heading = /^## Unreleased$/m.exec(changelog);
+	if (!heading) return null;
+	const after = changelog.slice(heading.index + heading[0].length);
+	const next = after.search(/^## /m);
+	return next === -1 ? after : after.slice(0, next);
+}
+
+/** Unreleased content with the bump marker + surrounding whitespace stripped.
+ * `''` means an empty section; `null` means no section (or no CHANGELOG). */
+function changelog_unreleased_content(): string | null {
+	let changelog: string;
 	try {
-		return /^## Unreleased$/m.test(Deno.readTextFileSync(CHANGELOG_PATH));
+		changelog = Deno.readTextFileSync(CHANGELOG_PATH);
 	} catch {
-		return false;
+		return null;
 	}
+	const section = unreleased_section(changelog);
+	if (section === null) return null;
+	return section.replace(/^<!-- bump: (?:patch|minor|major) -->$/m, '').trim();
+}
+
+/** The `<!-- bump: <level> -->` marker declared in the Unreleased section, or null. */
+function changelog_declared_bump(): BumpLevel | null {
+	let changelog: string;
+	try {
+		changelog = Deno.readTextFileSync(CHANGELOG_PATH);
+	} catch {
+		return null;
+	}
+	const section = unreleased_section(changelog);
+	if (section === null) return null;
+	const m = /^<!-- bump: (patch|minor|major) -->$/m.exec(section);
+	return m ? (m[1] as BumpLevel) : null;
+}
+
+/** The bump level — required on BOTH the --bump flag and the CHANGELOG marker,
+ * and they must match. Exits if either is missing or they disagree. */
+function resolve_bump(flag: BumpLevel | null, declared: BumpLevel | null): BumpLevel {
+	if (!flag) {
+		console.error('  FAIL: --bump patch|minor|major is required (and must match the CHANGELOG marker)');
+		Deno.exit(1);
+	}
+	if (!declared) {
+		console.error(
+			`  FAIL: no "<!-- bump: <level> -->" marker under ## Unreleased in ${CHANGELOG_PATH} — declare the bump there too`,
+		);
+		Deno.exit(1);
+	}
+	if (flag !== declared) {
+		console.error(
+			`  FAIL: --bump ${flag} disagrees with CHANGELOG marker <!-- bump: ${declared} --> (they must match)`,
+		);
+		Deno.exit(1);
+	}
+	return flag;
 }
 
 /**

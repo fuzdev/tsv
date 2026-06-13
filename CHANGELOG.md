@@ -6,6 +6,7 @@ Covers the npm packages published from this repo — `@fuzdev/tsv_format_wasm`,
 converts the `## Unreleased` section into the released version's section.
 
 ## Unreleased
+<!-- bump: minor -->
 
 - formatting is now **non-configurable by design** — no config files, CLI flags,
   or runtime options, and none are planned (opinionated like `gofmt` and Black).
