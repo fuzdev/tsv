@@ -39,7 +39,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       # Pinned, not `stable`: the workspace runs clippy::nursery at warn and the
       # `lint` task denies warnings, so a floating toolchain would fail CI
@@ -89,7 +89,7 @@ jobs:
     timeout-minutes: 70
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master (no semver tags; bump manually)
@@ -115,7 +115,7 @@ jobs:
           cache: true
 
       - name: Install Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           # Pinned to match local. Needs >= 22.18 for native .ts type stripping
           # (scripts/test_npm.ts runs under node --test directly). Bump deliberately.
