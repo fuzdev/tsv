@@ -78,7 +78,7 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
 - non-configurable: formatter settings are fixed at Prettier's defaults except
   `print_width: 100`, `use_tabs: true`, and
   `bracketSpacing: false` (maybe controversial, discussion welcome),
-  and there are no config files or CLI options -
+  and there are no config files or CLI config options -
   tsv is opinionated like `gofmt` and Python's Black,
   see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
 - JS and TS always parse as modules in strict mode - sloppy-mode-only syntax
