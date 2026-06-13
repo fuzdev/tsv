@@ -4,7 +4,7 @@
 
 ## Architecture Position
 
-Depends on `tsv_ts`, `tsv_css`, `tsv_svelte` (each with `convert` feature) and `tsv_lang` transitively. Sibling binding crate: [`tsv_wasm`](../tsv_wasm/) (WebAssembly). Consumers include Deno FFI, Python `ctypes`, and any other C-FFI host. N-API is not used.
+Depends on `tsv_ts`, `tsv_css`, `tsv_svelte` (each with `convert` feature) and `tsv_lang` transitively. Sibling binding crate: [`tsv_wasm`](../tsv_wasm/) (WebAssembly). Consumers include Deno FFI, Python `ctypes`, and any other C-FFI host. This crate does not use N-API; a separate `tsv_napi` crate (Node/Bun native addon) is planned as a third sibling binding alongside this one and `tsv_wasm`.
 
 Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-bindings).
 

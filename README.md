@@ -75,8 +75,8 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
   tsv is opinionated like `gofmt` and Python's Black,
   see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
 - Rust-only implementation that never embeds or calls a JS runtime, for performance;
-  JS reaches tsv through the WASM bindings, and native N-API bindings are
-  undecided (open to requests)
+  JS reaches tsv through the WASM bindings today, with native N-API bindings
+  planned for a faster path on Node and Bun
 - "optimal artifacts" is an invariant, not a preference: runtime speed and compiled
   code size are first-class goals for every shipped artifact, and heavier future
   layers (incremental parsing, CST for LSP) will be feature-gated so they
@@ -115,7 +115,8 @@ Deferred rather than refused:
 
 - internal AST stabilization - not any time soon; the public JSON AST is the
   stable surface, tracking Svelte's
-- N-API native bindings - npm is WASM-only for now
+- N-API native bindings - planned for native-speed parse/format on Node and
+  Bun without WASM's marshalling overhead; npm is WASM-only today
 - full Prettier conformance? see [discussion 1](https://github.com/fuzdev/tsv/discussions/1)
 
 tsv is derived from:

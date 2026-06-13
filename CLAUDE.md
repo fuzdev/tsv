@@ -186,7 +186,7 @@ Two binding crates for different use cases:
 | `tsv_ffi`  | C ABI        | Any FFI (Deno, Python, etc.) | `libtsv_ffi.so` / `.dylib` / `.dll`                               |
 | `tsv_wasm` | wasm-bindgen | Browser, Deno, Node          | `.wasm` module (format / parse / all variants via cargo features) |
 
-N-API is a maybe — the decision is deferred; there is currently no `tsv_napi` crate.
+N-API bindings are planned: a third sibling crate (`tsv_napi`) giving Node/Bun a native-speed path without WASM's call-boundary and string-marshalling overhead. Not yet built — there is currently no `tsv_napi` crate.
 
 `tsv_wasm` produces three npm packages from one crate via the `format` + `parse` cargo features (default = both): `@fuzdev/tsv_format_wasm` (format only), `@fuzdev/tsv_parse_wasm` (parse only), and `@fuzdev/tsv_wasm` (everything + the `tsv` CLI). Each variant has its own output directory.
 
