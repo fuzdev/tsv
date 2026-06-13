@@ -68,6 +68,12 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
   Svelte 5's modern AST with acorn and acorn-typescript
   (see [docs/conformance_svelte.md](docs/conformance_svelte.md)),
   but keeps its own internal AST optimized for manipulation over serialization
+- non-configurable: formatter settings are fixed at Prettier's defaults except
+  `print_width: 100`, `use_tabs: true`, and
+  `bracketSpacing: false` (maybe controversial, discussion welcome),
+  and there are no config files or CLI config options -
+  tsv is opinionated like `gofmt` and Python's Black,
+  see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
 - Rust-only implementation that never embeds or calls a JS runtime, for performance;
   JS reaches tsv through the WASM bindings, and native N-API bindings are
   undecided (open to requests)
@@ -75,12 +81,6 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
   code size are first-class goals for every shipped artifact, and heavier future
   layers (incremental parsing, CST for LSP) will be feature-gated so they
   don't regress the artifacts that exist today
-- non-configurable: formatter settings are fixed at Prettier's defaults except
-  `print_width: 100`, `use_tabs: true`, and
-  `bracketSpacing: false` (maybe controversial, discussion welcome),
-  and there are no config files or CLI config options -
-  tsv is opinionated like `gofmt` and Python's Black,
-  see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
 - JS and TS always parse as modules in strict mode - sloppy-mode-only syntax
   (`with`, legacy octal literals, etc) is rejected; Svelte and TypeScript are
   inherently strict, so this only matters for standalone JS scripts

@@ -4,7 +4,7 @@
 
 High-performance Rust parser as a drop-in replacement for Svelte's modern parser (acorn + acorn-typescript) with a near-Prettier formatter that tracks Prettier closely.
 
-**Non-configurable by design**: formatting options are fixed at Prettier's defaults (print_width=100, tab_width=2, use_tabs=true) — no config files, CLI flags, or runtime options, ever (opinionated like `gofmt` and Black). See [Configuration](#configuration).
+**Non-configurable by design**: formatting options are fixed at Prettier's defaults except print_width=100, use_tabs=true, and bracketSpacing=false — no config files, CLI flags, or runtime options, ever (opinionated like `gofmt` and Black). See [Configuration](#configuration).
 
 ## Committing
 
@@ -309,13 +309,15 @@ See ./docs/performance.md.
 
 ## Configuration
 
-**Non-configurable by design.** Formatting options are fixed at Prettier's defaults and cannot be changed — there are no config files, CLI flags, or runtime options, and none are planned. tsv is opinionated like `gofmt` and Black: one canonical style, always. A narrower user-facing option set may be revisited far down the road, but the 0.x contract is no configuration at all.
+**Non-configurable by design.** Formatting options are fixed at Prettier's defaults, except where noted below, and cannot be changed — there are no config files, CLI flags, or runtime options, and none are planned. tsv is opinionated like `gofmt` and Black: one canonical style, always. A narrower user-facing option set may be revisited far down the road, but the 0.x contract is no configuration at all.
 
-| Setting       | Value | Notes                |
-| ------------- | ----- | -------------------- |
-| `print_width` | 100   | Prettier default     |
-| `tab_width`   | 2     | Visual width of tabs |
-| `use_tabs`    | true  | No spaces option     |
+The table lists the settings that diverge from Prettier's defaults; everything else (e.g. tab_width=2) matches Prettier.
+
+| Setting          | Value | Notes                                       |
+| ---------------- | ----- | ------------------------------------------- |
+| `print_width`    | 100   | Wider than Prettier's default of 80         |
+| `use_tabs`       | true  | Tabs, not spaces (Prettier defaults to off) |
+| `bracketSpacing` | false | No spaces inside `{ }` — discussion welcome |
 
 **Measuring line widths**: Use `cargo run -p tsv_debug line_width <file>` to measure visual width of lines (accounts for tab_width=2). Never use `wc -c` — it counts bytes, not visual characters (tabs are 1 byte but 2 visual chars). The `compare` command also shows line widths on changed lines.
 

@@ -112,22 +112,20 @@ impl<'a> SvelteParser<'a> {
         // Scan to find closing } and extract content
         let (expr_content, content_start) = self.scan_block_tag_content(tag_content_start)?;
 
-        // Extract the expression (skip "if " or "else if " prefix, handling variable whitespace)
+        // Extract the expression (skip "if " or "else if " prefix, handling
+        // variable whitespace). Svelte requires whitespace after the `if`
+        // keyword, so `{#if(x)}` / `{:else if(x)}` are rejected.
         let expr_str = if is_elseif {
             // {:else if expr} - skip "else", whitespace, "if", whitespace
             let after_else = expr_content
                 .strip_prefix("else")
                 .unwrap_or(expr_content)
                 .trim_start();
-            after_else
-                .strip_prefix("if")
-                .unwrap_or(after_else)
+            self.strip_block_keyword(after_else, "if", tag_content_start)?
                 .trim_start()
         } else {
             // {#if expr} - skip "if", whitespace
-            expr_content
-                .strip_prefix("if")
-                .unwrap_or(expr_content)
+            self.strip_block_keyword(expr_content, "if", tag_content_start)?
                 .trim_start()
         };
 
@@ -148,12 +146,7 @@ impl<'a> SvelteParser<'a> {
         // Check for alternate branch
         let alternate = if self.check(TokenKind::BlockContinue) {
             // Peek at what follows {:
-            let after_continue = self.current_end;
-            let remaining = &self.source[after_continue..];
-            let keyword_end = remaining
-                .find(|c: char| !c.is_alphabetic() && c != ' ')
-                .unwrap_or(remaining.len());
-            let keyword = remaining[..keyword_end].trim();
+            let keyword = self.continuation_keyword_at(self.current_end);
             // Normalize whitespace: "else  if" -> "else if"
             let keyword_normalized: String = keyword
                 .split_whitespace()
@@ -220,22 +213,12 @@ impl<'a> SvelteParser<'a> {
         // Scan to find closing } and extract content
         let (tag_content, content_start) = self.scan_block_tag_content(tag_content_start)?;
 
-        // {#each} requires an iterable expression; the keyword alone is invalid
-        // (the canonical parser rejects it). Without this guard the keyword
-        // itself parses as the expression.
-        if tag_content.trim() == "each" {
-            return Err(self.error_expected_at("each expression", tag_content_start));
-        }
-
-        // Parse: "each expression as context, index (key)"
-        // Strip "each " prefix
-        let each_prefix_len = if tag_content.starts_with("each ") {
-            5
-        } else {
-            0
-        };
-        let content = &tag_content[each_prefix_len..];
-        let content_offset = tag_content_start + each_prefix_len;
+        // Parse: "each expression as context, index (key)" — Svelte requires
+        // whitespace after the keyword. The remainder keeps its leading
+        // whitespace; `content_offset` points just past the keyword and the
+        // `trim_start()` below recovers the expression's exact offset.
+        let content = self.strip_block_keyword(tag_content, "each", tag_content_start)?;
+        let content_offset = tag_content_start + (tag_content.len() - content.len());
 
         // Use partial parsing for the iterable expression - stops at identifiers like "as"
         // This correctly handles cases like `getItems(" as ")` where " as " is inside a string
@@ -302,8 +285,12 @@ impl<'a> SvelteParser<'a> {
         // Parse body
         let body = self.parse_block_children(&["else", "each"], content_start)?;
 
-        // Check for fallback
-        let fallback = if self.check(TokenKind::BlockContinue) {
+        // Check for fallback. Only `{:else}` is an each continuation — any other
+        // `{:keyword}` (e.g. `{:catch}`, `{:then}`) is left unconsumed so it
+        // surfaces as an orphan-continuation error, matching the canonical parser.
+        let fallback = if self.check(TokenKind::BlockContinue)
+            && self.continuation_keyword_at(self.current_end) == "else"
+        {
             let else_tag_start = self.current_end;
             let (_, else_content_start) = self.scan_block_tag_content(else_tag_start)?; // consume "else}"
             Some(self.parse_block_children(&["each"], else_content_start)?)
@@ -529,15 +516,12 @@ impl<'a> SvelteParser<'a> {
         // Scan to find closing } and extract content
         let (tag_content, content_start) = self.scan_block_tag_content(tag_content_start)?;
 
-        // Parse: "await expression" or "await expression then value"
-        // Strip "await " prefix
-        let await_prefix_len = if tag_content.starts_with("await ") {
-            6
-        } else {
-            0
-        };
-        let content = &tag_content[await_prefix_len..];
-        let content_offset = tag_content_start + await_prefix_len;
+        // Parse: "await expression" or "await expression then value" — Svelte
+        // requires whitespace after the keyword. The remainder keeps its leading
+        // whitespace; `content_offset` points just past the keyword and the
+        // `trim_start()` below recovers the expression's exact offset.
+        let content = self.strip_block_keyword(tag_content, "await", tag_content_start)?;
+        let content_offset = tag_content_start + (tag_content.len() - content.len());
 
         // Use partial parsing for the promise expression
         // This correctly handles cases like `fetch(" then ")` where " then " is inside a string
@@ -643,6 +627,16 @@ impl<'a> SvelteParser<'a> {
                 block_end,
             )
         } else {
+            // No `then`/`catch` shorthand matched, so the opening tag must end
+            // right after the promise expression. Reject trailing content like
+            // `{#await p garbage}` or a shorthand jammed against the expression
+            // (`{#await p then(v)}`) — the canonical parser rejects both.
+            let trailing = after_expr.trim_start();
+            if !trailing.is_empty() {
+                let trailing_start = expr_end_pos + (after_expr.len() - trailing.len());
+                return Err(self.error_expected_at("'}'", trailing_start));
+            }
+
             // Full syntax with pending block
             let pending_content =
                 self.parse_block_children(&["then", "catch", "await"], content_start)?;
@@ -701,15 +695,10 @@ impl<'a> SvelteParser<'a> {
 
     /// Check if the next token is a BlockContinue with the given keyword (e.g., "catch", "then").
     fn check_await_continuation(&self, keyword: &str) -> bool {
-        if !self.check(TokenKind::BlockContinue) {
-            return false;
-        }
-        let continue_start = self.current_end;
-        let remaining = &self.source[continue_start..];
-        let keyword_end = remaining
-            .find(|c: char| !c.is_alphabetic() && c != ' ')
-            .unwrap_or(remaining.len());
-        remaining[..keyword_end].trim().starts_with(keyword)
+        self.check(TokenKind::BlockContinue)
+            && self
+                .continuation_keyword_at(self.current_end)
+                .starts_with(keyword)
     }
 
     /// Parse a {:catch error} continuation block within an await block.
@@ -720,10 +709,8 @@ impl<'a> SvelteParser<'a> {
         let catch_tag_start = self.current_end;
         let (catch_tag_content, catch_content_start) =
             self.scan_block_tag_content(catch_tag_start)?;
-        let error_str = catch_tag_content
-            .strip_prefix("catch ")
-            .or_else(|| catch_tag_content.strip_prefix("catch"))
-            .unwrap_or("")
+        let error_str = self
+            .strip_keyword_value(catch_tag_content, "catch", catch_tag_start)?
             .trim();
 
         let error = if !error_str.is_empty() {
@@ -746,10 +733,8 @@ impl<'a> SvelteParser<'a> {
     ) -> Result<(Option<Fragment>, Option<tsv_ts::Expression>), ParseError> {
         let then_tag_start = self.current_end;
         let (then_tag_content, then_content_start) = self.scan_block_tag_content(then_tag_start)?;
-        let value_str = then_tag_content
-            .strip_prefix("then ")
-            .or_else(|| then_tag_content.strip_prefix("then"))
-            .unwrap_or("")
+        let value_str = self
+            .strip_keyword_value(then_tag_content, "then", then_tag_start)?
             .trim();
 
         let value = if !value_str.is_empty() {
@@ -772,6 +757,59 @@ impl<'a> SvelteParser<'a> {
             .find(|c: char| !c.is_alphabetic())
             .unwrap_or(remaining.len());
         &remaining[..end]
+    }
+
+    /// Read the continuation keyword-run at `pos` — the alphabetic-and-space run
+    /// after `{:`, trimmed. Unlike `keyword_at` this keeps internal spaces so the
+    /// two-word `else if` survives; callers compare against `"else"`, `"else if"`,
+    /// `"catch"`, etc. Trailing content makes the run miss every keyword (e.g.
+    /// `{:else garbage}` yields `"else garbage"`, which is neither `else` nor
+    /// `else if`), so it is left unconsumed and surfaces as an error.
+    fn continuation_keyword_at(&self, pos: usize) -> &'a str {
+        let remaining = &self.source[pos..];
+        let end = remaining
+            .find(|c: char| !c.is_alphabetic() && c != ' ')
+            .unwrap_or(remaining.len());
+        remaining[..end].trim()
+    }
+
+    /// Strip a leading block/tag keyword, enforcing the whitespace Svelte
+    /// requires between the keyword and any value that follows. The value may be
+    /// absent (`{:then}` → `Ok("")`), but a value jammed against the keyword
+    /// (`{:then(v)}`, `{:thenx}`) is rejected — matching the canonical parser,
+    /// which emits `expected_whitespace`. Any whitespace counts (space, tab,
+    /// newline), so the returned remainder is left untrimmed; callers trim it and
+    /// recover span offsets with `subslice_offset`.
+    fn strip_keyword_value(
+        &self,
+        content: &'a str,
+        keyword: &str,
+        keyword_start: usize,
+    ) -> Result<&'a str, ParseError> {
+        let rest = content.strip_prefix(keyword).unwrap_or(content);
+        if rest.is_empty() || rest.starts_with(|c: char| c.is_whitespace()) {
+            Ok(rest)
+        } else {
+            Err(self.error_expected_at(&format!("whitespace after `{keyword}`"), keyword_start))
+        }
+    }
+
+    /// Like `strip_keyword_value`, but the value is mandatory: the keyword
+    /// standing alone (`{#each}`, `{@html}`) is also rejected. Used by the blocks
+    /// and tags whose expression or name is required.
+    fn strip_block_keyword(
+        &self,
+        content: &'a str,
+        keyword: &str,
+        keyword_start: usize,
+    ) -> Result<&'a str, ParseError> {
+        let rest = self.strip_keyword_value(content, keyword, keyword_start)?;
+        if rest.is_empty() {
+            return Err(
+                self.error_expected_at(&format!("whitespace after `{keyword}`"), keyword_start)
+            );
+        }
+        Ok(rest)
     }
 
     /// Consume the closing `{/expected}` tag and return the position after it.
@@ -803,17 +841,9 @@ impl<'a> SvelteParser<'a> {
         // Scan to find closing } and extract content
         let (tag_content, content_start) = self.scan_block_tag_content(tag_content_start)?;
 
-        // {#key} requires an expression; the keyword alone is invalid (the
-        // canonical parser rejects it). Without this guard the keyword itself
-        // parses as the expression.
-        if tag_content.trim() == "key" {
-            return Err(self.error_expected_at("key expression", tag_content_start));
-        }
-
-        // Parse: "key expression"
-        let expr_str = tag_content
-            .strip_prefix("key ")
-            .unwrap_or(tag_content)
+        // Parse: "key expression" — Svelte requires whitespace after the keyword.
+        let expr_str = self
+            .strip_block_keyword(tag_content, "key", tag_content_start)?
             .trim();
 
         let expr_offset = tag_content_start + super::subslice_offset(tag_content, expr_str);
@@ -851,17 +881,10 @@ impl<'a> SvelteParser<'a> {
         // Scan to find closing } and extract content
         let (tag_content, content_start) = self.scan_block_tag_content(tag_content_start)?;
 
-        // {#snippet} requires a name; the keyword alone is invalid (the
-        // canonical parser rejects it). Without this guard the keyword itself
-        // parses as the snippet name.
-        if tag_content.trim() == "snippet" {
-            return Err(self.error_expected_at("snippet name", tag_content_start));
-        }
-
-        // Parse: "snippet name(params)" or "snippet name<T>(params)"
-        let content = tag_content
-            .strip_prefix("snippet ")
-            .unwrap_or(tag_content)
+        // Parse: "snippet name(params)" or "snippet name<T>(params)" — Svelte
+        // requires whitespace after the keyword.
+        let content = self
+            .strip_block_keyword(tag_content, "snippet", tag_content_start)?
             .trim();
 
         // Find the name (identifier before < or ()
@@ -1036,10 +1059,9 @@ impl<'a> SvelteParser<'a> {
         let tag_content_start = self.current_end;
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
-        // Parse: "html expression"
-        let expr_str = tag_content
-            .strip_prefix("html ")
-            .unwrap_or(tag_content)
+        // Parse: "html expression" — Svelte requires whitespace after the keyword.
+        let expr_str = self
+            .strip_block_keyword(tag_content, "html", tag_content_start)?
             .trim();
 
         let expr_offset = tag_content_start + super::subslice_offset(tag_content, expr_str);
@@ -1062,10 +1084,9 @@ impl<'a> SvelteParser<'a> {
         let tag_content_start = self.current_end;
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
-        // Parse: "const name = expression"
-        let decl_str = tag_content
-            .strip_prefix("const ")
-            .unwrap_or(tag_content)
+        // Parse: "const name = expression" — Svelte requires whitespace after the keyword.
+        let decl_str = self
+            .strip_block_keyword(tag_content, "const", tag_content_start)?
             .trim();
 
         let decl_offset = tag_content_start + super::subslice_offset(tag_content, decl_str);
@@ -1195,10 +1216,10 @@ impl<'a> SvelteParser<'a> {
         let tag_content_start = self.current_end;
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
-        // Parse: "render expression" where expression must be a call
-        let expr_str = tag_content
-            .strip_prefix("render ")
-            .unwrap_or(tag_content)
+        // Parse: "render expression" where expression must be a call — Svelte
+        // requires whitespace after the keyword.
+        let expr_str = self
+            .strip_block_keyword(tag_content, "render", tag_content_start)?
             .trim();
 
         let expr_offset = tag_content_start + super::subslice_offset(tag_content, expr_str);
@@ -1363,12 +1384,7 @@ impl<'a> SvelteParser<'a> {
 
             // Check for block continue {:keyword}
             if self.check(TokenKind::BlockContinue) {
-                let after_continue = self.current_end;
-                let remaining = &self.source[after_continue..];
-                let keyword_end = remaining
-                    .find(|c: char| !c.is_alphabetic() && c != ' ')
-                    .unwrap_or(remaining.len());
-                let keyword = remaining[..keyword_end].trim();
+                let keyword = self.continuation_keyword_at(self.current_end);
 
                 // Check if any stop keyword starts with or matches this keyword
                 let should_stop = stop_keywords
