@@ -1,6 +1,6 @@
 # @fuzdev/tsv_format_wasm
 
-> formatter for TypeScript, Svelte, and CSS
+> formatter for Svelte, TypeScript, and CSS
 
 Rust-based formatter compiled to WASM. A near-Prettier formatter that tracks **Prettier** + **prettier-plugin-svelte** closely, with documented divergences.
 

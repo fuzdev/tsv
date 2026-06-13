@@ -203,9 +203,9 @@ const pkg = JSON.parse(Deno.readTextFileSync(pkg_path));
 
 pkg.name = pkg_name;
 pkg.description = {
-	format: 'formatter for TypeScript, Svelte, and CSS',
-	parse: 'parser for TypeScript, Svelte, and CSS',
-	all: 'formatter and parser for TypeScript, Svelte, and CSS',
+	format: 'formatter for Svelte, TypeScript, and CSS',
+	parse: 'parser for Svelte, TypeScript, and CSS',
+	all: 'formatter and parser for Svelte, TypeScript, and CSS',
 }[variant];
 pkg.type = 'module';
 pkg.exports = {
