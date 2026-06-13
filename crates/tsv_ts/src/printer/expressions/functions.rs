@@ -748,7 +748,7 @@ impl<'a> Printer<'a> {
         // Svelte disambiguation: single param without constraint needs trailing comma
         // in Svelte files to avoid confusion with template syntax like `<Component>`.
         // In pure .ts files (arrow_type_param_trailing_comma=false), no trailing comma needed.
-        let needs_trailing_comma = self.ts_config.arrow_type_param_trailing_comma
+        let needs_trailing_comma = self.ts_context.arrow_type_param_trailing_comma()
             && decl.params.len() == 1
             && decl.params[0].constraint.is_none();
         let inner_parts = if needs_trailing_comma {

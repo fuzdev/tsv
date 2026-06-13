@@ -31,7 +31,7 @@ use self::text::TextAnalysis;
 use crate::ast::internal::{self, FragmentNode};
 use std::rc::Rc;
 use tsv_lang::doc::arena::{DocArena, DocId};
-use tsv_lang::{Comment, EmbedContext, OutputBuffer, PrintConfig, SharedInterner, SymbolResolver};
+use tsv_lang::{Comment, EmbedContext, OutputBuffer, SharedInterner, SymbolResolver};
 
 /// Pending whitespace state - buffers whitespace decisions until next node is known
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -144,8 +144,6 @@ pub(crate) struct Printer<'a> {
     buffer: OutputBuffer,
     /// Current indentation level
     pub(crate) indent_level: usize,
-    /// Print configuration
-    config: PrintConfig,
     /// Embedding context (layout mode, offsets)
     embed: EmbedContext,
     /// Arena allocator for doc nodes
@@ -161,30 +159,22 @@ pub(crate) struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    /// Create a new printer with the given source, interner, comments, and default config
+    /// Create a new printer with the given source, interner, and comments (standalone layout).
     pub(crate) fn new(source: &'a str, interner: SharedInterner, comments: &'a [Comment]) -> Self {
-        Self::with_config(
-            source,
-            interner,
-            comments,
-            PrintConfig::default(),
-            EmbedContext::default(),
-        )
+        Self::with_embed(source, interner, comments, EmbedContext::default())
     }
 
-    /// Create a new printer with the given source, interner, comments, config, and embed context
-    pub(crate) fn with_config(
+    /// Create a new printer with the given source, interner, comments, and embed context.
+    pub(crate) fn with_embed(
         source: &'a str,
         interner: SharedInterner,
         comments: &'a [Comment],
-        config: PrintConfig,
         embed: EmbedContext,
     ) -> Self {
         let line_breaks = tsv_lang::printing::build_line_breaks(source);
         Self {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
-            config,
             embed,
             arena: DocArena::for_source(source),
             source,
@@ -257,19 +247,19 @@ impl<'a> Printer<'a> {
 impl<'a> Printer<'a> {
     /// Build a DocId for a TS expression (with comments) in our arena.
     ///
-    /// Uses the standard parameters: self.comments, self.config, self.line_breaks.
-    /// For calls that need custom config or empty comments, use the tsv_ts functions directly.
+    /// Uses the standard parameters: self.comments, self.embed, self.line_breaks.
+    /// For calls that need a custom embed context or empty comments, use the
+    /// tsv_ts functions directly.
     pub(crate) fn build_ts_expression_doc(&self, expr: &tsv_ts::Expression) -> DocId {
         tsv_ts::build_expression_doc_with_comments(
             self.d(),
             expr,
             self.source,
             Rc::clone(&self.interner),
-            &self.config,
             &self.embed,
             self.comments,
             &self.line_breaks,
-            tsv_ts::TsConfig::svelte(),
+            tsv_ts::TsContext::Svelte,
         )
     }
 
@@ -283,11 +273,10 @@ impl<'a> Printer<'a> {
             expr,
             self.source,
             Rc::clone(&self.interner),
-            &self.config,
             &self.embed,
             &[],
             &self.line_breaks,
-            tsv_ts::TsConfig::svelte(),
+            tsv_ts::TsContext::Svelte,
         )
     }
 
@@ -301,9 +290,8 @@ impl<'a> Printer<'a> {
             Rc::clone(&self.interner),
             &[],
             &self.line_breaks,
-            PrintConfig::default(),
             EmbedContext::default(),
-            tsv_ts::TsConfig::svelte(),
+            tsv_ts::TsContext::Svelte,
         )
     }
 }

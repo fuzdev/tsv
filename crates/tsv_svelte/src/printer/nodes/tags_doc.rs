@@ -145,11 +145,10 @@ impl<'a> Printer<'a> {
             expr,
             self.source,
             Rc::clone(&self.interner),
-            &self.config,
             &embed,
             self.comments,
             &self.line_breaks,
-            tsv_ts::TsConfig::svelte(),
+            tsv_ts::TsContext::Svelte,
         );
 
         let trailing_docs: Vec<DocId> =

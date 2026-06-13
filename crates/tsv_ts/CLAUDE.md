@@ -15,8 +15,8 @@ Standard `ast/` (internal + public + convert), `lexer/`, `parser/`, `printer/` l
 **Standalone** (`.ts` files, top-level callers):
 
 - `parse(source) -> Result<Program>`
-- `format(program, source) -> String` — uses `TsConfig::default()`
-- `format_with_config(program, source, ts_config) -> String`
+- `format(program, source) -> String` — uses `TsContext::Standalone`
+- `format_with_context(program, source, ts_context) -> String`
 - `convert_ast(program, source) -> public::Program` / `convert_ast_json(...) -> serde_json::Value` / `convert_ast_json_string(...) -> String` (all gated on `convert` feature). The string variant is the compact-wire hot path (FFI/WASM/CLI non-pretty): it serializes the typed public AST directly when eligible, never materializing the intermediate `Value` (per-language eligibility matrix: [docs/architecture.md §Closed Scope, Open Convention](../../docs/architecture.md#closed-scope-open-convention)). The typed offset-translation walk (`ast/convert/translate_typed.rs`) is the typed mirror of the `Value` walk in `ast/convert/mod.rs` — the two must stay byte-identical, gated by the fixture suite's string-path identity check and typed-walk parity probes (synthesized multibyte variants plus extracted `<script>` contents, so every fixture's AST shapes are covered) and `json_profile`'s corpus comparison. Output is byte-identical to serializing `convert_ast_json`'s `Value`.
 
 **Embedding** (used by `tsv_svelte` — shares interner, indent, comment buffers with the host document):
@@ -28,7 +28,7 @@ Standard `ast/` (internal + public + convert), `lexer/`, `parser/`, `printer/` l
 
 ## Distinctives
 
-- **`TsConfig`** ([`config.rs`](src/config.rs)) is the per-language knob and the type unique to this crate. Default is pure-TS (`arrow_type_param_trailing_comma: false`). `TsConfig::svelte()` enables `<T,>` trailing-comma disambiguation — `tsv_svelte` passes this when formatting embedded TS so `<T>` isn't ambiguous with template syntax. Pure `.ts` and `.svelte.ts` files use the default.
+- **`TsContext`** ([`config.rs`](src/config.rs)) is the per-language context unique to this crate — not user configuration (tsv is non-configurable), but the standalone-vs-Svelte distinction derived from the file kind. Default is `TsContext::Standalone` (pure TS). `TsContext::Svelte` enables `<T,>` trailing-comma disambiguation — `tsv_svelte` passes it when formatting embedded TS so `<T>` isn't ambiguous with template syntax. Pure `.ts` and `.svelte.ts` files use `Standalone`.
 - **`Schema`** in [`ast/convert/mod.rs`](src/ast/convert/mod.rs) selects the public-AST shape. `convert_ast()` always uses `Schema::Acorn`; callers needing Svelte's non-`lang="ts"` `<script>` shape (omit `importKind`/`exportKind="value"`, always emit `attributes`) invoke `ast::convert::convert_program(..., Schema::SvelteScript)` directly. Tracked alongside the hand-maintained `tsv_ast.d.ts` — see [../tsv_wasm/CLAUDE.md §TS type maintenance](../tsv_wasm/CLAUDE.md#ts-type-maintenance).
 - **`lexer/escapes.rs`** owns ECMAScript string/template escape decoding (acorn parity). `tsv_lang::escapes` only handles quote swapping at print time; full decoding lives here.
 - **Strict mode only** — no `with`, no legacy octals, no duplicate parameters. See [../../CLAUDE.md §Strict Mode Only](../../CLAUDE.md#strict-mode-only).
