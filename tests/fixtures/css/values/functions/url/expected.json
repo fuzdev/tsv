@@ -66,7 +66,7 @@
 							"start": 200,
 							"end": 252,
 							"property": "mask-image",
-							"value": "url('https://example.tsv.dev/image.png')"
+							"value": "url('https://example.fuz.dev/image.png')"
 						},
 						{
 							"type": "Declaration",
@@ -168,7 +168,7 @@
 		"content": {
 			"start": 7,
 			"end": 904,
-			"styles": "\n\tdiv {\n\t\t/* Quoted URLs - single quotes */\n\t\tbackground: url('image.png');\n\t\tbackground-image: url('../assets/bg.jpg');\n\t\t/* Quoted URLs - double quotes */\n\t\tborder-image: url('font.woff');\n\t\tmask-image: url('https://example.tsv.dev/image.png');\n\t\t/* Unquoted URLs */\n\t\tlist-style-image: url(image.png);\n\t\tcontent: url(../assets/bg.jpg);\n\t\tcursor: url(/absolute/path.svg), auto;\n\t\t/* Data URIs - unquoted */\n\t\tbackground-color: url(data:image/png;base64,ABC123);\n\t\tbackground-position: url(data:text/plain;charset=utf-8,Hello%20World);\n\t\t/* Data URIs - quoted (commas inside quotes) */\n\t\tbackground: url('data:image/svg+xml,<svg></svg>');\n\t\tbackground: url('data:text/css,body{color:red}');\n\t\t/* URLs with spaces (must be quoted) */\n\t\toutline: url('file with spaces.png');\n\t\tborder: url('path to file.jpg');\n\t}\n\n\t@font-face {\n\t\tfont-family: 'Custom';\n\t\tsrc: url('font.woff2') format('woff2');\n\t}\n",
+			"styles": "\n\tdiv {\n\t\t/* Quoted URLs - single quotes */\n\t\tbackground: url('image.png');\n\t\tbackground-image: url('../assets/bg.jpg');\n\t\t/* Quoted URLs - double quotes */\n\t\tborder-image: url('font.woff');\n\t\tmask-image: url('https://example.fuz.dev/image.png');\n\t\t/* Unquoted URLs */\n\t\tlist-style-image: url(image.png);\n\t\tcontent: url(../assets/bg.jpg);\n\t\tcursor: url(/absolute/path.svg), auto;\n\t\t/* Data URIs - unquoted */\n\t\tbackground-color: url(data:image/png;base64,ABC123);\n\t\tbackground-position: url(data:text/plain;charset=utf-8,Hello%20World);\n\t\t/* Data URIs - quoted (commas inside quotes) */\n\t\tbackground: url('data:image/svg+xml,<svg></svg>');\n\t\tbackground: url('data:text/css,body{color:red}');\n\t\t/* URLs with spaces (must be quoted) */\n\t\toutline: url('file with spaces.png');\n\t\tborder: url('path to file.jpg');\n\t}\n\n\t@font-face {\n\t\tfont-family: 'Custom';\n\t\tsrc: url('font.woff2') format('woff2');\n\t}\n",
 			"comment": null
 		}
 	},

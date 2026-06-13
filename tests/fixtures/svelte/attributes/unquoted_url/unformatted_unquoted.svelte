@@ -1,2 +1,2 @@
-<a href=https://tsv.dev>link</a>
-<a href=https://tsv.dev/a/b>link</a>
+<a href=https://fuz.dev>link</a>
+<a href=https://fuz.dev/a/b>link</a>

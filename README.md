@@ -1,6 +1,6 @@
 # tsv
 
-> a formatter, parser, and future linter + more for TypeScript, Svelte, and CSS - [tsv.dev](https://www.tsv.dev/)
+> a formatter, parser, and future linter + more for TypeScript, Svelte, and CSS - [tsv.fuz.dev](https://tsv.fuz.dev/)
 
 tsv is a toolchain for TypeScript, Svelte, and CSS, written in Rust.
 The first release has a near-[Prettier](https://prettier.io/) formatter that
@@ -9,7 +9,7 @@ and a drop-in replacement for [Svelte](https://svelte.dev/)'s parser +
 [acorn](https://github.com/acornjs/acorn) +
 [acorn-typescript](https://github.com/sveltejs/acorn-typescript).
 
-For benchmarks including performance and binary size, visit [tsv.dev](https://www.tsv.dev/).
+For benchmarks including performance and binary size, visit [tsv.fuz.dev](https://tsv.fuz.dev/).
 
 This is an early release, and reports and feedback are appreciated -
 see the [issues](https://github.com/fuzdev/tsv/issues)

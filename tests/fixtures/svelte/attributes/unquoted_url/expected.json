@@ -47,8 +47,8 @@
 								"start": 9,
 								"end": 24,
 								"type": "Text",
-								"raw": "https://tsv.dev",
-								"data": "https://tsv.dev"
+								"raw": "https://fuz.dev",
+								"data": "https://fuz.dev"
 							}
 						]
 					}
@@ -113,8 +113,8 @@
 								"start": 44,
 								"end": 63,
 								"type": "Text",
-								"raw": "https://tsv.dev/a/b",
-								"data": "https://tsv.dev/a/b"
+								"raw": "https://fuz.dev/a/b",
+								"data": "https://fuz.dev/a/b"
 							}
 						]
 					}

@@ -232,7 +232,7 @@ Every pattern in `patterns.ts` includes:
 
 Results are saved to `benches/deno/results/` as timestamped files plus
 `report.json` and `report.md` (committed to git). To publish benchmarks
-to tsv.dev, run `npm run update-benchmarks` in ~/dev/tsv.dev.
+to tsv.fuz.dev, run `npm run update-benchmarks` in ~/dev/tsv.fuz.dev.
 
 The committed `report.json` (baseline `version: 4`) carries, beyond timing
 stats: per-language `corpus` totals, `versions`, and `binary_sizes` (each with
@@ -446,7 +446,7 @@ Paths defined in `lib/corpus.ts` `DEFAULT_CORPUS_PATHS`, relative to project roo
 
 - zzz (large apps)
 - fuz.dev, fuz_app, fuz_css, fuz_ui, fuz_util, fuz_template, fuz_blog, fuz_mastodon, fuz_code, fuz_docs, fuz_gitops (fuz ecosystem)
-- gro, svelte-docinfo, tsv.dev (build tooling)
+- gro, svelte-docinfo, tsv.fuz.dev (build tooling)
 - kit/packages/kit, svelte/packages/svelte, svelte.dev subpaths (external monorepos)
 - prettier-plugin-svelte/test (.html treated as Svelte, files with companion `options.json` skipped)
 - prettier/tests/format/typescript, prettier/tests/format/js, prettier/tests/format/css, prettier/tests/format/html (prettier test suites)

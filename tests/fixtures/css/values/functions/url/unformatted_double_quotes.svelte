@@ -5,7 +5,7 @@
 		background-image: url("../assets/bg.jpg");
 		/* Quoted URLs - double quotes */
 		border-image: url("font.woff");
-		mask-image: url("https://example.tsv.dev/image.png");
+		mask-image: url("https://example.fuz.dev/image.png");
 		/* Unquoted URLs */
 		list-style-image: url(image.png);
 		content: url(../assets/bg.jpg);

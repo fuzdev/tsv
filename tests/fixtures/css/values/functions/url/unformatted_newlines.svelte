@@ -12,7 +12,7 @@
 			'font.woff'
 		);
 		mask-image: url(
-			'https://example.tsv.dev/image.png'
+			'https://example.fuz.dev/image.png'
 		);
 		/* Unquoted URLs */
 		list-style-image: url(
