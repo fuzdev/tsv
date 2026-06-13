@@ -1,6 +1,6 @@
 # tsv
 
-> a formatter, parser, and future linter + more for TypeScript, Svelte, and CSS
+> a formatter, parser, and future linter + more for Svelte, TypeScript, and CSS
 
 High-performance Rust parser as a drop-in replacement for Svelte's modern parser (acorn + acorn-typescript) with a near-Prettier formatter that tracks Prettier closely.
 

@@ -42,7 +42,7 @@ const PARSER_NAMES = new Set(['svelte', 'typescript', 'css']);
 
 const HELP = `Usage: tsv <command> [<args>]
 
-formatter and parser for TypeScript, Svelte, and CSS (WASM build)
+formatter and parser for Svelte, TypeScript, and CSS (WASM build)
 
 Commands:
   format            Format source code in place (near-Prettier output)

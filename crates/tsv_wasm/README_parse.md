@@ -1,6 +1,6 @@
 # @fuzdev/tsv_parse_wasm
 
-> parser for TypeScript, Svelte, and CSS
+> parser for Svelte, TypeScript, and CSS
 
 Rust-based parser compiled to WASM. Drop-in replacement for **Svelte's parser** + **acorn** + **acorn-typescript**.
 
