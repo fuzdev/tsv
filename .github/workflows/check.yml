@@ -1,0 +1,136 @@
+# Two jobs run on every push to main and every PR:
+#
+#   check     — mirrors the local `deno task check` gate exactly (typecheck,
+#               cargo test + fixtures, deno tests, conformance audit,
+#               rustfmt --check, AST-type drift, clippy with -D warnings).
+#   artifacts — publish-parity: builds the WASM/npm packages, checks size
+#               bounds, runs the Node package tests (see the job comment).
+#
+# `check` needs Rust *and* Deno: the fixture suite drives prettier + svelte
+# through a Deno sidecar (npm: specifiers pinned in
+# crates/tsv_debug/src/deno/sidecar.ts and fetched at runtime — not
+# lockfile-pinned, hence the cache-hash on sidecar.ts below), so
+# `cargo test --workspace` panics without Deno — tests/fixtures_tests.rs
+# health-checks the sidecar first. wasm-pack is not needed by `check`.
+
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: ['**']
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# This job only reads the repo; deny everything else (least privilege).
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    # The fixture suite fetches pinned npm packages at runtime (no frozen
+    # lock), so bound the job to fail fast on a registry stall or hung sidecar
+    # instead of running to the 6h default.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      # Pinned, not `stable`: the workspace runs clippy::nursery at warn and the
+      # `lint` task denies warnings, so a floating toolchain would fail CI
+      # whenever a new Rust release adds a nursery lint. Edition 2024 needs
+      # >= 1.85. Bump deliberately.
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master (no semver tags; bump manually)
+        with:
+          toolchain: 1.94.1
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+
+      - name: Install Deno
+        uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
+        with:
+          # Pinned to match local: deno drives the prettier/svelte fixture oracle
+          # and `deno test`, so a floating minor could shift behavior the pinned
+          # Rust toolchain can't guard. Bump deliberately (not Dependabot-tracked).
+          deno-version: 2.8.0
+          # Round-trips DENO_DIR across runs — captures the sidecar's runtime
+          # npm fetches (prettier/svelte/acorn) since those land in DENO_DIR.
+          cache: true
+          # Key on the sidecar pins (fetched at runtime, not lockfile-pinned) so a
+          # bump invalidates the cached deps. NOT benches/deno/deno.lock: it governs
+          # `test:deno` but is dominated by bench-only tools (biome/oxc/oxfmt) that
+          # `check` never fetches, so keying on it would bust the cache on unrelated
+          # bumps. (There is no root deno.lock — the root config has no external deps.)
+          cache-hash: ${{ hashFiles('crates/tsv_debug/src/deno/sidecar.ts', 'crates/tsv_debug/src/deno/actor.rs') }}
+
+      - name: Check
+        run: deno task check
+
+  # Publish-parity gate: builds every WASM/npm artifact, checks the size
+  # bounds, and runs the Node package tests — none of which `check` exercises,
+  # so a packaging break surfaces on PRs instead of at release time. Mirrors
+  # what scripts/publish.ts builds + validates. Heavier than `check` (release
+  # LTO build + wasm-pack compile + 6 wasm-pack builds), hence the longer bound.
+  artifacts:
+    runs-on: ubuntu-latest
+    # Gate behind `check` so a PR that fails basic checks doesn't burn the
+    # ~45-min build; costs some latency on green PRs.
+    needs: check
+    # Headroom over the ~45-min cold build (wasm-pack compile + LTO release + 6
+    # wasm-pack builds) — a bound at the estimate itself would flake the first
+    # uncached run. Still well short of the 6h default so a hang fails fast.
+    timeout-minutes: 70
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master (no semver tags; bump manually)
+        with:
+          toolchain: 1.94.1
+          targets: wasm32-unknown-unknown
+
+      # cache-bin (on by default) caches the cargo-installed wasm-pack too.
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+
+      # Pinned to match local: wasm-pack bundles wasm-opt, whose output size the
+      # ~±8% validate:artifacts bounds are calibrated against. A floating version
+      # would trip the size gate on an unrelated wasm-pack/binaryen release.
+      # Manual bump (not Dependabot-tracked).
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --version 0.15.0 --locked
+
+      - name: Install Deno
+        uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
+        with:
+          # Pinned to match the check job / local. Bump deliberately.
+          deno-version: 2.8.0
+          cache: true
+
+      - name: Install Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          # Pinned to match local. Needs >= 22.18 for native .ts type stripping
+          # (scripts/test_npm.ts runs under node --test directly). Bump deliberately.
+          node-version: '24.14.1'
+
+      - name: Build all artifacts
+        run: deno task build:all
+
+      - name: Validate artifact sizes
+        run: deno task validate:artifacts
+
+      # All three published shapes differ (format excludes convert, parse
+      # bundles the .d.ts, all ships the tsv bin), so test each.
+      - name: Node package tests
+        run: |
+          deno task test:npm
+          deno task test:npm:parse
+          deno task test:npm:all
