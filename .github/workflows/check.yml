@@ -73,6 +73,9 @@ jobs:
   # LTO build + wasm-pack compile + 6 wasm-pack builds), hence the longer bound.
   artifacts:
     runs-on: ubuntu-latest
+    # Gate behind `check` so a PR that fails basic checks doesn't burn the
+    # ~45-min build; costs some latency on green PRs.
+    needs: check
     timeout-minutes: 45
 
     steps:
@@ -87,8 +90,12 @@ jobs:
       # cache-bin (on by default) caches the cargo-installed wasm-pack too.
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
+      # Pinned to match local: wasm-pack bundles wasm-opt, whose output size the
+      # ~±8% validate:artifacts bounds are calibrated against. A floating version
+      # would trip the size gate on an unrelated wasm-pack/binaryen release.
+      # Manual bump (not Dependabot-tracked).
       - name: Install wasm-pack
-        run: cargo install wasm-pack --locked
+        run: cargo install wasm-pack --version 0.15.0 --locked
 
       - name: Install Deno
         uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
@@ -109,5 +116,10 @@ jobs:
       - name: Validate artifact sizes
         run: deno task validate:artifacts
 
+      # All three published shapes differ (format excludes convert, parse
+      # bundles the .d.ts, all ships the tsv bin), so test each.
       - name: Node package tests
-        run: deno task test:npm:all
+        run: |
+          deno task test:npm
+          deno task test:npm:parse
+          deno task test:npm:all
