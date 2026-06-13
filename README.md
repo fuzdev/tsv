@@ -75,12 +75,10 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
   code size are first-class goals for every shipped artifact, and heavier future
   layers (incremental parsing, CST for LSP) will be feature-gated so they
   don't regress the artifacts that exist today
-- non-configurable by design: formatter settings are fixed at Prettier's defaults
-  (`print_width: 100`, `tab_width: 2`, `use_tabs: true`,
-  and `bracketSpacing: false` which may be a bad choice that came from the author's preference)
-  and there are no config files or CLI options - tsv is opinionated like `gofmt` and Black -
-  see [CLAUDE.md § Configuration](CLAUDE.md#configuration),
-  and discussions/requests are welcome
+- non-configurable: formatter settings are fixed at Prettier's defaults plus
+  `print_width: 100`, `use_tabs: true`, `tab_width: 2`, and `bracketSpacing: false`,
+  and there are no config files or CLI options - tsv is opinionated like `gofmt` and Python's Black,
+  see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
 - JS and TS always parse as modules in strict mode - sloppy-mode-only syntax
   (`with`, legacy octal literals, etc) is rejected; Svelte and TypeScript are
   inherently strict, so this only matters for standalone JS scripts
