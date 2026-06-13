@@ -15,8 +15,8 @@
 		"dev": "cargo watch -x 'check --workspace' -x 'test --workspace' || echo '⚠️  cargo-watch not installed. Run: cargo install cargo-watch'",
 		"typecheck": "cargo check --workspace",
 		"test": "cargo test --workspace",
-		"lint": "cargo clippy --workspace",
-		"check": "deno task typecheck && deno task test && deno task test:deno && deno task lint && deno task conformance:audit && cargo fmt --check && deno task check:ast-types",
+		"lint": "cargo clippy --workspace -- -D warnings",
+		"check": "deno task typecheck && deno task test && deno task test:deno && deno task conformance:audit && cargo fmt --check && deno task check:ast-types && deno task lint",
 		"check:ast-types": "deno run --allow-read --allow-write=scripts --allow-run=cargo,deno scripts/check_ast_types.ts",
 
 		"fixture:init": "cargo run -p tsv_debug --quiet fixture_init",
