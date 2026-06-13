@@ -17,6 +17,10 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
   change to formatter output or the published API (`format_*` / `parse_*` / the
   `tsv` bin) — a posture formalization plus removal of the internal config
   plumbing that anticipated future options.
+- `parse_*` now rejects malformed Svelte control-flow blocks that the canonical
+  Svelte parser also rejects: a closing tag that doesn't match its opening block
+  (e.g. `{#if x}…{/each}`) and `{#each}` / `{#key}` / `{#snippet}` with no
+  expression or name. These previously parsed without error.
 
 ## 0.1.0
 
