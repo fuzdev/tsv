@@ -76,7 +76,8 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
   layers (incremental parsing, CST for LSP) will be feature-gated so they
   don't regress the artifacts that exist today
 - non-configurable: formatter settings are fixed at Prettier's defaults except
-  `print_width: 100`, `use_tabs: true`, and `bracketSpacing: false` (maybe controversial),
+  `print_width: 100`, `use_tabs: true`, and
+  `bracketSpacing: false` (maybe controversial, discussion welcome),
   and there are no config files or CLI options -
   tsv is opinionated like `gofmt` and Python's Black,
   see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
