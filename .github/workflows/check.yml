@@ -20,9 +20,18 @@ concurrency:
   group: check-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# This job only reads the repo; deny everything else (least privilege).
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest
+
+    # The fixture suite fetches pinned npm packages at runtime (no frozen
+    # lock), so bound the job to fail fast on a registry stall or hung sidecar
+    # instead of running to the 6h default.
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
