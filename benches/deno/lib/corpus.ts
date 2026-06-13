@@ -213,7 +213,7 @@ const DEFAULT_CORPUS_PATHS: CorpusPath[] = [
 	// Build tooling
 	'../gro/src',
 	'../svelte-docinfo/src',
-	'../tsv.dev/src',
+	'../tsv.fuz.dev/src',
 	// External projects (monorepo subpaths)
 	'../kit/packages/kit/src',
 	'../svelte/packages/svelte/src',

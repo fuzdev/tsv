@@ -88,8 +88,8 @@
 											"start": 112,
 											"end": 154,
 											"type": "Text",
-											"raw": "https://tsv.dev/long/path/to/resource/aaaa",
-											"data": "https://tsv.dev/long/path/to/resource/aaaa"
+											"raw": "https://fuz.dev/long/path/to/resource/aaaa",
+											"data": "https://fuz.dev/long/path/to/resource/aaaa"
 										}
 									]
 								}

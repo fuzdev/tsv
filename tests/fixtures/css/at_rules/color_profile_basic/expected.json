@@ -21,7 +21,7 @@
 							"start": 37,
 							"end": 95,
 							"property": "src",
-							"value": "url('https://example.tsv.dev/SWOP2006_Coated5v2.icc')"
+							"value": "url('https://example.fuz.dev/SWOP2006_Coated5v2.icc')"
 						}
 					]
 				}
@@ -30,7 +30,7 @@
 		"content": {
 			"start": 7,
 			"end": 100,
-			"styles": "\n\t@color-profile --swop5c {\n\t\tsrc: url('https://example.tsv.dev/SWOP2006_Coated5v2.icc');\n\t}\n",
+			"styles": "\n\t@color-profile --swop5c {\n\t\tsrc: url('https://example.fuz.dev/SWOP2006_Coated5v2.icc');\n\t}\n",
 			"comment": null
 		}
 	},

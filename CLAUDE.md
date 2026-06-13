@@ -280,7 +280,7 @@ BENCH_STALE_OK=1 deno task bench:run      # Run despite stale artifacts (default
 
 **Prerequisites**: `cargo install wasm-pack`
 
-Compares three implementations: canonical (prettier + svelte/compiler), native (FFI), WASM. Results are saved to `benches/deno/results/report.{json,md}` (committed). To publish to tsv.dev: `npm run update-benchmarks` in ~/dev/tsv.dev. See ./benches/deno/CLAUDE.md.
+Compares three implementations: canonical (prettier + svelte/compiler), native (FFI), WASM. Results are saved to `benches/deno/results/report.{json,md}` (committed). To publish to tsv.fuz.dev: `npm run update-benchmarks` in ~/dev/tsv.fuz.dev. See ./benches/deno/CLAUDE.md.
 
 ### Performance Profiling
 
