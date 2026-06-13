@@ -10,6 +10,9 @@
 
 import type { AllVersions } from './versions.ts';
 
+/** Binary kind for grouping comparisons */
+export type BinaryKind = 'wasm' | 'native';
+
 /** A collected binary size entry */
 export interface BinarySize {
 	/** Display label */
@@ -23,8 +26,25 @@ export interface BinarySize {
 	 */
 	gzip_bytes: number | null;
 	/** Binary kind for grouping comparisons */
-	kind: 'wasm' | 'native';
+	kind: BinaryKind;
 }
+
+/**
+ * Display labels — also the identity keys for the ratio-anchor lookups in
+ * `build_display_entries`, so the producer (`collect_binary_sizes`) and the
+ * consumer must reference the same constant. Renaming a label here updates both.
+ */
+const LABELS = {
+	tsv_native: 'tsv (native)',
+	tsv_format_wasm: 'tsv_format_wasm',
+	tsv_parse_wasm: 'tsv_parse_wasm',
+	tsv_wasm: 'tsv_wasm',
+	biome_wasm: 'biome (wasm)',
+	oxc_parser_native: 'oxc-parser (native)',
+	oxfmt_native: 'oxfmt (native)',
+	oxc_parser_wasm: 'oxc-parser (wasm)',
+	oxc_combined_native: 'oxc-parser+oxfmt (native)',
+} as const;
 
 /** Get the Deno npm cache base path */
 function get_deno_npm_cache_path(): string {
@@ -81,7 +101,7 @@ type StagedEntry = { entry: Omit<BinarySize, 'gzip_bytes'>; path: string };
 async function push_size(
 	out: StagedEntry[],
 	label: string,
-	kind: 'wasm' | 'native',
+	kind: BinaryKind,
 	path: string,
 ): Promise<void> {
 	const bytes = await file_size(path);
@@ -107,6 +127,36 @@ async function resolve_first(
 		}
 	}
 	return null;
+}
+
+/** Stage an entry resolved by scanning `dirs` for the first file ending in `ext`. */
+async function push_resolved(
+	out: StagedEntry[],
+	label: string,
+	kind: BinaryKind,
+	dirs: string[],
+	ext: string,
+): Promise<void> {
+	const found = await resolve_first(dirs, ext);
+	if (found !== null) out.push({ entry: { label, bytes: found.bytes, kind }, path: found.path });
+}
+
+/**
+ * Candidate cache dirs for a NAPI native binding, newest layout first. npm
+ * ships per-libc variants (`-gnu`, `-musl`) plus a libc-agnostic fallback.
+ */
+function napi_binding_dirs(
+	npm_cache: string,
+	scope_pkg: string,
+	os: string,
+	arch: string,
+	version: string,
+): string[] {
+	return [
+		`${npm_cache}/${scope_pkg}-${os}-${arch}-gnu/${version}`,
+		`${npm_cache}/${scope_pkg}-${os}-${arch}-musl/${version}`,
+		`${npm_cache}/${scope_pkg}-${os}-${arch}/${version}`,
+	];
 }
 
 /**
@@ -139,7 +189,7 @@ export async function collect_binary_sizes(
 		const prefix = Deno.build.os === 'windows' ? '' : 'lib';
 		await push_size(
 			staged,
-			'tsv',
+			LABELS.tsv_native,
 			'native',
 			`${project_root}/target/release/${prefix}tsv_ffi.${ext}`,
 		);
@@ -152,19 +202,19 @@ export async function collect_binary_sizes(
 	if (options?.has_wasm !== false) {
 		await push_size(
 			staged,
-			'tsv_format_wasm',
+			LABELS.tsv_format_wasm,
 			'wasm',
 			`${project_root}/crates/tsv_wasm/pkg/format/deno/tsv_wasm_bg.wasm`,
 		);
 		await push_size(
 			staged,
-			'tsv_parse_wasm',
+			LABELS.tsv_parse_wasm,
 			'wasm',
 			`${project_root}/crates/tsv_wasm/pkg/parse/deno/tsv_wasm_bg.wasm`,
 		);
 		await push_size(
 			staged,
-			'tsv_wasm',
+			LABELS.tsv_wasm,
 			'wasm',
 			`${project_root}/crates/tsv_wasm/pkg/all/deno/tsv_wasm_bg.wasm`,
 		);
@@ -172,14 +222,13 @@ export async function collect_binary_sizes(
 
 	// biome WASM
 	if (options?.has_biome !== false) {
-		const biome_dir = `${npm_cache}/@biomejs/wasm-bundler/${versions.biome.wasm}`;
-		const found = await resolve_first([biome_dir], '.wasm');
-		if (found !== null) {
-			staged.push({
-				entry: { label: 'biome (wasm)', bytes: found.bytes, kind: 'wasm' },
-				path: found.path,
-			});
-		}
+		await push_resolved(
+			staged,
+			LABELS.biome_wasm,
+			'wasm',
+			[`${npm_cache}/@biomejs/wasm-bundler/${versions.biome.wasm}`],
+			'.wasm',
+		);
 	}
 
 	// oxc-parser + oxfmt
@@ -188,44 +237,31 @@ export async function collect_binary_sizes(
 		const oxc_ver = versions.oxc['oxc-parser'];
 		const oxfmt_ver = versions.oxc.oxfmt;
 
-		const oxc_dirs = [
-			`${npm_cache}/@oxc-parser/binding-${os}-${arch}-gnu/${oxc_ver}`,
-			`${npm_cache}/@oxc-parser/binding-${os}-${arch}-musl/${oxc_ver}`,
-			`${npm_cache}/@oxc-parser/binding-${os}-${arch}/${oxc_ver}`,
-		];
-		const oxc_found = await resolve_first(oxc_dirs, '.node');
-		if (oxc_found !== null) {
-			staged.push({
-				entry: { label: 'oxc-parser (native)', bytes: oxc_found.bytes, kind: 'native' },
-				path: oxc_found.path,
-			});
-		}
+		await push_resolved(
+			staged,
+			LABELS.oxc_parser_native,
+			'native',
+			napi_binding_dirs(npm_cache, '@oxc-parser/binding', os, arch, oxc_ver),
+			'.node',
+		);
 
 		// oxfmt native binding (0.50.0+: @oxfmt/binding-{platform}; pre-0.49: @oxfmt/{platform}).
-		const oxfmt_dirs = [
-			`${npm_cache}/@oxfmt/binding-${os}-${arch}-gnu/${oxfmt_ver}`,
-			`${npm_cache}/@oxfmt/binding-${os}-${arch}-musl/${oxfmt_ver}`,
-			`${npm_cache}/@oxfmt/binding-${os}-${arch}/${oxfmt_ver}`,
-		];
-		const oxfmt_found = await resolve_first(oxfmt_dirs, '.node');
-		if (oxfmt_found !== null) {
-			staged.push({
-				entry: { label: 'oxfmt (native)', bytes: oxfmt_found.bytes, kind: 'native' },
-				path: oxfmt_found.path,
-			});
-		}
+		await push_resolved(
+			staged,
+			LABELS.oxfmt_native,
+			'native',
+			napi_binding_dirs(npm_cache, '@oxfmt/binding', os, arch, oxfmt_ver),
+			'.node',
+		);
 
 		// oxc-parser WASM binding (@oxc-parser/binding-wasm32-wasi)
-		const oxc_wasm_found = await resolve_first(
+		await push_resolved(
+			staged,
+			LABELS.oxc_parser_wasm,
+			'wasm',
 			[`${npm_cache}/@oxc-parser/binding-wasm32-wasi/${oxc_ver}`],
 			'.wasm',
 		);
-		if (oxc_wasm_found !== null) {
-			staged.push({
-				entry: { label: 'oxc-parser (wasm)', bytes: oxc_wasm_found.bytes, kind: 'wasm' },
-				path: oxc_wasm_found.path,
-			});
-		}
 	}
 
 	// Stage 2: gzip every collected file in parallel.
@@ -256,12 +292,10 @@ function build_display_entries(sizes: BinarySize[]): {
 	wasm_entries: DisplayRow[];
 	native_entries: DisplayRow[];
 } {
-	const tsv_native = sizes.find((s) => s.label === 'tsv');
-	// "vs tsv" wasm anchor: the flagship full build (`tsv_wasm`, the artifact
-	// the bench executes), falling back to the format subset for reports
-	// generated before shape v2 added the third build.
-	const tsv_wasm = sizes.find((s) => s.label === 'tsv_wasm') ??
-		sizes.find((s) => s.label === 'tsv_format_wasm');
+	const tsv_native = sizes.find((s) => s.label === LABELS.tsv_native);
+	// "vs tsv" wasm anchor: the flagship full build (`tsv_wasm`), the artifact
+	// the bench executes.
+	const tsv_wasm = sizes.find((s) => s.label === LABELS.tsv_wasm);
 
 	const wasm_sizes = sizes.filter((s) => s.kind === 'wasm');
 	const native_sizes = sizes.filter((s) => s.kind === 'native');
@@ -270,11 +304,11 @@ function build_display_entries(sizes: BinarySize[]): {
 	// the sum of the parts' gzipped sizes; that overstates wire size slightly
 	// (two streams don't share a dictionary) but matches how npm ships them
 	// — each binding is its own tarball.
-	const oxc_parser = native_sizes.find((s) => s.label === 'oxc-parser (native)');
-	const oxfmt_entry = native_sizes.find((s) => s.label === 'oxfmt (native)');
+	const oxc_parser = native_sizes.find((s) => s.label === LABELS.oxc_parser_native);
+	const oxfmt_entry = native_sizes.find((s) => s.label === LABELS.oxfmt_native);
 	const combined_oxc: BinarySize | null = oxc_parser && oxfmt_entry
 		? {
-			label: 'oxc-parser+oxfmt (native)',
+			label: LABELS.oxc_combined_native,
 			bytes: oxc_parser.bytes + oxfmt_entry.bytes,
 			gzip_bytes: oxc_parser.gzip_bytes !== null && oxfmt_entry.gzip_bytes !== null
 				? oxc_parser.gzip_bytes + oxfmt_entry.gzip_bytes

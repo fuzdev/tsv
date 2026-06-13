@@ -123,7 +123,7 @@ _Note: every `Nx` is speedup form — values > 1 mean self is faster. File count
 | tsv_wasm                  |  2.9 MB | 911.3 KB |      — |           — |
 | biome (wasm)              | 34.4 MB |   8.2 MB |  11.9x |        9.0x |
 | oxc-parser (wasm)         |  1.9 MB | 518.7 KB |   0.6x |        0.6x |
-| tsv                       |  3.9 MB |   1.6 MB |      — |           — |
+| tsv (native)              |  3.9 MB |   1.6 MB |      — |           — |
 | oxc-parser+oxfmt (native) | 10.7 MB |   4.3 MB |   2.8x |        2.6x |
 | oxc-parser (native)       |  2.7 MB |   1.0 MB |   0.7x |        0.6x |
 | oxfmt (native)            |  8.0 MB |   3.2 MB |   2.1x |        2.0x |
