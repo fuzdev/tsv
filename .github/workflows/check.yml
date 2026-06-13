@@ -8,7 +8,8 @@
 #
 # `check` needs Rust *and* Deno: the fixture suite drives prettier + svelte
 # through a Deno sidecar (npm: specifiers pinned in
-# crates/tsv_debug/src/deno/sidecar.ts and locked in deno.lock), so
+# crates/tsv_debug/src/deno/sidecar.ts and fetched at runtime — not
+# lockfile-pinned, hence the cache-hash on sidecar.ts below), so
 # `cargo test --workspace` panics without Deno — tests/fixtures_tests.rs
 # health-checks the sidecar first. wasm-pack is not needed by `check`.
 
@@ -62,9 +63,12 @@ jobs:
           # Round-trips DENO_DIR across runs — captures the sidecar's runtime
           # npm fetches (prettier/svelte/acorn) since those land in DENO_DIR.
           cache: true
-          # Those versions are pinned in sidecar.ts / actor.rs, NOT deno.lock,
-          # so key on them too — a bump there must invalidate the cached deps.
-          cache-hash: ${{ hashFiles('deno.lock', 'crates/tsv_debug/src/deno/sidecar.ts', 'crates/tsv_debug/src/deno/actor.rs') }}
+          # Key on the sidecar pins (fetched at runtime, not lockfile-pinned) so a
+          # bump invalidates the cached deps. NOT benches/deno/deno.lock: it governs
+          # `test:deno` but is dominated by bench-only tools (biome/oxc/oxfmt) that
+          # `check` never fetches, so keying on it would bust the cache on unrelated
+          # bumps. (There is no root deno.lock — the root config has no external deps.)
+          cache-hash: ${{ hashFiles('crates/tsv_debug/src/deno/sidecar.ts', 'crates/tsv_debug/src/deno/actor.rs') }}
 
       - name: Check
         run: deno task check
