@@ -17,8 +17,9 @@ and [discussions](https://github.com/fuzdev/tsv/discussions).
 
 AI disclosure: this codebase was generated with machine agents.
 The first release took 7 months and ~1800 manual commits.
-Significant effort went into design and quality, but the docs are in rough shape
-and the usual LLM caveats apply.
+Significant effort went into design and quality
+(I think refactoring and quality were well over half of the token spend),
+but the docs are in rough shape and the usual LLM caveats apply.
 
 ## Install
 
@@ -60,7 +61,7 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
 
 ## Design
 
-- supports Svelte, TypeScript, CSS, and JS, plus the HTML semantics within Svelte markup
+- supports Svelte, TypeScript, CSS, JS, and HTML
 - formatting tracks Prettier and prettier-plugin-svelte closely, but intentionally diverges
   in some cases - see [docs/conformance_prettier.md](docs/conformance_prettier.md)
 - tsv can generate a public JSON AST that should exactly match
@@ -69,14 +70,17 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
   but keeps its own internal AST optimized for manipulation over serialization
 - Rust-only implementation that never embeds or calls a JS runtime, for performance;
   JS reaches tsv through the WASM bindings, and native N-API bindings are
-  undecided (feel free to discuss)
+  undecided (open to requests)
 - "optimal artifacts" is an invariant, not a preference: runtime speed and compiled
   code size are first-class goals for every shipped artifact, and heavier future
   layers (incremental parsing, CST for LSP) will be feature-gated so they
   don't regress the artifacts that exist today
-- minimal configuration for now: formatter settings are hardcoded (`print_width: 100`, `tab_width: 2`, `use_tabs: true`);
-  config files and CLI options will come later (linter will need its own configuration) -
-  see [CLAUDE.md § Configuration](CLAUDE.md#configuration), and discussions/requests are welcome
+- minimal configuration for now: formatter settings are hardcoded
+  (`print_width: 100`, `tab_width: 2`, `use_tabs: true`,
+  and `bracketSpacing: false` which may be a bad choice that came from the author's preference);
+  config files and CLI options will come later -
+  see [CLAUDE.md § Configuration](CLAUDE.md#configuration),
+  and discussions/requests are welcome
 - JS and TS always parse as modules in strict mode - sloppy-mode-only syntax
   (`with`, legacy octal literals, etc) is rejected; Svelte and TypeScript are
   inherently strict, so this only matters for standalone JS scripts
@@ -93,6 +97,8 @@ Svelte and CSS entirely - though the published packages include all three.
 Future LSP/incremental features will be later feature-gated layers that don't bloat
 these artifacts - see [docs/architecture.md](docs/architecture.md)
 
+tsv's goal is to be an optimal toolchain for Svelte and TypeScript,
+and avoiding bloat is a key characteristic.
 The scope trade is depth over breadth: a closed language set with an expanding
 tool set, instead of more frameworks. Hard non-goals:
 
@@ -108,6 +114,7 @@ Deferred rather than refused:
 - internal AST stabilization - not any time soon; the public JSON AST is the
   stable surface, tracking Svelte's
 - N-API native bindings - npm is WASM-only for now
+- full Prettier conformance? see [discussion 1](https://github.com/fuzdev/tsv/discussions/1)
 
 tsv is derived from:
 
