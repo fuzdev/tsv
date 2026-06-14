@@ -1199,3 +1199,34 @@ impl<'a> Printer<'a> {
         d.concat(&outer)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use string_interner::DefaultStringInterner;
+
+    /// Run `should_group_binary_continuation` on a parsed binary expression.
+    fn group(src: &str) -> bool {
+        let interner = Rc::new(RefCell::new(DefaultStringInterner::new()));
+        let expr = crate::parse_expression_with_comments(src, 0, interner)
+            .expect("expression should parse")
+            .0;
+        match expr {
+            Expression::BinaryExpression(b) => Printer::should_group_binary_continuation(&b),
+            other => panic!("expected a binary expression, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn should_group_binary_continuation_by_category() {
+        // A logical operand under an arithmetic parent — categories differ, so the
+        // continuation gets its own group.
+        assert!(group("(a && b) + c"));
+        assert!(group("(a && b) * c"));
+        // Flattened same-category chains do NOT group (the left is the same category).
+        assert!(!group("a && b && c"));
+        assert!(!group("a * b * c"));
+    }
+}

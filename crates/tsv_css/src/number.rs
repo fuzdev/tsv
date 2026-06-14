@@ -147,4 +147,20 @@ mod tests {
         assert_eq!(exponent_len("e"), 0);
         assert_eq!(exponent_len("px"), 0);
     }
+
+    #[test]
+    fn number_part_len_malformed_boundaries() {
+        // A second dot terminates the number.
+        assert_eq!(number_part_len("1.2.3"), 3);
+        // Only the first exponent is consumed.
+        assert_eq!(number_part_len("5e10e10"), 4);
+        // Leading-dot fraction plus exponent.
+        assert_eq!(number_part_len(".5e3"), 4);
+        // A lone dot before an exponent (no int/fraction digit) is not a number.
+        assert_eq!(number_part_len(".e3"), 0);
+        // An incomplete exponent (sign, no digit) is rejected — just the `1`.
+        assert_eq!(number_part_len("1e+"), 1);
+        // Underscore is not a CSS number char.
+        assert_eq!(number_part_len("1_000"), 1);
+    }
 }

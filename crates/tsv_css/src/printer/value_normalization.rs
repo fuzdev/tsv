@@ -929,6 +929,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_normalize_css_number_table() {
+        // Mantissa: leading-zero insertion, trailing-zero/dot trimming, with
+        // leading integer zeros and the negative-zero sign preserved.
+        assert_eq!(normalize_css_number(".5"), "0.5");
+        assert_eq!(normalize_css_number("5."), "5");
+        assert_eq!(normalize_css_number("1.50"), "1.5");
+        assert_eq!(normalize_css_number("00.500"), "00.5");
+        assert_eq!(normalize_css_number("-0.0"), "-0");
+        // Exponent: lowercase `e`, drop `+`, strip leading zeros, drop a zero exponent.
+        assert_eq!(normalize_css_number("5e0"), "5");
+        assert_eq!(normalize_css_number("1e+0010"), "1e10");
+        assert_eq!(normalize_css_number("1.5E-3"), "1.5e-3");
+        // A bare trailing `e` (no exponent digits) drops to the mantissa.
+        assert_eq!(normalize_css_number("1e"), "1");
+    }
+
+    #[test]
     fn test_extract_function_args() {
         assert_eq!(
             extract_function_args("prop: var(--a, red)", "var"),

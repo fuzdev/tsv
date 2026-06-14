@@ -523,3 +523,89 @@ pub(in crate::printer) fn has_multiline_object_before_last(
         .iter()
         .any(|arg| is_multiline_object(arg, line_breaks))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use string_interner::DefaultStringInterner;
+
+    /// Parse a bare expression to its internal AST node (spans index into `src`).
+    fn parse_expr(src: &str) -> Expression {
+        let interner = Rc::new(RefCell::new(DefaultStringInterner::new()));
+        crate::parse_expression_with_comments(src, 0, interner)
+            .expect("expression should parse")
+            .0
+    }
+
+    /// Parse a call expression and return its argument list.
+    fn args_of(src: &str) -> Vec<Expression> {
+        match parse_expr(src) {
+            Expression::CallExpression(call) => call.arguments,
+            other => panic!("expected a call expression, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn concise_numeric_array_detection() {
+        assert!(is_concise_numeric_array(&parse_expr("[1, 2, 3]")));
+        // Unary +/- prefixes still count as numeric.
+        assert!(is_concise_numeric_array(&parse_expr("[-1, +2]")));
+        // Empty array is not concise-numeric.
+        assert!(!is_concise_numeric_array(&parse_expr("[]")));
+        // A non-numeric element disqualifies it.
+        assert!(!is_concise_numeric_array(&parse_expr("[1, 'x']")));
+        // A hole is not a numeric element (unlike is_simple_call_argument).
+        assert!(!is_concise_numeric_array(&parse_expr("[1, , 2]")));
+        // Non-array expressions are never concise-numeric.
+        assert!(!is_concise_numeric_array(&parse_expr("foo")));
+    }
+
+    #[test]
+    fn simple_call_argument_depth_and_shape() {
+        // Depth 0 is always "not simple".
+        assert!(!is_simple_call_argument(&parse_expr("x"), 0));
+        // Literals / identifiers are simple at any positive depth.
+        assert!(is_simple_call_argument(&parse_expr("42"), 1));
+        assert!(is_simple_call_argument(&parse_expr("foo"), 1));
+        // Regex is simple only if the pattern width is <= 5.
+        assert!(is_simple_call_argument(&parse_expr("/abcde/"), 2));
+        assert!(!is_simple_call_argument(&parse_expr("/abcdef/"), 2));
+        // A call's args must fit within the remaining depth: `f(a)` needs depth >= 2.
+        assert!(!is_simple_call_argument(&parse_expr("f(a)"), 1));
+        assert!(is_simple_call_argument(&parse_expr("f(a)"), 2));
+        // Spread elements are never simple.
+        assert!(!is_simple_call_argument(&parse_expr("[...x]"), 2));
+    }
+
+    #[test]
+    fn contains_call_expression_recursion() {
+        // An empty call does not count, but we recurse into the callee.
+        assert!(!contains_call_expression(&parse_expr("a.b()")));
+        // A call WITH arguments counts.
+        assert!(contains_call_expression(&parse_expr("a.b(x)")));
+        // Recurse through a binary expression.
+        assert!(contains_call_expression(&parse_expr("a + f(x)")));
+        // A computed member recurses into the property.
+        assert!(contains_call_expression(&parse_expr("a[f(x)]")));
+        // No call anywhere.
+        assert!(!contains_call_expression(&parse_expr("a + b")));
+    }
+
+    #[test]
+    fn function_composition_args_detection() {
+        // Two arrow args ⇒ composition.
+        assert!(is_function_composition_args(&args_of(
+            "compose(a => a, b => b)"
+        )));
+        // A single arg is never composition.
+        assert!(!is_function_composition_args(&args_of("f(a => a)")));
+        // A call argument that itself wraps a callback ⇒ composition.
+        assert!(is_function_composition_args(&args_of(
+            "compose(x, g(() => {}))"
+        )));
+        // Two non-function args ⇒ not composition.
+        assert!(!is_function_composition_args(&args_of("f(a, b)")));
+    }
+}

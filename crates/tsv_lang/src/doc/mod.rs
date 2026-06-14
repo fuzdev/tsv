@@ -119,6 +119,18 @@ mod arena_tests {
     }
 
     #[test]
+    fn test_available_width() {
+        // PRINT_WIDTH = 100, TAB_WIDTH = 2.
+        assert_eq!(available_width(0, 0, 0), 100);
+        // indent 2 levels (2*2=4) + 1 trailing char reserved.
+        assert_eq!(available_width(2, 0, 1), 100 - 4 - 1);
+        // current_column (50) dominates the indent width (1*2=2).
+        assert_eq!(available_width(1, 50, 0), 50);
+        // saturating floor: never underflows below 0.
+        assert_eq!(available_width(0, 200, 0), 0);
+    }
+
+    #[test]
     fn test_arena_simple_text() {
         let a = DocArena::new(2);
         let doc = a.text("hello");
@@ -681,6 +693,41 @@ mod arena_tests {
         let a = DocArena::new(2);
         let doc = a.group(a.concat(&[a.text("hello"), a.line(), a.text("world")]));
         assert_eq!(render_pw_tab(&a, doc, 8), "hello\nworld");
+    }
+
+    #[test]
+    fn test_conditional_group_picks_first_fitting_state() {
+        // Three plain-text states of decreasing width; the renderer tries them in
+        // order and renders the first whose flat form fits the print width.
+        fn build(a: &DocArena) -> DocId {
+            a.conditional_group(&[
+                a.text("WWWWWWWWWW"), // width 10
+                a.text("MMMMM"),      // width 5
+                a.text("SS"),         // width 2
+            ])
+        }
+        let a = DocArena::new(2);
+        let doc = build(&a);
+        assert_eq!(render_pw(&a, doc, 20), "WWWWWWWWWW"); // first state fits
+        assert_eq!(render_pw(&a, doc, 7), "MMMMM"); // only the 5-wide state fits
+        assert_eq!(render_pw(&a, doc, 3), "SS"); // only the 2-wide state fits
+        // Nothing fits → fall back to the last state.
+        assert_eq!(render_pw(&a, doc, 1), "SS");
+    }
+
+    #[test]
+    fn test_conditional_group_single_state() {
+        // A lone state (no expanded states) renders directly.
+        let a = DocArena::new(2);
+        let doc = a.conditional_group(&[a.text("x")]);
+        assert_eq!(render_pw(&a, doc, 1), "x");
+    }
+
+    #[test]
+    #[should_panic(expected = "conditional_group requires at least one state")]
+    fn test_conditional_group_empty_panics() {
+        let a = DocArena::new(2);
+        a.conditional_group(&[]);
     }
 
     #[test]

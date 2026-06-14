@@ -335,4 +335,47 @@ mod tests {
             BinaryOperator::LessThan
         ));
     }
+
+    #[test]
+    fn test_exponentiation_never_flattens() {
+        // ** is right-associative: a parent of ** short-circuits flattening (Step 5),
+        // even against another ** at the same precedence level.
+        assert!(!should_flatten(
+            BinaryOperator::StarStar,
+            BinaryOperator::StarStar
+        ));
+    }
+
+    #[test]
+    fn test_bitshift_pairs_dont_flatten() {
+        // Bitshift operators share precedence (9) but prettier parenthesizes chains
+        // for clarity (Step 6) — unlike additive ops, same-op bitshift does NOT flatten.
+        assert!(!should_flatten(
+            BinaryOperator::LeftShift,
+            BinaryOperator::LeftShift
+        ));
+        assert!(!should_flatten(
+            BinaryOperator::LeftShift,
+            BinaryOperator::RightShift
+        ));
+        assert!(!should_flatten(
+            BinaryOperator::UnsignedRightShift,
+            BinaryOperator::RightShift
+        ));
+    }
+
+    #[test]
+    fn test_right_associative_negatives() {
+        // Only ** is right-associative; pin a representative spread of the rest.
+        for op in [
+            BinaryOperator::PipePipe,
+            BinaryOperator::AmpersandAmpersand,
+            BinaryOperator::LeftShift,
+            BinaryOperator::Percent,
+            BinaryOperator::Slash,
+            BinaryOperator::EqualsEqualsEquals,
+        ] {
+            assert!(!is_right_associative(op));
+        }
+    }
 }

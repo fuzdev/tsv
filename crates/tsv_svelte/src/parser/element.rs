@@ -477,3 +477,48 @@ impl<'a> SvelteParser<'a> {
         })])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{VOID_ELEMENTS, is_component, is_void};
+
+    #[test]
+    fn component_classification_by_last_segment() {
+        // Uppercase first char (of the last dotted segment) ⇒ component.
+        assert!(is_component("Comp"));
+        assert!(is_component("ns.Comp"));
+        assert!(is_component("deep.nested.Comp"));
+        // Lowercase ⇒ regular HTML element, even with dots.
+        assert!(!is_component("div"));
+        assert!(!is_component("ns.lower"));
+        // Empty name has no first char.
+        assert!(!is_component(""));
+        // Non-ASCII uppercase still counts.
+        assert!(is_component("Über"));
+        assert!(!is_component("élan"));
+    }
+
+    #[test]
+    fn void_element_detection_and_doctype() {
+        assert!(is_void("br"));
+        assert!(is_void("input"));
+        // `!doctype` is case-insensitive; everything else is exact.
+        assert!(is_void("!doctype"));
+        assert!(is_void("!DOCTYPE"));
+        assert!(!is_void("div"));
+        assert!(!is_void("BR"));
+    }
+
+    #[test]
+    fn void_list_stays_in_parity_with_tsv_html() {
+        // The parser keeps its own VOID_ELEMENTS list duplicating tsv_html's;
+        // they must not drift (a divergence would split parsing from classification).
+        for &name in VOID_ELEMENTS {
+            assert!(
+                tsv_html::is_void_element(name),
+                "{name} is void in the parser but not in tsv_html"
+            );
+        }
+        assert_eq!(is_void("!DOCTYPE"), tsv_html::is_void_element("!DOCTYPE"));
+    }
+}
