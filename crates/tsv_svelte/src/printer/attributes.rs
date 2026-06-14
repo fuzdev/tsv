@@ -93,10 +93,20 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build a Doc for a trailing JS comment (after content)
+    /// Build a Doc for a trailing JS comment (after content), before a closing
+    /// `}` / `)` / ` as ` token emitted by the caller.
     ///
-    /// Block comments: ` /*content*/` (with leading space)
-    /// Line comments: ` // content` (with leading space, no hardline)
+    /// Block comments: ` /*content*/` (inline, leading space) — the closing token
+    /// follows on the same line.
+    /// Line comments: ` // content` + `hardline` — a `//` comment runs to end of
+    /// line, so the closing token MUST drop to the next line; otherwise it would be
+    /// swallowed into the comment and lost on reparse. Unlike a trailing line comment
+    /// on a TypeScript statement (deferred past the `;` via `line_suffix`), here the
+    /// brace stays in expression context — text past `}` is Svelte template text, so
+    /// `line_suffix` would render the comment on the page. Keeping `}` on its own line
+    /// is the only placement that preserves the comment and stays idempotent. See
+    /// `docs/conformance_prettier.md` §Comment Position Philosophy and the
+    /// `expr_trailing_line` divergence fixture.
     pub(super) fn build_trailing_js_comment_doc(&self, comment: &tsv_lang::Comment) -> DocId {
         let d = self.d();
         if comment.is_block {
@@ -107,7 +117,11 @@ impl<'a> Printer<'a> {
             ])
         } else {
             // Content already includes the space after // (e.g., " comment" from "// comment")
-            d.concat(&[d.text(" //"), d.text_owned(comment.content.clone())])
+            d.concat(&[
+                d.text(" //"),
+                d.text_owned(comment.content.clone()),
+                d.hardline(),
+            ])
         }
     }
 
@@ -518,8 +532,15 @@ impl<'a> Printer<'a> {
                 | tsv_ts::ast::internal::Expression::BinaryExpression(_)
         );
 
+        // A trailing line comment already forces `}` onto its own line (its doc ends
+        // in a hardline). Hug it directly — block structure would add its own softline
+        // before `}`, leaving a stray blank line (`={\n\texpr // c\n\n}`).
+        let has_trailing_line_comment = tag_span.is_some_and(|span| {
+            tsv_lang::has_line_comments_in_range(self.comments, expr.span().end, span.end - 1)
+        });
+
         let d = self.d();
-        let inner = if is_hugged {
+        let inner = if is_hugged || has_trailing_line_comment {
             // Hugged: the expression's internal doc handles wrapping
             let content = d.concat(&expr_content);
             d.concat(&[d.text("{"), content, d.text("}")])
@@ -675,22 +696,19 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = vec![d.text("{")];
 
-        // Add leading comments between { and expression
+        // Add leading comments between { and expression (block inline, line + hardline)
         let expr_start = tag.expression.span().start;
         for comment in tsv_lang::comments_in_range(self.comments, tag.span.start + 1, expr_start) {
-            if comment.is_block {
-                parts.push(d.text_owned(format!("/*{}*/ ", comment.content)));
-            }
+            parts.push(self.build_leading_js_comment_doc(comment));
         }
 
         parts.push(self.build_expression_doc_for_attribute(&tag.expression));
 
-        // Add trailing comments (block comments only in expression tags)
+        // Add trailing comments. A line comment forces `}` onto its own line (the
+        // helper appends a hardline) so the `//` doesn't swallow the brace.
         let expr_end = tag.expression.span().end;
         for comment in tsv_lang::comments_in_range(self.comments, expr_end, tag.span.end - 1) {
-            if comment.is_block {
-                parts.push(d.text_owned(format!(" /*{}*/", comment.content)));
-            }
+            parts.push(self.build_trailing_js_comment_doc(comment));
         }
 
         parts.push(d.text("}"));

@@ -203,7 +203,7 @@ Prettier preserves byte-order marks. tsv strips them (they serve no purpose in U
 
 ### Svelte: Attributes
 
-**Trailing comments in `{...}`** (content preservation) — [expr_trailing](../tests/fixtures/svelte/syntax/comments/expr_trailing_prettier_divergence/).
+**Trailing comments in `{...}`** (content preservation) — [expr_trailing](../tests/fixtures/svelte/syntax/comments/expr_trailing_prettier_divergence/) (block comments, inline); [expr_trailing_line](../tests/fixtures/svelte/syntax/comments/expr_trailing_line_prettier_divergence/) (line comments — `}` kept on its own line so the `//` doesn't swallow it).
 
 ### Svelte: Blocks
 
