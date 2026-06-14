@@ -97,6 +97,12 @@ impl<'a> Printer<'a> {
     /// Comments are positioned relative to the first semicolon found in the
     /// source range `member_end..upper_bound`. If no semicolon exists in source,
     /// all comments are placed before the semicolon.
+    ///
+    /// A trailing **line** comment is emitted via `line_suffix` (zero width) so it
+    /// doesn't poison the member's own `fits()` — a long trailing comment on a
+    /// member whose type fits inline (e.g. a union) must not force that type to
+    /// break (matches prettier's `lineSuffix`, and the interface-member path). Block
+    /// comments stay inline since their width does count toward the line.
     fn build_comments_around_semicolon_doc(
         &self,
         comments: &[&tsv_lang::Comment],
@@ -118,15 +124,25 @@ impl<'a> Printer<'a> {
 
         let mut docs = Vec::with_capacity(before_semi.len() + after_semi.len() + 1);
         for comment in before_semi {
-            docs.push(d.text(" "));
-            docs.push(self.build_comment_doc(comment));
+            self.push_member_semicolon_comment(&mut docs, comment);
         }
         docs.push(d.text(";"));
         for comment in after_semi {
-            docs.push(d.text(" "));
-            docs.push(self.build_comment_doc(comment));
+            self.push_member_semicolon_comment(&mut docs, comment);
         }
         docs
+    }
+
+    /// Push a single trailing comment for a type-literal member: a line comment via
+    /// `line_suffix` (excluded from width), a block comment inline with a leading
+    /// space. See `build_comments_around_semicolon_doc`.
+    fn push_member_semicolon_comment(&self, docs: &mut Vec<DocId>, comment: &tsv_lang::Comment) {
+        if comment.is_block {
+            docs.push(self.d().text(" "));
+            docs.push(self.build_comment_doc(comment));
+        } else {
+            docs.push(self.build_trailing_line_comment_doc(comment));
+        }
     }
 
     //
