@@ -102,7 +102,8 @@ See [Debug Tooling](#debug-tooling).
 # Deno tasks (recommended)
 deno task build            # workspace dev build
 deno task build:release    # workspace optimized build
-deno task build:all        # release + ffi + deno WASM bundles + npm packages
+deno task build:all        # release + ffi + build:packages (everything)
+deno task build:packages   # the 6 publishable WASM bundles (npm + deno) — single source of truth shared by CI + publish.ts
 deno task build:ffi        # C FFI library
 deno task build:wasm:deno  # deno-target WASM bundle (requires wasm-pack; :parse:deno / :all:deno for the other variants)
 deno task clean            # clean build artifacts
