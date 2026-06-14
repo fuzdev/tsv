@@ -368,14 +368,7 @@ impl<'a> Printer<'a> {
         for comment in
             tsv_lang::comments_in_range(self.comments, consequent_end, comments_before_colon_end)
         {
-            if comment.is_block {
-                // Block comments count toward width
-                q_parts.push(d.text(" "));
-                q_parts.push(self.build_comment_doc(comment));
-            } else {
-                // Line comments use line_suffix to exclude from width calculations
-                q_parts.push(self.build_trailing_line_comment_doc(comment));
-            }
+            q_parts.push(self.build_trailing_comment_doc(comment));
         }
 
         // : on new line

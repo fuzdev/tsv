@@ -1694,14 +1694,8 @@ impl<'a> Printer<'a> {
         type_params_end: u32,
         paren_pos: u32,
     ) {
-        let d = self.d();
         for comment in comments_in_range(self.comments, type_params_end, paren_pos) {
-            if comment.is_block {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-            } else {
-                parts.push(self.build_trailing_line_comment_doc(comment));
-            }
+            parts.push(self.build_trailing_comment_doc(comment));
         }
     }
 
@@ -1713,6 +1707,22 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_trailing_line_comment_doc(&self, comment: &internal::Comment) -> DocId {
         let d = self.d();
         d.line_suffix(d.concat(&[d.text(" "), self.build_comment_doc(comment)]))
+    }
+
+    /// Build a doc for a single trailing comment (`expr /* c */` or `expr; // c`).
+    ///
+    /// A **block** comment is inline with a leading space — its width counts toward
+    /// the line. A **line** comment goes through `line_suffix` (zero width), so a
+    /// long trailing comment never forces a preceding group (e.g. a member's union
+    /// type) to break. Shared by every spot that trails a comment on a member or
+    /// inner type without semicolon-relative positioning.
+    pub(crate) fn build_trailing_comment_doc(&self, comment: &internal::Comment) -> DocId {
+        if comment.is_block {
+            let d = self.d();
+            d.concat(&[d.text(" "), self.build_comment_doc(comment)])
+        } else {
+            self.build_trailing_line_comment_doc(comment)
+        }
     }
 
     /// Emit leading comments in `[keyword_end, value_start)` followed by

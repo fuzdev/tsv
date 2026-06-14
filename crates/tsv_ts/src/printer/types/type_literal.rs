@@ -96,7 +96,10 @@ impl<'a> Printer<'a> {
     ///
     /// Comments are positioned relative to the first semicolon found in the
     /// source range `member_end..upper_bound`. If no semicolon exists in source,
-    /// all comments are placed before the semicolon.
+    /// all comments are placed before the semicolon. Each comment is emitted via
+    /// `build_trailing_comment_doc` — block inline, line through `line_suffix` so a
+    /// long trailing comment never forces the member's own type (e.g. a union) to
+    /// break (matches prettier and the interface-member path).
     fn build_comments_around_semicolon_doc(
         &self,
         comments: &[&tsv_lang::Comment],
@@ -118,13 +121,11 @@ impl<'a> Printer<'a> {
 
         let mut docs = Vec::with_capacity(before_semi.len() + after_semi.len() + 1);
         for comment in before_semi {
-            docs.push(d.text(" "));
-            docs.push(self.build_comment_doc(comment));
+            docs.push(self.build_trailing_comment_doc(comment));
         }
         docs.push(d.text(";"));
         for comment in after_semi {
-            docs.push(d.text(" "));
-            docs.push(self.build_comment_doc(comment));
+            docs.push(self.build_trailing_comment_doc(comment));
         }
         docs
     }
@@ -395,8 +396,7 @@ impl<'a> Printer<'a> {
                     // In break mode semicolon is added, comments still come after
                     member_parts.push(d.if_break(d.text(";"), d.empty()));
                     for comment in &trailing {
-                        member_parts.push(d.text(" "));
-                        member_parts.push(self.build_comment_doc(comment));
+                        member_parts.push(self.build_trailing_comment_doc(comment));
                     }
                 } else {
                     // Non-last: semicolon always present, preserve comment position
@@ -634,8 +634,7 @@ impl<'a> Printer<'a> {
                 } else {
                     // Last member in hugging mode: no semicolon
                     for comment in &trailing {
-                        parts.push(d.text(" "));
-                        parts.push(self.build_comment_doc(comment));
+                        parts.push(self.build_trailing_comment_doc(comment));
                     }
                 }
             }
@@ -670,8 +669,7 @@ impl<'a> Printer<'a> {
                     // Last member: semicolon only when broken, comments after
                     member_parts.push(d.if_break(d.text(";"), d.empty()));
                     for comment in &trailing {
-                        member_parts.push(d.text(" "));
-                        member_parts.push(self.build_comment_doc(comment));
+                        member_parts.push(self.build_trailing_comment_doc(comment));
                     }
                 } else {
                     // Non-last: preserve comment position relative to semicolon
@@ -763,13 +761,7 @@ impl<'a> Printer<'a> {
                 }
                 parts.push(inner);
                 for comment in &trailing {
-                    if comment.is_block {
-                        parts.push(d.text(" "));
-                        parts.push(self.build_comment_doc(comment));
-                    } else {
-                        let suffix = d.concat(&[d.text(" "), self.build_comment_doc(comment)]);
-                        parts.push(d.line_suffix(suffix));
-                    }
+                    parts.push(self.build_trailing_comment_doc(comment));
                 }
                 d.concat(&parts)
             }
