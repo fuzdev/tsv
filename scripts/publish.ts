@@ -87,21 +87,6 @@ const packages = [
 	},
 ];
 
-/**
- * Everything Step 6 validates, including the unpublished deno bundles —
- * stale bundles must never gate (or falsely pass) a publish. Ordered to
- * group cargo feature sets (format, format, parse, parse, default, default)
- * so the crate recompiles once per feature set instead of once per task.
- */
-const build_tasks = [
-	'build:npm:format',
-	'build:wasm:deno',
-	'build:npm:parse',
-	'build:wasm:parse:deno',
-	'build:npm:all',
-	'build:wasm:all:deno',
-];
-
 /** Only the release files — a stray file generated mid-pipeline must never
  * ride into the release commit. */
 const release_files = [CARGO_PATH, 'Cargo.lock', CHANGELOG_PATH];
@@ -315,9 +300,13 @@ if (no_check) {
 // Step 4: Build
 
 console.log('\n=== Step 4: Build WASM bundles (npm + deno) ===');
-for (const build_task of build_tasks) {
-	run(`deno task ${build_task}`, 'deno', ['task', build_task]);
-}
+// Single source of truth for the publishable artifact build: the `build:packages`
+// task in deno.json. It builds everything Step 6 validates, including the
+// unpublished deno bundles (stale bundles must never gate or falsely pass a
+// publish), and is ordered to group cargo feature sets (format, format, parse,
+// parse, default, default) so the wasm crate compiles once per feature set, not
+// once per task. CI's artifacts job runs the same task, so the two can't drift.
+run('deno task build:packages', 'deno', ['task', 'build:packages']);
 
 // Step 5: Verify built packages
 
