@@ -11,6 +11,7 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
 ## Unreleased
 <!-- bump: minor -->
 
+- various conformance fixes
 - formatting is now **non-configurable by design** — no config files, CLI flags,
   or runtime options, and none are planned (opinionated like `gofmt` and Black).
   Reverses the earlier "config options will come later" note in the docs. No
