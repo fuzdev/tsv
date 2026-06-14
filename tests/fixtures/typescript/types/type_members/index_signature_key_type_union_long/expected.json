@@ -1,0 +1,754 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 649,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Union key at exactly 100 cols stays fully inline (no wrap)",
+			"start": 20,
+			"end": 81,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " At 101 cols the bracket breaks; the key and union move to one indented line",
+			"start": 201,
+			"end": 279,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A union too wide to fit even after the bracket breaks wraps onto leading pipes",
+			"start": 407,
+			"end": 488,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 82
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 648,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 639,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 22,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 83,
+					"end": 198,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 93,
+						"end": 94,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 11
+							},
+							"end": {
+								"line": 3,
+								"column": 12
+							}
+						},
+						"name": "A"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 95,
+						"end": 198,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 13
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSIndexSignature",
+								"start": 99,
+								"end": 195,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 98
+									}
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 100,
+										"end": 184,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 3
+											},
+											"end": {
+												"line": 4,
+												"column": 87
+											}
+										},
+										"name": "k",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 101,
+											"end": 184,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 4
+												},
+												"end": {
+													"line": 4,
+													"column": 87
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSUnionType",
+												"start": 103,
+												"end": 184,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 6
+													},
+													"end": {
+														"line": 4,
+														"column": 87
+													}
+												},
+												"types": [
+													{
+														"type": "TSTypeReference",
+														"start": 103,
+														"end": 142,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 6
+															},
+															"end": {
+																"line": 4,
+																"column": 45
+															}
+														},
+														"typeName": {
+															"type": "Identifier",
+															"start": 103,
+															"end": 142,
+															"loc": {
+																"start": {
+																	"line": 4,
+																	"column": 6
+																},
+																"end": {
+																	"line": 4,
+																	"column": 45
+																}
+															},
+															"name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+														}
+													},
+													{
+														"type": "TSTypeReference",
+														"start": 145,
+														"end": 184,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 48
+															},
+															"end": {
+																"line": 4,
+																"column": 87
+															}
+														},
+														"typeName": {
+															"type": "Identifier",
+															"start": 145,
+															"end": 184,
+															"loc": {
+																"start": {
+																	"line": 4,
+																	"column": 48
+																},
+																"end": {
+																	"line": 4,
+																	"column": 87
+																}
+															},
+															"name": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 185,
+									"end": 194,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 88
+										},
+										"end": {
+											"line": 4,
+											"column": 97
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSBooleanKeyword",
+										"start": 187,
+										"end": 194,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 90
+											},
+											"end": {
+												"line": 4,
+												"column": 97
+											}
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Union key at exactly 100 cols stays fully inline (no wrap)",
+							"start": 20,
+							"end": 81
+						}
+					]
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 281,
+					"end": 404,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 291,
+						"end": 292,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 11
+							},
+							"end": {
+								"line": 8,
+								"column": 12
+							}
+						},
+						"name": "B"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 293,
+						"end": 404,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 13
+							},
+							"end": {
+								"line": 12,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSIndexSignature",
+								"start": 297,
+								"end": 401,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 13
+									}
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 302,
+										"end": 387,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 3
+											},
+											"end": {
+												"line": 10,
+												"column": 88
+											}
+										},
+										"name": "k",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 303,
+											"end": 387,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 4
+												},
+												"end": {
+													"line": 10,
+													"column": 88
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSUnionType",
+												"start": 305,
+												"end": 387,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 6
+													},
+													"end": {
+														"line": 10,
+														"column": 88
+													}
+												},
+												"types": [
+													{
+														"type": "TSTypeReference",
+														"start": 305,
+														"end": 344,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 6
+															},
+															"end": {
+																"line": 10,
+																"column": 45
+															}
+														},
+														"typeName": {
+															"type": "Identifier",
+															"start": 305,
+															"end": 344,
+															"loc": {
+																"start": {
+																	"line": 10,
+																	"column": 6
+																},
+																"end": {
+																	"line": 10,
+																	"column": 45
+																}
+															},
+															"name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+														}
+													},
+													{
+														"type": "TSTypeReference",
+														"start": 347,
+														"end": 387,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 48
+															},
+															"end": {
+																"line": 10,
+																"column": 88
+															}
+														},
+														"typeName": {
+															"type": "Identifier",
+															"start": 347,
+															"end": 387,
+															"loc": {
+																"start": {
+																	"line": 10,
+																	"column": 48
+																},
+																"end": {
+																	"line": 10,
+																	"column": 88
+																}
+															},
+															"name": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 391,
+									"end": 400,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 3
+										},
+										"end": {
+											"line": 11,
+											"column": 12
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSBooleanKeyword",
+										"start": 393,
+										"end": 400,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 5
+											},
+											"end": {
+												"line": 11,
+												"column": 12
+											}
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 101 cols the bracket breaks; the key and union move to one indented line",
+							"start": 201,
+							"end": 279
+						}
+					]
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 490,
+					"end": 638,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 500,
+						"end": 501,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 11
+							},
+							"end": {
+								"line": 15,
+								"column": 12
+							}
+						},
+						"name": "C"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 502,
+						"end": 638,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 13
+							},
+							"end": {
+								"line": 21,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSIndexSignature",
+								"start": 506,
+								"end": 635,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 13
+									}
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 511,
+										"end": 621,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 3
+											},
+											"end": {
+												"line": 19,
+												"column": 53
+											}
+										},
+										"name": "k",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 512,
+											"end": 621,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 4
+												},
+												"end": {
+													"line": 19,
+													"column": 53
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSUnionType",
+												"start": 518,
+												"end": 621,
+												"loc": {
+													"start": {
+														"line": 18,
+														"column": 4
+													},
+													"end": {
+														"line": 19,
+														"column": 53
+													}
+												},
+												"types": [
+													{
+														"type": "TSTypeReference",
+														"start": 520,
+														"end": 567,
+														"loc": {
+															"start": {
+																"line": 18,
+																"column": 6
+															},
+															"end": {
+																"line": 18,
+																"column": 53
+															}
+														},
+														"typeName": {
+															"type": "Identifier",
+															"start": 520,
+															"end": 567,
+															"loc": {
+																"start": {
+																	"line": 18,
+																	"column": 6
+																},
+																"end": {
+																	"line": 18,
+																	"column": 53
+																}
+															},
+															"name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+														}
+													},
+													{
+														"type": "TSTypeReference",
+														"start": 574,
+														"end": 621,
+														"loc": {
+															"start": {
+																"line": 19,
+																"column": 6
+															},
+															"end": {
+																"line": 19,
+																"column": 53
+															}
+														},
+														"typeName": {
+															"type": "Identifier",
+															"start": 574,
+															"end": 621,
+															"loc": {
+																"start": {
+																	"line": 19,
+																	"column": 6
+																},
+																"end": {
+																	"line": 19,
+																	"column": 53
+																}
+															},
+															"name": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 625,
+									"end": 634,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 3
+										},
+										"end": {
+											"line": 20,
+											"column": 12
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSBooleanKeyword",
+										"start": 627,
+										"end": 634,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 5
+											},
+											"end": {
+												"line": 20,
+												"column": 12
+											}
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A union too wide to fit even after the bracket breaks wraps onto leading pipes",
+							"start": 407,
+							"end": 488
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
