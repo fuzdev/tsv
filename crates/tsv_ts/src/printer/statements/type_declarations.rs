@@ -1272,41 +1272,45 @@ impl<'a> Printer<'a> {
                     .map_or(cursor, |p| p as u32);
                     self.push_pre_name_comments_doc(&mut parts, cursor, bracket_pos);
                 }
-                parts.push(d.text("["));
-                for (idx, param) in i.parameters.iter().enumerate() {
-                    if idx > 0 {
-                        parts.push(d.text(", "));
-                    }
-                    parts.push(d.symbol(param.name.to_u32()));
-                    if let Some(ta) = &param.type_annotation {
-                        // Comments between param name and colon: `[key /* c */ : string]`
-                        let colon_pos = ta.span.start;
-                        let name_end = skip_identifier_at(
-                            self.source.as_bytes(),
-                            param.span.start as usize,
-                            colon_pos as usize,
-                        ) as u32;
-                        if let Some(comment_doc) =
-                            self.build_inline_comments_between_doc_opt(name_end, colon_pos)
-                        {
-                            parts.push(comment_doc);
-                            parts.push(d.text(" : "));
-                        } else {
-                            parts.push(d.text(": "));
+                // Build each `key: keyType` param, then wrap `[ … ]` in a group so the
+                // bracket breaks (key onto its own line) when the key type breaks — matching
+                // prettier's index-signature.js. The type-literal printer
+                // (`build_type_element_index_signature_doc`) uses the same structure.
+                let param_docs: Vec<DocId> = i
+                    .parameters
+                    .iter()
+                    .map(|param| {
+                        let mut param_parts = vec![d.symbol(param.name.to_u32())];
+                        if let Some(ta) = &param.type_annotation {
+                            // Comments between the key name and the colon: `[key /* c */ : string]`.
+                            // Prettier adds a space before `:` when such a comment is present.
+                            let colon_pos = ta.span.start;
+                            let name_end = skip_identifier_at(
+                                self.source.as_bytes(),
+                                param.span.start as usize,
+                                colon_pos as usize,
+                            ) as u32;
+                            if let Some(comment_doc) =
+                                self.build_inline_comments_between_doc_opt(name_end, colon_pos)
+                            {
+                                param_parts.push(comment_doc);
+                                param_parts.push(d.text(" "));
+                            }
+                            // Delegate the `: keyType` — colon→type comments (line comments break,
+                            // never merge) and the union/intersection break layout — to the shared
+                            // annotation printer.
+                            param_parts.push(self.build_type_annotation_doc(ta));
                         }
-                        // Comments between colon and type: `[key: /* c */ B | C]`
-                        let key_colon_end = colon_pos + 1;
-                        let key_type_start = ta.type_annotation.span().start;
-                        parts.push(self.build_comments_between(
-                            key_colon_end,
-                            key_type_start,
-                            CommentSpacing::Trailing,
-                        ));
-                        parts.push(self.build_type_doc(&ta.type_annotation));
-                    }
-                }
+                        d.concat(&param_parts)
+                    })
+                    .collect();
+                parts.push(d.group(d.concat(&[
+                    d.text("["),
+                    d.indent_softline(d.join(param_docs, ", ")),
+                    d.softline(),
+                    d.text("]"),
+                ])));
                 // Value type annotation: use build_type_annotation_doc for comment handling
-                parts.push(d.text("]"));
                 parts.push(self.build_type_annotation_doc(&i.type_annotation));
                 parts.push(d.text(";"));
                 d.concat(&parts)

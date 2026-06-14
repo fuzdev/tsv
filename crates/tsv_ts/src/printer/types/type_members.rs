@@ -299,56 +299,24 @@ impl<'a> Printer<'a> {
             .map(|param| {
                 let mut param_parts = vec![d.symbol(param.name.to_u32())];
                 if let Some(type_ann) = &param.type_annotation {
-                    // Extract comments between param name and colon: `[key /* c */ : string]`
-                    // Prettier adds space before `:` when comments present
+                    // Comments between the key name and the colon: `[key /* c */ : string]`.
+                    // Prettier adds a space before `:` when such a comment is present.
                     let colon_pos = type_ann.span.start;
                     let name_end = skip_identifier_at(
                         self.source.as_bytes(),
                         param.span.start as usize,
                         colon_pos as usize,
                     ) as u32;
-                    let has_pre_colon_comment = if let Some(comment_doc) =
+                    if let Some(comment_doc) =
                         self.build_inline_comments_between_doc_opt(name_end, colon_pos)
                     {
                         param_parts.push(comment_doc);
-                        true
-                    } else {
-                        false
-                    };
-                    let key_colon_end = colon_pos + 1;
-                    let key_type_start = type_ann.type_annotation.span().start;
-                    // Union/Intersection key types: break after `:` with leading `|` or trailing `&`
-                    let breaking_type_doc = match type_ann.type_annotation.as_ref() {
-                        TSType::Union(u) => Some(self.build_union_type_doc(u, false)),
-                        TSType::Intersection(i) => Some(self.build_intersection_type_doc(i, false)),
-                        _ => None,
-                    };
-                    if let Some(type_doc) = breaking_type_doc {
-                        let comments_doc = self.build_comments_between(
-                            key_colon_end,
-                            key_type_start,
-                            CommentSpacing::Trailing,
-                        );
-                        param_parts.push(d.text(if has_pre_colon_comment { " :" } else { ":" }));
-                        param_parts
-                            .push(hang_after_operator(d, d.concat(&[comments_doc, type_doc])));
-                    } else {
-                        // Regular key type: use standard annotation
-                        // build_type_annotation_doc emits `: type`, need space before `:` with comments
-                        if has_pre_colon_comment {
-                            let type_start = type_ann.type_annotation.span().start;
-                            let colon_end = colon_pos + 1;
-                            param_parts.push(d.text(" :"));
-                            // Handle comments between `:` and type (delegate to existing logic)
-                            let between_doc =
-                                self.build_inline_comments_between_doc(colon_end, type_start);
-                            param_parts.push(d.text(" "));
-                            param_parts.push(between_doc);
-                            param_parts.push(self.build_type_doc(&type_ann.type_annotation));
-                        } else {
-                            param_parts.push(self.build_type_annotation_doc(type_ann));
-                        }
+                        param_parts.push(d.text(" "));
                     }
+                    // Delegate the `: keyType` — colon→type comments (line comments break,
+                    // never merge) and the union/intersection break layout — to the shared
+                    // annotation printer.
+                    param_parts.push(self.build_type_annotation_doc(type_ann));
                 }
                 d.concat(&param_parts)
             })
