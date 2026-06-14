@@ -13,3 +13,9 @@
 <button on:click={fn/* c */}>text</button>
 <div class:class1={cond/* c */}></div>
 <div use:fn={expr/* c */}></div>
+{foo/* c */}
+{@render fn()/* c */}
+<div style:color={expr/* c */}></div>
+<div transition:fn={expr/* c */}></div>
+<div animate:fn={expr/* c */}></div>
+<Comp let:v={expr/* c */}></Comp>
