@@ -35,37 +35,30 @@ impl<'a> Printer<'a> {
 
         // Check if there's a line comment between : and the type
         if self.has_line_comments_between(colon_end, type_start) {
-            // Check if type is union (gets indented) or intersection (stays at same level)
-            let is_union = matches!(&*annotation.type_annotation, TSType::Union(_));
-            let is_intersection = matches!(&*annotation.type_annotation, TSType::Intersection(_));
-
-            if is_union {
-                // Line comment stays before union, type on new INDENTED line
-                let comments_doc = self.build_inline_comments_between_doc(colon_end, type_start);
+            // Each comment is emitted with a break after a LINE comment so it
+            // terminates at end-of-line — otherwise a following comment (or the
+            // type) is swallowed into the line comment's text (`// a // b`
+            // reparses as one comment: a content loss). `break_for_line` keeps
+            // block comments inline (trailing space) and breaks after line
+            // comments, so the first comment trails `:` and any remaining
+            // comments land on their own lines.
+            let comments_doc = self.build_trailing_comments_break_for_line(colon_end, type_start);
+            if matches!(&*annotation.type_annotation, TSType::Union(_)) {
+                // Union: the remaining comments and the type indent one level.
+                // The `indent` wraps the leading space + comments + type, so only
+                // the first comment stays flush on the `:` line; the breaks inside
+                // (between comments, and before the type) land at the indent.
                 d.concat(&[
                     d.text(":"),
-                    comments_doc,
-                    // Wrap hardline inside indent so the line break is at the indented level
                     d.indent(d.concat(&[
-                        d.hardline(),
+                        d.text(" "),
+                        comments_doc,
                         self.build_type_doc(&annotation.type_annotation),
                     ])),
                 ])
-            } else if is_intersection {
-                // Line comment stays before intersection, type on new line (NOT indented)
-                let comments_doc = self.build_inline_comments_between_doc(colon_end, type_start);
-                d.concat(&[
-                    d.text(":"),
-                    comments_doc,
-                    d.hardline(),
-                    self.build_type_doc(&annotation.type_annotation),
-                ])
             } else {
-                // Simple type with a line comment between `:` and the type.
-                // The comment must terminate at end-of-line — emit it inline after `:`,
-                // then a hardline before the type so the line comment doesn't swallow it.
-                let comments_doc =
-                    self.build_trailing_comments_break_for_line(colon_end, type_start);
+                // Intersection and simple types: comments and the type stay flush
+                // (no extra indent), matching prettier.
                 d.concat(&[
                     d.text(":"),
                     d.text(" "),
