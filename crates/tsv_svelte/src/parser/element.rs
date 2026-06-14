@@ -6,18 +6,6 @@ use tsv_lang::{ParseError, Span};
 
 use super::parser_impl::SvelteParser;
 
-// Void elements never have closing tags
-// Reference: node_modules/svelte/src/utils.js:16-41
-const VOID_ELEMENTS: &[&str] = &[
-    "area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link",
-    "meta", "param", "source", "track", "wbr",
-];
-
-/// Check if an element is void (self-closing by spec, never has children)
-fn is_void(name: &str) -> bool {
-    VOID_ELEMENTS.contains(&name) || name.eq_ignore_ascii_case("!doctype")
-}
-
 /// Check if a tag name is a component (last segment starts with uppercase)
 /// Examples: "Comp" -> true, "ns.Comp" -> true, "deep.nested.Comp" -> true, "div" -> false
 fn is_component(name: &str) -> bool {
@@ -113,7 +101,8 @@ impl<'a> SvelteParser<'a> {
         self.expect(TokenKind::RightAngle)?;
 
         // Void and self-closing elements have no children or closing tag
-        if is_void(&tag_name) || self_closing {
+        // (classification lives in tsv_html, shared with the printer).
+        if tsv_html::is_void_element(&tag_name) || self_closing {
             return Ok(ParsedElement::Element(Element {
                 name: tag_symbol,
                 kind,
@@ -480,7 +469,7 @@ impl<'a> SvelteParser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{VOID_ELEMENTS, is_component, is_void};
+    use super::is_component;
 
     #[test]
     fn component_classification_by_last_segment() {
@@ -496,29 +485,5 @@ mod tests {
         // Non-ASCII uppercase still counts.
         assert!(is_component("Über"));
         assert!(!is_component("élan"));
-    }
-
-    #[test]
-    fn void_element_detection_and_doctype() {
-        assert!(is_void("br"));
-        assert!(is_void("input"));
-        // `!doctype` is case-insensitive; everything else is exact.
-        assert!(is_void("!doctype"));
-        assert!(is_void("!DOCTYPE"));
-        assert!(!is_void("div"));
-        assert!(!is_void("BR"));
-    }
-
-    #[test]
-    fn void_list_stays_in_parity_with_tsv_html() {
-        // The parser keeps its own VOID_ELEMENTS list duplicating tsv_html's;
-        // they must not drift (a divergence would split parsing from classification).
-        for &name in VOID_ELEMENTS {
-            assert!(
-                tsv_html::is_void_element(name),
-                "{name} is void in the parser but not in tsv_html"
-            );
-        }
-        assert_eq!(is_void("!DOCTYPE"), tsv_html::is_void_element("!DOCTYPE"));
     }
 }

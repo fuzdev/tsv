@@ -173,16 +173,6 @@ pub fn arena_print_doc(arena: &DocArena, doc: DocId, embed: &EmbedContext) -> St
     arena_print_doc_at_column(arena, doc, embed, 0)
 }
 
-/// Convert an arena doc tree to a formatted string with symbol resolution.
-pub fn arena_print_doc_resolved<R: TextResolver + ?Sized>(
-    arena: &DocArena,
-    doc: DocId,
-    embed: &EmbedContext,
-    resolver: &R,
-) -> String {
-    arena_print_doc_with_indent_resolved(arena, doc, embed, 0, 0, resolver)
-}
-
 /// Render with effectively infinite print width — every group flattens.
 ///
 /// Used by callers that need to measure a doc's flat-layout width
@@ -223,17 +213,6 @@ pub fn arena_print_doc_at_column(
     start_column: usize,
 ) -> String {
     arena_print_doc_with_indent(arena, doc, embed, start_column, 0)
-}
-
-/// Convert an arena doc tree to a formatted string at a specific column, with symbol resolution.
-pub fn arena_print_doc_at_column_resolved<R: TextResolver + ?Sized>(
-    arena: &DocArena,
-    doc: DocId,
-    embed: &EmbedContext,
-    start_column: usize,
-    resolver: &R,
-) -> String {
-    arena_print_doc_with_indent_resolved(arena, doc, embed, start_column, 0, resolver)
 }
 
 /// Convert an arena doc tree to a formatted string with column and indent level.

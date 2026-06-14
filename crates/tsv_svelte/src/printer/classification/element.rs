@@ -1,10 +1,10 @@
 // Element type classification adapters for Svelte printer
 //
 // These methods extend Printer to provide convenient element classification
-// by wrapping the pure language-level functions from crate::language::html.
+// by wrapping the pure language-level functions from the tsv_html crate.
 //
 // The printer-specific part is resolving symbols (interned strings) to
-// tag names. The actual classification logic lives in crate::language::html
+// tag names. The actual classification logic lives in tsv_html
 // and can be reused by other tools (linter, type-checker, language server).
 
 use crate::ast::internal;

@@ -31,9 +31,9 @@ pub use types::{DocContext, DocText, GroupId, LineKind, Mode, TextResolver};
 
 // Arena render
 pub use arena_render::{
-    arena_print_doc, arena_print_doc_at_column, arena_print_doc_at_column_resolved,
-    arena_print_doc_flat_resolved, arena_print_doc_resolved, arena_print_doc_with_indent,
-    arena_print_doc_with_indent_resolved, arena_print_doc_with_indent_resolved_preserve_whitespace,
+    arena_print_doc, arena_print_doc_at_column, arena_print_doc_flat_resolved,
+    arena_print_doc_with_indent, arena_print_doc_with_indent_resolved,
+    arena_print_doc_with_indent_resolved_preserve_whitespace,
 };
 
 // Arena fits

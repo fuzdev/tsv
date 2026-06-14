@@ -607,14 +607,8 @@ fn build_json_path_map(json_str: &str) -> std::collections::HashMap<usize, Strin
 
 /// Extract JSON key from a line like '"key": value' or '"key": {'
 fn extract_json_key(line: &str) -> Option<String> {
-    let line = line.trim();
-    if line.starts_with('"')
-        && let Some(end_quote) = line[1..].find('"')
-    {
-        let key = &line[1..=end_quote];
-        return Some(key.to_string());
-    }
-    None
+    let (key, _) = line.trim().strip_prefix('"')?.split_once('"')?;
+    Some(key.to_string())
 }
 
 /// Write an inline diff showing character-level changes between two lines
