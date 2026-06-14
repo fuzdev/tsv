@@ -2,7 +2,8 @@
 	"tasks": {
 		"build": "cargo build --workspace",
 		"build:release": "cargo build --workspace --release",
-		"build:all": "deno task build:release && deno task build:ffi && deno task build:wasm:deno && deno task build:wasm:parse:deno && deno task build:wasm:all:deno && deno task build:npm:format && deno task build:npm:parse && deno task build:npm:all",
+		"build:all": "deno task build:release && deno task build:ffi && deno task build:packages",
+		"build:packages": "deno task build:npm:format && deno task build:wasm:deno && deno task build:npm:parse && deno task build:wasm:parse:deno && deno task build:npm:all && deno task build:wasm:all:deno",
 		"build:ffi": "cargo build -p tsv_ffi --release",
 		"build:wasm:deno": "wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/format/deno -- --no-default-features --features format",
 		"build:wasm:parse:deno": "wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/parse/deno -- --no-default-features --features parse",

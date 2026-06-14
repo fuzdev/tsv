@@ -20,6 +20,8 @@ on:
     branches: [main]
   pull_request:
     branches: ['**']
+  # Allow manually re-running checks from the Actions tab.
+  workflow_dispatch:
 
 concurrency:
   group: check-${{ github.ref }}
@@ -39,7 +41,10 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      # persist-credentials: false keeps the GITHUB_TOKEN out of .git/config (no step here pushes via git).
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
 
       # Pinned, not `stable`: the workspace runs clippy::nursery at warn and the
       # `lint` task denies warnings, so a floating toolchain would fail CI
@@ -58,7 +63,7 @@ jobs:
         with:
           # Pinned to match local: deno drives the prettier/svelte fixture oracle
           # and `deno test`, so a floating minor could shift behavior the pinned
-          # Rust toolchain can't guard. Bump deliberately (not Dependabot-tracked).
+          # Rust toolchain can't guard. Bump deliberately.
           deno-version: 2.8.0
           # Round-trips DENO_DIR across runs — captures the sidecar's runtime
           # npm fetches (prettier/svelte/acorn) since those land in DENO_DIR.
@@ -75,21 +80,24 @@ jobs:
 
   # Publish-parity gate: builds every WASM/npm artifact, checks the size
   # bounds, and runs the Node package tests — none of which `check` exercises,
-  # so a packaging break surfaces on PRs instead of at release time. Mirrors
-  # what scripts/publish.ts builds + validates. Heavier than `check` (release
-  # LTO build + wasm-pack compile + 6 wasm-pack builds), hence the longer bound.
+  # so a packaging break surfaces on PRs instead of at release time. Runs the
+  # same `build:packages` task as scripts/publish.ts (6 wasm-pack release builds
+  # + wasm-opt), so the two can't drift.
   artifacts:
     runs-on: ubuntu-latest
     # Gate behind `check` so a PR that fails basic checks doesn't burn the
-    # ~45-min build; costs some latency on green PRs.
+    # build; costs some latency on green PRs.
     needs: check
-    # Headroom over the ~45-min cold build (wasm-pack compile + LTO release + 6
-    # wasm-pack builds) — a bound at the estimate itself would flake the first
-    # uncached run. Still well short of the 6h default so a hang fails fast.
-    timeout-minutes: 70
+    # Generous headroom over the cold wasm-only build (6 wasm-pack release builds
+    # + wasm-opt; wasm-pack itself is now a prebuilt download, not a source
+    # compile) — well short of the 6h default so a hang fails fast.
+    timeout-minutes: 45
 
     steps:
+      # persist-credentials: false keeps the GITHUB_TOKEN out of .git/config (no step here pushes via git).
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master (no semver tags; bump manually)
@@ -97,15 +105,20 @@ jobs:
           toolchain: 1.94.1
           targets: wasm32-unknown-unknown
 
-      # cache-bin (on by default) caches the cargo-installed wasm-pack too.
+      # Caches the wasm32 dependency builds across runs (keyed on Cargo.lock).
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
-      # Pinned to match local: wasm-pack bundles wasm-opt, whose output size the
-      # ~±8% validate:artifacts bounds are calibrated against. A floating version
-      # would trip the size gate on an unrelated wasm-pack/binaryen release.
-      # Manual bump (not Dependabot-tracked).
+      # Prebuilt binary, not `cargo install` from source: a source build is keyed
+      # by rust-cache on Cargo.lock, so any dep bump forced a multi-minute wasm-pack
+      # recompile. The download is independent of the cache and runs in seconds.
+      # Version pinned to match local: wasm-pack bundles wasm-opt, whose output size
+      # the ~±8% validate:artifacts bounds are calibrated against — a float would trip
+      # the size gate on an unrelated binaryen release. Bump the SHA and wasm-pack
+      # version manually.
       - name: Install wasm-pack
-        run: cargo install wasm-pack --version 0.15.0 --locked
+        uses: taiki-e/install-action@7a79fe8c3a13344501c80d99cae481c1c9085912 # v2.81.10
+        with:
+          tool: wasm-pack@0.15.0
 
       - name: Install Deno
         uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
@@ -121,8 +134,12 @@ jobs:
           # (scripts/test_npm.ts runs under node --test directly). Bump deliberately.
           node-version: '24.14.1'
 
-      - name: Build all artifacts
-        run: deno task build:all
+      # Builds only the publishable wasm bundles (npm + deno) — exactly what
+      # scripts/publish.ts builds and what validate:artifacts / test:npm consume.
+      # NOT `build:all`: that prepends an LTO release workspace build + FFI lib that
+      # nothing here validates (publish skips them too), so they were pure overhead.
+      - name: Build packages
+        run: deno task build:packages
 
       - name: Validate artifact sizes
         run: deno task validate:artifacts
