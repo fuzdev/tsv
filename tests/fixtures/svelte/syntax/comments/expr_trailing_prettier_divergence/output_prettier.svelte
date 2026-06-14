@@ -13,3 +13,9 @@
 <button on:click={fn}>text</button>
 <div class:class1={cond}></div>
 <div use:fn={expr}></div>
+{foo}
+{@render fn()}
+<div style:color={expr}></div>
+<div transition:fn={expr}></div>
+<div animate:fn={expr}></div>
+<Comp let:v={expr}></Comp>
