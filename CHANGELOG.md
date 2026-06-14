@@ -12,6 +12,16 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
 <!-- bump: minor -->
 
 - various conformance fixes
+- fix: a trailing JS **line** comment before a Svelte template construct's closing
+  `}` (e.g. `{expr // c}`, `{#if cond // c}`, `on:click={fn // c}`, `{@const x = e // c}`)
+  no longer emits invalid output — previously the `}` was placed on the comment's
+  line and swallowed (`{expr // c}` reparsed with no closing brace). The comment is
+  now preserved with `}` kept on its own line. Covers expression tags, `{@html}` /
+  `{@render}` / `{@debug}` / `{@const}` tags, `{#if}` / `{:else if}` / `{#each}`
+  (collection + key) / `{#await}` / `{#key}` blocks, and `{...spread}` / `bind:` /
+  `on:` / `class:` / `use:` / `transition:` / `animate:` / `let:` / `data-attr` /
+  `style:` attributes. Prettier drops these comments; tsv preserves them
+  (`expr_trailing_line` divergence)
 - formatting is now **non-configurable by design** — no config files, CLI flags,
   or runtime options, and none are planned (opinionated like `gofmt` and Black).
   Reverses the earlier "config options will come later" note in the docs. No
