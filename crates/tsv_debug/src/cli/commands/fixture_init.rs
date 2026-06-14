@@ -102,11 +102,7 @@ impl FixtureInitCommand {
         print_line_width_summary(&formatted, &self.dir);
 
         // Generate expected.json from canonical parser
-        let parse_result = match input_type {
-            InputType::Svelte => deno::parse_svelte(&formatted).await,
-            InputType::SvelteTs | InputType::TypeScript => deno::parse_typescript(&formatted).await,
-            InputType::Css => deno::parse_css(&formatted).await,
-        };
+        let parse_result = deno::parse_by_type(&formatted, input_type.parser_type()).await;
 
         match parse_result {
             Ok(ast) => match to_json_with_tabs(&ast) {

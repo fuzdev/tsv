@@ -333,18 +333,59 @@ mod tests {
 
     #[test]
     fn parse_internal_reports_errors() {
-        let out = call(tsv_parse_internal_typescript, "const =");
+        // Cover the error arm of `with_source_parse_internal` for all three
+        // languages (success arm is covered above for all three).
+        let cases: [(&str, FfiFn, &str); 3] = [
+            ("typescript", tsv_parse_internal_typescript, "const ="),
+            ("svelte", tsv_parse_internal_svelte, "<div {"),
+            ("css", tsv_parse_internal_css, "a {"),
+        ];
+        for (label, f, src) in cases {
+            let out = call(f, src);
+            assert!(
+                error_message(&out).is_some(),
+                "{label}: expected error JSON, got: {out}"
+            );
+        }
+    }
+
+    // --- format_panic renders each payload variant (pure, no panic needed) ---
+
+    #[test]
+    fn format_panic_renders_payload_variants() {
+        use std::any::Any;
+        let as_str: Box<dyn Any + Send> = Box::new("boom");
+        assert_eq!(format_panic(&*as_str), "panic: boom");
+        let owned: Box<dyn Any + Send> = Box::new(String::from("kaboom"));
+        assert_eq!(format_panic(&*owned), "panic: kaboom");
+        let other: Box<dyn Any + Send> = Box::new(42i32);
+        assert_eq!(format_panic(&*other), "panic: <unknown>");
+    }
+
+    // --- multibyte sources survive the UTF-8 / char-offset marshalling boundary ---
+
+    #[test]
+    fn parse_and_format_preserve_multibyte_source() {
+        let src = "const x = '€🦀';\n";
+        let parsed = call(tsv_parse_typescript, src);
         assert!(
-            error_message(&out).is_some(),
-            "expected error JSON, got: {out}"
+            error_message(&parsed).is_none(),
+            "unexpected error: {parsed}"
         );
+        let formatted = call(tsv_format_typescript, src);
+        assert!(
+            formatted.contains("€🦀"),
+            "multibyte content lost: {formatted}"
+        );
+        // Re-formatting is stable (idempotent) across the boundary.
+        assert_eq!(call(tsv_format_typescript, &formatted), formatted);
     }
 
     // --- error path: invalid syntax surfaces as JSON error (and still frees) ---
 
     #[test]
     fn invalid_syntax_returns_json_error() {
-        let cases: [(&str, FfiFn, FfiFn, &str); 2] = [
+        let cases: [(&str, FfiFn, FfiFn, &str); 3] = [
             (
                 "typescript",
                 tsv_parse_typescript,
@@ -352,6 +393,7 @@ mod tests {
                 "const =",
             ),
             ("css", tsv_parse_css, tsv_format_css, "a {"),
+            ("svelte", tsv_parse_svelte, tsv_format_svelte, "<div {"),
         ];
         for (label, parse_fn, format_fn, src) in cases {
             assert!(
@@ -382,7 +424,23 @@ mod tests {
 
     #[test]
     fn empty_input_is_handled() {
+        // Format of empty input is empty for every language.
         assert_eq!(call(tsv_format_typescript, ""), "");
+        assert_eq!(call(tsv_format_css, ""), "");
+        assert_eq!(call(tsv_format_svelte, ""), "");
+        // Parse of empty input succeeds (a valid root, no error) for every language.
+        let parsers: [(&str, FfiFn); 3] = [
+            ("typescript", tsv_parse_typescript),
+            ("css", tsv_parse_css),
+            ("svelte", tsv_parse_svelte),
+        ];
+        for (label, f) in parsers {
+            let out = call(f, "");
+            assert!(
+                error_message(&out).is_none(),
+                "{label}: empty parse errored: {out}"
+            );
+        }
     }
 
     // --- tsv_free tolerates null / zero-length (documented no-op) ---

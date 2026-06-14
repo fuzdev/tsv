@@ -20,12 +20,9 @@ async fn test_all_fixtures() {
         "Fixtures directory not found: tests/fixtures"
     );
 
-    // Bulk workload: spread the JS work across a small sidecar pool (must be
-    // set before the first sidecar call — deno::check() below spawns the pool)
-    let concurrency = std::thread::available_parallelism()
-        .map(std::num::NonZero::get)
-        .unwrap_or(4);
-    tsv_debug::deno::set_pool_size(tsv_debug::deno::bulk_pool_size(concurrency));
+    // Bulk workload: spread the JS work across a small sidecar pool (init must
+    // happen before the first sidecar call — deno::check() below spawns the pool).
+    let concurrency = tsv_debug::deno::init_bulk_pool();
 
     // Verify Deno sidecar is healthy before running tests
     // This prevents cascading failures if the sidecar dies during tests

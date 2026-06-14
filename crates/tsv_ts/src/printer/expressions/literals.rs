@@ -405,6 +405,15 @@ pub(in crate::printer) fn is_valid_js_identifier(s: &str) -> bool {
     chars.all(is_id_continue)
 }
 
+/// Check if an identifier name matches Prettier's `isFactory`: `/^[A-Z]|^[$_]+$/u`
+/// (member-chain.js:273) — starts uppercase (`Object`, `React`) or is a pure
+/// `$`/`_` name (`$`, `_`, `$__`). Drives chain factory-merge decisions; `$util`
+/// / `_helper` are NOT factories.
+pub(in crate::printer) fn is_factory_identifier_name(name: &str) -> bool {
+    name.chars().next().is_some_and(char::is_uppercase)
+        || (!name.is_empty() && name.chars().all(|c| c == '$' || c == '_'))
+}
+
 #[cfg(test)]
 mod tests {
     use super::format_directive as fd;
@@ -483,5 +492,36 @@ mod tests {
         assert_eq!(norm("100n"), "100n");
         assert_eq!(norm("0xFFn"), "0xffn");
         assert_eq!(norm("0x1Fn"), "0x1fn");
+    }
+
+    #[test]
+    fn regex_flags_sorted_alphabetically() {
+        use super::sort_regex_flags as srf;
+        // Prettier normalizes flag order (e.g. /…/vg → /…/gv).
+        assert_eq!(srf("vg"), "gv");
+        assert_eq!(srf("yim"), "imy");
+        // Already-sorted flags are unchanged; empty stays empty.
+        assert_eq!(srf("gimsuy"), "gimsuy");
+        assert_eq!(srf("g"), "g");
+        assert_eq!(srf(""), "");
+    }
+
+    #[test]
+    fn valid_js_identifier_accepts_and_rejects() {
+        use super::is_valid_js_identifier as vid;
+        // Valid identifiers (so prettier emits the object key unquoted).
+        assert!(vid("foo"));
+        assert!(vid("$x"));
+        assert!(vid("_"));
+        assert!(vid("a1"));
+        assert!(vid("camelCase"));
+        // Reserved words count as identifiers (prettier outputs them unquoted).
+        assert!(vid("class"));
+        // Invalid: empty, leading digit, or any char that isn't id_continue.
+        assert!(!vid(""));
+        assert!(!vid("1a"));
+        assert!(!vid("a-b"));
+        assert!(!vid("a b"));
+        assert!(!vid("a.b"));
     }
 }

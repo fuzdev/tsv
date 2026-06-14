@@ -7,7 +7,7 @@ use super::{
     convert_function_expression, convert_member_expression, convert_new_expression,
     convert_object_pattern, convert_property, convert_template_literal, convert_type,
     convert_type_annotation, convert_type_parameter_instantiation, convert_yield_expression,
-    create_location,
+    create_location, json_number_from_f64,
 };
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker, Span};
@@ -649,12 +649,9 @@ fn convert_literal_expression(
     }
 
     let (value, bigint) = match &lit.value {
-        internal::LiteralValue::Number(n) => (
-            serde_json::Value::Number(
-                serde_json::Number::from_f64(*n).unwrap_or_else(|| serde_json::Number::from(0)),
-            ),
-            None,
-        ),
+        internal::LiteralValue::Number(n) => {
+            (serde_json::Value::Number(json_number_from_f64(*n)), None)
+        }
         internal::LiteralValue::String { content, .. } => {
             (serde_json::Value::String(content.clone()), None)
         }

@@ -274,6 +274,13 @@ pub(super) fn create_location(
     to_public_location(loc)
 }
 
+/// Convert an `f64` literal value to a `serde_json::Number`, mapping non-finite
+/// values (NaN / ±Inf) to `0` for acorn parity — non-finite number literals
+/// don't occur in valid source, and JSON has no representation for them.
+pub(super) fn json_number_from_f64(n: f64) -> serde_json::Number {
+    serde_json::Number::from_f64(n).unwrap_or_else(|| serde_json::Number::from(0))
+}
+
 /// Convert an internal `Program` to the public AST under the given schema.
 ///
 /// Use `Schema::Acorn` for standalone TypeScript and Svelte `lang="ts"` scripts;
@@ -298,5 +305,24 @@ pub fn convert_program(
             .map(|s| convert_statement(s, source, loc, &interner, 0, schema))
             .collect(),
         source_type: "module".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::json_number_from_f64;
+
+    #[test]
+    fn json_number_from_f64_finite_and_non_finite() {
+        // Finite values pass through faithfully (the only case valid source hits).
+        assert_eq!(json_number_from_f64(1.5).as_f64(), Some(1.5));
+        assert_eq!(json_number_from_f64(0.0).as_f64(), Some(0.0));
+        assert_eq!(json_number_from_f64(-42.0).as_f64(), Some(-42.0));
+        // Non-finite values never occur in valid source, but the defensive arm
+        // must collapse them to integer 0 — JSON has no NaN/Infinity, and acorn
+        // emits 0 here too.
+        for n in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(json_number_from_f64(n), serde_json::Number::from(0));
+        }
     }
 }

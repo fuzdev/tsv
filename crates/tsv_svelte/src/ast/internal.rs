@@ -839,3 +839,52 @@ pub struct Style {
     pub attributes: Vec<AttributeNode>,
     pub css_stylesheet: CssStyleSheet, // Parsed CSS stylesheet (nodes + value comments)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{SpecialElementKind, SpecialElementTag};
+
+    #[test]
+    fn special_element_tag_from_name() {
+        use SpecialElementTag::*;
+        assert_eq!(
+            SpecialElementTag::from_tag_name("svelte:head", false),
+            Some(SvelteHead)
+        );
+        assert_eq!(
+            SpecialElementTag::from_tag_name("slot", false),
+            Some(SlotElement)
+        );
+        assert_eq!(
+            SpecialElementTag::from_tag_name("svelte:boundary", false),
+            Some(SvelteBoundary)
+        );
+        // `title` is special only inside <svelte:head> — the flag gates both arms.
+        assert_eq!(
+            SpecialElementTag::from_tag_name("title", true),
+            Some(TitleElement)
+        );
+        assert_eq!(SpecialElementTag::from_tag_name("title", false), None);
+        // Unknown / regular tags are not special.
+        assert_eq!(SpecialElementTag::from_tag_name("div", true), None);
+        assert_eq!(
+            SpecialElementTag::from_tag_name("svelte:unknown", false),
+            None
+        );
+    }
+
+    #[test]
+    fn special_element_kind_is_block() {
+        // Only the four document-binding elements are block.
+        assert!(SpecialElementKind::SvelteHead.is_block());
+        assert!(SpecialElementKind::SvelteWindow.is_block());
+        assert!(SpecialElementKind::SvelteBody.is_block());
+        assert!(SpecialElementKind::SvelteDocument.is_block());
+        // The content/dynamic/error elements are inline.
+        assert!(!SpecialElementKind::SlotElement.is_block());
+        assert!(!SpecialElementKind::SvelteSelf.is_block());
+        assert!(!SpecialElementKind::SvelteFragment.is_block());
+        assert!(!SpecialElementKind::SvelteBoundary.is_block());
+        assert!(!SpecialElementKind::TitleElement.is_block());
+    }
+}

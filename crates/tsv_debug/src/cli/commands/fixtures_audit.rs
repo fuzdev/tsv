@@ -73,10 +73,7 @@ impl FixturesAuditCommand {
         // CPU-bound Rust work runs on all runtime workers (buffer_unordered
         // alone only interleaves at await points on the stream-driving task),
         // with a small sidecar pool for the JS side
-        let concurrency = std::thread::available_parallelism()
-            .map(std::num::NonZero::get)
-            .unwrap_or(4);
-        crate::deno::set_pool_size(crate::deno::bulk_pool_size(concurrency));
+        let concurrency = crate::deno::init_bulk_pool();
 
         let joined: Vec<_> = stream::iter(fixture_list)
             .map(|fixture| tokio::spawn(async move { audit_fixture(&fixture).await }))

@@ -736,3 +736,32 @@ impl<'a> Printer<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_class_text;
+
+    #[test]
+    fn collapses_runs_and_trims_trailing_per_line() {
+        assert_eq!(normalize_class_text("a   b", true), "a b");
+        // Leading whitespace preserved, trailing dropped.
+        assert_eq!(normalize_class_text("  a b  ", true), "  a b");
+        // Newlines kept; per-line leading preserved, intra-line runs collapsed.
+        assert_eq!(normalize_class_text("a  b\n  c  d", true), "a b\n  c d");
+    }
+
+    #[test]
+    fn last_part_flag_controls_separator_space() {
+        // Non-last part with content keeps one trailing space (separates from `{expr}`).
+        assert_eq!(normalize_class_text("text ", false), "text ");
+        // Last part drops the trailing space.
+        assert_eq!(normalize_class_text("text ", true), "text");
+    }
+
+    #[test]
+    fn all_whitespace_passes_through() {
+        // No non-whitespace ⇒ the separator-space rule doesn't apply.
+        assert_eq!(normalize_class_text(" ", false), " ");
+        assert_eq!(normalize_class_text("", true), "");
+    }
+}

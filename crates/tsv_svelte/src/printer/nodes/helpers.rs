@@ -533,3 +533,45 @@ impl<'a> Printer<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{has_any_expanding_blocks, is_control_flow_block, is_expanding_control_flow_block};
+    use crate::ast::internal::FragmentNode;
+
+    /// Parse a Svelte template and return its top-level fragment nodes.
+    fn parse_nodes(src: &str) -> Vec<FragmentNode> {
+        crate::parse(src)
+            .expect("template should parse")
+            .fragment
+            .nodes
+    }
+
+    #[test]
+    fn control_flow_classification_await_is_not_expanding() {
+        let if_nodes = parse_nodes("{#if c}x{/if}");
+        assert!(is_control_flow_block(&if_nodes[0]));
+        assert!(is_expanding_control_flow_block(&if_nodes[0]));
+
+        let await_nodes = parse_nodes("{#await p}x{/await}");
+        assert!(is_control_flow_block(&await_nodes[0]));
+        // Await blocks are control-flow but do NOT force expansion.
+        assert!(!is_expanding_control_flow_block(&await_nodes[0]));
+    }
+
+    #[test]
+    fn expanding_block_detected_through_nested_awaits() {
+        // An if directly inside an await is detected.
+        assert!(has_any_expanding_blocks(&parse_nodes(
+            "{#await p}{#if c}x{/if}{/await}"
+        )));
+        // ...and through a second level of await nesting (recursion).
+        assert!(has_any_expanding_blocks(&parse_nodes(
+            "{#await p}{#await q}{#if c}x{/if}{/await}{/await}"
+        )));
+        // An await with only inline/element content does NOT expand.
+        assert!(!has_any_expanding_blocks(&parse_nodes(
+            "{#await p}<span>x</span>{/await}"
+        )));
+    }
+}

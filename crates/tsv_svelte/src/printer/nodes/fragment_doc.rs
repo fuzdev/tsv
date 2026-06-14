@@ -14,7 +14,6 @@
 use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
-use tsv_lang::SymbolResolver;
 use tsv_lang::doc::arena::DocId;
 
 /// Position of a text node relative to its siblings.
@@ -884,11 +883,8 @@ impl<'a> Printer<'a> {
     /// The line structure comes from whitespace in text nodes, not from node types.
     fn is_block_fragment_node(&self, node: &FragmentNode) -> bool {
         match node {
-            FragmentNode::Element(el) => {
-                let tag = self.resolve_symbol(el.name);
-                // Only HTML block elements - components are inline
-                tsv_html::is_block_element(&tag)
-            }
+            // Defer to the one block-element adapter (component + script/style overlay).
+            FragmentNode::Element(el) => self.is_block_element(el),
             FragmentNode::SpecialElement(el) => el.kind.is_block(),
             _ => super::helpers::is_control_flow_block(node),
         }

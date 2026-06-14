@@ -42,6 +42,7 @@ impl<'a> Printer<'a> {
     fn print_selector_list_inline(&mut self, list: &internal::SelectorList) {
         for (i, complex) in list.selectors.iter().enumerate() {
             if i > 0 {
+                self.pop_selector_terminator();
                 self.write(", ");
             }
             self.print_complex_selector(complex);
@@ -112,6 +113,7 @@ impl<'a> Printer<'a> {
             self.indent_level += 1;
             for (i, complex) in list.selectors.iter().enumerate() {
                 if i > 0 {
+                    self.pop_selector_terminator();
                     self.write(",\n");
                 }
                 self.write_indent();
@@ -155,6 +157,7 @@ impl<'a> Printer<'a> {
             // Print multiline: each selector on its own line
             for (i, complex) in list.selectors.iter().enumerate() {
                 if i > 0 {
+                    self.pop_selector_terminator();
                     self.write(",");
                     self.write("\n");
                     self.write_indent();
@@ -246,15 +249,30 @@ impl<'a> Printer<'a> {
     // Doc Builders - all formatting logic expressed as doc IR
     //
 
-    /// Build a doc for a simple selector
-    ///
-    /// Uses source extraction where possible to preserve escapes.
+    /// Build a width-measurement doc for a span-based simple selector (type /
+    /// class / id / pseudo) from source, preserving raw escapes verbatim.
+    fn build_span_selector_doc(&self, span: tsv_lang::Span) -> DocId {
+        let raw = span.extract(self.source);
+        // An escaped selector that is the last before a line break (in wrapped source)
+        // absorbs that newline as its escape terminator into the span. The terminator is
+        // always dropped on render (it sits at a separator), and a newline inside a
+        // width-measurement text node makes `fits()` short-circuit on it — collapsing the
+        // list. Exclude a newline-bearing terminator from the measured width. Space/tab
+        // terminators are left intact (they may be a rendered compound separator).
+        let text = if raw.contains('\n') {
+            raw.trim_end()
+        } else {
+            raw
+        };
+        self.d().text_owned(text.to_string())
+    }
+
+    /// Build a width-measurement doc for a simple selector, dispatched by kind.
+    /// Span-based kinds extract from source to preserve escapes verbatim.
     pub(crate) fn build_simple_selector_doc(&self, simple: &internal::SimpleSelector) -> DocId {
         let d = self.d();
         match simple {
-            internal::SimpleSelector::Type { span, .. } => {
-                d.text_owned(span.extract(self.source).to_string())
-            }
+            internal::SimpleSelector::Type { span, .. } => self.build_span_selector_doc(*span),
             internal::SimpleSelector::Universal { namespace, .. } => {
                 if let Some(ns) = namespace {
                     d.text_owned(format!("{ns}|*"))
@@ -262,12 +280,8 @@ impl<'a> Printer<'a> {
                     d.text("*")
                 }
             }
-            internal::SimpleSelector::Class { span, .. } => {
-                d.text_owned(span.extract(self.source).to_string())
-            }
-            internal::SimpleSelector::Id { span, .. } => {
-                d.text_owned(span.extract(self.source).to_string())
-            }
+            internal::SimpleSelector::Class { span, .. } => self.build_span_selector_doc(*span),
+            internal::SimpleSelector::Id { span, .. } => self.build_span_selector_doc(*span),
             internal::SimpleSelector::Attribute {
                 namespace,
                 name,
@@ -298,11 +312,10 @@ impl<'a> Printer<'a> {
                 d.text_owned(result)
             }
             internal::SimpleSelector::PseudoClass { span, .. } => {
-                // Extract from source to get accurate representation
-                d.text_owned(span.extract(self.source).to_string())
+                self.build_span_selector_doc(*span)
             }
             internal::SimpleSelector::PseudoElement { span, .. } => {
-                d.text_owned(span.extract(self.source).to_string())
+                self.build_span_selector_doc(*span)
             }
             internal::SimpleSelector::Nesting { .. } => d.text("&"),
             internal::SimpleSelector::Percentage { value, .. } => d.text_owned(format!("{value}%")),
@@ -363,6 +376,12 @@ impl<'a> Printer<'a> {
             } else {
                 let combinator_text = Self::get_combinator_str(combinator, is_leading);
                 if !combinator_text.is_empty() {
+                    // A between-combinator (` > `, ` + `, ` `, …) leads with a
+                    // space; if the previous compound ended with a hex escape's
+                    // terminator whitespace, drop it so the two don't double.
+                    if combinator_text.starts_with(' ') {
+                        self.pop_selector_terminator();
+                    }
                     self.write(combinator_text);
                 }
             }
@@ -370,6 +389,67 @@ impl<'a> Printer<'a> {
 
         for simple in &relative.selectors {
             self.print_simple_selector(simple);
+        }
+    }
+
+    /// Drop a single trailing escape-terminator whitespace from the output buffer.
+    /// A hex escape consumes one following whitespace as its terminator (`.\1F600 `
+    /// before `{`), which is captured in the selector token; this strips that
+    /// *trailing* one so it doesn't double with a following separator (block `{`, a
+    /// between-combinator, or a `)`/`,` in pseudo args). The terminator may be a
+    /// space, tab, or — when the selector is the last before a line break in wrapped
+    /// source — a newline (`\r\n` or `\n`). An *internal* terminator (compound
+    /// `.\1F600 .b`) is mid-string and untouched (the char before it is non-whitespace).
+    pub(super) fn pop_selector_terminator(&mut self) {
+        self.buffer.pop_if_ends_with(' ');
+        self.buffer.pop_if_ends_with('\t');
+        self.buffer.pop_if_ends_with('\n');
+        self.buffer.pop_if_ends_with('\r');
+    }
+
+    /// Write a pseudo selector's `:name` / `::name` prefix raw from source,
+    /// preserving escape sequences. Svelte decodes the internal `name` field
+    /// (`:\41 ` → name "A"), but the formatter must keep `:\41 ` verbatim, like
+    /// class/id/type selectors. For a pseudo with args, only the part before the
+    /// args `(` is the name (args format separately); without args, the whole
+    /// span is written — including a hex escape's trailing terminator whitespace,
+    /// which `pop_selector_terminator` drops at the following separator.
+    fn write_pseudo_name(&mut self, span: tsv_lang::Span, has_args: bool) {
+        let raw = span.extract(self.source);
+        let name = if has_args {
+            raw.split_once('(').map_or(raw, |(before, _)| before)
+        } else {
+            raw
+        };
+        // Prettier lowercases pseudo-class/element names (case-insensitive
+        // keywords), e.g. `:HOVER` → `:hover`, `::-WEBKIT-` → `::-webkit-`.
+        // Custom `:--Name` pseudos are case-sensitive, so preserve them.
+        let after_colons = name.trim_start_matches(':');
+        if after_colons.starts_with("--") {
+            self.write(name);
+            return;
+        }
+        // For an escaped name prettier folds case only up to the first
+        // whitespace — a hex escape's terminator (`:\4A b` → `:\4a b`, folding
+        // the escape's hex digits and any leading literal) — and preserves
+        // everything from that whitespace on (`::\41 B` keeps the literal `B`;
+        // `:\4E \4F` keeps the second escape verbatim). With no terminator the
+        // whole name folds (`:HO\56ER` → `:ho\56er`). This is pseudo-specific:
+        // class/id/type selectors render raw (see `print_simple_selector`), so
+        // their hex escapes keep their case. Mirrors prettier's
+        // `maybeToLowerCase(node.value)`, where the escape terminator splits the
+        // pseudo's value token at the first whitespace.
+        let (head, tail) = match name.find(|c: char| c.is_ascii_whitespace()) {
+            Some(i) => name.split_at(i),
+            None => (name, ""),
+        };
+        if head.bytes().any(|b| b.is_ascii_uppercase()) {
+            self.write(&head.to_ascii_lowercase());
+        } else {
+            self.write(head);
+        }
+        if !tail.is_empty() {
+            self.write(tail);
         }
     }
 
@@ -455,19 +535,20 @@ impl<'a> Printer<'a> {
                 }
                 self.write("]");
             }
-            internal::SimpleSelector::PseudoClass { name, args, .. } => {
-                self.write(":");
-                self.write(name);
+            internal::SimpleSelector::PseudoClass { args, span, .. } => {
+                self.write_pseudo_name(*span, args.is_some());
                 if let Some(args) = args {
                     self.print_pseudo_class_with_args(args, false);
                 }
             }
-            internal::SimpleSelector::PseudoElement { name, args, .. } => {
-                self.write("::");
-                self.write(name);
+            internal::SimpleSelector::PseudoElement { args, span, .. } => {
+                self.write_pseudo_name(*span, args.is_some());
                 if let Some(args) = args {
                     self.write("(");
                     self.print_pseudo_element_args(args);
+                    // Drop a hex escape's terminator whitespace before `)`
+                    // (`::slotted(.\41 )` → `::slotted(.\41)`).
+                    self.pop_selector_terminator();
                     self.write(")");
                 }
             }
@@ -582,6 +663,9 @@ impl<'a> Printer<'a> {
             // Print inline
             self.write("(");
             self.print_pseudo_class_args_with_mode(args, false);
+            // Drop a hex escape's terminator whitespace before the closing `)`
+            // (`:not(.\41 )` → `:not(.\41)`), like other selector separators.
+            self.pop_selector_terminator();
             self.write(")");
         } else {
             // Print with line breaks - matches Prettier's group pattern
@@ -593,6 +677,11 @@ impl<'a> Printer<'a> {
                 self.indent_level += 1;
             }
             self.print_pseudo_class_args_with_mode(args, true);
+            // Drop the last arg's escape terminator before the closing newline-`)`. When
+            // the last selector is an escaped class, the source line break after it is
+            // absorbed as the escape's terminator into the span, so it renders as a
+            // trailing newline here — pop it so it doesn't double the structural break.
+            self.pop_selector_terminator();
             self.write("\n");
             // Only remove the inner indent, keep extra_indent for closing
             self.indent_level -= 1;
@@ -810,9 +899,8 @@ impl<'a> Printer<'a> {
         extra_indent: bool,
     ) {
         match simple {
-            internal::SimpleSelector::PseudoClass { name, args, .. } => {
-                self.write(":");
-                self.write(name);
+            internal::SimpleSelector::PseudoClass { args, span, .. } => {
+                self.write_pseudo_name(*span, args.is_some());
                 if let Some(args) = args {
                     self.print_pseudo_class_with_args(args, extra_indent);
                 }

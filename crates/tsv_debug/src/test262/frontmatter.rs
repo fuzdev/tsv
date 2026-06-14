@@ -76,6 +76,7 @@ pub fn parse(content: &str) -> Option<Frontmatter> {
 
     let mut frontmatter = Frontmatter::default();
     let mut in_negative = false;
+    let mut list_target: Option<ListField> = None;
 
     for line in yaml.lines() {
         let trimmed = line.trim();
@@ -85,13 +86,35 @@ pub fn parse(content: &str) -> Option<Frontmatter> {
             continue;
         }
 
-        // features: [a, b, c]
-        if trimmed.starts_with("features:") {
-            frontmatter.features = parse_array(trimmed);
+        // Block-sequence item ("  - value") for the list field opened above.
+        if let Some(target) = list_target {
+            if let Some(item) = trimmed.strip_prefix('-') {
+                let item = item.trim().trim_matches('"').trim_matches('\'');
+                if !item.is_empty() {
+                    match target {
+                        ListField::Features => frontmatter.features.push(item.to_string()),
+                        ListField::Flags => frontmatter.flags.push(item.to_string()),
+                    }
+                }
+                continue;
+            }
+            // A non-item line closes the block sequence; fall through to re-process it.
+            list_target = None;
         }
-        // flags: [a, b, c]
+
+        // features: [a, b, c]  (inline)  or  features:  (block list on following lines)
+        if trimmed.starts_with("features:") {
+            match parse_list_field(trimmed) {
+                ListValue::Inline(items) => frontmatter.features = items,
+                ListValue::Block => list_target = Some(ListField::Features),
+            }
+        }
+        // flags: [a, b, c]  (inline)  or  flags:  (block list)
         else if trimmed.starts_with("flags:") {
-            frontmatter.flags = parse_array(trimmed);
+            match parse_list_field(trimmed) {
+                ListValue::Inline(items) => frontmatter.flags = items,
+                ListValue::Block => list_target = Some(ListField::Flags),
+            }
         }
         // negative: (start of block)
         else if trimmed.starts_with("negative:") {
@@ -123,6 +146,32 @@ pub fn parse(content: &str) -> Option<Frontmatter> {
     }
 
     Some(frontmatter)
+}
+
+/// Which list field a YAML block sequence is being accumulated into.
+#[derive(Clone, Copy)]
+enum ListField {
+    Features,
+    Flags,
+}
+
+/// The shape of a `features:` / `flags:` line.
+enum ListValue {
+    /// Inline `[a, b, c]` (possibly empty).
+    Inline(Vec<String>),
+    /// No inline array — a YAML block sequence follows on subsequent `- item` lines.
+    Block,
+}
+
+/// Classify a `features:` / `flags:` line as an inline array or the header of a
+/// block sequence. test262 uses both forms (`flags: [onlyStrict]` inline,
+/// `features:\n  - class` block).
+fn parse_list_field(line: &str) -> ListValue {
+    if line.contains('[') {
+        ListValue::Inline(parse_array(line))
+    } else {
+        ListValue::Block
+    }
 }
 
 /// Parse a YAML array from a line like "features: [a, b, c]"
@@ -218,6 +267,36 @@ flags: [async, module, onlyStrict]
 
         let fm = parse(content).unwrap();
         assert_eq!(fm.flags, vec!["async", "module", "onlyStrict"]);
+    }
+
+    #[test]
+    fn test_parse_features_block_form() {
+        // test262 commonly writes `features` as a YAML block sequence, with an
+        // inline `flags` line right after it.
+        let content = r"/*---
+features:
+  - class
+  - class-fields-private
+flags: [onlyStrict]
+---*/";
+
+        let fm = parse(content).unwrap();
+        assert_eq!(fm.features, vec!["class", "class-fields-private"]);
+        // The inline `flags` line after the block sequence still parses.
+        assert_eq!(fm.flags, vec!["onlyStrict"]);
+    }
+
+    #[test]
+    fn test_parse_flags_block_form() {
+        let content = r"/*---
+flags:
+  - async
+  - module
+---*/";
+
+        let fm = parse(content).unwrap();
+        assert_eq!(fm.flags, vec!["async", "module"]);
+        assert!(fm.is_module());
     }
 
     #[test]

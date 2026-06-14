@@ -298,3 +298,138 @@ pub fn comments_after(comments: &[Comment], pos: u32) -> impl Iterator<Item = &C
     let first_idx = find_first_comment_from(comments, pos);
     comments[first_idx..].iter()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::printing::build_line_breaks;
+
+    fn comment(start: u32, end: u32, is_block: bool, content: &str) -> Comment {
+        Comment {
+            content: content.to_string(),
+            is_block,
+            span: Span::new(start, end),
+            emit_character_field: false,
+        }
+    }
+
+    #[test]
+    fn comments_in_range_respects_start_and_end_boundaries() {
+        let comments = vec![
+            comment(0, 2, true, "a"),
+            comment(5, 7, true, "b"),
+            comment(10, 12, true, "c"),
+        ];
+
+        // [5, 12] includes the comments starting at 5 and 10 (both end <= 12).
+        let starts: Vec<u32> = comments_in_range(&comments, 5, 12)
+            .map(|c| c.span.start)
+            .collect();
+        assert_eq!(starts, vec![5, 10]);
+
+        // Tightening `end` to 11 drops the [10,12) comment (its end 12 > 11) —
+        // the `take_while(end <= end)` bound, not a filter.
+        let starts: Vec<u32> = comments_in_range(&comments, 5, 11)
+            .map(|c| c.span.start)
+            .collect();
+        assert_eq!(starts, vec![5]);
+
+        // Raising `start` past a comment excludes it via the binary-search entry.
+        let starts: Vec<u32> = comments_in_range(&comments, 6, 12)
+            .map(|c| c.span.start)
+            .collect();
+        assert_eq!(starts, vec![10]);
+    }
+
+    #[test]
+    fn has_comments_in_range_agrees_with_iterator() {
+        let comments = vec![comment(0, 2, false, "a"), comment(5, 7, false, "b")];
+        for (start, end) in [(0, 2), (0, 7), (3, 7), (3, 6), (6, 7), (0, 1)] {
+            assert_eq!(
+                has_comments_in_range(&comments, start, end),
+                comments_in_range(&comments, start, end).next().is_some(),
+                "range {start}..{end}"
+            );
+        }
+    }
+
+    #[test]
+    fn has_comments_in_range_shortcut_only_inspects_first_comment() {
+        // A multi-line block comment whose end overruns the query window: the
+        // O(log n) shortcut returns false because the first comment at/after
+        // `start` ends past `end`, and the iterator agrees (take_while stops there).
+        let comments = vec![comment(5, 40, true, "*\n big\n ")];
+        assert!(!has_comments_in_range(&comments, 5, 10));
+        assert!(comments_in_range(&comments, 5, 10).next().is_none());
+    }
+
+    #[test]
+    fn line_and_multiline_block_predicates() {
+        let block_ml = comment(0, 10, true, "a\nb");
+        let block_sl = comment(0, 6, true, "a");
+        let line = comment(0, 4, false, " x");
+
+        assert!(has_multiline_block_comments_in_range(
+            std::slice::from_ref(&block_ml),
+            0,
+            10
+        ));
+        assert!(!has_multiline_block_comments_in_range(
+            std::slice::from_ref(&block_sl),
+            0,
+            6
+        ));
+        assert!(!has_multiline_block_comments_in_range(
+            std::slice::from_ref(&line),
+            0,
+            4
+        ));
+
+        assert!(has_line_comments_in_range(
+            std::slice::from_ref(&line),
+            0,
+            4
+        ));
+        assert!(!has_line_comments_in_range(
+            std::slice::from_ref(&block_sl),
+            0,
+            6
+        ));
+    }
+
+    #[test]
+    fn classify_comment_slow_and_fast_agree() {
+        // Offsets: 'x'=0, "// trail"=[2,10), '\n'=10, "/* own */"=[11,20),
+        // '\n'=20, "/* inline */"=[21,33), ' '=33, 'y'=34.
+        let source = "x // trail\n/* own */\n/* inline */ y";
+        let breaks = build_line_breaks(source);
+        let line = comment(2, 10, false, " trail");
+        let own = comment(11, 20, true, " own ");
+        let inline = comment(21, 33, true, " inline ");
+
+        // prev_end = 1 (after 'x'), curr_start = 34 (the 'y').
+        assert_eq!(
+            classify_comment(&line, 1, 34, source),
+            CommentPosition::Trailing
+        );
+        assert_eq!(
+            classify_comment(&own, 1, 34, source),
+            CommentPosition::LeadingOwnLine
+        );
+        assert_eq!(
+            classify_comment(&inline, 1, 34, source),
+            CommentPosition::LeadingInline
+        );
+
+        // The precomputed-line-breaks variant must never disagree with the
+        // source-scanning one.
+        for c in [&line, &own, &inline] {
+            assert_eq!(
+                classify_comment(c, 1, 34, source),
+                classify_comment_fast(c, 1, 34, &breaks),
+                "slow/fast disagree for span {:?}",
+                c.span
+            );
+        }
+    }
+}

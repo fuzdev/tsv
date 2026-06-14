@@ -305,4 +305,43 @@ mod tests {
     fn test_line_continuation() {
         assert_eq!(decode_string_escapes("test\\\nline").unwrap(), "testline");
     }
+
+    #[test]
+    fn test_legacy_octal_escapes() {
+        // Legacy octal escapes decode to their code point.
+        assert_eq!(decode_string_escapes("\\101").unwrap(), "A"); // 0o101 = 65
+        assert_eq!(decode_string_escapes("\\141").unwrap(), "a"); // 0o141 = 97
+        // `\0` followed by a digit is an octal escape, not the null shortcut.
+        assert_eq!(decode_string_escapes("\\012").unwrap(), "\n"); // 0o12 = 10
+    }
+
+    #[test]
+    fn test_crlf_and_unicode_line_continuations() {
+        // `\` + CRLF consumes both and contributes nothing.
+        assert_eq!(decode_string_escapes("a\\\r\nb").unwrap(), "ab");
+        // `\` + U+2028 / U+2029 are line continuations too.
+        assert_eq!(decode_string_escapes("a\\\u{2028}b").unwrap(), "ab");
+        assert_eq!(decode_string_escapes("a\\\u{2029}b").unwrap(), "ab");
+    }
+
+    #[test]
+    fn test_lone_high_surrogate_falls_back_to_replacement() {
+        // A high surrogate with no following low surrogate becomes U+FFFD.
+        assert_eq!(decode_string_escapes("\\uD83D").unwrap(), "\u{FFFD}");
+        // ...followed by a plain char: replacement, then the char.
+        assert_eq!(decode_string_escapes("\\uD83Dx").unwrap(), "\u{FFFD}x");
+        // ...followed by a `\u` that is NOT a low surrogate: the lookahead is
+        // restored and the second escape decodes on its own.
+        assert_eq!(
+            decode_string_escapes("\\uD83D\\u0041").unwrap(),
+            "\u{FFFD}A"
+        );
+    }
+
+    #[test]
+    fn test_codepoint_escape_length_and_range_errors() {
+        assert!(decode_string_escapes("\\u{}").is_err()); // empty
+        assert!(decode_string_escapes("\\u{1234567}").is_err()); // > 6 digits
+        assert!(decode_string_escapes("\\u{110000}").is_err()); // > U+10FFFF
+    }
 }

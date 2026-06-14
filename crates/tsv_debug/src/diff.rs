@@ -607,14 +607,8 @@ fn build_json_path_map(json_str: &str) -> std::collections::HashMap<usize, Strin
 
 /// Extract JSON key from a line like '"key": value' or '"key": {'
 fn extract_json_key(line: &str) -> Option<String> {
-    let line = line.trim();
-    if line.starts_with('"')
-        && let Some(end_quote) = line[1..].find('"')
-    {
-        let key = &line[1..=end_quote];
-        return Some(key.to_string());
-    }
-    None
+    let (key, _) = line.trim().strip_prefix('"')?.split_once('"')?;
+    Some(key.to_string())
 }
 
 /// Write an inline diff showing character-level changes between two lines
@@ -1000,5 +994,88 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn context_filter_emits_two_hunks_with_a_gap() {
+        // Two changes far enough apart (context = 3) produce two separate hunks,
+        // each with its own `@@` header, and a `...` gap between them.
+        let lines: Vec<String> = (0..20).map(|i| format!("line{i}")).collect();
+        let expected = lines.join("\n") + "\n";
+        let mut actual_lines = lines;
+        actual_lines[2] = "CHANGED_A".to_string();
+        actual_lines[17] = "CHANGED_B".to_string();
+        let actual = actual_lines.join("\n") + "\n";
+
+        let mut options = DiffOptions::compare();
+        options.color = false;
+        let out = diff_to_string(&expected, &actual, &options);
+
+        assert_eq!(
+            out.matches("@@ -").count(),
+            2,
+            "expected two hunk headers:\n{out}"
+        );
+        assert!(out.contains("..."), "expected a gap between hunks:\n{out}");
+    }
+
+    #[test]
+    fn no_changes_yields_empty_diff() {
+        // Identical inputs ⇒ apply_context_filter returns nothing ⇒ empty output.
+        let same = "alpha\nbeta\ngamma\n";
+        let mut options = DiffOptions::compare();
+        options.color = false;
+        assert!(diff_to_string(same, same, &options).is_empty());
+    }
+
+    #[test]
+    fn extract_json_key_basic() {
+        assert_eq!(
+            extract_json_key("\"type\": \"Program\""),
+            Some("type".to_string())
+        );
+        assert_eq!(
+            extract_json_key("  \"start\": 0,"),
+            Some("start".to_string())
+        );
+        assert_eq!(
+            extract_json_key("\"children\": ["),
+            Some("children".to_string())
+        );
+        // Non-key lines.
+        assert_eq!(extract_json_key("123,"), None);
+        assert_eq!(extract_json_key("{"), None);
+        assert_eq!(extract_json_key("}"), None);
+    }
+
+    #[test]
+    fn build_json_path_map_objects_and_scalar_arrays() {
+        let json = serde_json::to_string_pretty(&serde_json::json!({
+            "type": "X",
+            "nums": [10, 20, 30],
+        }))
+        .unwrap();
+        let map = build_json_path_map(&json);
+        let has = |path: &str| map.values().any(|v| v == path);
+        // Object keys map to `$.key`.
+        assert!(has("$.type"), "map: {map:?}");
+        assert!(has("$.nums"), "map: {map:?}");
+        // Scalar array elements get incrementing indices.
+        assert!(has("$.nums[0]"), "map: {map:?}");
+        assert!(has("$.nums[1]"), "map: {map:?}");
+        assert!(has("$.nums[2]"), "map: {map:?}");
+
+        // Known limitation: the array index only advances for scalar elements
+        // ending in ',', so arrays of OBJECTS all collapse to `[0]`. Pinned here
+        // so a future fix is noticed (cosmetic — debug-diff path annotations only).
+        let obj_array = serde_json::to_string_pretty(&serde_json::json!({
+            "items": [{"v": 1}, {"v": 2}],
+        }))
+        .unwrap();
+        let m2 = build_json_path_map(&obj_array);
+        assert!(
+            m2.values().all(|v| !v.contains("[1]")),
+            "object-array indices unexpectedly advanced: {m2:?}"
+        );
     }
 }

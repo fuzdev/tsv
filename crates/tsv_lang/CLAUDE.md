@@ -62,13 +62,11 @@ arena_fits_with_lookahead()  — check if group fits in remaining width
 arena_print_doc*()           — render doc tree to formatted string
 ```
 
-**Rendering variants** (8 total):
+**Rendering variants** (6 total):
 
 - `arena_print_doc()` — standard (column 0, no resolver)
-- `arena_print_doc_resolved()` — with symbol resolution via `TextResolver`
 - `arena_print_doc_flat_resolved()` — render in flat mode (no group breaking)
 - `arena_print_doc_at_column()` — mid-line start (for Svelte template expressions)
-- `arena_print_doc_at_column_resolved()` — mid-line + symbols
 - `arena_print_doc_with_indent()` — explicit indent level
 - `arena_print_doc_with_indent_resolved()` — full control
 - `arena_print_doc_with_indent_resolved_preserve_whitespace()` — for HTML pre/textarea

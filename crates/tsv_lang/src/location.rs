@@ -296,4 +296,47 @@ mod tests {
         let tracker = LocationTracker::new_ecmascript("a\r\u{2028}b");
         assert_eq!(tracker.get_line_column(5), (3, 0)); // b
     }
+
+    #[test]
+    fn test_byte_to_char_ascii_identity() {
+        let m = ByteToCharMap::new("abc");
+        assert!(!m.has_multibyte());
+        assert_eq!(m.byte_to_char(0), 0);
+        assert_eq!(m.byte_to_char(2), 2);
+        // On the ASCII fast path the input is returned unchanged, even past the end.
+        assert_eq!(m.byte_to_char(99), 99);
+    }
+
+    #[test]
+    fn test_byte_to_char_bmp_multibyte() {
+        // "é=x": é is 2 UTF-8 bytes but 1 UTF-16 code unit, so '=' is unit 1, 'x' unit 2.
+        let m = ByteToCharMap::new("é=x");
+        assert!(m.has_multibyte());
+        assert_eq!(m.byte_to_char(0), 0);
+        assert_eq!(m.byte_to_char(2), 1); // '=' at byte 2
+        assert_eq!(m.byte_to_char(3), 2); // 'x' at byte 3
+    }
+
+    #[test]
+    fn test_byte_to_char_astral_surrogate_pair() {
+        // "😀x": the emoji is 4 UTF-8 bytes and 2 UTF-16 code units (surrogate pair),
+        // so 'x' at byte 4 is UTF-16 unit 2.
+        let m = ByteToCharMap::new("😀x");
+        assert!(m.has_multibyte());
+        assert_eq!(m.byte_to_char(0), 0);
+        assert_eq!(m.byte_to_char(4), 2); // 'x'
+        assert_eq!(m.byte_to_char(5), 3); // end-of-string sentinel
+    }
+
+    #[test]
+    fn test_byte_to_char_interior_byte_fills_to_char_start() {
+        // "a😀b": 'a'=unit 0, emoji=units 1-2 (bytes 1-4), 'b'=unit 3 (byte 5).
+        // A byte offset *inside* the emoji fills to that char's UTF-16 start (1),
+        // exercising the gap-fill loop's `last > 0` branch.
+        let m = ByteToCharMap::new("a😀b");
+        assert_eq!(m.byte_to_char(0), 0); // 'a'
+        assert_eq!(m.byte_to_char(1), 1); // emoji start
+        assert_eq!(m.byte_to_char(2), 1); // interior byte → emoji start
+        assert_eq!(m.byte_to_char(5), 3); // 'b' (emoji consumed 2 units)
+    }
 }

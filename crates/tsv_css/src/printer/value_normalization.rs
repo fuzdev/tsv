@@ -236,7 +236,11 @@ pub(crate) fn normalize_value_text(input: &str) -> String {
 }
 
 fn is_known_css_unit(unit: &str) -> bool {
-    CSS_UNITS.contains(unit.to_ascii_lowercase().as_str())
+    // Fast path: units arrive lowercase, so probe directly and only allocate a
+    // lowercased copy when the input actually has uppercase ASCII.
+    CSS_UNITS.contains(unit)
+        || (unit.bytes().any(|b| b.is_ascii_uppercase())
+            && CSS_UNITS.contains(unit.to_ascii_lowercase().as_str()))
 }
 
 /// Can `ch` begin a CSS identifier? (letter, `_`, `$`, `@`, or non-ASCII)
@@ -347,25 +351,22 @@ pub(crate) fn format_color_value(color: &Color) -> String {
     }
 }
 
+/// Format a computed `f64` for CSS output: a whole number drops its fraction
+/// (`1.0` → `1`), otherwise the default float rendering. (Distinct from
+/// `normalize_css_number`, which canonicalizes a number's *source text*.)
+fn format_css_f64(v: f64) -> String {
+    if v.fract() == 0.0 {
+        (v as i64).to_string()
+    } else {
+        v.to_string()
+    }
+}
+
 /// Format a ColorChannel value
 fn format_color_channel(channel: &ColorChannel) -> String {
     match channel {
-        ColorChannel::Number(n) => {
-            // Format number, removing unnecessary decimals
-            if n.fract() == 0.0 {
-                (*n as i64).to_string()
-            } else {
-                n.to_string()
-            }
-        }
-        ColorChannel::Percentage(p) => {
-            // Format percentage
-            if p.fract() == 0.0 {
-                format!("{}%", *p as i64)
-            } else {
-                format!("{p}%")
-            }
-        }
+        ColorChannel::Number(n) => format_css_f64(*n),
+        ColorChannel::Percentage(p) => format!("{}%", format_css_f64(*p)),
         ColorChannel::None => "none".to_string(),
     }
 }
@@ -518,13 +519,51 @@ pub(crate) fn extract_property_name(decl_source: &str) -> String {
                 property_part.trim().to_string()
             }
         } else {
-            // No comment - just trim
-            property_part.trim().to_string()
+            // No comment: trim insignificant whitespace, but a property name ending in a
+            // hex escape (`\41`) consumes one following whitespace as the escape's
+            // terminator. That whitespace is part of the identifier token, so prettier
+            // keeps it before the `:` (`\41 : red`); any extra whitespace is still trimmed
+            // (`color : red` → `color: red`).
+            let bare = property_part.trim();
+            if property_part.ends_with(char::is_whitespace) && ends_with_hex_escape(bare) {
+                format!("{bare} ")
+            } else {
+                bare.to_string()
+            }
         }
     } else {
         // Fallback: no colon found (malformed declaration)
         decl_source.trim().to_string()
     }
+}
+
+/// Returns true if `name` ends with a CSS hex escape (`\` + 1..=6 hex digits).
+///
+/// Such an escape consumes a single following whitespace as its terminator; that
+/// whitespace is part of the identifier token and must be preserved (e.g. the space
+/// before `:` in a property name `\41 : red`). A literal char after the escape
+/// (`ab\44 cd`) or an escaped backslash (`\\41`) does not end with a live escape.
+fn ends_with_hex_escape(name: &str) -> bool {
+    let bytes = name.as_bytes();
+    // Consume up to 6 trailing hex digits.
+    let mut i = bytes.len();
+    let mut digits = 0;
+    while i > 0 && digits < 6 && bytes[i - 1].is_ascii_hexdigit() {
+        i -= 1;
+        digits += 1;
+    }
+    if digits == 0 || i == 0 || bytes[i - 1] != b'\\' {
+        return false;
+    }
+    // The introducing `\` must itself be unescaped: an odd run of backslashes ending
+    // here means the last one starts the escape (`\41` yes, `\\41` no).
+    let mut backslashes = 0;
+    let mut j = i;
+    while j > 0 && bytes[j - 1] == b'\\' {
+        backslashes += 1;
+        j -= 1;
+    }
+    backslashes % 2 == 1
 }
 
 /// Extract and format string value from declaration source
@@ -927,6 +966,23 @@ pub(crate) fn split_args_by_comma(content: &str) -> Vec<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_normalize_css_number_table() {
+        // Mantissa: leading-zero insertion, trailing-zero/dot trimming, with
+        // leading integer zeros and the negative-zero sign preserved.
+        assert_eq!(normalize_css_number(".5"), "0.5");
+        assert_eq!(normalize_css_number("5."), "5");
+        assert_eq!(normalize_css_number("1.50"), "1.5");
+        assert_eq!(normalize_css_number("00.500"), "00.5");
+        assert_eq!(normalize_css_number("-0.0"), "-0");
+        // Exponent: lowercase `e`, drop `+`, strip leading zeros, drop a zero exponent.
+        assert_eq!(normalize_css_number("5e0"), "5");
+        assert_eq!(normalize_css_number("1e+0010"), "1e10");
+        assert_eq!(normalize_css_number("1.5E-3"), "1.5e-3");
+        // A bare trailing `e` (no exponent digits) drops to the mantissa.
+        assert_eq!(normalize_css_number("1e"), "1");
+    }
 
     #[test]
     fn test_extract_function_args() {

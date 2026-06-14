@@ -798,4 +798,69 @@ mod tests {
         // Mixed ASCII + non-ASCII
         assert_eq!(visual_width("hi⭐", 2), 4);
     }
+
+    #[test]
+    fn test_visual_width_combining_and_zero_width() {
+        // base 'e' + combining acute accent (U+0301, width 0) = one grapheme, width 1.
+        // Exercises the non-emoji multi-char branch (sum of char widths).
+        assert_eq!(visual_width("e\u{0301}", 2), 1);
+        // zero-width space contributes 0
+        assert_eq!(visual_width("a\u{200B}b", 2), 2);
+        // lone combining mark: must not panic, width 0
+        assert_eq!(visual_width("\u{0301}", 2), 0);
+    }
+
+    #[test]
+    fn test_is_same_line_invalid_positions() {
+        // Out-of-order and out-of-bounds positions are not "same line" (documented).
+        assert!(!is_same_line("ab", 5, 1));
+        assert!(!is_same_line("ab", 0, 99));
+    }
+
+    #[test]
+    fn test_has_blank_line_between_invalid_positions() {
+        assert!(!has_blank_line_between("a\n\nb", 5, 1));
+        assert!(!has_blank_line_between("a\n\nb", 0, 99));
+    }
+
+    #[test]
+    fn test_has_newline_between_invalid_positions() {
+        assert!(!has_newline_between("{\nx", 5, 1));
+        assert!(!has_newline_between("{\nx", 0, 99));
+    }
+
+    #[test]
+    fn test_spans_on_same_line_overlap_and_reversed() {
+        let source = "abcdefgh";
+        let a = Span::new(0, 5);
+        let b = Span::new(3, 8); // overlaps `a`
+        assert!(spans_on_same_line(source, a, b));
+        // Argument order must not matter.
+        assert!(spans_on_same_line(source, b, a));
+    }
+
+    #[test]
+    fn test_line_break_fns_slow_fast_agree() {
+        // "a\n\nb\nc": newlines at byte offsets 1, 2, 4.
+        let source = "a\n\nb\nc";
+        let breaks = build_line_breaks(source);
+        assert_eq!(breaks, vec![1, 2, 4]);
+        for (p, c) in [(0u32, 1u32), (1, 4), (0, 6), (3, 5), (1, 3), (4, 6)] {
+            assert_eq!(
+                is_same_line(source, p, c),
+                is_same_line_fast(&breaks, p, c),
+                "is_same_line {p},{c}"
+            );
+            assert_eq!(
+                has_blank_line_between(source, p, c),
+                has_blank_line_between_fast(&breaks, p, c),
+                "has_blank_line_between {p},{c}"
+            );
+            assert_eq!(
+                has_newline_between(source, p, c),
+                has_newline_between_fast(&breaks, p, c),
+                "has_newline_between {p},{c}"
+            );
+        }
+    }
 }

@@ -193,3 +193,43 @@ fn print_json(audits: &[Audit]) {
         serde_json::to_string_pretty(&report).unwrap_or_default()
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_linked_fixtures_handles_link_and_prose_forms() {
+        // Markdown link, backticked inline code, table-cell `|` terminator, and
+        // bare prose references all yield the bare `<path>`.
+        let doc = "see [foo](../tests/fixtures/a/b/) and `tests/fixtures/c/d` | tests/fixtures/e/f]\n\
+                   also tests/fixtures/g/h done\n";
+        let set = extract_linked_fixtures(doc);
+        let expected: BTreeSet<String> = ["a/b", "c/d", "e/f", "g/h"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        assert_eq!(set, expected);
+    }
+
+    #[test]
+    fn extract_linked_fixtures_dedups_and_ignores_empty() {
+        // Duplicates collapse; a bare `tests/fixtures/` with no path is ignored.
+        let doc = "tests/fixtures/x/y tests/fixtures/x/y tests/fixtures/ ";
+        let set = extract_linked_fixtures(doc);
+        let expected = BTreeSet::from(["x/y".to_string()]);
+        assert_eq!(set, expected);
+    }
+
+    #[test]
+    fn normalize_fixture_path_strips_prefix_and_trailing_slash() {
+        assert_eq!(normalize_fixture_path("./tests/fixtures/x/y/"), "x/y");
+        assert_eq!(
+            normalize_fixture_path("../tests/fixtures/foo/bar"),
+            "foo/bar"
+        );
+        // No marker: returned as-is (minus any trailing slash).
+        assert_eq!(normalize_fixture_path("x/y"), "x/y");
+        assert_eq!(normalize_fixture_path("x/y/"), "x/y");
+    }
+}

@@ -184,3 +184,86 @@ impl<'a> Printer<'a> {
         result
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::TextAnalysis;
+
+    #[test]
+    fn whitespace_only_uses_ascii_class() {
+        assert!("  \t\n ".is_whitespace_only());
+        assert!("".is_whitespace_only());
+        // NBSP (U+00A0) is content, not collapsible whitespace.
+        assert!(!"\u{00A0}".is_whitespace_only());
+        assert!(!"a".is_whitespace_only());
+    }
+
+    #[test]
+    fn newline_counting_and_blank_line() {
+        assert_eq!("a\nb".count_newlines(), 1);
+        assert_eq!("a\n\nb".count_newlines(), 2);
+        assert!("a\n\nb".has_blank_line());
+        assert!(!"a\nb".has_blank_line());
+    }
+
+    #[test]
+    fn leading_and_trailing_whitespace_analysis() {
+        assert_eq!("  \nx".leading_whitespace(), "  \n");
+        assert!("  \nx".has_leading_newline());
+        assert!(!"  \nx".has_leading_space_only());
+
+        assert_eq!("x  ".trailing_whitespace(), "  ");
+        assert!("x  ".has_trailing_space_only());
+        assert!(!"x  ".has_trailing_newline());
+
+        // A trailing blank line needs 2+ newlines in the trailing whitespace.
+        assert!("x\n\n".has_trailing_blank_line());
+        assert!(!"x\n".has_trailing_blank_line());
+    }
+
+    /// Build a bare `Printer` (no comments) just to reach `normalize_whitespace`,
+    /// which uses no interner/comment/source state of its own.
+    fn printer(source: &str) -> crate::printer::Printer<'_> {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+        use string_interner::DefaultStringInterner;
+        let interner = Rc::new(RefCell::new(DefaultStringInterner::new()));
+        crate::printer::Printer::new(source, interner, &[])
+    }
+
+    #[test]
+    fn normalize_whitespace_block_vs_inline() {
+        let p = printer("");
+        // Block context (trim_completely = true): collapse runs and trim both ends.
+        assert_eq!(
+            p.normalize_whitespace("  hello   world  ", true),
+            "hello world"
+        );
+        // Inline context: collapse runs but keep one boundary space each side.
+        assert_eq!(
+            p.normalize_whitespace("  hello   world  ", false),
+            " hello world "
+        );
+    }
+
+    #[test]
+    fn normalize_whitespace_all_whitespace_fast_path() {
+        let p = printer("");
+        // Inline all-whitespace collapses to a single space; block to empty.
+        assert_eq!(p.normalize_whitespace("   ", false), " ");
+        assert_eq!(p.normalize_whitespace("   ", true), "");
+        // Empty stays empty.
+        assert_eq!(p.normalize_whitespace("", false), "");
+    }
+
+    #[test]
+    fn normalize_whitespace_preserves_nbsp_as_content() {
+        let p = printer("");
+        // A non-breaking space is content, not collapsible whitespace.
+        assert_eq!(p.normalize_whitespace("a\u{00A0}b", true), "a\u{00A0}b");
+        assert_eq!(
+            p.normalize_whitespace("\u{00A0}hello\u{00A0}", false),
+            "\u{00A0}hello\u{00A0}"
+        );
+    }
+}

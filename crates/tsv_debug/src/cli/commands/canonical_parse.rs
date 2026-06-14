@@ -55,18 +55,6 @@ impl CanonicalParseCommand {
 async fn run(input: &Input, parser_type: ParserType) -> error::Result<String> {
     let content = input.content();
 
-    match parser_type {
-        ParserType::Svelte => {
-            let ast = deno::parse_svelte(content).await?;
-            Ok(format!("{}\n", to_json_with_tabs(&ast)?))
-        }
-        ParserType::TypeScript => {
-            let ast = deno::parse_typescript(content).await?;
-            Ok(format!("{}\n", to_json_with_tabs(&ast)?))
-        }
-        ParserType::Css => {
-            let ast = deno::parse_css(content).await?;
-            Ok(format!("{}\n", to_json_with_tabs(&ast)?))
-        }
-    }
+    let ast = deno::parse_by_type(content, parser_type).await?;
+    Ok(format!("{}\n", to_json_with_tabs(&ast)?))
 }

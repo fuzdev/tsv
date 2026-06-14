@@ -144,6 +144,22 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		assert.equal(node_entry.parse_svelte('<div>x</div>').type, 'Root');
 		assert.equal(node_entry.parse_css('a { color: red }').type, 'StyleSheetFile');
 	});
+
+	it('parse_*_json round-trips to parse_*', { skip: !has_parse }, () => {
+		// parse_X is defined as JSON.parse(parse_X_json(src)); the two must agree.
+		assert.deepEqual(
+			JSON.parse(node_entry.parse_typescript_json('const x = 1;')),
+			node_entry.parse_typescript('const x = 1;'),
+		);
+		assert.deepEqual(
+			JSON.parse(node_entry.parse_svelte_json('<div>x</div>')),
+			node_entry.parse_svelte('<div>x</div>'),
+		);
+		assert.deepEqual(
+			JSON.parse(node_entry.parse_css_json('a { color: red }')),
+			node_entry.parse_css('a { color: red }'),
+		);
+	});
 });
 
 // Browser entry (browser.js) — tests the init guard wrapper.
