@@ -20,6 +20,8 @@ on:
     branches: [main]
   pull_request:
     branches: ['**']
+  # Allow manually re-running checks from the Actions tab.
+  workflow_dispatch:
 
 concurrency:
   group: check-${{ github.ref }}
@@ -39,7 +41,10 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      # persist-credentials: false keeps the GITHUB_TOKEN out of .git/config (no step here pushes via git).
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
 
       # Pinned, not `stable`: the workspace runs clippy::nursery at warn and the
       # `lint` task denies warnings, so a floating toolchain would fail CI
@@ -89,7 +94,10 @@ jobs:
     timeout-minutes: 45
 
     steps:
+      # persist-credentials: false keeps the GITHUB_TOKEN out of .git/config (no step here pushes via git).
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master (no semver tags; bump manually)
