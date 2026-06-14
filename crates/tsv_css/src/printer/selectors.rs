@@ -249,11 +249,8 @@ impl<'a> Printer<'a> {
     // Doc Builders - all formatting logic expressed as doc IR
     //
 
-    /// Build a doc for a simple selector
-    ///
-    /// Uses source extraction where possible to preserve escapes.
-    /// Render a span-based simple selector (type / class / id / pseudo) from
-    /// source, preserving raw escapes verbatim.
+    /// Build a width-measurement doc for a span-based simple selector (type /
+    /// class / id / pseudo) from source, preserving raw escapes verbatim.
     fn build_span_selector_doc(&self, span: tsv_lang::Span) -> DocId {
         let raw = span.extract(self.source);
         // An escaped selector that is the last before a line break (in wrapped source)
@@ -270,6 +267,8 @@ impl<'a> Printer<'a> {
         self.d().text_owned(text.to_string())
     }
 
+    /// Build a width-measurement doc for a simple selector, dispatched by kind.
+    /// Span-based kinds extract from source to preserve escapes verbatim.
     pub(crate) fn build_simple_selector_doc(&self, simple: &internal::SimpleSelector) -> DocId {
         let d = self.d();
         match simple {
