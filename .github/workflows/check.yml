@@ -63,7 +63,7 @@ jobs:
         with:
           # Pinned to match local: deno drives the prettier/svelte fixture oracle
           # and `deno test`, so a floating minor could shift behavior the pinned
-          # Rust toolchain can't guard. Bump deliberately (not Dependabot-tracked).
+          # Rust toolchain can't guard. Bump deliberately.
           deno-version: 2.8.0
           # Round-trips DENO_DIR across runs — captures the sidecar's runtime
           # npm fetches (prettier/svelte/acorn) since those land in DENO_DIR.
@@ -113,8 +113,8 @@ jobs:
       # recompile. The download is independent of the cache and runs in seconds.
       # Version pinned to match local: wasm-pack bundles wasm-opt, whose output size
       # the ~±8% validate:artifacts bounds are calibrated against — a float would trip
-      # the size gate on an unrelated binaryen release. The action SHA is
-      # Dependabot-tracked; the wasm-pack version is a manual bump.
+      # the size gate on an unrelated binaryen release. Bump the SHA and wasm-pack
+      # version manually.
       - name: Install wasm-pack
         uses: taiki-e/install-action@7a79fe8c3a13344501c80d99cae481c1c9085912 # v2.81.10
         with:
