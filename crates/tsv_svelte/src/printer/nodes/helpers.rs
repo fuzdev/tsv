@@ -60,10 +60,16 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Write a JS comment as a trailing comment (after content)
+    /// Write a JS comment as a trailing comment (after content), before a closing
+    /// `}` emitted by the caller.
     ///
-    /// Block comments: ` /*content*/` (with leading space)
-    /// Line comments: ` // content` (with leading space, no newline)
+    /// Block comments: ` /*content*/` (inline; the `}` follows on the same line).
+    /// Line comments: ` // content` + newline + indent — a `//` comment runs to end
+    /// of line, so the closing `}` MUST drop to the next line; otherwise it would be
+    /// swallowed into the comment and lost on reparse. This mirrors the doc-path
+    /// `build_trailing_js_comment_doc` (which appends a `hardline`); the buffer here
+    /// writes the newline + current indent directly. See `build_trailing_js_comment_doc`
+    /// for why `line_suffix`/inline is not an option in template context.
     pub(crate) fn write_trailing_js_comment(&mut self, comment: &tsv_lang::Comment) {
         if comment.is_block {
             self.write(" /*");
@@ -73,6 +79,8 @@ impl<'a> Printer<'a> {
             // Content already includes the space after // (e.g., " comment" from "// comment")
             self.write(" //");
             self.write(&comment.content);
+            self.write("\n");
+            self.write_indent();
         }
     }
 
