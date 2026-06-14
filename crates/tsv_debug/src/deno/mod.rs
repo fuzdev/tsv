@@ -273,4 +273,22 @@ mod tests {
             Some("StyleSheetFile")
         );
     }
+
+    #[test]
+    fn bulk_pool_size_floor_knee_and_ceiling() {
+        // Always at least 1, even for degenerate concurrency.
+        assert_eq!(bulk_pool_size(0), 1);
+        assert_eq!(bulk_pool_size(1), 1);
+        // Below the first knee (concurrency/4 < 1) still maps to a single sidecar.
+        assert_eq!(bulk_pool_size(3), 1);
+        assert_eq!(bulk_pool_size(4), 1);
+        assert_eq!(bulk_pool_size(7), 1);
+        // Each step of 4 concurrent tasks adds one sidecar.
+        assert_eq!(bulk_pool_size(8), 2);
+        assert_eq!(bulk_pool_size(12), 3);
+        assert_eq!(bulk_pool_size(16), 4);
+        // Capped at 4 — extra sidecars only pay module-load cost past the knee.
+        assert_eq!(bulk_pool_size(20), 4);
+        assert_eq!(bulk_pool_size(128), 4);
+    }
 }
