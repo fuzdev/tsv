@@ -1,0 +1,358 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 464,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 103,
+				"data": " Line comment after the tag name stays on the tag-name line (prettier moves it to its own line) "
+			},
+			{
+				"type": "Text",
+				"start": 103,
+				"end": 104,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 104,
+				"end": 149,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 105
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 108
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 117,
+						"end": 134,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 3,
+								"column": 1,
+								"character": 117
+							},
+							"end": {
+								"line": 3,
+								"column": 10,
+								"character": 126
+							}
+						},
+						"value": [
+							{
+								"start": 128,
+								"end": 133,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 136,
+							"end": 143,
+							"raw": "\n\ttext\n",
+							"data": "\n\ttext\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 149,
+				"end": 151,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 151,
+				"end": 264,
+				"data": " Between-attribute line comment stays trailing the previous attribute (prettier moves it to its own line) "
+			},
+			{
+				"type": "Text",
+				"start": 264,
+				"end": 265,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 265,
+				"end": 333,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 266
+					},
+					"end": {
+						"line": 9,
+						"column": 4,
+						"character": 269
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 271,
+						"end": 290,
+						"name": "data-attr1",
+						"name_loc": {
+							"start": {
+								"line": 10,
+								"column": 1,
+								"character": 271
+							},
+							"end": {
+								"line": 10,
+								"column": 11,
+								"character": 281
+							}
+						},
+						"value": [
+							{
+								"start": 283,
+								"end": 289,
+								"type": "Text",
+								"raw": "value1",
+								"data": "value1"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 299,
+						"end": 318,
+						"name": "data-attr2",
+						"name_loc": {
+							"start": {
+								"line": 11,
+								"column": 1,
+								"character": 299
+							},
+							"end": {
+								"line": 11,
+								"column": 11,
+								"character": 309
+							}
+						},
+						"value": [
+							{
+								"start": 311,
+								"end": 317,
+								"type": "Text",
+								"raw": "value2",
+								"data": "value2"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 320,
+							"end": 327,
+							"raw": "\n\ttext\n",
+							"data": "\n\ttext\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 333,
+				"end": 335,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 335,
+				"end": 420,
+				"data": " Combined: after-tag-name comment + trailing comment on a shorthand attribute "
+			},
+			{
+				"type": "Text",
+				"start": 420,
+				"end": 421,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 421,
+				"end": 463,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 1,
+						"character": 422
+					},
+					"end": {
+						"line": 17,
+						"column": 4,
+						"character": 425
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 434,
+						"end": 441,
+						"name": "value",
+						"name_loc": {
+							"start": {
+								"line": 18,
+								"column": 2,
+								"character": 435
+							},
+							"end": {
+								"line": 18,
+								"column": 7,
+								"character": 440
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 435,
+							"end": 440,
+							"expression": {
+								"type": "Identifier",
+								"name": "value",
+								"start": 435,
+								"end": 440,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2,
+										"character": 435
+									},
+									"end": {
+										"line": 18,
+										"column": 7,
+										"character": 440
+									}
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 450,
+							"end": 457,
+							"raw": "\n\ttext\n",
+							"data": "\n\ttext\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"start": 109,
+			"end": 115,
+			"value": " foo",
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 5,
+					"character": 109
+				},
+				"end": {
+					"line": 2,
+					"column": 11,
+					"character": 115
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"start": 291,
+			"end": 297,
+			"value": " mid",
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 21,
+					"character": 291
+				},
+				"end": {
+					"line": 10,
+					"column": 27,
+					"character": 297
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"start": 426,
+			"end": 432,
+			"value": " foo",
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 5,
+					"character": 426
+				},
+				"end": {
+					"line": 17,
+					"column": 11,
+					"character": 432
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"start": 442,
+			"end": 448,
+			"value": " bar",
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 9,
+					"character": 442
+				},
+				"end": {
+					"line": 18,
+					"column": 15,
+					"character": 448
+				}
+			}
+		}
+	]
+}

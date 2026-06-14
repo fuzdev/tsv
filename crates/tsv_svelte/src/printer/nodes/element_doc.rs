@@ -1487,9 +1487,11 @@ impl<'a> Printer<'a> {
 
     /// Push docs for JS comments between attributes.
     ///
-    /// Each comment gets a preceding separator (hardline for own-line, space for inline).
-    /// Returns whether the last comment was on its own line (caller uses this
-    /// to decide the separator before the next attribute).
+    /// Each comment gets a preceding separator (hardline when it starts its own
+    /// line, an inline space when it trails the previous token). Returns whether
+    /// the following attribute must start on a new line — true for any own-line
+    /// comment and for any line comment (a `//` runs to end of line, so the next
+    /// token can't share it); the caller uses this to pick that separator.
     pub(super) fn push_attr_comment_docs(
         &self,
         docs: &mut Vec<DocId>,
@@ -1502,14 +1504,26 @@ impl<'a> Printer<'a> {
             let is_own_line =
                 self.source[range_start as usize..comment.span.start as usize].contains('\n');
 
-            if comment.is_block && !is_own_line {
-                docs.push(d.text(" "));
-                last_was_own_line = false;
-            } else {
+            // Preserve the author's placement: a comment on its own line stays on its
+            // own line; a comment on the same line as the preceding token stays
+            // trailing it (inline). This already held for block comments; it now
+            // extends to line comments (a `//` the author put after the tag name or
+            // an attribute is kept there rather than relocated to its own line).
+            if is_own_line {
                 docs.push(d.hardline());
-                last_was_own_line = true;
+            } else {
+                docs.push(d.text(" "));
             }
             docs.push(self.build_attr_js_comment_doc(comment));
+            if !comment.is_block {
+                // A `//` runs to end of line, so the following attribute or the
+                // closing `>` / `/>` must drop to the next line — force the open-tag
+                // group to break so it can't be swallowed into the comment.
+                docs.push(d.break_parent());
+            }
+            // A line comment always pushes the next token to a new line; a same-line
+            // block comment lets it stay inline.
+            last_was_own_line = is_own_line || !comment.is_block;
         }
         last_was_own_line
     }

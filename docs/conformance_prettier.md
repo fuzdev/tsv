@@ -205,6 +205,8 @@ Prettier preserves byte-order marks. tsv strips them (they serve no purpose in U
 
 **Trailing comments in `{...}`** (content preservation) — [expr_trailing](../tests/fixtures/svelte/syntax/comments/expr_trailing_prettier_divergence/) (block comments, inline); [expr_trailing_line](../tests/fixtures/svelte/syntax/comments/expr_trailing_line_prettier_divergence/) (line comments — `}` kept on its own line so the `//` doesn't swallow it).
 
+**Same-line `//` comment placement in the attribute list** (placement preservation) — [comment_same_line](../tests/fixtures/svelte/attributes/comment_same_line_prettier_divergence/): a line comment the author put on the same line as the tag name (`<div // foo`) or trailing an attribute that has more attributes after it (`a="1" // mid`) stays trailing that token; prettier relocates it to its own line. A `//` trailing the *last* attribute (before `>`/`/>`) already stays inline in both formatters, so it is not a divergence — [comment_trailing_same_line](../tests/fixtures/svelte/attributes/comment_trailing_same_line/). Block comments and own-line comments are preserved as-written by both. See [Comment Position Philosophy](#comment-position-philosophy).
+
 ### Svelte: Blocks
 
 - `{#each}` line wrap — [each_long](../tests/fixtures/svelte/blocks/each/long_prettier_divergence/)
