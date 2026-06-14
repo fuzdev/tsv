@@ -425,12 +425,7 @@ impl<'a> Printer<'a> {
         // relocated leading line comments from inside true_type's parens.
         let mut trailing_on_extends_parts: Vec<DocId> = Vec::new();
         for comment in comments_in_range(self.comments, extends_type_end, before_q_end) {
-            if comment.is_block {
-                trailing_on_extends_parts.push(d.text(" "));
-                trailing_on_extends_parts.push(self.build_comment_doc(comment));
-            } else {
-                trailing_on_extends_parts.push(self.build_trailing_line_comment_doc(comment));
-            }
+            trailing_on_extends_parts.push(self.build_trailing_comment_doc(comment));
         }
         for comment in &true_paren_leading_line_comments {
             trailing_on_extends_parts.push(self.build_trailing_line_comment_doc(comment));
@@ -462,12 +457,7 @@ impl<'a> Printer<'a> {
         let colon = self.find_char_outside_comments(true_type_end, false_type_start, b':');
         if let Some(c_pos) = colon {
             for comment in comments_in_range(self.comments, true_type_end, c_pos) {
-                if comment.is_block {
-                    q_parts.push(d.text(" "));
-                    q_parts.push(self.build_comment_doc(comment));
-                } else {
-                    q_parts.push(self.build_trailing_line_comment_doc(comment));
-                }
+                q_parts.push(self.build_trailing_comment_doc(comment));
             }
         }
         for comment in &false_paren_leading_line_comments {

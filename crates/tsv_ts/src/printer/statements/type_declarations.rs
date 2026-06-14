@@ -963,14 +963,7 @@ impl<'a> Printer<'a> {
                         continue;
                     }
 
-                    if comment.is_block {
-                        // Single-line block comments are inline, affect width
-                        parts.push(d.text(" "));
-                        parts.push(self.build_comment_doc(comment));
-                    } else {
-                        // Line comments go in line_suffix, don't affect width
-                        parts.push(self.build_trailing_line_comment_doc(comment));
-                    }
+                    parts.push(self.build_trailing_comment_doc(comment));
                 } else {
                     break; // Only same-line comments
                 }
