@@ -534,10 +534,10 @@ fn is_short_name(symbol: DefaultSymbol, interner: &impl SymbolLookup, tab_width:
 /// - Pure `$`/`_` identifiers: `$`, `_`, `$_`, `$__` (lodash-style)
 fn is_factory_name(symbol: DefaultSymbol, interner: &impl SymbolLookup) -> bool {
     interner
-        .with_name(symbol, |name| {
-            name.chars().next().is_some_and(char::is_uppercase)
-                || (!name.is_empty() && name.chars().all(|c| c == '$' || c == '_'))
-        })
+        .with_name(
+            symbol,
+            crate::printer::expressions::literals::is_factory_identifier_name,
+        )
         .unwrap_or(false)
 }
 

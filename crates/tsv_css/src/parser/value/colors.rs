@@ -85,6 +85,36 @@ fn parse_hue(s: &str) -> Option<(ColorChannel, Option<AngleUnit>)> {
     None
 }
 
+/// Split a color function's argument string into its channel parts across the
+/// CSS Color 4 syntaxes — `c, c, c[, a]`, space-separated `c c c`, and the
+/// slash-alpha form `c c c / a`. Returns `None` if fewer than 3 parts. Shared by
+/// `parse_rgb` and `parse_hsl`, which differ only in how they parse each channel.
+fn split_color_args(args_str: &str) -> Option<Vec<&str>> {
+    let args_str = args_str.trim();
+    let parts: Vec<&str> = if let Some((head, alpha_part)) = args_str.split_once('/') {
+        // Slash-alpha form: c c c / a
+        let mut parts = head
+            .split([',', ' '])
+            .filter(|s| !s.is_empty())
+            .map(str::trim)
+            .collect::<Vec<_>>();
+        parts.push(alpha_part.trim());
+        parts
+    } else if args_str.contains(',') {
+        // Comma-separated: c, c, c[, a]
+        args_str.split(',').map(str::trim).collect::<Vec<_>>()
+    } else {
+        // Space-separated: c c c
+        args_str
+            .split(' ')
+            .filter(|s| !s.is_empty())
+            .map(str::trim)
+            .collect::<Vec<_>>()
+    };
+
+    (parts.len() >= 3).then_some(parts)
+}
+
 /// Parse rgb() or rgba() color
 ///
 /// Supports CSS Color 4:
@@ -93,34 +123,7 @@ fn parse_hue(s: &str) -> Option<(ColorChannel, Option<AngleUnit>)> {
 /// - Percentages: rgb(100% 0% 0%), rgb(100% 0% 0% / 50%)
 /// - None keyword: rgb(255 0 none)
 fn parse_rgb(args_str: &str) -> Option<Color> {
-    let args_str = args_str.trim();
-    let parts: Vec<&str> = if args_str.contains('/') {
-        // New format: r g b / a
-        let (rgb_part, alpha_part) = args_str.split_once('/')?;
-        let mut parts = rgb_part
-            .split([',', ' '])
-            .filter(|s| !s.is_empty())
-            .map(str::trim)
-            .collect::<Vec<_>>();
-        parts.push(alpha_part.trim());
-        parts
-    } else {
-        // Old format: r, g, b or r, g, b, a OR space-separated: r g b
-        if args_str.contains(',') {
-            args_str.split(',').map(str::trim).collect::<Vec<_>>()
-        } else {
-            // Space-separated
-            args_str
-                .split(' ')
-                .filter(|s| !s.is_empty())
-                .map(str::trim)
-                .collect::<Vec<_>>()
-        }
-    };
-
-    if parts.len() < 3 {
-        return None;
-    }
+    let parts = split_color_args(args_str)?;
 
     let r = parse_color_channel(parts[0])?;
     let g = parse_color_channel(parts[1])?;
@@ -143,33 +146,7 @@ fn parse_rgb(args_str: &str) -> Option<Color> {
 /// - None keyword: hsl(none 50% 50%)
 /// - Alpha as percentage: hsl(0 100% 50% / 50%)
 fn parse_hsl(args_str: &str) -> Option<Color> {
-    let args_str = args_str.trim();
-    let parts: Vec<&str> = if args_str.contains('/') {
-        let (hsl_part, alpha_part) = args_str.split_once('/')?;
-        let mut parts = hsl_part
-            .split([',', ' '])
-            .filter(|s| !s.is_empty())
-            .map(str::trim)
-            .collect::<Vec<_>>();
-        parts.push(alpha_part.trim());
-        parts
-    } else {
-        // Old format: h, s%, l% OR space-separated: h s% l%
-        if args_str.contains(',') {
-            args_str.split(',').map(str::trim).collect::<Vec<_>>()
-        } else {
-            // Space-separated
-            args_str
-                .split(' ')
-                .filter(|s| !s.is_empty())
-                .map(str::trim)
-                .collect::<Vec<_>>()
-        }
-    };
-
-    if parts.len() < 3 {
-        return None;
-    }
+    let parts = split_color_args(args_str)?;
 
     let (hue, hue_unit) = parse_hue(parts[0])?;
     let saturation = parse_color_channel(parts[1])?;
@@ -191,7 +168,11 @@ fn parse_hsl(args_str: &str) -> Option<Color> {
 
 /// Check if string is a named CSS color (case-insensitive, O(1) lookup)
 fn is_named_color(s: &str) -> bool {
-    NAMED_COLORS.contains(s.to_lowercase().as_str())
+    // Fast path: names arrive lowercase, so probe the set directly and only
+    // allocate a lowercased copy when the input actually has uppercase ASCII.
+    NAMED_COLORS.contains(s)
+        || (s.bytes().any(|b| b.is_ascii_uppercase())
+            && NAMED_COLORS.contains(s.to_ascii_lowercase().as_str()))
 }
 
 /// Static set of CSS named colors (148 standard + 5 keywords) - compiled at build time

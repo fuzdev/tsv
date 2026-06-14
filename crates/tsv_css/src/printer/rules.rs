@@ -22,6 +22,10 @@ impl<'a> Printer<'a> {
         // Format selector (uses selectors module)
         self.print_selector_list(&rule.selector);
 
+        // Drop a hex escape's terminator whitespace (`.\1F600 ` before `{`) so it
+        // doesn't double with the block separator written below.
+        self.pop_selector_terminator();
+
         // Inline-print any comments between the selector and opening brace.
         // block_span.start is the position of the opening brace, so a leading
         // child whose span precedes it is a pre-brace comment.

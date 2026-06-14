@@ -2,7 +2,7 @@
 
 use super::super::{internal, public};
 use super::declarations::convert_type_parameter;
-use super::{bigint_to_decimal, convert_expression, create_location};
+use super::{bigint_to_decimal, convert_expression, create_location, json_number_from_f64};
 use internal::TSKeywordKind;
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
@@ -256,16 +256,8 @@ pub(in crate::ast) fn convert_type(
                 .type_annotation
                 .as_ref()
                 .map(|t| Box::new(convert_type(t, source, loc, interner, offset))),
-            readonly: m.readonly.map(|r| match r {
-                internal::TSMappedTypeModifier::True => public::TSMappedTypeModifier::True,
-                internal::TSMappedTypeModifier::Plus => public::TSMappedTypeModifier::Plus,
-                internal::TSMappedTypeModifier::Minus => public::TSMappedTypeModifier::Minus,
-            }),
-            optional: m.optional.map(|o| match o {
-                internal::TSMappedTypeModifier::True => public::TSMappedTypeModifier::True,
-                internal::TSMappedTypeModifier::Plus => public::TSMappedTypeModifier::Plus,
-                internal::TSMappedTypeModifier::Minus => public::TSMappedTypeModifier::Minus,
-            }),
+            readonly: m.readonly.map(convert_mapped_type_modifier),
+            optional: m.optional.map(convert_mapped_type_modifier),
         }),
         internal::TSType::TypeOperator(o) => {
             public::TSType::TSTypeOperator(public::TSTypeOperator {
@@ -541,13 +533,9 @@ fn convert_literal_type(
         internal::TSLiteralType::Number(literal) => {
             let raw = literal.span.extract(source);
             let (value, bigint) = match &literal.value {
-                internal::LiteralValue::Number(n) => (
-                    serde_json::Value::Number(
-                        serde_json::Number::from_f64(*n)
-                            .unwrap_or_else(|| serde_json::Number::from(0)),
-                    ),
-                    None,
-                ),
+                internal::LiteralValue::Number(n) => {
+                    (serde_json::Value::Number(json_number_from_f64(*n)), None)
+                }
                 _ => (serde_json::Value::Null, None),
             };
             public::TSType::TSLiteralType(public::TSLiteralType {
@@ -601,13 +589,9 @@ fn convert_literal_type(
             };
             let arg_raw = arg_lit.span.extract(source);
             let (arg_value, arg_bigint) = match &arg_lit.value {
-                internal::LiteralValue::Number(n) => (
-                    serde_json::Value::Number(
-                        serde_json::Number::from_f64(*n)
-                            .unwrap_or_else(|| serde_json::Number::from(0)),
-                    ),
-                    None,
-                ),
+                internal::LiteralValue::Number(n) => {
+                    (serde_json::Value::Number(json_number_from_f64(*n)), None)
+                }
                 internal::LiteralValue::BigInt(val) => {
                     let decimal = bigint_to_decimal(val);
                     (serde_json::Value::String(decimal.clone()), Some(decimal))
@@ -1138,5 +1122,15 @@ fn convert_enum_member(
             .initializer
             .as_ref()
             .map(|expr| convert_expression(expr, source, loc, interner, offset)),
+    }
+}
+
+/// Convert a mapped-type `+`/`-`/`true` modifier to its public form. Shared by
+/// the `readonly` and `optional` fields of a mapped type.
+fn convert_mapped_type_modifier(m: internal::TSMappedTypeModifier) -> public::TSMappedTypeModifier {
+    match m {
+        internal::TSMappedTypeModifier::True => public::TSMappedTypeModifier::True,
+        internal::TSMappedTypeModifier::Plus => public::TSMappedTypeModifier::Plus,
+        internal::TSMappedTypeModifier::Minus => public::TSMappedTypeModifier::Minus,
     }
 }

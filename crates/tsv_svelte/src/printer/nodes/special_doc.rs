@@ -63,7 +63,7 @@ impl<'a> Printer<'a> {
         // Self-closing detection
         let is_self_closing = element.fragment.nodes.is_empty()
             && is_typically_empty
-            && self.was_special_self_closing_doc(element);
+            && self.span_was_self_closing(element.span);
 
         // Build attribute docs (including this={...} for component/element)
         let attr_docs = self.build_special_element_attrs_doc(element);
@@ -485,10 +485,5 @@ impl<'a> Printer<'a> {
             Some(FragmentNode::Text(text)) => !text.raw.ends_with(char::is_whitespace),
             _ => true,
         }
-    }
-
-    /// Check if special element was self-closing in source (for doc building)
-    pub(super) fn was_special_self_closing_doc(&self, element: &internal::SpecialElement) -> bool {
-        element.span.extract(self.source).trim_end().ends_with("/>")
     }
 }

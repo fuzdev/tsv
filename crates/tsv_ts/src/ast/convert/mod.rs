@@ -274,6 +274,13 @@ pub(super) fn create_location(
     to_public_location(loc)
 }
 
+/// Convert an `f64` literal value to a `serde_json::Number`, mapping non-finite
+/// values (NaN / ±Inf) to `0` for acorn parity — non-finite number literals
+/// don't occur in valid source, and JSON has no representation for them.
+pub(super) fn json_number_from_f64(n: f64) -> serde_json::Number {
+    serde_json::Number::from_f64(n).unwrap_or_else(|| serde_json::Number::from(0))
+}
+
 /// Convert an internal `Program` to the public AST under the given schema.
 ///
 /// Use `Schema::Acorn` for standalone TypeScript and Svelte `lang="ts"` scripts;

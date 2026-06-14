@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 320,
+		"end": 1276,
 		"attributes": [],
 		"children": [
 			{
@@ -239,18 +239,334 @@
 				},
 				"start": 280,
 				"end": 311
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 479,
+					"end": 488,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 479,
+							"end": 488,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "😀b",
+											"start": 479,
+											"end": 488
+										}
+									],
+									"start": 479,
+									"end": 488
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 489,
+					"end": 508,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 493,
+							"end": 504,
+							"property": "color",
+							"value": "teal"
+						}
+					]
+				},
+				"start": 479,
+				"end": 508
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 673,
+					"end": 678,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 673,
+							"end": 678,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "A",
+											"start": 673,
+											"end": 678
+										}
+									],
+									"start": 673,
+									"end": 678
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 678,
+					"end": 698,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 682,
+							"end": 694,
+							"property": "color",
+							"value": "brown"
+						}
+					]
+				},
+				"start": 673,
+				"end": 698
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 863,
+					"end": 879,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 863,
+							"end": 879,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "A",
+											"start": 863,
+											"end": 868
+										},
+										{
+											"type": "ClassSelector",
+											"name": "b",
+											"start": 868,
+											"end": 870
+										}
+									],
+									"start": 863,
+									"end": 870
+								},
+								{
+									"type": "RelativeSelector",
+									"combinator": {
+										"type": "Combinator",
+										"name": ">",
+										"start": 871,
+										"end": 872
+									},
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "cde",
+											"start": 873,
+											"end": 879
+										}
+									],
+									"start": 871,
+									"end": 879
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 880,
+					"end": 899,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 884,
+							"end": 895,
+							"property": "color",
+							"value": "navy"
+						}
+					]
+				},
+				"start": 863,
+				"end": 899
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 1055,
+					"end": 1060,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 1055,
+							"end": 1060,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "A",
+											"args": null,
+											"start": 1055,
+											"end": 1060
+										}
+									],
+									"start": 1055,
+									"end": 1060
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 1060,
+					"end": 1079,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 1064,
+							"end": 1075,
+							"property": "color",
+							"value": "pink"
+						}
+					]
+				},
+				"start": 1055,
+				"end": 1079
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 1081,
+					"end": 1088,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 1081,
+							"end": 1088,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "Ab",
+											"start": 1081,
+											"end": 1088
+										}
+									],
+									"start": 1081,
+									"end": 1088
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 1089,
+					"end": 1108,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 1093,
+							"end": 1104,
+							"property": "color",
+							"value": "gray"
+						}
+					]
+				},
+				"start": 1081,
+				"end": 1108
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 1237,
+					"end": 1247,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 1237,
+							"end": 1247,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "A",
+											"args": null,
+											"start": 1237,
+											"end": 1242
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "B",
+											"args": null,
+											"start": 1242,
+											"end": 1247
+										}
+									],
+									"start": 1237,
+									"end": 1247
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 1247,
+					"end": 1267,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 1251,
+							"end": 1263,
+							"property": "color",
+							"value": "olive"
+						}
+					]
+				},
+				"start": 1237,
+				"end": 1267
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 312,
-			"styles": "\n\t/* identity escapes keep the backslash in the AST name */\n\t#\\? {\n\t\tcolor: red;\n\t}\n\t.\\@ {\n\t\tcolor: blue;\n\t}\n\ta\\+b {\n\t\tcolor: green;\n\t}\n\t/* hex escapes decode (with optional whitespace terminator) */\n\t#\\3A b {\n\t\tcolor: orange;\n\t}\n\t/* mixed identity and hex in one name */\n\t.a\\?\\41 b {\n\t\tcolor: purple;\n\t}\n",
+			"end": 1268,
+			"styles": "\n\t/* identity escapes keep the backslash in the AST name */\n\t#\\? {\n\t\tcolor: red;\n\t}\n\t.\\@ {\n\t\tcolor: blue;\n\t}\n\ta\\+b {\n\t\tcolor: green;\n\t}\n\t/* hex escapes decode (with optional whitespace terminator) */\n\t#\\3A b {\n\t\tcolor: orange;\n\t}\n\t/* mixed identity and hex in one name */\n\t.a\\?\\41 b {\n\t\tcolor: purple;\n\t}\n\t/* astral-plane (>BMP) hex escape decodes to a multi-byte char in the AST name\n\t   (exercises surrogate-pair / 4-byte offset translation); formatter keeps it raw */\n\t.\\1F600 b {\n\t\tcolor: teal;\n\t}\n\t/* a hex escape's terminator whitespace right before the block is part of the\n\t   selector token, but the formatter must not re-emit it as a doubled separator */\n\t.\\41 {\n\t\tcolor: brown;\n\t}\n\t/* the same terminator before a combinator is consumed once, not doubled — and\n\t   the single space inside the compound `.\\41 .b` (two simple selectors) stays */\n\t.\\41 .b > c\\64 e {\n\t\tcolor: navy;\n\t}\n\t/* pseudo-class and pseudo-element names keep hex escapes raw too — Svelte\n\t   decodes them in the AST `name`, but the formatter preserves the source */\n\t:\\41 {\n\t\tcolor: pink;\n\t}\n\t::\\41 b {\n\t\tcolor: gray;\n\t}\n\t/* the terminator between two escaped pseudos in a compound stays; only the\n\t   trailing one (before the block) is dropped */\n\t:\\41 :\\42 {\n\t\tcolor: olive;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 321,
+	"end": 1277,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

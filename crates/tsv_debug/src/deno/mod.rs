@@ -55,6 +55,19 @@ pub fn set_pool_size(n: usize) {
     POOL_SIZE.store(n.max(1), Ordering::Relaxed);
 }
 
+/// Prepare for a bulk workload: derive a task concurrency from the machine's
+/// parallelism, size the sidecar pool accordingly (this must happen before the
+/// first sidecar call), and return that concurrency so the caller can size its
+/// `buffer_unordered` / `buffered` stream. Centralizes the size-pool-then-fan-out
+/// ordering that every bulk command needs.
+pub fn init_bulk_pool() -> usize {
+    let concurrency = std::thread::available_parallelism()
+        .map(std::num::NonZero::get)
+        .unwrap_or(4);
+    set_pool_size(bulk_pool_size(concurrency));
+    concurrency
+}
+
 /// Get a Deno actor from the pool, spawning the pool on first use.
 ///
 /// Requests dispatch round-robin: each actor already multiplexes concurrent
@@ -149,6 +162,21 @@ pub async fn parse_typescript(source: &str) -> Result<serde_json::Value, DenoErr
 /// Returns an error if Deno is not available or parsing fails.
 pub async fn parse_css(source: &str) -> Result<serde_json::Value, DenoError> {
     get_actor().await?.call("css-parse", source, None).await
+}
+
+/// Parse `content` with the canonical external parser for `parser`
+/// (Svelte / acorn-typescript / parseCss). The single dispatch point, so callers
+/// keyed on `ParserType` or `InputType::parser_type()` don't re-spell the match.
+pub async fn parse_by_type(
+    content: &str,
+    parser: tsv_cli::cli::input::ParserType,
+) -> Result<serde_json::Value, DenoError> {
+    use tsv_cli::cli::input::ParserType;
+    match parser {
+        ParserType::Svelte => parse_svelte(content).await,
+        ParserType::TypeScript => parse_typescript(content).await,
+        ParserType::Css => parse_css(content).await,
+    }
 }
 
 /// Version information from the Deno sidecar

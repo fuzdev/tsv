@@ -405,6 +405,15 @@ pub(in crate::printer) fn is_valid_js_identifier(s: &str) -> bool {
     chars.all(is_id_continue)
 }
 
+/// Check if an identifier name matches Prettier's `isFactory`: `/^[A-Z]|^[$_]+$/u`
+/// (member-chain.js:273) — starts uppercase (`Object`, `React`) or is a pure
+/// `$`/`_` name (`$`, `_`, `$__`). Drives chain factory-merge decisions; `$util`
+/// / `_helper` are NOT factories.
+pub(in crate::printer) fn is_factory_identifier_name(name: &str) -> bool {
+    name.chars().next().is_some_and(char::is_uppercase)
+        || (!name.is_empty() && name.chars().all(|c| c == '$' || c == '_'))
+}
+
 #[cfg(test)]
 mod tests {
     use super::format_directive as fd;
