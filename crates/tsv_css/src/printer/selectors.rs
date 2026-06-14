@@ -422,20 +422,34 @@ impl<'a> Printer<'a> {
             raw
         };
         // Prettier lowercases pseudo-class/element names (case-insensitive
-        // keywords), e.g. `:HOVER` → `:hover`, `::-WEBKIT-` → `::-webkit-`. It
-        // preserves custom `:--Name` pseudos, and leaves escaped names' literal
-        // case alone (`::\41 B` keeps its literal `B`) — so skip names carrying a
-        // `\` escape and render them raw, matching prettier's escape handling.
-        //
-        // TODO: prettier additionally lowercases the hex *digits* of escapes in
-        // pseudo names (`:\4A ` → `:\4a `, unlike class/id names). We render the
-        // escape raw, so that rare case diverges; align if a real input hits it.
+        // keywords), e.g. `:HOVER` → `:hover`, `::-WEBKIT-` → `::-webkit-`.
+        // Custom `:--Name` pseudos are case-sensitive, so preserve them.
         let after_colons = name.trim_start_matches(':');
-        let preserve_case = name.contains('\\') || after_colons.starts_with("--");
-        if !preserve_case && name.bytes().any(|b| b.is_ascii_uppercase()) {
-            self.write(&name.to_ascii_lowercase());
-        } else {
+        if after_colons.starts_with("--") {
             self.write(name);
+            return;
+        }
+        // For an escaped name prettier folds case only up to the first
+        // whitespace — a hex escape's terminator (`:\4A b` → `:\4a b`, folding
+        // the escape's hex digits and any leading literal) — and preserves
+        // everything from that whitespace on (`::\41 B` keeps the literal `B`;
+        // `:\4E \4F` keeps the second escape verbatim). With no terminator the
+        // whole name folds (`:HO\56ER` → `:ho\56er`). This is pseudo-specific:
+        // class/id/type selectors render raw (see `print_simple_selector`), so
+        // their hex escapes keep their case. Mirrors prettier's
+        // `maybeToLowerCase(node.value)`, where the escape terminator splits the
+        // pseudo's value token at the first whitespace.
+        let (head, tail) = match name.find(|c: char| c.is_ascii_whitespace()) {
+            Some(i) => name.split_at(i),
+            None => (name, ""),
+        };
+        if head.bytes().any(|b| b.is_ascii_uppercase()) {
+            self.write(&head.to_ascii_lowercase());
+        } else {
+            self.write(head);
+        }
+        if !tail.is_empty() {
+            self.write(tail);
         }
     }
 
