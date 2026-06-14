@@ -11,7 +11,7 @@ use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::{SymbolResolver, SymbolToU32};
+use tsv_lang::{Span, SymbolResolver, SymbolToU32};
 
 /// How content relates to an element boundary (opening or closing tag)
 ///
@@ -1528,9 +1528,10 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Check if element was self-closing in source (for doc building)
-    pub(super) fn was_self_closing_doc(&self, element: &internal::Element) -> bool {
-        element.span.extract(self.source).trim_end().ends_with("/>")
+    /// Whether the source slice for `span` ends with a self-closing `/>` (for doc
+    /// building). Shared by regular and special elements.
+    pub(super) fn span_was_self_closing(&self, span: Span) -> bool {
+        span.extract(self.source).trim_end().ends_with("/>")
     }
 
     /// Check if an expression has internal break points (ternary, &&, ||, +, etc.)
@@ -1603,14 +1604,8 @@ impl<'a> Printer<'a> {
     /// this - only actual HTML block elements like `<div>`, `<p>`, etc.
     fn is_block_element_child(&self, node: &FragmentNode) -> bool {
         match node {
-            FragmentNode::Element(el) => {
-                // Only HTML block elements, not components
-                if el.kind == internal::ElementKind::Component {
-                    return false;
-                }
-                let tag = self.resolve_symbol(el.name);
-                tsv_html::is_block_element(&tag)
-            }
+            // Defer to the one block-element adapter (component + script/style overlay).
+            FragmentNode::Element(el) => self.is_block_element(el),
             // svelte:* elements and control flow don't trigger multiline
             _ => false,
         }
@@ -1730,7 +1725,7 @@ impl<'a> Printer<'a> {
         // Check if self-closing
         let is_self_closing = (kind.is_component() || is_foreign)
             && element.fragment.nodes.is_empty()
-            && self.was_self_closing_doc(element);
+            && self.span_was_self_closing(element.span);
 
         // Check if empty
         let is_empty = element.fragment.nodes.is_empty()

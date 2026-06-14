@@ -371,9 +371,7 @@ fn convert_index_signature(
             .parameters
             .iter()
             .map(|p| {
-                let name = interner
-                    .resolve(p.name)
-                    .map_or_else(String::new, str::to_string);
+                let name = interner.resolve_infallible(p.name).to_string();
                 public::Identifier {
                     node_type: "Identifier".to_string(),
                     start: p.span.start,

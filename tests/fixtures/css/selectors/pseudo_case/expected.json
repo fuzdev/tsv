@@ -1,0 +1,291 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 461,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 180,
+					"end": 186,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 180,
+							"end": 186,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "hover",
+											"args": null,
+											"start": 180,
+											"end": 186
+										}
+									],
+									"start": 180,
+									"end": 186
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 187,
+					"end": 205,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 191,
+							"end": 201,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 180,
+				"end": 205
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 207,
+					"end": 215,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 207,
+							"end": 215,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "before",
+											"start": 207,
+											"end": 215
+										}
+									],
+									"start": 207,
+									"end": 215
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 216,
+					"end": 235,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 220,
+							"end": 231,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 207,
+				"end": 235
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 237,
+					"end": 245,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 237,
+							"end": 245,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "not",
+											"args": {
+												"type": "SelectorList",
+												"start": 242,
+												"end": 244,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 242,
+														"end": 244,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "A",
+																		"start": 242,
+																		"end": 244
+																	}
+																],
+																"start": 242,
+																"end": 244
+															}
+														]
+													}
+												]
+											},
+											"start": 237,
+											"end": 245
+										}
+									],
+									"start": 237,
+									"end": 245
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 246,
+					"end": 266,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 250,
+							"end": 262,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 237,
+				"end": 266
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 311,
+					"end": 330,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 311,
+							"end": 330,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "-webkit-scrollbar",
+											"start": 311,
+											"end": 330
+										}
+									],
+									"start": 311,
+									"end": 330
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 331,
+					"end": 350,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 335,
+							"end": 346,
+							"property": "color",
+							"value": "teal"
+						}
+					]
+				},
+				"start": 311,
+				"end": 350
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 421,
+					"end": 430,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 421,
+							"end": 430,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "--Custom",
+											"args": null,
+											"start": 421,
+											"end": 430
+										}
+									],
+									"start": 421,
+									"end": 430
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 431,
+					"end": 452,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 435,
+							"end": 448,
+							"property": "color",
+							"value": "orange"
+						}
+					]
+				},
+				"start": 421,
+				"end": 452
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 453,
+			"styles": "\n\t/* pseudo-class and pseudo-element names are case-insensitive keywords, so\n\t   prettier lowercases them (the args are left alone — class names are\n\t   case-sensitive) */\n\t:hover {\n\t\tcolor: red;\n\t}\n\t::before {\n\t\tcolor: blue;\n\t}\n\t:not(.A) {\n\t\tcolor: green;\n\t}\n\t/* vendor-prefixed names lowercase too */\n\t::-webkit-scrollbar {\n\t\tcolor: teal;\n\t}\n\t/* custom `:--name` pseudo-classes are preserved, not lowercased */\n\t:--Custom {\n\t\tcolor: orange;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 462,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

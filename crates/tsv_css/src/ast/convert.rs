@@ -691,22 +691,27 @@ fn convert_simple_selector(simple: &internal::SimpleSelector, source: &str) -> s
                 "end": span.end,
             })
         }
-        internal::SimpleSelector::PseudoElement {
-            name,
-            args: _,
-            span,
-        } => {
-            // Truncate span to match Svelte: just the pseudo-element name, excluding args
-            // Example: ::slotted(*) has full span 9-21, but Svelte outputs 9-18 (just ::slotted)
-            // Rationale: Public AST matches Svelte for drop-in compatibility
-            // Internal AST retains full accurate span (including args) for formatter/tooling
-            let name_end = span.start + 2 + name.len() as u32; // :: = 2 chars, name = name.len()
+        internal::SimpleSelector::PseudoElement { name, args, span } => {
+            // Truncate span to match Svelte: just the pseudo-element name, excluding args.
+            // Example: ::slotted(*) has full span 9-21, but Svelte outputs 9-18 (just ::slotted).
+            // Public AST matches Svelte for drop-in compatibility; the internal AST keeps the
+            // full accurate span (including args) for the formatter/tooling.
+            //
+            // Derive the name end from the source `(` rather than the decoded `name.len()`,
+            // which undercounts when the name contains escapes (`::\41 b` is 7 raw bytes but
+            // decodes to "Ab"). Without args the span is already exactly `::name`.
+            let name_end = if args.is_some() {
+                let raw = &source[span.start as usize..span.end as usize];
+                raw.find('(').map_or(span.end, |i| span.start + i as u32)
+            } else {
+                span.end
+            };
 
             serde_json::json!({
                 "type": "PseudoElementSelector",
                 "name": name,
                 "start": span.start,
-                "end": name_end,  // Matches Svelte (name only, not including args)
+                "end": name_end, // Matches Svelte (name only, not including args)
             })
         }
         internal::SimpleSelector::Nesting { span } => {

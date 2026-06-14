@@ -14,6 +14,30 @@ fn tsv(args: &[&str]) -> std::process::Output {
         .expect("Failed to execute command")
 }
 
+/// Run the tsv binary, piping `input` to its stdin (for `--stdin` mode).
+/// Test helper; panicking on spawn/IO failure is the desired behavior.
+#[allow(clippy::expect_used)]
+fn tsv_stdin(args: &[&str], input: &str) -> std::process::Output {
+    use std::io::Write;
+    use std::process::Stdio;
+    let mut child = Command::new("cargo")
+        .args(["run", "-p", "tsv_cli", "-q"])
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn command");
+    // Writing then dropping the handle closes the pipe so the child sees EOF.
+    child
+        .stdin
+        .take()
+        .expect("child stdin")
+        .write_all(input.as_bytes())
+        .expect("Failed to write to stdin");
+    child.wait_with_output().expect("Failed to wait for output")
+}
+
 /// Create a fresh temp directory unique to this test.
 /// Test helper; panicking on IO failure is the desired behavior.
 #[allow(clippy::expect_used)]
@@ -59,8 +83,24 @@ fn test_parse_command_with_pretty() {
 
     assert!(output.status.success(), "Parse command should succeed");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    // Pretty output should have newlines
-    assert!(stdout.contains('\n'), "Pretty output should be formatted");
+    // Pretty output is tab-indented (the whole point of the pretty path).
+    assert!(
+        stdout.contains("\n\t"),
+        "Pretty output should be tab-indented: {stdout}"
+    );
+
+    // The compact form of the same input must NOT be tab-indented.
+    let compact = tsv(&[
+        "parse",
+        "--content",
+        "const x = 42;",
+        "--parser",
+        "typescript",
+    ]);
+    assert!(
+        !String::from_utf8_lossy(&compact.stdout).contains("\n\t"),
+        "Compact output should not be tab-indented"
+    );
 }
 
 #[test]
@@ -126,7 +166,12 @@ fn test_unknown_command() {
 fn test_parse_invalid_syntax() {
     let output = tsv(&["parse", "--content", "const x = ", "--parser", "typescript"]);
 
-    assert!(!output.status.success(), "Invalid syntax should fail");
+    // parse exits 1 on a parse error (distinct from format's 2 for errors).
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "Invalid syntax should exit 1"
+    );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("Parse error") || stderr.contains("error"),
@@ -138,9 +183,11 @@ fn test_parse_invalid_syntax() {
 fn test_parse_missing_parser() {
     let output = tsv(&["parse", "--content", "<div>test</div>"]);
 
-    assert!(
-        !output.status.success(),
-        "Parse without --parser should fail"
+    // Missing --parser is a resolve error → exit 1 (parse's error code).
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "Parse without --parser should exit 1"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -537,5 +584,91 @@ fn test_no_command() {
     assert!(
         stderr.contains("subcommand") || stderr.contains("--help"),
         "Should show usage/help message"
+    );
+}
+
+#[test]
+fn test_parse_file_autodetects_parser() {
+    let dir = temp_dir("parse_autodetect");
+    let cases: [(&str, &str, &str); 3] = [
+        ("a.ts", "const x = 1;\n", r#""type":"Program"#),
+        ("b.svelte", "<div>x</div>\n", r#""type":"Root"#),
+        ("c.css", "a {\n\tcolor: red;\n}\n", r#""type":"StyleSheet"#),
+    ];
+    for (name, src, marker) in cases {
+        let file = dir.join(name);
+        fs::write(&file, src).unwrap();
+        // No --parser: the parser is auto-detected from the extension.
+        let output = tsv(&["parse", file.to_str().unwrap()]);
+        assert_eq!(output.status.code(), Some(0), "{name} should parse");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains(marker),
+            "{name}: missing {marker} in {stdout}"
+        );
+    }
+}
+
+#[test]
+fn test_parse_stdin() {
+    let output = tsv_stdin(
+        &["parse", "--stdin", "--parser", "typescript"],
+        "const x = 1;\n",
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains(r#""type":"Program"#),
+        "stdin parse should emit an AST: {stdout}"
+    );
+}
+
+#[test]
+fn test_format_stdin_to_stdout() {
+    let output = tsv_stdin(
+        &["format", "--stdin", "--parser", "typescript"],
+        UNFORMATTED_TS,
+    );
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(String::from_utf8_lossy(&output.stdout), FORMATTED_TS);
+}
+
+#[test]
+fn test_format_check_stdin_dirty_exits_one() {
+    // --check + --stdin (editor-integration path): unformatted input exits 1.
+    let output = tsv_stdin(
+        &["format", "--check", "--stdin", "--parser", "typescript"],
+        UNFORMATTED_TS,
+    );
+    assert_eq!(output.status.code(), Some(1));
+}
+
+#[test]
+fn test_parser_ts_alias() {
+    // `ts` is an accepted alias for `typescript`.
+    let output = tsv(&["parse", "--content", "const x = 1;", "--parser", "ts"]);
+    assert_eq!(output.status.code(), Some(0));
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains(r#""type":"Program"#),
+        "`--parser ts` should parse as TypeScript"
+    );
+}
+
+#[test]
+fn test_format_content_with_paths_errors() {
+    // --content cannot be combined with file path arguments.
+    let output = tsv(&[
+        "format",
+        "--content",
+        "const x=1;",
+        "--parser",
+        "typescript",
+        "somefile.ts",
+    ]);
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("cannot be combined"),
+        "stderr should explain the conflict: {stderr}"
     );
 }

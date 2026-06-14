@@ -149,11 +149,7 @@ async fn parse_to_value(
     content: &str,
     parser_type: ParserType,
 ) -> error::Result<serde_json::Value> {
-    match parser_type {
-        ParserType::Svelte => Ok(deno::parse_svelte(content).await?),
-        ParserType::TypeScript => Ok(deno::parse_typescript(content).await?),
-        ParserType::Css => Ok(deno::parse_css(content).await?),
-    }
+    Ok(deno::parse_by_type(content, parser_type).await?)
 }
 
 /// Format content using our Rust printer

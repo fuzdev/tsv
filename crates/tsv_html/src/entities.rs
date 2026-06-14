@@ -439,4 +439,43 @@ mod tests {
         assert_eq!(decode_character_references("&#x41", false), "A");
         assert_eq!(decode_character_references("&#X41", false), "A");
     }
+
+    #[test]
+    fn test_degenerate_references() {
+        // Empty/zero-length references collect no name or digits and stay literal —
+        // these are the boundary cases for the name/digit scanners.
+        assert_eq!(decode_character_references("&;", false), "&;");
+        assert_eq!(decode_character_references("&#;", false), "&#;");
+        assert_eq!(decode_character_references("&#x;", false), "&#x;");
+        assert_eq!(decode_character_references("&#X;", false), "&#X;");
+    }
+
+    #[test]
+    fn test_longest_match_fallthrough() {
+        // No-semicolon longest match: "COPY" is a legacy entity but "COPYRIGHT" is
+        // not, so only the "COPY" prefix decodes and "RIGHT" is left as text.
+        assert_eq!(decode_character_references("&COPYRIGHT", false), "©RIGHT");
+        // Semicolon present but neither "notit;" nor "notit" is an entity; the
+        // legacy longest-match loop (which runs after the semicolon-first loop
+        // breaks) still finds "not", matching Svelte's decoder — &not → ¬, "it;" stays.
+        assert_eq!(decode_character_references("&notit;", false), "¬it;");
+    }
+
+    #[test]
+    fn test_numeric_overflow_and_plane_boundaries() {
+        // Values that overflow u32 fail to parse and remain literal text.
+        assert_eq!(
+            decode_character_references("&#99999999999999;", false),
+            "&#99999999999999;"
+        );
+        assert_eq!(
+            decode_character_references("&#xFFFFFFFFFF;", false),
+            "&#xFFFFFFFFFF;"
+        );
+        // Plane boundary: 0x2FFFF (end of plane 2) is preserved, but the unlisted
+        // higher planes and beyond-Unicode-max both normalize to NUL (Svelte parity).
+        assert_eq!(decode_character_references("&#x2FFFF;", false), "\u{2FFFF}");
+        assert_eq!(decode_character_references("&#x30000;", false), "\0");
+        assert_eq!(decode_character_references("&#x110000;", false), "\0");
+    }
 }

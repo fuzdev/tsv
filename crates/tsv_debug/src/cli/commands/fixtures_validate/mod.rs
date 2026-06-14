@@ -79,16 +79,10 @@ impl FixturesValidateCommand {
             return;
         }
 
-        // Validate fixtures concurrently using tokio streams
-        let concurrency = std::thread::available_parallelism()
-            .map(std::num::NonZero::get)
-            .unwrap_or(4);
+        // Validate fixtures concurrently using tokio streams. Bulk workload:
+        // spread the JS work (prettier/parsers) across a small sidecar pool.
+        let concurrency = crate::deno::init_bulk_pool();
         let prettier_only = self.prettier_only;
-
-        // Bulk workload: spread the JS work (prettier/parsers) across a small
-        // sidecar pool — a single sidecar is one single-threaded process and
-        // becomes the wall-clock bound
-        crate::deno::set_pool_size(crate::deno::bulk_pool_size(concurrency));
 
         // tokio::spawn per fixture: buffer_unordered alone only interleaves at
         // await points on the single stream-driving task — the CPU-bound Rust

@@ -222,3 +222,83 @@ pub fn determine_required_suffix(
         (false, false) => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn input_type_from_filepath_ordering_and_roundtrip() {
+        // The critical ordering case: `.svelte.ts` must be matched before `.ts`.
+        assert_eq!(
+            InputType::from_filepath("input.svelte.ts"),
+            Some(InputType::SvelteTs)
+        );
+        assert_eq!(
+            InputType::from_filepath("input.ts"),
+            Some(InputType::TypeScript)
+        );
+        assert_eq!(
+            InputType::from_filepath("input.svelte"),
+            Some(InputType::Svelte)
+        );
+        assert_eq!(InputType::from_filepath("input.css"), Some(InputType::Css));
+        // Unknown extensions fail loudly (None) rather than misclassify.
+        assert_eq!(InputType::from_filepath("input.json"), None);
+        assert_eq!(InputType::from_filepath("README.md"), None);
+
+        // extension() round-trips back through from_filepath() for every variant.
+        for ty in [
+            InputType::Svelte,
+            InputType::SvelteTs,
+            InputType::TypeScript,
+            InputType::Css,
+        ] {
+            let name = format!("input{}", ty.extension());
+            assert_eq!(
+                InputType::from_filepath(&name),
+                Some(ty),
+                "round-trip {name}"
+            );
+        }
+
+        // `.svelte.ts` rune modules are TypeScript to our parser.
+        assert_eq!(InputType::SvelteTs.parser_type(), ParserType::TypeScript);
+        assert_eq!(InputType::Svelte.parser_type(), ParserType::Svelte);
+    }
+
+    #[test]
+    fn determine_required_suffix_truth_table() {
+        // (ours, svelte, output_prettier, prettier_variants, unformatted_ours, variants)
+        // expected_ours alone ⇒ svelte divergence.
+        assert_eq!(
+            determine_required_suffix(true, false, false, false, false, false),
+            Some("_svelte_divergence")
+        );
+        // output_prettier alone ⇒ prettier divergence.
+        assert_eq!(
+            determine_required_suffix(false, false, true, false, false, false),
+            Some("_prettier_divergence")
+        );
+        // Both sides present ⇒ combined suffix.
+        assert_eq!(
+            determine_required_suffix(false, true, false, false, true, false),
+            Some("_svelte_prettier_divergence")
+        );
+        // Nothing ⇒ no suffix required.
+        assert_eq!(
+            determine_required_suffix(false, false, false, false, false, false),
+            None
+        );
+        // unformatted_ours alone flips the prettier side on.
+        assert_eq!(
+            determine_required_suffix(false, false, false, false, true, false),
+            Some("_prettier_divergence")
+        );
+        // expected_svelte alone flips the svelte side on.
+        assert_eq!(
+            determine_required_suffix(false, true, false, false, false, false),
+            Some("_svelte_divergence")
+        );
+    }
+}

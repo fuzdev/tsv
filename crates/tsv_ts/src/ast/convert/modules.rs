@@ -5,7 +5,7 @@ use super::types::convert_declare_function;
 use super::{
     Schema, bigint_to_decimal, convert_block_statement, convert_class_declaration,
     convert_expression, convert_identifier, convert_type_annotation,
-    convert_type_parameter_declaration, create_location,
+    convert_type_parameter_declaration, create_location, json_number_from_f64,
 };
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
@@ -211,12 +211,9 @@ pub(in crate::ast) fn convert_literal(
     offset: usize,
 ) -> public::Literal {
     let (value, bigint) = match &lit.value {
-        internal::LiteralValue::Number(n) => (
-            serde_json::Value::Number(
-                serde_json::Number::from_f64(*n).unwrap_or_else(|| serde_json::Number::from(0)),
-            ),
-            None,
-        ),
+        internal::LiteralValue::Number(n) => {
+            (serde_json::Value::Number(json_number_from_f64(*n)), None)
+        }
         internal::LiteralValue::String { content, .. } => {
             (serde_json::Value::String(content.clone()), None)
         }

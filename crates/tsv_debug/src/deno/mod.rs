@@ -55,6 +55,19 @@ pub fn set_pool_size(n: usize) {
     POOL_SIZE.store(n.max(1), Ordering::Relaxed);
 }
 
+/// Prepare for a bulk workload: derive a task concurrency from the machine's
+/// parallelism, size the sidecar pool accordingly (this must happen before the
+/// first sidecar call), and return that concurrency so the caller can size its
+/// `buffer_unordered` / `buffered` stream. Centralizes the size-pool-then-fan-out
+/// ordering that every bulk command needs.
+pub fn init_bulk_pool() -> usize {
+    let concurrency = std::thread::available_parallelism()
+        .map(std::num::NonZero::get)
+        .unwrap_or(4);
+    set_pool_size(bulk_pool_size(concurrency));
+    concurrency
+}
+
 /// Get a Deno actor from the pool, spawning the pool on first use.
 ///
 /// Requests dispatch round-robin: each actor already multiplexes concurrent
@@ -151,6 +164,21 @@ pub async fn parse_css(source: &str) -> Result<serde_json::Value, DenoError> {
     get_actor().await?.call("css-parse", source, None).await
 }
 
+/// Parse `content` with the canonical external parser for `parser`
+/// (Svelte / acorn-typescript / parseCss). The single dispatch point, so callers
+/// keyed on `ParserType` or `InputType::parser_type()` don't re-spell the match.
+pub async fn parse_by_type(
+    content: &str,
+    parser: tsv_cli::cli::input::ParserType,
+) -> Result<serde_json::Value, DenoError> {
+    use tsv_cli::cli::input::ParserType;
+    match parser {
+        ParserType::Svelte => parse_svelte(content).await,
+        ParserType::TypeScript => parse_typescript(content).await,
+        ParserType::Css => parse_css(content).await,
+    }
+}
+
 /// Version information from the Deno sidecar
 #[derive(Debug, Clone)]
 pub struct VersionInfo {
@@ -244,5 +272,23 @@ mod tests {
             ast.get("type").and_then(|v| v.as_str()),
             Some("StyleSheetFile")
         );
+    }
+
+    #[test]
+    fn bulk_pool_size_floor_knee_and_ceiling() {
+        // Always at least 1, even for degenerate concurrency.
+        assert_eq!(bulk_pool_size(0), 1);
+        assert_eq!(bulk_pool_size(1), 1);
+        // Below the first knee (concurrency/4 < 1) still maps to a single sidecar.
+        assert_eq!(bulk_pool_size(3), 1);
+        assert_eq!(bulk_pool_size(4), 1);
+        assert_eq!(bulk_pool_size(7), 1);
+        // Each step of 4 concurrent tasks adds one sidecar.
+        assert_eq!(bulk_pool_size(8), 2);
+        assert_eq!(bulk_pool_size(12), 3);
+        assert_eq!(bulk_pool_size(16), 4);
+        // Capped at 4 — extra sidecars only pay module-load cost past the knee.
+        assert_eq!(bulk_pool_size(20), 4);
+        assert_eq!(bulk_pool_size(128), 4);
     }
 }

@@ -6,18 +6,6 @@ use tsv_lang::{ParseError, Span};
 
 use super::parser_impl::SvelteParser;
 
-// Void elements never have closing tags
-// Reference: node_modules/svelte/src/utils.js:16-41
-const VOID_ELEMENTS: &[&str] = &[
-    "area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link",
-    "meta", "param", "source", "track", "wbr",
-];
-
-/// Check if an element is void (self-closing by spec, never has children)
-fn is_void(name: &str) -> bool {
-    VOID_ELEMENTS.contains(&name) || name.eq_ignore_ascii_case("!doctype")
-}
-
 /// Check if a tag name is a component (last segment starts with uppercase)
 /// Examples: "Comp" -> true, "ns.Comp" -> true, "deep.nested.Comp" -> true, "div" -> false
 fn is_component(name: &str) -> bool {
@@ -113,7 +101,8 @@ impl<'a> SvelteParser<'a> {
         self.expect(TokenKind::RightAngle)?;
 
         // Void and self-closing elements have no children or closing tag
-        if is_void(&tag_name) || self_closing {
+        // (classification lives in tsv_html, shared with the printer).
+        if tsv_html::is_void_element(&tag_name) || self_closing {
             return Ok(ParsedElement::Element(Element {
                 name: tag_symbol,
                 kind,
@@ -475,5 +464,26 @@ impl<'a> SvelteParser<'a> {
                 end: content_end as u32,
             },
         })])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_component;
+
+    #[test]
+    fn component_classification_by_last_segment() {
+        // Uppercase first char (of the last dotted segment) ⇒ component.
+        assert!(is_component("Comp"));
+        assert!(is_component("ns.Comp"));
+        assert!(is_component("deep.nested.Comp"));
+        // Lowercase ⇒ regular HTML element, even with dots.
+        assert!(!is_component("div"));
+        assert!(!is_component("ns.lower"));
+        // Empty name has no first char.
+        assert!(!is_component(""));
+        // Non-ASCII uppercase still counts.
+        assert!(is_component("Über"));
+        assert!(!is_component("élan"));
     }
 }

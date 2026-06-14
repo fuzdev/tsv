@@ -750,9 +750,7 @@ fn is_factory_chain(expr: &Expression, source: &str) -> bool {
         Expression::MemberExpression(member) => is_factory_chain(&member.object, source),
         Expression::TSNonNullExpression(non_null) => is_factory_chain(&non_null.expression, source),
         Expression::Identifier(id) => {
-            let name = id.span.extract(source);
-            name.chars().next().is_some_and(char::is_uppercase)
-                || (!name.is_empty() && name.chars().all(|c| c == '$' || c == '_'))
+            super::literals::is_factory_identifier_name(id.span.extract(source))
         }
         Expression::ThisExpression(_) | Expression::Super(_) => true,
         _ => false,

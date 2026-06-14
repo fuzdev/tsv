@@ -1,0 +1,217 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 702,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 385,
+					"end": 391,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 385,
+							"end": 391,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "Jb",
+											"args": null,
+											"start": 385,
+											"end": 391
+										}
+									],
+									"start": 385,
+									"end": 391
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 392,
+					"end": 410,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 396,
+							"end": 406,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 385,
+				"end": 410
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 453,
+					"end": 460,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 453,
+							"end": 460,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "Jb",
+											"start": 453,
+											"end": 460
+										}
+									],
+									"start": 453,
+									"end": 460
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 461,
+					"end": 480,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 465,
+							"end": 476,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 453,
+				"end": 480
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 551,
+					"end": 558,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 551,
+							"end": 558,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "nOT",
+											"args": null,
+											"start": 551,
+											"end": 558
+										}
+									],
+									"start": 551,
+									"end": 558
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 559,
+					"end": 579,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 563,
+							"end": 575,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 551,
+				"end": 579
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 660,
+					"end": 671,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 660,
+							"end": 671,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "--custom",
+											"args": null,
+											"start": 660,
+											"end": 671
+										}
+									],
+									"start": 660,
+									"end": 671
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 672,
+					"end": 693,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 676,
+							"end": 689,
+							"property": "color",
+							"value": "orange"
+						}
+					]
+				},
+				"start": 660,
+				"end": 693
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 694,
+			"styles": "\n\t/* In a pseudo name, prettier lowercases everything up to the first whitespace\n\t   (a hex escape's terminator) and preserves the rest. So escape hex digits and\n\t   leading literals fold, but literal letters after a terminator keep their case.\n\t   This differs from class/id/type selectors, which never fold (see escaped_names). */\n\n\t/* hex escape digits fold to lowercase */\n\t:\\4a b {\n\t\tcolor: red;\n\t}\n\t/* pseudo-elements fold the same way */\n\t::\\4a b {\n\t\tcolor: blue;\n\t}\n\t/* a literal letter after the escape's terminator keeps its case */\n\t:\\6e OT {\n\t\tcolor: green;\n\t}\n\t/* an escaped leading dash is not a custom `:--` pseudo, so the name folds */\n\t:\\2d-custom {\n\t\tcolor: orange;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 703,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

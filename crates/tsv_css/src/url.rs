@@ -22,3 +22,36 @@ pub(crate) fn trim_url_raw(raw: &str) -> Option<String> {
     let inner = raw[open + 1..close].trim();
     Some(format!("{}{})", &raw[..=open], inner))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn trims_inner_whitespace_preserving_content_and_casing() {
+        // Inner whitespace trimmed; colons/slashes in the opaque content kept.
+        assert_eq!(
+            trim_url_raw("url( http://x.com )").as_deref(),
+            Some("url(http://x.com)")
+        );
+        // Original url/URL casing is preserved.
+        assert_eq!(trim_url_raw("URL(  a  )").as_deref(), Some("URL(a)"));
+        // Whitespace-only content collapses to empty parens.
+        assert_eq!(trim_url_raw("url(  )").as_deref(), Some("url()"));
+    }
+
+    #[test]
+    fn returns_none_when_not_parenthesized() {
+        assert_eq!(trim_url_raw("noparens"), None);
+        // A ')' before the '(' is not a valid token.
+        assert_eq!(trim_url_raw(")x("), None);
+    }
+
+    #[test]
+    fn matches_any_parenthesized_token_and_uses_last_paren() {
+        // Not restricted to the `url` prefix — any parenthesized token works.
+        assert_eq!(trim_url_raw("(x)").as_deref(), Some("(x)"));
+        // rfind(')') is used, so inner content may itself contain ')'.
+        assert_eq!(trim_url_raw("url(a)b)").as_deref(), Some("url(a)b)"));
+    }
+}
