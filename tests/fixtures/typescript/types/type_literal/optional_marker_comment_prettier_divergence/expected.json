@@ -1,0 +1,408 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 208,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Comment between ? and : in type-literal property",
+			"start": 33,
+			"end": 84,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Comment between ? and : in type-literal property",
+			"start": 33,
+			"end": 84,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 90,
+			"end": 98,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 5
+				},
+				"end": {
+					"line": 4,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Comment between ? and ( in type-literal method",
+			"start": 112,
+			"end": 161,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 167,
+			"end": 175,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 5
+				},
+				"end": {
+					"line": 7,
+					"column": 13
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 207,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 198,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 20,
+					"end": 197,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 25,
+						"end": 26,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 6
+							},
+							"end": {
+								"line": 2,
+								"column": 7
+							}
+						},
+						"name": "T"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 29,
+						"end": 196,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 10
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 87,
+								"end": 108,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 23
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 87,
+									"end": 88,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"optional": true,
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 99,
+									"end": 107,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 14
+										},
+										"end": {
+											"line": 4,
+											"column": 22
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 101,
+										"end": 107,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 16
+											},
+											"end": {
+												"line": 4,
+												"column": 22
+											}
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 90,
+											"end": 98
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " Comment between ? and : in type-literal property",
+										"start": 33,
+										"end": 84
+									},
+									{
+										"type": "Line",
+										"value": " Comment between ? and : in type-literal property",
+										"start": 33,
+										"end": 84
+									}
+								]
+							},
+							{
+								"type": "TSMethodSignature",
+								"start": 164,
+								"end": 193,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 31
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 164,
+									"end": 165,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 3
+										}
+									},
+									"name": "m"
+								},
+								"optional": true,
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 176,
+										"end": 185,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 14
+											},
+											"end": {
+												"line": 7,
+												"column": 23
+											}
+										},
+										"name": "x",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 177,
+											"end": 185,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 15
+												},
+												"end": {
+													"line": 7,
+													"column": 23
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSNumberKeyword",
+												"start": 179,
+												"end": 185,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 17
+													},
+													"end": {
+														"line": 7,
+														"column": 23
+													}
+												}
+											}
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c2 ",
+												"start": 167,
+												"end": 175
+											}
+										]
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 186,
+									"end": 192,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 24
+										},
+										"end": {
+											"line": 7,
+											"column": 30
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSVoidKeyword",
+										"start": 188,
+										"end": 192,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 26
+											},
+											"end": {
+												"line": 7,
+												"column": 30
+											}
+										}
+									}
+								},
+								"kind": "method",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " Comment between ? and ( in type-literal method",
+										"start": 112,
+										"end": 161
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

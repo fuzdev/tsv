@@ -296,6 +296,41 @@ impl<'a> Printer<'a> {
         pos + 1
     }
 
+    /// Emit comments in the gap between an optional `?`/`!` marker and a member's
+    /// type annotation `:`, preserving the user's placement *after* the marker.
+    ///
+    /// A block comment stays inline with a trailing space before `:`
+    /// (`a? /* c */ : T`); a line comment forces a hardline so the `: T`
+    /// annotation drops to the next line instead of being swallowed as comment
+    /// text (`a? // c⏎: T`) — a content-loss / non-idempotency fix. Prettier
+    /// instead relocates such comments (a block before `?`, a line after the
+    /// member `;`), so the preserved forms are `_prettier_divergence`s
+    /// ([conformance_prettier.md](../../../../docs/conformance_prettier.md)
+    /// §Comment relocation).
+    ///
+    /// Shared by the three type-element property arms (type-literal, interface,
+    /// class). Returns `None` when the range has no comments.
+    pub(crate) fn build_marker_to_colon_comments_doc(
+        &self,
+        after: u32,
+        colon_start: u32,
+    ) -> Option<DocId> {
+        let comments = self.build_name_to_type_params_comments_opt(
+            after,
+            colon_start,
+            CommentSpacing::Leading,
+        )?;
+        let d = self.d();
+        if self.has_line_comments_between(after, colon_start) {
+            // A line comment already ended its line with a hardline; `:` follows
+            // on the next line, so no extra space.
+            Some(comments)
+        } else {
+            // Block-only: single space before `:` (matches bare `?:` spacing).
+            Some(d.concat(&[comments, d.text(" ")]))
+        }
+    }
+
     /// Build a Doc for trailing comments where a line comment must force the
     /// following content onto a new line.
     ///

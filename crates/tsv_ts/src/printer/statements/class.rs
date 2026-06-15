@@ -574,11 +574,12 @@ impl<'a> Printer<'a> {
         // Type annotation - use width-aware wrapping for generics and union types
         if let Some(type_ann) = &prop.type_annotation {
             // Comments between modifier (or key) and `:` (e.g., `c! /* c */ : number`)
-            if self.has_comments_between(after_modifier, type_ann.span.start) {
-                let comment_doc =
-                    self.build_inline_comments_between_doc(after_modifier, type_ann.span.start);
-                // Trailing space separates comment from `:` in the type annotation
-                parts.push(d.concat(&[comment_doc, d.text(" ")]));
+            // stay after the modifier; a line comment forces a break so it can't
+            // swallow the annotation (`c? // c⏎: number`)
+            if let Some(comment_doc) =
+                self.build_marker_to_colon_comments_doc(after_modifier, type_ann.span.start)
+            {
+                parts.push(comment_doc);
             }
             parts.push(self.build_type_annotation_doc_wrapping(type_ann));
         }
