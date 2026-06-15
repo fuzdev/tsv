@@ -1,9 +1,9 @@
 # long_prettier_divergence
 
-Prettier keeps long binary expressions inline in `{#if}` block conditions even when they exceed print_width.
+Prettier keeps long binary expressions inline in `{#if}` block conditions even when they exceed printWidth.
 
 tsv: wraps with continuation indent at 101+ chars
-Prettier: keeps inline (exceeds print_width)
+Prettier: keeps inline (exceeds printWidth)
 
 | Line width | tsv   | Prettier |
 | ---------- | ----- | -------- |

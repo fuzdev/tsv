@@ -1,6 +1,6 @@
 # transform_long_prettier_divergence
 
-Prettier doesn't wrap space-separated CSS value lists at the print_width boundary.
+Prettier doesn't wrap space-separated CSS value lists at the printWidth boundary.
 
 tsv: wraps at 101 chars (>100)
 Prettier: wraps at 102 chars (off-by-one)

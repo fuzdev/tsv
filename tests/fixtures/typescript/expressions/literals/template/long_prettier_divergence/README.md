@@ -1,9 +1,9 @@
 # long_prettier_divergence
 
-Tests the 100/101 char print_width boundary for template literal interpolations.
+Tests the 100/101 char printWidth boundary for template literal interpolations.
 
 tsv: breaks to `${\n\texpr\n}` at 101 chars
-Prettier: keeps `${expr}` inline (exceeds print_width)
+Prettier: keeps `${expr}` inline (exceeds printWidth)
 
 | Line width | tsv                | Prettier           |
 | ---------- | ------------------ | ------------------ |
@@ -12,4 +12,4 @@ Prettier: keeps `${expr}` inline (exceeds print_width)
 
 ## Reason
 
-tsv treats print_width as a hard limit for template interpolations. Consistent with tsv's template literal handling across all contexts.
+tsv treats printWidth as a hard limit for template interpolations. Consistent with tsv's template literal handling across all contexts.

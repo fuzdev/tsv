@@ -598,25 +598,25 @@ cargo run -p tsv_debug line_width tests/fixtures/css/values/functions/gradient_l
 
 # Output shows:
 # Line 1: 7 chars (0 tabs = 0, content = 7) ✓
-# Line 4: 101 chars (3 tabs = 6, content = 95) ✗ EXCEEDS print_width (100)
-# Line 5: 100 chars (3 tabs = 6, content = 94) ⚠️ EXACTLY print_width (100)
+# Line 4: 101 chars (3 tabs = 6, content = 95) ✗ EXCEEDS printWidth (100)
+# Line 5: 100 chars (3 tabs = 6, content = 94) ⚠️ EXACTLY printWidth (100)
 # ...
-# Summary: 3/35 lines exceed print_width (100)
+# Summary: 3/35 lines exceed printWidth (100)
 ```
 
 **Measure specific line:**
 
 ```bash
 cargo run -p tsv_debug line_width input.svelte --line 4
-# Line 4: 101 chars (3 tabs = 6, content = 95) ✗ EXCEEDS print_width (100)
+# Line 4: 101 chars (3 tabs = 6, content = 95) ✗ EXCEEDS printWidth (100)
 #   			clip-path: polygon(...);
 ```
 
 **Tab width calculation:**
 
-- Each `\t` counts as `tab_width` chars (default: 2, matching prettier's `tabWidth: 2`)
+- Each `\t` counts as `tabWidth` chars (default: 2, matching prettier's `tabWidth: 2`)
 - **Indentation tabs DO count** toward line length (matches prettier's behavior)
-- Total = (tab_count × tab_width) + content_length
+- Total = (tab_count × tabWidth) + content_length
 
 **Boundary testing for `long` fixtures:**
 

@@ -8,7 +8,7 @@ the closing `}` at `2 tabs + 2 spaces` (a sub-tab alignment).
 tsv: closing `}` at a whole tab
 Prettier: closing `}` at `2 tabs + 2 spaces`
 
-Both are the same visual width at `tab_width = 2`; only the representation
+Both are the same visual width at `tabWidth = 2`; only the representation
 differs (whole tabs vs tabs-then-spaces).
 
 ## Reason

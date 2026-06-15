@@ -1,6 +1,6 @@
 # template_literal_type_conditional_long_prettier_divergence
 
-When a conditional type inside a template literal type exceeds print_width, Prettier preserves whatever form is given (stable variant — both compact and broken are idempotent). tsv normalizes to break at `?` and `:` operators.
+When a conditional type inside a template literal type exceeds printWidth, Prettier preserves whatever form is given (stable variant — both compact and broken are idempotent). tsv normalizes to break at `?` and `:` operators.
 
 tsv: breaks at `?` and `:` at 101+ chars
 Prettier: preserves input form (stable variant, allows inline at 101+ chars)

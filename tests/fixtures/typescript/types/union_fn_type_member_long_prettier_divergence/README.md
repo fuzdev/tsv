@@ -9,7 +9,7 @@ alignment).
 tsv: closing `) => void)` at a whole tab
 Prettier: closing `) => void)` at `2 tabs + 2 spaces`
 
-Both are the same visual width at `tab_width = 2`; only the representation
+Both are the same visual width at `tabWidth = 2`; only the representation
 differs (whole tabs vs tabs-then-spaces).
 
 `Short` (inline) and `Fit` (params at exactly 100, stays inline) are the

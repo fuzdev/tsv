@@ -14,4 +14,4 @@ Prettier has stable variants: the inline form, the wrapped form, and a spaces-pr
 
 ## Reason
 
-tsv enforces print_width consistently across all CSS at-rules. Prettier simply never implemented wrapping for `@container` queries.
+tsv enforces printWidth consistently across all CSS at-rules. Prettier simply never implemented wrapping for `@container` queries.

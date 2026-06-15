@@ -9,4 +9,4 @@ Both formatters preserve comments in their original positions. The difference is
 
 ## Reason
 
-tsv enforces print_width consistently. See [media_long](../../../at_rules/media_long_prettier_divergence/) for the base case.
+tsv enforces printWidth consistently. See [media_long](../../../at_rules/media_long_prettier_divergence/) for the base case.

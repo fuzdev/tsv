@@ -4,7 +4,7 @@
 
 High-performance Rust parser as a drop-in replacement for Svelte's modern parser (acorn + acorn-typescript) with a near-Prettier formatter that tracks Prettier closely.
 
-**Non-configurable by design**: formatting options are fixed at Prettier's defaults except print_width=100, use_tabs=true, and bracketSpacing=false — no config files, CLI flags, or runtime options, ever (opinionated like `gofmt` and Black). See [Configuration](#configuration).
+**Non-configurable by design**: formatting options are fixed at Prettier's defaults except printWidth=100, useTabs=true, singleQuote=true, and bracketSpacing=false — no config files, CLI flags, or runtime options, ever (opinionated like `gofmt` and Black). See [Configuration](#configuration).
 
 ## Committing
 
@@ -314,15 +314,18 @@ See ./docs/performance.md.
 
 **Non-configurable by design.** Formatting options are fixed at Prettier's defaults, except where noted below, and cannot be changed — there are no config files, CLI flags, or runtime options, and none are planned. tsv is opinionated like `gofmt` and Black: one canonical style, always. A narrower user-facing option set may be revisited far down the road, but the 0.x contract is no configuration at all.
 
-The table lists the settings that diverge from Prettier's defaults; everything else (e.g. tab_width=2) matches Prettier.
+The table lists the settings that diverge from Prettier's defaults; everything else (e.g. tabWidth=2) matches Prettier.
 
 | Setting          | Value | Notes                                       |
 | ---------------- | ----- | ------------------------------------------- |
-| `print_width`    | 100   | Wider than Prettier's default of 80         |
-| `use_tabs`       | true  | Tabs, not spaces (Prettier defaults to off) |
-| `bracketSpacing` | false | No spaces inside `{ }` — discussion welcome |
+| `printWidth`     | 100   | Wider than Prettier's default of 80         |
+| `useTabs`        | true  | Tabs, not spaces (Prettier defaults to off) |
+| `singleQuote`    | true  | Single quotes, not double (Prettier off)    |
+| `bracketSpacing` | false | No spaces inside `{ }`                      |
 
-**Measuring line widths**: Use `cargo run -p tsv_debug line_width <file>` to measure visual width of lines (accounts for tab_width=2). Never use `wc -c` — it counts bytes, not visual characters (tabs are 1 byte but 2 visual chars). The `compare` command also shows line widths on changed lines.
+`bracketSpacing: false`: tight object and destructuring braces (`{foo}`) stay visually distinct from the `{` that opens a function body or block.
+
+**Measuring line widths**: Use `cargo run -p tsv_debug line_width <file>` to measure visual width of lines (accounts for tabWidth=2). Never use `wc -c` — it counts bytes, not visual characters (tabs are 1 byte but 2 visual chars). The `compare` command also shows line widths on changed lines.
 
 ### Internal Configuration (Rust Library Only)
 
@@ -506,7 +509,7 @@ cargo run -p tsv_debug check                  # Verify sidecar works
 # compare - diff our formatter vs prettier (shows line widths on changed lines)
 cargo run -p tsv_debug compare file.svelte
 # Options: --verbose/-v (full input/ours/prettier), --quiet, --color <auto|always|never>, --json
-# Line widths appear as right-aligned numbers on diff lines (helps spot print_width issues)
+# Line widths appear as right-aligned numbers on diff lines (helps spot printWidth issues)
 # "Outputs match" = ours(input) == prettier(input), NOT input stability; a match on a
 # non-format-stable input adds a note + input-vs-formatted diff (F1 fails on such an input)
 
