@@ -177,17 +177,25 @@ impl<'a> Printer<'a> {
             // Normalize whitespace in class attributes on HTML elements
             let normalize_class = is_html && self.with_resolved_symbol(attr.name, |s| s == "class");
 
-            let is_pure_expression = value_parts.len() == 1
-                && matches!(value_parts[0], internal::AttributeValue::ExpressionTag(_));
-
-            let mut parts = vec![d.symbol(name_sym)];
-
-            if is_pure_expression {
-                parts.push(d.text("="));
-            } else {
-                parts.push(d.text("=\""));
+            // Fast path: a single value part (the common `name="x"` / `name={x}`).
+            // Build with a stack array instead of the per-attribute `parts` Vec.
+            if value_parts.len() == 1 {
+                let sym = d.symbol(name_sym);
+                let value_doc = if normalize_class {
+                    self.build_class_attribute_value_doc(&value_parts[0], true)
+                } else {
+                    self.build_attribute_value_doc(&value_parts[0])
+                };
+                return if matches!(value_parts[0], internal::AttributeValue::ExpressionTag(_)) {
+                    d.concat(&[sym, d.text("="), value_doc])
+                } else {
+                    d.concat(&[sym, d.text("=\""), value_doc, d.text("\"")])
+                };
             }
 
+            // General path: a multi-part value is always a quoted string (a pure
+            // `{expr}` value is single-part and handled by the fast path above).
+            let mut parts = vec![d.symbol(name_sym), d.text("=\"")];
             let last_idx = value_parts.len().saturating_sub(1);
             for (i, part) in value_parts.iter().enumerate() {
                 if normalize_class {
@@ -196,10 +204,7 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_attribute_value_doc(part));
                 }
             }
-
-            if !is_pure_expression {
-                parts.push(d.text("\""));
-            }
+            parts.push(d.text("\""));
 
             d.concat(&parts)
         } else {
