@@ -271,6 +271,16 @@ impl<'a> Printer<'a> {
     /// Inner implementation for identifier doc building.
     fn build_identifier_doc_inner(&self, id: &internal::Identifier, wrap_type_args: bool) -> DocId {
         let d = self.d();
+
+        // Fast path for the common bare identifier (no decorators, optional
+        // marker, or type annotation): the doc is just the interned name.
+        // Skips the single-element `parts` Vec the slow path heap-allocates and
+        // the name-end scan that only the modifier/annotation branches consume.
+        // Returns the exact DocId the `parts.len() == 1` tail would.
+        if id.decorators.is_none() && !id.optional && id.type_annotation.is_none() {
+            return d.symbol(id.name.to_u32());
+        }
+
         let mut parts = Vec::new();
 
         // Handle decorators (for parameter decorators)
