@@ -10,10 +10,6 @@ pub struct LineWidthCommand {
     #[argh(option)]
     line: Option<usize>,
 
-    /// tab width (default: 2, matches prettier)
-    #[argh(option, default = "2")]
-    tab_width: usize,
-
     /// emit JSON
     #[argh(switch)]
     json: bool,
@@ -58,7 +54,7 @@ impl LineWidthCommand {
 
         let content = input.content();
         let lines: Vec<&str> = content.lines().collect();
-        let print_width = 100; // Prettier default
+        let print_width = tsv_lang::PRINT_WIDTH;
 
         if lines.is_empty() {
             if self.json {
@@ -95,9 +91,9 @@ impl LineWidthCommand {
             }
 
             // Calculate visual width using Unicode Standard Annex #11
-            let total = visual_width(line, self.tab_width);
+            let total = visual_width(line, tsv_lang::TAB_WIDTH);
             let tab_count = line.chars().filter(|&c| c == '\t').count();
-            let tab_width_total = tab_count * self.tab_width;
+            let tab_width_total = tab_count * tsv_lang::TAB_WIDTH;
             let content_width = total - tab_width_total;
 
             let exceeds = total > print_width;

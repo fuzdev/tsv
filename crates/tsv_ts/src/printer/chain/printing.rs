@@ -115,9 +115,6 @@ pub trait ChainPrinter: SymbolLookup {
     /// Get the source code string
     fn get_source(&self) -> &str;
 
-    /// Get the tab width from config
-    fn get_tab_width(&self) -> usize;
-
     /// Check if chain expansion should be forced
     ///
     /// Used when inside template expressions with original breaks, where the

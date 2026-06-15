@@ -498,8 +498,7 @@ pub fn should_not_wrap<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
             Expression::Identifier(id) => {
                 is_factory_name(id.name, printer)
                     || has_computed
-                    || (printer.is_expression_statement()
-                        && is_short_name(id.name, printer, printer.get_tab_width()))
+                    || (printer.is_expression_statement() && is_short_name(id.name, printer))
             }
 
             _ => has_computed,
@@ -520,9 +519,9 @@ pub fn should_not_wrap<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
 ///
 /// Prettier ref: `isShort` in print/member-chain.js:284
 /// Uses `name.length <= options.tabWidth` (JS .length, ASCII-only in practice)
-fn is_short_name(symbol: DefaultSymbol, interner: &impl SymbolLookup, tab_width: usize) -> bool {
+fn is_short_name(symbol: DefaultSymbol, interner: &impl SymbolLookup) -> bool {
     interner
-        .with_name(symbol, |name| name.len() <= tab_width)
+        .with_name(symbol, |name| name.len() <= tsv_lang::TAB_WIDTH)
         .unwrap_or(false)
 }
 

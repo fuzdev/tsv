@@ -200,8 +200,8 @@ fn resolve_content(
 /// Shows lines at or near print_width (90+), max width, and warns for `_long`
 /// directories where nothing is near the boundary.
 fn print_line_width_summary(content: &str, dir_path: &str) {
-    let tab_width = 2;
-    let print_width = 100;
+    let tab_width = tsv_lang::TAB_WIDTH;
+    let print_width = tsv_lang::PRINT_WIDTH;
     let threshold = 90; // Show lines at 90+ chars
 
     let lines: Vec<&str> = content.lines().collect();

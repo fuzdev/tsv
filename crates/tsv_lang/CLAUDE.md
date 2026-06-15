@@ -90,7 +90,7 @@ parser.parse().map_err(|e| e.with_context(source))
 
 ```rust
 // Create arena, build doc tree, render:
-let arena = DocArena::for_source(source); // sized for source.len(), default TAB_WIDTH
+let arena = DocArena::for_source(source); // sized for source.len()
 let mut printer = Printer::new(&arena, interner, source, &comments, &line_breaks, config);
 printer.print_program(&program);
 let output = printer.into_string();

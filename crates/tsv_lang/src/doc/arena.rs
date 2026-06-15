@@ -13,6 +13,7 @@
 
 use std::cell::RefCell;
 
+use crate::config::TAB_WIDTH;
 use crate::printing::visual_width;
 
 use super::types::{
@@ -199,40 +200,36 @@ pub struct DocArena {
     /// match `nodes`; sound because nodes are append-only and the arena is
     /// per-format, so a node's `will_break` value never changes once it exists.
     will_break_cache: RefCell<Vec<Option<bool>>>,
-    /// Tab width for visual width calculations (stored for precomputing text widths)
-    tab_width: usize,
 }
 
 impl DocArena {
     /// Create a new empty arena.
-    pub fn new(tab_width: usize) -> Self {
+    pub fn new() -> Self {
         Self {
             nodes: RefCell::new(Vec::new()),
             children: RefCell::new(Vec::new()),
             will_break_cache: RefCell::new(Vec::new()),
-            tab_width,
         }
     }
 
     /// Create an arena with pre-allocated capacity based on source size.
     ///
     /// Heuristic: ~4 nodes per source byte for typical formatted code.
-    pub fn with_source_size_hint(source_len: usize, tab_width: usize) -> Self {
+    pub fn with_source_size_hint(source_len: usize) -> Self {
         let estimated_nodes = source_len * 4;
         let estimated_children = estimated_nodes / 2;
         Self {
             nodes: RefCell::new(Vec::with_capacity(estimated_nodes)),
             children: RefCell::new(Vec::with_capacity(estimated_children)),
             will_break_cache: RefCell::new(Vec::new()),
-            tab_width,
         }
     }
 
-    /// Create an arena sized for `source`, using the default `TAB_WIDTH`.
+    /// Create an arena sized for `source`.
     ///
-    /// Equivalent to `with_source_size_hint(source.len(), TAB_WIDTH)`.
+    /// Equivalent to `with_source_size_hint(source.len())`.
     pub fn for_source(source: &str) -> Self {
-        Self::with_source_size_hint(source.len(), crate::config::TAB_WIDTH)
+        Self::with_source_size_hint(source.len())
     }
 
     //
@@ -290,7 +287,7 @@ impl DocArena {
         } else if s.contains('\n') {
             TEXT_WIDTH_HAS_NEWLINE
         } else {
-            visual_width(&s, self.tab_width) as u16
+            visual_width(&s, TAB_WIDTH) as u16
         };
         self.alloc(DocNode::Text(DocText::Owned(s, w)))
     }
@@ -577,18 +574,6 @@ impl DocArena {
         self.wrap("(", inner, ")")
     }
 
-    /// Wrap a doc in parentheses with indent-on-break structure.
-    #[inline]
-    pub fn parens_break(&self, inner: DocId) -> DocId {
-        let sl = self.softline();
-        let content = self.concat(&[sl, inner]);
-        let indented = self.indent(content);
-        let sl2 = self.softline();
-        let close = self.text(")");
-        let open = self.text("(");
-        self.group(self.concat(&[open, indented, sl2, close]))
-    }
-
     /// Wrap a doc in square brackets.
     #[inline]
     pub fn brackets(&self, inner: DocId) -> DocId {
@@ -631,16 +616,6 @@ impl DocArena {
     #[inline]
     pub fn trailing_comma(&self) -> DocId {
         self.if_break(self.text(","), self.text(""))
-    }
-
-    /// Apply N levels of indentation to a doc.
-    #[inline]
-    pub fn apply_indent_levels(&self, inner: DocId, levels: usize) -> DocId {
-        let mut result = inner;
-        for _ in 0..levels {
-            result = self.indent(result);
-        }
-        result
     }
 
     //
@@ -1019,6 +994,6 @@ impl DocArena {
 
 impl Default for DocArena {
     fn default() -> Self {
-        Self::new(crate::TAB_WIDTH)
+        Self::new()
     }
 }

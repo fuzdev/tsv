@@ -1,6 +1,7 @@
 //! Rendering algorithm for arena-based document trees.
 
 use crate::EmbedContext;
+use crate::config::TAB_WIDTH;
 use std::collections::HashMap;
 
 use super::arena::{ArenaCommand, DocArena, DocId, DocNode};
@@ -33,7 +34,6 @@ fn render_text<R: TextResolver + ?Sized>(
     text: &super::types::DocText,
     output: &mut String,
     pos: &mut usize,
-    tab_width: usize,
     resolver: Option<&R>,
 ) {
     let s = resolve_text(text, resolver);
@@ -42,11 +42,11 @@ fn render_text<R: TextResolver + ?Sized>(
         Some(w) if w == TEXT_WIDTH_HAS_NEWLINE => {
             // Has newline — compute position from last line
             if let Some(last_nl) = s.rfind('\n') {
-                *pos = crate::printing::visual_width(&s[last_nl + 1..], tab_width);
+                *pos = crate::printing::visual_width(&s[last_nl + 1..], TAB_WIDTH);
             }
         }
         Some(w) => *pos += w as usize, // Common path: no visual_width call
-        None => update_pos_for_text(pos, s, tab_width), // Symbol fallback
+        None => update_pos_for_text(pos, s), // Symbol fallback
     }
 }
 
@@ -289,7 +289,7 @@ pub fn arena_print_doc_with_indent_resolved_preserve_whitespace<R: TextResolver 
     output
 }
 
-/// Test-only entry point: render with explicit width/tab/indent overrides.
+/// Test-only entry point: render with explicit width/indent overrides.
 ///
 /// Production callers should use [`arena_print_doc`] (which uses
 /// [`crate::PRINT_WIDTH`] / [`crate::TAB_WIDTH`] / [`crate::INDENT`]).
@@ -355,7 +355,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
     while let Some(cmd) = commands.pop() {
         match &nodes[cmd.doc.index()] {
             DocNode::Text(t) => {
-                render_text(t, output, pos, render.tab_width, resolver);
+                render_text(t, output, pos, resolver);
             }
 
             DocNode::Line(kind) => {
@@ -438,7 +438,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                             Mode::Flat,
                             &commands,
                             remaining_width,
-                            render,
                             embed,
                             resolver,
                         );
@@ -465,7 +464,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                                     Mode::Flat,
                                     &commands,
                                     remaining_width,
-                                    render,
                                     embed,
                                     resolver,
                                 );
@@ -507,7 +505,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                         Mode::Flat,
                         &commands,
                         remaining_width,
-                        render,
                         embed,
                         resolver,
                     );
@@ -532,7 +529,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                     Mode::Flat,
                     &commands,
                     remaining_width,
-                    render,
                     embed,
                     resolver,
                 );
@@ -677,7 +673,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 Mode::Flat,
                 rest_commands,
                 remaining as isize,
-                render,
                 embed,
                 resolver,
             )
@@ -688,7 +683,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 Mode::Flat,
                 &[],
                 available as isize,
-                render,
                 embed,
                 resolver,
             )
@@ -764,7 +758,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
             &[content, separator, next_content],
             available,
             Mode::Flat,
-            render,
             embed,
             resolver,
         );
@@ -832,7 +825,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                     Mode::Flat,
                     &[],
                     remaining_at_start as isize,
-                    render,
                     embed,
                     resolver,
                 );
@@ -1001,7 +993,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
     while let Some(cmd) = commands.pop() {
         match &nodes[cmd.doc.index()] {
             DocNode::Text(t) => {
-                render_text(t, output, pos, render.tab_width, resolver);
+                render_text(t, output, pos, resolver);
             }
 
             DocNode::Line(kind) => {
@@ -1064,7 +1056,6 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                         Mode::Flat,
                         &commands,
                         remaining,
-                        render,
                         embed,
                         resolver,
                     ) {
@@ -1085,7 +1076,6 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                                 Mode::Flat,
                                 &commands,
                                 remaining,
-                                render,
                                 embed,
                                 resolver,
                             ) {
@@ -1112,7 +1102,6 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                         Mode::Flat,
                         &commands,
                         remaining,
-                        render,
                         embed,
                         resolver,
                     ) {
@@ -1140,7 +1129,6 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                         Mode::Flat,
                         &commands,
                         remaining,
-                        render,
                         embed,
                         resolver,
                     ) {
@@ -1272,7 +1260,7 @@ fn write_indentation(
 }
 
 fn indent_width(level: usize, render: &RenderConfig) -> usize {
-    level * indent_str_width(render.indent, render.tab_width)
+    level * indent_str_width(render.indent)
 }
 
 fn line_start_column(
@@ -1282,12 +1270,12 @@ fn line_start_column(
     base_override: Option<usize>,
 ) -> usize {
     let base = base_override.unwrap_or(embed.base_indent_offset);
-    indent_width(indent_level, render) + base * render.tab_width
+    indent_width(indent_level, render) + base * TAB_WIDTH
 }
 
-fn indent_str_width(indent: &str, tab_width: usize) -> usize {
+fn indent_str_width(indent: &str) -> usize {
     indent
         .chars()
-        .map(|ch| if ch == '\t' { tab_width } else { 1 })
+        .map(|ch| if ch == '\t' { TAB_WIDTH } else { 1 })
         .sum()
 }
