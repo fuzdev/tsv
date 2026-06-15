@@ -73,12 +73,10 @@ fn trim_trailing_whitespace(output: &mut String) {
 
 /// Render a line break.
 #[inline]
-#[allow(clippy::too_many_arguments)]
 fn render_line_break(
     kind: LineKind,
     mode: Mode,
     indent_level: usize,
-    base_indent_override: Option<usize>,
     output: &mut String,
     pos: &mut usize,
     render: &RenderConfig,
@@ -96,7 +94,7 @@ fn render_line_break(
             trim_trailing_whitespace(output);
             output.push('\n');
             write_indentation(output, indent_level, render, embed);
-            *pos = line_start_column(indent_level, render, embed, base_indent_override);
+            *pos = line_start_column(indent_level, render, embed);
         }
         true
     } else if kind == LineKind::Normal {
@@ -132,7 +130,6 @@ fn flush_line_suffix<R: TextResolver + ?Sized>(
             render,
             embed,
             resolver,
-            None,
             None,
         );
     }
@@ -338,7 +335,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
         indent: start_indent_level,
         mode: Mode::Break,
         doc,
-        base_indent_override: None,
     }];
 
     let mut line_suffix: Vec<ArenaCommand> = Vec::new();
@@ -372,16 +368,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                         resolver,
                     );
                 }
-                render_line_break(
-                    kind,
-                    cmd.mode,
-                    cmd.indent,
-                    cmd.base_indent_override,
-                    output,
-                    pos,
-                    render,
-                    embed,
-                );
+                render_line_break(kind, cmd.mode, cmd.indent, output, pos, render, embed);
             }
 
             DocNode::Indent(inner) => {
@@ -591,7 +578,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
             DocNode::WithContext { doc, context } => {
                 let inner_doc = *doc;
                 let context = context.clone();
-                let merged_override = context.base_indent_override.or(cmd.base_indent_override);
 
                 if let DocNode::Fill(fill_range) = &nodes[inner_doc.index()] {
                     let parts: Vec<DocId> = fill_range.resolve(children_vec).to_vec();
@@ -600,7 +586,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                         resolver,
                     );
                 } else {
-                    commands.push(cmd.with_base_override(merged_override, inner_doc));
+                    commands.push(cmd.with_doc(inner_doc));
                 }
             }
 
@@ -691,8 +677,7 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
         // Case 1: Last item
         if offset + 1 >= parts.len() {
             if !content_fits {
-                let line_start_pos =
-                    line_start_column(indent_level, render, embed, context.base_indent_override);
+                let line_start_pos = line_start_column(indent_level, render, embed);
                 if *pos != line_start_pos {
                     trim_trailing_whitespace(output);
                     output.push('\n');
@@ -710,7 +695,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
-                context.base_indent_override,
             );
             break;
         }
@@ -729,7 +713,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
-                context.base_indent_override,
             );
             let sep_mode = if content_fits {
                 Mode::Flat
@@ -746,7 +729,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
-                context.base_indent_override,
             );
             break;
         }
@@ -773,7 +755,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
-                context.base_indent_override,
             );
             render_single_doc(
                 arena,
@@ -785,7 +766,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
-                context.base_indent_override,
             );
         } else if content_fits {
             render_single_doc(
@@ -798,7 +778,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
-                context.base_indent_override,
             );
             render_single_doc(
                 arena,
@@ -810,11 +789,9 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
-                context.base_indent_override,
             );
         } else {
-            let line_start_pos =
-                line_start_column(indent_level, render, embed, context.base_indent_override);
+            let line_start_pos = line_start_column(indent_level, render, embed);
             let at_line_start = *pos == line_start_pos;
 
             if !at_line_start {
@@ -845,7 +822,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                         render,
                         embed,
                         resolver,
-                        context.base_indent_override,
                     );
                     render_single_doc(
                         arena,
@@ -857,7 +833,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                         render,
                         embed,
                         resolver,
-                        context.base_indent_override,
                     );
                 } else {
                     render_single_doc(
@@ -870,7 +845,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                         render,
                         embed,
                         resolver,
-                        context.base_indent_override,
                     );
                     render_single_doc(
                         arena,
@@ -882,7 +856,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                         render,
                         embed,
                         resolver,
-                        context.base_indent_override,
                     );
                 }
             } else {
@@ -896,7 +869,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                     render,
                     embed,
                     resolver,
-                    context.base_indent_override,
                 );
                 render_single_doc(
                     arena,
@@ -908,7 +880,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                     render,
                     embed,
                     resolver,
-                    context.base_indent_override,
                 );
             }
         }
@@ -929,7 +900,6 @@ fn render_single_doc<R: TextResolver + ?Sized>(
     render: &RenderConfig,
     embed: &EmbedContext,
     resolver: Option<&R>,
-    base_indent_override: Option<usize>,
 ) {
     let mut line_suffix: Vec<ArenaCommand> = Vec::new();
     render_single_doc_inner(
@@ -943,7 +913,6 @@ fn render_single_doc<R: TextResolver + ?Sized>(
         embed,
         resolver,
         Some(&mut line_suffix),
-        base_indent_override,
     );
     flush_line_suffix(
         arena,
@@ -969,13 +938,11 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
     embed: &EmbedContext,
     resolver: Option<&R>,
     suffix_buffer: Option<&mut Vec<ArenaCommand>>,
-    base_indent_override: Option<usize>,
 ) {
     let mut commands: Vec<ArenaCommand> = vec![ArenaCommand {
         indent: indent_level,
         mode,
         doc,
-        base_indent_override,
     }];
 
     let tracking_suffix = suffix_buffer.is_some();
@@ -1004,16 +971,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                         flush_line_suffix(arena, line_suffix, output, pos, render, embed, resolver);
                     }
                 }
-                render_line_break(
-                    kind,
-                    cmd.mode,
-                    cmd.indent,
-                    cmd.base_indent_override,
-                    output,
-                    pos,
-                    render,
-                    embed,
-                );
+                render_line_break(kind, cmd.mode, cmd.indent, output, pos, render, embed);
             }
 
             DocNode::Indent(inner) => {
@@ -1209,13 +1167,10 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                             resolver,
                         );
                     } else {
-                        let merged_override =
-                            context.base_indent_override.or(cmd.base_indent_override);
-                        commands.push(cmd.with_base_override(merged_override, inner_doc));
+                        commands.push(cmd.with_doc(inner_doc));
                     }
                 } else {
-                    let merged_override = context.base_indent_override.or(cmd.base_indent_override);
-                    commands.push(cmd.with_base_override(merged_override, inner_doc));
+                    commands.push(cmd.with_doc(inner_doc));
                 }
             }
 
@@ -1263,14 +1218,8 @@ fn indent_width(level: usize, render: &RenderConfig) -> usize {
     level * indent_str_width(render.indent)
 }
 
-fn line_start_column(
-    indent_level: usize,
-    render: &RenderConfig,
-    embed: &EmbedContext,
-    base_override: Option<usize>,
-) -> usize {
-    let base = base_override.unwrap_or(embed.base_indent_offset);
-    indent_width(indent_level, render) + base * TAB_WIDTH
+fn line_start_column(indent_level: usize, render: &RenderConfig, embed: &EmbedContext) -> usize {
+    indent_width(indent_level, render) + embed.base_indent_offset * TAB_WIDTH
 }
 
 fn indent_str_width(indent: &str) -> usize {

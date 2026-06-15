@@ -814,7 +814,6 @@ mod arena_tests {
             a.text("abcd"),
             DocContext {
                 trailing_reserve: 3,
-                base_indent_override: None,
             },
         );
         // 4 content + 3 reserved = 7

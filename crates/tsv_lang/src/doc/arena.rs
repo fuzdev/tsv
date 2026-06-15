@@ -128,7 +128,6 @@ pub struct ArenaCommand {
     pub indent: usize,
     pub mode: Mode,
     pub doc: DocId,
-    pub base_indent_override: Option<usize>,
 }
 
 impl ArenaCommand {
@@ -172,16 +171,6 @@ impl ArenaCommand {
     #[inline]
     pub fn with_mode(&self, mode: Mode, doc: DocId) -> Self {
         Self { mode, doc, ..*self }
-    }
-
-    /// Create a command with a base indent override.
-    #[inline]
-    pub fn with_base_override(&self, base_indent_override: Option<usize>, doc: DocId) -> Self {
-        Self {
-            doc,
-            base_indent_override,
-            ..*self
-        }
     }
 }
 
@@ -450,17 +439,6 @@ impl DocArena {
     /// Wrap a doc with rendering context.
     pub fn with_context(&self, doc: DocId, context: DocContext) -> DocId {
         self.alloc(DocNode::WithContext { doc, context })
-    }
-
-    /// Wrap a doc with a base indent override.
-    pub fn with_base_indent_override(&self, doc: DocId, base_offset: usize) -> DocId {
-        self.alloc(DocNode::WithContext {
-            doc,
-            context: DocContext {
-                trailing_reserve: 0,
-                base_indent_override: Some(base_offset),
-            },
-        })
     }
 
     /// Content to print at the end of the current line.

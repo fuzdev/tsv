@@ -47,7 +47,7 @@ All methods take `&self` (interior mutability via `RefCell`):
 | Structure    | `group()`, `group_break()`, `indent()`, `dedent()`, `align()`      |
 | Conditionals | `if_break()`, `indent_if_break()`, `conditional_group()`           |
 | Sequences    | `concat()`, `fill()`, `join()`, `join_doc()`                       |
-| Context      | `with_context()`, `with_base_indent_override()`                    |
+| Context      | `with_context()`                                                   |
 | Line suffix  | `line_suffix()`, `line_suffix_boundary()`, `break_parent()`        |
 | Convenience  | `wrap()`, `parens()`, `brackets()`, `braces()`, `trailing_comma()` |
 | Inspection   | `will_break()`, `has_forced_break()`                               |
@@ -126,8 +126,6 @@ See [../../CLAUDE.md §Comment Handling](../../CLAUDE.md#comment-handling-detach
 | `has_comments_in_range()`                 | Quick existence check                                                      |
 | `has_line_comments_in_range()`            | Existence check restricted to line comments                                |
 | `has_multiline_block_comments_in_range()` | Existence check for multi-line block comments (force expansion)            |
-| `leading_comments()`                      | Filter to leading comments only                                            |
-| `trailing_comments()`                     | Filter to trailing comments only                                           |
 
 ## Interner Traits
 

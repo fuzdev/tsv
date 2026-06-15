@@ -23,7 +23,4 @@ pub struct WireResponse {
     pub ok: bool,
     pub output: Option<Value>,
     pub error: Option<String>,
-    /// Execution time in milliseconds (for diagnostics)
-    #[allow(dead_code)]
-    pub duration_ms: u64,
 }

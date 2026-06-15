@@ -31,8 +31,7 @@ mod span;
 pub use comment::{
     ClassifiedComments, Comment, CommentPosition, classify_comment, classify_comment_fast,
     comments_after, comments_in_range, find_first_comment_from, has_comments_in_range,
-    has_line_comments_in_range, has_multiline_block_comments_in_range, leading_comments,
-    trailing_comments,
+    has_line_comments_in_range, has_multiline_block_comments_in_range,
 };
 pub use config::{EmbedContext, INDENT, LayoutMode, PRINT_WIDTH, TAB_WIDTH};
 pub use error::{ErrorContext, ParseError, Result};

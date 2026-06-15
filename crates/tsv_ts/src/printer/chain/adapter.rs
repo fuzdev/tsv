@@ -128,28 +128,13 @@ impl<'a> ChainPrinter for Printer<'a> {
         d.concat(&parts)
     }
 
-    fn build_leading_block_doc(&self, comments: &[&Comment]) -> DocId {
+    fn build_leading_comments_doc(&self, comments: &[&Comment]) -> DocId {
         let d = self.d();
         if comments.is_empty() {
             return d.empty();
         }
 
-        // Emit block comments on their own lines (with hardline after each)
-        let mut parts = Vec::with_capacity(comments.len() * 2);
-        for comment in comments {
-            parts.push(self.build_comment_doc(comment));
-            parts.push(d.hardline());
-        }
-        d.concat(&parts)
-    }
-
-    fn build_leading_line_doc(&self, comments: &[&Comment]) -> DocId {
-        let d = self.d();
-        if comments.is_empty() {
-            return d.empty();
-        }
-
-        // Emit line comments on their own lines (with hardline after each)
+        // Emit each comment on its own line (with hardline after each)
         let mut parts = Vec::with_capacity(comments.len() * 2);
         for comment in comments {
             parts.push(self.build_comment_doc(comment));

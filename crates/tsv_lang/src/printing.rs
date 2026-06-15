@@ -67,15 +67,23 @@ pub fn format_string_literal(raw_content: &str, original_quote: char) -> String 
         '\''
     };
 
-    // Swap quote escaping if needed, or use raw content as-is
-    let final_content = if optimal_quote == original_quote {
-        raw_content.to_string()
+    // Build the quoted literal in a single pre-sized allocation. On the common
+    // path (quote unchanged) the content copies in directly; the swap path still
+    // allocates inside `swap_quote_escaping`, but its result is copied in just
+    // once here rather than via a second `format!` buffer.
+    let mut result = String::with_capacity(raw_content.len() + 2);
+    result.push(optimal_quote);
+    if optimal_quote == original_quote {
+        result.push_str(raw_content);
     } else {
-        swap_quote_escaping(raw_content, original_quote, optimal_quote)
-    };
-
-    // Return formatted string with quotes
-    format!("{optimal_quote}{final_content}{optimal_quote}")
+        result.push_str(&swap_quote_escaping(
+            raw_content,
+            original_quote,
+            optimal_quote,
+        ));
+    }
+    result.push(optimal_quote);
+    result
 }
 
 /// Check if two positions are on the same line (no newline between them)

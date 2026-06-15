@@ -153,13 +153,13 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
             // Leading block comments (on their own line)
             self.parts.push(
                 self.printer
-                    .build_leading_block_doc(&classified.leading_block),
+                    .build_leading_comments_doc(&classified.leading_block),
             );
 
             // Leading line comments (on their own line)
             self.parts.push(
                 self.printer
-                    .build_leading_line_doc(&classified.leading_line),
+                    .build_leading_comments_doc(&classified.leading_line),
             );
 
             // Blank line after last leading comment (before property)
