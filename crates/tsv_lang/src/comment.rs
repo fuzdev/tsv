@@ -169,68 +169,6 @@ impl<'a> ClassifiedComments<'a> {
     }
 }
 
-/// Iterate over leading comments (excludes trailing).
-///
-/// Returns (comment, is_inline) pairs where is_inline is true for comments
-/// on the same line as curr_start.
-///
-/// # Arguments
-///
-/// * `comments` - All comments sorted by span.start
-/// * `prev_end` - End position of the previous element
-/// * `curr_start` - Start position of the next element
-/// * `source` - The source text
-///
-/// # Returns
-///
-/// An iterator yielding (comment, is_inline) pairs for leading comments only.
-///
-/// Uses binary search to find the starting point: O(log n + k) where k is result count.
-pub fn leading_comments<'a>(
-    comments: &'a [Comment],
-    prev_end: u32,
-    curr_start: u32,
-    source: &'a str,
-) -> impl Iterator<Item = (&'a Comment, bool)> + 'a {
-    comments_in_range(comments, prev_end, curr_start).filter_map(move |comment| {
-        match classify_comment(comment, prev_end, curr_start, source) {
-            CommentPosition::Trailing => None,
-            CommentPosition::LeadingOwnLine => Some((comment, false)),
-            CommentPosition::LeadingInline => Some((comment, true)),
-        }
-    })
-}
-
-/// Iterate over trailing comments only.
-///
-/// Returns comments that are on the same line as prev_end.
-///
-/// # Arguments
-///
-/// * `comments` - All comments sorted by span.start
-/// * `prev_end` - End position of the previous element
-/// * `curr_start` - Start position of the next element
-/// * `source` - The source text
-///
-/// # Returns
-///
-/// An iterator yielding trailing comments only.
-///
-/// Uses binary search to find the starting point: O(log n + k) where k is result count.
-pub fn trailing_comments<'a>(
-    comments: &'a [Comment],
-    prev_end: u32,
-    curr_start: u32,
-    source: &'a str,
-) -> impl Iterator<Item = &'a Comment> + 'a {
-    comments_in_range(comments, prev_end, curr_start).filter(move |comment| {
-        matches!(
-            classify_comment(comment, prev_end, curr_start, source),
-            CommentPosition::Trailing
-        )
-    })
-}
-
 //
 // Efficient Comment Lookup Utilities
 //

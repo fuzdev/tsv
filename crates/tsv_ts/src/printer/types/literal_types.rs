@@ -9,6 +9,7 @@
 
 use super::{CommentSpacing, Printer};
 use crate::ast::internal::{TSLiteralType, TSType, TemplateLiteralType};
+use tsv_lang::PRINT_WIDTH;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -43,7 +44,6 @@ impl<'a> Printer<'a> {
     /// breaks would have given them more room.
     pub(super) fn build_template_literal_type_doc(&self, template: &TemplateLiteralType) -> DocId {
         let d = self.d();
-        let print_width = tsv_lang::PRINT_WIDTH;
 
         // First pass: analyze types and determine which exceed print width at their flat positions
         // Store as (doc, comments_doc, flat_str, is_conditional, exceeds_width)
@@ -74,7 +74,7 @@ impl<'a> Printer<'a> {
                 // Position includes: current pos + "${" (2) + type + "}" (1)
                 // (comment width is small enough to ignore for width calculation)
                 let interp_end = pos + 2 + flat_str.len() + 1;
-                let exceeds_width = interp_end > print_width;
+                let exceeds_width = interp_end > PRINT_WIDTH;
 
                 type_data.push((
                     type_doc,

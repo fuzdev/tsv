@@ -8,6 +8,7 @@
 
 use super::{Printer, has_wrappable_args, value_normalization};
 use crate::ast::internal::{self, CssValue};
+use tsv_lang::PRINT_WIDTH;
 use tsv_lang::doc::{self, DocContext, Mode, arena::DocId};
 
 impl<'a> Printer<'a> {
@@ -280,7 +281,7 @@ impl<'a> Printer<'a> {
             let func_source = span.extract(self.source);
             let normalized = value_normalization::normalize_value_spacing(func_source);
             let inline_len = decl.property.len() + 2 + normalized.len() + 1;
-            self.indent_width() + inline_len > tsv_lang::PRINT_WIDTH
+            self.indent_width() + inline_len > PRINT_WIDTH
         } else {
             let context_offset = decl.property.len() + 3;
             self.should_wrap_function_with_offset(name, args, context_offset)
@@ -551,7 +552,6 @@ impl<'a> Printer<'a> {
         // to exactly printWidth and then exceeding when ';' is added
         let context = DocContext {
             trailing_reserve: 1,
-            base_indent_override: None,
         };
         let fill = d.fill(&parts);
         d.with_context(fill, context)
@@ -603,10 +603,7 @@ impl<'a> Printer<'a> {
     fn build_space_fill_doc(&self, values: &[CssValue], trailing_reserve: usize) -> DocId {
         let d = self.d();
         let parts = self.build_space_fill_parts(values);
-        let context = DocContext {
-            trailing_reserve,
-            base_indent_override: None,
-        };
+        let context = DocContext { trailing_reserve };
         let fill = d.fill(&parts);
         d.with_context(fill, context)
     }
@@ -670,7 +667,7 @@ impl<'a> Printer<'a> {
 
     /// Check if an arg string would exceed width when printed at current position
     fn arg_string_exceeds_width(&self, arg: &str) -> bool {
-        self.indent_width() + arg.len() > tsv_lang::PRINT_WIDTH
+        self.indent_width() + arg.len() > PRINT_WIDTH
     }
 
     /// Print space-separated values with fill wrapping
@@ -690,8 +687,7 @@ impl<'a> Printer<'a> {
         let first_is_comment = parts[0].trim().starts_with("/*");
         let first_len = parts[0].len();
         let second_len = parts[1].len();
-        let first_fills_line =
-            self.indent_width() + first_len + 1 + second_len > tsv_lang::PRINT_WIDTH;
+        let first_fills_line = self.indent_width() + first_len + 1 + second_len > PRINT_WIDTH;
 
         // When comment fills line: print it separately, then handle values with continuation
         let (value_parts, use_continuation) =
@@ -703,13 +699,11 @@ impl<'a> Printer<'a> {
                 // Check if value parts need continuation indent
                 let val1_len = parts[1].len();
                 let val2_len = parts[2].len();
-                let needs_wrap =
-                    self.indent_width() + val1_len + 1 + val2_len > tsv_lang::PRINT_WIDTH;
+                let needs_wrap = self.indent_width() + val1_len + 1 + val2_len > PRINT_WIDTH;
                 (&parts[1..], needs_wrap)
             } else {
                 // Normal case: check if first two items fit together
-                let both_fit =
-                    self.indent_width() + first_len + 1 + second_len <= tsv_lang::PRINT_WIDTH;
+                let both_fit = self.indent_width() + first_len + 1 + second_len <= PRINT_WIDTH;
                 (parts, both_fit)
             };
 

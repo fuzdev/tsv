@@ -67,7 +67,7 @@ mod arena_tests {
     use super::*;
     use crate::EmbedContext;
 
-    /// Test helper: render with explicit width/tab/indent overrides and
+    /// Test helper: render with explicit width/indent overrides and
     /// optional `base_indent_offset`. Wraps the internal
     /// [`arena_print_doc_with_indent_and_render`] for compactness.
     fn render_test(
@@ -88,7 +88,7 @@ mod arena_tests {
         arena_print_doc(arena, doc, &EmbedContext::default())
     }
 
-    /// Test helper: render with explicit `print_width`, default tab/indent.
+    /// Test helper: render with explicit `print_width`, default indent.
     fn render_pw(arena: &DocArena, doc: DocId, print_width: usize) -> String {
         let render = RenderConfig {
             print_width,
@@ -98,11 +98,10 @@ mod arena_tests {
     }
 
     /// Test helper: render with explicit `print_width` and 2-space indent
-    /// (matches the old `indent: "  ", tab_width: 2` test setup).
+    /// (matches the old `indent: "  "` test setup).
     fn render_pw_spaces(arena: &DocArena, doc: DocId, print_width: usize) -> String {
         let render = RenderConfig {
             print_width,
-            tab_width: 2,
             indent: "  ",
         };
         render_test(arena, doc, &render, 0)
@@ -112,7 +111,6 @@ mod arena_tests {
     fn render_pw_tab(arena: &DocArena, doc: DocId, print_width: usize) -> String {
         let render = RenderConfig {
             print_width,
-            tab_width: 2,
             indent: "\t",
         };
         render_test(arena, doc, &render, 0)
@@ -132,49 +130,49 @@ mod arena_tests {
 
     #[test]
     fn test_arena_simple_text() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.text("hello");
         assert_eq!(render_default(&a, doc), "hello");
     }
 
     #[test]
     fn test_arena_concat() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.concat(&[a.text("hello"), a.text(" "), a.text("world")]);
         assert_eq!(render_default(&a, doc), "hello world");
     }
 
     #[test]
     fn test_arena_line_in_flat_mode_fits() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.group(a.concat(&[a.text("a"), a.line(), a.text("b")]));
         assert_eq!(render_pw_tab(&a, doc, 10), "a b");
     }
 
     #[test]
     fn test_arena_line_in_break_mode() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.group(a.concat(&[a.text("hello"), a.line(), a.text("world")]));
         assert_eq!(render_pw_tab(&a, doc, 8), "hello\nworld");
     }
 
     #[test]
     fn test_arena_hardline() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.concat(&[a.text("a"), a.hardline(), a.text("b")]);
         assert_eq!(render_pw_tab(&a, doc, 100), "a\nb");
     }
 
     #[test]
     fn test_arena_softline() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.group(a.concat(&[a.text("a"), a.softline(), a.text("b")]));
         assert_eq!(render_pw_tab(&a, doc, 10), "ab");
     }
 
     #[test]
     fn test_arena_indent() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let inner = a.concat(&[a.hardline(), a.text("child")]);
         let doc = a.concat(&[a.text("parent"), a.indent(inner)]);
         assert_eq!(render_pw_tab(&a, doc, 80), "parent\n\tchild");
@@ -182,14 +180,14 @@ mod arena_tests {
 
     #[test]
     fn test_arena_group_with_indent() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let inner = a.concat(&[a.line(), a.text("content")]);
         let indented = a.indent(inner);
         let doc = a.group(a.concat(&[a.text("("), indented, a.line(), a.text(")")]));
 
         assert_eq!(render_pw_spaces(&a, doc, 20), "( content )");
 
-        let a2 = DocArena::new(2);
+        let a2 = DocArena::new();
         let inner2 = a2.concat(&[a2.line(), a2.text("content")]);
         let indented2 = a2.indent(inner2);
         let doc2 = a2.group(a2.concat(&[a2.text("("), indented2, a2.line(), a2.text(")")]));
@@ -199,7 +197,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_if_break() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.group(a.concat(&[
             a.text("("),
             a.if_break(a.text(",\n"), a.text(", ")),
@@ -211,7 +209,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_dedent() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let inner = a.concat(&[a.hardline(), a.text("back-to-level0")]);
         let dedented = a.dedent(inner);
         let doc = a.indent(a.concat(&[
@@ -228,21 +226,21 @@ mod arena_tests {
 
     #[test]
     fn test_arena_fill_all_fit() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.fill(&[a.text("a"), a.line(), a.text("b"), a.line(), a.text("c")]);
         assert_eq!(render_pw_tab(&a, doc, 20), "a b c");
     }
 
     #[test]
     fn test_arena_fill_greedy_packing() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.fill(&[a.text("aa"), a.line(), a.text("bb"), a.line(), a.text("cc")]);
         assert_eq!(render_pw_tab(&a, doc, 6), "aa bb\ncc");
     }
 
     #[test]
     fn test_arena_fill_long_comma_list() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.fill(&[
             a.text("aaaa"),
             a.concat(&[a.text(","), a.line()]),
@@ -257,7 +255,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_fill_with_base_indent_offset() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.indent(a.fill(&[
             a.text("1"),
             a.concat(&[a.text(","), a.line()]),
@@ -278,7 +276,6 @@ mod arena_tests {
 
         let render = RenderConfig {
             print_width: 12,
-            tab_width: 2,
             indent: "\t",
         };
         assert_eq!(
@@ -286,7 +283,7 @@ mod arena_tests {
             "1, 2, 3, 4,\n\t5, 6, 7, 8"
         );
 
-        let a2 = DocArena::new(2);
+        let a2 = DocArena::new();
         let doc2 = a2.indent(a2.fill(&[
             a2.text("1"),
             a2.concat(&[a2.text(","), a2.line()]),
@@ -313,7 +310,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_join() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let docs = vec![a.text("a"), a.text("b"), a.text("c")];
         let doc = a.join(docs, ", ");
         assert_eq!(render_default(&a, doc), "a, b, c");
@@ -321,7 +318,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_join_empty() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let docs: Vec<_> = vec![];
         let doc = a.join(docs, ", ");
         assert_eq!(render_default(&a, doc), "");
@@ -329,7 +326,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_join_doc_with_line() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let sep = a.line();
         let docs = vec![a.text("a"), a.text("b"), a.text("c")];
         let joined = a.join_doc(docs, sep);
@@ -337,7 +334,7 @@ mod arena_tests {
 
         assert_eq!(render_pw(&a, doc, 20), "a b c");
 
-        let a2 = DocArena::new(2);
+        let a2 = DocArena::new();
         let sep2 = a2.line();
         let docs2 = vec![a2.text("a"), a2.text("b"), a2.text("c")];
         let joined2 = a2.join_doc(docs2, sep2);
@@ -348,35 +345,35 @@ mod arena_tests {
 
     #[test]
     fn test_arena_wrap() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.wrap("(", a.text("content"), ")");
         assert_eq!(render_default(&a, doc), "(content)");
     }
 
     #[test]
     fn test_arena_parens() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.parens(a.text("x"));
         assert_eq!(render_default(&a, doc), "(x)");
     }
 
     #[test]
     fn test_arena_brackets() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.brackets(a.text("0"));
         assert_eq!(render_default(&a, doc), "[0]");
     }
 
     #[test]
     fn test_arena_braces() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.braces(a.text("a: 1"));
         assert_eq!(render_default(&a, doc), "{a: 1}");
     }
 
     #[test]
     fn test_arena_join_trailing_flat() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let sep = a.concat(&[a.text(","), a.line()]);
         let docs = vec![a.text("a"), a.text("b"), a.text("c")];
         let trailing = a.join_trailing(docs, sep);
@@ -386,7 +383,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_join_trailing_break() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let sep = a.concat(&[a.text(","), a.line()]);
         let docs = vec![a.text("a"), a.text("b"), a.text("c")];
         let trailing = a.join_trailing(docs, sep);
@@ -396,21 +393,21 @@ mod arena_tests {
 
     #[test]
     fn test_arena_indent_line() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.group(a.concat(&[a.text("prefix"), a.indent_line(a.text("indented"))]));
         assert_eq!(render_pw_spaces(&a, doc, 10), "prefix\n  indented");
     }
 
     #[test]
     fn test_arena_indent_softline_flat() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.group(a.concat(&[a.text("a"), a.indent_softline(a.text("b"))]));
         assert_eq!(render_pw_spaces(&a, doc, 20), "ab");
     }
 
     #[test]
     fn test_arena_isolated_group_prevents_break() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let inner = a.concat(&[a.text("a"), a.hardline(), a.text("b")]);
         let iso = a.isolated_group(inner);
         let doc = a.group(a.concat(&[a.text("fn("), iso, a.text(")")]));
@@ -419,14 +416,14 @@ mod arena_tests {
 
     #[test]
     fn test_arena_will_break_false_for_isolated() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.isolated_group(a.concat(&[a.text("a"), a.hardline(), a.text("b")]));
         assert!(!a.will_break(doc));
     }
 
     #[test]
     fn test_arena_nested_isolated_groups() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let inner_iso = a.isolated_group(a.concat(&[a.text("x"), a.hardline(), a.text("y")]));
         let outer_iso = a.isolated_group(a.concat(&[a.text("b("), inner_iso, a.text(")")]));
         let doc = a.group(a.concat(&[a.text("a("), outer_iso, a.text(")")]));
@@ -435,7 +432,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_fill_wraps_last_item_at_101() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let items = [
             "a0000000000",
             "a1111111111",
@@ -457,7 +454,6 @@ mod arena_tests {
         let doc = a.fill(&parts);
         let render = RenderConfig {
             print_width: 100,
-            tab_width: 2,
             indent: "\t",
         };
         let embed = EmbedContext {
@@ -488,7 +484,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_join_single() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let docs = vec![a.text("a")];
         let doc = a.join(docs, ", ");
         assert_eq!(render_default(&a, doc), "a");
@@ -496,7 +492,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_join_doc_with_comma_line() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let sep = a.concat(&[a.text(","), a.line()]);
         let docs = vec![a.text("item1"), a.text("item2"), a.text("item3")];
         let joined = a.join_doc(docs, sep);
@@ -504,7 +500,7 @@ mod arena_tests {
 
         assert_eq!(render_pw(&a, doc, 30), "item1, item2, item3");
 
-        let a2 = DocArena::new(2);
+        let a2 = DocArena::new();
         let sep2 = a2.concat(&[a2.text(","), a2.line()]);
         let docs2 = vec![a2.text("item1"), a2.text("item2"), a2.text("item3")];
         let joined2 = a2.join_doc(docs2, sep2);
@@ -515,7 +511,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_join_trailing_empty() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let sep = a.concat(&[a.text(","), a.line()]);
         let docs: Vec<DocId> = vec![];
         let doc = a.join_trailing(docs, sep);
@@ -524,7 +520,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_join_trailing_single() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let sep = a.concat(&[a.text(","), a.line()]);
         let docs = vec![a.text("a")];
         let trailing = a.join_trailing(docs, sep);
@@ -534,7 +530,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_join_trailing_in_brackets() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let sep = a.concat(&[a.text(","), a.line()]);
         let docs = vec![a.text("item1"), a.text("item2"), a.text("item3")];
         let trailing = a.join_trailing(docs, sep);
@@ -546,7 +542,7 @@ mod arena_tests {
 
         assert_eq!(render_pw_spaces(&a, doc, 30), "[item1, item2, item3]");
 
-        let a2 = DocArena::new(2);
+        let a2 = DocArena::new();
         let sep2 = a2.concat(&[a2.text(","), a2.line()]);
         let docs2 = vec![a2.text("item1"), a2.text("item2"), a2.text("item3")];
         let trailing2 = a2.join_trailing(docs2, sep2);
@@ -564,21 +560,21 @@ mod arena_tests {
 
     #[test]
     fn test_arena_fill_single_item() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.fill(&[a.text("hello")]);
         assert_eq!(render_default(&a, doc), "hello");
     }
 
     #[test]
     fn test_arena_fill_two_items() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.fill(&[a.text("a"), a.line(), a.text("b")]);
         assert_eq!(render_pw_tab(&a, doc, 10), "a b");
     }
 
     #[test]
     fn test_arena_fill_none_fit() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.fill(&[
             a.text("verylongitem1"),
             a.line(),
@@ -594,7 +590,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_fill_with_indent() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.indent(a.fill(&[
             a.text("aaa"),
             a.line(),
@@ -607,14 +603,14 @@ mod arena_tests {
 
     #[test]
     fn test_arena_indent_softline_break() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.group(a.concat(&[a.text("a"), a.indent_softline(a.text("b"))]));
         assert_eq!(render_pw_spaces(&a, doc, 1), "a\n  b");
     }
 
     #[test]
     fn test_arena_indent_softline_in_parens() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let sl = a.softline();
         let doc = a.group(a.concat(&[
             a.text("fn("),
@@ -625,7 +621,7 @@ mod arena_tests {
 
         assert_eq!(render_pw_spaces(&a, doc, 30), "fn(arg1, arg2)");
 
-        let a2 = DocArena::new(2);
+        let a2 = DocArena::new();
         let sl2 = a2.softline();
         let doc2 = a2.group(a2.concat(&[
             a2.text("fn("),
@@ -639,14 +635,14 @@ mod arena_tests {
 
     #[test]
     fn test_arena_indent_line_fits() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.group(a.concat(&[a.text("a"), a.indent_line(a.text("b"))]));
         assert_eq!(render_pw_spaces(&a, doc, 20), "a b");
     }
 
     #[test]
     fn test_arena_isolated_group_still_breaks_on_width() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let iso = a.isolated_group(a.text("verylongcontent"));
         let doc = a.group(a.concat(&[
             a.text("fn("),
@@ -659,7 +655,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_isolated_group_with_softlines() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let inner_sl = a.softline();
         let inner_group = a.group(a.concat(&[
             a.text("inner("),
@@ -674,7 +670,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_wrap_with_nested_content() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let inner = a.concat(&[a.text("a"), a.text(", "), a.text("b")]);
         let doc = a.brackets(inner);
         assert_eq!(render_default(&a, doc), "[a, b]");
@@ -682,7 +678,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_nested_wraps() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let inner = a.brackets(a.text("x"));
         let doc = a.braces(a.concat(&[a.text(" "), inner, a.text(" ")]));
         assert_eq!(render_default(&a, doc), "{ [x] }");
@@ -690,7 +686,7 @@ mod arena_tests {
 
     #[test]
     fn test_arena_line_in_break_mode_doesnt_fit() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.group(a.concat(&[a.text("hello"), a.line(), a.text("world")]));
         assert_eq!(render_pw_tab(&a, doc, 8), "hello\nworld");
     }
@@ -706,7 +702,7 @@ mod arena_tests {
                 a.text("SS"),         // width 2
             ])
         }
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = build(&a);
         assert_eq!(render_pw(&a, doc, 20), "WWWWWWWWWW"); // first state fits
         assert_eq!(render_pw(&a, doc, 7), "MMMMM"); // only the 5-wide state fits
@@ -718,7 +714,7 @@ mod arena_tests {
     #[test]
     fn test_conditional_group_single_state() {
         // A lone state (no expanded states) renders directly.
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.conditional_group(&[a.text("x")]);
         assert_eq!(render_pw(&a, doc, 1), "x");
     }
@@ -726,7 +722,7 @@ mod arena_tests {
     #[test]
     #[should_panic(expected = "conditional_group requires at least one state")]
     fn test_conditional_group_empty_panics() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         a.conditional_group(&[]);
     }
 
@@ -772,7 +768,7 @@ mod arena_tests {
 
     #[test]
     fn test_fits_flat_width_concat_and_lines() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         // concat sums child widths
         assert_flat_width(&a, a.concat(&[a.text("abcd"), a.text("ef")]), 6);
         // Normal line = 1 (space) in flat; Soft line = 0
@@ -784,7 +780,7 @@ mod arena_tests {
 
     #[test]
     fn test_fits_flat_width_wrappers() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         // a non-breaking group recurses into its contents
         let g = a.group(a.concat(&[a.text("ab"), a.line(), a.text("cd")]));
         assert_flat_width(&a, g, 5);
@@ -801,7 +797,7 @@ mod arena_tests {
 
     #[test]
     fn test_fits_flat_width_if_break_picks_flat_doc() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         // In flat mode the flat_doc (", ", width 2) is measured, never break_doc (",\n").
         let doc = a.concat(&[
             a.text("("),
@@ -813,12 +809,11 @@ mod arena_tests {
 
     #[test]
     fn test_fits_flat_width_with_context_trailing_reserve() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         let doc = a.with_context(
             a.text("abcd"),
             DocContext {
                 trailing_reserve: 3,
-                base_indent_override: None,
             },
         );
         // 4 content + 3 reserved = 7
@@ -827,7 +822,7 @@ mod arena_tests {
 
     #[test]
     fn test_fits_flat_width_cached_non_ascii() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         // "café" is non-ASCII, so its width is precomputed (cached_width = Some(4));
         // this exercises the cached-`Some(w)` arm rather than the resolve fallback.
         assert_flat_width(&a, a.text_owned("café".to_string()), 4);
@@ -835,7 +830,7 @@ mod arena_tests {
 
     #[test]
     fn test_fits_flat_should_break_group_defers_to_walk() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         // Flat content is 2+1+8 = 11 wide, but should_break forces Break mode in the
         // walk, where the inner line returns "fits" early. The fast path must NOT
         // shortcut this as an 11-wide flat subtree.
@@ -848,7 +843,7 @@ mod arena_tests {
 
     #[test]
     fn test_fits_flat_hardline_defers_to_walk() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         // hardline → the walk returns true after the leading text; a fast-path that
         // miscounted the hardline as 0 would compute width 4 and wrongly fail at 3.
         let doc = a.concat(&[a.text("ab"), a.hardline(), a.text("cd")]);
@@ -857,7 +852,7 @@ mod arena_tests {
 
     #[test]
     fn test_fits_flat_break_parent_forces_false() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         // BreakParent → the walk returns false even at unbounded width; a fast-path
         // that treated it as 0 width would wrongly report "fits".
         let doc = a.concat(&[a.text("ab"), a.break_parent(), a.text("cd")]);
@@ -866,7 +861,7 @@ mod arena_tests {
 
     #[test]
     fn test_fits_flat_newline_text_defers_to_walk() {
-        let a = DocArena::new(2);
+        let a = DocArena::new();
         // Static newline text: resolved on demand, contains '\n' → walk returns true.
         assert!(fits_flat(&a, a.text("a\nb"), 0));
         // Owned non-ASCII newline text: cached as HAS_NEWLINE → same early-true path.

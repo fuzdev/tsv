@@ -1,6 +1,7 @@
 use argh::FromArgs;
 use tsv_cli::cli::input::Input;
 use tsv_lang::printing::visual_width;
+use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 
 /// Measure visual line widths (accounts for tab width).
 #[derive(FromArgs, Debug)]
@@ -9,10 +10,6 @@ pub struct LineWidthCommand {
     /// only measure this line number
     #[argh(option)]
     line: Option<usize>,
-
-    /// tab width (default: 2, matches prettier)
-    #[argh(option, default = "2")]
-    tab_width: usize,
 
     /// emit JSON
     #[argh(switch)]
@@ -58,7 +55,6 @@ impl LineWidthCommand {
 
         let content = input.content();
         let lines: Vec<&str> = content.lines().collect();
-        let print_width = 100; // Prettier default
 
         if lines.is_empty() {
             if self.json {
@@ -95,12 +91,12 @@ impl LineWidthCommand {
             }
 
             // Calculate visual width using Unicode Standard Annex #11
-            let total = visual_width(line, self.tab_width);
+            let total = visual_width(line, TAB_WIDTH);
             let tab_count = line.chars().filter(|&c| c == '\t').count();
-            let tab_width_total = tab_count * self.tab_width;
+            let tab_width_total = tab_count * TAB_WIDTH;
             let content_width = total - tab_width_total;
 
-            let exceeds = total > print_width;
+            let exceeds = total > PRINT_WIDTH;
             if exceeds {
                 exceeds_count += 1;
             }
@@ -115,10 +111,10 @@ impl LineWidthCommand {
                     "exceeds": exceeds,
                 }));
             } else {
-                let status = if total > print_width {
-                    format!("✗ EXCEEDS print_width ({print_width})")
-                } else if total == print_width {
-                    format!("⚠️  EXACTLY print_width ({print_width})")
+                let status = if total > PRINT_WIDTH {
+                    format!("✗ EXCEEDS print_width ({PRINT_WIDTH})")
+                } else if total == PRINT_WIDTH {
+                    format!("⚠️  EXACTLY print_width ({PRINT_WIDTH})")
                 } else {
                     "✓".to_string()
                 };
@@ -140,7 +136,7 @@ impl LineWidthCommand {
                 "\nSummary: {}/{} lines exceed print_width ({})",
                 exceeds_count,
                 lines.len(),
-                print_width
+                PRINT_WIDTH
             );
         }
 

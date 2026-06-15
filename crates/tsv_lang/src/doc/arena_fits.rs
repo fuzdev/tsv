@@ -1,11 +1,11 @@
 //! Width fitting algorithms for arena-based doc trees.
 
 use crate::EmbedContext;
+use crate::config::TAB_WIDTH;
 use crate::printing::visual_width;
 use smallvec::SmallVec;
 
 use super::arena::{ArenaCommand, DocArena, DocId, DocNode, FLAT_WIDTH_BREAKS, FLAT_WIDTH_UNKNOWN};
-use super::render_config::RenderConfig;
 use super::types::{LineKind, Mode, TEXT_WIDTH_HAS_NEWLINE, TextResolver, resolve_text};
 
 /// Flat-mode width of a subtree for the `arena_fits` fast-path, memoized per
@@ -18,7 +18,6 @@ fn flat_width_memo<R: TextResolver + ?Sized>(
     nodes: &[DocNode],
     children: &[DocId],
     cache: &mut [u32],
-    render: &RenderConfig,
     resolver: Option<&R>,
 ) -> Option<u32> {
     match cache[id.index()] {
@@ -35,7 +34,7 @@ fn flat_width_memo<R: TextResolver + ?Sized>(
                 if s.contains('\n') {
                     None
                 } else {
-                    Some(visual_width(s, render.tab_width) as u32)
+                    Some(visual_width(s, TAB_WIDTH) as u32)
                 }
             }
         },
@@ -52,30 +51,30 @@ fn flat_width_memo<R: TextResolver + ?Sized>(
             if *should_break {
                 None
             } else {
-                flat_width_memo(*contents, nodes, children, cache, render, resolver)
+                flat_width_memo(*contents, nodes, children, cache, resolver)
             }
         }
         DocNode::IsolatedGroup { contents } => {
-            flat_width_memo(*contents, nodes, children, cache, render, resolver)
+            flat_width_memo(*contents, nodes, children, cache, resolver)
         }
         DocNode::Indent(inner) | DocNode::Dedent(inner) => {
-            flat_width_memo(*inner, nodes, children, cache, render, resolver)
+            flat_width_memo(*inner, nodes, children, cache, resolver)
         }
         DocNode::Align { contents, .. } => {
-            flat_width_memo(*contents, nodes, children, cache, render, resolver)
+            flat_width_memo(*contents, nodes, children, cache, resolver)
         }
         DocNode::IndentIfBreak { contents, .. } => {
-            flat_width_memo(*contents, nodes, children, cache, render, resolver)
+            flat_width_memo(*contents, nodes, children, cache, resolver)
         }
         DocNode::IfBreak { flat_doc, .. } => {
-            flat_width_memo(*flat_doc, nodes, children, cache, render, resolver)
+            flat_width_memo(*flat_doc, nodes, children, cache, resolver)
         }
         DocNode::Concat(range) | DocNode::Fill(range) => {
             let kids = range.resolve(children);
             let mut sum: u32 = 0;
             let mut ok = true;
             for &kid in kids {
-                match flat_width_memo(kid, nodes, children, cache, render, resolver) {
+                match flat_width_memo(kid, nodes, children, cache, resolver) {
                     Some(w) => sum = sum.saturating_add(w),
                     None => {
                         ok = false;
@@ -86,7 +85,7 @@ fn flat_width_memo<R: TextResolver + ?Sized>(
             if ok { Some(sum) } else { None }
         }
         DocNode::WithContext { doc, context } => {
-            flat_width_memo(*doc, nodes, children, cache, render, resolver)
+            flat_width_memo(*doc, nodes, children, cache, resolver)
                 .map(|w| w.saturating_add(context.trailing_reserve as u32))
         }
         DocNode::LineSuffix(_) | DocNode::LineSuffixBoundary => Some(0),
@@ -103,17 +102,15 @@ fn flat_width_memo<R: TextResolver + ?Sized>(
 ///
 /// Arena-based version of `fits_with_lookahead`.
 ///
-/// `embed` is currently unused — fits decisions only need `tab_width`. The
-/// parameter is threaded so internal callers from `arena_render` can pass
-/// the same render/embed pair uniformly.
-#[allow(clippy::too_many_arguments)]
+/// `embed` is currently unused — fits decisions only need the fixed
+/// [`crate::TAB_WIDTH`]. The parameter is threaded so internal callers from
+/// `arena_render` can pass it uniformly.
 pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
     arena: &DocArena,
     doc: DocId,
     mode: Mode,
     rest_commands: &[ArenaCommand],
     remaining_width: isize,
-    render: &RenderConfig,
     _embed: &EmbedContext,
     resolver: Option<&R>,
 ) -> bool {
@@ -154,7 +151,6 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
                 &nodes,
                 &children_vec,
                 flat_cache.as_mut_slice(),
-                render,
                 resolver,
             )
         {
@@ -173,7 +169,7 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
                         if s.contains('\n') {
                             return true;
                         }
-                        remaining -= visual_width(s, render.tab_width) as isize;
+                        remaining -= visual_width(s, TAB_WIDTH) as isize;
                     }
                 }
             }
@@ -270,8 +266,8 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
 /// Check if a doc fits in the remaining width (public API without look-ahead).
 ///
 /// Uses the production [`crate::TAB_WIDTH`] for visual width calculations.
-/// Internal callers that need to vary widths should use
-/// [`arena_fits_with_lookahead`] with a custom [`RenderConfig`].
+/// Internal callers that need look-ahead use [`arena_fits_with_lookahead`]
+/// directly.
 pub fn arena_fits<R: TextResolver + ?Sized>(
     arena: &DocArena,
     doc: DocId,
@@ -285,20 +281,17 @@ pub fn arena_fits<R: TextResolver + ?Sized>(
         mode,
         &[],
         width as isize,
-        &RenderConfig::default(),
         &EmbedContext::default(),
         resolver,
     )
 }
 
 /// Check if multiple docs fit sequentially in the remaining width.
-#[allow(clippy::too_many_arguments)]
 pub(super) fn arena_fits_multi<R: TextResolver + ?Sized>(
     arena: &DocArena,
     doc_ids: &[DocId],
     width: usize,
     mode: Mode,
-    render: &RenderConfig,
     _embed: &EmbedContext,
     resolver: Option<&R>,
 ) -> bool {
@@ -332,7 +325,7 @@ pub(super) fn arena_fits_multi<R: TextResolver + ?Sized>(
                         if s.contains('\n') {
                             return true;
                         }
-                        remaining_width -= visual_width(s, render.tab_width) as isize;
+                        remaining_width -= visual_width(s, TAB_WIDTH) as isize;
                         if remaining_width < 0 {
                             return false;
                         }
@@ -417,11 +410,11 @@ pub(super) fn arena_fits_multi<R: TextResolver + ?Sized>(
 
 /// Update position after rendering a text string, accounting for tab expansion.
 #[inline]
-pub(super) fn update_pos_for_text(pos: &mut usize, s: &str, tab_width: usize) {
+pub(super) fn update_pos_for_text(pos: &mut usize, s: &str) {
     if let Some(last_newline_pos) = s.rfind('\n') {
         let after_newline = &s[last_newline_pos + 1..];
-        *pos = visual_width(after_newline, tab_width);
+        *pos = visual_width(after_newline, TAB_WIDTH);
     } else {
-        *pos += visual_width(s, tab_width);
+        *pos += visual_width(s, TAB_WIDTH);
     }
 }

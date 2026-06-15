@@ -14,6 +14,7 @@ use super::value_normalization;
 use crate::ast::internal;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::{self, Mode, arena::DocId};
+use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 
 /// Convert a supports connector to its string representation
 fn connector_str(conn: internal::SupportsConnector) -> &'static str {
@@ -475,7 +476,7 @@ impl<'a> Printer<'a> {
         let suffix_len = if has_block { " {".len() } else { 0 };
 
         let current_col = self.current_column();
-        let available = tsv_lang::PRINT_WIDTH.saturating_sub(current_col + suffix_len);
+        let available = PRINT_WIDTH.saturating_sub(current_col + suffix_len);
         let fits = doc::arena_fits::<dyn doc::TextResolver>(
             &self.arena,
             prelude_doc,
@@ -707,7 +708,6 @@ impl<'a> Printer<'a> {
         suffix_len: usize,
     ) -> usize {
         let mut line_width = current_col;
-        let print_width = tsv_lang::PRINT_WIDTH;
 
         for (i, part) in parts.iter().enumerate() {
             // Width of connector before this part (if any)
@@ -723,7 +723,7 @@ impl<'a> Printer<'a> {
             // Check if adding this part + suffix exceeds width
             let projected = line_width + conn_width + part_width + suffix_len;
 
-            if projected > print_width && i > 0 {
+            if projected > PRINT_WIDTH && i > 0 {
                 // Split before this part
                 return i;
             }
@@ -791,7 +791,7 @@ impl<'a> Printer<'a> {
         let normalized = value_normalization::normalize_value_text(content);
         // Fits inline (counting the trailing `;`) — emit verbatim.
         let total_width = self.current_column() + normalized.len() + 1;
-        if total_width <= tsv_lang::PRINT_WIDTH {
+        if total_width <= PRINT_WIDTH {
             self.write(&normalized);
             return;
         }
@@ -831,17 +831,16 @@ impl<'a> Printer<'a> {
     /// internal break — so naive greedy line-packing is equivalent to prettier's
     /// pairwise `fill`.) The trailing `;`/`,` (1 wide) rides each query's last line.
     fn print_import_media_query_fill(&mut self, queries: &[&str]) {
-        let width = tsv_lang::PRINT_WIDTH;
         let base = self.effective_indent();
-        let indent1 = (base + 1) * tsv_lang::TAB_WIDTH; // comma-break column
-        let indent2 = (base + 2) * tsv_lang::TAB_WIDTH; // within-query break column
+        let indent1 = (base + 1) * TAB_WIDTH; // comma-break column
+        let indent2 = (base + 2) * TAB_WIDTH; // within-query break column
 
         let mut col = self.current_column();
         let n = queries.len();
         for (qi, query) in queries.iter().enumerate() {
             let is_last = qi == n - 1;
             let query_start = col;
-            col = self.emit_import_query(query, query_start, indent2, width);
+            col = self.emit_import_query(query, query_start, indent2, PRINT_WIDTH);
             if is_last {
                 continue;
             }
@@ -854,7 +853,7 @@ impl<'a> Printer<'a> {
             // forces the comma to break; otherwise the next query packs inline if it fits.
             let next = queries[qi + 1];
             let next_comma = usize::from(qi + 1 != n - 1);
-            if query_start + query.len() + next.len() + 2 + next_comma <= width {
+            if query_start + query.len() + next.len() + 2 + next_comma <= PRINT_WIDTH {
                 self.write(" ");
                 col += 1;
             } else {
@@ -920,7 +919,7 @@ impl<'a> Printer<'a> {
         let current_col = self.current_column();
         let total_width = current_col + content.len() + suffix_len;
 
-        if total_width <= tsv_lang::PRINT_WIDTH {
+        if total_width <= PRINT_WIDTH {
             self.write(content);
             return;
         }
@@ -953,16 +952,14 @@ impl<'a> Printer<'a> {
 
         for (idx, _) in content.match_indices(" and ") {
             let break_pos = idx + " and".len();
-            if current_col + break_pos <= tsv_lang::PRINT_WIDTH {
+            if current_col + break_pos <= PRINT_WIDTH {
                 best_break = Some(break_pos);
             }
         }
 
         for (idx, _) in content.match_indices(" or ") {
             let break_pos = idx + " or".len();
-            if current_col + break_pos <= tsv_lang::PRINT_WIDTH
-                && best_break.is_none_or(|b| break_pos > b)
-            {
+            if current_col + break_pos <= PRINT_WIDTH && best_break.is_none_or(|b| break_pos > b) {
                 best_break = Some(break_pos);
             }
         }

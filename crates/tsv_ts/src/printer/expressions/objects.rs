@@ -15,6 +15,7 @@ use crate::printer::expressions::literals::is_valid_js_identifier;
 use crate::printer::layout::hang_after_operator;
 use tsv_lang::Comment;
 use tsv_lang::SymbolResolver;
+use tsv_lang::TAB_WIDTH;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
@@ -683,22 +684,20 @@ impl<'a> Printer<'a> {
     /// Uses `getStringWidth(cleanDoc(keyDoc)) < tabWidth + MIN_OVERLAP_FOR_BREAK`
     fn is_short_property_key(&self, key: &Expression, computed: bool) -> bool {
         // Prettier: MIN_OVERLAP_FOR_BREAK = 3 (assignment.js:409)
-        let threshold = tsv_lang::TAB_WIDTH + super::assignment::MIN_OVERLAP_FOR_BREAK;
+        let threshold = TAB_WIDTH + super::assignment::MIN_OVERLAP_FOR_BREAK;
 
         let base_width = match key {
             // Prettier: cleanDoc reduces identifier keys to their name string
-            Expression::Identifier(id) => {
-                visual_width(&self.resolve_symbol(id.name), tsv_lang::TAB_WIDTH)
-            }
+            Expression::Identifier(id) => visual_width(&self.resolve_symbol(id.name), TAB_WIDTH),
             Expression::Literal(lit) => match &lit.value {
                 LiteralValue::String { content, .. } => {
                     // For computed keys, quotes are always preserved: ["x"] prints as ['x']
                     // For non-computed keys, valid identifiers are unquoted: {"x":1} → {x:1}
                     // Escape-bearing keys keep their quotes (see `string_key_unquotes`).
                     if computed || !self.string_key_unquotes(lit, content) {
-                        visual_width(content, tsv_lang::TAB_WIDTH) + 2 // Include quotes
+                        visual_width(content, TAB_WIDTH) + 2 // Include quotes
                     } else {
-                        visual_width(content, tsv_lang::TAB_WIDTH)
+                        visual_width(content, TAB_WIDTH)
                     }
                 }
                 LiteralValue::Number(_) => {

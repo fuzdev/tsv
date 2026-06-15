@@ -97,13 +97,9 @@ pub trait ChainPrinter: SymbolLookup {
     /// Uses line_suffix to keep comments with preceding element.
     fn build_trailing_line_doc(&self, comments: &[&tsv_lang::Comment]) -> DocId;
 
-    /// Build doc for leading block comments from a pre-classified slice.
-    /// Comments are on their own lines, no surrounding spaces.
-    fn build_leading_block_doc(&self, comments: &[&tsv_lang::Comment]) -> DocId;
-
-    /// Build doc for leading line comments from a pre-classified slice.
-    /// Emits hardline after each comment.
-    fn build_leading_line_doc(&self, comments: &[&tsv_lang::Comment]) -> DocId;
+    /// Build doc for a pre-classified slice of leading comments, each on its
+    /// own line (hardline after each).
+    fn build_leading_comments_doc(&self, comments: &[&tsv_lang::Comment]) -> DocId;
 
     /// Build line_suffix docs for line comments WITHOUT a trailing boundary.
     ///
@@ -114,9 +110,6 @@ pub trait ChainPrinter: SymbolLookup {
 
     /// Get the source code string
     fn get_source(&self) -> &str;
-
-    /// Get the tab width from config
-    fn get_tab_width(&self) -> usize;
 
     /// Check if chain expansion should be forced
     ///

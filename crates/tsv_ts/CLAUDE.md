@@ -22,8 +22,9 @@ Standard `ast/` (internal + public + convert), `lexer/`, `parser/`, `printer/` l
 **Embedding** (used by `tsv_svelte` — shares interner, indent, comment buffers with the host document):
 
 - `parse_with_interner`, `parse_expression_with_comments`, `parse_pattern_with_comments`, `parse_type_annotation_partial`, `parse_expression_partial_with_comments`
-- `format_expression` — renders to string given `EmbedContext`
-- `build_program_doc`, `build_expression_doc_with_comments` — emit a `DocId` into the caller's `DocArena` so Svelte can compose the doc tree before rendering
+- `PrinterInputs { source, interner, comments, line_breaks, ts_context }` — the per-document environment the format entry points share, so embedders don't re-thread the same five values per call (the per-call `EmbedContext` and the expression/program stay separate args). `tsv_svelte` builds one via its `Printer::ts_inputs()` helper.
+- `format_expression(expression, &PrinterInputs, EmbedContext) -> String` — renders an expression to a string
+- `build_program_doc`, `build_expression_doc_with_comments` — emit a `DocId` into the caller's `DocArena` so Svelte can compose the doc tree before rendering; `build_expression_doc_with_comments(arena, expression, &PrinterInputs, &EmbedContext)` takes the shared bundle (`build_program_doc` derives it from the `Program`)
 - `should_inline_logical_expression`, `conditional_should_break_after_op` — Prettier assignment-layout predicates, exposed so embedders that mirror the assignment layout (Svelte's `{@const}`) apply the same break-after-operator rules instead of re-implementing them
 
 ## Distinctives

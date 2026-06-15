@@ -115,6 +115,31 @@ struct ElementContext {
     only_text_content: bool,
 }
 
+/// Inputs to the [`Printer::compute_needs_multiline`] decision.
+///
+/// Bundles the per-element flags the predicate reads so they pass by name
+/// rather than as positional bools that are easy to misorder at the call site.
+/// Mirrors the corresponding [`ElementContext`] fields — both are built from
+/// the same locals.
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Clone, Copy)]
+struct MultilineInputs {
+    /// Element type classification
+    kind: ElementKind,
+    /// Whether element has no meaningful content
+    is_empty: bool,
+    /// Whether content should hug the closing tag
+    hug_end: bool,
+    /// Whether source has newline at opening boundary
+    source_has_leading_break: bool,
+    /// Whether source has newline at closing boundary
+    source_has_trailing_break: bool,
+    /// Whether element has block flow children (if, each, etc.)
+    has_block_flow_children: bool,
+    /// Whether all content children are text nodes
+    only_text_content: bool,
+}
+
 impl<'a> Printer<'a> {
     /// Build a doc for an element (regular HTML or component)
     ///
@@ -1787,13 +1812,15 @@ impl<'a> Printer<'a> {
         // Compute needs_multiline
         let needs_multiline = self.compute_needs_multiline(
             element,
-            kind,
-            is_empty,
-            hug_end,
-            source_has_leading_break,
-            source_has_trailing_break,
-            has_block_flow_children,
-            only_text_content,
+            MultilineInputs {
+                kind,
+                is_empty,
+                hug_end,
+                source_has_leading_break,
+                source_has_trailing_break,
+                has_block_flow_children,
+                only_text_content,
+            },
         );
 
         // Compute trim_boundaries
@@ -1821,18 +1848,21 @@ impl<'a> Printer<'a> {
     }
 
     /// Compute whether children need multiline formatting
-    #[allow(clippy::too_many_arguments)]
     fn compute_needs_multiline(
         &self,
         element: &internal::Element,
-        kind: ElementKind,
-        is_empty: bool,
-        hug_end: bool,
-        source_has_leading_break: bool,
-        source_has_trailing_break: bool,
-        has_block_flow_children: bool,
-        only_text_content: bool,
+        inputs: MultilineInputs,
     ) -> bool {
+        let MultilineInputs {
+            kind,
+            is_empty,
+            hug_end,
+            source_has_leading_break,
+            source_has_trailing_break,
+            has_block_flow_children,
+            only_text_content,
+        } = inputs;
+
         if is_empty {
             return false;
         }

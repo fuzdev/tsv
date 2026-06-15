@@ -4,10 +4,9 @@
 // block and tag builders, and source position tracking used in inline run
 // grouping and multiline formatting decisions.
 
-use std::rc::Rc;
-
 use crate::ast::internal::FragmentNode;
 use crate::printer::Printer;
+use tsv_lang::TAB_WIDTH;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -121,7 +120,7 @@ impl<'a> Printer<'a> {
 
         // Calculate first_line_offset for width-aware wrapping
         // This tells the TypeScript formatter where the expression starts on the line
-        let first_line_offset = self.buffer.current_column(tsv_lang::TAB_WIDTH);
+        let first_line_offset = self.buffer.current_column(TAB_WIDTH);
         // Pass current indent level so wrapped lines get proper indentation
         let base_indent_offset = self.indent_level;
         let embed = tsv_lang::EmbedContext {
@@ -132,15 +131,7 @@ impl<'a> Printer<'a> {
         };
 
         // Format the expression with context-aware width calculations
-        let formatted = tsv_ts::format_expression(
-            expr,
-            self.source(),
-            Rc::clone(&self.interner),
-            self.comments,
-            &self.line_breaks,
-            embed,
-            tsv_ts::TsContext::Svelte,
-        );
+        let formatted = tsv_ts::format_expression(expr, &self.ts_inputs(), embed);
         self.write(&formatted);
 
         // Print any trailing comments between the expression and closing brace
@@ -398,7 +389,7 @@ impl<'a> Printer<'a> {
 
         // Embed for embedded expression context: binary chains use ContinuationIndent style.
         // first_line_offset estimates the column position for width calculations.
-        let context_indent = tsv_lang::TAB_WIDTH;
+        let context_indent = TAB_WIDTH;
         let opening_offset = 5; // typical tag prefix, e.g. `{#if `
         let first_line_offset = context_indent + opening_offset;
         let embed = tsv_lang::EmbedContext {
@@ -410,16 +401,8 @@ impl<'a> Printer<'a> {
         // Build expression doc directly in the shared arena.
         // No suffix_width needed — the surrounding doc tree (closing `}`, etc.)
         // provides natural lookahead via arena_fits_with_lookahead's rest_commands.
-        let expr_doc = tsv_ts::build_expression_doc_with_comments(
-            d,
-            expr,
-            self.source,
-            Rc::clone(&self.interner),
-            &embed,
-            self.comments,
-            &self.line_breaks,
-            tsv_ts::TsContext::Svelte,
-        );
+        let expr_doc =
+            tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embed);
 
         // Build docs for trailing comments (between expression end and span_end)
         let trailing_docs: Vec<DocId> =
@@ -476,7 +459,7 @@ impl<'a> Printer<'a> {
         // In multiline contexts, set up embedded expression context so binary chains
         // use ContinuationIndent style. first_line_offset estimates the column position.
         let embed = if in_multiline_context {
-            let context_indent = tsv_lang::TAB_WIDTH;
+            let context_indent = TAB_WIDTH;
             let first_line_offset = context_indent + opening_offset;
             tsv_lang::EmbedContext {
                 first_line_offset,
@@ -490,28 +473,11 @@ impl<'a> Printer<'a> {
         // Build expression doc tree
         // Assignment expressions need parens in block conditions: {#if (a = b)}
         let expr_doc = if matches!(expr, tsv_ts::Expression::AssignmentExpression(_)) {
-            let inner = tsv_ts::build_expression_doc_with_comments(
-                d,
-                expr,
-                self.source,
-                Rc::clone(&self.interner),
-                &embed,
-                self.comments,
-                &self.line_breaks,
-                tsv_ts::TsContext::Svelte,
-            );
+            let inner =
+                tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embed);
             d.parens(inner)
         } else {
-            tsv_ts::build_expression_doc_with_comments(
-                d,
-                expr,
-                self.source,
-                Rc::clone(&self.interner),
-                &embed,
-                self.comments,
-                &self.line_breaks,
-                tsv_ts::TsContext::Svelte,
-            )
+            tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embed)
         };
 
         // Apply remove_lines() only in INLINE contexts to prevent the condition

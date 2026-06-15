@@ -9,8 +9,6 @@
 //
 // Uses Doc IR for all formatting - build_*_doc methods are the canonical implementations.
 
-use std::rc::Rc;
-
 use crate::ast::internal;
 use crate::printer::Printer;
 use tsv_lang::doc::arena::DocId;
@@ -461,29 +459,12 @@ impl<'a> Printer<'a> {
 
         // Assignment expressions need parens in attribute values: prop={(a = b)}
         if let tsv_ts::ast::internal::Expression::AssignmentExpression(_) = expr {
-            let inner = tsv_ts::build_expression_doc_with_comments(
-                d,
-                expr,
-                self.source,
-                Rc::clone(&self.interner),
-                &embedded,
-                self.comments,
-                &self.line_breaks,
-                tsv_ts::TsContext::Svelte,
-            );
+            let inner =
+                tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embedded);
             return d.parens(inner);
         }
 
-        tsv_ts::build_expression_doc_with_comments(
-            d,
-            expr,
-            self.source,
-            Rc::clone(&self.interner),
-            &embedded,
-            self.comments,
-            &self.line_breaks,
-            tsv_ts::TsContext::Svelte,
-        )
+        tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embedded)
     }
 
     /// Build Doc parts for an expression with optional span for comment lookup: `={expr}`

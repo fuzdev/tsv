@@ -1,6 +1,7 @@
 //! Rendering algorithm for arena-based document trees.
 
 use crate::EmbedContext;
+use crate::config::TAB_WIDTH;
 use std::collections::HashMap;
 
 use super::arena::{ArenaCommand, DocArena, DocId, DocNode};
@@ -33,7 +34,6 @@ fn render_text<R: TextResolver + ?Sized>(
     text: &super::types::DocText,
     output: &mut String,
     pos: &mut usize,
-    tab_width: usize,
     resolver: Option<&R>,
 ) {
     let s = resolve_text(text, resolver);
@@ -42,11 +42,11 @@ fn render_text<R: TextResolver + ?Sized>(
         Some(w) if w == TEXT_WIDTH_HAS_NEWLINE => {
             // Has newline — compute position from last line
             if let Some(last_nl) = s.rfind('\n') {
-                *pos = crate::printing::visual_width(&s[last_nl + 1..], tab_width);
+                *pos = crate::printing::visual_width(&s[last_nl + 1..], TAB_WIDTH);
             }
         }
         Some(w) => *pos += w as usize, // Common path: no visual_width call
-        None => update_pos_for_text(pos, s, tab_width), // Symbol fallback
+        None => update_pos_for_text(pos, s), // Symbol fallback
     }
 }
 
@@ -73,12 +73,10 @@ fn trim_trailing_whitespace(output: &mut String) {
 
 /// Render a line break.
 #[inline]
-#[allow(clippy::too_many_arguments)]
 fn render_line_break(
     kind: LineKind,
     mode: Mode,
     indent_level: usize,
-    base_indent_override: Option<usize>,
     output: &mut String,
     pos: &mut usize,
     render: &RenderConfig,
@@ -96,7 +94,7 @@ fn render_line_break(
             trim_trailing_whitespace(output);
             output.push('\n');
             write_indentation(output, indent_level, render, embed);
-            *pos = line_start_column(indent_level, render, embed, base_indent_override);
+            *pos = line_start_column(indent_level, render, embed);
         }
         true
     } else if kind == LineKind::Normal {
@@ -132,7 +130,6 @@ fn flush_line_suffix<R: TextResolver + ?Sized>(
             render,
             embed,
             resolver,
-            None,
             None,
         );
     }
@@ -289,7 +286,7 @@ pub fn arena_print_doc_with_indent_resolved_preserve_whitespace<R: TextResolver 
     output
 }
 
-/// Test-only entry point: render with explicit width/tab/indent overrides.
+/// Test-only entry point: render with explicit width/indent overrides.
 ///
 /// Production callers should use [`arena_print_doc`] (which uses
 /// [`crate::PRINT_WIDTH`] / [`crate::TAB_WIDTH`] / [`crate::INDENT`]).
@@ -338,7 +335,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
         indent: start_indent_level,
         mode: Mode::Break,
         doc,
-        base_indent_override: None,
     }];
 
     let mut line_suffix: Vec<ArenaCommand> = Vec::new();
@@ -355,7 +351,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
     while let Some(cmd) = commands.pop() {
         match &nodes[cmd.doc.index()] {
             DocNode::Text(t) => {
-                render_text(t, output, pos, render.tab_width, resolver);
+                render_text(t, output, pos, resolver);
             }
 
             DocNode::Line(kind) => {
@@ -372,16 +368,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                         resolver,
                     );
                 }
-                render_line_break(
-                    kind,
-                    cmd.mode,
-                    cmd.indent,
-                    cmd.base_indent_override,
-                    output,
-                    pos,
-                    render,
-                    embed,
-                );
+                render_line_break(kind, cmd.mode, cmd.indent, output, pos, render, embed);
             }
 
             DocNode::Indent(inner) => {
@@ -438,7 +425,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                             Mode::Flat,
                             &commands,
                             remaining_width,
-                            render,
                             embed,
                             resolver,
                         );
@@ -465,7 +451,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                                     Mode::Flat,
                                     &commands,
                                     remaining_width,
-                                    render,
                                     embed,
                                     resolver,
                                 );
@@ -507,7 +492,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                         Mode::Flat,
                         &commands,
                         remaining_width,
-                        render,
                         embed,
                         resolver,
                     );
@@ -532,7 +516,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                     Mode::Flat,
                     &commands,
                     remaining_width,
-                    render,
                     embed,
                     resolver,
                 );
@@ -595,7 +578,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
             DocNode::WithContext { doc, context } => {
                 let inner_doc = *doc;
                 let context = context.clone();
-                let merged_override = context.base_indent_override.or(cmd.base_indent_override);
 
                 if let DocNode::Fill(fill_range) = &nodes[inner_doc.index()] {
                     let parts: Vec<DocId> = fill_range.resolve(children_vec).to_vec();
@@ -604,7 +586,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                         resolver,
                     );
                 } else {
-                    commands.push(cmd.with_base_override(merged_override, inner_doc));
+                    commands.push(cmd.with_doc(inner_doc));
                 }
             }
 
@@ -677,7 +659,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 Mode::Flat,
                 rest_commands,
                 remaining as isize,
-                render,
                 embed,
                 resolver,
             )
@@ -688,7 +669,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 Mode::Flat,
                 &[],
                 available as isize,
-                render,
                 embed,
                 resolver,
             )
@@ -697,8 +677,7 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
         // Case 1: Last item
         if offset + 1 >= parts.len() {
             if !content_fits {
-                let line_start_pos =
-                    line_start_column(indent_level, render, embed, context.base_indent_override);
+                let line_start_pos = line_start_column(indent_level, render, embed);
                 if *pos != line_start_pos {
                     trim_trailing_whitespace(output);
                     output.push('\n');
@@ -716,7 +695,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
-                context.base_indent_override,
             );
             break;
         }
@@ -735,7 +713,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
-                context.base_indent_override,
             );
             let sep_mode = if content_fits {
                 Mode::Flat
@@ -752,7 +729,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
-                context.base_indent_override,
             );
             break;
         }
@@ -764,7 +740,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
             &[content, separator, next_content],
             available,
             Mode::Flat,
-            render,
             embed,
             resolver,
         );
@@ -780,7 +755,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
-                context.base_indent_override,
             );
             render_single_doc(
                 arena,
@@ -792,7 +766,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
-                context.base_indent_override,
             );
         } else if content_fits {
             render_single_doc(
@@ -805,7 +778,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
-                context.base_indent_override,
             );
             render_single_doc(
                 arena,
@@ -817,11 +789,9 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
-                context.base_indent_override,
             );
         } else {
-            let line_start_pos =
-                line_start_column(indent_level, render, embed, context.base_indent_override);
+            let line_start_pos = line_start_column(indent_level, render, embed);
             let at_line_start = *pos == line_start_pos;
 
             if !at_line_start {
@@ -832,7 +802,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                     Mode::Flat,
                     &[],
                     remaining_at_start as isize,
-                    render,
                     embed,
                     resolver,
                 );
@@ -853,7 +822,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                         render,
                         embed,
                         resolver,
-                        context.base_indent_override,
                     );
                     render_single_doc(
                         arena,
@@ -865,7 +833,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                         render,
                         embed,
                         resolver,
-                        context.base_indent_override,
                     );
                 } else {
                     render_single_doc(
@@ -878,7 +845,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                         render,
                         embed,
                         resolver,
-                        context.base_indent_override,
                     );
                     render_single_doc(
                         arena,
@@ -890,7 +856,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                         render,
                         embed,
                         resolver,
-                        context.base_indent_override,
                     );
                 }
             } else {
@@ -904,7 +869,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                     render,
                     embed,
                     resolver,
-                    context.base_indent_override,
                 );
                 render_single_doc(
                     arena,
@@ -916,7 +880,6 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                     render,
                     embed,
                     resolver,
-                    context.base_indent_override,
                 );
             }
         }
@@ -937,7 +900,6 @@ fn render_single_doc<R: TextResolver + ?Sized>(
     render: &RenderConfig,
     embed: &EmbedContext,
     resolver: Option<&R>,
-    base_indent_override: Option<usize>,
 ) {
     let mut line_suffix: Vec<ArenaCommand> = Vec::new();
     render_single_doc_inner(
@@ -951,7 +913,6 @@ fn render_single_doc<R: TextResolver + ?Sized>(
         embed,
         resolver,
         Some(&mut line_suffix),
-        base_indent_override,
     );
     flush_line_suffix(
         arena,
@@ -977,13 +938,11 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
     embed: &EmbedContext,
     resolver: Option<&R>,
     suffix_buffer: Option<&mut Vec<ArenaCommand>>,
-    base_indent_override: Option<usize>,
 ) {
     let mut commands: Vec<ArenaCommand> = vec![ArenaCommand {
         indent: indent_level,
         mode,
         doc,
-        base_indent_override,
     }];
 
     let tracking_suffix = suffix_buffer.is_some();
@@ -1001,7 +960,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
     while let Some(cmd) = commands.pop() {
         match &nodes[cmd.doc.index()] {
             DocNode::Text(t) => {
-                render_text(t, output, pos, render.tab_width, resolver);
+                render_text(t, output, pos, resolver);
             }
 
             DocNode::Line(kind) => {
@@ -1012,16 +971,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                         flush_line_suffix(arena, line_suffix, output, pos, render, embed, resolver);
                     }
                 }
-                render_line_break(
-                    kind,
-                    cmd.mode,
-                    cmd.indent,
-                    cmd.base_indent_override,
-                    output,
-                    pos,
-                    render,
-                    embed,
-                );
+                render_line_break(kind, cmd.mode, cmd.indent, output, pos, render, embed);
             }
 
             DocNode::Indent(inner) => {
@@ -1064,7 +1014,6 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                         Mode::Flat,
                         &commands,
                         remaining,
-                        render,
                         embed,
                         resolver,
                     ) {
@@ -1085,7 +1034,6 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                                 Mode::Flat,
                                 &commands,
                                 remaining,
-                                render,
                                 embed,
                                 resolver,
                             ) {
@@ -1112,7 +1060,6 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                         Mode::Flat,
                         &commands,
                         remaining,
-                        render,
                         embed,
                         resolver,
                     ) {
@@ -1140,7 +1087,6 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                         Mode::Flat,
                         &commands,
                         remaining,
-                        render,
                         embed,
                         resolver,
                     ) {
@@ -1221,13 +1167,10 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                             resolver,
                         );
                     } else {
-                        let merged_override =
-                            context.base_indent_override.or(cmd.base_indent_override);
-                        commands.push(cmd.with_base_override(merged_override, inner_doc));
+                        commands.push(cmd.with_doc(inner_doc));
                     }
                 } else {
-                    let merged_override = context.base_indent_override.or(cmd.base_indent_override);
-                    commands.push(cmd.with_base_override(merged_override, inner_doc));
+                    commands.push(cmd.with_doc(inner_doc));
                 }
             }
 
@@ -1272,22 +1215,16 @@ fn write_indentation(
 }
 
 fn indent_width(level: usize, render: &RenderConfig) -> usize {
-    level * indent_str_width(render.indent, render.tab_width)
+    level * indent_str_width(render.indent)
 }
 
-fn line_start_column(
-    indent_level: usize,
-    render: &RenderConfig,
-    embed: &EmbedContext,
-    base_override: Option<usize>,
-) -> usize {
-    let base = base_override.unwrap_or(embed.base_indent_offset);
-    indent_width(indent_level, render) + base * render.tab_width
+fn line_start_column(indent_level: usize, render: &RenderConfig, embed: &EmbedContext) -> usize {
+    indent_width(indent_level, render) + embed.base_indent_offset * TAB_WIDTH
 }
 
-fn indent_str_width(indent: &str, tab_width: usize) -> usize {
+fn indent_str_width(indent: &str) -> usize {
     indent
         .chars()
-        .map(|ch| if ch == '\t' { tab_width } else { 1 })
+        .map(|ch| if ch == '\t' { TAB_WIDTH } else { 1 })
         .sum()
 }
