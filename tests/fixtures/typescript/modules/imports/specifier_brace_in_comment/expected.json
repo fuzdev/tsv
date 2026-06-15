@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 54,
+	"end": 89,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -25,24 +25,40 @@
 					"column": 16
 				}
 			}
+		},
+		{
+			"type": "Block",
+			"value": " } ",
+			"start": 58,
+			"end": 65,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 14
+				},
+				"end": {
+					"line": 3,
+					"column": 21
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 53,
+		"end": 88,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 44,
+			"end": 79,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 3,
+					"line": 4,
 					"column": 9
 				}
 			},
@@ -181,6 +197,143 @@
 						},
 						"value": "./a",
 						"raw": "'./a'"
+					},
+					"attributes": []
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 45,
+					"end": 78,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 34
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 53,
+							"end": 54,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 9
+								},
+								"end": {
+									"line": 3,
+									"column": 10
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 53,
+								"end": 54,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 9
+									},
+									"end": {
+										"line": 3,
+										"column": 10
+									}
+								},
+								"name": "c"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 53,
+								"end": 54,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 9
+									},
+									"end": {
+										"line": 3,
+										"column": 10
+									}
+								},
+								"name": "c"
+							}
+						},
+						{
+							"type": "ImportSpecifier",
+							"start": 56,
+							"end": 57,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 12
+								},
+								"end": {
+									"line": 3,
+									"column": 13
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 56,
+								"end": 57,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 12
+									},
+									"end": {
+										"line": 3,
+										"column": 13
+									}
+								},
+								"name": "d"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 56,
+								"end": 57,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 12
+									},
+									"end": {
+										"line": 3,
+										"column": 13
+									}
+								},
+								"name": "d"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " } ",
+									"start": 58,
+									"end": 65
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 72,
+						"end": 77,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 28
+							},
+							"end": {
+								"line": 3,
+								"column": 33
+							}
+						},
+						"value": "./b",
+						"raw": "'./b'"
 					},
 					"attributes": []
 				}

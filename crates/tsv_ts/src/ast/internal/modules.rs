@@ -20,6 +20,11 @@ pub struct ExportNamedDeclaration {
     pub specifiers: Vec<ExportSpecifier>,
     /// Re-export source: `export { x } from "y"` or None for local exports
     pub source: Option<Literal>,
+    /// Import attributes: `export { x } from "y" with { type: "json" }`.
+    /// `None` = no `with` clause; `Some([])` = empty `with {}` (preserved,
+    /// matching acorn/prettier). Only a re-export (with `source`) can carry a
+    /// clause (spec: `WithClause` attaches to `export ExportFromClause FromClause`).
+    pub attributes: Option<Vec<ImportAttribute>>,
     /// Export kind: "value" for regular exports, "type" for type-only exports
     pub export_kind: ExportKind,
     pub span: Span,
@@ -71,6 +76,9 @@ pub struct ExportAllDeclaration {
     pub exported: Option<Identifier>,
     /// Module source
     pub source: Literal,
+    /// Import attributes: `export * from "y" with { type: "json" }`.
+    /// `None` = no `with` clause; `Some([])` = empty `with {}`.
+    pub attributes: Option<Vec<ImportAttribute>>,
     /// Export kind: "value" or "type" (for `export type * from`)
     pub export_kind: ExportKind,
     pub span: Span,
@@ -111,8 +119,9 @@ pub struct ImportDeclaration {
     pub specifiers: Vec<ImportSpecifier>,
     /// Module source (string literal)
     pub source: Literal,
-    /// Import attributes: `import x from "y" with { type: "json" }`
-    pub attributes: Vec<ImportAttribute>,
+    /// Import attributes: `import x from "y" with { type: "json" }`.
+    /// `None` = no `with` clause; `Some([])` = empty `with {}`.
+    pub attributes: Option<Vec<ImportAttribute>>,
     /// Import kind: "value" or "type" (for `import type { ... }`)
     pub import_kind: ImportKind,
     pub span: Span,
@@ -157,12 +166,29 @@ pub struct ImportNamespaceSpecifier {
     pub span: Span,
 }
 
-/// Import attribute: `{ type: "json" }`
+/// Import attribute: `{ type: "json" }` or `{ "resolution-mode": "import" }`
 #[derive(Debug, Clone)]
 pub struct ImportAttribute {
-    pub key: Identifier,
+    pub key: ImportAttributeKey,
     pub value: Literal,
     pub span: Span,
+}
+
+/// Import attribute key: a bare identifier (`type`) or a string literal
+/// (`"resolution-mode"`). Per ecma262 `AttributeKey : IdentifierName | StringLiteral`.
+#[derive(Debug, Clone)]
+pub enum ImportAttributeKey {
+    Identifier(Identifier),
+    Literal(Literal),
+}
+
+impl ImportAttributeKey {
+    pub fn span(&self) -> Span {
+        match self {
+            ImportAttributeKey::Identifier(id) => id.span,
+            ImportAttributeKey::Literal(lit) => lit.span,
+        }
+    }
 }
 
 /// TypeScript import equals declaration: `import x = require("y")` or `import x = A.B`

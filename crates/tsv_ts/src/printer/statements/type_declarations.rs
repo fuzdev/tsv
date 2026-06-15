@@ -1297,9 +1297,25 @@ impl<'a> Printer<'a> {
                         d.concat(&param_parts)
                     })
                     .collect();
+                // A comment in the param→`]` gap (`[key: string /* c */]`) trails
+                // the contents inside the brackets, preserved in place. The `]` is
+                // located outside comments so a `]` glyph in that comment isn't
+                // mistaken for it.
+                let close_search = i.parameters.last().map_or(i.span.start, |p| p.span.end);
+                let bracket_close = self.find_char_outside_comments(
+                    close_search,
+                    i.type_annotation.span.start,
+                    b']',
+                );
+                let bracket_inner = match bracket_close
+                    .and_then(|cp| self.build_inline_comments_between_doc_opt(close_search, cp))
+                {
+                    Some(c) => d.concat(&[d.join(param_docs, ", "), c]),
+                    None => d.join(param_docs, ", "),
+                };
                 parts.push(d.group(d.concat(&[
                     d.text("["),
-                    d.indent_softline(d.join(param_docs, ", ")),
+                    d.indent_softline(bracket_inner),
                     d.softline(),
                     d.text("]"),
                 ])));

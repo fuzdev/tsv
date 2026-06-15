@@ -287,23 +287,31 @@ impl<'a> Printer<'a> {
             TSType::IndexedAccess(i) => {
                 let object_doc = self.build_type_doc(&i.object_type);
                 let needs_parens = type_needs_parens_for_indexed_access_object(&i.object_type);
-                // Comments between `[` and the index type
                 let index_type_start = i.index_type.span().start;
-                // Find `[` position: after object type end (or after `)` for parens case)
                 let bracket_area_start = i.object_type.span().end;
-                let bracket_pos = self.source
-                    [bracket_area_start as usize..index_type_start as usize]
-                    .find('[')
-                    .map(|p| bracket_area_start + p as u32 + 1); // +1 for after `[`
-                let index_comments = bracket_pos.map(|bp| {
-                    self.build_comments_between(bp, index_type_start, CommentSpacing::Trailing)
+                // The access `[`, located outside comments so a `[` glyph inside a
+                // comment before it (`A /* [ */[K]`) isn't mistaken for the bracket.
+                let bracket_open =
+                    self.find_char_outside_comments(bracket_area_start, index_type_start, b'[');
+                // Comments in the object→`[` gap (`A /* c */[K]`) trail the object
+                // in place; comments in the `[`→index gap (`A[/* c */ K]`) lead the
+                // index — both preserved where the user placed them.
+                let object_comments = bracket_open.and_then(|bp| {
+                    self.build_inline_comments_between_doc_opt(bracket_area_start, bp)
+                });
+                let index_comments = bracket_open.map(|bp| {
+                    self.build_comments_between(bp + 1, index_type_start, CommentSpacing::Trailing)
                 });
                 let index_doc = self.build_type_doc(&i.index_type);
                 let mut parts = if needs_parens {
-                    vec![d.text("("), object_doc, d.text(")[")]
+                    vec![d.text("("), object_doc, d.text(")")]
                 } else {
-                    vec![object_doc, d.text("[")]
+                    vec![object_doc]
                 };
+                if let Some(c) = object_comments {
+                    parts.push(c);
+                }
+                parts.push(d.text("["));
                 if let Some(c) = index_comments {
                     parts.push(c);
                 }
