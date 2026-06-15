@@ -194,75 +194,27 @@ impl<'a> Printer<'a> {
                 // Comments inside braces are captured in from-to-source below
                 parts.push(d.text("{}"));
             } else {
-                // Find the opening and closing brace positions.
-                // Use forward search from keyword end to skip `{` inside comments.
-                let first_start = decl.specifiers[0].span.start;
-                let export_kw_end = self.export_header_end(decl, first_start);
-                let brace_start = self
-                    .find_char_outside_comments(export_kw_end, first_start, b'{')
-                    .unwrap_or(0);
-
-                // Comment between the `type` keyword and `{` (named specifiers):
-                // preserve it in place before the braces — prettier relocates it
-                // into the braces as the first specifier's leading comment. Mirrors
-                // the import side.
-                if is_type_export
-                    && let Some(comments_doc) =
-                        self.build_rhs_comments_opt(export_kw_end, brace_start)
-                {
-                    parts.push(comments_doc);
-                }
-
-                let last_spec_end = decl.specifiers.last().map_or(0, |s| s.span.end);
-                let semi_or_source = decl.source.as_ref().map_or(decl.span.end, |s| s.span.start);
-                let brace_close = self.source[last_spec_end as usize..semi_or_source as usize]
-                    .find('}')
-                    .map_or(semi_or_source, |p| last_spec_end + p as u32);
-                close_brace_end = brace_close + 1;
-
-                // Check for expanding comments (force multiline):
-                // line comments, or own-line single-line block comments
-                let brace_span = tsv_lang::Span::new(brace_start, brace_close + 1);
-                let has_expanding_comments = self.has_line_comments_in_delimited_list(
+                // Named specifiers: comment-aware braced list. `close_brace_end`
+                // is the offset past `}`, for the trailing pre-`;` comment scan.
+                let kw_end = self.export_header_end(decl, decl.specifiers[0].span.start);
+                let bound = decl.source.as_ref().map_or(decl.span.end, |s| s.span.start);
+                close_brace_end = self.push_braced_specifier_list(
+                    &mut parts,
                     &decl.specifiers,
+                    kw_end,
+                    bound,
+                    is_type_export,
                     |s| s.span,
-                    brace_close,
-                ) || self
-                    .has_line_comments_between(brace_start + 1, decl.specifiers[0].span.start)
-                    || self.has_own_line_block_comments_in_bracket_list(
-                        brace_span,
-                        &decl.specifiers,
-                        |s| s.span,
-                    );
-
-                if has_expanding_comments {
-                    // Comment-aware multiline path. `Some(first_start)` keeps a
-                    // same-line `{` comment on the brace line (divergence from
-                    // prettier, which relocates it as the first specifier's
-                    // leading comment).
-                    parts.push(self.build_braced_hardline_comma_list(
-                        &decl.specifiers,
-                        brace_start,
-                        brace_close,
-                        Some(first_start),
-                        |s| s.span,
-                        |s| self.build_export_specifier_doc(s, is_type_export),
-                    ));
-                } else {
-                    // No expanding comments: group-based wrapping with comment splitting
-                    let spec_doc = self.build_softline_comma_list(
-                        &decl.specifiers,
-                        brace_start,
-                        brace_close,
-                        |s| s.span,
-                        |s| self.build_export_specifier_doc(s, is_type_export),
-                    );
-
-                    parts.push(self.braced_softline_group(spec_doc));
-                }
+                    |s| self.build_export_specifier_doc(s, is_type_export),
+                );
             }
 
-            if let Some(source) = &decl.source {
+            // Comments between the last content token (attribute `}`, source
+            // literal, or closing `}`) and the terminating `;` — preserved where
+            // the user placed them (prettier relocates no-`from` ones inside the
+            // braces). Emitted outside the content group so a line-comment break
+            // doesn't expand the braces.
+            let content_end = if let Some(source) = &decl.source {
                 let empty_brace_start = if decl.specifiers.is_empty() {
                     Some(self.export_header_end(decl, source.span.start))
                 } else {
@@ -282,13 +234,16 @@ impl<'a> Printer<'a> {
                     empty_brace_start,
                     from_content_end,
                 ));
-            }
-
-            // Comments between the closing `}` (or source literal) and the
-            // terminating `;` — preserved where the user placed them (prettier
-            // relocates no-`from` ones inside the braces). Emitted outside the
-            // content group so a line-comment break doesn't expand the braces.
-            let content_end = decl.source.as_ref().map_or(close_brace_end, |s| s.span.end);
+                // Import attributes: `export { x } from "y" with { type: "json" }`
+                self.push_import_attributes_clause(
+                    &mut parts,
+                    decl.attributes.as_deref(),
+                    source.span.end,
+                    decl.span.end,
+                )
+            } else {
+                close_brace_end
+            };
             self.finish_with_pre_semi(parts, content_end, decl.span.end, true)
         }
     }
@@ -381,7 +336,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let is_type = decl.export_kind == internal::ExportKind::Type;
-        let export_end = decl.span.start + 6; // "export".len()
+        let export_end = decl.span.start + MODULE_KW_LEN;
         // The `*` token, after the keyword(s) and before any `as`/`from`.
         let star_limit = decl
             .exported
@@ -434,8 +389,16 @@ impl<'a> Printer<'a> {
         }
 
         parts.push(self.build_from_source_doc(decl.span.start, &decl.source, None, None));
-        // Comments between the source literal and `;` — preserved in place.
-        self.finish_with_pre_semi(parts, decl.source.span.end, decl.span.end, false)
+        // Import attributes: `export * from "y" with { type: "json" }`.
+        // Returns the offset past the attribute `}` (or source) for the trailing
+        // pre-`;` comment scan, preserved in place.
+        let content_end = self.push_import_attributes_clause(
+            &mut parts,
+            decl.attributes.as_deref(),
+            decl.source.span.end,
+            decl.span.end,
+        );
+        self.finish_with_pre_semi(parts, content_end, decl.span.end, false)
     }
 
     /// Check if an import declaration has empty named braces `{}` in source.
@@ -463,14 +426,23 @@ impl<'a> Printer<'a> {
         };
         if let Some(from_pos) = from_pos {
             let before_from = &text[..from_pos];
-            // Check for empty braces (with any amount of whitespace/comments inside)
-            if let Some(brace_start) = before_from.rfind('{') {
-                let abs_brace = decl_start + brace_start as u32;
-                if self.is_pos_inside_comment(abs_brace) {
-                    return false;
-                }
-                if let Some(brace_end) = before_from[brace_start..].find('}') {
-                    let inside = &before_from[brace_start + 1..brace_start + brace_end];
+            // Check for empty braces (with any amount of whitespace/comments inside).
+            // Find the opening `{` outside comments — a naive rfind('{') matches a `{`
+            // glyph inside an enclosed comment (`{/* { */}`), landing on the wrong brace
+            // and misclassifying the named braces (which silently drops `{}` + `from`).
+            if let Some(brace_start) =
+                find_char_skipping_comments(before_from.as_bytes(), 0, before_from.len(), b'{')
+            {
+                // Likewise find the closing `}` outside comments — a naive find('}')
+                // matches a `}` glyph inside the enclosed comment (`{/* } */}`),
+                // truncating `inside` mid-comment and misclassifying as non-empty.
+                if let Some(brace_end) = find_char_skipping_comments(
+                    before_from.as_bytes(),
+                    brace_start,
+                    before_from.len(),
+                    b'}',
+                ) {
+                    let inside = &before_from[brace_start + 1..brace_end];
                     return is_only_whitespace_and_comments(inside);
                 }
             }
@@ -500,12 +472,8 @@ impl<'a> Printer<'a> {
     /// specifier start when a tighter bound is needed to avoid matching `type`
     /// inside the specifier list.
     fn import_header_end(&self, decl: &internal::ImportDeclaration, search_end: u32) -> u32 {
-        if decl.import_kind == internal::ImportKind::Type {
-            self.find_keyword_end("type", decl.span.start, search_end)
-                .unwrap_or(decl.span.start + MODULE_TYPE_KW_LEN)
-        } else {
-            decl.span.start + MODULE_KW_LEN
-        }
+        let is_type = decl.import_kind == internal::ImportKind::Type;
+        self.module_header_end(is_type, decl.span.start, search_end)
     }
 
     /// Position just past the leading keyword(s) of an export named declaration:
@@ -514,11 +482,21 @@ impl<'a> Printer<'a> {
     /// `export`. `search_end` bounds the `type` scan — the source/`;`, or the first
     /// specifier start to avoid matching `type` inside the specifier list.
     fn export_header_end(&self, decl: &internal::ExportNamedDeclaration, search_end: u32) -> u32 {
-        if decl.export_kind == internal::ExportKind::Type {
-            self.find_keyword_end("type", decl.span.start, search_end)
-                .unwrap_or(decl.span.start + MODULE_TYPE_KW_LEN)
+        let is_type = decl.export_kind == internal::ExportKind::Type;
+        self.module_header_end(is_type, decl.span.start, search_end)
+    }
+
+    /// Position just past a module declaration's leading keyword(s): after the
+    /// `type` keyword for a type-only import/re-export (located by scanning, so a
+    /// comment in the `import`/`export`→`type` gap doesn't throw off the offset),
+    /// else after the 6-char `import`/`export`. `search_end` bounds the `type`
+    /// scan. Shared by [`Self::import_header_end`] and [`Self::export_header_end`].
+    fn module_header_end(&self, is_type: bool, span_start: u32, search_end: u32) -> u32 {
+        if is_type {
+            self.find_keyword_end("type", span_start, search_end)
+                .unwrap_or(span_start + MODULE_TYPE_KW_LEN)
         } else {
-            decl.span.start + MODULE_KW_LEN
+            span_start + MODULE_KW_LEN
         }
     }
 
@@ -726,7 +704,10 @@ impl<'a> Printer<'a> {
                 // default end and `{` to before the comma: `import x /* c */, {a}`
                 let prev_end = namespace_spec.map_or(default_spec_end, |ns| ns.span.end);
                 let brace_or_source = if named_specs.is_empty() {
-                    // Empty braces: find `{` before source
+                    // Empty braces: find `{` before source.
+                    // TODO: this naive find('{') matches a `{` inside a comment, and the
+                    // surrounding default+empty-braces comment path has a separate
+                    // comment-duplication bug — both deferred (harden together).
                     self.source[prev_end as usize..decl.source.span.start as usize]
                         .find('{')
                         .map_or(decl.source.span.start, |p| prev_end + p as u32)
@@ -754,69 +735,18 @@ impl<'a> Printer<'a> {
                 }
                 parts.push(d.text("{}"));
             } else {
-                // Find the opening and closing brace positions.
-                // Use forward search from keyword end to skip `{` inside comments.
-                let import_kw_end = self.import_header_end(decl, named_specs[0].span.start);
-                let brace_start = self
-                    .find_char_outside_comments(import_kw_end, named_specs[0].span.start, b'{')
-                    .unwrap_or(0);
-
-                // Comment between the `type` keyword and `{` (named specifiers):
-                // preserve it in place before the braces — prettier relocates it
-                // into the braces as the first specifier's leading comment. A line
-                // comment breaks before `{` but leaves the specifier group inline.
-                if is_type_import
-                    && let Some(comments_doc) =
-                        self.build_rhs_comments_opt(import_kw_end, brace_start)
-                {
-                    parts.push(comments_doc);
-                }
-
-                let last_spec_end = named_specs.last().map_or(0, |s| s.span.end);
-                let brace_close = self.source
-                    [last_spec_end as usize..decl.source.span.start as usize]
-                    .find('}')
-                    .map_or(decl.source.span.start, |p| last_spec_end + p as u32);
-                from_content_end = Some(brace_close + 1);
-
-                // Check for expanding comments (force multiline):
-                // line comments, or own-line single-line block comments
-                let brace_span = tsv_lang::Span::new(brace_start, brace_close + 1);
-                let has_expanding_comments =
-                    self.has_line_comments_in_delimited_list(&named_specs, |s| s.span, brace_close)
-                        || self
-                            .has_line_comments_between(brace_start + 1, named_specs[0].span.start)
-                        || self.has_own_line_block_comments_in_bracket_list(
-                            brace_span,
-                            &named_specs,
-                            |s| s.span,
-                        );
-
-                if has_expanding_comments {
-                    // Comment-aware multiline path. `Some(first)` keeps a
-                    // same-line `{` comment on the brace line (divergence from
-                    // prettier, which relocates it as the first specifier's
-                    // leading comment).
-                    parts.push(self.build_braced_hardline_comma_list(
-                        &named_specs,
-                        brace_start,
-                        brace_close,
-                        Some(named_specs[0].span.start),
-                        |s| s.span,
-                        |s| self.build_import_specifier_doc(s, is_type_import),
-                    ));
-                } else {
-                    // No expanding comments: group-based wrapping with comment splitting
-                    let spec_doc = self.build_softline_comma_list(
-                        &named_specs,
-                        brace_start,
-                        brace_close,
-                        |s| s.span,
-                        |s| self.build_import_specifier_doc(s, is_type_import),
-                    );
-
-                    parts.push(self.braced_softline_group(spec_doc));
-                }
+                // Named specifiers: comment-aware braced list. `from_content_end`
+                // is the offset past `}`, for the `}`→`from` gap comment scan.
+                let kw_end = self.import_header_end(decl, named_specs[0].span.start);
+                from_content_end = Some(self.push_braced_specifier_list(
+                    &mut parts,
+                    &named_specs,
+                    kw_end,
+                    decl.source.span.start,
+                    is_type_import,
+                    |s| s.span,
+                    |s| self.build_import_specifier_doc(s, is_type_import),
+                ));
             }
         }
 
@@ -849,81 +779,210 @@ impl<'a> Printer<'a> {
             parts.push(self.build_literal_doc(&decl.source));
         }
 
-        // Add import attributes: `with { type: "json" }`
-        // PR #17329 (prettier 3.7): Break attributes across lines when long
-        if !decl.attributes.is_empty() {
-            // Find the `with` keyword and the opening brace (forward search skips
-            // `{`/keyword text inside comments).
-            let first_attr_start = decl.attributes[0].span.start;
-            let with_end = self
-                .find_keyword_end("with", decl.source.span.end, first_attr_start)
-                .unwrap_or(decl.source.span.end);
-            let with_start = with_end - "with".len() as u32;
-            let brace_start = self
-                .find_char_outside_comments(with_end, first_attr_start, b'{')
-                .unwrap_or(0);
+        // Add import attributes: `with { type: "json" }`. Returns the offset
+        // past the attribute `}` (or source literal) — the anchor for the
+        // trailing pre-`;` comment scan, preserved where the user placed it.
+        // Emitted outside the content group (see export above).
+        let content_end = self.push_import_attributes_clause(
+            &mut parts,
+            decl.attributes.as_deref(),
+            decl.source.span.end,
+            decl.span.end,
+        );
+        self.finish_with_pre_semi(parts, content_end, decl.span.end, true)
+    }
 
-            // Comments in the attributes header — source→`with` and `with`→`{` —
-            // preserved in place. Prettier keeps a source→`with` block in place but
-            // floats a line past `;`, and relocates a `with`→`{` block to before
-            // `with`. A block trails inline; a line forces the next token onto a new
-            // line. See conformance_prettier.md §Comment relocation.
-            self.push_gap_comment_keyword(&mut parts, decl.source.span.end, with_start, "with");
-            // `with`→`{` gap; the brace group below emits the `{` itself.
-            self.push_gap_comment(&mut parts, with_end, brace_start);
+    /// Append the `with { … }` import-attributes clause to `parts`, if any, and
+    /// return the byte offset just past the clause's closing `}` — the anchor for
+    /// the caller's trailing pre-`;` comment scan (`source_end` when there is no
+    /// `with` clause).
+    ///
+    /// Shared by the import declaration and the two re-export hosts
+    /// (`export { … } from …` and `export * from …`). `attributes` is `None`
+    /// when there is no `with` clause (nothing emitted) and `Some(_)` when one
+    /// is present — `Some([])` emits an empty `with {}` (preserved to match
+    /// acorn/prettier). `source_end` is the byte offset just past the source
+    /// string literal — where the `with` keyword search begins; `stmt_end` is
+    /// the declaration's span end (the `;`). PR #17329 (prettier 3.7): break
+    /// attributes across lines when long.
+    fn push_import_attributes_clause(
+        &self,
+        parts: &mut Vec<DocId>,
+        attributes: Option<&[internal::ImportAttribute]>,
+        source_end: u32,
+        stmt_end: u32,
+    ) -> u32 {
+        let Some(attributes) = attributes else {
+            return source_end;
+        };
+        let d = self.d();
+        // Find the `with` keyword and the opening brace (forward search skips
+        // `{`/keyword text inside comments). The search upper bound is the first
+        // attribute, or the statement end for an empty `with {}`.
+        let header_bound = attributes.first().map_or(stmt_end, |a| a.span.start);
+        let with_end = self
+            .find_keyword_end("with", source_end, header_bound)
+            .unwrap_or(source_end);
+        let with_start = with_end - "with".len() as u32;
+        let brace_start = self
+            .find_char_outside_comments(with_end, header_bound, b'{')
+            .unwrap_or(0);
+        // The closing `}`: the first `}` (outside comments) at or after the last
+        // attribute — or after the opening `{` for an empty `with {}`. Returned
+        // (plus one) as the content end for the trailing comment scan.
+        let close_search_start = attributes.last().map_or(brace_start, |a| a.span.end);
+        let brace_close = self.close_brace_offset(close_search_start, stmt_end);
 
-            // Check for line comments between/around attributes (force multiline)
-            let has_line_comments = self.has_line_comments_in_delimited_list(
-                &decl.attributes,
-                |a| a.span,
-                decl.span.end,
-            ) || self
-                .has_line_comments_between(brace_start + 1, decl.attributes[0].span.start);
+        // Comments in the attributes header — source→`with` and `with`→`{` —
+        // preserved in place. Prettier keeps a source→`with` block in place but
+        // floats a line past `;`, and relocates a `with`→`{` block to before
+        // `with`. A block trails inline; a line forces the next token onto a new
+        // line. See conformance_prettier.md §Comment relocation.
+        self.push_gap_comment_keyword(parts, source_end, with_start, "with");
+        // `with`→`{` gap; the brace group below emits the `{` itself.
+        self.push_gap_comment(parts, with_end, brace_start);
 
-            if has_line_comments {
-                // `None`: the import-attribute `with {…}` brace keeps relocating
-                // a same-line comment (separate, rarer delimiter — scoped out).
-                parts.push(self.build_braced_hardline_comma_list(
-                    &decl.attributes,
-                    brace_start,
-                    decl.span.end,
-                    None,
-                    |a| a.span,
-                    |a| self.build_import_attribute_doc(a),
-                ));
-            } else {
-                let last_attr_end = decl.attributes.last().map_or(0, |a| a.span.end);
-                let brace_close_pos = self.source[last_attr_end as usize..decl.span.end as usize]
-                    .find('}')
-                    .map_or(decl.span.end, |p| last_attr_end + p as u32);
-
-                let attr_doc = self.build_softline_comma_list(
-                    &decl.attributes,
-                    brace_start,
-                    brace_close_pos,
-                    |a| a.span,
-                    |a| self.build_import_attribute_doc(a),
-                );
-
-                // Own group so the braces fit independently of the outer statement —
-                // a preserved header line comment (source→`with` / `with`→`{`) forces
-                // the outer group to break but must not expand inline attributes.
-                parts.push(self.braced_softline_group(attr_doc));
+        // Empty `with {}` — preserved (acorn/prettier keep it). A comment between
+        // the braces is kept in place (`with {/* c */}`); prettier instead
+        // relocates it before `with` — a comment-position divergence, like the
+        // `with`→`{` gap. See attributes_empty_comment_prettier_divergence.
+        if attributes.is_empty() {
+            let mut inner = vec![d.text("{")];
+            let mut last_was_line = false;
+            let mut any_comment = false;
+            for comment in comments_in_range(self.comments, brace_start + 1, brace_close) {
+                if any_comment {
+                    inner.push(d.text(" "));
+                }
+                inner.push(self.build_comment_doc(comment));
+                last_was_line = !comment.is_block;
+                any_comment = true;
             }
+            // A trailing line comment would swallow the `}`; push it to a new line.
+            if last_was_line {
+                inner.push(d.hardline());
+            }
+            inner.push(d.text("}"));
+            parts.push(d.concat(&inner));
+            return brace_close + 1;
         }
 
-        // Comments between the last content token (source literal, or attribute
-        // `}` if present) and the terminating `;` — preserved where the user
-        // placed them. Emitted outside the content group (see export above).
-        let content_end = if decl.attributes.is_empty() {
-            decl.source.span.end
+        // Check for line comments between/around attributes (force multiline)
+        let has_line_comments =
+            self.has_line_comments_in_delimited_list(attributes, |a| a.span, stmt_end)
+                || self.has_line_comments_between(brace_start + 1, attributes[0].span.start);
+
+        if has_line_comments {
+            // `None`: the import-attribute `with {…}` brace keeps relocating
+            // a same-line comment (separate, rarer delimiter — scoped out).
+            parts.push(self.build_braced_hardline_comma_list(
+                attributes,
+                brace_start,
+                stmt_end,
+                None,
+                |a| a.span,
+                |a| self.build_import_attribute_doc(a),
+            ));
         } else {
-            let last_attr_end = decl.attributes.last().map_or(0, |a| a.span.end);
-            self.source[last_attr_end as usize..decl.span.end as usize]
-                .find('}')
-                .map_or(decl.span.end, |p| last_attr_end + p as u32 + 1)
-        };
-        self.finish_with_pre_semi(parts, content_end, decl.span.end, true)
+            let attr_doc = self.build_softline_comma_list(
+                attributes,
+                brace_start,
+                brace_close,
+                |a| a.span,
+                |a| self.build_import_attribute_doc(a),
+            );
+
+            // Own group so the braces fit independently of the outer statement —
+            // a preserved header line comment (source→`with` / `with`→`{`) forces
+            // the outer group to break but must not expand inline attributes.
+            parts.push(self.braced_softline_group(attr_doc));
+        }
+        brace_close + 1
+    }
+
+    /// The source offset of a closing `}` — the first `}` (outside comments, so a
+    /// `}` inside a trailing comment is skipped) at or after `search_start`,
+    /// bounded by `bound` (the fallback when the brace can't be located). Shared
+    /// by the named-specifier brace scans (import/export) and the attribute clause.
+    fn close_brace_offset(&self, search_start: u32, bound: u32) -> u32 {
+        self.find_char_outside_comments(search_start, bound, b'}')
+            .unwrap_or(bound)
+    }
+
+    /// Render a braced, comma-separated specifier list (`{a, b as c}`) with
+    /// comment-aware wrapping, push the doc onto `parts`, and return the offset
+    /// just past the closing `}` — the caller's trailing-comment anchor.
+    ///
+    /// Shared by import and export named specifiers (which differed only in the
+    /// item type and per-item doc builder). `kw_end` is the offset past the
+    /// `import`/`export [type]` header, where the `{` search begins; `bound`
+    /// caps the brace scans (the source-literal start, or the `;` for a local
+    /// `export {…}`). When `is_type`, a comment in the `type`→`{` gap is preserved
+    /// in place (prettier relocates it into the braces as the first specifier's
+    /// leading comment).
+    // Two closures (span + per-item doc) plus positional context — inherent to a
+    // generic list builder; sibling `build_braced_hardline_comma_list` is at 7.
+    #[allow(clippy::too_many_arguments)]
+    fn push_braced_specifier_list<T>(
+        &self,
+        parts: &mut Vec<DocId>,
+        specifiers: &[T],
+        kw_end: u32,
+        bound: u32,
+        is_type: bool,
+        get_span: impl Fn(&T) -> tsv_lang::Span,
+        build_item: impl Fn(&T) -> DocId,
+    ) -> u32 {
+        debug_assert!(
+            !specifiers.is_empty(),
+            "push_braced_specifier_list requires ≥1 specifier; empty `{{}}` is handled separately"
+        );
+        // Forward search from the header skips a `{` inside comments.
+        let first_start = get_span(&specifiers[0]).start;
+        let brace_start = self
+            .find_char_outside_comments(kw_end, first_start, b'{')
+            .unwrap_or(0);
+
+        if is_type && let Some(comments_doc) = self.build_rhs_comments_opt(kw_end, brace_start) {
+            parts.push(comments_doc);
+        }
+
+        let last_spec_end = specifiers.last().map_or(0, |s| get_span(s).end);
+        let brace_close = self.close_brace_offset(last_spec_end, bound);
+
+        // Expanding comments (line comments, or own-line single-line block
+        // comments) force the multiline path.
+        let brace_span = tsv_lang::Span::new(brace_start, brace_close + 1);
+        let has_expanding_comments =
+            self.has_line_comments_in_delimited_list(specifiers, &get_span, brace_close)
+                || self.has_line_comments_between(brace_start + 1, first_start)
+                || self
+                    .has_own_line_block_comments_in_bracket_list(brace_span, specifiers, &get_span);
+
+        if has_expanding_comments {
+            // `Some(first_start)` keeps a same-line `{` comment on the brace line
+            // (divergence from prettier, which relocates it as the first
+            // specifier's leading comment).
+            parts.push(self.build_braced_hardline_comma_list(
+                specifiers,
+                brace_start,
+                brace_close,
+                Some(first_start),
+                &get_span,
+                &build_item,
+            ));
+        } else {
+            // No expanding comments: group-based wrapping with comment splitting.
+            let spec_doc = self.build_softline_comma_list(
+                specifiers,
+                brace_start,
+                brace_close,
+                &get_span,
+                &build_item,
+            );
+            parts.push(self.braced_softline_group(spec_doc));
+        }
+        brace_close + 1
     }
 
     /// Build doc for `import x = require("y")` or `import x = A.B`
@@ -1153,10 +1212,10 @@ impl<'a> Printer<'a> {
         );
 
         let comment_search_start = if let Some(search_start) = empty_brace_search_start {
-            // Include comments from inside empty braces (relocated after "from")
-            self.source[search_start as usize..from_end as usize]
-                .find('{')
-                .map_or(from_end, |p| search_start + p as u32 + 1)
+            // Include comments from inside empty braces (relocated after "from").
+            // Locate `{` outside comments so a `{` glyph in a comment isn't mistaken for it.
+            self.find_char_outside_comments(search_start, from_end, b'{')
+                .map_or(from_end, |p| p + 1)
         } else {
             from_end
         };
@@ -1404,12 +1463,30 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
+    /// Build doc for an import attribute key: a bare identifier emits verbatim;
+    /// a string-literal key follows prettier's `quoteProps: as-needed` — quotes
+    /// are stripped when the value is a valid identifier with no escapes
+    /// (`'type'` → `type`), else kept and normalized (`'resolution-mode'`).
+    fn build_import_attribute_key_doc(&self, key: &internal::ImportAttributeKey) -> DocId {
+        match key {
+            internal::ImportAttributeKey::Identifier(id) => self.d().symbol(id.name.to_u32()),
+            internal::ImportAttributeKey::Literal(lit) => {
+                if let internal::LiteralValue::String { content, .. } = &lit.value {
+                    self.build_string_literal_key_doc(lit, content)
+                } else {
+                    // Attribute keys are only identifiers or string literals.
+                    self.build_literal_doc(lit)
+                }
+            }
+        }
+    }
+
     /// Build doc for a single import attribute: `key: value`
     ///
     /// Handles comments between key, `:`, and value.
     fn build_import_attribute_doc(&self, attr: &internal::ImportAttribute) -> DocId {
         let d = self.d();
-        let key_end = attr.key.span.end;
+        let key_end = attr.key.span().end;
         let value_start = attr.value.span.start;
 
         // Check for comments between key and value (around the `:`)
@@ -1420,7 +1497,7 @@ impl<'a> Printer<'a> {
         if !has_comments {
             // Fast path: no comments
             return d.concat(&[
-                d.symbol(attr.key.name.to_u32()),
+                self.build_import_attribute_key_doc(&attr.key),
                 d.text(": "),
                 self.build_literal_doc(&attr.value),
             ]);
@@ -1436,7 +1513,7 @@ impl<'a> Printer<'a> {
         )
         .expect("colon must exist in import attribute") as u32;
 
-        let mut parts = vec![d.symbol(attr.key.name.to_u32())];
+        let mut parts = vec![self.build_import_attribute_key_doc(&attr.key)];
 
         // Comments between key and `:`
         self.append_trailing_inline_block_comments(&mut parts, key_end, colon_pos);

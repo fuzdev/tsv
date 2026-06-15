@@ -322,13 +322,26 @@ impl<'a> Printer<'a> {
             })
             .collect();
 
+        // The closing `]`, located outside comments so a `]` glyph inside a
+        // comment before it (`[key: string /* ] */]`) isn't mistaken for it.
+        let search_start = idx.parameters.last().map_or(idx.span.start, |p| p.span.end);
+        let bracket_close_pos = self.find_char_outside_comments(search_start, idx.span.end, b']');
+
         // Build `[key: type]` as a group that can break when key type is long
         // Flat: [key: type]
         // Break: [\n\tkey: type\n]
+        // A comment in the param→`]` gap (`[key: string /* c */]`) trails the
+        // contents inside the brackets, preserved in place.
         let bracket_contents = d.join(param_docs, ", ");
+        let bracket_inner = match bracket_close_pos
+            .and_then(|cp| self.build_inline_comments_between_doc_opt(search_start, cp))
+        {
+            Some(comment) => d.concat(&[bracket_contents, comment]),
+            None => bracket_contents,
+        };
         let bracket_group = d.group(d.concat(&[
             d.text("["),
-            d.indent_softline(bracket_contents),
+            d.indent_softline(bracket_inner),
             d.softline(),
             d.text("]"),
         ]));
@@ -336,10 +349,6 @@ impl<'a> Printer<'a> {
 
         // Handle comments between `]` and `:` of value type annotation
         // Only search up to the colon position, not the type start
-        let search_start = idx.parameters.last().map_or(idx.span.start, |p| p.span.end);
-        let bracket_close_pos = self.source[search_start as usize..]
-            .find(']')
-            .map(|p| search_start + p as u32);
         let val_colon_pos = idx.type_annotation.span.start;
         let val_colon_end = val_colon_pos + 1;
         let val_type_start = idx.type_annotation.type_annotation.span().start;

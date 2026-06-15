@@ -1,0 +1,252 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 110,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 109,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 10,
+					"end": 36,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 27
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 17,
+							"end": 18,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 8
+								},
+								"end": {
+									"line": 2,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 17,
+								"end": 18,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 8
+									},
+									"end": {
+										"line": 2,
+										"column": 9
+									}
+								},
+								"name": "a"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 24,
+						"end": 27,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 15
+							},
+							"end": {
+								"line": 2,
+								"column": 18
+							}
+						},
+						"value": "a",
+						"raw": "'a'"
+					},
+					"attributes": []
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 38,
+					"end": 66,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 29
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 46,
+							"end": 47,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 9
+								},
+								"end": {
+									"line": 3,
+									"column": 10
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 46,
+								"end": 47,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 9
+									},
+									"end": {
+										"line": 3,
+										"column": 10
+									}
+								},
+								"name": "b"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 46,
+								"end": 47,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 9
+									},
+									"end": {
+										"line": 3,
+										"column": 10
+									}
+								},
+								"name": "b"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 54,
+						"end": 57,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 17
+							},
+							"end": {
+								"line": 3,
+								"column": 20
+							}
+						},
+						"value": "b",
+						"raw": "'b'"
+					},
+					"attributes": []
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 68,
+					"end": 99,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 32
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportNamespaceSpecifier",
+							"start": 75,
+							"end": 81,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 8
+								},
+								"end": {
+									"line": 4,
+									"column": 14
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 80,
+								"end": 81,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 13
+									},
+									"end": {
+										"line": 4,
+										"column": 14
+									}
+								},
+								"name": "c"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 87,
+						"end": 90,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 20
+							},
+							"end": {
+								"line": 4,
+								"column": 23
+							}
+						},
+						"value": "c",
+						"raw": "'c'"
+					},
+					"attributes": []
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -27,6 +27,12 @@
 	// c2
 	'h';
 
+	// empty braces enclosing a comment with a `}` glyph (relocated after from)
+	import {} from /* } */ 'j';
+
+	// empty braces enclosing a comment with a `{` glyph (relocated after from)
+	import {} from /* { */ 'k';
+
 	// block comment between from and source (with specifiers)
 	import {a} from /* c */ 'i';
 </script>

@@ -109,21 +109,29 @@ pub(in crate::ast) fn convert_import_attribute(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::ImportAttribute {
+    let key = match &attr.key {
+        internal::ImportAttributeKey::Identifier(id) => {
+            public::ImportAttributeKey::Identifier(public::Identifier {
+                node_type: "Identifier".to_string(),
+                start: id.span.start,
+                end: id.span.end,
+                loc: create_location(id.span, loc, offset),
+                name: interner.resolve_infallible(id.name).to_string(),
+                optional: false,
+                type_annotation: None,
+                decorators: Vec::new(),
+            })
+        }
+        internal::ImportAttributeKey::Literal(lit) => {
+            public::ImportAttributeKey::Literal(convert_literal(lit, source, loc, offset))
+        }
+    };
     public::ImportAttribute {
         node_type: "ImportAttribute".to_string(),
         start: attr.span.start,
         end: attr.span.end,
         loc: create_location(attr.span, loc, offset),
-        key: public::Identifier {
-            node_type: "Identifier".to_string(),
-            start: attr.key.span.start,
-            end: attr.key.span.end,
-            loc: create_location(attr.key.span, loc, offset),
-            name: interner.resolve_infallible(attr.key.name).to_string(),
-            optional: false,
-            type_annotation: None,
-            decorators: Vec::new(),
-        },
+        key,
         value: convert_literal(&attr.value, source, loc, offset),
     }
 }

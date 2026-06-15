@@ -13,6 +13,32 @@ use super::{
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker, Span};
 
+/// Convert an import/export declaration's import attributes to the public shape.
+///
+/// Internal `None` = no `with` clause; `Some(_)` = a clause (possibly empty
+/// `with {}`). Svelte's non-`lang="ts"` schema always emits the `attributes`
+/// array (even with no clause); acorn-typescript omits it only when there is no
+/// clause, but emits `[]` for an empty `with {}`. Shared by the import and the
+/// two re-export hosts.
+fn convert_attributes(
+    attributes: Option<&[internal::ImportAttribute]>,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+    schema: Schema,
+) -> Option<Vec<public::ImportAttribute>> {
+    match attributes {
+        Some(attrs) => Some(
+            attrs
+                .iter()
+                .map(|a| convert_import_attribute(a, source, loc, interner, offset))
+                .collect(),
+        ),
+        None => schema.is_svelte_script().then(Vec::new),
+    }
+}
+
 /// Find the `export` keyword position in source, scanning past decorators.
 /// Used when a decorated class is exported — acorn's export node starts at
 /// `export`, not at the decorator.
@@ -99,13 +125,15 @@ pub(in crate::ast) fn convert_statement(
                 }
                 internal::ExportKind::Type => Some("type".to_string()),
             };
-            // Svelte parser always includes `attributes: []` on ExportNamedDeclaration;
-            // acorn-typescript omits it entirely. Internal struct doesn't have this field.
-            let attributes = if schema.is_svelte_script() {
-                Some(Vec::new())
-            } else {
-                None
-            };
+            // `attributes`: see `convert_attributes` (None = no `with` clause).
+            let attributes = convert_attributes(
+                export_decl.attributes.as_deref(),
+                source,
+                loc,
+                interner,
+                offset,
+                schema,
+            );
             let export_start = if let Some(internal::Statement::ClassDeclaration(class)) =
                 export_decl.declaration.as_deref()
             {
@@ -186,13 +214,15 @@ pub(in crate::ast) fn convert_statement(
                 }
                 internal::ExportKind::Type => Some("type".to_string()),
             };
-            // Svelte parser always includes `attributes: []` on ExportAllDeclaration;
-            // acorn-typescript omits it entirely. Internal struct doesn't have this field.
-            let attributes = if schema.is_svelte_script() {
-                Some(Vec::new())
-            } else {
-                None
-            };
+            // `attributes`: see `convert_attributes` (None = no `with` clause).
+            let attributes = convert_attributes(
+                export_decl.attributes.as_deref(),
+                source,
+                loc,
+                interner,
+                offset,
+                schema,
+            );
             public::Statement::ExportAllDeclaration(public::ExportAllDeclaration {
                 node_type: "ExportAllDeclaration".to_string(),
                 start: export_decl.span.start,
@@ -233,18 +263,14 @@ pub(in crate::ast) fn convert_statement(
                 }
                 internal::ImportKind::Type => Some("type".to_string()),
             };
-            let attrs: Vec<_> = import_decl
-                .attributes
-                .iter()
-                .map(|a| convert_import_attribute(a, source, loc, interner, offset))
-                .collect();
-            let attributes = if schema.is_svelte_script() {
-                Some(attrs)
-            } else if attrs.is_empty() {
-                None
-            } else {
-                Some(attrs)
-            };
+            let attributes = convert_attributes(
+                import_decl.attributes.as_deref(),
+                source,
+                loc,
+                interner,
+                offset,
+                schema,
+            );
             public::Statement::ImportDeclaration(public::ImportDeclaration {
                 node_type: "ImportDeclaration".to_string(),
                 start: import_decl.span.start,

@@ -1111,7 +1111,8 @@ export interface ImportAttribute {
 	start: number;
 	end: number;
 	loc: SourceLocation;
-	key: Identifier;
+	/** Bare `type` → `Identifier`; quoted `'resolution-mode'` → `Literal`. */
+	key: Identifier | Literal;
 	value: Literal;
 }
 

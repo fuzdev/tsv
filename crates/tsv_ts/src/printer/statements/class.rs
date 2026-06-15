@@ -443,6 +443,16 @@ impl<'a> Printer<'a> {
             sig.parameters.iter().map(|p| self.build_identifier_doc(p)),
             ", ",
         ));
+        // A comment in the param→`]` gap (`[key: string /* c */]`), preserved in
+        // place. The `]` is located outside comments so a `]` glyph in that
+        // comment isn't mistaken for it.
+        let close_search = sig.parameters.last().map_or(sig.span.start, |p| p.span.end);
+        if let Some(cp) =
+            self.find_char_outside_comments(close_search, sig.type_annotation.span.start, b']')
+            && let Some(c) = self.build_inline_comments_between_doc_opt(close_search, cp)
+        {
+            parts.push(c);
+        }
         parts.push(d.text("]"));
         parts.push(self.build_type_annotation_doc(&sig.type_annotation));
         parts.push(d.text(";"));
