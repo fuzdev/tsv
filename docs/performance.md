@@ -238,6 +238,38 @@ Run an A/A control (same binary on both sides of each pair) to calibrate the
 noise floor before trusting any delta; on this workload the floor is roughly
 ±1–3% per metric even on a quiet machine.
 
+### 6. `wasm_format_probe.ts` — WASM format wall-time A/B
+
+The tools above measure the native Rust side. Allocation *counts* are
+target-independent (heaptrack reads the same on either), but WASM *wall-time* is
+not: `@fuzdev/tsv_format_wasm` runs on dlmalloc, which memcpys on every heap
+growth, so an allocation-count win can move WASM format time even when the same
+change is a wash on native glibc. The full `deno task bench` is too coarse to
+see those single-digit-% moves; `benches/deno/wasm_format_probe.ts` resolves
+them.
+
+It applies the §5 paired discipline in a single invocation: interleaved pairs
+alternate which build runs first, the A/A noise floor is measured in the *same*
+run (a floor from a separate run is untrustworthy — a rebuild between runs shifts
+CPU frequency/thermals ~10%, dwarfing a ~1% signal), and it reports `net = A/B ÷
+floor` plus the A/B `[min,max]` spread so a noisy median is visible. A corpus
+byte-identity check gates it — a no-behavior-change edit must format every file
+identically across the builds, or the run aborts.
+
+```bash
+# copy the artifact aside before editing (pkg/ is gitignored)
+cp -r crates/tsv_wasm/pkg/all/deno crates/tsv_wasm/pkg/all/deno.baseline
+# ... edit source, then rebuild and A/B:
+deno task build:wasm:all:deno
+deno run --allow-read --allow-env --allow-net --allow-sys \
+  benches/deno/wasm_format_probe.ts \
+  --baseline crates/tsv_wasm/pkg/all/deno.baseline/tsv_wasm.js
+```
+
+Defaults to `../zzz/src/lib` (the corpus the native profiling tools use, for
+comparability); pass a directory to override, or `--lang`, `--pairs`, `--warmup`,
+`--control` (a separate identical-code copy for a two-instance floor).
+
 ## Measurement Process
 
 ### Before an optimization

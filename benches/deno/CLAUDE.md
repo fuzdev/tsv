@@ -735,6 +735,13 @@ Implementation: `lib/binary_sizes.ts`
   `deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/skip_triage.ts`
 - `wasm_json_probe.ts` — split parse cost into pure-parse vs materialization for
   native + WASM, isolating JS-side `JSON.parse`.
+- `wasm_format_probe.ts` — measure WASM **format** wall-time at the resolution
+  the full bench folds into noise (single-digit-% changes). A/Bs two WASM builds
+  (copy `pkg/all/deno` aside before editing, rebuild, pass `--baseline
+  …/tsv_wasm.js`) with the ../../docs/performance.md §5 paired discipline:
+  interleaved pairs, the A/A noise floor measured in the same run, `net = A/B ÷
+  floor`, and a corpus byte-identity gate that aborts if the builds format
+  differently. See the module doc for the full workflow.
 - **wasm-opt**: runs with explicit feature flags in `crates/tsv_wasm/Cargo.toml` — Rust 2024's bulk-memory and nontrapping-float-to-int ops are passed by name to wasm-opt v117, giving ~−2% gzipped on the WASM bundle.
 - **oxfmt × Deno timer interaction (workaround in place)**: once `oxfmt.format` runs once,
   Deno's timer wheel processes exactly one further `setTimeout` callback and then stalls all
