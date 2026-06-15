@@ -1,0 +1,202 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 115,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 68,
+				"data": " `}` inside a regex / comment must not close the {#if} early "
+			},
+			{
+				"type": "Text",
+				"start": 68,
+				"end": 69,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 69,
+				"end": 89,
+				"test": {
+					"type": "CallExpression",
+					"start": 74,
+					"end": 82,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 5
+						},
+						"end": {
+							"line": 2,
+							"column": 13
+						}
+					},
+					"callee": {
+						"type": "Identifier",
+						"start": 74,
+						"end": 75,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 5
+							},
+							"end": {
+								"line": 2,
+								"column": 6
+							}
+						},
+						"name": "f"
+					},
+					"arguments": [
+						{
+							"type": "Literal",
+							"start": 76,
+							"end": 81,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 2,
+									"column": 12
+								}
+							},
+							"value": {},
+							"raw": "/[}]/",
+							"regex": {
+								"pattern": "[}]",
+								"flags": ""
+							}
+						}
+					],
+					"optional": false
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 83,
+							"end": 84,
+							"raw": "a",
+							"data": "a"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 89,
+				"end": 90,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 90,
+				"end": 114,
+				"test": {
+					"type": "CallExpression",
+					"start": 95,
+					"end": 107,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 5
+						},
+						"end": {
+							"line": 3,
+							"column": 17
+						}
+					},
+					"callee": {
+						"type": "Identifier",
+						"start": 95,
+						"end": 96,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 5
+							},
+							"end": {
+								"line": 3,
+								"column": 6
+							}
+						},
+						"name": "g"
+					},
+					"arguments": [
+						{
+							"type": "Identifier",
+							"start": 105,
+							"end": 106,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 15
+								},
+								"end": {
+									"line": 3,
+									"column": 16
+								}
+							},
+							"name": "x",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " } ",
+									"start": 97,
+									"end": 104
+								}
+							]
+						}
+					],
+					"optional": false
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 108,
+							"end": 109,
+							"raw": "b",
+							"data": "b"
+						}
+					]
+				},
+				"alternate": null
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " } ",
+			"start": 97,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 7
+				},
+				"end": {
+					"line": 3,
+					"column": 14
+				}
+			}
+		}
+	]
+}

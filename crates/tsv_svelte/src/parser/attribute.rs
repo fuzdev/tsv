@@ -5,7 +5,22 @@ use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 use tsv_ts::ast::internal::{Expression, Identifier};
 
+use super::expression_tag::scan_to_matching_brace;
 use super::parser_impl::SvelteParser;
+
+/// Does a `{` at byte `pos` begin an expression tag, vs a block/tag construct?
+///
+/// `{#`, `{:`, `{@` (block/tag opens) and `{/word}` (block close) are not
+/// expression tags; `{/*` and `{//` are comments, which are. Mirrors the lexer's
+/// brace dispatch — shared by the quoted and unquoted attribute-value readers so
+/// the two can't drift apart.
+fn brace_starts_expression(bytes: &[u8], pos: usize) -> bool {
+    match bytes.get(pos + 1) {
+        Some(b'#' | b':' | b'@') => false,
+        Some(b'/') => matches!(bytes.get(pos + 2), Some(b'*' | b'/')),
+        _ => true,
+    }
+}
 
 /// Directive prefix types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -383,7 +398,7 @@ impl<'a> SvelteParser<'a> {
                 }
             } else if self.check(TokenKind::Identifier) {
                 // Unquoted value: style:background=green
-                let parts = self.parse_unquoted_attribute_value()?;
+                let parts = self.parse_unquoted_attribute_value(true)?;
                 StyleDirectiveValue::Parts(parts)
             } else {
                 return Err(
@@ -440,30 +455,14 @@ impl<'a> SvelteParser<'a> {
         // The content is: {@attach expr}
         let brace_start = self.current_start;
 
-        // Find the closing brace by scanning forward (handles nested braces)
         let content_start = brace_start + 2; // Skip "{@"
-        let mut depth = 1;
-        let mut pos = content_start;
-        let source_bytes = self.source.as_bytes();
 
-        while pos < self.source.len() && depth > 0 {
-            match source_bytes[pos] {
-                b'{' => depth += 1,
-                b'}' => depth -= 1,
-                _ => {}
-            }
-            if depth > 0 {
-                pos += 1;
-            }
-        }
-
-        if depth != 0 {
+        // Find the matching closing `}` (skips strings/comments/regex).
+        let Some(content_end) = scan_to_matching_brace(self.source.as_bytes(), content_start)
+        else {
             return Err(self.error_unclosed_at("{@attach} tag", start));
-        }
-
-        // pos is now at the closing '}'
-        let content_end = pos;
-        let end = pos + 1; // Include the closing '}'
+        };
+        let end = content_end + 1; // Include the closing '}'
 
         // Extract content: "attach expr"
         let content = &self.source[content_start..content_end];
@@ -511,30 +510,14 @@ impl<'a> SvelteParser<'a> {
         // We're at '{', scan forward to find the closing '}'
         let brace_start = self.current_start;
 
-        // Find the closing brace by scanning forward (handles nested braces)
         let content_start = brace_start + 1; // Skip "{"
-        let mut depth = 1;
-        let mut pos = content_start;
-        let source_bytes = self.source.as_bytes();
 
-        while pos < self.source.len() && depth > 0 {
-            match source_bytes[pos] {
-                b'{' => depth += 1,
-                b'}' => depth -= 1,
-                _ => {}
-            }
-            if depth > 0 {
-                pos += 1;
-            }
-        }
-
-        if depth != 0 {
+        // Find the matching closing `}` (skips strings/comments/regex).
+        let Some(content_end) = scan_to_matching_brace(self.source.as_bytes(), content_start)
+        else {
             return Err(self.error_unclosed_at("spread attribute", start));
-        }
-
-        // pos is now at the closing '}'
-        let content_end = pos;
-        let end = pos + 1; // Include the closing '}'
+        };
+        let end = content_end + 1; // Include the closing '}'
 
         // Extract content: "...expr" or " ...expr " (with whitespace)
         let content = &self.source[content_start..content_end];
@@ -737,26 +720,16 @@ impl<'a> SvelteParser<'a> {
         &mut self,
         parse_expressions: bool,
     ) -> Result<Vec<AttributeValue>, ParseError> {
-        let mut parts = Vec::new();
-
-        // Check for expression attribute {expr}
-        if self.check(TokenKind::LeftBrace) {
-            let expr_tag = self.parse_expression_tag()?;
-            parts.push(AttributeValue::ExpressionTag(expr_tag));
-            return Ok(parts);
-        }
-
-        // Check for unquoted attribute value
-        // HTML allows unquoted attribute values: any chars except whitespace, ", ', =, <, >, `
-        // This handles simple identifiers (data-attr=value) and URLs (href=https://example.com)
-        if self.check(TokenKind::Identifier) {
-            return self.parse_unquoted_attribute_value();
-        }
-
-        // Otherwise expect string value
+        // Any value not starting with a quote is unquoted, read as a Svelte
+        // `read_sequence` — a run of Text + {expr} chunks to the terminator regex.
+        // Covers a bare identifier (`data-attr=value`), a single expression
+        // (`prop={a}`), concatenations (`prop={a}{b}`, `src={a}//cdn`), and
+        // slash-led paths (`href=/path`).
         if !self.check(TokenKind::String) {
-            return Err(self.error_expected_found("string or expression value"));
+            return self.parse_unquoted_attribute_value(parse_expressions);
         }
+
+        let mut parts = Vec::new();
 
         // Extract string content (without quotes)
         let (token_start, token_end) = self.current_pos();
@@ -782,23 +755,23 @@ impl<'a> SvelteParser<'a> {
             return Ok(parts);
         }
 
-        // Scan for expression tags within the quoted value
-        // Example: "delete {'\"'}" contains text "delete " and expression {'\"'}
+        // Scan the quoted value as a sequence of Text and {expr} chunks. Each
+        // `{expr}` is parsed by the shared `parse_expression_tag_at`, which skips
+        // nested braces, strings, comments, and regex literals — so a `}` inside one
+        // (`"{/* } */ x}"`, `"{f(/[}]/)}"`) doesn't desync brace matching.
+        // Example: "delete {'\"'}" contains text "delete " and expression {'\"'}.
         let mut pos = content_start;
         let source_bytes = self.source.as_bytes();
 
         while pos < content_end {
-            // Scan for the start of an expression tag
+            // Accumulate text up to the next `{`.
             let text_start = pos;
             while pos < content_end && source_bytes[pos] != b'{' {
                 pos += 1;
             }
-
-            // If we found text before the expression tag (or we're at the end), create a text part
             if pos > text_start {
-                let text_content = self.source[text_start..pos].to_string();
                 parts.push(AttributeValue::Text(Text {
-                    raw: text_content,
+                    raw: self.source[text_start..pos].to_string(),
                     decoding: TextDecoding::AttributeValue,
                     span: Span {
                         start: text_start as u32,
@@ -807,95 +780,13 @@ impl<'a> SvelteParser<'a> {
                 }));
             }
 
-            // If we're at an expression tag, parse it
             if pos < content_end && source_bytes[pos] == b'{' {
-                // Check if this is really an expression tag (not a block tag)
-                // Expression tags start with { followed by anything except # / : @
-                let next_char = source_bytes.get(pos + 1);
-                let is_expression_tag =
-                    !matches!(next_char, Some(b'#') | Some(b'/') | Some(b':') | Some(b'@'));
-
-                if is_expression_tag {
-                    // Manually extract the expression content by scanning for the matching }
-                    // NOTE: Similar brace/string tracking logic exists in the lexer (lexer.rs).
-                    // The lexer tokenizes the whole string; we extract expression boundaries here.
-                    let expr_start = pos + 1; // Skip the opening {
-                    let mut brace_depth = 1;
-                    let mut expr_end = expr_start;
-                    let mut in_string = false;
-                    let mut string_char = '\0';
-                    let mut escape_next = false;
-
-                    let mut i = expr_start;
-                    while i < content_end && brace_depth > 0 {
-                        let ch = source_bytes[i] as char;
-
-                        if in_string && escape_next {
-                            escape_next = false;
-                            i += 1;
-                            continue;
-                        }
-
-                        if in_string && ch == '\\' {
-                            escape_next = true;
-                            i += 1;
-                            continue;
-                        }
-
-                        if in_string {
-                            if ch == string_char {
-                                in_string = false;
-                            }
-                        } else if ch == '"' || ch == '\'' || ch == '`' {
-                            in_string = true;
-                            string_char = ch;
-                        } else if ch == '{' {
-                            brace_depth += 1;
-                        } else if ch == '}' {
-                            brace_depth -= 1;
-                            if brace_depth == 0 {
-                                expr_end = i;
-                                break;
-                            }
-                        }
-
-                        i += 1;
-                    }
-
-                    if brace_depth != 0 {
-                        return Err(ParseError::InvalidSyntax {
-                            message: "Unclosed expression tag in attribute value".to_string(),
-                            position: pos,
-                            context: None,
-                        });
-                    }
-
-                    // Parse the expression content
-                    let expr_content = &self.source[expr_start..expr_end];
-                    let (expression, comments) = tsv_ts::parse_expression_with_comments(
-                        expr_content,
-                        expr_start,
-                        std::rc::Rc::clone(&self.interner),
-                    )?;
-
-                    // Add expression comments to the parser's collection
-                    self.expression_comments.extend(comments);
-
-                    // Create the expression tag
-                    let tag_end = expr_end + 1; // Include the closing }
-                    parts.push(AttributeValue::ExpressionTag(ExpressionTag {
-                        expression,
-                        span: Span {
-                            start: pos as u32,
-                            end: tag_end as u32,
-                        },
-                    }));
-
-                    // Move past the expression tag
-                    pos = tag_end;
+                if brace_starts_expression(source_bytes, pos) {
+                    let tag = self.parse_expression_tag_at(pos)?;
+                    pos = tag.span.end as usize;
+                    parts.push(AttributeValue::ExpressionTag(tag));
                 } else {
-                    // Not an expression tag, treat { as literal text
-                    pos += 1;
+                    pos += 1; // literal `{`
                 }
             }
         }
@@ -915,48 +806,89 @@ impl<'a> SvelteParser<'a> {
         Ok(parts)
     }
 
-    /// Parse an unquoted attribute value by scanning raw bytes.
+    /// Parse an unquoted attribute value as a Svelte `read_sequence`.
     ///
-    /// HTML spec: unquoted values are any chars except whitespace, `"`, `'`, `=`, `<`, `>`, `` ` ``.
-    /// The lexer's identifier token only covers alphanumeric and a few special chars (`:`, `.`, `-`),
-    /// so URLs like `https://example.com/path` would be split across tokens. Instead, we start from
-    /// the current token position and scan raw bytes for the full unquoted value.
+    /// An unquoted value is a run of `Text` and `{expr}` chunks terminated by
+    /// `regex_invalid_unquoted_attribute_value` — `/>` or one of whitespace, `"`,
+    /// `'`, `=`, `<`, `>`, `` ` ``. So `prop={a}{b}` is one value `[{a}, {b}]`,
+    /// `src={a}//cdn` is `[{a}, "//cdn"]`, and `href=/path` is `["/path"]`. A bare
+    /// `/` (only `/>`) does not terminate, so protocol-relative and root-relative
+    /// URLs read as plain text.
+    ///
+    /// We scan raw bytes because the lexer's identifier token doesn't span `/`,
+    /// `:`, and the like. `Text` chunks decode with attribute-context rules to
+    /// match Svelte (`decode_character_references(raw, true)`).
+    ///
+    /// `parse_expressions` is `false` for `<script>` / `<style>` tag attributes,
+    /// where `{` is literal text and the whole value is a single `Text` chunk.
     pub(crate) fn parse_unquoted_attribute_value(
         &mut self,
+        parse_expressions: bool,
     ) -> Result<Vec<AttributeValue>, ParseError> {
+        // `src`/`bytes` borrow the source data (lifetime `'a`), so they stay valid
+        // across the `&mut self` `parse_expression_tag_at` call below.
+        let src = self.source;
+        let bytes = src.as_bytes();
         let start = self.current_start;
-        let source_bytes = self.source.as_bytes();
+        let mut parts: Vec<AttributeValue> = Vec::new();
+        let mut text_start = start;
         let mut pos = start;
 
-        while pos < source_bytes.len() {
-            match source_bytes[pos] {
-                b' ' | b'\t' | b'\n' | b'\r' | b'\x0C' // whitespace
-                | b'"' | b'\'' | b'=' | b'<' | b'>' | b'`' => break,
-                _ => pos += 1,
+        let flush_text = |parts: &mut Vec<AttributeValue>, from: usize, to: usize| {
+            if to > from {
+                parts.push(AttributeValue::Text(Text {
+                    raw: src[from..to].to_string(),
+                    decoding: TextDecoding::AttributeValue,
+                    span: Span {
+                        start: from as u32,
+                        end: to as u32,
+                    },
+                }));
             }
+        };
+
+        loop {
+            // Terminator regex: `/>` or one of whitespace " ' = < > `
+            let terminated = match bytes.get(pos).copied() {
+                None => true,
+                Some(b'/') => bytes.get(pos + 1) == Some(&b'>'),
+                Some(
+                    b' ' | b'\t' | b'\n' | b'\r' | b'\x0C' | b'"' | b'\'' | b'=' | b'<' | b'>'
+                    | b'`',
+                ) => true,
+                Some(_) => false,
+            };
+            if terminated {
+                flush_text(&mut parts, text_start, pos);
+                break;
+            }
+
+            // An `{expr}` chunk starts a new part. Every `{` is literal text when
+            // expressions are disabled (script/style tag attributes).
+            if parse_expressions && bytes[pos] == b'{' && brace_starts_expression(bytes, pos) {
+                flush_text(&mut parts, text_start, pos);
+                // Parse the `{expr}` without disturbing the lexer (it handles nested
+                // braces, strings, comments, and regex that a raw byte scan cannot);
+                // we own the cursor and sync the lexer once below.
+                let tag = self.parse_expression_tag_at(pos)?;
+                pos = tag.span.end as usize;
+                text_start = pos;
+                parts.push(AttributeValue::ExpressionTag(tag));
+                continue;
+            }
+
+            pos += 1;
         }
 
         if pos == start {
             return Err(self.error_msg("Expected attribute value"));
         }
 
-        // TODO: Svelte decodes unquoted attribute values with attribute-context
-        // rules (element.js read_attribute_value decodes the unquoted match too);
-        // tsv has never decoded here, so `data` keeps entities (e.g. `a&amp;b`).
-        // Latent public-AST divergence, unpinned by any fixture — fix fixture-first.
-        let text_content = self.source[start..pos].to_string();
-        let text = Text {
-            raw: text_content,
-            decoding: TextDecoding::Raw,
-            span: Span {
-                start: start as u32,
-                end: pos as u32,
-            },
-        };
-
-        // Advance the lexer past the raw-scanned value
+        // Sync the lexer to the value terminator for the element parser. The loop
+        // never touched the lexer, so `inside_tag` is still set (we're inside the
+        // tag) and `advance_to_position` re-lexes the terminator in tag mode.
         self.advance_to_position(pos)?;
 
-        Ok(vec![AttributeValue::Text(text)])
+        Ok(parts)
     }
 }
