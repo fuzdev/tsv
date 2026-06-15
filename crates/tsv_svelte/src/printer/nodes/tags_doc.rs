@@ -3,8 +3,6 @@
 // {@html}, {@const}, {@debug}, and {@render} — tag layout and the
 // {@const} initializer break rules.
 
-use std::rc::Rc;
-
 use crate::ast::internal;
 use crate::printer::Printer;
 use tsv_lang::doc::GroupId;
@@ -140,16 +138,8 @@ impl<'a> Printer<'a> {
             ..self.embed
         };
 
-        let expr_doc = tsv_ts::build_expression_doc_with_comments(
-            d,
-            expr,
-            self.source,
-            Rc::clone(&self.interner),
-            &embed,
-            self.comments,
-            &self.line_breaks,
-            tsv_ts::TsContext::Svelte,
-        );
+        let expr_doc =
+            tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embed);
 
         let trailing_docs: Vec<DocId> =
             tsv_lang::comments_in_range(self.comments, expr_end, span_end)

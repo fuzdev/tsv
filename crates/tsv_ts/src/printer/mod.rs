@@ -57,11 +57,13 @@ pub(crate) use expressions::assignment::{
 pub(crate) use needs_parens::{ParenContext, needs_parens};
 pub(crate) use types::{should_hug_union_type, unwrap_parenthesized};
 
+use crate::PrinterInputs;
 use crate::ast::internal;
 use crate::config::TsContext;
 use std::cell::Cell;
+use std::rc::Rc;
 use tsv_lang::{
-    EmbedContext, OutputBuffer, SharedInterner, SymbolResolver, comments_in_range,
+    EmbedContext, OutputBuffer, SharedInterner, SymbolResolver, TAB_WIDTH, comments_in_range,
     doc::{
         self,
         arena::{DocArena, DocId},
@@ -172,28 +174,23 @@ pub struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    /// Create a new printer with the given arena, interner, source, comments,
-    /// line_breaks, embedding context, and TS context.
-    #[allow(clippy::too_many_arguments)]
+    /// Create a new printer borrowing the given arena, [`PrinterInputs`], and
+    /// embedding context.
     pub(crate) fn with_context(
         arena: &'a DocArena,
-        interner: SharedInterner,
-        source: &'a str,
-        comments: &'a [internal::Comment],
-        line_breaks: &'a [u32],
+        inputs: &PrinterInputs<'a>,
         embed: EmbedContext,
-        ts_context: TsContext,
     ) -> Self {
         Self {
-            buffer: OutputBuffer::with_capacity(source.len()),
+            buffer: OutputBuffer::with_capacity(inputs.source.len()),
             indent_level: 0,
             embed,
-            ts_context,
+            ts_context: inputs.ts_context,
             arena,
-            interner,
-            source,
-            comments,
-            line_breaks,
+            interner: Rc::clone(&inputs.interner),
+            source: inputs.source,
+            comments: inputs.comments,
+            line_breaks: inputs.line_breaks,
             declaration_indent_depth: Cell::new(0),
             is_expression_statement: Cell::new(false),
             in_top_level_assignment: Cell::new(false),
@@ -236,7 +233,7 @@ impl<'a> Printer<'a> {
                 0
             }
         } else {
-            self.embed.base_indent_offset * tsv_lang::TAB_WIDTH
+            self.embed.base_indent_offset * TAB_WIDTH
         };
         let current_col = self.current_column() + context_offset;
         let output = {
@@ -271,7 +268,7 @@ impl<'a> Printer<'a> {
 
     /// Get the current column position (for doc-builder width calculations)
     pub(crate) fn current_column(&self) -> usize {
-        self.buffer.current_column(tsv_lang::TAB_WIDTH)
+        self.buffer.current_column(TAB_WIDTH)
     }
 
     /// Compute the visual indent width at a source position.
@@ -281,7 +278,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn source_indent_visual(&self, pos: u32) -> usize {
         let pos = pos as usize;
         let line_start = self.source[..pos].rfind('\n').map_or(0, |i| i + 1);
-        printing::visual_width(&self.source[line_start..pos], tsv_lang::TAB_WIDTH)
+        printing::visual_width(&self.source[line_start..pos], TAB_WIDTH)
     }
 
     /// Check if two positions are on the same line (O(log n) binary search)

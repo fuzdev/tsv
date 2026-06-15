@@ -148,7 +148,7 @@ impl<'a> ValueParser<'a> {
     /// in the SAME source string, avoiding position drift.
     fn parse_comma_separated(&self) -> CssValue {
         let text = self.text();
-        let mut cursor = ValueCursor::new(text, self.absolute_span());
+        let mut cursor = ValueCursor::new(text);
         let mut values = Vec::new();
 
         loop {
@@ -184,7 +184,7 @@ impl<'a> ValueParser<'a> {
     /// in the SAME source string, avoiding position drift.
     fn parse_space_separated(&self) -> CssValue {
         let text = self.text();
-        let mut cursor = ValueCursor::new(text, self.absolute_span());
+        let mut cursor = ValueCursor::new(text);
         let mut values = Vec::new();
 
         loop {

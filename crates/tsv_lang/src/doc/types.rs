@@ -25,8 +25,8 @@ pub enum GroupId {
     ArrowChain,
 }
 
-/// Context for doc rendering - provides hints about trailing punctuation,
-/// width constraints, and indent overrides that affect how content is rendered.
+/// Context for doc rendering - provides hints about trailing punctuation
+/// that affect how content is rendered.
 ///
 /// This allows fills to make better packing decisions by knowing about
 /// punctuation that will be added by the parent (e.g., semicolons in CSS,
@@ -40,15 +40,6 @@ pub struct DocContext {
     ///
     /// Example: CSS declarations add ";" after the value, so reserve 1 char.
     pub trailing_reserve: usize,
-
-    /// Override base_indent_offset for position calculations within this context.
-    ///
-    /// When `Some(n)`, width calculations use `n` instead of `config.base_indent_offset`.
-    /// This is used for template expression content where the wrapper (e.g., Svelte)
-    /// won't add its usual indentation, so position calculations shouldn't account for it.
-    ///
-    /// When `None`, uses the default `config.base_indent_offset`.
-    pub base_indent_override: Option<usize>,
 }
 
 /// Trait for resolving symbol IDs to strings at print time

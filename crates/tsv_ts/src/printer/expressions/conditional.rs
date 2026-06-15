@@ -4,6 +4,7 @@
 
 use crate::ast::internal;
 use crate::printer::{Printer, template_literal_has_newlines};
+use tsv_lang::INDENT;
 use tsv_lang::doc::arena::DocId;
 
 /// Check if an expression is a nullish coalescing expression (`??`)
@@ -323,7 +324,7 @@ impl<'a> Printer<'a> {
                 if has_prev_comment_after_q {
                     // Subsequent comments go on their own line
                     q_parts.push(d.hardline());
-                    q_parts.push(d.text(tsv_lang::INDENT));
+                    q_parts.push(d.text(INDENT));
                 } else {
                     q_parts.push(d.text(" "));
                 }
@@ -350,7 +351,7 @@ impl<'a> Printer<'a> {
         if has_line_comment_before_consequent {
             // Line comment — consequent on new line
             q_parts.push(d.hardline());
-            q_parts.push(d.text(tsv_lang::INDENT));
+            q_parts.push(d.text(INDENT));
             q_parts.push(consequent);
         } else {
             // Single block comment or no comment - space then consequent
@@ -384,7 +385,7 @@ impl<'a> Printer<'a> {
                 if has_prev_comment_after_colon {
                     // Subsequent comments go on their own line
                     q_parts.push(d.hardline());
-                    q_parts.push(d.text(tsv_lang::INDENT));
+                    q_parts.push(d.text(INDENT));
                 } else {
                     q_parts.push(d.text(" "));
                 }
@@ -408,7 +409,7 @@ impl<'a> Printer<'a> {
 
         if has_line_comment_before_alternate {
             q_parts.push(d.hardline());
-            q_parts.push(d.text(tsv_lang::INDENT));
+            q_parts.push(d.text(INDENT));
         } else {
             q_parts.push(d.text(" "));
         }

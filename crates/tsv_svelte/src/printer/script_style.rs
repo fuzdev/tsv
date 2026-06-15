@@ -6,6 +6,7 @@
 
 use crate::ast::internal;
 use crate::printer::Printer;
+use tsv_lang::TAB_WIDTH;
 use tsv_lang::doc::{self, arena::DocId};
 
 impl<'a> Printer<'a> {
@@ -56,8 +57,8 @@ impl<'a> Printer<'a> {
             self.d(),
             script_doc_id,
             &embed,
-            tsv_lang::TAB_WIDTH, // start column = 1 tab's visual width
-            1,                   // start indent level = 1 (accounts for Svelte wrapper)
+            TAB_WIDTH, // start column = 1 tab's visual width
+            1,         // start indent level = 1 (accounts for Svelte wrapper)
             &*interner,
         );
 
@@ -295,7 +296,7 @@ impl<'a> Printer<'a> {
         } else {
             0
         };
-        let col = self.buffer.current_column(tsv_lang::TAB_WIDTH);
+        let col = self.buffer.current_column(TAB_WIDTH);
         let embed = tsv_lang::EmbedContext {
             suffix_width: closing_tag_width,
             ..self.embed

@@ -28,7 +28,7 @@ mod values;
 
 use crate::ast::internal::{Comment, CssBlockChild, CssNode, CssStyleSheet, CssValue};
 use tsv_lang::{
-    CommentPosition, EmbedContext, OutputBuffer, classify_comment_fast,
+    CommentPosition, EmbedContext, INDENT, OutputBuffer, TAB_WIDTH, classify_comment_fast,
     doc::{
         self,
         arena::{DocArena, DocId},
@@ -133,7 +133,7 @@ impl<'a> Printer<'a> {
     ///
     /// Used for printing nested structures like CSS rules.
     pub(crate) fn write_indent(&mut self) {
-        tsv_lang::write_indent(&mut self.buffer, self.indent_level, tsv_lang::INDENT);
+        tsv_lang::write_indent(&mut self.buffer, self.indent_level, INDENT);
     }
 
     /// Write indentation at the current level plus `extra` additional levels.
@@ -162,9 +162,9 @@ impl<'a> Printer<'a> {
     /// Includes base_indent_offset to account for Svelte wrapper indentation
     /// that will be added to each line during final formatting.
     pub(crate) fn current_column(&self) -> usize {
-        let col = self.buffer.current_column(tsv_lang::TAB_WIDTH);
+        let col = self.buffer.current_column(TAB_WIDTH);
         // Add wrapper indent width so fill calculations account for final indentation
-        col + (self.embed.base_indent_offset * tsv_lang::TAB_WIDTH)
+        col + (self.embed.base_indent_offset * TAB_WIDTH)
     }
 
     /// Get the effective indent level for width calculations
@@ -179,7 +179,7 @@ impl<'a> Printer<'a> {
     ///
     /// Converts indent level to actual character width based on tab_width.
     pub(crate) fn indent_width(&self) -> usize {
-        self.effective_indent() * tsv_lang::TAB_WIDTH
+        self.effective_indent() * TAB_WIDTH
     }
 
     /// Write a DocId to the buffer, accounting for current column and indent level

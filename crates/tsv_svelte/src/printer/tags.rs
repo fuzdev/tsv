@@ -1,7 +1,5 @@
 //! Template tag printing (html, const, debug, render)
 
-use std::rc::Rc;
-
 use super::Printer;
 use crate::ast::internal;
 use tsv_lang::comments_in_range;
@@ -51,15 +49,7 @@ impl<'a> Printer<'a> {
         };
 
         // Format the id (pattern) with current indent level for multiline patterns
-        let formatted_id = tsv_ts::format_expression(
-            &tag.id,
-            self.source,
-            Rc::clone(&self.interner),
-            self.comments,
-            &self.line_breaks,
-            embed,
-            tsv_ts::TsContext::Svelte,
-        );
+        let formatted_id = tsv_ts::format_expression(&tag.id, &self.ts_inputs(), embed);
         self.write(&formatted_id);
         self.write(" = ");
 
@@ -69,15 +59,7 @@ impl<'a> Printer<'a> {
         }
 
         // Format the init expression
-        let formatted_init = tsv_ts::format_expression(
-            &tag.init,
-            self.source,
-            Rc::clone(&self.interner),
-            self.comments,
-            &self.line_breaks,
-            embed,
-            tsv_ts::TsContext::Svelte,
-        );
+        let formatted_init = tsv_ts::format_expression(&tag.init, &self.ts_inputs(), embed);
         self.write(&formatted_init);
 
         // Print any trailing comments between the init expression and closing brace

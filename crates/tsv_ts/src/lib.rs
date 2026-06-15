@@ -32,29 +32,35 @@ use tsv_lang::EmbedContext;
 use tsv_lang::doc::arena::{DocArena, DocId};
 pub use tsv_lang::{ParseError, Result, SharedInterner};
 
-/// Build a fully-configured printer borrowing the given arena/source/state.
+/// The per-document environment shared by every formatting entry point: the
+/// source the AST's spans index into, the shared interner, the comment buffer,
+/// the precomputed line breaks, and the [`TsContext`]. Bundling these keeps the
+/// printer constructor — and the `tsv_svelte` embedding call sites — from
+/// re-threading the same five values. The [`EmbedContext`] and the
+/// expression/program being printed vary per call, so they stay separate args.
+pub struct PrinterInputs<'a> {
+    /// Full source the AST's spans index into.
+    pub source: &'a str,
+    /// Interner shared with the parse phase (cloned per printer).
+    pub interner: SharedInterner,
+    /// Detached comment buffer for the document.
+    pub comments: &'a [ast::Comment],
+    /// Precomputed newline offsets for O(log n) line/column lookup.
+    pub line_breaks: &'a [u32],
+    /// Standalone vs. Svelte-embedded TypeScript.
+    pub ts_context: TsContext,
+}
+
+/// Build a fully-configured printer borrowing the given arena and [`PrinterInputs`].
 ///
 /// All `format_*` and `build_*_doc` entry points funnel through this so the
-/// constructor argument list lives in exactly one place.
-#[allow(clippy::too_many_arguments)]
+/// constructor lives in exactly one place.
 fn make_printer<'a>(
     arena: &'a DocArena,
-    source: &'a str,
-    interner: SharedInterner,
-    comments: &'a [ast::Comment],
-    line_breaks: &'a [u32],
+    inputs: &PrinterInputs<'a>,
     embed: EmbedContext,
-    ts_context: TsContext,
 ) -> printer::Printer<'a> {
-    printer::Printer::with_context(
-        arena,
-        interner,
-        source,
-        comments,
-        line_breaks,
-        embed,
-        ts_context,
-    )
+    printer::Printer::with_context(arena, inputs, embed)
 }
 
 /// Parse TypeScript source code into an internal AST
@@ -106,15 +112,14 @@ pub fn format(program: &Program, source: &str) -> String {
 /// TypeScript so `<T>` arrow type params get the disambiguating trailing comma.
 pub fn format_with_context(program: &Program, source: &str, ts_context: TsContext) -> String {
     let arena = DocArena::for_source(source);
-    let mut printer = make_printer(
-        &arena,
+    let inputs = PrinterInputs {
         source,
-        Rc::clone(&program.interner),
-        &program.comments,
-        &program.line_breaks,
-        EmbedContext::default(),
+        interner: Rc::clone(&program.interner),
+        comments: &program.comments,
+        line_breaks: &program.line_breaks,
         ts_context,
-    );
+    };
+    let mut printer = make_printer(&arena, &inputs, EmbedContext::default());
     printer.print_program(program);
     printer.into_string()
 }
@@ -229,30 +234,17 @@ pub fn parse_expression_with_comments(
 /// Format a single TypeScript expression to a string.
 ///
 /// `expression` was parsed as part of a larger document (e.g., a Svelte
-/// template); `source` is the full document the expression's spans index into.
-/// `embed.base_indent_offset` seeds the printer's indent level so wrapped
+/// template); `inputs.source` is the full document the expression's spans index
+/// into. `embed.base_indent_offset` seeds the printer's indent level so wrapped
 /// lines (method chains, multiline arrays) indent relative to the surrounding
 /// context.
-#[allow(clippy::too_many_arguments)]
 pub fn format_expression(
     expression: &Expression,
-    source: &str,
-    interner: SharedInterner,
-    comments: &[ast::Comment],
-    line_breaks: &[u32],
+    inputs: &PrinterInputs,
     embed: EmbedContext,
-    ts_context: TsContext,
 ) -> String {
-    let arena = DocArena::for_source(source);
-    let mut printer = make_printer(
-        &arena,
-        source,
-        interner,
-        comments,
-        line_breaks,
-        embed,
-        ts_context,
-    );
+    let arena = DocArena::for_source(inputs.source);
+    let mut printer = make_printer(&arena, inputs, embed);
     printer.set_indent_level(embed.base_indent_offset);
     printer.print_expression(expression);
     printer.into_string()
@@ -350,27 +342,14 @@ pub fn parse_expression_partial_with_comments(
 
 /// Build a DocId for a TypeScript expression with comments in the caller's arena.
 ///
-/// Pass `&[]` for comments when no comments need to be preserved.
-#[allow(clippy::too_many_arguments)]
+/// Set `inputs.comments` to `&[]` when no comments need to be preserved.
 pub fn build_expression_doc_with_comments(
     arena: &DocArena,
     expression: &Expression,
-    source: &str,
-    interner: SharedInterner,
+    inputs: &PrinterInputs,
     embed: &EmbedContext,
-    comments: &[ast::Comment],
-    line_breaks: &[u32],
-    ts_context: TsContext,
 ) -> DocId {
-    let printer = make_printer(
-        arena,
-        source,
-        interner,
-        comments,
-        line_breaks,
-        *embed,
-        ts_context,
-    );
+    let printer = make_printer(arena, inputs, *embed);
     printer.build_expression_doc(expression)
 }
 
@@ -385,15 +364,14 @@ pub fn build_program_doc(
     embed: EmbedContext,
     ts_context: TsContext,
 ) -> DocId {
-    let printer = make_printer(
-        arena,
+    let inputs = PrinterInputs {
         source,
-        Rc::clone(&program.interner),
-        &program.comments,
-        &program.line_breaks,
-        embed,
+        interner: Rc::clone(&program.interner),
+        comments: &program.comments,
+        line_breaks: &program.line_breaks,
         ts_context,
-    );
+    };
+    let printer = make_printer(arena, &inputs, embed);
     printer.build_program_doc(program)
 }
 

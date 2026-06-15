@@ -6,6 +6,7 @@
 use crate::ast::internal::Expression;
 use crate::printer::comments::CommentSpacing;
 use crate::printer::{ParenContext, Printer, needs_parens};
+use tsv_lang::TAB_WIDTH;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
 
@@ -147,7 +148,7 @@ impl<'a> Printer<'a> {
                 .chars()
                 .take_while(|c| *c == '\t' || *c == ' ')
                 .count();
-            visual_width(&after_nl[..ws_end], tsv_lang::TAB_WIDTH)
+            visual_width(&after_nl[..ws_end], TAB_WIDTH)
         } else {
             0
         }
@@ -169,13 +170,12 @@ impl<'a> Printer<'a> {
             return doc;
         }
         let d = self.d();
-        let tab_width = tsv_lang::TAB_WIDTH;
         // In prettier's useTabs renderer, align(n%tw) creates a WIDTH command
         // that adds lastTabs=1 + lastSpaces=n%tw. When followed by INDENT,
         // flushTabs() emits the pending tab and resetLast() drops the fractional
         // spaces. So align(r) + indent effectively rounds up to a full tab.
         // Match this by using ceiling division for the indent count.
-        let n = size.div_ceil(tab_width);
+        let n = size.div_ceil(TAB_WIDTH);
         let mut result = doc;
         for _ in 0..n {
             result = d.indent(result);

@@ -19,6 +19,7 @@ use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
 use crate::printer::layout::hang_after_operator;
+use tsv_lang::INDENT;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
@@ -253,7 +254,7 @@ impl<'a> Printer<'a> {
                     // Literal tab text (not d.indent) shifts only the first line
                     // without increasing the structural indent level for nested
                     // content.
-                    d.concat(&[d.hardline(), d.text(tsv_lang::INDENT), branch_doc])
+                    d.concat(&[d.hardline(), d.text(INDENT), branch_doc])
                 } else {
                     d.concat(&[d.text(" "), branch_doc])
                 }
@@ -476,7 +477,7 @@ impl<'a> Printer<'a> {
             if prev_was_line_comment {
                 // Line comments end the line, so subsequent comments need a new line
                 q_parts.push(d.hardline());
-                q_parts.push(d.text(tsv_lang::INDENT));
+                q_parts.push(d.text(INDENT));
             } else {
                 q_parts.push(d.text(" "));
             }
