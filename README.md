@@ -209,7 +209,7 @@ tsv/
 └── tests/              # workspace-level integration tests
 ```
 
-Each language crate exports a clean API:
+Each language crate exports a consistent API:
 
 - `parse(source) -> Result<AST>`
 - `format(ast, source) -> String`
@@ -219,7 +219,7 @@ See [CLAUDE.md](CLAUDE.md) for detailed structure and full command reference.
 
 ## Credits
 
-tsv is an implementation of software designs and specs:
+tsv is an implementation of various software designs and specs:
 
 Software:
 
