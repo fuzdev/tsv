@@ -70,6 +70,19 @@ const samples: Sample[] = [
 		type: 'Program',
 	},
 	{
+		// Import attributes: bare `Identifier` key and quoted `Literal` key
+		// (the `key: Identifier | Literal` union), on import + both re-export hosts.
+		name: 'ts_import_attributes',
+		source: [
+			'import a from "./a" with { type: "json" };',
+			'import b from "./b" with { "resolution-mode": "import" };',
+			'export { c } from "./c" with { type: "json" };',
+			'export * from "./d" with { type: "json" };',
+		].join('\n'),
+		parser: 'typescript',
+		type: 'Program',
+	},
+	{
 		name: 'css_rule_at_media',
 		source: '.foo { color: red; }\n@media (min-width: 600px) {\n\t.bar { padding: 1em 2em; }\n}',
 		parser: 'css',

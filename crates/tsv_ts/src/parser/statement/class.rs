@@ -99,6 +99,7 @@ impl<'a> Parser<'a> {
                     declaration: Some(Box::new(Statement::ClassDeclaration(class))),
                     specifiers: Vec::new(),
                     source: None,
+                    attributes: None,
                     export_kind: ExportKind::Value,
                     span: Span::new(start as u32, end),
                 }))

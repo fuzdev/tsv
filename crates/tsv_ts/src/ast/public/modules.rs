@@ -166,7 +166,7 @@ pub struct ImportNamespaceSpecifier {
     pub local: Identifier,
 }
 
-/// Import attribute: `{ type: "json" }`
+/// Import attribute: `{ type: "json" }` or `{ "resolution-mode": "import" }`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportAttribute {
     #[serde(rename = "type")]
@@ -174,8 +174,18 @@ pub struct ImportAttribute {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    pub key: Identifier,
+    pub key: ImportAttributeKey,
     pub value: Literal,
+}
+
+/// Import attribute key: a bare `Identifier` (`type`) or a `Literal` string
+/// (`"resolution-mode"`). Acorn emits whichever the source used; serialized
+/// untagged (each variant carries its own `type` discriminator).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ImportAttributeKey {
+    Identifier(Identifier),
+    Literal(Literal),
 }
 
 /// TypeScript import equals declaration: `import x = require("y")` or `import x = A.B`

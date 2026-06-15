@@ -739,28 +739,37 @@ impl<'a> Printer<'a> {
         raw.len() >= 2 && raw[1..raw.len() - 1] == *content
     }
 
+    /// Emit a string-literal key with prettier's `quoteProps: as-needed`: drop the
+    /// quotes when the raw text is already a valid identifier (`'type'` → `type`),
+    /// else keep them and normalize the quote style. Keeping quotes covers
+    /// non-identifier keys (`'kebab-case'`) and escape-bearing keys (`'b'`) whose
+    /// escapes must be preserved (see [`Self::string_key_unquotes`]). Shared by
+    /// object property keys and import-attribute keys.
+    pub(in crate::printer) fn build_string_literal_key_doc(
+        &self,
+        lit: &Literal,
+        content: &str,
+    ) -> DocId {
+        let d = self.d();
+        if self.string_key_unquotes(lit, content) {
+            d.text_owned(content.to_string())
+        } else {
+            d.text_owned(format_string_literal_from_ast(lit, self.source))
+        }
+    }
+
     /// Build a Doc for a property key
     ///
     /// String literal keys that are valid identifiers are output without quotes.
     /// Example: `{"key": 1}` → `{key: 1}`, but `{"kebab-case": 1}` keeps quotes.
     pub(in crate::printer) fn build_property_key_doc(&self, key: &Expression) -> DocId {
-        let d = self.d();
         match key {
             Expression::Literal(
                 lit @ Literal {
                     value: LiteralValue::String { content, .. },
                     ..
                 },
-            ) => {
-                if self.string_key_unquotes(lit, content) {
-                    d.text_owned(content.clone())
-                } else {
-                    // Keep quotes (and apply quote optimization). Covers
-                    // non-identifier keys (`'kebab-case'`) and escape-bearing
-                    // keys (`'b'`) whose escapes must be preserved.
-                    d.text_owned(format_string_literal_from_ast(lit, self.source))
-                }
-            }
+            ) => self.build_string_literal_key_doc(lit, content),
             _ => self.build_expression_doc(key),
         }
     }

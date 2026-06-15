@@ -41,10 +41,10 @@ pub use declarations::{
 // Modules (imports/exports)
 pub use modules::{
     ExportAllDeclaration, ExportDefaultDeclaration, ExportDefaultValue, ExportFunctionDeclaration,
-    ExportKind, ExportNamedDeclaration, ExportSpecifier, ImportAttribute, ImportDeclaration,
-    ImportDefaultSpecifier, ImportKind, ImportNamedSpecifier, ImportNamespaceSpecifier,
-    ImportSpecifier, TSExportAssignment, TSExternalModuleReference, TSImportEqualsDeclaration,
-    TSModuleReference,
+    ExportKind, ExportNamedDeclaration, ExportSpecifier, ImportAttribute, ImportAttributeKey,
+    ImportDeclaration, ImportDefaultSpecifier, ImportKind, ImportNamedSpecifier,
+    ImportNamespaceSpecifier, ImportSpecifier, TSExportAssignment, TSExternalModuleReference,
+    TSImportEqualsDeclaration, TSModuleReference,
 };
 
 // Classes

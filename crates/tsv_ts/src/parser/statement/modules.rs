@@ -15,6 +15,7 @@ fn export_named(start: usize, declaration: Statement, export_kind: ExportKind) -
         declaration: Some(Box::new(declaration)),
         specifiers: Vec::new(),
         source: None,
+        attributes: None,
         export_kind,
         span: Span::new(start as u32, end),
     })
@@ -289,11 +290,14 @@ impl<'a> Parser<'a> {
 
         // Parse source string
         let source = self.parse_string_literal()?;
+        // Parse import attributes: `with { type: "json" }`
+        let attributes = self.parse_import_attributes()?;
         let end = self.semicolon_end()?;
 
         Ok(Statement::ExportAllDeclaration(ExportAllDeclaration {
             exported,
             source,
+            attributes,
             export_kind,
             span: Span::new(start, end),
         }))
@@ -364,13 +368,18 @@ impl<'a> Parser<'a> {
         }
         self.advance()?;
 
-        // Check for 'from "source"'
-        let source = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::From)) {
-            self.advance()?;
-            Some(self.parse_string_literal()?)
-        } else {
-            None
-        };
+        // Check for 'from "source"', then optional import attributes. Per the
+        // spec a `with` clause attaches only to a re-export (`export … from …`),
+        // so attributes stay empty for a local `export { x }`.
+        let (source, attributes) =
+            if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::From)) {
+                self.advance()?;
+                let source = self.parse_string_literal()?;
+                let attributes = self.parse_import_attributes()?;
+                (Some(source), attributes)
+            } else {
+                (None, None)
+            };
 
         let end = self.semicolon_end()?;
 
@@ -378,6 +387,7 @@ impl<'a> Parser<'a> {
             declaration: None,
             specifiers,
             source,
+            attributes,
             export_kind,
             span: Span::new(start, end),
         }))
@@ -457,7 +467,7 @@ impl<'a> Parser<'a> {
         if matches!(self.current_kind(), TokenKind::String) {
             let source = self.parse_string_literal()?;
             // Check for import attributes after source
-            let (attributes, _attr_end) = self.parse_import_attributes()?;
+            let attributes = self.parse_import_attributes()?;
             let end = self.semicolon_end()?;
 
             return Ok(Statement::ImportDeclaration(ImportDeclaration {
@@ -639,7 +649,7 @@ impl<'a> Parser<'a> {
         let source = self.parse_string_literal()?;
 
         // Parse import attributes: `with { type: "json" }`
-        let (attributes, _attr_end) = self.parse_import_attributes()?;
+        let attributes = self.parse_import_attributes()?;
 
         let end = self.semicolon_end()?;
 
@@ -652,14 +662,15 @@ impl<'a> Parser<'a> {
         }))
     }
 
-    /// Parse import attributes: `with { type: "json" }`
-    /// Returns (attributes, end_position) where end_position is Some if attributes were parsed
-    fn parse_import_attributes(
-        &mut self,
-    ) -> Result<(Vec<ImportAttribute>, Option<u32>), ParseError> {
+    /// Parse import attributes: `with { type: "json" }`.
+    ///
+    /// `None` when there is no `with` clause; `Some(vec)` when one is present —
+    /// `Some([])` for an empty `with {}`, which is preserved (acorn/prettier
+    /// keep it).
+    fn parse_import_attributes(&mut self) -> Result<Option<Vec<ImportAttribute>>, ParseError> {
         // Check for 'with' keyword (contextual - it's an identifier, not a keyword)
         if !matches!(self.current_kind(), TokenKind::Identifier) || self.current_value() != "with" {
-            return Ok((Vec::new(), None));
+            return Ok(None);
         }
         self.advance()?; // consume 'with'
 
@@ -670,19 +681,38 @@ impl<'a> Parser<'a> {
         self.advance()?;
 
         let mut attributes = Vec::new();
+        // Decoded `[[Key]]` StringValues seen so far, for the duplicate-key early
+        // error (ecma262 §sec-imports-static-semantics-early-errors).
+        let mut seen_keys: Vec<String> = Vec::new();
 
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
             let (attr_start, _) = self.current_pos();
 
-            // Parse attribute key (identifier)
-            if !matches!(self.current_kind(), TokenKind::Identifier) {
-                return Err(self.error_expected("identifier as import attribute key"));
-            }
-            let (key_start, key_end) = self.current_pos();
-            let key_symbol = self.intern_identifier();
-            self.advance()?;
+            // Parse attribute key — an `IdentifierName` (`type`, or a reserved
+            // word like `default`) or a string literal (`'resolution-mode'`).
+            // Per ecma262 `AttributeKey : IdentifierName | StringLiteral`.
+            let key = if matches!(self.current_kind(), TokenKind::String) {
+                ImportAttributeKey::Literal(self.parse_string_literal()?)
+            } else if let Some(key_symbol) = self.try_intern_identifier_name() {
+                let (key_start, key_end) = self.current_pos();
+                self.advance()?;
+                ImportAttributeKey::Identifier(Identifier::simple(
+                    key_symbol,
+                    Span::new(key_start as u32, key_end as u32),
+                ))
+            } else {
+                return Err(self.error_expected("identifier or string as import attribute key"));
+            };
 
-            let key = Identifier::simple(key_symbol, Span::new(key_start as u32, key_end as u32));
+            // Duplicate-key check: keys with the same StringValue are a Syntax
+            // Error (`with {type:'a', type:'b'}` / `with {'type':'a', type:'b'}`).
+            let key_string = self.attribute_key_string(&key);
+            if seen_keys.iter().any(|k| k == &key_string) {
+                return Err(
+                    self.error_msg_at("Duplicated key in attributes", key.span().start as usize)
+                );
+            }
+            seen_keys.push(key_string);
 
             // Expect colon
             if !matches!(self.current_kind(), TokenKind::Colon) {
@@ -711,10 +741,29 @@ impl<'a> Parser<'a> {
             }
         }
 
-        let (_, brace_end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
 
-        Ok((attributes, Some(brace_end as u32)))
+        Ok(Some(attributes))
+    }
+
+    /// The decoded `[[Key]]` StringValue of an import-attribute key (ecma262):
+    /// an identifier resolves to its name, a string literal to its decoded
+    /// content. Used to detect duplicate keys, where `type` and `'type'` collide.
+    fn attribute_key_string(&self, key: &ImportAttributeKey) -> String {
+        match key {
+            ImportAttributeKey::Identifier(id) => self
+                .interner
+                .borrow()
+                .resolve(id.name)
+                .unwrap_or("")
+                .to_string(),
+            ImportAttributeKey::Literal(Literal {
+                value: LiteralValue::String { content, .. },
+                ..
+            }) => content.clone(),
+            // Attribute keys are only identifiers or string literals.
+            ImportAttributeKey::Literal(_) => String::new(),
+        }
     }
 
     /// Parse `import x = require("y")` or `import x = A.B`

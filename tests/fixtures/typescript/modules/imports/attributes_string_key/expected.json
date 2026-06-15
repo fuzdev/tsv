@@ -1,0 +1,269 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 114,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 113,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 10,
+					"end": 63,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 54
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 17,
+							"end": 18,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 8
+								},
+								"end": {
+									"line": 2,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 17,
+								"end": 18,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 8
+									},
+									"end": {
+										"line": 2,
+										"column": 9
+									}
+								},
+								"name": "a"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 24,
+						"end": 27,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 15
+							},
+							"end": {
+								"line": 2,
+								"column": 18
+							}
+						},
+						"value": "a",
+						"raw": "'a'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 34,
+							"end": 61,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 25
+								},
+								"end": {
+									"line": 2,
+									"column": 52
+								}
+							},
+							"key": {
+								"type": "Literal",
+								"start": 34,
+								"end": 51,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 25
+									},
+									"end": {
+										"line": 2,
+										"column": 42
+									}
+								},
+								"value": "resolution-mode",
+								"raw": "'resolution-mode'"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 53,
+								"end": 61,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 44
+									},
+									"end": {
+										"line": 2,
+										"column": 52
+									}
+								},
+								"value": "import",
+								"raw": "'import'"
+							}
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 65,
+					"end": 103,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 39
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 72,
+							"end": 73,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 8
+								},
+								"end": {
+									"line": 3,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 72,
+								"end": 73,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 8
+									},
+									"end": {
+										"line": 3,
+										"column": 9
+									}
+								},
+								"name": "b"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 79,
+						"end": 82,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 15
+							},
+							"end": {
+								"line": 3,
+								"column": 18
+							}
+						},
+						"value": "b",
+						"raw": "'b'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 89,
+							"end": 101,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 25
+								},
+								"end": {
+									"line": 3,
+									"column": 37
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 89,
+								"end": 93,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 25
+									},
+									"end": {
+										"line": 3,
+										"column": 29
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 95,
+								"end": 101,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 31
+									},
+									"end": {
+										"line": 3,
+										"column": 37
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							}
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

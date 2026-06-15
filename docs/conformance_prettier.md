@@ -396,6 +396,8 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Export specifiers to `from` → Into the specifier braces — [from_comment](../tests/fixtures/typescript/modules/exports/from_comment_prettier_divergence/)
 - Import source to `with` (line) → After `;` — [with_keyword_comment](../tests/fixtures/typescript/modules/imports/with_keyword_comment_prettier_divergence/)
 - Import `with` to attributes `{` → Before `with` (block) / `;` (line) — [with_keyword_comment](../tests/fixtures/typescript/modules/imports/with_keyword_comment_prettier_divergence/)
+- Re-export attributes header (`with`→`{`, after `}`) → Before `with` (block) / into braces — [exports/attributes_comment](../tests/fixtures/typescript/modules/exports/attributes_comment_prettier_divergence/)
+- Empty `with {}` comment (`with`→`{`, inside `{}`, after `}`) → Before `with` — [attributes_empty_comment](../tests/fixtures/typescript/modules/imports/attributes_empty_comment_prettier_divergence/)
 - Import source to `;` (line) → After `;` — [source_trailing_comment](../tests/fixtures/typescript/modules/imports/source_trailing_comment_prettier_divergence/)
 - Re-export source to `;` (line) → After `;` — [all_source_trailing_comment](../tests/fixtures/typescript/modules/exports/all_source_trailing_comment_prettier_divergence/)
 - Import-equals ref to `;` (line) → After `;` — [equals_trailing_comment](../tests/fixtures/typescript/modules/imports/equals_trailing_comment_prettier_divergence/)

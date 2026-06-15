@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 53,
+	"end": 77,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -25,24 +25,40 @@
 					"column": 19
 				}
 			}
+		},
+		{
+			"type": "Block",
+			"value": " [ ",
+			"start": 55,
+			"end": 62,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 12
+				},
+				"end": {
+					"line": 3,
+					"column": 19
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 52,
+		"end": 76,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 43,
+			"end": 67,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 3,
+					"line": 4,
 					"column": 9
 				}
 			},
@@ -160,6 +176,122 @@
 									"end": 38
 								}
 							]
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 44,
+					"end": 66,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 23
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 49,
+						"end": 50,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSIndexedAccessType",
+						"start": 53,
+						"end": 65,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 3,
+								"column": 22
+							}
+						},
+						"objectType": {
+							"type": "TSTypeReference",
+							"start": 53,
+							"end": 54,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 10
+								},
+								"end": {
+									"line": 3,
+									"column": 11
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 53,
+								"end": 54,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 10
+									},
+									"end": {
+										"line": 3,
+										"column": 11
+									}
+								},
+								"name": "U"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " [ ",
+									"start": 55,
+									"end": 62
+								}
+							]
+						},
+						"indexType": {
+							"type": "TSTypeReference",
+							"start": 63,
+							"end": 64,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 20
+								},
+								"end": {
+									"line": 3,
+									"column": 21
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 63,
+								"end": 64,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 20
+									},
+									"end": {
+										"line": 3,
+										"column": 21
+									}
+								},
+								"name": "K"
+							}
 						}
 					}
 				}

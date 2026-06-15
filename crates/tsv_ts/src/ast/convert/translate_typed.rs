@@ -488,7 +488,10 @@ impl Translator<'_> {
         if let Some(attributes) = attributes {
             for a in attributes {
                 span!(self, a);
-                self.identifier(&mut a.key);
+                match &mut a.key {
+                    ImportAttributeKey::Identifier(id) => self.identifier(id),
+                    ImportAttributeKey::Literal(lit) => span!(self, lit),
+                }
                 span!(self, a.value);
             }
         }

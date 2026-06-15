@@ -16,7 +16,9 @@ import { Biome } from '@biomejs/js-api/bundler';
  *
  * Supports:
  * - Format: Svelte, TypeScript, JS, CSS
- * - Parse: Not implemented in benchmarks
+ * - Parse: unsupported — the `@biomejs/js-api` package exposes no parse entry
+ *   point (only `formatContent`/`lintContent`/`fixFile`); Biome parses
+ *   internally but never surfaces the AST across the JS boundary.
  */
 export class BiomeImplementation implements TsvImplementation {
 	name = 'biome-wasm' as const;
@@ -24,7 +26,7 @@ export class BiomeImplementation implements TsvImplementation {
 	private _biome: Biome | null = null;
 	private _project_key: number | null = null;
 
-	/** Languages supported for parsing (none - not implemented) */
+	/** Languages supported for parsing (none — the js-api exposes no parser) */
 	static readonly PARSE_LANGUAGES: Language[] = [];
 
 	/** Languages supported for formatting */
@@ -72,7 +74,7 @@ export class BiomeImplementation implements TsvImplementation {
 	}
 
 	parse(_source: string, _language: Language): unknown {
-		throw new Error('Biome parse not implemented in benchmarks');
+		throw new Error('Biome has no parser: the @biomejs/js-api package exposes no parse API');
 	}
 
 	format(source: string, language: Language): string {

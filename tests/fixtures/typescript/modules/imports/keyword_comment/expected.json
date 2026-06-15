@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 842,
+	"end": 1056,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -300,9 +300,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " block comment between from and source (with specifiers)",
+			"value": " empty braces enclosing a comment with a `}` glyph (relocated after from)",
 			"start": 743,
-			"end": 801,
+			"end": 818,
 			"loc": {
 				"start": {
 					"line": 30,
@@ -310,6 +310,70 @@
 				},
 				"end": {
 					"line": 30,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " } ",
+			"start": 835,
+			"end": 842,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 16
+				},
+				"end": {
+					"line": 31,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " empty braces enclosing a comment with a `{` glyph (relocated after from)",
+			"start": 850,
+			"end": 925,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 1
+				},
+				"end": {
+					"line": 33,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " { ",
+			"start": 942,
+			"end": 949,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 16
+				},
+				"end": {
+					"line": 34,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment between from and source (with specifiers)",
+			"start": 957,
+			"end": 1015,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1
+				},
+				"end": {
+					"line": 36,
 					"column": 59
 				}
 			}
@@ -317,15 +381,15 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 819,
-			"end": 826,
+			"start": 1033,
+			"end": 1040,
 			"loc": {
 				"start": {
-					"line": 31,
+					"line": 37,
 					"column": 17
 				},
 				"end": {
-					"line": 31,
+					"line": 37,
 					"column": 24
 				}
 			}
@@ -334,19 +398,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 841,
+		"end": 1055,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 832,
+			"end": 1046,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 32,
+					"line": 38,
 					"column": 9
 				}
 			},
@@ -765,8 +829,8 @@
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 803,
-					"end": 831,
+					"start": 820,
+					"end": 847,
 					"loc": {
 						"start": {
 							"line": 31,
@@ -774,6 +838,106 @@
 						},
 						"end": {
 							"line": 31,
+							"column": 28
+						}
+					},
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 843,
+						"end": 846,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 24
+							},
+							"end": {
+								"line": 31,
+								"column": 27
+							}
+						},
+						"value": "j",
+						"raw": "'j'",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " } ",
+								"start": 835,
+								"end": 842
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " empty braces enclosing a comment with a `}` glyph (relocated after from)",
+							"start": 743,
+							"end": 818
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 927,
+					"end": 954,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 28
+						}
+					},
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 950,
+						"end": 953,
+						"loc": {
+							"start": {
+								"line": 34,
+								"column": 24
+							},
+							"end": {
+								"line": 34,
+								"column": 27
+							}
+						},
+						"value": "k",
+						"raw": "'k'",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " { ",
+								"start": 942,
+								"end": 949
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " empty braces enclosing a comment with a `{` glyph (relocated after from)",
+							"start": 850,
+							"end": 925
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 1017,
+					"end": 1045,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
 							"column": 29
 						}
 					},
@@ -781,29 +945,29 @@
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
-							"start": 811,
-							"end": 812,
+							"start": 1025,
+							"end": 1026,
 							"loc": {
 								"start": {
-									"line": 31,
+									"line": 37,
 									"column": 9
 								},
 								"end": {
-									"line": 31,
+									"line": 37,
 									"column": 10
 								}
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 811,
-								"end": 812,
+								"start": 1025,
+								"end": 1026,
 								"loc": {
 									"start": {
-										"line": 31,
+										"line": 37,
 										"column": 9
 									},
 									"end": {
-										"line": 31,
+										"line": 37,
 										"column": 10
 									}
 								},
@@ -811,15 +975,15 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 811,
-								"end": 812,
+								"start": 1025,
+								"end": 1026,
 								"loc": {
 									"start": {
-										"line": 31,
+										"line": 37,
 										"column": 9
 									},
 									"end": {
-										"line": 31,
+										"line": 37,
 										"column": 10
 									}
 								},
@@ -830,15 +994,15 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 827,
-						"end": 830,
+						"start": 1041,
+						"end": 1044,
 						"loc": {
 							"start": {
-								"line": 31,
+								"line": 37,
 								"column": 25
 							},
 							"end": {
-								"line": 31,
+								"line": 37,
 								"column": 28
 							}
 						},
@@ -848,8 +1012,8 @@
 							{
 								"type": "Block",
 								"value": " c ",
-								"start": 819,
-								"end": 826
+								"start": 1033,
+								"end": 1040
 							}
 						]
 					},
@@ -857,8 +1021,8 @@
 						{
 							"type": "Line",
 							"value": " block comment between from and source (with specifiers)",
-							"start": 743,
-							"end": 801
+							"start": 957,
+							"end": 1015
 						}
 					]
 				}
