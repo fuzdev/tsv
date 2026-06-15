@@ -200,6 +200,20 @@ impl<'a> Printer<'a> {
         self.source
     }
 
+    /// Standard [`tsv_ts::PrinterInputs`] for embedding TypeScript: this
+    /// document's source, interner, comments, and line breaks, in Svelte TS
+    /// context. Call sites needing empty comments override via
+    /// `PrinterInputs { comments: &[], ..self.ts_inputs() }`.
+    pub(crate) fn ts_inputs(&self) -> tsv_ts::PrinterInputs<'_> {
+        tsv_ts::PrinterInputs {
+            source: self.source,
+            interner: Rc::clone(&self.interner),
+            comments: self.comments,
+            line_breaks: &self.line_breaks,
+            ts_context: tsv_ts::TsContext::Svelte,
+        }
+    }
+
     /// Write indentation based on current indent level
     pub(crate) fn write_indent(&mut self) {
         tsv_lang::write_indent(&mut self.buffer, self.indent_level, tsv_lang::INDENT);
@@ -251,16 +265,7 @@ impl<'a> Printer<'a> {
     /// For calls that need a custom embed context or empty comments, use the
     /// tsv_ts functions directly.
     pub(crate) fn build_ts_expression_doc(&self, expr: &tsv_ts::Expression) -> DocId {
-        tsv_ts::build_expression_doc_with_comments(
-            self.d(),
-            expr,
-            self.source,
-            Rc::clone(&self.interner),
-            &self.embed,
-            self.comments,
-            &self.line_breaks,
-            tsv_ts::TsContext::Svelte,
-        )
+        tsv_ts::build_expression_doc_with_comments(self.d(), expr, &self.ts_inputs(), &self.embed)
     }
 
     /// Build a DocId for a TS expression without comments.
@@ -268,31 +273,22 @@ impl<'a> Printer<'a> {
     /// Used for contexts like @const patterns or this={expr} where no comments
     /// are expected between the expression and its container.
     pub(crate) fn build_ts_expression_doc_no_comments(&self, expr: &tsv_ts::Expression) -> DocId {
-        tsv_ts::build_expression_doc_with_comments(
-            self.d(),
-            expr,
-            self.source,
-            Rc::clone(&self.interner),
-            &self.embed,
-            &[],
-            &self.line_breaks,
-            tsv_ts::TsContext::Svelte,
-        )
+        let inputs = tsv_ts::PrinterInputs {
+            comments: &[],
+            ..self.ts_inputs()
+        };
+        tsv_ts::build_expression_doc_with_comments(self.d(), expr, &inputs, &self.embed)
     }
 
     /// Format a TS expression to a string.
     ///
     /// Returns a simple formatted string with no indent context or comments.
     pub(crate) fn format_ts_expression(&self, expr: &tsv_ts::Expression) -> String {
-        tsv_ts::format_expression(
-            expr,
-            self.source,
-            Rc::clone(&self.interner),
-            &[],
-            &self.line_breaks,
-            EmbedContext::default(),
-            tsv_ts::TsContext::Svelte,
-        )
+        let inputs = tsv_ts::PrinterInputs {
+            comments: &[],
+            ..self.ts_inputs()
+        };
+        tsv_ts::format_expression(expr, &inputs, EmbedContext::default())
     }
 }
 
