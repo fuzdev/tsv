@@ -163,7 +163,12 @@ Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
 
 **Async generic arrow params**: acorn-typescript drops all function parameters from `async` arrow functions that have type parameters (`async <T,>(x: T) => x` → `params: []`). Non-async generic arrows are unaffected. This is semantic corruption — tools consuming the AST would see zero-argument functions. **Upstream candidate**: acorn-typescript async arrow parsing.
 
-Fixtures: [async_generic/basic](../tests/fixtures/typescript/expressions/arrow/async_generic/basic_svelte_divergence/), [async_generic/basic_ts](../tests/fixtures/typescript/expressions/arrow/async_generic/basic_ts_svelte_divergence/), [async_generic/long](../tests/fixtures/typescript/expressions/arrow/async_generic/long_svelte_divergence/), [curried_typed_callback](../tests/fixtures/typescript/expressions/arrow/curried_typed_callback_svelte_divergence/), [indexed_access/basic](../tests/fixtures/typescript/types/indexed_access/basic_svelte_divergence/)
+Fixtures: [async_generic/basic](../tests/fixtures/typescript/expressions/arrow/async_generic/basic_svelte_prettier_divergence/), [async_generic/basic_ts](../tests/fixtures/typescript/expressions/arrow/async_generic/basic_ts_svelte_divergence/), [async_generic/long](../tests/fixtures/typescript/expressions/arrow/async_generic/long_svelte_divergence/), [curried_typed_callback](../tests/fixtures/typescript/expressions/arrow/curried_typed_callback_svelte_prettier_divergence/), [indexed_access/basic](../tests/fixtures/typescript/types/indexed_access/basic_svelte_divergence/)
+
+The `async_generic/basic` and `curried_typed_callback` fixtures carry a second,
+independent divergence — prettier's forced `<T,>` trailing comma on single-unconstrained
+arrow type params (hence the `_svelte_prettier_divergence` suffix). See
+[conformance_prettier.md](./conformance_prettier.md) §TypeScript.
 
 **Member access on a parenthesized decorator expression** (`@(f()).g a;`):
 acorn-typescript only accepts a call after a parenthesized decorator

@@ -745,30 +745,20 @@ impl<'a> Printer<'a> {
             .map(|param| self.build_type_parameter_doc(param, false))
             .collect();
 
-        // Svelte disambiguation: single param without constraint needs trailing comma
-        // in Svelte files to avoid confusion with template syntax like `<Component>`.
-        // In pure .ts files (`TsContext::Standalone`), no trailing comma needed.
-        let needs_trailing_comma = self.ts_context.arrow_type_param_trailing_comma()
-            && decl.params.len() == 1
-            && decl.params[0].constraint.is_none();
-        let inner_parts = if needs_trailing_comma {
-            d.concat(&[d.join(param_docs, ", "), d.text(",")])
-        } else {
-            d.join_trailing(param_docs, d.comma_line())
-        };
+        // A bare `<T>` is the canonical form everywhere. Prettier forces a trailing
+        // comma (`<T,>`) on single-unconstrained arrow type params to stay valid as
+        // TSX, but tsv never emits TSX and Svelte's parser accepts the bare form in
+        // every TS position, so the disambiguation is moot — see the
+        // single_type_param_prettier_divergence fixture. The trailing comma added
+        // here only appears when the group breaks across lines.
+        let inner_parts = d.join_trailing(param_docs, d.comma_line());
 
-        // Single param with trailing comma (Svelte disambiguation) stays inline —
-        // `<T,>` should never expand even when the parent group breaks.
-        let brackets_doc = if needs_trailing_comma {
-            d.concat(&[d.text("<"), inner_parts, d.text(">")])
-        } else {
-            d.concat(&[
-                d.text("<"),
-                d.indent_softline(inner_parts),
-                d.softline(),
-                d.text(">"),
-            ])
-        };
+        let brackets_doc = d.concat(&[
+            d.text("<"),
+            d.indent_softline(inner_parts),
+            d.softline(),
+            d.text(">"),
+        ]);
 
         d.group(brackets_doc)
     }

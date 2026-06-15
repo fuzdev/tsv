@@ -19,12 +19,9 @@
 //! ```
 
 pub mod ast;
-mod config;
 mod lexer;
 mod parser;
 mod printer;
-
-pub use config::TsContext;
 
 use std::rc::Rc;
 
@@ -34,10 +31,10 @@ pub use tsv_lang::{ParseError, Result, SharedInterner};
 
 /// The per-document environment shared by every formatting entry point: the
 /// source the AST's spans index into, the shared interner, the comment buffer,
-/// the precomputed line breaks, and the [`TsContext`]. Bundling these keeps the
-/// printer constructor — and the `tsv_svelte` embedding call sites — from
-/// re-threading the same five values. The [`EmbedContext`] and the
-/// expression/program being printed vary per call, so they stay separate args.
+/// and the precomputed line breaks. Bundling these keeps the printer
+/// constructor — and the `tsv_svelte` embedding call sites — from re-threading
+/// the same values. The [`EmbedContext`] and the expression/program being
+/// printed vary per call, so they stay separate args.
 pub struct PrinterInputs<'a> {
     /// Full source the AST's spans index into.
     pub source: &'a str,
@@ -47,8 +44,6 @@ pub struct PrinterInputs<'a> {
     pub comments: &'a [ast::Comment],
     /// Precomputed newline offsets for O(log n) line/column lookup.
     pub line_breaks: &'a [u32],
-    /// Standalone vs. Svelte-embedded TypeScript.
-    pub ts_context: TsContext,
 }
 
 /// Build a fully-configured printer borrowing the given arena and [`PrinterInputs`].
@@ -102,22 +97,12 @@ pub fn parse(source: &str) -> Result<Program> {
 /// assert_eq!(formatted, "const x = 42;\n");
 /// ```
 pub fn format(program: &Program, source: &str) -> String {
-    format_with_context(program, source, TsContext::Standalone)
-}
-
-/// Format an internal AST back to source code in a given [`TsContext`].
-///
-/// Standalone `.ts` callers use [`format`] ([`TsContext::Standalone`]);
-/// `tsv_svelte` passes [`TsContext::Svelte`] when formatting embedded
-/// TypeScript so `<T>` arrow type params get the disambiguating trailing comma.
-pub fn format_with_context(program: &Program, source: &str, ts_context: TsContext) -> String {
     let arena = DocArena::for_source(source);
     let inputs = PrinterInputs {
         source,
         interner: Rc::clone(&program.interner),
         comments: &program.comments,
         line_breaks: &program.line_breaks,
-        ts_context,
     };
     let mut printer = make_printer(&arena, &inputs, EmbedContext::default());
     printer.print_program(program);
@@ -362,14 +347,12 @@ pub fn build_program_doc(
     program: &Program,
     source: &str,
     embed: EmbedContext,
-    ts_context: TsContext,
 ) -> DocId {
     let inputs = PrinterInputs {
         source,
         interner: Rc::clone(&program.interner),
         comments: &program.comments,
         line_breaks: &program.line_breaks,
-        ts_context,
     };
     let printer = make_printer(arena, &inputs, embed);
     printer.build_program_doc(program)

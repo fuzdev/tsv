@@ -24,10 +24,10 @@
 	const h = (a: A, b: B) => (c, d): Handler => { return c; };
 
 	// Type parameters on outer arrow - ALWAYS breaks
-	const i = <T>(x: T) => (y) => x + y;
+	const i = <T extends A>(x: T) => (y) => x + y;
 
 	// Type parameters on inner arrow - ALWAYS breaks
-	const j = (x: T) => <U>(y: U) => x + y;
+	const j = (x: T) => <U extends B>(y: U) => x + y;
 
 	// Destructuring param - ALWAYS breaks
 	const k = ({a, b}) => (y) => a + b + y;

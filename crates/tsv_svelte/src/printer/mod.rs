@@ -203,8 +203,8 @@ impl<'a> Printer<'a> {
     }
 
     /// Standard [`tsv_ts::PrinterInputs`] for embedding TypeScript: this
-    /// document's source, interner, comments, and line breaks, in Svelte TS
-    /// context. Call sites needing empty comments override via
+    /// document's source, interner, comments, and line breaks. Call sites
+    /// needing empty comments override via
     /// `PrinterInputs { comments: &[], ..self.ts_inputs() }`.
     pub(crate) fn ts_inputs(&self) -> tsv_ts::PrinterInputs<'_> {
         tsv_ts::PrinterInputs {
@@ -212,7 +212,6 @@ impl<'a> Printer<'a> {
             interner: Rc::clone(&self.interner),
             comments: self.comments,
             line_breaks: &self.line_breaks,
-            ts_context: tsv_ts::TsContext::Svelte,
         }
     }
 
