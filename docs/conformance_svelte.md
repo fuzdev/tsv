@@ -257,12 +257,14 @@ All corrections exist because of upstream bugs. If fixed upstream, tsv would rem
 
 ### Comment Attachment Differences
 
-Acorn-typescript's backtrack-reparse behavior causes comment duplication in `trailingComments`/`leadingComments` that tsv doesn't replicate. These are cosmetic AST differences — the root `comments` array is identical. Fixtures use `expected_ours.json` + `expected_svelte.json`.
+Acorn-typescript's backtrack-reparse behavior causes comment duplication in `trailingComments`/`leadingComments` (and, for some constructs, in the root `comments` array itself) that tsv doesn't replicate. These are cosmetic AST differences — the set of distinct comments is identical, only multiplicity differs, and `ast_diff` confirms semantic equivalence. Fixtures use `expected_ours.json` + `expected_svelte.json`.
 
-| Context                            | Acorn attachment                                  | tsv attachment | Fixture                                                                                                                                   |
-| ---------------------------------- | ------------------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Return type to `;` (class methods) | `trailingComments` on type annotation (duplicate) | Not duplicated | [method_trailing_semicolon_comment](../tests/fixtures/typescript/declarations/class/method_trailing_semicolon_comment_svelte_divergence/) |
-| Return type to `;` (type members)  | `trailingComments` on type annotation (duplicate) | Not duplicated | [trailing_semicolon_comment](../tests/fixtures/typescript/types/type_members/trailing_semicolon_comment_svelte_divergence/)               |
+| Context                               | Acorn attachment                                           | tsv attachment | Fixture                                                                                                                                                   |
+| ------------------------------------- | ---------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Return type to `;` (class methods)    | `trailingComments` on type annotation (duplicate)          | Not duplicated | [method_trailing_semicolon_comment](../tests/fixtures/typescript/declarations/class/method_trailing_semicolon_comment_svelte_divergence/)                 |
+| Return type to `;` (type members)     | `trailingComments` on type annotation (duplicate)          | Not duplicated | [trailing_semicolon_comment](../tests/fixtures/typescript/types/type_members/trailing_semicolon_comment_svelte_divergence/)                               |
+| Index-signature in-bracket comments   | Root `comments` duplicate (before-key; type-lit after-key) | Single entry   | [index_signature_bracket_comment_positions](../tests/fixtures/typescript/types/type_members/index_signature_bracket_comment_positions_svelte_divergence/) |
+| Class index-signature in-bracket cmts | Root `comments` duplicate (before-key, after-key)          | Single entry   | [index_signature_bracket_comment_positions](../tests/fixtures/typescript/declarations/class/index_signature_bracket_comment_positions_svelte_divergence/) |
 
 ### Known Acorn-TypeScript Bugs (Not Corrections)
 
