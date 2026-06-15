@@ -587,6 +587,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 loc: create_location(param_prop.span, loc, offset),
                 accessibility: param_prop.accessibility.map(|a| a.as_str().to_string()),
                 readonly: param_prop.readonly,
+                r#override: param_prop.r#override,
                 parameter: Box::new(parameter),
             })
         }

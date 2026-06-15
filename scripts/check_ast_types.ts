@@ -57,7 +57,7 @@ const samples: Sample[] = [
 			'}',
 			'class C<T> extends Base implements I {',
 			'	#priv: T;',
-			'	constructor(public x: T) { super(); this.#priv = x; }',
+			'	constructor(public override readonly x: T) { super(); this.#priv = x; }',
 			'}',
 		].join('\n'),
 		parser: 'typescript',

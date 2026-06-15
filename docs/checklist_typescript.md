@@ -387,6 +387,7 @@ ES2015 module syntax with ES2024 additions.
 - Computed method names
 - Generator methods
 - Async methods
+- Empty members (stray `;` skipped, matching acorn — prettier strips them)
 
 ### Field Declarations (ES2022)
 
@@ -433,7 +434,7 @@ Note: Parameter decorators are not supported (legacy TypeScript only, not ES2023
 
 - `override` modifier - TS 4.3
 - `accessor` keyword - ES2022/TS 4.9
-- Parameter properties (`constructor(public x: T)`)
+- Parameter properties (`constructor(public x: T)`) — all modifiers: `public`/`private`/`protected`, `override`, `readonly` (canonical order `accessibility → override → readonly`)
 
 ---
 

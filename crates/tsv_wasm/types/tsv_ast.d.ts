@@ -853,6 +853,8 @@ export interface TSParameterProperty {
 	accessibility?: string;
 	/** Omitted from JSON when false. */
 	readonly?: boolean;
+	/** Omitted from JSON when false. */
+	override?: boolean;
 	parameter: Expression;
 }
 

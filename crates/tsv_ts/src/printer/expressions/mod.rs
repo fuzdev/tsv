@@ -773,13 +773,16 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = Vec::new();
 
-        // Print accessibility modifier
+        // Print modifiers in canonical TS order: accessibility, override, readonly
         if let Some(acc) = &param_prop.accessibility {
             parts.push(d.text(acc.as_str()));
             parts.push(d.text(" "));
         }
 
-        // Print readonly modifier
+        if param_prop.r#override {
+            parts.push(d.text("override "));
+        }
+
         if param_prop.readonly {
             parts.push(d.text("readonly "));
         }
