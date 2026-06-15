@@ -67,22 +67,8 @@ impl<'a> SvelteParser<'a> {
         let program =
             tsv_ts::parse_with_interner(content, content_start, Rc::clone(&self.interner))?;
 
-        // Recreate lexer starting from the closing tag position
-        // (same pattern as expression tags)
-        let remaining_source = &self.source[content_end..];
-        let mut new_lexer = crate::lexer::Lexer::new(remaining_source);
-
-        let (token_kind, token_start, token_end) = {
-            let token = new_lexer.next_token()?;
-            (token.kind, token.start, token.end)
-        };
-
-        self.lexer = new_lexer;
-        self.base_offset = content_end;
-        self.current_kind = token_kind;
-        self.current_start = content_end + token_start;
-        self.current_end = content_end + token_end;
-        self.peek_cache = None;
+        // Reposition the lexer to the closing `</script>` tag (resumes at `<`).
+        self.advance_to_position(content_end)?;
 
         // Verify it's the closing tag: </script>
         if !self.check(TokenKind::LeftAngle) {
