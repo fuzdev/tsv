@@ -3,11 +3,11 @@
 At 101 chars, Prettier tolerates the overage and keeps space-separated values inline. tsv breaks to stay within 100 chars.
 
 tsv: wraps space-separated values within comma-separated list items
-Prettier: allows 101 char lines (1 over print_width)
+Prettier: allows 101 char lines (1 over printWidth)
 
 ## Reason
 
-tsv treats print_width as a hard limit. At 100 and 102 chars both formatters match — this divergence only manifests at the 101-char boundary.
+tsv treats printWidth as a hard limit. At 100 and 102 chars both formatters match — this divergence only manifests at the 101-char boundary.
 
 ## Related
 

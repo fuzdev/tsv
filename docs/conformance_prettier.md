@@ -89,7 +89,7 @@ as `tabs + 2 spaces`. The result mixes tabs and spaces on a single indentation
 level.
 
 tsv rounds the 2-column offset up to one tab everywhere. At
-`tab_width = 2` the two are the same visual width; only the representation
+`tabWidth = 2` the two are the same visual width; only the representation
 differs (`⟨n+1 tabs⟩}` vs `⟨n tabs⟩··}`). This keeps indentation
 tab-width-agnostic: a reader viewing tabs at any width sees consistent
 structure, whereas Prettier's 2-space offset assumes the prefix is exactly 2
@@ -142,7 +142,7 @@ columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 
 **Space-separated value wrap**: Prettier doesn't wrap CSS space-separated values (e.g., `box-shadow`) when they exceed print width. A 101-char `box-shadow: var(--a) color-mix(...)` stays on one line. tsv wraps at the print width boundary, breaking between space-separated values. This respects the configured print width rather than allowing arbitrary overflows.
 
-**Comma+space value boundary**: When comma-separated values contain space-separated parts (like multiple `box-shadow` values), Prettier tolerates lines exceeding print_width. tsv breaks to stay within 100 chars. See `comma_space_separated_long/` for the matching behavior at 100 and 102 chars.
+**Comma+space value boundary**: When comma-separated values contain space-separated parts (like multiple `box-shadow` values), Prettier tolerates lines exceeding printWidth. tsv breaks to stay within 100 chars. See `comma_space_separated_long/` for the matching behavior at 100 and 102 chars.
 
 **Number dot-ident**: tsv matches Prettier's number normalization for all valid CSS — scientific-notation exponents (`1E+2`→`1e2`, `5e0`→`5`), trailing/leading zeros (`1.50`→`1.5`, `.5`→`0.5`), and a trailing dot before a terminator (`1.`→`1`, `1.e1`→`1e1`). This applies to declaration values and to `@media`/`@supports` preludes; `@container` preludes are left raw, matching Prettier. The lone divergence is the _invalid_ sequence `<number>.<ident>` (e.g. `1.px`, `1.foo`): Prettier merges it into a dimension (`1px`), but per CSS Syntax 3 §4.3.3 that is three tokens (`<number>` `<delim .>` `<ident>`), not a dimension — so tsv preserves the source verbatim. This only arises in invalid CSS; Prettier itself keeps `url(1.png)` unmerged.
 
