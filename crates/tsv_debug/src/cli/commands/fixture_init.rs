@@ -1,4 +1,5 @@
 use crate::deno;
+use crate::diff::LINE_WIDTH_THRESHOLD;
 use crate::fixtures::{self, InputType, find_input_file};
 use argh::FromArgs;
 use std::path::Path;
@@ -201,8 +202,6 @@ fn resolve_content(
 /// Shows lines at or near PRINT_WIDTH (90+), max width, and warns for `_long`
 /// directories where nothing is near the boundary.
 fn print_line_width_summary(content: &str, dir_path: &str) {
-    let threshold = 90; // Show lines at 90+ chars
-
     let lines: Vec<&str> = content.lines().collect();
     if lines.is_empty() {
         return;
@@ -218,7 +217,7 @@ fn print_line_width_summary(content: &str, dir_path: &str) {
             max_width = width;
             max_line_num = idx + 1;
         }
-        if width >= threshold {
+        if width >= LINE_WIDTH_THRESHOLD {
             notable_lines.push((idx + 1, width));
         }
     }
@@ -241,7 +240,7 @@ fn print_line_width_summary(content: &str, dir_path: &str) {
 
     // Warn for _long directories where nothing is near PRINT_WIDTH
     let is_long_fixture = dir_path.contains("_long") || dir_path.ends_with("/long");
-    if is_long_fixture && max_width < threshold {
+    if is_long_fixture && max_width < LINE_WIDTH_THRESHOLD {
         eprintln!(
             "⚠ Warning: directory name suggests a boundary test but max width is {max_width} (need ~{PRINT_WIDTH})"
         );

@@ -3,16 +3,14 @@
 use std::fmt::Write;
 use std::io::IsTerminal;
 use std::str::FromStr;
+use tsv_lang::TAB_WIDTH;
 use tsv_lang::printing::visual_width;
 
 /// Indentation prefix for diff output lines
 const INDENT: &str = "           ";
 
-/// Default tab width for visual width calculations (matches prettier)
-const TAB_WIDTH: usize = 2;
-
 /// Only show line widths when they exceed this threshold
-const LINE_WIDTH_THRESHOLD: usize = 90;
+pub(crate) const LINE_WIDTH_THRESHOLD: usize = 90;
 
 /// Number of digits needed to display `n` (minimum 1)
 pub const fn digit_width(n: usize) -> usize {

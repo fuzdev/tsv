@@ -2,9 +2,7 @@ use crate::deno::{PrettierParser, run_prettier};
 use crate::diff::{digit_width, expand_tabs};
 use argh::FromArgs;
 use tsv_cli::cli::input::{Input, InputArgs, ParserType};
-
-/// Default tab width for visual width calculations (matches prettier)
-const TAB_WIDTH: usize = 2;
+use tsv_lang::TAB_WIDTH;
 
 /// Format code using prettier (with line width annotations by default).
 #[derive(FromArgs, Debug)]
