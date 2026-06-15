@@ -146,6 +146,8 @@ pub struct TSParameterProperty {
     pub accessibility: Option<Accessibility>,
     /// Whether the parameter is readonly
     pub readonly: bool,
+    /// Whether the parameter property carries the `override` modifier
+    pub r#override: bool,
     /// The actual parameter - can be Identifier or AssignmentPattern (with default value)
     pub parameter: Box<Expression>,
     pub span: Span,
