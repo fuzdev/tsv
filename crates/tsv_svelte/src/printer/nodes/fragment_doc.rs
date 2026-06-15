@@ -14,7 +14,12 @@
 use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
+use smallvec::SmallVec;
 use tsv_lang::doc::arena::DocId;
+
+/// Inline buffer for one output line's docs. Most lines hold only a few, so
+/// `SmallVec` keeps the common case off the heap.
+type LineBuf = SmallVec<[DocId; 8]>;
 
 /// Position of a text node relative to its siblings.
 ///
@@ -566,8 +571,8 @@ impl<'a> Printer<'a> {
 
         // Use separate current_line and completed lines vectors to avoid unwrap calls.
         // The pattern: build current line, then push to lines when starting a new line.
-        let mut lines: Vec<Vec<DocId>> = Vec::new();
-        let mut current_line: Vec<DocId> = Vec::new();
+        let mut lines: Vec<LineBuf> = Vec::new();
+        let mut current_line: LineBuf = SmallVec::new();
 
         // Track if previous text ended with space (for inline-before-block pattern)
         let mut prev_text_has_trailing_space = false;
@@ -706,7 +711,7 @@ impl<'a> Printer<'a> {
                         }
                         // At most one blank line (2+ newlines → 1 blank line)
                         if newline_count >= 2 {
-                            lines.push(vec![]);
+                            lines.push(SmallVec::new());
                         }
                         prev_text_has_trailing_space = false; // Newline resets trailing space
                     } else if should_split_expressions {
