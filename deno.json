@@ -5,6 +5,8 @@
 		"build:all": "deno task build:release && deno task build:ffi && deno task build:packages",
 		"build:packages": "deno task build:npm:format && deno task build:wasm:deno && deno task build:npm:parse && deno task build:wasm:parse:deno && deno task build:npm:all && deno task build:wasm:all:deno",
 		"build:ffi": "cargo build -p tsv_ffi --release",
+		"build:ffi:format": "cargo build -p tsv_ffi --release --no-default-features --features format --target-dir target/ffi-format",
+		"build:ffi:parse": "cargo build -p tsv_ffi --release --no-default-features --features parse --target-dir target/ffi-parse",
 		"build:wasm:deno": "wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/format/deno -- --no-default-features --features format",
 		"build:wasm:parse:deno": "wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/parse/deno -- --no-default-features --features parse",
 		"build:wasm:all:deno": "wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/all/deno",
@@ -31,7 +33,7 @@
 		"conformance:audit": "cargo run -p tsv_debug --quiet conformance_audit",
 		"metrics": "cargo run -p tsv_debug --quiet metrics",
 
-		"bench": "deno task build:ffi && deno task build:wasm:deno && deno task build:wasm:parse:deno && deno task build:wasm:all:deno && deno task bench:run",
+		"bench": "deno task build:ffi && deno task build:ffi:format && deno task build:ffi:parse && deno task build:wasm:deno && deno task build:wasm:parse:deno && deno task build:wasm:all:deno && deno task bench:run",
 		"bench:run": "deno run --v8-flags=--expose-gc --allow-ffi --allow-read --allow-write=benches/deno/results --allow-run=git,gzip --allow-env --allow-net --allow-sys benches/deno/bench.ts",
 		"bench:clean": "rm -f benches/deno/results/baseline.json benches/deno/results/[0-9]*.json benches/deno/results/[0-9]*.md",
 		"smoke": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/smoke.ts",

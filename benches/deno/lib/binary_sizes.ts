@@ -36,6 +36,8 @@ export interface BinarySize {
  */
 const LABELS = {
 	tsv_native: 'tsv (native)',
+	tsv_format_native: 'tsv format (native)',
+	tsv_parse_native: 'tsv parse (native)',
 	tsv_format_wasm: 'tsv_format_wasm',
 	tsv_parse_wasm: 'tsv_parse_wasm',
 	tsv_wasm: 'tsv_wasm',
@@ -192,6 +194,29 @@ export async function collect_binary_sizes(
 			LABELS.tsv_native,
 			'native',
 			`${project_root}/target/release/${prefix}tsv_ffi.${ext}`,
+		);
+		// tsv format-only native — the native mirror of @fuzdev/tsv_format_wasm:
+		// dropping the convert/JSON layer (and the parse exports) leaves a
+		// scope-matched comparison against oxfmt (native), which is format-only
+		// too. Built into a separate target dir (deno task build:ffi:format) so it
+		// doesn't clobber the full libtsv_ffi the perf rows load; omitted from the
+		// table when that build hasn't been run.
+		await push_size(
+			staged,
+			LABELS.tsv_format_native,
+			'native',
+			`${project_root}/target/ffi-format/release/${prefix}tsv_ffi.${ext}`,
+		);
+		// tsv parse-only native — the native mirror of @fuzdev/tsv_parse_wasm:
+		// keeps the parse exports + the convert/JSON layer and drops the printers,
+		// so it's scope-matched to oxc-parser (native), which also materializes a
+		// JSON AST. Separate target dir (deno task build:ffi:parse); omitted when
+		// unbuilt.
+		await push_size(
+			staged,
+			LABELS.tsv_parse_native,
+			'native',
+			`${project_root}/target/ffi-parse/release/${prefix}tsv_ffi.${ext}`,
 		);
 	}
 
