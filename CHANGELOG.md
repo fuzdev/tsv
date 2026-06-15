@@ -12,6 +12,7 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
 <!-- bump: minor -->
 
 - various conformance fixes to the formatter and parser
+- reduce allocations using `SmallVec` and memoizations
 - formatting is now **non-configurable by design** — no config files, CLI flags,
   or runtime options, and none are planned (opinionated like `gofmt` and Black).
   Policy only — no change to formatter output or the published API
