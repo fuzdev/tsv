@@ -1,0 +1,572 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 498,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 48,
+				"end": 50,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 50,
+				"end": 81,
+				"data": " plain string attribute "
+			},
+			{
+				"type": "Text",
+				"start": 81,
+				"end": 82,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteElement",
+				"start": 82,
+				"end": 128,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 83
+					},
+					"end": {
+						"line": 7,
+						"column": 15,
+						"character": 97
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"tag": {
+					"type": "Literal",
+					"value": "hello",
+					"raw": "'hello'",
+					"start": 104,
+					"end": 109
+				}
+			},
+			{
+				"type": "Text",
+				"start": 128,
+				"end": 130,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 130,
+				"end": 158,
+				"data": " variable expression "
+			},
+			{
+				"type": "Text",
+				"start": 158,
+				"end": 159,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteElement",
+				"start": 159,
+				"end": 203,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 160
+					},
+					"end": {
+						"line": 10,
+						"column": 15,
+						"character": 174
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"tag": {
+					"type": "Identifier",
+					"start": 181,
+					"end": 184,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 22
+						},
+						"end": {
+							"line": 10,
+							"column": 25
+						}
+					},
+					"name": "tag"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 203,
+				"end": 205,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 205,
+				"end": 274,
+				"data": " string concatenation (not a Literal -> delegates to printJS) "
+			},
+			{
+				"type": "Text",
+				"start": 274,
+				"end": 275,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteElement",
+				"start": 275,
+				"end": 325,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 276
+					},
+					"end": {
+						"line": 13,
+						"column": 15,
+						"character": 290
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"tag": {
+					"type": "BinaryExpression",
+					"start": 297,
+					"end": 306,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 22
+						},
+						"end": {
+							"line": 13,
+							"column": 31
+						}
+					},
+					"left": {
+						"type": "Literal",
+						"start": 297,
+						"end": 300,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 22
+							},
+							"end": {
+								"line": 13,
+								"column": 25
+							}
+						},
+						"value": "a",
+						"raw": "'a'"
+					},
+					"operator": "+",
+					"right": {
+						"type": "Literal",
+						"start": 303,
+						"end": 306,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 28
+							},
+							"end": {
+								"line": 13,
+								"column": 31
+							}
+						},
+						"value": "b",
+						"raw": "'b'"
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 325,
+				"end": 327,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 327,
+				"end": 352,
+				"data": " template literal "
+			},
+			{
+				"type": "Text",
+				"start": 352,
+				"end": 353,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteElement",
+				"start": 353,
+				"end": 401,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 16,
+						"column": 1,
+						"character": 354
+					},
+					"end": {
+						"line": 16,
+						"column": 15,
+						"character": 368
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"tag": {
+					"type": "TemplateLiteral",
+					"start": 375,
+					"end": 382,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 22
+						},
+						"end": {
+							"line": 16,
+							"column": 29
+						}
+					},
+					"expressions": [],
+					"quasis": [
+						{
+							"type": "TemplateElement",
+							"start": 376,
+							"end": 381,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 23
+								},
+								"end": {
+									"line": 16,
+									"column": 28
+								}
+							},
+							"value": {
+								"raw": "hello",
+								"cooked": "hello"
+							},
+							"tail": true
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 401,
+				"end": 403,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 403,
+				"end": 447,
+				"data": " template literal with interpolation "
+			},
+			{
+				"type": "Text",
+				"start": 447,
+				"end": 448,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteElement",
+				"start": 448,
+				"end": 497,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 19,
+						"column": 1,
+						"character": 449
+					},
+					"end": {
+						"line": 19,
+						"column": 15,
+						"character": 463
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"tag": {
+					"type": "TemplateLiteral",
+					"start": 470,
+					"end": 478,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 22
+						},
+						"end": {
+							"line": 19,
+							"column": 30
+						}
+					},
+					"expressions": [
+						{
+							"type": "Identifier",
+							"start": 474,
+							"end": 475,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 26
+								},
+								"end": {
+									"line": 19,
+									"column": 27
+								}
+							},
+							"name": "x"
+						}
+					],
+					"quasis": [
+						{
+							"type": "TemplateElement",
+							"start": 471,
+							"end": 472,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 23
+								},
+								"end": {
+									"line": 19,
+									"column": 24
+								}
+							},
+							"value": {
+								"raw": "a",
+								"cooked": "a"
+							},
+							"tail": false
+						},
+						{
+							"type": "TemplateElement",
+							"start": 476,
+							"end": 477,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 28
+								},
+								"end": {
+									"line": 19,
+									"column": 29
+								}
+							},
+							"value": {
+								"raw": "b",
+								"cooked": "b"
+							},
+							"tail": true
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 48,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 39,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 26,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 17
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 14,
+							"end": 25,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 5
+								},
+								"end": {
+									"line": 2,
+									"column": 16
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 14,
+								"end": 17,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 5
+									},
+									"end": {
+										"line": 2,
+										"column": 8
+									}
+								},
+								"name": "tag"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 20,
+								"end": 25,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 11
+									},
+									"end": {
+										"line": 2,
+										"column": 16
+									}
+								},
+								"value": "div",
+								"raw": "'div'"
+							}
+						}
+					],
+					"kind": "let"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 28,
+					"end": 38,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 32,
+							"end": 37,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 5
+								},
+								"end": {
+									"line": 3,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 32,
+								"end": 33,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 5
+									},
+									"end": {
+										"line": 3,
+										"column": 6
+									}
+								},
+								"name": "x"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 36,
+								"end": 37,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 9
+									},
+									"end": {
+										"line": 3,
+										"column": 10
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

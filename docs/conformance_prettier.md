@@ -199,6 +199,7 @@ columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 | Block multiline attrs hug | Print width          | [block_multiline_attrs_content_hug](../tests/fixtures/svelte/elements/block_multiline_attrs_content_hug_prettier_divergence/) |
 | Fill expr break boundary  | Print width          | [fill_expr_break_boundary_long](../tests/fixtures/svelte/elements/fill_expr_break_boundary_long_prettier_divergence/)         |
 | @debug comments           | Content preservation | [debug_comment](../tests/fixtures/svelte/tags/debug/debug_comment_prettier_divergence/)                                       |
+| svelte:element `this`     | Prettier bug         | [svelte_element_this_string](../tests/fixtures/svelte/special_elements/svelte_element_this_string_prettier_divergence/)       |
 
 **Fill after inline**: Prettier's fill algorithm allows lines to exceed print width when text follows an inline element closing tag. Prettier produces 111 char lines, tsv breaks at exactly 100 chars.
 
@@ -217,6 +218,8 @@ columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 **Menu block element**: prettier-plugin-svelte's `blockElements` list includes `ol` and `ul` but omits `menu`. The HTML spec treats `<menu>` identically to `<ul>` — same `display: block`, same CSS rules (`padding-inline-start: 40px`, `counter-reset: list-item`). The spec explicitly says: _"The `menu` element is simply a semantic alternative to `ul`."_ tsv includes `<menu>` in the block element list (spec-compliant), causing block formatting (expanded content) where Prettier hugs content. This only manifests when compact input is formatted — both formatters preserve the block form if given it directly.
 
 **Block multiline attrs hug**: When whitespace-sensitive elements (`<pre>`, `<textarea>`) have multiline attributes and hugged content that would exceed print width, Prettier keeps `>{content}</tag>` on the attribute line (101+ chars). tsv breaks `>` to its own line (`\n>{content}`) to respect print width while preserving whitespace semantics (no text node added since `>` immediately precedes content).
+
+**svelte:element `this`**: prettier-plugin-svelte 4.x ignores `singleQuote` for a brace-wrapped string literal in `<svelte:element this={…}>`, always emitting double quotes (`this={'hello'}` → `this={"hello"}`), and skips escaping entirely — so `this={'a"b'}` becomes the invalid `this={"a"b"}` and `this={'a\b'}` corrupts to a backspace. tsv delegates the literal to the normal string printer, honoring `singleQuote` and escaping like any other string. The bug is narrow — only a *directly* brace-wrapped string literal triggers it; concatenations, template literals, and other expressions delegate to the JS printer and agree (boundary fixture [svelte_element_this](../tests/fixtures/svelte/special_elements/svelte_element_this/)). One adjacent facet diverges further: a *parenthesized* literal `this={('hello')}` collapses to the plain attribute `this="hello"` under prettier (structural rewrite), while tsv keeps `this={'hello'}` — encoded by the fixture's `unformatted_ours_paren` + `variant_paren_collapse` pair. A fix restoring JS-printer delegation has been prepared for prettier-plugin-svelte; once released and re-pinned, this divergence retires.
 
 ### Svelte: Attributes
 
