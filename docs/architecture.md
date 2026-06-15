@@ -188,7 +188,11 @@ time; the parse-capable builds (`@fuzdev/tsv_parse_wasm` and the full
 `@fuzdev/tsv_wasm`) opt in via the `tsv_wasm/parse` feature, which
 forwards to each language crate's `convert`. The parse-only build
 conversely omits the `tsv_wasm/format` feature, so the `format_*`
-exports and the printers behind them drop at link time. Third-party
+exports and the printers behind them drop at link time. `tsv_ffi`
+carries the same `format`/`parse` feature pair (default both), so the
+native C FFI binding tree-shakes identically — the benchmark builds
+format-only and parse-only `libtsv_ffi` variants to size them
+scope-matched against `oxfmt` and `oxc-parser`. Third-party
 Rust consumers that only need parse/format can follow the same pattern:
 
 ```toml

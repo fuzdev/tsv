@@ -10,10 +10,22 @@ repository.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-tsv_svelte = { workspace = true, features = ["convert"] }
-tsv_ts = { workspace = true, features = ["convert"] }
-tsv_css = { workspace = true, features = ["convert"] }
+tsv_svelte = { workspace = true }
+tsv_ts = { workspace = true }
+tsv_css = { workspace = true }
 serde_json.workspace = true
+
+[features]
+# Default build — both halves: the full libtsv_ffi the bench perf rows load and
+# any FFI host links against. The format-only size build uses
+# `--no-default-features --features format` (deno task build:ffi:format), the
+# native mirror of @fuzdev/tsv_format_wasm — it drops the convert/JSON layer.
+default = ["format", "parse"]
+# tsv_format_<lang> exports.
+format = []
+# tsv_parse_<lang> + tsv_parse_internal_<lang> exports plus the public-AST/JSON
+# convert layer they serialize through.
+parse = ["tsv_ts/convert", "tsv_css/convert", "tsv_svelte/convert"]
 
 # FFI requires unsafe code. Cargo replaces the whole [lints] table on
 # override (no partial inherit), so the workspace lints are re-declared

@@ -19,8 +19,9 @@
  * during measurement — the FFI library and the `pkg/all/deno` WASM bundle
  * (the default full build, supplying both the parse and format functions the
  * bench runs). Size-only artifacts like the subset `pkg/format/deno` and
- * `pkg/parse/deno` bundles aren't guarded: `binary_sizes.ts` already degrades
- * gracefully when they're absent.
+ * `pkg/parse/deno` WASM bundles and the `target/ffi-{format,parse}` FFI builds
+ * aren't guarded: `binary_sizes.ts` already degrades gracefully when they're
+ * absent.
  *
  * Escape hatch: set `BENCH_STALE_OK=1` to run anyway. A missing artifact is
  * always fatal (you can't measure what isn't there); `BENCH_STALE_OK=1`
