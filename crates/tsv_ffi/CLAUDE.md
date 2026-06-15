@@ -4,13 +4,24 @@
 
 ## Architecture Position
 
-Depends on `tsv_ts`, `tsv_css`, `tsv_svelte` (each with `convert` feature) and `tsv_lang` transitively. Sibling binding crate: [`tsv_wasm`](../tsv_wasm/) (WebAssembly). Consumers include Deno FFI, Python `ctypes`, and any other C-FFI host. N-API is not used.
+Depends on `tsv_ts`, `tsv_css`, `tsv_svelte` and `tsv_lang` transitively. Sibling binding crate: [`tsv_wasm`](../tsv_wasm/) (WebAssembly). Consumers include Deno FFI, Python `ctypes`, and any other C-FFI host. N-API is not used.
 
 Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-bindings).
 
+## Features
+
+Mirrors `tsv_wasm`'s split so the bench can size scope-matched native artifacts:
+
+| Feature  | Default | Enables                                                                                  |
+| -------- | ------- | ---------------------------------------------------------------------------------------- |
+| `format` | yes     | `tsv_format_<lang>` exports                                                               |
+| `parse`  | yes     | `tsv_parse_<lang>` + `tsv_parse_internal_<lang>` exports, and the `convert` layer on each language crate |
+
+The default both-features build is the full `libtsv_ffi` the bench perf rows load and any FFI host links. The size table also reports two subset builds, each into its own target dir so they don't clobber the full lib: `--no-default-features --features format` (the native mirror of `@fuzdev/tsv_format_wasm`, no convert layer, scope-matched to oxfmt) and `--no-default-features --features parse` (the mirror of `@fuzdev/tsv_parse_wasm`, printers dropped, scope-matched to oxc-parser). See `deno task build:ffi:format` / `build:ffi:parse`.
+
 ## Public API
 
-The `lang_bindings!` macro generates three `extern "C"` functions per language (svelte, typescript, css):
+The `lang_bindings!` macro generates three `extern "C"` functions per language (svelte, typescript, css) — the full default build; the `format`/`parse` features gate which are emitted (see [Features](#features) above):
 
 | Function                    | Returns                                                                                                            |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------ |

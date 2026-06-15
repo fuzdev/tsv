@@ -366,6 +366,10 @@ Things the published numbers measure that aren't quite what they look like:
   consumers ship the smaller `@fuzdev/tsv_format_wasm` (~2.2 MB, no convert
   layer) or `@fuzdev/tsv_parse_wasm` (~1.7 MB, no printers). The Binary
   Sizes table lists all three; the throughput rows reflect the full build.
+  The native `tsv` row is the same story: the perf row loads the full
+  `libtsv_ffi`, while the Binary Sizes table also lists `tsv format (native)`
+  and `tsv parse (native)` subset builds (no perf rows of their own — they
+  exist only to size scope-matched against `oxfmt` and `oxc-parser`).
 - **Intersection-corpus iteration (default)** — within each group, every
   impl is timed on the same all-N intersection: the set of files every impl
   in the group successfully processed during pre-flight. Ratios within a
@@ -627,7 +631,15 @@ counts make this immediately visible without needing `--verbose`.
 
 Benchmark output includes binary/WASM size comparison across implementations:
 
-- **`tsv`**: native FFI (`.so`/`.dylib`/`.dll`) and WASM (`.wasm`) from build output
+- **`tsv`**: native FFI (`.so`/`.dylib`/`.dll`) and WASM (`.wasm`) from build output.
+  Native ships three rows from one `tsv_ffi` crate via its `format`/`parse` features
+  (matching the three WASM rows): the full `libtsv_ffi` (`target/release`, both
+  features — the build the perf rows load), `tsv format (native)`
+  (`target/ffi-format/release`, `--features format`, no convert layer — scope-matched
+  to `oxfmt (native)`), and `tsv parse (native)` (`target/ffi-parse/release`,
+  `--features parse`, printers dropped — scope-matched to `oxc-parser (native)`).
+  `deno task bench` builds all three; the subset rows are omitted if those builds
+  haven't been run.
 - **biome**: WASM (`.wasm`) from Deno npm cache
 - **oxc-parser**: native binding (`.node`) and WASM (`.wasm` from `binding-wasm32-wasi`) from Deno npm cache
 - **oxfmt**: native binding (`.node`) from Deno npm cache (no WASM variant)

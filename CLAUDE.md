@@ -193,7 +193,9 @@ N-API is a maybe — the decision is deferred; there is currently no `tsv_napi` 
 
 ```bash
 # Build bindings
-deno task build:ffi                  # C FFI → target/release/libtsv_ffi.so
+deno task build:ffi                  # C FFI, full build → target/release/libtsv_ffi.so
+deno task build:ffi:format           # C FFI, format-only (size only) → target/ffi-format/release/
+deno task build:ffi:parse            # C FFI, parse-only (size only) → target/ffi-parse/release/
 deno task build:wasm:deno            # deno WASM, format-only → pkg/format/deno/
 deno task build:wasm:parse:deno      # deno WASM, parse-only → pkg/parse/deno/
 deno task build:wasm:all:deno        # deno WASM, full build (benches/sidecar) → pkg/all/deno/

@@ -83,6 +83,7 @@ where
 ///
 /// # Safety
 /// Caller must ensure `source_ptr` points to valid UTF-8 of `source_len` bytes.
+#[cfg(feature = "parse")]
 unsafe fn with_source_parse_internal<F, T>(
     source_ptr: *const u8,
     source_len: usize,
@@ -137,6 +138,7 @@ macro_rules! lang_bindings {
         ///
         /// # Safety
         /// See the module-level safety contract.
+        #[cfg(feature = "parse")]
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $parse_fn(
             source_ptr: *const u8,
@@ -156,6 +158,7 @@ macro_rules! lang_bindings {
         ///
         /// # Safety
         /// See the module-level safety contract.
+        #[cfg(feature = "parse")]
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $parse_internal_fn(
             source_ptr: *const u8,
@@ -173,6 +176,7 @@ macro_rules! lang_bindings {
         ///
         /// # Safety
         /// See the module-level safety contract.
+        #[cfg(feature = "format")]
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $format_fn(
             source_ptr: *const u8,
