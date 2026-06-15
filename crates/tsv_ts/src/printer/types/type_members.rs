@@ -10,9 +10,8 @@
 use super::super::comments_in_range;
 use super::CommentSpacing;
 use super::Printer;
-use crate::ast::internal::{self, TSType, TSTypeElement};
+use crate::ast::internal::{self, TSTypeElement};
 use crate::printer::analysis::skip_identifier_at;
-use crate::printer::layout::hang_after_operator;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -334,35 +333,63 @@ impl<'a> Printer<'a> {
             TSTypeElement::ConstructSignature(ctor) => {
                 self.build_construct_signature_member_doc(ctor)
             }
-            TSTypeElement::IndexSignature(idx) => self.build_type_element_index_signature_doc(idx),
+            TSTypeElement::IndexSignature(idx) => self.build_index_signature_member_doc(idx),
         }
     }
 
-    /// Build doc for index signature in type elements: `[key: Type]: Value`
-    fn build_type_element_index_signature_doc(&self, idx: &internal::TSIndexSignature) -> DocId {
+    /// Build a `TSIndexSignature` member (`static`? `readonly`? `[key: KeyType]`
+    /// `: Value`) **without** the trailing `;` — shared by the type-literal,
+    /// interface, and class index-signature printers (the interface and class
+    /// callers append `;`; the type-literal caller leaves the separator to
+    /// `build_type_literal_doc`), matching how the property/method/call/construct
+    /// members already delegate. `static` is class-only (`is_static` is always
+    /// false for type-element members).
+    ///
+    /// Comment handling at each gap: keyword→`[` (`readonly /* c */ [k]`, bounded
+    /// at `[`), `[`→key inside the brackets (`[/* c */ k]`, a block hugs `[`, a
+    /// line comment breaks the bracket), key→`:` (`[k /* c */ : T]`, a space forced
+    /// before `:`), param→`]` (`[k: T /* c */]`, trailing inside the brackets),
+    /// and `]`→`:` (`[k: T] /* c */: V`, a space forced before the value `:`).
+    /// The value type — colon→type comments (block inline, line comments breaking)
+    /// and the union/intersection break layout, including redundant-paren stripping
+    /// — is delegated to the shared `build_type_annotation_doc`.
+    pub(in crate::printer) fn build_index_signature_member_doc(
+        &self,
+        idx: &internal::TSIndexSignature,
+    ) -> DocId {
         let d = self.d();
         let mut parts = vec![];
-        if idx.readonly {
-            // Preserve comments before the `[` (e.g., `readonly /* c */ [k: string]: T`)
-            let bracket_bound = idx
-                .parameters
-                .first()
-                .map_or(idx.span.end, |p| p.span.start);
+
+        // Locate the opening `[`, skipping comments so a `[` inside one (e.g.
+        // `readonly /* [ */ [k]`) isn't matched. Bounded at the first parameter so
+        // a `[` in the key type can't be mistaken for it.
+        let first_param_start = idx.parameters.first().map(|p| p.span.start);
+        let bracket_bound = first_param_start.unwrap_or(idx.span.end);
+        let bracket_open_pos = find_char_skipping_comments(
+            self.source.as_bytes(),
+            idx.span.start as usize,
+            bracket_bound as usize,
+            b'[',
+        )
+        .map(|p| p as u32);
+
+        if idx.is_static || idx.readonly {
+            // Modifier keywords (`static`/`readonly`, the former class-only),
+            // preserving comments before each and before the `[`
+            // (e.g., `static /* c */ readonly /* d */ [k: string]: T`).
             let mut cursor = idx.span.start;
-            self.push_member_keyword_doc(&mut parts, "readonly ", &mut cursor, bracket_bound);
-            let bracket_pos = find_char_skipping_comments(
-                self.source.as_bytes(),
-                cursor as usize,
-                bracket_bound as usize,
-                b'[',
-            )
-            .map_or(cursor, |p| p as u32);
-            self.push_pre_name_comments_doc(&mut parts, cursor, bracket_pos);
+            if idx.is_static {
+                self.push_member_keyword_doc(&mut parts, "static ", &mut cursor, bracket_bound);
+            }
+            if idx.readonly {
+                self.push_member_keyword_doc(&mut parts, "readonly ", &mut cursor, bracket_bound);
+            }
+            self.push_pre_name_comments_doc(&mut parts, cursor, bracket_open_pos.unwrap_or(cursor));
         }
 
-        // Build the key parameter docs
-        // For key type annotations with unions/intersections, use special handling
-        // so they break properly with leading |/trailing & style.
+        // Build the key parameter docs. The `: keyType` is delegated to the
+        // shared annotation printer so a union/intersection key breaks with the
+        // leading-`|` / hanging-`&` layout.
         let param_docs: Vec<_> = idx
             .parameters
             .iter()
@@ -400,15 +427,24 @@ impl<'a> Printer<'a> {
         // Build `[key: type]` as a group that can break when key type is long
         // Flat: [key: type]
         // Break: [\n\tkey: type\n]
-        // A comment in the param→`]` gap (`[key: string /* c */]`) trails the
-        // contents inside the brackets, preserved in place.
-        let bracket_contents = d.join(param_docs, ", ");
-        let bracket_inner = match bracket_close_pos
-            .and_then(|cp| self.build_inline_comments_between_doc_opt(search_start, cp))
-        {
-            Some(comment) => d.concat(&[bracket_contents, comment]),
-            None => bracket_contents,
+        // A comment in the `[`→key gap (`[/* c */ k: string]`) leads the contents:
+        // a block comment hugs `[` and stays inline, a line comment forces the
+        // bracket to break (`[\n\t// c\n\tk: string\n]`). A comment in the param→`]`
+        // gap (`[key: string /* c */]`) trails the contents. Both are preserved in
+        // place inside the brackets.
+        let lead_comment = match (bracket_open_pos, first_param_start) {
+            (Some(open), Some(key_start)) if self.has_comments_between(open + 1, key_start) => {
+                Some(self.build_trailing_comments_break_for_line(open + 1, key_start))
+            }
+            _ => None,
         };
+        let trailing_comment = bracket_close_pos
+            .and_then(|cp| self.build_inline_comments_between_doc_opt(search_start, cp));
+        let mut inner_parts = Vec::new();
+        inner_parts.extend(lead_comment);
+        inner_parts.push(d.join(param_docs, ", "));
+        inner_parts.extend(trailing_comment);
+        let bracket_inner = d.concat(&inner_parts);
         let bracket_group = d.group(d.concat(&[
             d.text("["),
             d.indent_softline(bracket_inner),
@@ -442,41 +478,13 @@ impl<'a> Printer<'a> {
             ));
             parts.push(self.build_type_doc(&idx.type_annotation.type_annotation));
         } else {
-            // No bracket-colon comment: use normal type annotation handling.
-            // Strip redundant comment-free parens so `($A | $B)` / `($A & $B)`
-            // value types get the same hanging layout as the bare form (prettier
-            // strips them too); other parenthesized types keep the `_` fall-through.
-            match self.unwrap_redundant_parens(idx.type_annotation.type_annotation.as_ref()) {
-                TSType::Union(u) => {
-                    let type_doc = self.build_union_type_doc(u, false);
-                    let comments_doc = self.build_comments_between(
-                        val_colon_end,
-                        val_type_start,
-                        CommentSpacing::Trailing,
-                    );
-                    parts.push(d.text(":"));
-                    parts.push(hang_after_operator(d, d.concat(&[comments_doc, type_doc])));
-                }
-                TSType::Intersection(i) => {
-                    // Hug `: A & B & …` on the colon line, continuation members wrapping
-                    // one level in (`: A &\n\tB &\n\tC`) — prettier keeps intersections on
-                    // the colon line, unlike unions (which break after `:` to leading-`|`).
-                    // `intersection_hanging_with_indent` stays inline when it fits, handles
-                    // line comments between members, and skips its own indent for a huggable
-                    // last / expanding first member (avoiding double-indent).
-                    let comments_doc = self.build_comments_between(
-                        val_colon_end,
-                        val_type_start,
-                        CommentSpacing::Trailing,
-                    );
-                    parts.push(d.text(": "));
-                    parts.push(comments_doc);
-                    parts.push(self.intersection_hanging_with_indent(i));
-                }
-                _ => {
-                    parts.push(self.build_type_annotation_doc(&idx.type_annotation));
-                }
-            }
+            // No bracket-colon comment: delegate the value type to the shared
+            // annotation printer. It owns colon→type comment handling (including a
+            // line comment between `:` and the value, which must break so it can't
+            // swallow the type), redundant comment-free paren stripping, and the
+            // union (break-after-`:` to leading-`|`) / intersection (hug `:`,
+            // continuations wrap) break layouts.
+            parts.push(self.build_type_annotation_doc(&idx.type_annotation));
         }
 
         d.concat(&parts)

@@ -411,53 +411,13 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build a Doc for an index signature: `[key: Type]: ValueType;`
+    /// Build a Doc for a class index signature: `[key: Type]: ValueType;`.
+    /// Delegates to the shared `build_index_signature_member_doc` (which handles
+    /// the `static`/`readonly` modifiers and every in-bracket comment gap) and
+    /// appends the trailing `;`, matching the interface caller.
     fn build_index_signature_doc(&self, sig: &internal::TSIndexSignature) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
-
-        // Modifier keywords, preserving comments before the `[`
-        // (e.g., `readonly /* c */ [k: string]: T`)
-        let bracket_bound = sig
-            .parameters
-            .first()
-            .map_or(sig.span.end, |p| p.span.start);
-        let mut cursor = sig.span.start;
-        if sig.is_static {
-            self.push_member_keyword_doc(&mut parts, "static ", &mut cursor, bracket_bound);
-        }
-        if sig.readonly {
-            self.push_member_keyword_doc(&mut parts, "readonly ", &mut cursor, bracket_bound);
-        }
-        let bracket_pos = tsv_lang::source_scan::find_char_skipping_comments(
-            self.source.as_bytes(),
-            cursor as usize,
-            bracket_bound as usize,
-            b'[',
-        )
-        .map_or(cursor, |p| p as u32);
-        self.push_pre_name_comments_doc(&mut parts, cursor, bracket_pos);
-
-        parts.push(d.text("["));
-        parts.push(d.join(
-            sig.parameters.iter().map(|p| self.build_identifier_doc(p)),
-            ", ",
-        ));
-        // A comment in the param→`]` gap (`[key: string /* c */]`), preserved in
-        // place. The `]` is located outside comments so a `]` glyph in that
-        // comment isn't mistaken for it.
-        let close_search = sig.parameters.last().map_or(sig.span.start, |p| p.span.end);
-        if let Some(cp) =
-            self.find_char_outside_comments(close_search, sig.type_annotation.span.start, b']')
-            && let Some(c) = self.build_inline_comments_between_doc_opt(close_search, cp)
-        {
-            parts.push(c);
-        }
-        parts.push(d.text("]"));
-        parts.push(self.build_type_annotation_doc(&sig.type_annotation));
-        parts.push(d.text(";"));
-
-        d.concat(&parts)
+        d.concat(&[self.build_index_signature_member_doc(sig), d.text(";")])
     }
 
     /// Build a Doc for a static initialization block

@@ -3,7 +3,6 @@
 
 use super::{Printer, build_entity_name_doc, should_hug_union_type, unwrap_parenthesized};
 use crate::ast::internal::{self, TSType};
-use crate::printer::analysis::skip_identifier_at;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentFilter, CommentSpacing};
 use tsv_lang::doc::arena::DocId;
@@ -1003,109 +1002,9 @@ impl<'a> Printer<'a> {
                 d.concat(&[self.build_construct_signature_member_doc(c), d.text(";")])
             }
             internal::TSTypeElement::IndexSignature(i) => {
-                let mut parts = Vec::new();
-                if i.readonly {
-                    // Preserve comments before the `[` (e.g., `readonly /* c */ [k: string]: T`)
-                    let bracket_bound = i.parameters.first().map_or(i.span.end, |p| p.span.start);
-                    let mut cursor = i.span.start;
-                    self.push_member_keyword_doc(
-                        &mut parts,
-                        "readonly ",
-                        &mut cursor,
-                        bracket_bound,
-                    );
-                    let bracket_pos = find_char_skipping_comments(
-                        self.source.as_bytes(),
-                        cursor as usize,
-                        bracket_bound as usize,
-                        b'[',
-                    )
-                    .map_or(cursor, |p| p as u32);
-                    self.push_pre_name_comments_doc(&mut parts, cursor, bracket_pos);
-                }
-                // Build each `key: keyType` param, then wrap `[ … ]` in a group so the
-                // bracket breaks (key onto its own line) when the key type breaks — matching
-                // prettier's index-signature.js. The type-literal printer
-                // (`build_type_element_index_signature_doc`) uses the same structure.
-                let param_docs: Vec<DocId> = i
-                    .parameters
-                    .iter()
-                    .map(|param| {
-                        let mut param_parts = vec![d.symbol(param.name.to_u32())];
-                        if let Some(ta) = &param.type_annotation {
-                            // Comments between the key name and the colon: `[key /* c */ : string]`.
-                            // Prettier adds a space before `:` when such a comment is present.
-                            let colon_pos = ta.span.start;
-                            let name_end = skip_identifier_at(
-                                self.source.as_bytes(),
-                                param.span.start as usize,
-                                colon_pos as usize,
-                            ) as u32;
-                            if let Some(comment_doc) =
-                                self.build_inline_comments_between_doc_opt(name_end, colon_pos)
-                            {
-                                param_parts.push(comment_doc);
-                                param_parts.push(d.text(" "));
-                            }
-                            // Delegate the `: keyType` — colon→type comments (line comments break,
-                            // never merge) and the union/intersection break layout — to the shared
-                            // annotation printer.
-                            param_parts.push(self.build_type_annotation_doc(ta));
-                        }
-                        d.concat(&param_parts)
-                    })
-                    .collect();
-                // A comment in the param→`]` gap (`[key: string /* c */]`) trails
-                // the contents inside the brackets, preserved in place. The `]` is
-                // located outside comments so a `]` glyph in that comment isn't
-                // mistaken for it.
-                let close_search = i.parameters.last().map_or(i.span.start, |p| p.span.end);
-                let bracket_close = self.find_char_outside_comments(
-                    close_search,
-                    i.type_annotation.span.start,
-                    b']',
-                );
-                let bracket_inner = match bracket_close
-                    .and_then(|cp| self.build_inline_comments_between_doc_opt(close_search, cp))
-                {
-                    Some(c) => d.concat(&[d.join(param_docs, ", "), c]),
-                    None => d.join(param_docs, ", "),
-                };
-                parts.push(d.group(d.concat(&[
-                    d.text("["),
-                    d.indent_softline(bracket_inner),
-                    d.softline(),
-                    d.text("]"),
-                ])));
-                // A comment in the `]`→`:` gap (`[k: string] /* c */: T`) is kept
-                // before the value annotation; prettier emits ` : ` (space before
-                // the colon) when such a comment is present. Without this the
-                // comment was dropped entirely — content loss. (The type-literal
-                // printer handles the same gap in `build_type_element_index_signature_doc`.)
-                let val_colon_pos = i.type_annotation.span.start;
-                let val_type_start = i.type_annotation.type_annotation.span().start;
-                let mut has_bracket_colon_comment = false;
-                if let Some(close_pos) = bracket_close {
-                    for comment in comments_in_range(self.comments, close_pos + 1, val_colon_pos) {
-                        parts.push(d.text(" "));
-                        parts.push(self.build_comment_doc(comment));
-                        has_bracket_colon_comment = true;
-                    }
-                }
-                if has_bracket_colon_comment {
-                    parts.push(d.text(" : "));
-                    parts.push(self.build_comments_between(
-                        val_colon_pos + 1,
-                        val_type_start,
-                        CommentSpacing::Trailing,
-                    ));
-                    parts.push(self.build_type_doc(&i.type_annotation.type_annotation));
-                } else {
-                    // Value type annotation: use build_type_annotation_doc for comment handling
-                    parts.push(self.build_type_annotation_doc(&i.type_annotation));
-                }
-                parts.push(d.text(";"));
-                d.concat(&parts)
+                // Shared with the type-literal printer; the interface member
+                // appends its own `;`.
+                d.concat(&[self.build_index_signature_member_doc(i), d.text(";")])
             }
         }
     }
