@@ -1,0 +1,312 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 121,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Comment between ? and ( in class method",
+			"start": 32,
+			"end": 74,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 80,
+			"end": 87,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 5
+				},
+				"end": {
+					"line": 4,
+					"column": 12
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 120,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 111,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 20,
+					"end": 110,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 26,
+						"end": 27,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 7
+							},
+							"end": {
+								"line": 2,
+								"column": 8
+							}
+						},
+						"name": "A"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 28,
+						"end": 110,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 9
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 77,
+								"end": 107,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 32
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 77,
+									"end": 78,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 3
+										}
+									},
+									"name": "m"
+								},
+								"optional": true,
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 87,
+									"end": 107,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 12
+										},
+										"end": {
+											"line": 4,
+											"column": 32
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 88,
+											"end": 97,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 13
+												},
+												"end": {
+													"line": 4,
+													"column": 22
+												}
+											},
+											"name": "x",
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 89,
+												"end": 97,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 14
+													},
+													"end": {
+														"line": 4,
+														"column": 22
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSNumberKeyword",
+													"start": 91,
+													"end": 97,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 16
+														},
+														"end": {
+															"line": 4,
+															"column": 22
+														}
+													}
+												}
+											}
+										}
+									],
+									"returnType": {
+										"type": "TSTypeAnnotation",
+										"start": 98,
+										"end": 104,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 23
+											},
+											"end": {
+												"line": 4,
+												"column": 29
+											}
+										},
+										"typeAnnotation": {
+											"type": "TSVoidKeyword",
+											"start": 100,
+											"end": 104,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 25
+												},
+												"end": {
+													"line": 4,
+													"column": 29
+												}
+											}
+										}
+									},
+									"body": {
+										"type": "BlockStatement",
+										"start": 105,
+										"end": 107,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 30
+											},
+											"end": {
+												"line": 4,
+												"column": 32
+											}
+										},
+										"body": []
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 80,
+											"end": 87
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " Comment between ? and ( in class method",
+										"start": 32,
+										"end": 74
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

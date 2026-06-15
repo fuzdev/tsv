@@ -983,266 +983,24 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match elem {
             internal::TSTypeElement::PropertySignature(p) => {
-                let mut parts = Vec::new();
-                if p.readonly {
-                    // Preserve comments after the keyword (e.g., `readonly /* c */ a`);
-                    // bounded at `[` for computed keys (inner comments are the
-                    // bracket builder's)
-                    let key_start = p.key.span().start;
-                    let mut cursor = p.span.start;
-                    self.push_member_keyword_doc(&mut parts, "readonly ", &mut cursor, key_start);
-                    let bound = if p.computed {
-                        find_char_skipping_comments(
-                            self.source.as_bytes(),
-                            cursor as usize,
-                            key_start as usize,
-                            b'[',
-                        )
-                        .map_or(cursor, |pos| pos as u32)
-                    } else {
-                        key_start
-                    };
-                    self.push_pre_name_comments_doc(&mut parts, cursor, bound);
-                }
-                // Handle computed property keys: [key]: type
-                let (key_doc, key_region_end) =
-                    self.build_type_member_key_doc(p.span.start, &p.key, p.computed, true);
-                parts.push(key_doc);
-                // Comments before `?` modifier (e.g., `a /* c */?: number`)
-                if p.optional {
-                    let after_q = self.push_modifier_marker_doc(&mut parts, key_region_end, b'?');
-                    // Comments between `?` and `:` type annotation
-                    if let Some(ta) = &p.type_annotation
-                        && self.has_comments_between(after_q, ta.span.start)
-                    {
-                        let comment_doc =
-                            self.build_inline_comments_between_doc(after_q, ta.span.start);
-                        parts.push(d.concat(&[comment_doc, d.text(" ")]));
-                    }
-                } else if let Some(ta) = &p.type_annotation {
-                    // Comments between key and `:` type annotation (e.g., `[x] /* c */: number`)
-                    if self.has_comments_between(key_region_end, ta.span.start) {
-                        parts.push(
-                            self.build_inline_comments_between_doc(key_region_end, ta.span.start),
-                        );
-                    }
-                }
-                if let Some(ta) = &p.type_annotation {
-                    // Use width-aware wrapping for generic type arguments
-                    parts.push(self.build_type_annotation_doc_wrapping(ta));
-                    // Comments between type and `;`
-                    for comment in comments_in_range(self.comments, ta.span.end, p.span.end) {
-                        parts.push(d.text(" "));
-                        parts.push(self.build_comment_doc(comment));
-                    }
-                }
-                parts.push(d.text(";"));
-                d.concat(&parts)
+                // Shared with the type-literal printer; the only difference is
+                // the interface member carries its own `;`.
+                d.concat(&[self.build_property_signature_member_doc(p), d.text(";")])
             }
             internal::TSTypeElement::MethodSignature(m) => {
-                let mut parts = Vec::new();
-                // Print accessor keyword for get/set signatures, preserving
-                // comments between keyword and name
-                match m.kind {
-                    internal::MethodKind::Get => self.push_accessor_keyword_doc(
-                        &mut parts,
-                        "get ",
-                        m.span.start,
-                        m.key.span().start,
-                    ),
-                    internal::MethodKind::Set => self.push_accessor_keyword_doc(
-                        &mut parts,
-                        "set ",
-                        m.span.start,
-                        m.key.span().start,
-                    ),
-                    _ => {}
-                }
-                // Handle computed method keys: [key](): type
-                let (key_doc, key_region_end) =
-                    self.build_type_member_key_doc(m.span.start, &m.key, m.computed, false);
-                parts.push(key_doc);
-                // Comments before `?` modifier (e.g., `b /* c */?(x): void`)
-                if m.optional {
-                    let after_q = self.push_modifier_marker_doc(&mut parts, key_region_end, b'?');
-                    // Comments between `?` and next token (type params or parens)
-                    let next_token = m.type_parameters.as_ref().map_or_else(
-                        || {
-                            // Find `(` position skipping comments (not str::find which matches inside comments)
-                            find_char_skipping_comments(
-                                self.source.as_bytes(),
-                                after_q as usize,
-                                self.source.len(),
-                                b'(',
-                            )
-                            .map_or(m.span.end, |p| p as u32)
-                        },
-                        |tp| tp.span.start,
-                    );
-                    if self.has_comments_between(after_q, next_token) {
-                        parts.push(self.build_inline_comments_between_doc(after_q, next_token));
-                    }
-                } else {
-                    // Comments between key and next token (e.g., `[x] /* c */(): void`)
-                    // Line comments get a hardline to prevent absorbing type params as comment text
-                    let next_token = m.type_parameters.as_ref().map_or_else(
-                        || {
-                            find_char_skipping_comments(
-                                self.source.as_bytes(),
-                                key_region_end as usize,
-                                self.source.len(),
-                                b'(',
-                            )
-                            .map_or(key_region_end, |p| p as u32)
-                        },
-                        |tp| tp.span.start,
-                    );
-                    parts.push(self.build_name_to_type_params_comments(
-                        key_region_end,
-                        next_token,
-                        CommentSpacing::for_type_params(m.type_parameters.is_some()),
-                    ));
-                }
-                // Print type parameters if present: `<T>` or `<T, U>`
-                if let Some(type_params) = &m.type_parameters {
-                    parts.push(self.build_type_parameter_declaration_doc(type_params));
-                }
-                // Find `(` position for comment handling (skip comments to avoid matching `(` inside them)
-                let paren_search_start = m
-                    .type_parameters
-                    .as_ref()
-                    .map_or(key_region_end, |tp| tp.span.end);
-                let method_paren_pos = find_char_skipping_comments(
-                    self.source.as_bytes(),
-                    paren_search_start as usize,
-                    self.source.len(),
-                    b'(',
-                )
-                .map(|p| p as u32);
-                // Comments between type_params `>` and `(` go after type_params
-                if let (Some(tp), Some(pp)) = (m.type_parameters.as_ref(), method_paren_pos) {
-                    self.append_type_params_to_paren_comments(&mut parts, tp.span.end, pp);
-                }
-                // Width-based breaking for params
-                parts.push(self.build_signature_params_doc(&m.params, method_paren_pos));
-                if let Some(rt) = &m.return_type {
-                    parts.push(self.build_signature_return_type_doc(method_paren_pos, rt));
-                }
-                // Comments between return type (or params) and `;`
-                self.append_signature_end_comments(
-                    &mut parts,
-                    m.return_type.as_ref(),
-                    method_paren_pos,
-                    m.span.end,
-                );
-                parts.push(d.text(";"));
-                d.group(d.concat(&parts))
+                // Shared with the type-literal printer; the interface member
+                // appends its own `;`.
+                d.concat(&[self.build_method_signature_member_doc(m), d.text(";")])
             }
             internal::TSTypeElement::CallSignature(c) => {
-                let mut parts = Vec::new();
-                // Type parameters: `<T>` or `<T, U>`
-                if let Some(type_params) = &c.type_parameters {
-                    parts.push(self.build_type_parameter_declaration_doc(type_params));
-                }
-                // Find `(` position for comment handling
-                let paren_search_start = c
-                    .type_parameters
-                    .as_ref()
-                    .map_or(c.span.start, |tp| tp.span.end);
-                let call_paren_pos = find_char_skipping_comments(
-                    self.source.as_bytes(),
-                    paren_search_start as usize,
-                    self.source.len(),
-                    b'(',
-                )
-                .map(|p| p as u32);
-                // Comments between type_params and `(` go after type_params
-                if let (Some(tp), Some(pp)) = (
-                    c.type_parameters.as_ref().map(|t| t.span.end),
-                    call_paren_pos,
-                ) {
-                    self.append_type_params_to_paren_comments(&mut parts, tp, pp);
-                }
-                // Width-based breaking for params
-                parts.push(self.build_signature_params_doc(&c.params, call_paren_pos));
-                if let Some(rt) = &c.return_type {
-                    parts.push(self.build_signature_return_type_doc(call_paren_pos, rt));
-                }
-                // Comments between return type (or params) and `;`
-                self.append_signature_end_comments(
-                    &mut parts,
-                    c.return_type.as_ref(),
-                    call_paren_pos,
-                    c.span.end,
-                );
-                parts.push(d.text(";"));
-                d.group(d.concat(&parts))
+                // Shared with the type-literal printer; the interface member
+                // appends its own `;`.
+                d.concat(&[self.build_call_signature_member_doc(c), d.text(";")])
             }
             internal::TSTypeElement::ConstructSignature(c) => {
-                let mut parts = vec![d.text("new ")];
-                // Type parameters: `<T>` or `<T, U>`
-                if let Some(type_params) = &c.type_parameters {
-                    // Comments between `new` and `<T>`: `new /* c */ <T>(...)`
-                    let new_end = c.span.start + 3;
-                    if let Some(doc) = self.build_name_to_type_params_comments_opt(
-                        new_end,
-                        type_params.span.start,
-                        CommentSpacing::Trailing,
-                    ) {
-                        parts.push(doc);
-                    }
-                    parts.push(self.build_type_parameter_declaration_doc(type_params));
-                }
-                // Find `(` position for comment handling
-                let paren_search_start = c
-                    .type_parameters
-                    .as_ref()
-                    .map_or(c.span.start, |tp| tp.span.end);
-                let ctor_paren_pos = find_char_skipping_comments(
-                    self.source.as_bytes(),
-                    paren_search_start as usize,
-                    self.source.len(),
-                    b'(',
-                )
-                .map(|p| p as u32);
-                // Comments between type_params and `(` go after type_params
-                if let (Some(tp), Some(pp)) = (
-                    c.type_parameters.as_ref().map(|t| t.span.end),
-                    ctor_paren_pos,
-                ) {
-                    self.append_type_params_to_paren_comments(&mut parts, tp, pp);
-                }
-                // Without type params, comments between `new` and `(` stay in
-                // place: `new /* c */ (a: number)` (prettier relocates them
-                // into the parens). The "new " text already carries the
-                // leading space, so blocks get only a trailing space and line
-                // comments a hardline.
-                if c.type_parameters.is_none()
-                    && let Some(pp) = ctor_paren_pos
-                {
-                    for comment in comments_in_range(self.comments, c.span.start + 3, pp) {
-                        parts.push(self.build_comment_doc(comment));
-                        if comment.is_block {
-                            parts.push(d.text(" "));
-                        } else {
-                            parts.push(d.hardline());
-                        }
-                    }
-                }
-                // Width-based breaking for params
-                parts.push(self.build_signature_params_doc(&c.params, ctor_paren_pos));
-                if let Some(rt) = &c.return_type {
-                    parts.push(self.build_signature_return_type_doc(ctor_paren_pos, rt));
-                }
-                // Comments between return type (or params) and `;`
-                self.append_signature_end_comments(
-                    &mut parts,
-                    c.return_type.as_ref(),
-                    ctor_paren_pos,
-                    c.span.end,
-                );
-                parts.push(d.text(";"));
-                d.group(d.concat(&parts))
+                // Shared with the type-literal printer; the interface member
+                // appends its own `;`.
+                d.concat(&[self.build_construct_signature_member_doc(c), d.text(";")])
             }
             internal::TSTypeElement::IndexSignature(i) => {
                 let mut parts = Vec::new();
@@ -1319,8 +1077,33 @@ impl<'a> Printer<'a> {
                     d.softline(),
                     d.text("]"),
                 ])));
-                // Value type annotation: use build_type_annotation_doc for comment handling
-                parts.push(self.build_type_annotation_doc(&i.type_annotation));
+                // A comment in the `]`→`:` gap (`[k: string] /* c */: T`) is kept
+                // before the value annotation; prettier emits ` : ` (space before
+                // the colon) when such a comment is present. Without this the
+                // comment was dropped entirely — content loss. (The type-literal
+                // printer handles the same gap in `build_type_element_index_signature_doc`.)
+                let val_colon_pos = i.type_annotation.span.start;
+                let val_type_start = i.type_annotation.type_annotation.span().start;
+                let mut has_bracket_colon_comment = false;
+                if let Some(close_pos) = bracket_close {
+                    for comment in comments_in_range(self.comments, close_pos + 1, val_colon_pos) {
+                        parts.push(d.text(" "));
+                        parts.push(self.build_comment_doc(comment));
+                        has_bracket_colon_comment = true;
+                    }
+                }
+                if has_bracket_colon_comment {
+                    parts.push(d.text(" : "));
+                    parts.push(self.build_comments_between(
+                        val_colon_pos + 1,
+                        val_type_start,
+                        CommentSpacing::Trailing,
+                    ));
+                    parts.push(self.build_type_doc(&i.type_annotation.type_annotation));
+                } else {
+                    // Value type annotation: use build_type_annotation_doc for comment handling
+                    parts.push(self.build_type_annotation_doc(&i.type_annotation));
+                }
                 parts.push(d.text(";"));
                 d.concat(&parts)
             }
