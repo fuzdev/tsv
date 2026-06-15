@@ -69,6 +69,16 @@ const CHANGELOG_PATH = 'CHANGELOG.md';
 // Match version under [workspace.package] to avoid clobbering dependency versions
 const workspace_pkg_re = /(\[workspace\.package\][\s\S]*?^version\s*=\s*)"([^"]*)"/m;
 
+/** The `<!-- bump: <level> -->` marker, recognized ONLY on the line directly
+ * after the `## Unreleased` heading — the exact position `stamp_changelog`'s
+ * `with_marker` rewrites. `unreleased_section` returns the body starting at the
+ * newline after the heading, so the leading `\n` here anchors that placement.
+ * A marker anywhere else in the section is ignored, so validation can't accept
+ * a changelog whose marker the stamper would fail to strip. Kept in sync with
+ * `with_marker`. Declared here (not beside the changelog helpers below) so it's
+ * initialized before the top-level orchestration calls `changelog_declared_bump`. */
+const UNRELEASED_BUMP_MARKER = /^\n<!-- bump: (patch|minor|major) -->(?:\n|$)/;
+
 const dec = new TextDecoder();
 
 /** The published packages, in publish order. */
@@ -545,15 +555,6 @@ function unreleased_section(changelog: string): string | null {
 	const next = after.search(/^## /m);
 	return next === -1 ? after : after.slice(0, next);
 }
-
-/** The `<!-- bump: <level> -->` marker, recognized ONLY on the line directly
- * after the `## Unreleased` heading — the exact position `stamp_changelog`'s
- * `with_marker` rewrites. `unreleased_section` returns the body starting at the
- * newline after the heading, so the leading `\n` here anchors that placement.
- * A marker anywhere else in the section is ignored, so validation can't accept
- * a changelog whose marker the stamper would fail to strip. Kept in sync with
- * `with_marker`. */
-const UNRELEASED_BUMP_MARKER = /^\n<!-- bump: (patch|minor|major) -->(?:\n|$)/;
 
 /** Unreleased content with the bump marker + surrounding whitespace stripped.
  * `''` means an empty section; `null` means no section (or no CHANGELOG). */
