@@ -11,19 +11,11 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
 ## Unreleased
 <!-- bump: minor -->
 
-- various conformance fixes
+- various conformance fixes to the formatter and parser
 - formatting is now **non-configurable by design** — no config files, CLI flags,
   or runtime options, and none are planned (opinionated like `gofmt` and Black).
-  Reverses the earlier "config options will come later" note in the docs. No
-  change to formatter output or the published API (`format_*` / `parse_*` / the
-  `tsv` bin) — a posture formalization plus removal of the internal config
-  plumbing that anticipated future options.
-- `parse_*` now rejects malformed Svelte control-flow blocks and tags that the
-  canonical parser also rejects but tsv previously accepted — mismatched closing
-  tags, an unclosed block, trailing junk in a closing tag (`{/each foo}`), a
-  keyword not separated from its expression by whitespace, and invalid block
-  continuations — across `{#if}`, `{#each}`, `{#key}`, `{#snippet}`, `{#await}`,
-  and the `{@html}` / `{@render}` / `{@const}` tags.
+  Policy only — no change to formatter output or the published API
+  (`format_*` / `parse_*` / the `tsv` bin).
 
 ## 0.1.0
 
