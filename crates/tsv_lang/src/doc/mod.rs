@@ -743,4 +743,133 @@ mod arena_tests {
         assert_eq!(indent_str_width("  ", 2), 2);
         assert_eq!(indent_str_width("\t\t", 2), 4);
     }
+
+    // --- arena_fits flat-width fast-path guards ---
+    //
+    // `flat_width_memo` (arena_fits.rs) shortcuts break-free Flat subtrees with a
+    // memoized width instead of walking them. The fast path and the slow walk are
+    // two hand-maintained code paths that must stay byte-identical, so these tests
+    // pin each per-variant arm: a future desync (a miscounted width, or a Some/None
+    // that shortcuts a subtree that actually breaks) flips one of these assertions
+    // rather than silently producing wrong layout.
+
+    /// Fit `doc` in `width` columns in Flat mode, with no resolver (the docs here
+    /// use only `Static`/`Owned` text, never `Symbol`).
+    fn fits_flat(a: &DocArena, doc: DocId, width: usize) -> bool {
+        arena_fits(a, doc, width, Mode::Flat, None::<&dyn TextResolver>)
+    }
+
+    /// Assert the memoized flat width of `doc` is exactly `w`: it fits in `w` but
+    /// not in `w - 1`. Any off-by-N in a fast-path arm flips one of these.
+    fn assert_flat_width(a: &DocArena, doc: DocId, w: usize) {
+        assert!(fits_flat(a, doc, w), "expected width {w} to fit");
+        assert!(
+            !fits_flat(a, doc, w - 1),
+            "expected width {} not to fit",
+            w - 1
+        );
+    }
+
+    #[test]
+    fn test_fits_flat_width_concat_and_lines() {
+        let a = DocArena::new(2);
+        // concat sums child widths
+        assert_flat_width(&a, a.concat(&[a.text("abcd"), a.text("ef")]), 6);
+        // Normal line = 1 (space) in flat; Soft line = 0
+        assert_flat_width(&a, a.concat(&[a.text("ab"), a.line(), a.text("cd")]), 5);
+        assert_flat_width(&a, a.concat(&[a.text("ab"), a.softline(), a.text("cd")]), 4);
+        // fill is summed exactly like concat
+        assert_flat_width(&a, a.fill(&[a.text("ab"), a.line(), a.text("cd")]), 5);
+    }
+
+    #[test]
+    fn test_fits_flat_width_wrappers() {
+        let a = DocArena::new(2);
+        // a non-breaking group recurses into its contents
+        let g = a.group(a.concat(&[a.text("ab"), a.line(), a.text("cd")]));
+        assert_flat_width(&a, g, 5);
+        // isolated_group recurses too (this mirrors the fits walk, unlike will_break)
+        assert_flat_width(&a, a.isolated_group(a.text("abcde")), 5);
+        // indent / dedent / align add no width in flat mode (they matter only at breaks)
+        assert_flat_width(&a, a.indent(a.text("abc")), 3);
+        assert_flat_width(&a, a.dedent(a.text("abcd")), 4);
+        assert_flat_width(&a, a.align(4, a.text("ab")), 2);
+        // line_suffix content is deferred, so it contributes 0 to the fit width
+        let ls = a.concat(&[a.text("ab"), a.line_suffix(a.text("XXXXX")), a.text("cd")]);
+        assert_flat_width(&a, ls, 4);
+    }
+
+    #[test]
+    fn test_fits_flat_width_if_break_picks_flat_doc() {
+        let a = DocArena::new(2);
+        // In flat mode the flat_doc (", ", width 2) is measured, never break_doc (",\n").
+        let doc = a.concat(&[
+            a.text("("),
+            a.if_break(a.text(",\n"), a.text(", ")),
+            a.text(")"),
+        ]);
+        assert_flat_width(&a, doc, 4);
+    }
+
+    #[test]
+    fn test_fits_flat_width_with_context_trailing_reserve() {
+        let a = DocArena::new(2);
+        let doc = a.with_context(
+            a.text("abcd"),
+            DocContext {
+                trailing_reserve: 3,
+                base_indent_override: None,
+            },
+        );
+        // 4 content + 3 reserved = 7
+        assert_flat_width(&a, doc, 7);
+    }
+
+    #[test]
+    fn test_fits_flat_width_cached_non_ascii() {
+        let a = DocArena::new(2);
+        // "café" is non-ASCII, so its width is precomputed (cached_width = Some(4));
+        // this exercises the cached-`Some(w)` arm rather than the resolve fallback.
+        assert_flat_width(&a, a.text_owned("café".to_string()), 4);
+    }
+
+    #[test]
+    fn test_fits_flat_should_break_group_defers_to_walk() {
+        let a = DocArena::new(2);
+        // Flat content is 2+1+8 = 11 wide, but should_break forces Break mode in the
+        // walk, where the inner line returns "fits" early. The fast path must NOT
+        // shortcut this as an 11-wide flat subtree.
+        let content = a.concat(&[a.text("ab"), a.line(), a.text("cdefghij")]);
+        assert!(fits_flat(&a, a.group_break(content), 5));
+        // contrast: a non-breaking group with identical content does not fit at 5
+        let content2 = a.concat(&[a.text("ab"), a.line(), a.text("cdefghij")]);
+        assert!(!fits_flat(&a, a.group(content2), 5));
+    }
+
+    #[test]
+    fn test_fits_flat_hardline_defers_to_walk() {
+        let a = DocArena::new(2);
+        // hardline → the walk returns true after the leading text; a fast-path that
+        // miscounted the hardline as 0 would compute width 4 and wrongly fail at 3.
+        let doc = a.concat(&[a.text("ab"), a.hardline(), a.text("cd")]);
+        assert!(fits_flat(&a, doc, 3));
+    }
+
+    #[test]
+    fn test_fits_flat_break_parent_forces_false() {
+        let a = DocArena::new(2);
+        // BreakParent → the walk returns false even at unbounded width; a fast-path
+        // that treated it as 0 width would wrongly report "fits".
+        let doc = a.concat(&[a.text("ab"), a.break_parent(), a.text("cd")]);
+        assert!(!fits_flat(&a, doc, 100));
+    }
+
+    #[test]
+    fn test_fits_flat_newline_text_defers_to_walk() {
+        let a = DocArena::new(2);
+        // Static newline text: resolved on demand, contains '\n' → walk returns true.
+        assert!(fits_flat(&a, a.text("a\nb"), 0));
+        // Owned non-ASCII newline text: cached as HAS_NEWLINE → same early-true path.
+        assert!(fits_flat(&a, a.text_owned("café\nx".to_string()), 0));
+    }
 }
