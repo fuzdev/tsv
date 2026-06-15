@@ -268,6 +268,9 @@ pub struct TSParameterProperty {
     /// Whether the parameter is readonly
     #[serde(skip_serializing_if = "super::is_false")]
     pub readonly: bool,
+    /// Whether the parameter property carries the `override` modifier
+    #[serde(rename = "override", skip_serializing_if = "super::is_false")]
+    pub r#override: bool,
     /// The parameter - can be Identifier or AssignmentPattern (with default value)
     pub parameter: Box<Expression>,
 }

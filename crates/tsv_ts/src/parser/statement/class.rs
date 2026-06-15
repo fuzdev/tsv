@@ -343,6 +343,11 @@ impl<'a> Parser<'a> {
         let mut body = Vec::new();
 
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
+            // Stray semicolons are empty class members — acorn skips them,
+            // producing no node (prettier strips them on format).
+            if self.eat(TokenKind::Semicolon) {
+                continue;
+            }
             let member = self.parse_class_member(ambient)?;
             body.push(member);
         }

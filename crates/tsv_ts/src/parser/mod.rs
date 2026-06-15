@@ -562,6 +562,23 @@ impl<'a> Parser<'a> {
         self.peek_kind() == *kind
     }
 
+    /// Whether the peek token can begin a function parameter binding: an
+    /// identifier, a destructuring pattern (`[`/`{`), a rest element (`...`),
+    /// `this`, or a contextual keyword usable as a binding name (e.g. another
+    /// modifier like `readonly`). Used to disambiguate a contextual modifier
+    /// keyword (`override`) from a parameter that happens to be named the same.
+    pub(super) fn peek_starts_parameter_binding(&mut self) -> bool {
+        match self.peek_kind() {
+            TokenKind::Identifier
+            | TokenKind::BracketOpen
+            | TokenKind::BraceOpen
+            | TokenKind::DotDotDot
+            | TokenKind::Keyword(KeywordKind::This) => true,
+            TokenKind::Keyword(kw) => kw.can_be_binding_name(),
+            _ => false,
+        }
+    }
+
     /// Get the start position of the peek token (cache must be populated via peek_kind() first)
     pub(super) fn peek_start(&self) -> usize {
         self.peek_cache.as_ref().map_or(0, |p| p.start)
@@ -1050,6 +1067,12 @@ impl<'a> Parser<'a> {
                         let param_start = self.current_pos().0;
 
                         // Check for parameter property modifiers: public, private, protected, readonly
+                        // TODO: `readonly` is eaten greedily below, so `constructor(readonly)` /
+                        // `constructor(readonly, x)` (readonly as a plain param name) fail where
+                        // acorn accepts them — a pre-existing divergence. Fixing needs the same
+                        // `peek_starts_parameter_binding` lookahead `override` uses, but acorn's
+                        // per-keyword rules differ (it rejects bare `public` here), so it warrants
+                        // its own fixture-first pass.
                         let accessibility = if self.eat_contextual_keyword("public") {
                             Some(Accessibility::Public)
                         } else if self.eat_contextual_keyword("private") {
@@ -1060,16 +1083,30 @@ impl<'a> Parser<'a> {
                             None
                         };
 
+                        // Check for `override` modifier (TS order: accessibility →
+                        // override → readonly). Unlike accessibility/readonly,
+                        // `override` is commonly a real identifier, so only treat it
+                        // as a modifier when the next token starts a binding;
+                        // otherwise it is itself the parameter name
+                        // (`constructor(override)`, `constructor(override: T)`).
+                        let is_override = matches!(self.current_kind(), TokenKind::Identifier)
+                            && self.current_value() == "override"
+                            && self.peek_starts_parameter_binding();
+                        if is_override {
+                            self.advance()?; // consume 'override'
+                        }
+
                         // Check for readonly modifier (can appear alone or after accessibility)
                         let readonly = self.eat_contextual_keyword("readonly");
 
                         // If we have modifiers, this is a parameter property
-                        if accessibility.is_some() || readonly {
+                        if accessibility.is_some() || is_override || readonly {
                             let parameter = self.parse_simple_param()?;
                             let param_end = parameter.span().end;
                             Expression::TSParameterProperty(TSParameterProperty {
                                 accessibility,
                                 readonly,
+                                r#override: is_override,
                                 parameter: Box::new(parameter),
                                 span: Span::new(param_start as u32, param_end),
                             })
