@@ -6,6 +6,7 @@
 
 use crate::ast::internal::FragmentNode;
 use crate::printer::Printer;
+use tsv_lang::TAB_WIDTH;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -119,7 +120,7 @@ impl<'a> Printer<'a> {
 
         // Calculate first_line_offset for width-aware wrapping
         // This tells the TypeScript formatter where the expression starts on the line
-        let first_line_offset = self.buffer.current_column(tsv_lang::TAB_WIDTH);
+        let first_line_offset = self.buffer.current_column(TAB_WIDTH);
         // Pass current indent level so wrapped lines get proper indentation
         let base_indent_offset = self.indent_level;
         let embed = tsv_lang::EmbedContext {
@@ -388,7 +389,7 @@ impl<'a> Printer<'a> {
 
         // Embed for embedded expression context: binary chains use ContinuationIndent style.
         // first_line_offset estimates the column position for width calculations.
-        let context_indent = tsv_lang::TAB_WIDTH;
+        let context_indent = TAB_WIDTH;
         let opening_offset = 5; // typical tag prefix, e.g. `{#if `
         let first_line_offset = context_indent + opening_offset;
         let embed = tsv_lang::EmbedContext {
@@ -458,7 +459,7 @@ impl<'a> Printer<'a> {
         // In multiline contexts, set up embedded expression context so binary chains
         // use ContinuationIndent style. first_line_offset estimates the column position.
         let embed = if in_multiline_context {
-            let context_indent = tsv_lang::TAB_WIDTH;
+            let context_indent = TAB_WIDTH;
             let first_line_offset = context_indent + opening_offset;
             tsv_lang::EmbedContext {
                 first_line_offset,

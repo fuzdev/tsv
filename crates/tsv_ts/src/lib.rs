@@ -60,15 +60,7 @@ fn make_printer<'a>(
     inputs: &PrinterInputs<'a>,
     embed: EmbedContext,
 ) -> printer::Printer<'a> {
-    printer::Printer::with_context(
-        arena,
-        Rc::clone(&inputs.interner),
-        inputs.source,
-        inputs.comments,
-        inputs.line_breaks,
-        embed,
-        inputs.ts_context,
-    )
+    printer::Printer::with_context(arena, inputs, embed)
 }
 
 /// Parse TypeScript source code into an internal AST

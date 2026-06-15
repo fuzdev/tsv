@@ -21,6 +21,7 @@ use crate::printer::expressions::literals::format_string_literal_from_ast;
 use crate::printer::is_string_literal;
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use tsv_lang::Comment;
+use tsv_lang::PRINT_WIDTH;
 use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
 
@@ -829,7 +830,7 @@ impl<'a> Printer<'a> {
             right_expr,
             is_short_key,
             self.source,
-            tsv_lang::PRINT_WIDTH,
+            PRINT_WIDTH,
             self.comments,
         );
 
@@ -891,12 +892,8 @@ impl<'a> Printer<'a> {
         debug_assert!(
             {
                 let core_expr = unwrap_expression(right_expr);
-                !is_poorly_breakable_chain(
-                    core_expr,
-                    self.source,
-                    tsv_lang::PRINT_WIDTH,
-                    self.comments,
-                ) || !d.will_break(right_doc)
+                !is_poorly_breakable_chain(core_expr, self.source, PRINT_WIDTH, self.comments)
+                    || !d.will_break(right_doc)
             },
             "is_poorly_breakable_chain classified expression as poorly breakable but the \
              printed doc contains forced breaks — static analysis missed a break-emitting node"

@@ -11,6 +11,7 @@ use super::types::{ChainGroup, ChainNode, ChainNodeVec};
 use crate::ast::internal::{self, Expression};
 use crate::printer::{ParenContext, needs_parens};
 use string_interner::DefaultSymbol;
+use tsv_lang::TAB_WIDTH;
 
 //
 // Symbol Lookup Trait
@@ -521,7 +522,7 @@ pub fn should_not_wrap<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
 /// Uses `name.length <= options.tabWidth` (JS .length, ASCII-only in practice)
 fn is_short_name(symbol: DefaultSymbol, interner: &impl SymbolLookup) -> bool {
     interner
-        .with_name(symbol, |name| name.len() <= tsv_lang::TAB_WIDTH)
+        .with_name(symbol, |name| name.len() <= TAB_WIDTH)
         .unwrap_or(false)
 }
 

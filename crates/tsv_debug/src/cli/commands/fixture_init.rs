@@ -4,6 +4,7 @@ use argh::FromArgs;
 use std::path::Path;
 use tsv_cli::json_utils::to_json_with_tabs;
 use tsv_lang::printing::visual_width;
+use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 
 /// Create or reinitialize a fixture (formats through prettier + generates expected.json).
 ///
@@ -197,11 +198,9 @@ fn resolve_content(
 
 /// Print a compact line width summary for the formatted input.
 ///
-/// Shows lines at or near print_width (90+), max width, and warns for `_long`
+/// Shows lines at or near PRINT_WIDTH (90+), max width, and warns for `_long`
 /// directories where nothing is near the boundary.
 fn print_line_width_summary(content: &str, dir_path: &str) {
-    let tab_width = tsv_lang::TAB_WIDTH;
-    let print_width = tsv_lang::PRINT_WIDTH;
     let threshold = 90; // Show lines at 90+ chars
 
     let lines: Vec<&str> = content.lines().collect();
@@ -214,7 +213,7 @@ fn print_line_width_summary(content: &str, dir_path: &str) {
     let mut notable_lines: Vec<(usize, usize)> = Vec::new(); // (line_num, width)
 
     for (idx, line) in lines.iter().enumerate() {
-        let width = visual_width(line, tab_width);
+        let width = visual_width(line, TAB_WIDTH);
         if width > max_width {
             max_width = width;
             max_line_num = idx + 1;
@@ -224,14 +223,14 @@ fn print_line_width_summary(content: &str, dir_path: &str) {
         }
     }
 
-    // Print notable lines (at/near/over print_width)
+    // Print notable lines (at/near/over PRINT_WIDTH)
     if notable_lines.is_empty() {
         println!("  max width: {max_width} (line {max_line_num})");
     } else {
         for &(line_num, width) in &notable_lines {
-            let marker = if width > print_width {
+            let marker = if width > PRINT_WIDTH {
                 "✗ EXCEEDS"
-            } else if width == print_width {
+            } else if width == PRINT_WIDTH {
                 "⚠ EXACTLY"
             } else {
                 " "
@@ -240,11 +239,11 @@ fn print_line_width_summary(content: &str, dir_path: &str) {
         }
     }
 
-    // Warn for _long directories where nothing is near print_width
+    // Warn for _long directories where nothing is near PRINT_WIDTH
     let is_long_fixture = dir_path.contains("_long") || dir_path.ends_with("/long");
     if is_long_fixture && max_width < threshold {
         eprintln!(
-            "⚠ Warning: directory name suggests a boundary test but max width is {max_width} (need ~{print_width})"
+            "⚠ Warning: directory name suggests a boundary test but max width is {max_width} (need ~{PRINT_WIDTH})"
         );
     }
 }

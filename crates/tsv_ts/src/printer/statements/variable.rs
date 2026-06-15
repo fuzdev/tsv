@@ -16,6 +16,7 @@ use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::{INDENT, PRINT_WIDTH};
 
 /// Wrap a doc in parentheses if the expression needs them for variable init context
 fn wrap_init_doc(d: &DocArena, init_doc: DocId, init: &Expression) -> DocId {
@@ -202,7 +203,7 @@ impl<'a> Printer<'a> {
                         for comment in &comments[first_line_idx..] {
                             if needs_hardline {
                                 parts.push(d.hardline());
-                                parts.push(d.text(tsv_lang::INDENT));
+                                parts.push(d.text(INDENT));
                             } else {
                                 parts.push(d.text(" "));
                             }
@@ -214,7 +215,7 @@ impl<'a> Printer<'a> {
                     }
                     // Break to new line with indentation for next declarator
                     parts.push(d.hardline());
-                    parts.push(d.text(tsv_lang::INDENT));
+                    parts.push(d.text(INDENT));
                     if has_block_comment && !has_line_comment {
                         // Block comment: print on new line before declarator
                         parts.push(self.build_inline_comments_between_doc_no_leading_space(
@@ -420,12 +421,7 @@ impl<'a> Printer<'a> {
                 // assignment breaks at `=` with group(indent([line, rightDoc])).
                 let should_break_after_op_rhs = (is_module_path_fluid_call(init, &interner)
                     || is_pure_property_chain(init)
-                    || is_poorly_breakable_chain(
-                        init,
-                        self.source,
-                        tsv_lang::PRINT_WIDTH,
-                        self.comments,
-                    )
+                    || is_poorly_breakable_chain(init, self.source, PRINT_WIDTH, self.comments)
                     || is_string_literal(init)
                     || matches!(init, Expression::RegexLiteral(_)))
                     && is_layout_eligible;
@@ -482,7 +478,7 @@ impl<'a> Printer<'a> {
                     let call_head_width = indent_visual
                         + (call.callee.span().end as usize - decl.span.start as usize)
                         + 1; // +1 for "(" after callee
-                    call_head_width < tsv_lang::PRINT_WIDTH
+                    call_head_width < PRINT_WIDTH
                 } else {
                     false
                 };
@@ -512,7 +508,7 @@ impl<'a> Printer<'a> {
                 let is_type_assertion_with_lhs_type = is_type_assertion_call(
                     init,
                     self.source,
-                    tsv_lang::PRINT_WIDTH,
+                    PRINT_WIDTH,
                 ) && matches!(&declarator.id, Expression::Identifier(id) if id.type_annotation.is_some());
 
                 let is_simple_rhs_with_breakable_lhs =

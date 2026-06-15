@@ -31,7 +31,9 @@ use self::text::TextAnalysis;
 use crate::ast::internal::{self, FragmentNode};
 use std::rc::Rc;
 use tsv_lang::doc::arena::{DocArena, DocId};
-use tsv_lang::{Comment, EmbedContext, OutputBuffer, SharedInterner, SymbolResolver};
+use tsv_lang::{
+    Comment, EmbedContext, INDENT, OutputBuffer, SharedInterner, SymbolResolver, TAB_WIDTH,
+};
 
 /// Pending whitespace state - buffers whitespace decisions until next node is known
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -216,7 +218,7 @@ impl<'a> Printer<'a> {
 
     /// Write indentation based on current indent level
     pub(crate) fn write_indent(&mut self) {
-        tsv_lang::write_indent(&mut self.buffer, self.indent_level, tsv_lang::INDENT);
+        tsv_lang::write_indent(&mut self.buffer, self.indent_level, INDENT);
     }
 
     /// Get the formatted output
@@ -242,7 +244,7 @@ impl<'a> Printer<'a> {
     /// must be preserved. Normal elements have trailing whitespace stripped during
     /// doc building, not rendering.
     pub(crate) fn render_doc_immediate(&mut self, d: DocId) {
-        let col = self.buffer.current_column(tsv_lang::TAB_WIDTH);
+        let col = self.buffer.current_column(TAB_WIDTH);
         let output = {
             let interner = self.interner.borrow();
             tsv_lang::doc::arena_print_doc_with_indent_resolved_preserve_whitespace(

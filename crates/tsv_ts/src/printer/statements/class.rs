@@ -4,7 +4,7 @@ use super::Printer;
 use crate::ast::internal;
 use crate::printer::CommentSpacing;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::{SymbolToU32, comments_in_range};
+use tsv_lang::{PRINT_WIDTH, SymbolToU32, comments_in_range};
 
 /// Printed keyword (with trailing space) for an accessibility modifier.
 fn accessibility_keyword(accessibility: &str) -> &'static str {
@@ -69,7 +69,7 @@ impl<'a> Printer<'a> {
                     .map_or(0, |rt| (rt.span.end - rt.span.start) as usize)
             };
             // +4 accounts for parens and spaces: "()" around params, " {}" body
-            current_col + params_width + return_type_width + 4 > tsv_lang::PRINT_WIDTH
+            current_col + params_width + return_type_width + 4 > PRINT_WIDTH
         };
 
         let mut parts = Vec::new();
