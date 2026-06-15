@@ -5,8 +5,98 @@ use crate::config::TAB_WIDTH;
 use crate::printing::visual_width;
 use smallvec::SmallVec;
 
-use super::arena::{ArenaCommand, DocArena, DocId, DocNode};
+use super::arena::{ArenaCommand, DocArena, DocId, DocNode, FLAT_WIDTH_BREAKS, FLAT_WIDTH_UNKNOWN};
 use super::types::{LineKind, Mode, TEXT_WIDTH_HAS_NEWLINE, TextResolver, resolve_text};
+
+/// Flat-mode width of a subtree for the `arena_fits` fast-path, memoized per
+/// `DocId`. `Some(w)` = break-free subtree occupying `w` columns flat; `None` =
+/// contains a forced break, so `arena_fits` must walk it. Mirrors the flat-mode
+/// arm of the fits loop exactly, so substituting `remaining -= w` for the walk
+/// is byte-identical.
+fn flat_width_memo<R: TextResolver + ?Sized>(
+    id: DocId,
+    nodes: &[DocNode],
+    children: &[DocId],
+    cache: &mut [u32],
+    resolver: Option<&R>,
+) -> Option<u32> {
+    match cache[id.index()] {
+        FLAT_WIDTH_UNKNOWN => {}
+        FLAT_WIDTH_BREAKS => return None,
+        w => return Some(w),
+    }
+    let result: Option<u32> = match &nodes[id.index()] {
+        DocNode::Text(t) => match t.cached_width() {
+            Some(w) if w == TEXT_WIDTH_HAS_NEWLINE => None,
+            Some(w) => Some(u32::from(w)),
+            None => {
+                let s = resolve_text(t, resolver);
+                if s.contains('\n') {
+                    None
+                } else {
+                    Some(visual_width(s, TAB_WIDTH) as u32)
+                }
+            }
+        },
+        DocNode::Line(kind) => match kind {
+            LineKind::Hard | LineKind::Literal => None,
+            LineKind::Soft => Some(0),
+            LineKind::Normal => Some(1),
+        },
+        DocNode::Group {
+            contents,
+            should_break,
+            ..
+        } => {
+            if *should_break {
+                None
+            } else {
+                flat_width_memo(*contents, nodes, children, cache, resolver)
+            }
+        }
+        DocNode::IsolatedGroup { contents } => {
+            flat_width_memo(*contents, nodes, children, cache, resolver)
+        }
+        DocNode::Indent(inner) | DocNode::Dedent(inner) => {
+            flat_width_memo(*inner, nodes, children, cache, resolver)
+        }
+        DocNode::Align { contents, .. } => {
+            flat_width_memo(*contents, nodes, children, cache, resolver)
+        }
+        DocNode::IndentIfBreak { contents, .. } => {
+            flat_width_memo(*contents, nodes, children, cache, resolver)
+        }
+        DocNode::IfBreak { flat_doc, .. } => {
+            flat_width_memo(*flat_doc, nodes, children, cache, resolver)
+        }
+        DocNode::Concat(range) | DocNode::Fill(range) => {
+            let kids = range.resolve(children);
+            let mut sum: u32 = 0;
+            let mut ok = true;
+            for &kid in kids {
+                match flat_width_memo(kid, nodes, children, cache, resolver) {
+                    Some(w) => sum = sum.saturating_add(w),
+                    None => {
+                        ok = false;
+                        break;
+                    }
+                }
+            }
+            if ok { Some(sum) } else { None }
+        }
+        DocNode::WithContext { doc, context } => {
+            flat_width_memo(*doc, nodes, children, cache, resolver)
+                .map(|w| w.saturating_add(context.trailing_reserve as u32))
+        }
+        DocNode::LineSuffix(_) | DocNode::LineSuffixBoundary => Some(0),
+        DocNode::BreakParent => None,
+    };
+    cache[id.index()] = match result {
+        Some(w) => w,
+        None => FLAT_WIDTH_BREAKS,
+    };
+    result
+}
 
 /// Check if a doc fits in the remaining width, looking ahead at remaining commands.
 ///
@@ -30,6 +120,10 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
 
     let nodes = arena.borrow_nodes();
     let children_vec = arena.borrow_children();
+    let mut flat_cache = arena.borrow_flat_width_cache();
+    if flat_cache.len() < nodes.len() {
+        flat_cache.resize(nodes.len(), FLAT_WIDTH_UNKNOWN);
+    }
     let mut remaining = remaining_width;
 
     let mut stack: SmallVec<[(DocId, Mode); 16]> = SmallVec::new();
@@ -47,6 +141,22 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
             stack.push((cmd.doc, cmd.mode));
             continue;
         };
+
+        // Fast path: a break-free subtree in flat mode contributes a fixed,
+        // memoized width — identical to walking it (the walk would only sum the
+        // same width with no early return).
+        if current_mode == Mode::Flat
+            && let Some(w) = flat_width_memo(
+                current_id,
+                &nodes,
+                &children_vec,
+                flat_cache.as_mut_slice(),
+                resolver,
+            )
+        {
+            remaining -= w as isize;
+            continue;
+        }
 
         match &nodes[current_id.index()] {
             DocNode::Text(t) => {

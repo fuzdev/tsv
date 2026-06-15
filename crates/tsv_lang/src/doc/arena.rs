@@ -185,6 +185,22 @@ impl ArenaCommand {
     }
 }
 
+/// Sentinel cache values for the `arena_fits` flat-width fast-path. A cell holds
+/// either a real break-free flat width, or one of these two sentinels — the top
+/// two `u32` values, mirroring the `u16` text-width sentinels in `doc::types`
+/// (`TEXT_WIDTH_HAS_NEWLINE` / `TEXT_WIDTH_NOT_COMPUTED`). Packing the cache as
+/// `u32` (vs an 8-byte enum) halves its footprint — one `u32` per doc node, ~4
+/// nodes per source byte — which matters most for the memory-constrained WASM
+/// target.
+///
+/// A real width aliasing a sentinel would need a ~4 GB-wide break-free flat
+/// subtree, which is unreachable on real source; and even then it is
+/// correctness-safe, not wrong output — a `FLAT_WIDTH_BREAKS` alias just defers
+/// that node to the walk (which sums the same width), and a `FLAT_WIDTH_UNKNOWN`
+/// alias just recomputes it. So no cap on stored widths is needed.
+pub(super) const FLAT_WIDTH_UNKNOWN: u32 = u32::MAX;
+pub(super) const FLAT_WIDTH_BREAKS: u32 = u32::MAX - 1;
+
 /// Arena allocator for document nodes.
 ///
 /// All doc nodes are stored contiguously in `nodes`. Multi-child nodes
@@ -200,6 +216,11 @@ pub struct DocArena {
     /// match `nodes`; sound because nodes are append-only and the arena is
     /// per-format, so a node's `will_break` value never changes once it exists.
     will_break_cache: RefCell<Vec<Option<bool>>>,
+    /// Memoized flat-mode subtree widths for the `arena_fits` fast-path, indexed
+    /// by `DocId`. Lazily extended like `will_break_cache`; valid per-format
+    /// (depends only on the fixed `TAB_WIDTH` + the interner, both fixed for a
+    /// render).
+    flat_width_cache: RefCell<Vec<u32>>,
 }
 
 impl DocArena {
@@ -209,6 +230,7 @@ impl DocArena {
             nodes: RefCell::new(Vec::new()),
             children: RefCell::new(Vec::new()),
             will_break_cache: RefCell::new(Vec::new()),
+            flat_width_cache: RefCell::new(Vec::new()),
         }
     }
 
@@ -222,6 +244,7 @@ impl DocArena {
             nodes: RefCell::new(Vec::with_capacity(estimated_nodes)),
             children: RefCell::new(Vec::with_capacity(estimated_children)),
             will_break_cache: RefCell::new(Vec::new()),
+            flat_width_cache: RefCell::new(Vec::new()),
         }
     }
 
@@ -973,6 +996,12 @@ impl DocArena {
     #[inline]
     pub fn borrow_children(&self) -> std::cell::Ref<'_, Vec<DocId>> {
         self.children.borrow()
+    }
+
+    /// Mutably borrow the flat-width cache for the `arena_fits` fast-path.
+    #[inline]
+    pub(super) fn borrow_flat_width_cache(&self) -> std::cell::RefMut<'_, Vec<u32>> {
+        self.flat_width_cache.borrow_mut()
     }
 
     /// Estimate output buffer capacity (bytes) for the rendered string.
