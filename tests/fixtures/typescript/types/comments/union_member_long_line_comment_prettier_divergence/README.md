@@ -9,7 +9,7 @@ exercised through the line-comment path instead of the main union path.
 tsv: closing `>` at a whole tab (`3 tabs`)
 Prettier: closing `>` at `2 tabs + 2 spaces`
 
-Both are the same visual width at `tab_width = 2`; only the representation
+Both are the same visual width at `tabWidth = 2`; only the representation
 differs. The inner row (`Inner<…>`) sits at `4 tabs` in both — the member's
 internal break is offset one level past the `| ` prefix regardless of the
 adjacent comment, matching how the main union path lays the same member out.

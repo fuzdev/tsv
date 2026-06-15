@@ -1,6 +1,6 @@
 # inline_content_hug_long_prettier_divergence
 
-When inline element content with expressions exceeds print_width, there are two strategies:
+When inline element content with expressions exceeds printWidth, there are two strategies:
 
 1. Break opening bracket: `<small\n\t>content</small\n>` (Prettier)
 2. Break expression internally: `<small>{expr\n\t? x\n\t: y}</small\n>` (tsv)

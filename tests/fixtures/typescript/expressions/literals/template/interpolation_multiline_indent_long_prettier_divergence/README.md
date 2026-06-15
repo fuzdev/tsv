@@ -1,6 +1,6 @@
 # interpolation_multiline_indent_long_prettier_divergence
 
-When template literal interpolations exceed print_width inside code-generation templates, tsv respects indentation using Prettier's `addAlignmentToDoc` approach: measure visual width of whitespace after the last `\n` in the quasi text before `${`, then position the expression at that absolute indent level.
+When template literal interpolations exceed printWidth inside code-generation templates, tsv respects indentation using Prettier's `addAlignmentToDoc` approach: measure visual width of whitespace after the last `\n` in the quasi text before `${`, then position the expression at that absolute indent level.
 
 tsv: breaks at `${`/`}` with proper visual alignment to quasi indentation
 Prettier: keeps `${identifier` on the same line, breaks chain at dots
@@ -11,4 +11,4 @@ Cases 1-15 test various indent sizes (tabs, spaces, mixed). Case 16 tests deeply
 
 ## Reason
 
-tsv treats print_width as a hard limit for template interpolations, with correct indentation alignment for multiline templates.
+tsv treats printWidth as a hard limit for template interpolations, with correct indentation alignment for multiline templates.
