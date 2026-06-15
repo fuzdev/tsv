@@ -195,6 +195,10 @@ impl ArenaCommand {
 pub struct DocArena {
     nodes: RefCell<Vec<DocNode>>,
     children: RefCell<Vec<DocId>>,
+    /// Memoized `will_break(id)` results, indexed by `DocId`. Lazily extended to
+    /// match `nodes`; sound because nodes are append-only and the arena is
+    /// per-format, so a node's `will_break` value never changes once it exists.
+    will_break_cache: RefCell<Vec<Option<bool>>>,
     /// Tab width for visual width calculations (stored for precomputing text widths)
     tab_width: usize,
 }
@@ -205,6 +209,7 @@ impl DocArena {
         Self {
             nodes: RefCell::new(Vec::new()),
             children: RefCell::new(Vec::new()),
+            will_break_cache: RefCell::new(Vec::new()),
             tab_width,
         }
     }
@@ -218,6 +223,7 @@ impl DocArena {
         Self {
             nodes: RefCell::new(Vec::with_capacity(estimated_nodes)),
             children: RefCell::new(Vec::with_capacity(estimated_children)),
+            will_break_cache: RefCell::new(Vec::new()),
             tab_width,
         }
     }
@@ -642,35 +648,58 @@ impl DocArena {
     //
 
     /// Check if a doc will definitely break (contains hardline or should_break group).
+    ///
+    /// Memoized per `DocId`: the same subtree is re-checked many times as ancestor
+    /// groups test breaking, and the result is fixed once the node exists.
     pub fn will_break(&self, id: DocId) -> bool {
         let nodes = self.nodes.borrow();
-        self.will_break_inner(id, &nodes)
+        let children = self.children.borrow();
+        let mut cache = self.will_break_cache.borrow_mut();
+        if cache.len() < nodes.len() {
+            cache.resize(nodes.len(), None);
+        }
+        Self::will_break_memo(id, &nodes, &children, cache.as_mut_slice())
     }
 
-    fn will_break_inner(&self, id: DocId, nodes: &[DocNode]) -> bool {
-        match &nodes[id.index()] {
+    fn will_break_memo(
+        id: DocId,
+        nodes: &[DocNode],
+        children: &[DocId],
+        cache: &mut [Option<bool>],
+    ) -> bool {
+        if let Some(cached) = cache[id.index()] {
+            return cached;
+        }
+        let result = match &nodes[id.index()] {
             DocNode::Text(_) => false,
             DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
-            DocNode::Indent(inner) | DocNode::Dedent(inner) => self.will_break_inner(*inner, nodes),
-            DocNode::Align { contents, .. } => self.will_break_inner(*contents, nodes),
-            DocNode::IndentIfBreak { contents, .. } => self.will_break_inner(*contents, nodes),
+            DocNode::Indent(inner) | DocNode::Dedent(inner) => {
+                Self::will_break_memo(*inner, nodes, children, cache)
+            }
+            DocNode::Align { contents, .. } => {
+                Self::will_break_memo(*contents, nodes, children, cache)
+            }
+            DocNode::IndentIfBreak { contents, .. } => {
+                Self::will_break_memo(*contents, nodes, children, cache)
+            }
             DocNode::Group {
                 contents,
                 should_break,
                 ..
-            } => *should_break || self.will_break_inner(*contents, nodes),
+            } => *should_break || Self::will_break_memo(*contents, nodes, children, cache),
             DocNode::IfBreak { .. } => false,
-            DocNode::Concat(range) | DocNode::Fill(range) => {
-                let children = self.children.borrow();
-                let kids = range.resolve(&children);
-                kids.iter().any(|&kid| self.will_break_inner(kid, nodes))
-            }
-            DocNode::WithContext { doc, .. } => self.will_break_inner(*doc, nodes),
+            DocNode::Concat(range) | DocNode::Fill(range) => range
+                .resolve(children)
+                .iter()
+                .any(|&kid| Self::will_break_memo(kid, nodes, children, cache)),
+            DocNode::WithContext { doc, .. } => Self::will_break_memo(*doc, nodes, children, cache),
             DocNode::IsolatedGroup { .. } => false,
             DocNode::LineSuffix(_) => false,
             DocNode::LineSuffixBoundary => false,
             DocNode::BreakParent => true,
-        }
+        };
+        cache[id.index()] = Some(result);
+        result
     }
 
     /// Like `will_break`, but also traverses into `IsolatedGroup`.
