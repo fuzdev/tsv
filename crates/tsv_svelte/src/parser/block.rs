@@ -9,6 +9,7 @@ use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
 use tsv_lang::{ParseError, Span};
 
+use super::expression_tag::scan_to_matching_brace;
 use super::parser_impl::SvelteParser;
 
 /// Find the position of the LAST top-level ` as ` keyword in a string.
@@ -1312,63 +1313,20 @@ impl<'a> SvelteParser<'a> {
     /// Scan source from a position until we find the closing } of a block tag
     /// Returns (content between start and }, position after })
     fn scan_block_tag_content(&mut self, start: usize) -> Result<(&'a str, usize), ParseError> {
-        let source_bytes = self.source.as_bytes();
-        let mut end = start;
-        let mut brace_depth = 0;
-        let mut in_string = false;
-        let mut string_char = '\0';
-        let mut escape_next = false;
-
-        for (i, &byte) in source_bytes.iter().enumerate().skip(start) {
-            let ch = byte as char;
-
-            if in_string && escape_next {
-                escape_next = false;
-                continue;
-            }
-
-            if in_string && ch == '\\' {
-                escape_next = true;
-                continue;
-            }
-
-            if in_string {
-                if ch == string_char {
-                    in_string = false;
-                }
-            } else if ch == '"' || ch == '\'' || ch == '`' {
-                in_string = true;
-                string_char = ch;
-            } else if ch == '{' {
-                brace_depth += 1;
-            } else if ch == '}' {
-                if brace_depth == 0 {
-                    end = i;
-                    break;
-                }
-                brace_depth -= 1;
-            }
-        }
+        // Find the block tag's closing `}` (skips strings/comments/regex). `start`
+        // is just after the `{#…`/`{@…` keyword, so the opening `{` is the depth-1
+        // brace that `scan_to_matching_brace` matches.
+        let Some(end) = scan_to_matching_brace(self.source.as_bytes(), start) else {
+            return Err(self.error_unclosed_at("block tag", start));
+        };
 
         let content = &self.source[start..end];
 
-        // Recreate lexer at the position after }
+        // Reposition the lexer past `}`. Block tags only occur in template content,
+        // so `inside_tag` is already `false` (template mode) and stays that way for
+        // the block body, which `advance_to_position` preserves.
         let after_close = end + 1; // Skip past the }
-        let remaining_source = &self.source[after_close..];
-        let mut new_lexer = crate::lexer::Lexer::new(remaining_source);
-        new_lexer.inside_tag = false; // Back to template mode
-
-        let (token_kind, token_start, token_end) = {
-            let token = new_lexer.next_token()?;
-            (token.kind, token.start, token.end)
-        };
-
-        self.lexer = new_lexer;
-        self.base_offset = after_close;
-        self.current_kind = token_kind;
-        self.current_start = after_close + token_start;
-        self.current_end = after_close + token_end;
-        self.peek_cache = None;
+        self.advance_to_position(after_close)?;
 
         Ok((content, after_close))
     }

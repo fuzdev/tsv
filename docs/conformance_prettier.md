@@ -2,7 +2,7 @@
 
 The tsv formatter tracks Prettier closely, matching its output except where it **intentionally differs**. This document catalogs those divergences.
 
-## Mental Model
+## Terminology
 
 **Matched**: tsv produces identical output to Prettier — the goal and the common case (measure current rates with `deno task corpus:compare:format --all --summary`).
 
@@ -14,12 +14,17 @@ The tsv formatter tracks Prettier closely, matching its output except where it *
 | ------------------------- | ------------------------------------------------------- | ------------------------------------- |
 | **Spec violation**        | Prettier violates CSS/HTML/JS spec                      | tsv follows the spec                  |
 | **Stable quirk**          | Prettier preserves multiple forms without normalizing   | tsv normalizes consistently           |
-| **Toolchain fix**         | Prettier's output breaks Svelte's parser                | tsv produces Svelte-compatible output |
-| **Strict print width**    | Prettier allows lines to exceed printWidth              | tsv breaks to stay within limit       |
+| **Prettier bug**          | Prettier is non-idempotent or emits invalid output      | tsv produces stable, valid output     |
+| **Parser compat**         | Prettier's output breaks Svelte's parser                | tsv produces Svelte-compatible output |
+| **Print width**           | Prettier allows lines to exceed printWidth              | tsv breaks to stay within limit       |
+| **Tabs-only indent**      | Prettier mixes tabs and spaces under --use-tabs         | tsv uses whole tabs only              |
+| **BOM stripping**         | Prettier preserves byte-order marks                     | tsv strips them                       |
 | **Semantic preservation** | Prettier changes meaning (strips parens)                | tsv preserves original semantics      |
 | **Comment preservation**  | Prettier moves comments to different syntactic position | tsv preserves comment position        |
 | **Content preservation**  | Prettier silently drops user comments                   | tsv preserves all comments            |
 | **Design choice**         | Other deliberate behavior differences                   | Documented rationale in fixture       |
+
+> Most `Comment preservation` and `Content preservation` divergences live in the prose-form [TypeScript: Comments](#typescript-comments) and [CSS: Comments](#css-comments) catalogs, not the Reason-column tables — they're the largest divergence category but don't fit a one-word table cell.
 
 ## Decision Framework
 
@@ -29,13 +34,7 @@ The tsv formatter tracks Prettier closely, matching its output except where it *
 - Output that's valid and reasonable
 - Unclear which approach is "better"
 
-**When to differ from Prettier:**
-
-- Spec violations (Prettier misses required whitespace)
-- Svelte compatibility (Prettier output breaks Svelte parser)
-- Semantic preservation (Prettier strips parens that change meaning)
-- Comment position preservation (Prettier moves comments — see below)
-- Strict print width enforcement (see below)
+**When to differ:** any reason in [Reasons tsv Differs](#reasons-tsv-differs) above. The three cross-cutting principles — comment position, print width, and tabs-only indentation — are detailed below.
 
 ### Comment Position Philosophy
 
@@ -78,6 +77,24 @@ Prettier moves comments and we preserve position.
 
 The benefit: predictable output that respects the configured line length. The tradeoff: some constructs may break where Prettier would keep them inline.
 
+### Tabs-Only Indentation Philosophy
+
+**tsv renders all indentation as whole tabs and never mixes tabs with alignment spaces.**
+When breaking a union type, Prettier wraps each member's type doc in
+`align(2, …)` (`union-type.js`) to offset the 2-char `|` prefix. With
+`--use-tabs`, Prettier's indentation algorithm renders that 2-column offset as
+a **sub-tab alignment**: content that is further indented rounds the offset up
+to a whole tab, but a closing delimiter sitting at the offset column is emitted
+as `tabs + 2 spaces`. The result mixes tabs and spaces on a single indentation
+level.
+
+tsv rounds the 2-column offset up to one tab everywhere. At
+`tab_width = 2` the two are the same visual width; only the representation
+differs (`⟨n+1 tabs⟩}` vs `⟨n tabs⟩··}`). This keeps indentation
+tab-width-agnostic: a reader viewing tabs at any width sees consistent
+structure, whereas Prettier's 2-space offset assumes the prefix is exactly 2
+columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
+
 ---
 
 ## Catalog
@@ -87,13 +104,13 @@ The benefit: predictable output that respects the configured line length. The tr
 | Feature                | Reason         | Fixture                                                                                                                |
 | ---------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | @container spacing     | Spec violation | [container_spacing](../tests/fixtures/css/at_rules/container_spacing_prettier_divergence/)                             |
-| @container line wrap   | Design choice  | [container_long](../tests/fixtures/css/at_rules/container_long_prettier_divergence/)                                   |
-| @import line wrap      | Design choice  | [import_media_query_long](../tests/fixtures/css/at_rules/import_media_query_long_prettier_divergence/)                 |
+| @container line wrap   | Print width    | [container_long](../tests/fixtures/css/at_rules/container_long_prettier_divergence/)                                   |
+| @import line wrap      | Print width    | [import_media_query_long](../tests/fixtures/css/at_rules/import_media_query_long_prettier_divergence/)                 |
 | @media boolean spacing | Spec violation | [media_boolean_spacing](../tests/fixtures/css/at_rules/media_boolean_spacing_prettier_divergence/)                     |
-| @media line wrap       | Design choice  | [media_long](../tests/fixtures/css/at_rules/media_long_prettier_divergence/)                                           |
+| @media line wrap       | Print width    | [media_long](../tests/fixtures/css/at_rules/media_long_prettier_divergence/)                                           |
 | @scope whitespace      | Stable quirk   | [scope_complex](../tests/fixtures/css/at_rules/scope_complex_prettier_divergence/)                                     |
 | @scope newlines        | Stable quirk   | [scope_selector](../tests/fixtures/css/at_rules/scope_selector_prettier_divergence/)                                   |
-| @supports line wrap    | Design choice  | [supports_long](../tests/fixtures/css/at_rules/supports_long_prettier_divergence/)                                     |
+| @supports line wrap    | Print width    | [supports_long](../tests/fixtures/css/at_rules/supports_long_prettier_divergence/)                                     |
 | SCSS directive numbers | Design choice  | [scss_directive_number_preserved](../tests/fixtures/css/at_rules/scss_directive_number_preserved_prettier_divergence/) |
 
 **Spec violations**: CSS Syntax 3 §4.3.4 specifies that an identifier immediately followed by `(` tokenizes as a `<function-token>`, not as an `<ident-token>` plus `(`. Media Queries 4 §3 explicitly notes: "Whitespace is required between a 'not', 'and', or 'or' keyword and the following '(' character, because without it that would instead parse as a `<function-token>`." Container Queries (CSS Conditional 5) use the same grammar pattern. Prettier normalizes this for `@supports` but not `@media` or `@container`.
@@ -106,7 +123,7 @@ The benefit: predictable output that respects the configured line length. The tr
 
 | Feature                  | Reason        | Fixture                                                                                  |
 | ------------------------ | ------------- | ---------------------------------------------------------------------------------------- |
-| Column combinator `\|\|` | Toolchain fix | [column](../tests/fixtures/css/selectors/combinators/column_prettier_divergence/)        |
+| Column combinator `\|\|` | Parser compat | [column](../tests/fixtures/css/selectors/combinators/column_prettier_divergence/)        |
 | :nth-child() An+B        | Stable quirk  | [nth_child](../tests/fixtures/css/selectors/pseudo_class/nth_child_prettier_divergence/) |
 
 ### CSS: Values
@@ -114,14 +131,14 @@ The benefit: predictable output that respects the configured line length. The tr
 | Feature                    | Reason         | Fixture                                                                                                                    |
 | -------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | Ratio in media queries     | Stable quirk   | [ratio](../tests/fixtures/css/values/ratio/ratio_prettier_divergence/)                                                     |
-| Transform list wrap        | Design choice  | [transform_long](../tests/fixtures/css/values/functions/transform_long_prettier_divergence/)                               |
-| Space-separated value wrap | Design choice  | [space_separated_long_wrap](../tests/fixtures/css/values/lists/space_separated_long_wrap_prettier_divergence/)             |
-| Comma+space value boundary | Design choice  | [comma_space_separated_long](../tests/fixtures/css/values/lists/comma_space_separated_long_prettier_divergence/)           |
+| Transform list wrap        | Print width    | [transform_long](../tests/fixtures/css/values/functions/transform_long_prettier_divergence/)                               |
+| Space-separated value wrap | Print width    | [space_separated_long_wrap](../tests/fixtures/css/values/lists/space_separated_long_wrap_prettier_divergence/)             |
+| Comma+space value boundary | Print width    | [comma_space_separated_long](../tests/fixtures/css/values/lists/comma_space_separated_long_prettier_divergence/)           |
 | Number dot-ident           | Spec violation | [number_dot_ident](../tests/fixtures/css/values/numbers/number_dot_ident_prettier_divergence/)                             |
 | Block-valued custom prop   | Design choice  | [block_value](../tests/fixtures/css/values/variables/block_value_svelte_prettier_divergence/)                              |
 | Empty custom-prop value    | Stable quirk   | [empty_value](../tests/fixtures/css/values/variables/empty_value_prettier_divergence/)                                     |
 | Empty value + `!important` | Prettier bug   | [empty_value_important](../tests/fixtures/css/values/variables/empty_value_important_prettier_divergence/)                 |
-| var() value-less fallback  | Stable quirk   | [var_empty_fallback_degenerate](../tests/fixtures/css/values/variables/var_empty_fallback_degenerate_prettier_divergence/) |
+| var() value-less fallback  | Prettier bug   | [var_empty_fallback_degenerate](../tests/fixtures/css/values/variables/var_empty_fallback_degenerate_prettier_divergence/) |
 
 **Space-separated value wrap**: Prettier doesn't wrap CSS space-separated values (e.g., `box-shadow`) when they exceed print width. A 101-char `box-shadow: var(--a) color-mix(...)` stays on one line. tsv wraps at the print width boundary, breaking between space-separated values. This respects the configured print width rather than allowing arbitrary overflows.
 
@@ -137,7 +154,7 @@ The benefit: predictable output that respects the configured line length. The tr
 
 ### CSS: Layout
 
-**Greedy fill overflow** (design choice) — [comma_separated_greedy_fill](../tests/fixtures/css/comma_separated_greedy_fill_prettier_divergence/): Prettier's `fill()` algorithm allows lines to exceed `printWidth` by 1 char when fill segments exactly consume remaining width and the parent adds trailing punctuation. tsv treats `printWidth` as a hard limit.
+**Greedy fill overflow** (print width) — [comma_separated_greedy_fill](../tests/fixtures/css/comma_separated_greedy_fill_prettier_divergence/): Prettier's `fill()` algorithm allows lines to exceed `printWidth` by 1 char when fill segments exactly consume remaining width and the parent adds trailing punctuation. tsv treats `printWidth` as a hard limit.
 
 > **Related fill boundary divergences**: Several fixtures test variations of Prettier allowing lines to exceed `printWidth`. These share a common root cause—Prettier's `fill()` algorithm boundary conditions:
 >
@@ -147,7 +164,7 @@ The benefit: predictable output that respects the configured line length. The tr
 
 ### CSS: Comments
 
-Prettier has stable variants for comment positioning. tsv normalizes consistently.
+**Stable quirk.** Prettier has stable variants for comment positioning. tsv normalizes consistently.
 
 - At-rule before `{` — [atrule_before_opening_brace](../tests/fixtures/css/tokens/comments/atrule_before_opening_brace_prettier_divergence/)
 - At-rule in prelude — [atrule_in_prelude](../tests/fixtures/css/tokens/comments/atrule_in_prelude_prettier_divergence/)
@@ -161,7 +178,7 @@ Prettier has stable variants for comment positioning. tsv normalizes consistentl
 
 ### Whitespace: BOM Handling
 
-Prettier preserves byte-order marks. tsv strips them (they serve no purpose in UTF-8).
+**BOM stripping.** Prettier preserves byte-order marks. tsv strips them (they serve no purpose in UTF-8).
 
 - Svelte — [bom](../tests/fixtures/svelte/syntax/whitespace/bom_prettier_divergence/)
 - CSS — [bom](../tests/fixtures/css/tokens/whitespace/bom_prettier_divergence/)
@@ -173,14 +190,14 @@ Prettier preserves byte-order marks. tsv strips them (they serve no purpose in U
 | ------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | Menu block element        | Spec violation       | [menu_block](../tests/fixtures/svelte/elements/menu_block_prettier_divergence/)                                               |
 | Self-closing non-void     | Design choice        | [self_closing_nonvoid](../tests/fixtures/svelte/elements/self_closing_nonvoid_prettier_divergence/)                           |
-| Fill after inline         | Design choice        | [fill_after_inline](../tests/fixtures/svelte/elements/fill_after_inline_prettier_divergence/)                                 |
-| Fill boundary             | Design choice        | [inline_element_fill_long](../tests/fixtures/svelte/elements/inline_element_fill_long_prettier_divergence/)                   |
-| Fill after breaking attr  | Design choice        | [multiline_value_inline_long](../tests/fixtures/svelte/attributes/multiline_value_inline_long_prettier_divergence/)           |
-| Component fill boundary   | Design choice        | [inline_component_fill_long](../tests/fixtures/svelte/elements/inline_component_fill_long_prettier_divergence/)               |
-| Fill multiple expr        | Design choice        | [fill_multiple_expr_long](../tests/fixtures/svelte/elements/fill_multiple_expr_long_prettier_divergence/)                     |
+| Fill after inline         | Print width          | [fill_after_inline](../tests/fixtures/svelte/elements/fill_after_inline_prettier_divergence/)                                 |
+| Fill boundary             | Print width          | [inline_element_fill_long](../tests/fixtures/svelte/elements/inline_element_fill_long_prettier_divergence/)                   |
+| Fill after breaking attr  | Print width          | [multiline_value_inline_long](../tests/fixtures/svelte/attributes/multiline_value_inline_long_prettier_divergence/)           |
+| Component fill boundary   | Print width          | [inline_component_fill_long](../tests/fixtures/svelte/elements/inline_component_fill_long_prettier_divergence/)               |
+| Fill multiple expr        | Print width          | [fill_multiple_expr_long](../tests/fixtures/svelte/elements/fill_multiple_expr_long_prettier_divergence/)                     |
 | Inline content hug        | Design choice        | [inline_content_hug_long](../tests/fixtures/svelte/elements/inline_content_hug_long_prettier_divergence/)                     |
-| Block multiline attrs hug | Design choice        | [block_multiline_attrs_content_hug](../tests/fixtures/svelte/elements/block_multiline_attrs_content_hug_prettier_divergence/) |
-| Fill expr break boundary  | Design choice        | [fill_expr_break_boundary_long](../tests/fixtures/svelte/elements/fill_expr_break_boundary_long_prettier_divergence/)         |
+| Block multiline attrs hug | Print width          | [block_multiline_attrs_content_hug](../tests/fixtures/svelte/elements/block_multiline_attrs_content_hug_prettier_divergence/) |
+| Fill expr break boundary  | Print width          | [fill_expr_break_boundary_long](../tests/fixtures/svelte/elements/fill_expr_break_boundary_long_prettier_divergence/)         |
 | @debug comments           | Content preservation | [debug_comment](../tests/fixtures/svelte/tags/debug/debug_comment_prettier_divergence/)                                       |
 
 **Fill after inline**: Prettier's fill algorithm allows lines to exceed print width when text follows an inline element closing tag. Prettier produces 111 char lines, tsv breaks at exactly 100 chars.
@@ -205,7 +222,7 @@ Prettier preserves byte-order marks. tsv strips them (they serve no purpose in U
 
 **Trailing comments in `{...}`** (content preservation) — [expr_trailing](../tests/fixtures/svelte/syntax/comments/expr_trailing_prettier_divergence/) (block comments, inline); [expr_trailing_line](../tests/fixtures/svelte/syntax/comments/expr_trailing_line_prettier_divergence/) (line comments — `}` kept on its own line so the `//` doesn't swallow it).
 
-**Same-line `//` comment placement in the attribute list** (placement preservation) — [comment_same_line](../tests/fixtures/svelte/attributes/comment_same_line_prettier_divergence/): a line comment the author put on the same line as the tag name (`<div // foo`) or trailing an attribute that has more attributes after it (`a="1" // mid`) stays trailing that token; prettier relocates it to its own line. A `//` trailing the *last* attribute (before `>`/`/>`) already stays inline in both formatters, so it is not a divergence — [comment_trailing_same_line](../tests/fixtures/svelte/attributes/comment_trailing_same_line/). Block comments and own-line comments are preserved as-written by both. See [Comment Position Philosophy](#comment-position-philosophy).
+**Same-line `//` comment placement in the attribute list** (comment preservation) — [comment_same_line](../tests/fixtures/svelte/attributes/comment_same_line_prettier_divergence/): a line comment the author put on the same line as the tag name (`<div // foo`) or trailing an attribute that has more attributes after it (`a="1" // mid`) stays trailing that token; prettier relocates it to its own line. A `//` trailing the *last* attribute (before `>`/`/>`) already stays inline in both formatters, so it is not a divergence — [comment_trailing_same_line](../tests/fixtures/svelte/attributes/comment_trailing_same_line/). Block comments and own-line comments are preserved as-written by both. See [Comment Position Philosophy](#comment-position-philosophy).
 
 ### Svelte: Blocks
 
@@ -216,7 +233,7 @@ Prettier preserves byte-order marks. tsv strips them (they serve no purpose in U
 - `{#if}` last block quirk — [last_block](../tests/fixtures/svelte/blocks/if/last_block_prettier_divergence/)
 - `{#if}` short expr 100+ — [in_inline_element_long](../tests/fixtures/svelte/blocks/if/in_inline_element_long_prettier_divergence/)
 
-Prettier doesn't apply width-based wrapping to block expressions:
+**Print width.** Prettier doesn't apply width-based wrapping to block expressions:
 
 - **Method chains** in `{#each}`, `{#await}`, `{#if}`, `{#key}`, etc. don't account for the tag prefix width, resulting in 140+ char lines. tsv passes context offset for proper wrapping.
 - **Logical expressions** (`&&`, `||`) in block conditions are never wrapped internally by Prettier, even when exceeding 100 chars. (In `<script>`, assignments provide a break point so this isn't an issue.) tsv wraps them with proper indentation.
@@ -231,15 +248,15 @@ Prettier doesn't apply width-based wrapping to block expressions:
 | Feature                                   | Reason                | Fixture                                                                                                                                          |
 | ----------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Empty statement blank lines               | Design choice         | [empty_standalone](../tests/fixtures/typescript/statements/empty_standalone_prettier_divergence/)                                                |
-| Return type generic union                 | Design choice         | [return_type_generic_union_long](../tests/fixtures/typescript/declarations/function/return_type_generic_union_long_prettier_divergence/)         |
-| Single specifier import                   | Design choice         | [single_specifier_long](../tests/fixtures/typescript/modules/imports/single_specifier_long_prettier_divergence/)                                 |
-| Module path calls                         | Design choice         | [path_calls_long](../tests/fixtures/typescript/modules/imports/path_calls_long_prettier_divergence/)                                             |
+| Return type generic union                 | Print width           | [return_type_generic_union_long](../tests/fixtures/typescript/declarations/function/return_type_generic_union_long_prettier_divergence/)         |
+| Single specifier import                   | Print width           | [single_specifier_long](../tests/fixtures/typescript/modules/imports/single_specifier_long_prettier_divergence/)                                 |
+| Module path calls                         | Print width           | [path_calls_long](../tests/fixtures/typescript/modules/imports/path_calls_long_prettier_divergence/)                                             |
 | Instantiation expression parens           | Semantic preservation | [instantiation_parens](../tests/fixtures/typescript/typescript_specific/assertions/instantiation_parens_prettier_divergence/)                    |
 | Optional-chain base member chain          | Semantic preservation | [optional_paren_member_chain](../tests/fixtures/typescript/expressions/chain/optional_paren_member_chain_prettier_divergence/)                   |
 | Optional-chain non-null base member chain | Semantic preservation | [optional_paren_non_null_member_chain](../tests/fixtures/typescript/expressions/chain/optional_paren_non_null_member_chain_prettier_divergence/) |
-| Optional-chain non-null new callee        | Semantic preservation | [optional_paren_non_null_new_callee](../tests/fixtures/typescript/expressions/chain/optional_paren_non_null_new_callee_prettier_divergence/)     |
+| Optional-chain non-null new callee        | Prettier bug          | [optional_paren_non_null_new_callee](../tests/fixtures/typescript/expressions/chain/optional_paren_non_null_new_callee_prettier_divergence/)     |
 | Non-null parenthesized base               | Design choice         | [non_null_paren_base_long](../tests/fixtures/typescript/expressions/member/non_null_paren_base_long_prettier_divergence/)                        |
-| Constrained infer extends-operand parens  | Semantic preservation | [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens_prettier_divergence/)                           |
+| Constrained infer extends-operand parens  | Prettier bug          | [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens_prettier_divergence/)                           |
 
 **Instantiation expression parens**: Prettier strips parentheses from ternary and binary expressions in `TSInstantiationExpression` (`(x ? y : z)<T>` → `x ? y : z<T>`), changing semantics. Without parens, `<T>` only applies to the last operand. tsv preserves parens to maintain the original meaning. Both formatters agree on preserving parens for assignment expressions (`(x = y)<T>`).
 
@@ -263,23 +280,9 @@ tsv treats these like any other function call—no special-casing for module pat
 
 **Return type generic union**: Prettier has special handling for `null` and `void` in union types within generic return types. When the second union member is `null` or `void`: (1) function declarations and class methods allow lines to exceed print width instead of breaking inside `<>`, (2) arrow functions break the assignment (`const fn =`) instead of breaking inside the return type. tsv breaks consistently inside the return type generic at the print width boundary regardless of type keyword.
 
-### Tabs-Only Alignment (No Sub-Tab Spaces)
+### Tabs-Only Alignment
 
-When breaking a union type, Prettier wraps each member's type doc in
-`align(2, …)` (`union-type.js`) to offset the 2-char `|` prefix. With
-`--use-tabs`, Prettier's indentation algorithm renders that 2-column offset as
-a **sub-tab alignment**: content that is further indented rounds the offset up
-to a whole tab, but a closing delimiter sitting at the offset column is emitted
-as `tabs + 2 spaces`. The result mixes tabs and spaces on a single indentation
-level.
-
-tsv renders **all** indentation as whole tabs and never mixes tabs with
-alignment spaces — the 2-column offset is rounded up to one tab everywhere. At
-`tab_width = 2` the two are the same visual width; only the representation
-differs (`⟨n+1 tabs⟩}` vs `⟨n tabs⟩··}`). This keeps indentation
-tab-width-agnostic: a reader viewing tabs at any width sees consistent
-structure, whereas Prettier's 2-space offset assumes the prefix is exactly 2
-columns wide.
+These fixtures exercise the [Tabs-Only Indentation Philosophy](#tabs-only-indentation-philosophy): Prettier's `align(2, …)` for broken union members emits `tabs + 2 spaces` under `--use-tabs`, while tsv rounds the 2-column offset up to a whole tab everywhere.
 
 - Union object member — [union_object_member](../tests/fixtures/typescript/types/union_object_member_prettier_divergence/)
 - Union hugged object — [union_hug_object](../tests/fixtures/typescript/types/union_hug_object_prettier_divergence/)
@@ -521,7 +524,7 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 
 **Retained paren union member line comment**: the line-comment analog of the above — a line comment trailing the last inner member of a retained parenthesized union (`(a | b // c) | c`, `a | (b | c // c) | d`) → Prettier hoists it out to trail the whole member and keeps the inner union inline (`| (a | b) // c`). tsv keeps it inside the parens; because a line comment must end its line, the parenthesized union expands to its broken form (one member per line) with `)` on its own line. (Otherwise the comment is dropped entirely — content loss.) Unlike the block-comment case — which stays inline because a block comment can — the line comment forces the expanded layout. Our expanded form is stable in tsv; Prettier's inline-with-relocated-comment form is its own stable shape.
 
-**Retained paren first-member leading line comment**: a **leading** line comment inside a retained parenthesized union member, when that member is the **first** member of the outer union (`(// c\n A | B) | C`) → Prettier moves the comment out of the parens to lead the member, keeping the inner union inline when it fits (`| // c\n (A | B)`). tsv keeps it inside the parens leading the inner union; because a line comment must end its line, the parenthesized union expands to its broken form with `)` on its own line. (Otherwise the comment is dropped entirely — content loss: the inner-leading line comment has no previous member to relocate onto.) This is the leading-comment counterpart of the trailing **Retained paren union member line comment** above, and mirrors its keep-inside behavior. A leading line comment inside a **later** member's parens instead relocates to trail the previous member, where both formatters agree (see the [Tabs-Only Alignment](#tabs-only-alignment-no-sub-tab-spaces) `union_paren_member_long_line_comment` fixture); only the first member, lacking a previous member, keeps the comment inside.
+**Retained paren first-member leading line comment**: a **leading** line comment inside a retained parenthesized union member, when that member is the **first** member of the outer union (`(// c\n A | B) | C`) → Prettier moves the comment out of the parens to lead the member, keeping the inner union inline when it fits (`| // c\n (A | B)`). tsv keeps it inside the parens leading the inner union; because a line comment must end its line, the parenthesized union expands to its broken form with `)` on its own line. (Otherwise the comment is dropped entirely — content loss: the inner-leading line comment has no previous member to relocate onto.) This is the leading-comment counterpart of the trailing **Retained paren union member line comment** above, and mirrors its keep-inside behavior. A leading line comment inside a **later** member's parens instead relocates to trail the previous member, where both formatters agree (see the [Tabs-Only Alignment](#tabs-only-alignment) `union_paren_member_long_line_comment` fixture); only the first member, lacking a previous member, keeps the comment inside.
 
 **Retained paren intersection member comment**: the intersection counterpart of the retained-paren-union case — a block comment inside a parenthesized **intersection** member whose parens are retained because it nests in an outer union (`(a & b /* c */) | c`, `a | (/* c */ b & c)`, `a | (b & c /* c */)`) → Prettier hoists the comment out of the parens (trailing after `)`, leading before `(`: `(a & b) /* c */ | c`, `a | /* c */ (b & c)`). tsv keeps it inside the parens, associating it with the parenthesized member. (Unlike the union case this never dropped — it preserves through the paren-unwrapping path — but it is the same comment-position divergence and is pinned for completeness.) Both positions are dual-stable in our formatter.
 

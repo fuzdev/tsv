@@ -1,0 +1,174 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 109,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 70,
+				"data": " `}` inside a regex / comment must not close the {@html} early "
+			},
+			{
+				"type": "Text",
+				"start": 70,
+				"end": 71,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 71,
+				"end": 87,
+				"expression": {
+					"type": "CallExpression",
+					"start": 78,
+					"end": 86,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 7
+						},
+						"end": {
+							"line": 2,
+							"column": 15
+						}
+					},
+					"callee": {
+						"type": "Identifier",
+						"start": 78,
+						"end": 79,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 7
+							},
+							"end": {
+								"line": 2,
+								"column": 8
+							}
+						},
+						"name": "h"
+					},
+					"arguments": [
+						{
+							"type": "Literal",
+							"start": 80,
+							"end": 85,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 9
+								},
+								"end": {
+									"line": 2,
+									"column": 14
+								}
+							},
+							"value": {},
+							"raw": "/[}]/",
+							"regex": {
+								"pattern": "[}]",
+								"flags": ""
+							}
+						}
+					],
+					"optional": false
+				}
+			},
+			{
+				"type": "Text",
+				"start": 87,
+				"end": 88,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 88,
+				"end": 108,
+				"expression": {
+					"type": "CallExpression",
+					"start": 95,
+					"end": 107,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 7
+						},
+						"end": {
+							"line": 3,
+							"column": 19
+						}
+					},
+					"callee": {
+						"type": "Identifier",
+						"start": 95,
+						"end": 96,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 7
+							},
+							"end": {
+								"line": 3,
+								"column": 8
+							}
+						},
+						"name": "g"
+					},
+					"arguments": [
+						{
+							"type": "Identifier",
+							"start": 105,
+							"end": 106,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 17
+								},
+								"end": {
+									"line": 3,
+									"column": 18
+								}
+							},
+							"name": "x",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " } ",
+									"start": 97,
+									"end": 104
+								}
+							]
+						}
+					],
+					"optional": false
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " } ",
+			"start": 97,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 9
+				},
+				"end": {
+					"line": 3,
+					"column": 16
+				}
+			}
+		}
+	]
+}

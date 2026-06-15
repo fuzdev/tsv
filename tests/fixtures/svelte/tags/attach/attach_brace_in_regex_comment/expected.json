@@ -1,0 +1,309 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 178,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 82,
+				"data": " `}` inside a regex, string, or comment must not close the {@attach} early "
+			},
+			{
+				"type": "Text",
+				"start": 82,
+				"end": 83,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 83,
+				"end": 113,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 84
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 87
+					}
+				},
+				"attributes": [
+					{
+						"type": "AttachTag",
+						"start": 88,
+						"end": 106,
+						"expression": {
+							"type": "CallExpression",
+							"start": 97,
+							"end": 105,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 14
+								},
+								"end": {
+									"line": 2,
+									"column": 22
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 97,
+								"end": 98,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 14
+									},
+									"end": {
+										"line": 2,
+										"column": 15
+									}
+								},
+								"name": "a"
+							},
+							"arguments": [
+								{
+									"type": "Literal",
+									"start": 99,
+									"end": 104,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 16
+										},
+										"end": {
+											"line": 2,
+											"column": 21
+										}
+									},
+									"value": {},
+									"raw": "/[}]/",
+									"regex": {
+										"pattern": "[}]",
+										"flags": ""
+									}
+								}
+							],
+							"optional": false
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 113,
+				"end": 114,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 114,
+				"end": 142,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 115
+					},
+					"end": {
+						"line": 3,
+						"column": 4,
+						"character": 118
+					}
+				},
+				"attributes": [
+					{
+						"type": "AttachTag",
+						"start": 119,
+						"end": 135,
+						"expression": {
+							"type": "CallExpression",
+							"start": 128,
+							"end": 134,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 14
+								},
+								"end": {
+									"line": 3,
+									"column": 20
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 128,
+								"end": 129,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 14
+									},
+									"end": {
+										"line": 3,
+										"column": 15
+									}
+								},
+								"name": "b"
+							},
+							"arguments": [
+								{
+									"type": "Literal",
+									"start": 130,
+									"end": 133,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 16
+										},
+										"end": {
+											"line": 3,
+											"column": 19
+										}
+									},
+									"value": "}",
+									"raw": "'}'"
+								}
+							],
+							"optional": false
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 142,
+				"end": 143,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 143,
+				"end": 177,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 144
+					},
+					"end": {
+						"line": 4,
+						"column": 4,
+						"character": 147
+					}
+				},
+				"attributes": [
+					{
+						"type": "AttachTag",
+						"start": 148,
+						"end": 170,
+						"expression": {
+							"type": "CallExpression",
+							"start": 157,
+							"end": 169,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 14
+								},
+								"end": {
+									"line": 4,
+									"column": 26
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 157,
+								"end": 158,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 14
+									},
+									"end": {
+										"line": 4,
+										"column": 15
+									}
+								},
+								"name": "c"
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 167,
+									"end": 168,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 24
+										},
+										"end": {
+											"line": 4,
+											"column": 25
+										}
+									},
+									"name": "d",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " } ",
+											"start": 159,
+											"end": 166
+										}
+									]
+								}
+							],
+							"optional": false
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " } ",
+			"start": 159,
+			"end": 166,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 16
+				},
+				"end": {
+					"line": 4,
+					"column": 23
+				}
+			}
+		}
+	]
+}

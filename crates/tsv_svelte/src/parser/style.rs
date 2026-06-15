@@ -51,21 +51,8 @@ impl<'a> SvelteParser<'a> {
             return Err(self.error_msg_at("Unterminated style tag", start));
         }
 
-        // Recreate lexer starting from the closing tag position
-        let remaining_source = &self.source[content_end..];
-        let mut new_lexer = crate::lexer::Lexer::new(remaining_source);
-
-        let (token_kind, token_start, token_end) = {
-            let token = new_lexer.next_token()?;
-            (token.kind, token.start, token.end)
-        };
-
-        self.lexer = new_lexer;
-        self.base_offset = content_end;
-        self.current_kind = token_kind;
-        self.current_start = content_end + token_start;
-        self.current_end = content_end + token_end;
-        self.peek_cache = None;
+        // Reposition the lexer to the closing `</style>` tag (resumes at `<`).
+        self.advance_to_position(content_end)?;
 
         // Verify it's the closing tag: </style>
         if !self.check(TokenKind::LeftAngle) {

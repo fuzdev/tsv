@@ -438,21 +438,10 @@ impl<'a> SvelteParser<'a> {
             );
         }
 
-        // Reposition lexer to the closing tag
-        let remaining_source = &self.source[content_end..];
-        let mut new_lexer = crate::lexer::Lexer::new(remaining_source);
-
-        let (token_kind, token_start, token_end) = {
-            let token = new_lexer.next_token()?;
-            (token.kind, token.start, token.end)
-        };
-
-        self.lexer = new_lexer;
-        self.base_offset = content_end;
-        self.current_kind = token_kind;
-        self.current_start = content_end + token_start;
-        self.current_end = content_end + token_end;
-        self.peek_cache = None;
+        // Reposition the lexer to the closing tag. We resume at `<`, which lexes to
+        // `LeftAngle` in either mode; `inside_tag` is `false` here (after the opening
+        // tag's `>`), which `advance_to_position` preserves.
+        self.advance_to_position(content_end)?;
 
         // Create a Text node (Svelte always emits one, even if empty)
         let raw_content = &self.source[content_start..content_end];

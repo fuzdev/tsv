@@ -1,0 +1,447 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 456,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 72,
+				"data": " adjacent expressions read as one value, not separate attributes "
+			},
+			{
+				"type": "Text",
+				"start": 72,
+				"end": 73,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 73,
+				"end": 104,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 74
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 77
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 78,
+						"end": 97,
+						"name": "data-attr1",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 5,
+								"character": 78
+							},
+							"end": {
+								"line": 2,
+								"column": 15,
+								"character": 88
+							}
+						},
+						"value": [
+							{
+								"type": "ExpressionTag",
+								"start": 90,
+								"end": 93,
+								"expression": {
+									"type": "Identifier",
+									"start": 91,
+									"end": 92,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 18
+										},
+										"end": {
+											"line": 2,
+											"column": 19
+										}
+									},
+									"name": "a"
+								}
+							},
+							{
+								"type": "ExpressionTag",
+								"start": 93,
+								"end": 96,
+								"expression": {
+									"type": "Identifier",
+									"start": 94,
+									"end": 95,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 21
+										},
+										"end": {
+											"line": 2,
+											"column": 22
+										}
+									},
+									"name": "b"
+								}
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 104,
+				"end": 106,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 106,
+				"end": 142,
+				"data": " expression followed by text "
+			},
+			{
+				"type": "Text",
+				"start": 142,
+				"end": 143,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 143,
+				"end": 178,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 144
+					},
+					"end": {
+						"line": 5,
+						"column": 4,
+						"character": 147
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 148,
+						"end": 171,
+						"name": "data-attr2",
+						"name_loc": {
+							"start": {
+								"line": 5,
+								"column": 5,
+								"character": 148
+							},
+							"end": {
+								"line": 5,
+								"column": 15,
+								"character": 158
+							}
+						},
+						"value": [
+							{
+								"type": "ExpressionTag",
+								"start": 160,
+								"end": 163,
+								"expression": {
+									"type": "Identifier",
+									"start": 161,
+									"end": 162,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 18
+										},
+										"end": {
+											"line": 5,
+											"column": 19
+										}
+									},
+									"name": "a"
+								}
+							},
+							{
+								"start": 163,
+								"end": 170,
+								"type": "Text",
+								"raw": "//text1",
+								"data": "//text1"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 178,
+				"end": 180,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 180,
+				"end": 216,
+				"data": " text followed by expression "
+			},
+			{
+				"type": "Text",
+				"start": 216,
+				"end": 217,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 217,
+				"end": 250,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 218
+					},
+					"end": {
+						"line": 8,
+						"column": 4,
+						"character": 221
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 222,
+						"end": 243,
+						"name": "data-attr3",
+						"name_loc": {
+							"start": {
+								"line": 8,
+								"column": 5,
+								"character": 222
+							},
+							"end": {
+								"line": 8,
+								"column": 15,
+								"character": 232
+							}
+						},
+						"value": [
+							{
+								"start": 234,
+								"end": 239,
+								"type": "Text",
+								"raw": "text1",
+								"data": "text1"
+							},
+							{
+								"type": "ExpressionTag",
+								"start": 239,
+								"end": 242,
+								"expression": {
+									"type": "Identifier",
+									"start": 240,
+									"end": 241,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 23
+										},
+										"end": {
+											"line": 8,
+											"column": 24
+										}
+									},
+									"name": "a"
+								}
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 250,
+				"end": 252,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 252,
+				"end": 330,
+				"data": " a bare slash is value content; only `/>` terminates an unquoted value "
+			},
+			{
+				"type": "Text",
+				"start": 330,
+				"end": 331,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 331,
+				"end": 362,
+				"name": "a",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 1,
+						"character": 332
+					},
+					"end": {
+						"line": 11,
+						"column": 2,
+						"character": 333
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 334,
+						"end": 353,
+						"name": "href",
+						"name_loc": {
+							"start": {
+								"line": 11,
+								"column": 3,
+								"character": 334
+							},
+							"end": {
+								"line": 11,
+								"column": 7,
+								"character": 338
+							}
+						},
+						"value": [
+							{
+								"start": 340,
+								"end": 352,
+								"type": "Text",
+								"raw": "/text1/text2",
+								"data": "/text1/text2"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 354,
+							"end": 358,
+							"raw": "link",
+							"data": "link"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 362,
+				"end": 364,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 364,
+				"end": 426,
+				"data": " `/>` self-close terminates the value before the slash "
+			},
+			{
+				"type": "Text",
+				"start": 426,
+				"end": 427,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 427,
+				"end": 455,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 428
+					},
+					"end": {
+						"line": 14,
+						"column": 6,
+						"character": 433
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 434,
+						"end": 452,
+						"name": "data-attr4",
+						"name_loc": {
+							"start": {
+								"line": 14,
+								"column": 7,
+								"character": 434
+							},
+							"end": {
+								"line": 14,
+								"column": 17,
+								"character": 444
+							}
+						},
+						"value": [
+							{
+								"start": 446,
+								"end": 451,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
