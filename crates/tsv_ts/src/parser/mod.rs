@@ -596,6 +596,37 @@ impl<'a> Parser<'a> {
         self.source[from..to].contains(['\n', '\r', '\u{2028}', '\u{2029}'])
     }
 
+    /// Whether the token after a `declare` modifier begins an ambient declaration
+    /// on the same line.
+    ///
+    /// `declare` is a contextual keyword: a following line terminator (ASI) or a
+    /// non-declaration token demotes it to a plain identifier (`declare;`,
+    /// `declare = x`). Mirrors tsc's `isDeclaration` modifier handling
+    /// (`nextToken(); if (hasPrecedingLineBreak()) return false; continue;`): the
+    /// next token must be a declaration starter on the same line. The contextual
+    /// starters (`abstract`/`namespace`/`module`/`interface`/`type`/`global`) are
+    /// matched by source value since they lex as plain identifiers.
+    pub(super) fn peek_starts_ambient_declaration(&mut self) -> bool {
+        if self.peek_preceded_by_line_terminator() {
+            return false;
+        }
+        match self.peek_kind() {
+            TokenKind::Keyword(
+                KeywordKind::Const
+                | KeywordKind::Let
+                | KeywordKind::Var
+                | KeywordKind::Function
+                | KeywordKind::Class
+                | KeywordKind::Enum,
+            ) => true,
+            TokenKind::Identifier => matches!(
+                self.peek_value(),
+                "abstract" | "namespace" | "module" | "interface" | "type" | "global"
+            ),
+            _ => false,
+        }
+    }
+
     /// Whether the peeked token is followed on the same line by an identifier.
     ///
     /// Used for `await using [no LineTerminator here] BindingIdentifier`, where

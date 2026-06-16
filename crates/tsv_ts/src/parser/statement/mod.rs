@@ -141,22 +141,30 @@ impl<'a> Parser<'a> {
                 {
                     return self.parse_using_declaration();
                 }
-                // Check for contextual keyword 'type' followed by identifier (type alias declaration)
-                // peek_kind() skips comments: `type /* c */ A = string`
+                // Contextual keyword `type` starts a type alias only when the name is
+                // on the SAME line (tsc `nextTokenIsIdentifierOnSameLine`). A line
+                // break demotes `type` to a plain identifier and ASI splits the
+                // statement in two. peek_kind() skips comments: `type /* c */ A = T`.
                 if self.current_value() == "type"
                     && matches!(self.peek_kind(), TokenKind::Identifier)
+                    && !self.peek_preceded_by_line_terminator()
                 {
                     return self.parse_type_alias_declaration();
                 }
-                // Check for contextual keyword 'interface' followed by identifier
-                // peek_kind() skips comments: `interface /* c */ A {}`
+                // Contextual keyword `interface` starts a declaration only when the
+                // name is on the SAME line (tsc `nextTokenIsIdentifierOnSameLine`); a
+                // line break demotes it to an identifier. peek_kind() skips comments.
                 if self.current_value() == "interface"
                     && matches!(self.peek_kind(), TokenKind::Identifier)
+                    && !self.peek_preceded_by_line_terminator()
                 {
                     return self.parse_interface_declaration();
                 }
-                // Check for contextual keyword 'declare' followed by function/class
-                if self.current_value() == "declare" {
+                // Contextual keyword `declare` is an ambient-declaration modifier only
+                // when a declaration starter follows on the SAME line (tsc
+                // `isDeclaration`: `nextToken(); if (hasPrecedingLineBreak()) return
+                // false`). Otherwise `declare` is a plain identifier.
+                if self.current_value() == "declare" && self.peek_starts_ambient_declaration() {
                     return self.parse_declare_statement();
                 }
                 // Check for contextual keyword 'abstract' followed by class
@@ -169,10 +177,13 @@ impl<'a> Parser<'a> {
                 {
                     return self.parse_abstract_class();
                 }
-                // Check for contextual keyword 'namespace' or 'module' followed by identifier
-                // peek_kind() skips comments: `namespace /* c */ A {}`
+                // Contextual keywords `namespace`/`module` start a declaration only
+                // when the name is on the SAME line (tsc
+                // `nextTokenIsIdentifierOrStringLiteralOnSameLine`); a line break
+                // demotes them to identifiers. peek_kind() skips comments.
                 if (self.current_value() == "namespace" || self.current_value() == "module")
                     && matches!(self.peek_kind(), TokenKind::Identifier)
+                    && !self.peek_preceded_by_line_terminator()
                 {
                     return self.parse_module_declaration(false, false);
                 }
