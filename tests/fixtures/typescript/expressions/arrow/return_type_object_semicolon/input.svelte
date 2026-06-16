@@ -15,7 +15,7 @@
 	const f5 = ([x]): {a: number; b: number} => ({a: x, b: x});
 
 	// Generic arrow
-	const f6 = <T,>(): {a: number; b: number} => ({a: 1, b: 2});
+	const f6 = <T extends object>(): {a: number; b: number} => ({a: 1, b: 2});
 
 	// Nested object with semicolons
 	const f7 = (): {nested: {a: number; b: number}} => ({

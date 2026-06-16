@@ -1,8 +1,8 @@
 // Async generic arrow functions in pure TypeScript (.ts path)
-// No trailing comma needed for single type params (unlike .svelte)
-// See basic_svelte_divergence/input.svelte for full coverage
+// Single type params stay bare in both contexts for tsv; only prettier forces `<T,>` in Svelte
+// See basic_svelte_prettier_divergence/input.svelte for full coverage
 
-// Single type param — no trailing comma (the .ts-specific difference)
+// Single type param — bare `<T>` (prettier keeps it bare on the .ts path too)
 const basic = async <T>(x: T): Promise<T> => x;
 
 // Constrained — no trailing comma either way, but confirms standalone acorn-typescript path

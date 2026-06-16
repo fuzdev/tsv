@@ -37,8 +37,8 @@
 	// With return type
 	const a17 = b || ((fn): T => fn);
 
-	// Generic arrow (trailing comma disambiguates from JSX in Svelte context)
-	const a18 = b || (<T,>(fn: T): T => fn);
+	// Generic arrow (needs parens like any arrow on a binary RHS)
+	const a18 = b || (<T extends object>(fn: T): T => fn);
 
 	// Async arrow
 	const a19 = b || (async (fn) => fn);
