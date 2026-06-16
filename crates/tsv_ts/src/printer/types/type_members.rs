@@ -341,8 +341,9 @@ impl<'a> Printer<'a> {
     ///
     /// Comment handling at each gap: keyword→`[` (`readonly /* c */ [k]`, bounded
     /// at `[`), `[`→key inside the brackets (`[/* c */ k]`, a block hugs `[`, a
-    /// line comment breaks the bracket), key→`:` (`[k /* c */ : T]`, a space forced
-    /// before `:`), param→`]` (`[k: T /* c */]`, trailing inside the brackets),
+    /// line comment breaks the bracket), key→`:` (`[k /* c */ : T]` block inline;
+    /// `[k // c⏎: T]` line forces a hardline that breaks the bracket, so the `//`
+    /// can't swallow the `: T`), param→`]` (`[k: T /* c */]`, trailing inside the brackets),
     /// and `]`→`:` (`[k: T] /* c */: V`, a space forced before the value `:`).
     /// The value type — colon→type comments (block inline, line comments breaking)
     /// and the union/intersection break layout, including redundant-paren stripping
@@ -390,8 +391,12 @@ impl<'a> Printer<'a> {
             .map(|param| {
                 let mut param_parts = vec![d.symbol(param.name.to_u32())];
                 if let Some(type_ann) = &param.type_annotation {
-                    // Comments between the key name and the colon: `[key /* c */ : string]`.
-                    // Prettier adds a space before `:` when such a comment is present.
+                    // Comments between the key name and the colon: a block stays inline
+                    // with a space before `:` (`[key /* c */ : string]`); a line comment
+                    // forces a hardline so the `//` can't swallow the `: type`
+                    // (`[key // c⏎: string]`, a content-loss fix — the hardline also breaks
+                    // the bracket group). Shared with the type-element property arms via
+                    // `build_marker_to_colon_comments_doc` (here the "marker" is the key).
                     let colon_pos = type_ann.span.start;
                     let name_end = skip_identifier_at(
                         self.source.as_bytes(),
@@ -399,10 +404,9 @@ impl<'a> Printer<'a> {
                         colon_pos as usize,
                     ) as u32;
                     if let Some(comment_doc) =
-                        self.build_inline_comments_between_doc_opt(name_end, colon_pos)
+                        self.build_marker_to_colon_comments_doc(name_end, colon_pos)
                     {
                         param_parts.push(comment_doc);
-                        param_parts.push(d.text(" "));
                     }
                     // Delegate the `: keyType` — colon→type comments (line comments break,
                     // never merge) and the union/intersection break layout — to the shared

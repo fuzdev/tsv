@@ -309,7 +309,8 @@ impl<'a> Printer<'a> {
     /// §Comment relocation).
     ///
     /// Shared by the three type-element property arms (type-literal, interface,
-    /// class). Returns `None` when the range has no comments.
+    /// class) and the index-signature key→`:` gap (where the "marker" is the key
+    /// name). Returns `None` when the range has no comments.
     pub(crate) fn build_marker_to_colon_comments_doc(
         &self,
         after: u32,
