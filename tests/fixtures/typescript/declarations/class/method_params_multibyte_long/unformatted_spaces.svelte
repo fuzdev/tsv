@@ -7,6 +7,8 @@
 		method(  aa:  number ,  bb:  名名名名名名名名名名名名名名名名名名名名名名名名名名名名名名名A  ):  void  {}
 
 		// multibyte params at exactly 101 cols — wraps
-		method(  aa:  number ,  bb:  名名名名名名名名名名名名名名名名名名名名名名名名名名名名名名名名  ):  void  {}
+		method(  aa:  number , 
+		 bb:  名名名名名名名名名名名名名名名名名名名名名名名名名名名名名名名名  ):  void 
+		  {}
 	}
 </script>
