@@ -284,7 +284,7 @@ impl<'a> Printer<'a> {
             let extends_pos = self
                 .find_keyword_in_range(prev_end, constraint.span().start, "extends")
                 .expect("extends keyword must exist when constraint is present");
-            let extends_end = extends_pos + 7; // "extends".len()
+            let extends_end = extends_pos + "extends".len() as u32;
 
             // Comments between name and `extends`: <T /* c */ extends A>
             parts.push(self.build_comments_between(prev_end, extends_pos, CommentSpacing::Leading));

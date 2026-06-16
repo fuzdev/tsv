@@ -261,7 +261,7 @@ impl<'a> Printer<'a> {
         // Print type parameters if present: `<T>` or `<T, U>`
         if let Some(type_params) = &ctor.type_parameters {
             // Comments between `new` and `<T>`: `new /* c */ <T>(...)`
-            let new_end = ctor.span.start + 3;
+            let new_end = ctor.span.start + "new".len() as u32;
             if let Some(doc) = self.build_name_to_type_params_comments_opt(
                 new_end,
                 type_params.span.start,
@@ -295,7 +295,9 @@ impl<'a> Printer<'a> {
         if ctor.type_parameters.is_none()
             && let Some(pp) = paren_pos
         {
-            for comment in comments_in_range(self.comments, ctor.span.start + 3, pp) {
+            for comment in
+                comments_in_range(self.comments, ctor.span.start + "new".len() as u32, pp)
+            {
                 parts.push(self.build_comment_doc(comment));
                 if comment.is_block {
                     parts.push(d.text(" "));

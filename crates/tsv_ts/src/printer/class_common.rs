@@ -43,7 +43,7 @@ impl<'a> Printer<'a> {
         implements: &[internal::TSInterfaceHeritage],
     ) -> ClassHeritagePositions {
         let pre_heritage_end = type_parameters.map_or_else(
-            || id.map_or(span_start + 5, |id| id.span.end),
+            || id.map_or(span_start + "class".len() as u32, |id| id.span.end),
             |tp| tp.span.end,
         );
         // Find `extends`/`implements` keyword positions (not expression starts) so
@@ -56,7 +56,7 @@ impl<'a> Printer<'a> {
         } else {
             let search_start = extends_keyword_start.map_or(pre_heritage_end, |ek| {
                 // After the extends clause.
-                super_class.map_or(ek + 7, |sc| {
+                super_class.map_or(ek + "extends".len() as u32, |sc| {
                     super_type_parameters.map_or_else(|| sc.span().end, |tp| tp.span.end)
                 })
             });
@@ -71,7 +71,7 @@ impl<'a> Printer<'a> {
             .or(extends_clause_end)
             .or_else(|| type_parameters.map(|tp| tp.span.end))
             .or_else(|| id.map(|id| id.span.end))
-            .unwrap_or(span_start + 5);
+            .unwrap_or(span_start + "class".len() as u32);
 
         ClassHeritagePositions {
             pre_heritage_end,
@@ -130,7 +130,7 @@ impl<'a> Printer<'a> {
         // `extends`) with the super class pushed onto the next line — the shared
         // as/satisfies + type-param keyword→value mechanism.
         if let Some(kw_start) = extends_keyword_start {
-            let kw_end = kw_start + 7; // "extends".len()
+            let kw_end = kw_start + "extends".len() as u32;
             if self.has_line_comments_between(kw_end, super_class.span().start) {
                 let mut value_parts = vec![self.build_expression_doc(super_class)];
                 if let Some(type_args) = super_type_parameters {
@@ -157,7 +157,7 @@ impl<'a> Printer<'a> {
         }
         let mut ext_parts = vec![d.text("extends ")];
         if let Some(kw_start) = extends_keyword_start {
-            let kw_end = kw_start + 7; // "extends".len()
+            let kw_end = kw_start + "extends".len() as u32;
             ext_parts.push(self.build_comments_between(
                 kw_end,
                 super_class.span().start,

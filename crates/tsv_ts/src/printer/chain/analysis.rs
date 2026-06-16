@@ -592,7 +592,7 @@ mod tests {
             arguments: Vec::new(),
             type_arguments: None,
             optional: false,
-            span: Span::new(0, callee_end + 2), // +2 for "()"
+            span: Span::new(0, callee_end + "()".len() as u32),
         })
     }
 

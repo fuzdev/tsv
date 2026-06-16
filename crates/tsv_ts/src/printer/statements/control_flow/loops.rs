@@ -142,7 +142,7 @@ impl<'a> Printer<'a> {
 
         // Find the for header's closing paren via its open paren (depth-tracked, so
         // redundant parens or parens inside a clause don't yield a premature match).
-        let search_start = last_expr_end.unwrap_or(stmt.span.start + 4);
+        let search_start = last_expr_end.unwrap_or(stmt.span.start + "for ".len() as u32);
         self.find_open_paren_after(stmt.span.start)
             .and_then(|open| self.matching_close_paren(open))
             .map_or(search_start, |p| p + 1)
@@ -377,7 +377,7 @@ impl<'a> Printer<'a> {
             let search_start = first_semi.map_or_else(
                 || {
                     init_end.unwrap_or_else(|| {
-                        open_paren.map_or_else(|| stmt.span.start + 5, |p| p + 1)
+                        open_paren.map_or_else(|| stmt.span.start + "for (".len() as u32, |p| p + 1)
                     })
                 },
                 |s| s + 1,
@@ -440,7 +440,7 @@ impl<'a> Printer<'a> {
             let search_start = second_semi.map_or_else(
                 || {
                     test_end.or(init_end).unwrap_or_else(|| {
-                        open_paren.map_or_else(|| stmt.span.start + 5, |p| p + 1)
+                        open_paren.map_or_else(|| stmt.span.start + "for (".len() as u32, |p| p + 1)
                     })
                 },
                 |s| s + 1,
@@ -623,7 +623,7 @@ impl<'a> Printer<'a> {
             .unwrap_or(left_end);
 
         // Preserve comments between `for` keyword and `(`
-        let for_keyword_end = stmt.span.start + 3; // "for" is 3 chars
+        let for_keyword_end = stmt.span.start + "for".len() as u32;
         let open_paren = self.find_open_paren_after(stmt.span.start);
         let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
         let keyword_comments = self.build_keyword_paren_comments(for_keyword_end, open_paren);
@@ -676,7 +676,7 @@ impl<'a> Printer<'a> {
         }
 
         // Comments after 'in', before right
-        let in_keyword_end = in_pos + 2; // "in" is 2 chars
+        let in_keyword_end = in_pos + "in".len() as u32;
         let has_comment =
             self.append_for_in_of_block_comments(&mut parts, in_keyword_end, right_start);
         if !has_comment {
@@ -762,7 +762,7 @@ impl<'a> Printer<'a> {
         // Preserve comments between keywords and `(`
         // for await: two gaps — for-to-await and await-to-paren
         // for (non-await): one gap — for-to-paren
-        let for_keyword_end = stmt.span.start + 3; // "for" is 3 chars
+        let for_keyword_end = stmt.span.start + "for".len() as u32;
         let open_paren = self.find_open_paren_after(stmt.span.start);
         let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
         let (for_await_comments, await_paren_comments) = if stmt.r#await {
@@ -770,7 +770,7 @@ impl<'a> Printer<'a> {
             let for_await_c = await_pos
                 .and_then(|ap| self.build_inline_comments_between_doc_opt(for_keyword_end, ap));
             let await_paren_c = await_pos
-                .map(|ap| ap + 5)
+                .map(|ap| ap + "await".len() as u32)
                 .and_then(|ae| self.build_keyword_paren_comments(ae, open_paren));
             (for_await_c, await_paren_c)
         } else {
@@ -842,7 +842,7 @@ impl<'a> Printer<'a> {
         }
 
         // Comments after 'of', before right
-        let of_keyword_end = of_pos + 2; // "of" is 2 chars
+        let of_keyword_end = of_pos + "of".len() as u32;
         let has_comment =
             self.append_for_in_of_block_comments(&mut parts, of_keyword_end, right_start);
         if !has_comment {
@@ -1043,7 +1043,7 @@ impl<'a> Printer<'a> {
 
         // Preserve comments between `while` keyword and `(` in place:
         //   while/* c */(a){} → while /* c */ (a) {}
-        let while_keyword_end = stmt.span.start + 5; // "while" is 5 chars
+        let while_keyword_end = stmt.span.start + "while".len() as u32;
         let keyword_comments = self.build_keyword_paren_comments(while_keyword_end, open_paren);
 
         // Build condition group (handles breaking within condition and comments)
@@ -1111,7 +1111,7 @@ impl<'a> Printer<'a> {
 
         // Preserve comments between `for` keyword and `(` in place:
         //   for/* c */(;;){} → for /* c */ (;;) {}
-        let for_keyword_end = stmt.span.start + 3; // "for" is 3 chars
+        let for_keyword_end = stmt.span.start + "for".len() as u32;
         let open_paren = self.find_open_paren_after(stmt.span.start);
         let keyword_comments = self.build_keyword_paren_comments(for_keyword_end, open_paren);
         let has_pre_paren_comments = keyword_comments.is_some();
@@ -1275,7 +1275,7 @@ impl<'a> Printer<'a> {
         let is_block = matches!(stmt.body.as_ref(), Statement::BlockStatement(_));
 
         // Check for comments between `do` keyword and body
-        let do_end = stmt.span.start + 2; // "do" is 2 chars
+        let do_end = stmt.span.start + "do".len() as u32;
         let body_start = stmt.body.span().start;
         let mut parts = if self.has_comments_between(do_end, body_start) {
             let has_line = self.has_line_comments_between(do_end, body_start);
@@ -1344,7 +1344,7 @@ impl<'a> Printer<'a> {
         // Preserve comments between `while` keyword and `(` in place:
         //   do{}while/* c */(a); → do {} while /* c */ (a);
         let keyword_comments = if let Some(wp) = while_pos {
-            let while_keyword_end = wp + 5; // "while" is 5 chars
+            let while_keyword_end = wp + "while".len() as u32;
             self.build_keyword_paren_comments(while_keyword_end, open_paren)
         } else {
             None

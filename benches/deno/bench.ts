@@ -38,14 +38,14 @@ declare global {
 }
 
 import { z } from 'zod';
-import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.js';
-import { Benchmark } from '@fuzdev/fuz_util/benchmark.js';
-import type { BenchmarkResult } from '@fuzdev/fuz_util/benchmark_types.js';
+import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
+import { Benchmark } from '@fuzdev/fuz_util/benchmark.ts';
+import type { BenchmarkResult } from '@fuzdev/fuz_util/benchmark_types.ts';
 import {
 	benchmark_baseline_compare,
 	benchmark_baseline_format,
 	benchmark_baseline_save,
-} from '@fuzdev/fuz_util/benchmark_baseline.js';
+} from '@fuzdev/fuz_util/benchmark_baseline.ts';
 import { DevReposLoader, group_by_language } from './lib/corpus.ts';
 import {
 	canonical_parser_label,

@@ -7,6 +7,7 @@
 // - Raw content elements (script, style)
 // - Whitespace-sensitive elements (pre, textarea)
 
+use super::blocks_doc::{EACH_BLOCK_OPEN, ELSE_IF_BLOCK_OPEN, IF_BLOCK_OPEN};
 use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
@@ -1299,15 +1300,15 @@ impl<'a> Printer<'a> {
         // block expressions must not wrap (adding line breaks changes visible content)
         let expr_doc = self.build_expression_doc_for_block(
             &block.test,
-            block.opening_tag_span.start + 5, // after "{#if "
-            block.opening_tag_span.end - 1,   // before "}"
-            5,                                // "{#if " = 5 chars
+            block.opening_tag_span.start + IF_BLOCK_OPEN.len() as u32,
+            block.opening_tag_span.end - 1,
+            IF_BLOCK_OPEN.len(),
             false,
         );
 
         let body_doc = self.build_whitespace_sensitive_content_doc(&block.consequent.nodes);
 
-        let mut parts = vec![d.text("{#if "), expr_doc, d.text("}"), body_doc];
+        let mut parts = vec![d.text(IF_BLOCK_OPEN), expr_doc, d.text("}"), body_doc];
 
         if let Some(alt) = &block.alternate {
             self.build_ws_sensitive_if_alternate(alt, &mut parts);
@@ -1327,7 +1328,7 @@ impl<'a> Printer<'a> {
             let expr_doc = self.build_else_if_expr_doc(else_if, false);
 
             let body_doc = self.build_whitespace_sensitive_content_doc(&else_if.consequent.nodes);
-            parts.push(d.text("{:else if "));
+            parts.push(d.text(ELSE_IF_BLOCK_OPEN));
             parts.push(expr_doc);
             parts.push(d.text("}"));
             parts.push(body_doc);
@@ -1358,13 +1359,13 @@ impl<'a> Printer<'a> {
         // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
         let expr_doc = self.build_expression_doc_for_block(
             &block.expression,
-            block.opening_tag_span.start + 7, // after "{#each "
+            block.opening_tag_span.start + EACH_BLOCK_OPEN.len() as u32,
             expr_comment_end,
-            7, // "{#each " = 7 chars
+            EACH_BLOCK_OPEN.len(),
             false,
         );
 
-        let mut opening = vec![d.text("{#each "), expr_doc];
+        let mut opening = vec![d.text(EACH_BLOCK_OPEN), expr_doc];
 
         if let Some(context) = &block.context {
             opening.push(d.text(" as "));

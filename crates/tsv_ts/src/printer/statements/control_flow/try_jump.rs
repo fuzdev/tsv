@@ -37,7 +37,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
 
         // try keyword to block: `try /* comment */ {`
-        let try_keyword_end = stmt.span.start + 3; // "try" is 3 chars
+        let try_keyword_end = stmt.span.start + "try".len() as u32;
         let block_start = stmt.block.span.start;
         let mut parts = vec![d.text("try")];
         self.append_keyword_to_body_comments(&mut parts, try_keyword_end, block_start);
@@ -63,7 +63,7 @@ impl<'a> Printer<'a> {
             }
             if let Some(param) = &handler.param {
                 // Find paren positions for comment handling
-                let catch_keyword_end = handler.span.start + 5; // "catch" is 5 chars
+                let catch_keyword_end = handler.span.start + "catch".len() as u32;
                 let open_paren = self.find_open_paren_after(stmt.block.span.end);
                 let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
 
@@ -96,7 +96,7 @@ impl<'a> Printer<'a> {
                 );
             } else {
                 // No param: comments between catch keyword and body: `catch /* comment */ {`
-                let catch_keyword_end = handler.span.start + 5; // "catch" is 5 chars
+                let catch_keyword_end = handler.span.start + "catch".len() as u32;
                 self.append_keyword_to_body_comments(
                     &mut parts,
                     catch_keyword_end,
@@ -134,7 +134,7 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(" finally"));
             }
             // Comments between finally keyword and body: `finally /* comment */ {`
-            let finally_keyword_end = finally_keyword_pos + 7; // "finally" is 7 chars
+            let finally_keyword_end = finally_keyword_pos + "finally".len() as u32;
             self.append_keyword_to_body_comments(
                 &mut parts,
                 finally_keyword_end,

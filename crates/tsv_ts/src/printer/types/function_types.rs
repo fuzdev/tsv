@@ -109,7 +109,7 @@ impl<'a> Printer<'a> {
         let sp = if leading_space { " " } else { "" };
         // Comments between `=>` and the return type (e.g., `() => /* c */ string`)
         // For function types, the annotation span starts at `=` in `=>`
-        let arrow_end = return_type.span.start + 2; // after `=>`
+        let arrow_end = return_type.span.start + "=>".len() as u32;
         let type_start = return_type.type_annotation.span().start;
         // Use break-for-line variant: line comments must force a hardline before
         // the return type so they don't swallow it (`=> // c\nT`, not `=> // c T`).
@@ -232,7 +232,7 @@ impl<'a> Printer<'a> {
         parts.push(d.text("new"));
         let new_end = self
             .find_keyword_in_range(c.span.start, c.return_type.span.start, "new")
-            .map_or(c.span.start, |p| p + 3);
+            .map_or(c.span.start, |p| p + "new".len() as u32);
         let next_token_start = c
             .type_parameters
             .as_ref()
@@ -599,7 +599,7 @@ impl<'a> Printer<'a> {
             }
             internal::Expression::RestElement(rest) => {
                 // Comments between `...` and the argument (e.g., `.../* c */ args`)
-                let dots_end = rest.span.start + 3; // "...".len()
+                let dots_end = rest.span.start + "...".len() as u32;
                 let arg_start = rest.argument.span().start;
                 let comments_doc =
                     self.build_comments_between(dots_end, arg_start, CommentSpacing::Trailing);

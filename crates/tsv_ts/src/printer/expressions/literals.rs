@@ -366,8 +366,7 @@ impl<'a> Printer<'a> {
         let arg_doc = self.build_expression_doc_with_indent_on_break(&spread.argument);
 
         // Check for comments between `...` and the argument (e.g., `.../* comment */ arr`)
-        // The `...` is 3 chars, so comment region starts at span.start + 3
-        let dots_end = spread.span.start + 3;
+        let dots_end = spread.span.start + "...".len() as u32;
         let arg_start = spread.argument.span().start;
         // Use trailing_space variant: `.../* comment */ arg` (space after comment, not before)
         let comment_doc = self.build_rhs_comments_opt(dots_end, arg_start);

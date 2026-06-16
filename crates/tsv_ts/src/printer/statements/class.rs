@@ -213,7 +213,7 @@ impl<'a> Printer<'a> {
 
         if decl.declare {
             parts.push(d.text("declare"));
-            cursor = keyword_start + 7;
+            cursor = keyword_start + "declare".len() as u32;
         }
         if decl.r#abstract {
             // Find "abstract" in source after cursor, skipping comments
@@ -226,7 +226,7 @@ impl<'a> Printer<'a> {
                     parts.push(d.text(" "));
                 }
                 parts.push(d.text("abstract"));
-                cursor = ap + 8;
+                cursor = ap + "abstract".len() as u32;
             }
         }
         // Find "class" in source after cursor, skipping comments
@@ -239,7 +239,7 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(" "));
             }
             parts.push(d.text("class"));
-            cursor = cp + 5;
+            cursor = cp + "class".len() as u32;
         }
 
         // Build heritage docs (shared with the class-expression printer).
