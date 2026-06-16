@@ -7,9 +7,9 @@
 
 	// line comment between import and type keyword
 	import // c3
-	type {C} from './c';
+		type {C} from './c';
 
 	// line comment between type keyword and braces
 	import type // c4
-	{D} from './d';
+		{D} from './d';
 </script>

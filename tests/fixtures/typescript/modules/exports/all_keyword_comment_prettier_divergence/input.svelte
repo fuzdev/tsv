@@ -13,5 +13,17 @@
 
 	// line comment between export and type keyword
 	export // c5
-	type * from './e';
+		type * from './e';
+
+	// line comment between export and star
+	export // c6
+		* from './f';
+
+	// line comment between type keyword and star
+	export type // c7
+		* from './g';
+
+	// line comment between star and from
+	export * // c8
+		from './h';
 </script>

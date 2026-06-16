@@ -520,10 +520,6 @@ impl<'a> Printer<'a> {
             parts.push(d.text("function"));
         }
 
-        // Comments between `function` keyword and name
-        parts.push(self.build_keyword_to_name_comments(decl.span.start, decl.id.span.start));
-        parts.push(d.symbol(decl.id.name.to_u32()));
-
         // Find paren position for comment boundary and later comment handling
         let paren_search_start = decl
             .type_parameters
@@ -537,13 +533,18 @@ impl<'a> Printer<'a> {
         )
         .map(|p| p as u32);
 
+        // Everything after the `function`→name gap is collected into `tail` (the
+        // continuation), so a *line* comment in that gap indents the whole
+        // signature one level (uniform declaration-header rule).
+        let mut tail = vec![d.symbol(decl.id.name.to_u32())];
+
         // Comments between name and type params/parens: `declare function fn1/* c */ <T>()` or `fn1 /* c */()`
         // Line comments get a hardline to prevent absorbing type params as comment text
         let comment_end = decl
             .type_parameters
             .as_ref()
             .map_or_else(|| paren_pos.unwrap_or(decl.id.span.end), |tp| tp.span.start);
-        parts.push(self.build_name_to_type_params_comments(
+        tail.push(self.build_name_to_type_params_comments(
             decl.id.span.end,
             comment_end,
             CommentSpacing::for_type_params(decl.type_parameters.is_some()),
@@ -551,30 +552,38 @@ impl<'a> Printer<'a> {
 
         // Type parameters with wrapping support
         if let Some(type_params) = &decl.type_parameters {
-            parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
+            tail.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
         }
 
         // Comments between type_params and `(` go after type_params
         if let (Some(tp), Some(pp)) = (decl.type_parameters.as_ref().map(|t| t.span.end), paren_pos)
         {
-            self.append_type_params_to_paren_comments(&mut parts, tp, pp);
+            self.append_type_params_to_paren_comments(&mut tail, tp, pp);
         }
-        parts.push(self.build_signature_params_doc(&decl.params, paren_pos));
+        tail.push(self.build_signature_params_doc(&decl.params, paren_pos));
 
         // Return type (preserves a comment between `)` and `:`)
         if let Some(return_type) = &decl.return_type {
-            parts.push(self.build_signature_return_type_doc(paren_pos, return_type));
+            tail.push(self.build_signature_return_type_doc(paren_pos, return_type));
         }
 
         // Comments between return type (or `)`) and `;`
         self.append_signature_end_comments(
-            &mut parts,
+            &mut tail,
             decl.return_type.as_ref(),
             paren_pos,
             decl.span.end,
         );
 
-        parts.push(d.text(";"));
+        tail.push(d.text(";"));
+
+        // Comments between `function` keyword and name; a line comment indents the
+        // whole continuation (uniform declaration-header rule).
+        parts.push(self.build_keyword_to_name_continuation(
+            decl.span.start,
+            decl.id.span.start,
+            d.concat(&tail),
+        ));
 
         d.group(d.concat(&parts))
     }
@@ -1023,22 +1032,24 @@ impl<'a> Printer<'a> {
     /// ```
     pub(super) fn build_enum_declaration_doc(&self, decl: &internal::TSEnumDeclaration) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut prefix = Vec::new();
 
         // `declare` prefix if ambient declaration
         if decl.declare {
-            parts.push(d.text("declare "));
+            prefix.push(d.text("declare "));
         }
 
         // `const` prefix if const enum
         if decl.r#const {
-            parts.push(d.text("const "));
+            prefix.push(d.text("const "));
         }
 
-        // Comments between keywords and name
-        parts.push(d.text("enum"));
-        parts.push(self.build_keyword_to_name_comments(decl.span.start, decl.id.span.start));
-        parts.push(d.symbol(decl.id.name.to_u32()));
+        prefix.push(d.text("enum"));
+
+        // Everything after the `enum`→name gap is collected into `parts` (the
+        // continuation), so a *line* comment in that gap indents the whole
+        // declaration one level (uniform declaration-header rule).
+        let mut parts = vec![d.symbol(decl.id.name.to_u32())];
 
         // Handle comments between name and body: enum C /* comment */ {
         // Use comment-aware search to skip `{` inside comments.
@@ -1177,7 +1188,14 @@ impl<'a> Printer<'a> {
             parts.push(d.text("}"));
         }
 
-        d.concat(&parts)
+        // Comments between `enum` and the name; a line comment indents the whole
+        // continuation (uniform declaration-header rule).
+        prefix.push(self.build_keyword_to_name_continuation(
+            decl.span.start,
+            decl.id.span.start,
+            d.concat(&parts),
+        ));
+        d.concat(&prefix)
     }
 
     /// Build doc for a single enum member

@@ -4,5 +4,5 @@
 
 	// line comment between import and the named-specifier brace
 	import // c2
-	{b} from './b';
+		{b} from './b';
 </script>

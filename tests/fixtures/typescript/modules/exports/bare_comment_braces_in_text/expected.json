@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 140,
+	"end": 80,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,48 +12,16 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " line comment with braces-like text",
-			"start": 10,
-			"end": 47,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 38
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " {}",
-			"start": 56,
-			"end": 61,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 8
-				},
-				"end": {
-					"line": 3,
-					"column": 13
-				}
-			}
-		},
-		{
-			"type": "Line",
 			"value": " block comment with braces-like text",
-			"start": 70,
-			"end": 108,
+			"start": 10,
+			"end": 48,
 			"loc": {
 				"start": {
-					"line": 6,
+					"line": 2,
 					"column": 1
 				},
 				"end": {
-					"line": 6,
+					"line": 2,
 					"column": 39
 				}
 			}
@@ -61,15 +29,15 @@
 		{
 			"type": "Block",
 			"value": " {} ",
-			"start": 117,
-			"end": 125,
+			"start": 57,
+			"end": 65,
 			"loc": {
 				"start": {
-					"line": 7,
+					"line": 3,
 					"column": 8
 				},
 				"end": {
-					"line": 7,
+					"line": 3,
 					"column": 16
 				}
 			}
@@ -78,61 +46,34 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 139,
+		"end": 79,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 130,
+			"end": 70,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 8,
+					"line": 4,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "ExportNamedDeclaration",
-					"start": 49,
-					"end": 67,
+					"start": 50,
+					"end": 69,
 					"loc": {
 						"start": {
 							"line": 3,
 							"column": 1
 						},
 						"end": {
-							"line": 4,
-							"column": 5
-						}
-					},
-					"declaration": null,
-					"specifiers": [],
-					"source": null,
-					"attributes": [],
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " line comment with braces-like text",
-							"start": 10,
-							"end": 47
-						}
-					]
-				},
-				{
-					"type": "ExportNamedDeclaration",
-					"start": 110,
-					"end": 129,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
+							"line": 3,
 							"column": 20
 						}
 					},
@@ -143,23 +84,17 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " {}",
-							"start": 56,
-							"end": 61
-						},
-						{
-							"type": "Line",
 							"value": " block comment with braces-like text",
-							"start": 70,
-							"end": 108
+							"start": 10,
+							"end": 48
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Block",
 							"value": " {} ",
-							"start": 117,
-							"end": 125
+							"start": 57,
+							"end": 65
 						}
 					]
 				}
