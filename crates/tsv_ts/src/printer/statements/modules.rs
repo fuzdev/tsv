@@ -1070,46 +1070,58 @@ impl<'a> Printer<'a> {
         self.finish_with_pre_semi(parts, ref_end, decl.span.end, false)
     }
 
+    /// Build a doc for a renamed `{a}` / `{a as b}` specifier — shared by import and
+    /// export specifiers, which differ only in field order (import reads
+    /// `imported`→`local`, export reads `local`→`exported`).
+    ///
+    /// Emits an optional per-specifier `type ` prefix (skipped when the whole
+    /// declaration is already `import type` / `export type`), the `left` identifier,
+    /// and — when it's a rename — the ` as ` join with any comments in the `as` gap
+    /// split around the keyword (before-`as` inline, after-`as` with trailing space).
+    fn build_renamed_specifier_doc(
+        &self,
+        declaration_is_type_only: bool,
+        specifier_is_type: bool,
+        left: &internal::Identifier,
+        right: &internal::Identifier,
+    ) -> DocId {
+        let d = self.d();
+        let mut parts = Vec::new();
+        if !declaration_is_type_only && specifier_is_type {
+            parts.push(d.text("type "));
+        }
+        parts.push(d.symbol(left.name.to_u32()));
+        // Compare spans, not symbols: `{a}` has one span, `{a as a}` has two.
+        if left.span != right.span {
+            // Split comments at the `as` keyword: before-as and after-as.
+            if let Some(as_pos) = self.find_keyword_in_range(left.span.end, right.span.start, "as")
+            {
+                parts.push(self.build_inline_comments_between_doc(left.span.end, as_pos));
+                parts.push(d.text(" as "));
+                let as_end = as_pos + "as".len() as u32;
+                parts.push(
+                    self.build_inline_comments_between_doc_trailing_space(as_end, right.span.start),
+                );
+            } else {
+                parts.push(d.text(" as "));
+            }
+            parts.push(d.symbol(right.name.to_u32()));
+        }
+        d.concat(&parts)
+    }
+
     /// Build a doc for a single import specifier
     fn build_import_specifier_doc(
         &self,
         named_spec: &internal::ImportNamedSpecifier,
         is_type_import: bool,
     ) -> DocId {
-        let d = self.d();
-        let mut parts = Vec::new();
-        if !is_type_import && named_spec.import_kind == internal::ImportKind::Type {
-            parts.push(d.text("type "));
-        }
-        let imported_sym = named_spec.imported.name.to_u32();
-        let local_sym = named_spec.local.name.to_u32();
-        // Compare spans, not symbols: {a} has same span, {a as a} has different spans
-        if named_spec.imported.span == named_spec.local.span {
-            parts.push(d.symbol(imported_sym));
-        } else {
-            parts.push(d.symbol(imported_sym));
-            // Split comments at the `as` keyword: before-as and after-as
-            if let Some(as_pos) = self.find_keyword_in_range(
-                named_spec.imported.span.end,
-                named_spec.local.span.start,
-                "as",
-            ) {
-                let before_as =
-                    self.build_inline_comments_between_doc(named_spec.imported.span.end, as_pos);
-                parts.push(before_as);
-                parts.push(d.text(" as "));
-                let as_end = as_pos + "as".len() as u32;
-                let after_as = self.build_inline_comments_between_doc_trailing_space(
-                    as_end,
-                    named_spec.local.span.start,
-                );
-                parts.push(after_as);
-            } else {
-                parts.push(d.text(" as "));
-            }
-            parts.push(d.symbol(local_sym));
-        }
-        d.concat(&parts)
+        self.build_renamed_specifier_doc(
+            is_type_import,
+            named_spec.import_kind == internal::ImportKind::Type,
+            &named_spec.imported,
+            &named_spec.local,
+        )
     }
 
     /// Build a doc for a single export specifier
@@ -1118,37 +1130,12 @@ impl<'a> Printer<'a> {
         spec: &internal::ExportSpecifier,
         is_type_export: bool,
     ) -> DocId {
-        let d = self.d();
-        let mut spec_parts = Vec::new();
-        if !is_type_export && spec.export_kind == internal::ExportKind::Type {
-            spec_parts.push(d.text("type "));
-        }
-        let local_sym = spec.local.name.to_u32();
-        let exported_sym = spec.exported.name.to_u32();
-        // Compare spans, not symbols: {a} has same span, {a as a} has different spans
-        if spec.local.span == spec.exported.span {
-            spec_parts.push(d.symbol(local_sym));
-        } else {
-            spec_parts.push(d.symbol(local_sym));
-            // Split comments at the `as` keyword: before-as and after-as
-            if let Some(as_pos) =
-                self.find_keyword_in_range(spec.local.span.end, spec.exported.span.start, "as")
-            {
-                let before_as = self.build_inline_comments_between_doc(spec.local.span.end, as_pos);
-                spec_parts.push(before_as);
-                spec_parts.push(d.text(" as "));
-                let as_end = as_pos + "as".len() as u32;
-                let after_as = self.build_inline_comments_between_doc_trailing_space(
-                    as_end,
-                    spec.exported.span.start,
-                );
-                spec_parts.push(after_as);
-            } else {
-                spec_parts.push(d.text(" as "));
-            }
-            spec_parts.push(d.symbol(exported_sym));
-        }
-        d.concat(&spec_parts)
+        self.build_renamed_specifier_doc(
+            is_type_export,
+            spec.export_kind == internal::ExportKind::Type,
+            &spec.local,
+            &spec.exported,
+        )
     }
 
     /// The comment-and-continuation tail of a preserved header gap, *without* a
