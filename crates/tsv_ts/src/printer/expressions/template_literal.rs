@@ -73,13 +73,9 @@ impl<'a> Printer<'a> {
                 let has_line_comment = leading_comments.iter().any(|c| !c.is_block)
                     || trailing_comments.iter().any(|c| !c.is_block);
 
-                // Build comment docs
-                let leading_comments_doc =
-                    self.build_template_interpolation_comments(&leading_comments, true);
-                let trailing_comments_doc =
-                    self.build_template_interpolation_comments(&trailing_comments, false);
-
-                // Combine expression with comments
+                // Combine expression with comments. The line-comment path builds its own
+                // layout (hardlines after `//`), so the plain leading/trailing docs are only
+                // built in the branch that uses them.
                 let full_expr_doc = if has_line_comment {
                     self.build_template_comments_and_expr_doc(
                         &leading_comments,
@@ -87,6 +83,10 @@ impl<'a> Printer<'a> {
                         &trailing_comments,
                     )
                 } else {
+                    let leading_comments_doc =
+                        self.build_template_interpolation_comments(&leading_comments, true);
+                    let trailing_comments_doc =
+                        self.build_template_interpolation_comments(&trailing_comments, false);
                     d.concat(&[leading_comments_doc, expr_doc, trailing_comments_doc])
                 };
 

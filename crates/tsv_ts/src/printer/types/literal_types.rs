@@ -13,6 +13,27 @@ use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 
+/// How a `${…}` interpolation in a template literal type breaks.
+///
+/// Decided in the first pass at flat-layout positions so the second pass can emit
+/// each interpolation with its break already chosen (see `build_template_literal_type_doc`).
+enum InterpolationLayout {
+    /// Conditional type: wrap in a group; breaks happen at the `?`/`:` operators.
+    Conditional,
+    /// Exceeds print width at its flat position — always break after `${`.
+    Forced,
+    /// Short enough — try the flat-rendered string first, break if it doesn't fit
+    /// at the actual render position.
+    Flex(String),
+}
+
+/// One `${…}` interpolation's docs plus its computed layout.
+struct Interpolation {
+    type_doc: DocId,
+    comments_doc: DocId,
+    layout: InterpolationLayout,
+}
+
 impl<'a> Printer<'a> {
     /// Build a Doc for a literal type
     pub(super) fn build_literal_type_doc(&self, lit: &TSLiteralType) -> DocId {
@@ -46,10 +67,8 @@ impl<'a> Printer<'a> {
     pub(super) fn build_template_literal_type_doc(&self, template: &TemplateLiteralType) -> DocId {
         let d = self.d();
 
-        // First pass: analyze types and determine which exceed print width at their flat positions
-        // Store as (doc, comments_doc, flat_str, is_conditional, exceeds_width)
-        let mut type_data: Vec<(DocId, DocId, String, bool, bool)> =
-            Vec::with_capacity(template.types.len());
+        // First pass: render each type flat and decide its break at its flat position.
+        let mut interps: Vec<Interpolation> = Vec::with_capacity(template.types.len());
         let mut pos: usize = 1; // Start after backtick
 
         for (i, quasi) in template.quasis.iter().enumerate() {
@@ -58,7 +77,6 @@ impl<'a> Printer<'a> {
             pos += visual_width(&quasi.raw, TAB_WIDTH);
             if i < template.types.len() {
                 let t = &template.types[i];
-                let is_conditional = matches!(t, TSType::Conditional(_));
                 // Comments between `${` and the type
                 // Find the `${` by searching backward from the type start
                 let search_start = quasi.span.start;
@@ -80,47 +98,51 @@ impl<'a> Printer<'a> {
                 // (comment width is small enough to ignore for width calculation)
                 // `${`/`}` are exact ASCII column counts; the type uses visual width.
                 let interp_end = pos + 2 + visual_width(&flat_str, TAB_WIDTH) + 1;
-                let exceeds_width = interp_end > PRINT_WIDTH;
+                pos = interp_end;
 
-                type_data.push((
+                let layout = if matches!(t, TSType::Conditional(_)) {
+                    InterpolationLayout::Conditional
+                } else if interp_end > PRINT_WIDTH {
+                    InterpolationLayout::Forced
+                } else {
+                    InterpolationLayout::Flex(flat_str)
+                };
+                interps.push(Interpolation {
                     type_doc,
                     comments_doc,
-                    flat_str,
-                    is_conditional,
-                    exceeds_width,
-                ));
-                pos = interp_end;
+                    layout,
+                });
             }
         }
 
-        // Second pass: build doc with breaking decisions already made
+        // Second pass: build doc with breaking decisions already made.
+        // indent() positions content relative to the template's current indent level
+        // (e.g. after an `=` break in a type alias): content gets +1, the closing `}`
+        // stays at the current level.
         let mut parts = vec![d.text("`")];
-        let mut type_iter = type_data.into_iter();
+        let mut interp_iter = interps.into_iter();
 
         for quasi in &template.quasis {
             parts.push(d.text_owned(quasi.raw.clone()));
-            if let Some((type_doc, comments_doc, flat_str, is_conditional, exceeds_width)) =
-                type_iter.next()
+            if let Some(Interpolation {
+                type_doc,
+                comments_doc,
+                layout,
+            }) = interp_iter.next()
             {
-                // Use relative indent() for positioning within the current context.
-                // The template is already at some indent level (e.g., after = break in type alias).
-                // Content gets +1 indent, closing stays at current level.
-                let interp_doc = if is_conditional {
-                    // Conditional types: wrap in group - breaks happen at ?/: operators
-                    // Don't add extra indent - conditional type's own formatting handles branch indentation
-                    d.concat(&[d.text("${"), comments_doc, d.group(type_doc), d.text("}")])
-                } else if exceeds_width {
-                    // Exceeds print width at flat position - always break
-                    d.concat(&[
+                let interp_doc = match layout {
+                    // Conditional type's own formatting handles branch indentation, so no extra indent.
+                    InterpolationLayout::Conditional => {
+                        d.concat(&[d.text("${"), comments_doc, d.group(type_doc), d.text("}")])
+                    }
+                    InterpolationLayout::Forced => d.concat(&[
                         d.text("${"),
                         comments_doc,
                         d.indent(d.concat(&[d.hardline(), type_doc])),
                         d.hardline(),
                         d.text("}"),
-                    ])
-                } else {
-                    // Short enough - try flat first, break if doesn't fit at actual position
-                    d.conditional_group(&[
+                    ]),
+                    InterpolationLayout::Flex(flat_str) => d.conditional_group(&[
                         d.concat(&[
                             d.text("${"),
                             comments_doc,
@@ -134,7 +156,7 @@ impl<'a> Printer<'a> {
                             d.line(),
                             d.text("}"),
                         ]),
-                    ])
+                    ]),
                 };
                 parts.push(interp_doc);
             }
