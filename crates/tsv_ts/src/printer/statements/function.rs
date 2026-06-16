@@ -15,50 +15,64 @@ use super::super::types::function_types::{
 /// when there's 1 param and the return type is an object type or will break.
 ///
 /// This lets params stay flat even when the outer signature group breaks
-/// due to a multiline return type.
+/// due to a multiline return type. Takes decomposed fields so it serves both
+/// `FunctionDeclaration` (function declarations) and `FunctionExpression`
+/// (class methods) — their signature payloads are field-identical.
 fn should_group_function_parameters(
-    decl: &internal::FunctionDeclaration,
+    params: &[internal::Expression],
+    type_parameters: Option<&internal::TSTypeParameterDeclaration>,
+    return_type: Option<&internal::TSTypeAnnotation>,
     return_type_doc: Option<DocId>,
     d: &DocArena,
 ) -> bool {
-    if decl.params.len() != 1 {
+    if params.len() != 1 {
         return false;
     }
     let Some(rt_doc) = return_type_doc else {
         return false;
     };
-    if !type_params_allow_grouping(decl.type_parameters.as_ref()) {
+    if !type_params_allow_grouping(type_parameters) {
         return false;
     }
-    decl.return_type
-        .as_ref()
-        .is_some_and(|rt| return_type_triggers_grouping(rt, rt_doc, d))
+    return_type.is_some_and(|rt| return_type_triggers_grouping(rt, rt_doc, d))
 }
 
 impl<'a> Printer<'a> {
-    /// Build doc for function signature (params + return type) with comment handling.
+    /// Build doc for a callable signature (params + return type) with comment handling.
     ///
-    /// When `should_group_function_parameters` is true, params are wrapped in their
-    /// own inner group so they can stay flat even when the outer group breaks due to
-    /// the return type's hardlines.
-    fn build_function_signature_doc(&self, decl: &internal::FunctionDeclaration) -> DocId {
+    /// Shared by function declarations and class methods — their `FunctionDeclaration`
+    /// / `FunctionExpression` payloads carry identical signature fields, so the caller
+    /// passes them decomposed. When `should_group_function_parameters` is true, params
+    /// are wrapped in their own inner group so they can stay flat even when the outer
+    /// group breaks due to the return type's hardlines.
+    pub(in crate::printer) fn build_callable_signature_doc(
+        &self,
+        params: &[internal::Expression],
+        type_parameters: Option<&internal::TSTypeParameterDeclaration>,
+        return_type: Option<&internal::TSTypeAnnotation>,
+        params_start: u32,
+        body_start: u32,
+    ) -> DocId {
         let d = self.d();
-        let params_start = Some(decl.params_start);
 
         // Params trailing comments are bounded at the close paren; a comment between
         // `)` and the return type is emitted via build_paren_to_return_type_comments.
         let trailing_comments_end =
-            Some(self.params_trailing_comments_end(decl.params_start, decl.body.span.start));
+            Some(self.params_trailing_comments_end(params_start, body_start));
 
         let params_doc =
-            self.build_params_doc_with_comments(&decl.params, params_start, trailing_comments_end);
+            self.build_params_doc_with_comments(params, Some(params_start), trailing_comments_end);
 
-        let return_type_doc = decl
-            .return_type
-            .as_ref()
-            .map(|rt| self.build_type_annotation_doc_for_return_type(rt));
+        let return_type_doc =
+            return_type.map(|rt| self.build_type_annotation_doc_for_return_type(rt));
 
-        let params_doc = if should_group_function_parameters(decl, return_type_doc, d) {
+        let params_doc = if should_group_function_parameters(
+            params,
+            type_parameters,
+            return_type,
+            return_type_doc,
+            d,
+        ) {
             d.group(params_doc)
         } else {
             params_doc
@@ -67,12 +81,9 @@ impl<'a> Printer<'a> {
         let mut sig_parts = vec![params_doc];
         if let Some(rt_doc) = return_type_doc {
             // Preserve a comment between `)` and the return type `:` in place.
-            if let Some(rt) = &decl.return_type {
+            if let Some(rt) = return_type {
                 sig_parts.push(
-                    self.build_paren_to_return_type_comments(
-                        Some(decl.params_start),
-                        rt.span.start,
-                    ),
+                    self.build_paren_to_return_type_comments(Some(params_start), rt.span.start),
                 );
             }
             sig_parts.push(rt_doc);
@@ -168,7 +179,13 @@ impl<'a> Printer<'a> {
         }
 
         // Signature (params + return type) in a single group
-        tail.push(self.build_function_signature_doc(decl));
+        tail.push(self.build_callable_signature_doc(
+            &decl.params,
+            decl.type_parameters.as_ref(),
+            decl.return_type.as_ref(),
+            decl.params_start,
+            decl.body.span.start,
+        ));
 
         // Handle comments between signature and body: function a() /* comment */ {}
         let sig_end = self.signature_end(
