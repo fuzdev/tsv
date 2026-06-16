@@ -14,7 +14,7 @@
 
 import process from 'node:process';
 
-import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.js';
+import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
 import { z } from 'zod';
 
 import {

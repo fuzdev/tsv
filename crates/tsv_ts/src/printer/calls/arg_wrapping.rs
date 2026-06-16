@@ -88,7 +88,7 @@ pub(crate) fn prepend_arrow_body_comments(
     body_start: u32,
     body_doc: DocId,
 ) -> DocId {
-    let arrow_end = printer.find_arrow_token_for(arrow) + 2;
+    let arrow_end = printer.find_arrow_token_for(arrow) + "=>".len() as u32;
 
     // Prepend inline comments between `=>` and body
     if let Some(lc) = printer.build_rhs_comments_opt(arrow_end, body_start) {

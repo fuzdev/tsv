@@ -150,14 +150,14 @@ impl<'a> Printer<'a> {
         let bytes = self.source.as_bytes();
         let mut i = from as usize;
         let end = to as usize;
-        while i + 4 <= end {
+        while i + "else".len() <= end {
             if let Some(new_i) = skip_comment(bytes, i, end) {
                 // Clamp in case a block comment was unterminated
                 i = new_i.min(end);
                 continue;
             }
-            if bytes[i] == b'e' && &self.source[i..i + 4] == "else" {
-                return Some((i + 4) as u32);
+            if bytes[i] == b'e' && &self.source[i..i + "else".len()] == "else" {
+                return Some((i + "else".len()) as u32);
             }
             i += 1;
         }
@@ -183,7 +183,7 @@ impl<'a> Printer<'a> {
 
         // Preserve comments between `if` keyword and `(` in place:
         //   if/* c */(a){} → if /* c */ (a) {}
-        let if_keyword_end = stmt.span.start + 2; // "if" is 2 chars
+        let if_keyword_end = stmt.span.start + "if".len() as u32;
         let keyword_comments = self.build_keyword_paren_comments(if_keyword_end, open_paren);
 
         // Build condition group (handles breaking within condition and comments)
@@ -298,7 +298,7 @@ impl<'a> Printer<'a> {
         // Build condition group (same as build_if_statement_with_wrapping_doc)
         let open_paren = self.find_open_paren_after(stmt.span.start);
         let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
-        let if_keyword_end = stmt.span.start + 2;
+        let if_keyword_end = stmt.span.start + "if".len() as u32;
         let keyword_comments = self.build_keyword_paren_comments(if_keyword_end, open_paren);
         let condition_group = if let (Some(open), Some(close)) = (open_paren, close_paren) {
             self.build_condition_group_with_comments(&stmt.test, open, close)
@@ -362,7 +362,7 @@ impl<'a> Printer<'a> {
 
             // Find "else" keyword to split comments into before-else and after-else
             let else_end = self.find_else_keyword_end_between(consequent_end, alternate_start);
-            let else_start = else_end.map(|e| e - 4); // "else" is 4 chars
+            let else_start = else_end.map(|e| e - "else".len() as u32);
 
             // Comments between } and "else"
             let before_else_end = else_start.unwrap_or(alternate_start);

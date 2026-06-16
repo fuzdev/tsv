@@ -8,16 +8,21 @@ use crate::printer::Printer;
 use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
 
+// Opening-tag literals whose `.len()` locates the embedded expression past the
+// tag; sharing the literal keeps the emitted text and the scan offset in sync.
+const HTML_TAG_OPEN: &str = "{@html ";
+const RENDER_TAG_OPEN: &str = "{@render ";
+
 impl<'a> Printer<'a> {
     /// Build a doc for {@html expr}
     pub(crate) fn build_html_tag_doc(&self, tag: &internal::HtmlTag) -> DocId {
         let d = self.d();
         // Build expression doc with surrounding comments
-        // Span range: after "{@html " (start + 7) to before "}" (end - 1)
+        // Span range: after "{@html " to before "}"
         let expr_doc = self.build_expression_with_comments_doc(
             &tag.expression,
-            tag.span.start + 7, // after "{@html "
-            tag.span.end - 1,   // before "}"
+            tag.span.start + HTML_TAG_OPEN.len() as u32,
+            tag.span.end - 1,
         );
 
         // Assignment expressions need parens: {@html (a = b)}
@@ -27,7 +32,7 @@ impl<'a> Printer<'a> {
             expr_doc
         };
 
-        d.concat(&[d.text("{@html "), expr_doc, d.text("}")])
+        d.concat(&[d.text(HTML_TAG_OPEN), expr_doc, d.text("}")])
     }
 
     /// Build a doc for {@const declaration}
@@ -181,13 +186,13 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_render_tag_doc(&self, tag: &internal::RenderTag) -> DocId {
         let d = self.d();
         // Build expression doc with surrounding comments
-        // Span range: after "{@render " (start + 9) to before "}" (end - 1)
+        // Span range: after "{@render " to before "}"
         let expr_doc = self.build_expression_with_comments_doc(
             &tag.expression,
-            tag.span.start + 9, // after "{@render "
-            tag.span.end - 1,   // before "}"
+            tag.span.start + RENDER_TAG_OPEN.len() as u32,
+            tag.span.end - 1,
         );
 
-        d.concat(&[d.text("{@render "), expr_doc, d.text("}")])
+        d.concat(&[d.text(RENDER_TAG_OPEN), expr_doc, d.text("}")])
     }
 }

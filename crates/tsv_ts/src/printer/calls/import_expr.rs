@@ -25,7 +25,7 @@ pub(super) fn build_import_expression_doc(
     // Preserve comments between `import(` and the source expression, e.g.
     // import(/* @vite-ignore */ expr) — they would otherwise be lost. Own-line
     // comments force the parens to break; `leading_forces_break` drives that below.
-    let open_paren_end = import_expr.span.start + 7; // "import(" is 7 chars
+    let open_paren_end = import_expr.span.start + "import(".len() as u32;
     let source_start = import_expr.source.span().start;
 
     let raw_source_doc = printer.build_expression_doc(&import_expr.source);

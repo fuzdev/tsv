@@ -2,9 +2,9 @@
  * Summary report generation for benchmark results
  */
 
-import type { BenchmarkResult } from '@fuzdev/fuz_util/benchmark_types.js';
-import { benchmark_format_number } from '@fuzdev/fuz_util/benchmark_format.js';
-import { time_format, time_unit_detect_best, TIME_UNIT_DISPLAY } from '@fuzdev/fuz_util/time.js';
+import type { BenchmarkResult } from '@fuzdev/fuz_util/benchmark_types.ts';
+import { benchmark_format_number } from '@fuzdev/fuz_util/benchmark_format.ts';
+import { time_format, time_unit_detect_best, TIME_UNIT_DISPLAY } from '@fuzdev/fuz_util/time.ts';
 
 import type { Language } from './types.ts';
 

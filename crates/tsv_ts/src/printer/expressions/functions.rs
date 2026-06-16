@@ -235,7 +235,7 @@ impl<'a> Printer<'a> {
         let arrow_pos = self
             .find_arrow_token(sig_end, arrow.body.span().start)
             .unwrap_or_else(|| arrow.body.span().start);
-        let arrow_end = arrow_pos + 2; // Position after `=>`
+        let arrow_end = arrow_pos + "=>".len() as u32;
 
         // Check for comments between signature and `=>` (e.g., `(x) /* c */ =>`)
         // Single binary search via comments_in_range

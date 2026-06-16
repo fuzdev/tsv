@@ -105,7 +105,7 @@ impl<'a> Printer<'a> {
                 let mut parts = vec![];
                 if p.asserts {
                     // Comments between `asserts` and parameter name
-                    let asserts_end = p.span.start + 7; // "asserts".len()
+                    let asserts_end = p.span.start + "asserts".len() as u32;
                     let param_start = p.parameter_name.span.start;
                     parts.push(d.text("asserts "));
                     parts.push(self.build_comments_between(
@@ -127,7 +127,7 @@ impl<'a> Printer<'a> {
                         type_start as usize,
                         b'i',
                     )
-                    .map(|i_pos| (i_pos + 2) as u32); // skip past "is"
+                    .map(|i_pos| (i_pos + "is".len()) as u32);
                     // A line comment after `is` stays trailing it, with the
                     // predicate type on the next line (preserve-in-place; prettier
                     // relocates the comment to trail the body `{`).
@@ -239,7 +239,7 @@ impl<'a> Printer<'a> {
             TSType::Import(i) => self.build_import_type_doc(i),
             TSType::TypeQuery(q) => {
                 // Comments between `typeof` and the expression
-                let typeof_end = q.span.start + 6; // "typeof".len()
+                let typeof_end = q.span.start + "typeof".len() as u32;
                 let expr_start = q.expr_name.span().start;
                 // A line comment after `typeof` stays trailing it, with the
                 // expression on the next line (matches prettier).
@@ -320,7 +320,7 @@ impl<'a> Printer<'a> {
             }
             TSType::Rest(r) => {
                 // Comments between `...` and the type
-                let dots_end = r.span.start + 3; // "...".len()
+                let dots_end = r.span.start + "...".len() as u32;
                 let type_start = r.type_annotation.span().start;
                 let comments_doc =
                     self.build_comments_between(dots_end, type_start, CommentSpacing::Trailing);
@@ -396,7 +396,7 @@ impl<'a> Printer<'a> {
             }
             TSType::Infer(i) => {
                 // Comments between `infer` and the type parameter name
-                let infer_end = i.span.start + 5; // "infer".len()
+                let infer_end = i.span.start + "infer".len() as u32;
                 let name_start = i.type_parameter.name.span.start;
                 let comments_doc =
                     self.build_comments_between(infer_end, name_start, CommentSpacing::Trailing);
@@ -498,7 +498,7 @@ impl<'a> Printer<'a> {
     /// - trailing line comment → break multiline; trailing block → inline
     fn build_import_type_call_doc(&self, i: &TSImportType, paren_close: u32) -> DocId {
         let d = self.d();
-        let open_paren_end = i.span.start + 7; // "import(".len()
+        let open_paren_end = i.span.start + "import(".len() as u32;
         let arg_start = i.argument.span.start;
         let arg_end = i.argument.span.end;
         let literal_doc = self.build_literal_doc(&i.argument);

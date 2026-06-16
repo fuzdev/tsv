@@ -61,7 +61,9 @@ impl<'a> Printer<'a> {
                 let search_start = quasi.span.start;
                 let dollar_brace_end = self.source[search_start as usize..t.span().start as usize]
                     .rfind("${")
-                    .map_or(quasi.span.end, |p| search_start + p as u32 + 2);
+                    .map_or(quasi.span.end, |p| {
+                        search_start + p as u32 + "${".len() as u32
+                    });
                 let type_start = t.span().start;
                 let comments_doc = self.build_comments_between(
                     dollar_brace_end,

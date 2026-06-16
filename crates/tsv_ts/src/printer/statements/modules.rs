@@ -388,7 +388,7 @@ impl<'a> Printer<'a> {
                 Some(offset) => {
                     let abs_pos = decl_start + (search_offset + offset) as u32;
                     if self.is_pos_inside_comment(abs_pos) {
-                        search_offset += offset + 4; // skip past this "from"
+                        search_offset += offset + "from".len(); // skip past this "from"
                     } else {
                         break Some(search_offset + offset);
                     }
@@ -537,7 +537,7 @@ impl<'a> Printer<'a> {
         let as_pos = self.find_keyword_in_range(star_end, binding.span.start, "as");
         // `as` + the `as`→binding gap (line comment indents the binding, block trails
         // inline) + the binding name. The `as ` token supplies the leading space.
-        let as_end = as_pos.map_or(binding.span.start, |p| p + 2); // "as".len()
+        let as_end = as_pos.map_or(binding.span.start, |p| p + "as".len() as u32);
         let as_clause = d.concat(&[
             d.text("as "),
             self.gap_comment_continuation_tail(
@@ -1016,7 +1016,7 @@ impl<'a> Printer<'a> {
                 // Check for comments inside require() - expand if present
                 // The require() span includes `require(` at start and `)` at end
                 // Comments can be between `require(` and the string literal
-                let require_open_end = ext_ref.span.start + 8; // after "require("
+                let require_open_end = ext_ref.span.start + "require(".len() as u32;
                 let literal_start = ext_ref.expression.span.start;
                 let has_comments = self.has_line_comments_between(require_open_end, literal_start);
 
@@ -1098,7 +1098,7 @@ impl<'a> Printer<'a> {
                     self.build_inline_comments_between_doc(named_spec.imported.span.end, as_pos);
                 parts.push(before_as);
                 parts.push(d.text(" as "));
-                let as_end = as_pos + 2; // "as" is 2 chars
+                let as_end = as_pos + "as".len() as u32;
                 let after_as = self.build_inline_comments_between_doc_trailing_space(
                     as_end,
                     named_spec.local.span.start,
@@ -1137,7 +1137,7 @@ impl<'a> Printer<'a> {
                 let before_as = self.build_inline_comments_between_doc(spec.local.span.end, as_pos);
                 spec_parts.push(before_as);
                 spec_parts.push(d.text(" as "));
-                let as_end = as_pos + 2;
+                let as_end = as_pos + "as".len() as u32;
                 let after_as = self.build_inline_comments_between_doc_trailing_space(
                     as_end,
                     spec.exported.span.start,

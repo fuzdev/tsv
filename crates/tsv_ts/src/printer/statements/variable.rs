@@ -137,7 +137,7 @@ impl<'a> Printer<'a> {
         // continuation one level (uniform declaration-header rule); block/no-comment
         // cases stay inline. The leading space is supplied by the gap helper below.
         let keyword_end = if decl.declare {
-            decl.span.start + 8 + decl.kind.as_str().len() as u32 // "declare " + keyword
+            decl.span.start + "declare ".len() as u32 + decl.kind.as_str().len() as u32
         } else {
             decl.span.start + decl.kind.as_str().len() as u32
         };

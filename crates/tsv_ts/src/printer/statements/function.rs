@@ -100,7 +100,7 @@ impl<'a> Printer<'a> {
 
         if decl.r#async {
             parts.push(d.text("async"));
-            cursor = decl.span.start + 5; // "async" length
+            cursor = decl.span.start + "async".len() as u32;
         }
 
         // Find "function" in source after cursor, skipping comments
@@ -113,7 +113,7 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(" "));
             }
             parts.push(d.text("function"));
-            cursor = fp + 8; // "function" length
+            cursor = fp + "function".len() as u32;
         } else {
             if cursor > decl.span.start {
                 parts.push(d.text(" "));

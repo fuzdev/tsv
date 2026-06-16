@@ -202,7 +202,7 @@ impl<'a> Printer<'a> {
                 self.has_line_comments_between(kw_end, o.type_annotation.span().start)
             }
             TSType::TypeQuery(q) => {
-                let kw_end = q.span.start + 6; // "typeof".len()
+                let kw_end = q.span.start + "typeof".len() as u32;
                 self.has_line_comments_between(kw_end, q.expr_name.span().start)
             }
             _ => false,

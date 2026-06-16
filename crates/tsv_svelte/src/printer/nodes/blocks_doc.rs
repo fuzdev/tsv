@@ -13,6 +13,16 @@ use tsv_lang::doc::arena::DocId;
 
 use super::helpers::indent_body;
 
+// Opening-tag literals for control-flow blocks. Every offset that locates the
+// embedded expression past the opening tag derives from `.len()` of these, so
+// the emitted text and the scan offset cannot drift apart. Shared with the
+// inline / whitespace-sensitive builders in `element_doc.rs`.
+pub(crate) const IF_BLOCK_OPEN: &str = "{#if ";
+pub(crate) const ELSE_IF_BLOCK_OPEN: &str = "{:else if ";
+pub(crate) const EACH_BLOCK_OPEN: &str = "{#each ";
+pub(crate) const AWAIT_BLOCK_OPEN: &str = "{#await ";
+pub(crate) const KEY_BLOCK_OPEN: &str = "{#key ";
+
 /// Build an await block section body with newline-based whitespace detection.
 ///
 /// Returns `(body_doc, has_trailing)` — the indented body doc and whether the
@@ -122,9 +132,9 @@ impl<'a> Printer<'a> {
         let allow_wrapping = !has_preceding_breakable;
         let expr_doc = self.build_expression_doc_for_block(
             &block.test,
-            block.opening_tag_span.start + 5, // after "{#if "
-            block.opening_tag_span.end - 1,   // before "}"
-            5,                                // "{#if " = 5 chars
+            block.opening_tag_span.start + IF_BLOCK_OPEN.len() as u32,
+            block.opening_tag_span.end - 1,
+            IF_BLOCK_OPEN.len(),
             allow_wrapping || in_multiline_context,
         );
 
@@ -149,7 +159,7 @@ impl<'a> Printer<'a> {
         // Always wrap body in indent() for proper internal break indentation
         let indented_body = indent_body(self, body_doc, has_leading);
 
-        let mut parts = vec![d.text("{#if "), expr_doc, d.text("}"), indented_body];
+        let mut parts = vec![d.text(IF_BLOCK_OPEN), expr_doc, d.text("}"), indented_body];
 
         // Handle alternate (else/else-if) and determine final trailing status
         let final_has_trailing = if let Some(alt) = &block.alternate {
@@ -223,12 +233,11 @@ impl<'a> Printer<'a> {
         else_if: &internal::IfBlock,
         in_multiline_context: bool,
     ) -> DocId {
-        const ELSE_IF_OPEN_LEN: usize = "{:else if ".len();
         self.build_expression_doc_for_block(
             &else_if.test,
-            else_if.opening_tag_span.start + ELSE_IF_OPEN_LEN as u32,
+            else_if.opening_tag_span.start + ELSE_IF_BLOCK_OPEN.len() as u32,
             else_if.opening_tag_span.end - 1,
-            ELSE_IF_OPEN_LEN,
+            ELSE_IF_BLOCK_OPEN.len(),
             in_multiline_context,
         )
     }
@@ -273,7 +282,12 @@ impl<'a> Printer<'a> {
 
             let indented_body = indent_body(self, body_doc, has_leading);
 
-            let mut parts = vec![d.text("{:else if "), expr_doc, d.text("}"), indented_body];
+            let mut parts = vec![
+                d.text(ELSE_IF_BLOCK_OPEN),
+                expr_doc,
+                d.text("}"),
+                indented_body,
+            ];
 
             // Handle nested alternate or trailing
             if let Some(nested_alt) = &else_if.alternate {
@@ -372,13 +386,13 @@ impl<'a> Printer<'a> {
             .map_or(block.opening_tag_span.end - 1, |c| c.span().start);
         let expr_doc = self.build_expression_doc_for_block(
             &block.expression,
-            block.opening_tag_span.start + 7, // after "{#each "
+            block.opening_tag_span.start + EACH_BLOCK_OPEN.len() as u32,
             expr_comment_end,
-            7, // "{#each " = 7 chars
+            EACH_BLOCK_OPEN.len(),
             allow_wrapping || in_multiline_context,
         );
 
-        let mut opening = vec![d.text("{#each "), expr_doc];
+        let mut opening = vec![d.text(EACH_BLOCK_OPEN), expr_doc];
 
         // Pattern (context) - only add " as " when there's a context or index
         if let Some(context) = &block.context {
@@ -509,13 +523,13 @@ impl<'a> Printer<'a> {
         let allow_wrapping = !has_preceding_breakable;
         let expr_doc = self.build_expression_doc_for_block(
             &block.expression,
-            block.opening_tag_span.start + 8, // after "{#await "
-            block.opening_tag_span.end - 1,   // before "}"
-            8,                                // "{#await " = 8 chars
+            block.opening_tag_span.start + AWAIT_BLOCK_OPEN.len() as u32,
+            block.opening_tag_span.end - 1,
+            AWAIT_BLOCK_OPEN.len(),
             allow_wrapping || in_multiline_context,
         );
 
-        let mut parts = vec![d.text("{#await "), expr_doc];
+        let mut parts = vec![d.text(AWAIT_BLOCK_OPEN), expr_doc];
 
         // Shorthand: {#await expr then value}...{/await}
         // Also handles: {#await expr then value}...{:catch error}...{/await}
@@ -774,9 +788,9 @@ impl<'a> Printer<'a> {
         let allow_wrapping = !has_preceding_breakable;
         let expr_doc = self.build_expression_doc_for_block(
             &block.expression,
-            block.opening_tag_span.start + 6, // after "{#key "
-            block.opening_tag_span.end - 1,   // before "}"
-            6,                                // "{#key " = 6 chars
+            block.opening_tag_span.start + KEY_BLOCK_OPEN.len() as u32,
+            block.opening_tag_span.end - 1,
+            KEY_BLOCK_OPEN.len(),
             allow_wrapping || in_multiline_context,
         );
 
@@ -797,7 +811,7 @@ impl<'a> Printer<'a> {
 
         let indented_body = indent_body(self, body_doc, has_leading);
 
-        let mut parts = vec![d.text("{#key "), expr_doc, d.text("}"), indented_body];
+        let mut parts = vec![d.text(KEY_BLOCK_OPEN), expr_doc, d.text("}"), indented_body];
 
         // Add endline before {/key} only if trailing whitespace exists
         if has_trailing {

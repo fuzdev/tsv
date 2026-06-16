@@ -4,6 +4,11 @@ use super::Printer;
 use crate::ast::internal;
 use tsv_lang::comments_in_range;
 
+// Opening keyword for `{@debug` (no trailing space — the space is emitted
+// separately). The content offset derives from its length so emit and offset
+// can't drift.
+const DEBUG_TAG_OPEN: &str = "{@debug";
+
 impl<'a> Printer<'a> {
     /// Format an html tag: {@html expr}
     pub(super) fn print_html_tag(&mut self, tag: &internal::HtmlTag) {
@@ -75,7 +80,7 @@ impl<'a> Printer<'a> {
     /// Unlike Prettier (which strips comments), we preserve TS comments.
     /// Comments are looked up from Root.comments by span position.
     pub(super) fn print_debug_tag(&mut self, tag: &internal::DebugTag) {
-        self.write("{@debug");
+        self.write(DEBUG_TAG_OPEN);
 
         // Get comments within the tag's content (after "{@debug" and before "}")
         // The tag span includes the full `{@debug ... }`, so we look inside
@@ -90,9 +95,9 @@ impl<'a> Printer<'a> {
 
         self.write(" ");
 
-        // Track position as we emit content
-        // Start after "{@debug " (7 characters from tag start)
-        let mut last_end = tag.span.start + 7; // "{@debug" = 7 chars
+        // Track position as we emit content.
+        // Start after the "{@debug" keyword (the space is emitted separately above).
+        let mut last_end = tag.span.start + DEBUG_TAG_OPEN.len() as u32;
 
         for (i, id) in tag.identifiers.iter().enumerate() {
             if i > 0 {

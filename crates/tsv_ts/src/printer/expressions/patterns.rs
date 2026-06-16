@@ -1054,7 +1054,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_rest_element_doc(&self, rest: &internal::RestElement) -> DocId {
         let d = self.d();
         // Comments between `...` and the argument (e.g., `.../* c */ args`)
-        let dots_end = rest.span.start + 3; // "...".len()
+        let dots_end = rest.span.start + "...".len() as u32;
         let arg_start = rest.argument.span().start;
         let comments_doc =
             self.build_comments_between(dots_end, arg_start, CommentSpacing::Trailing);

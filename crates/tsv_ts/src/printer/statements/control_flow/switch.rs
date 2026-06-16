@@ -20,7 +20,7 @@ impl<'a> Printer<'a> {
 
         // Preserve comments between `switch` keyword and `(` in place:
         //   switch/* c */(a){} → switch /* c */ (a) {}
-        let switch_keyword_end = stmt.span.start + 6; // "switch" is 6 chars
+        let switch_keyword_end = stmt.span.start + "switch".len() as u32;
         let keyword_comments = self.build_keyword_paren_comments(switch_keyword_end, open_paren);
 
         // Preserve comments between ) and { in place:
@@ -159,7 +159,9 @@ impl<'a> Printer<'a> {
             // "default:" - find the actual ':' position
             self.source[case.span.start as usize..]
                 .find(':')
-                .map_or(case.span.start + 8, |p| case.span.start + p as u32 + 1)
+                .map_or(case.span.start + "default:".len() as u32, |p| {
+                    case.span.start + p as u32 + 1
+                })
         }
     }
 
@@ -194,7 +196,7 @@ impl<'a> Printer<'a> {
             parts.push(d.text(":"));
         } else {
             // Comments between `default` keyword and colon: `default /* c */:`
-            let default_keyword_end = case.span.start + 7; // "default".len()
+            let default_keyword_end = case.span.start + "default".len() as u32;
             let colon_pos = find_char_skipping_comments(
                 self.source.as_bytes(),
                 default_keyword_end as usize,

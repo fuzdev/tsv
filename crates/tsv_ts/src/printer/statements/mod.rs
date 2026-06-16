@@ -163,7 +163,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let Some(arg) = &ret.argument else {
             // Check for comments between `return` and `;`: return /* comment */;
-            let keyword_end = ret.span.start + 6; // "return" is 6 chars
+            let keyword_end = ret.span.start + "return".len() as u32;
             let semi = ret.span.end; // span end is after `;`
             if let Some(comment_doc) = self.build_inline_comments_between_doc_opt(keyword_end, semi)
             {

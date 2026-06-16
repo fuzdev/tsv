@@ -138,7 +138,7 @@ impl<'a> Printer<'a> {
             b'e',
         );
         let extends_kw_start = extends_kw_start.map_or(check_type_end, |p| p as u32);
-        let extends_kw_end = extends_kw_start + 7; // "extends".len()
+        let extends_kw_end = extends_kw_start + "extends".len() as u32;
         let comments_before_extends =
             self.build_comments_between(check_type_end, extends_kw_start, CommentSpacing::Leading);
         let extends_type_doc = self.build_conditional_type_extends_doc(c, extends_kw_end);
@@ -408,7 +408,7 @@ impl<'a> Printer<'a> {
             b'e',
         )
         .map_or(check_type_end, |p| p as u32);
-        let extends_kw_end = extends_kw_start + 7; // "extends".len()
+        let extends_kw_end = extends_kw_start + "extends".len() as u32;
 
         let extends_type_doc = self.build_conditional_type_extends_doc(c, extends_kw_end);
 
@@ -572,7 +572,7 @@ impl<'a> Printer<'a> {
             constraint_start as usize,
             b'i',
         );
-        let in_end = in_start.map_or(name_end, |p| (p + 2) as u32);
+        let in_end = in_start.map_or(name_end, |p| (p + "in".len()) as u32);
         let in_start = in_start.map_or(name_end, |p| p as u32);
         // Comments between key name and `in` keyword
         body_parts.push(self.build_comments_between(name_end, in_start, CommentSpacing::Leading));
@@ -599,7 +599,7 @@ impl<'a> Printer<'a> {
                 name_type_start as usize,
                 b'a',
             );
-            let as_end = as_start.map_or(constraint_end, |p| (p + 2) as u32);
+            let as_end = as_start.map_or(constraint_end, |p| (p + "as".len()) as u32);
             let as_start = as_start.map_or(constraint_end, |p| p as u32);
             // Comments between constraint and `as` keyword
             body_parts.push(self.build_comments_between(

@@ -14,6 +14,12 @@ use crate::printer::Printer;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::{SymbolResolver, SymbolToU32};
 
+// Opening prefixes for brace-wrapped attribute expressions. `build_braced_expression_doc`
+// emits the prefix and derives the expression offset from its `.len()`, so these are the
+// single source for both the emitted text and the comment-scan anchor.
+const SPREAD_OPEN: &str = "{...";
+const ATTACH_TAG_OPEN: &str = "{@attach ";
+
 /// Normalize whitespace in a class attribute text value.
 ///
 /// Matches prettier-plugin-svelte behavior for `class` attributes on HTML elements:
@@ -267,9 +273,9 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a spread attribute: `{...expr}`
     fn build_spread_attribute_doc(&self, spread: &internal::SpreadAttribute) -> DocId {
         self.build_braced_expression_doc(
-            "{...",
+            SPREAD_OPEN,
             &spread.expression,
-            spread.span.start + 4, // after `{...`
+            spread.span.start,
             spread.span.end,
         )
     }
@@ -277,9 +283,9 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an attach tag: `{@attach expr}`
     fn build_attach_tag_doc(&self, tag: &internal::AttachTag) -> DocId {
         self.build_braced_expression_doc(
-            "{@attach ",
+            ATTACH_TAG_OPEN,
             &tag.expression,
-            tag.span.start + 9, // after `{@attach `
+            tag.span.start,
             tag.span.end,
         )
     }
@@ -291,11 +297,16 @@ impl<'a> Printer<'a> {
         &self,
         prefix: &'static str,
         expr: &tsv_ts::ast::internal::Expression,
-        comment_start: u32,
+        span_start: u32,
         span_end: u32,
     ) -> DocId {
         let d = self.d();
         let mut parts = vec![d.text(prefix)];
+
+        // The expression begins exactly `prefix.len()` bytes past the span start,
+        // so the comment-scan anchor derives from the emitted prefix — the two
+        // can't drift apart.
+        let comment_start = span_start + prefix.len() as u32;
 
         // Leading comments (between prefix and expression)
         let expr_start = expr.span().start;
