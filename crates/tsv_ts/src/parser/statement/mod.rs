@@ -68,9 +68,8 @@ impl<'a> Parser<'a> {
                     // Check for `await using` declaration (ES2024 Explicit Resource Management);
                     // both gaps carry [no LineTerminator here] — a break before `using` or
                     // before the binding makes this an `await using` expression statement
-                    if self.peek_is_identifier()
+                    if self.peek_is_same_line_identifier()
                         && self.peek_value() == "using"
-                        && !self.peek_preceded_by_line_terminator()
                         && self.peek_followed_by_same_line_identifier()
                     {
                         return self.parse_await_using_declaration();
@@ -135,29 +134,20 @@ impl<'a> Parser<'a> {
                 // Check for contextual keyword 'using' followed by identifier (ES2024
                 // Explicit Resource Management); `using [no LineTerminator here]
                 // BindingIdentifier` — a break makes `using` an identifier statement
-                if self.current_value() == "using"
-                    && self.peek_is_identifier()
-                    && !self.peek_preceded_by_line_terminator()
-                {
+                if self.current_value() == "using" && self.peek_is_same_line_identifier() {
                     return self.parse_using_declaration();
                 }
                 // Contextual keyword `type` starts a type alias only when the name is
                 // on the SAME line (tsc `nextTokenIsIdentifierOnSameLine`). A line
                 // break demotes `type` to a plain identifier and ASI splits the
                 // statement in two. peek_kind() skips comments: `type /* c */ A = T`.
-                if self.current_value() == "type"
-                    && matches!(self.peek_kind(), TokenKind::Identifier)
-                    && !self.peek_preceded_by_line_terminator()
-                {
+                if self.current_value() == "type" && self.peek_is_same_line_identifier() {
                     return self.parse_type_alias_declaration();
                 }
                 // Contextual keyword `interface` starts a declaration only when the
                 // name is on the SAME line (tsc `nextTokenIsIdentifierOnSameLine`); a
                 // line break demotes it to an identifier. peek_kind() skips comments.
-                if self.current_value() == "interface"
-                    && matches!(self.peek_kind(), TokenKind::Identifier)
-                    && !self.peek_preceded_by_line_terminator()
-                {
+                if self.current_value() == "interface" && self.peek_is_same_line_identifier() {
                     return self.parse_interface_declaration();
                 }
                 // Contextual keyword `declare` is an ambient-declaration modifier only
@@ -181,9 +171,8 @@ impl<'a> Parser<'a> {
                 // when the name is on the SAME line (tsc
                 // `nextTokenIsIdentifierOrStringLiteralOnSameLine`); a line break
                 // demotes them to identifiers. peek_kind() skips comments.
-                if (self.current_value() == "namespace" || self.current_value() == "module")
-                    && matches!(self.peek_kind(), TokenKind::Identifier)
-                    && !self.peek_preceded_by_line_terminator()
+                if matches!(self.current_value(), "namespace" | "module")
+                    && self.peek_is_same_line_identifier()
                 {
                     return self.parse_module_declaration(false, false);
                 }

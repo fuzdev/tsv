@@ -596,6 +596,16 @@ impl<'a> Parser<'a> {
         self.source[from..to].contains(['\n', '\r', '\u{2028}', '\u{2029}'])
     }
 
+    /// Whether the peeked token is an identifier on the same line as the current
+    /// token (tsc's `nextTokenIsIdentifierOnSameLine`).
+    ///
+    /// The shared shape behind the contextual-keyword declaration starters
+    /// (`using`/`type`/`interface`/`namespace`/`module`): a line break before the
+    /// name demotes the keyword to a plain identifier and ASI splits the statement.
+    pub(super) fn peek_is_same_line_identifier(&mut self) -> bool {
+        self.peek_is_identifier() && !self.peek_preceded_by_line_terminator()
+    }
+
     /// Whether the token after a `declare` modifier begins an ambient declaration
     /// on the same line.
     ///
