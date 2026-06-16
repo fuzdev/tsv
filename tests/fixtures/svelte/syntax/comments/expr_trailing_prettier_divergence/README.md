@@ -7,7 +7,9 @@ Prettier: `{#if condition}` (comment stripped)
 
 Affected contexts: `{expr}`, `{@html}`, `{@render}`, `{@const}`, `{#if}`, `{:else if}`, `{#each}` (collection and key), `{#await}`, `{#key}`, `{...spread}`, `bind:value={}`, `{@attach}`, `data-attr={}`, `on:event={}`, `class:name={}`, `use:action={}`, `style:prop={}`, `transition:fn={}`, `animate:fn={}`, `let:name={}`.
 
-Prettier also produces broken output for `{@const x = value /* c */}` (unmatched paren in output).
+(`{@const x = value /* c */}` drops the comment like the rest. Under
+prettier-plugin-svelte 3.5.2 this one case instead produced broken output with an
+unmatched paren — `{@const x = value) /* c */}`; 4.x drops the comment cleanly.)
 
 ## Reason
 

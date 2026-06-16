@@ -180,9 +180,12 @@ impl<'a> Printer<'a> {
 
     /// Check if a fragment can be flattened to an else-if.
     ///
-    /// Returns the single IfBlock if the fragment contains exactly one IfBlock
-    /// (plus optional whitespace) and can be flattened. Returns None if the
-    /// fragment has multiple IfBlocks or other content that prevents flattening.
+    /// Returns the inner IfBlock only when the fragment is exactly one IfBlock
+    /// (plus optional whitespace) AND the user authored it as `{:else if}`
+    /// (Svelte's `elseif: true` flag). Returns None for multiple IfBlocks, other
+    /// content, or a block-form `{:else}{#if}{/if}` (`elseif: false`): that form is
+    /// preserved verbatim rather than collapsed — matching prettier, which keeps the
+    /// two distinct (collapsing would be information loss).
     pub(super) fn get_flattenable_else_if(alt: &Fragment) -> Option<&internal::IfBlock> {
         let mut if_block: Option<&internal::IfBlock> = None;
 
@@ -205,7 +208,29 @@ impl<'a> Printer<'a> {
             }
         }
 
-        if_block
+        // Block-form `{:else}{#if}{/if}` (elseif: false) does not flatten — see fn doc.
+        if_block.filter(|b| b.elseif)
+    }
+
+    /// Build the condition-expression doc for a flattened `{:else if}` block.
+    ///
+    /// Shared by the normal and whitespace-sensitive alternate printers.
+    /// `get_flattenable_else_if` only returns genuine `{:else if}` blocks, so the
+    /// opening is always the literal `{:else if ` and the expression starts that many
+    /// chars past the opening-tag span.
+    pub(super) fn build_else_if_expr_doc(
+        &self,
+        else_if: &internal::IfBlock,
+        in_multiline_context: bool,
+    ) -> DocId {
+        const ELSE_IF_OPEN_LEN: usize = "{:else if ".len();
+        self.build_expression_doc_for_block(
+            &else_if.test,
+            else_if.opening_tag_span.start + ELSE_IF_OPEN_LEN as u32,
+            else_if.opening_tag_span.end - 1,
+            ELSE_IF_OPEN_LEN,
+            in_multiline_context,
+        )
     }
 
     /// Build doc for if block alternate (else or else-if)
@@ -228,15 +253,7 @@ impl<'a> Printer<'a> {
         // Check if this can be flattened to {:else if ...}
         if let Some(else_if) = Self::get_flattenable_else_if(alt) {
             // {:else if condition}
-            // The span offset depends on whether this is a true {:else if} or a normalized {#if}
-            let opening_offset: usize = if else_if.elseif { 10 } else { 5 };
-            let expr_doc = self.build_expression_doc_for_block(
-                &else_if.test,
-                else_if.opening_tag_span.start + opening_offset as u32,
-                else_if.opening_tag_span.end - 1,
-                opening_offset,
-                in_multiline_context,
-            );
+            let expr_doc = self.build_else_if_expr_doc(else_if, in_multiline_context);
 
             // Check this branch's own leading/trailing whitespace
             let (has_leading, has_trailing) =

@@ -1,5 +1,5 @@
 {#if cond /* c */}yes{/if}
-{#if a}a{:else}{#if b /* c */}b{/if}{/if}
+{#if a}a{:else if b /* c */}b{/if}
 {#each items /* c */ as item}{item}{/each}
 {#each items as item (item.id /* c */)}{item}{/each}
 {#await promise /* c */}{:then val}{val}{/await}
