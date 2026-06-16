@@ -1,16 +1,17 @@
 <script lang="ts">
 	//
-	// Basic Async Generic Arrow Functions (Svelte context - trailing comma needed)
-	// See basic_ts/input.ts for pure TypeScript version (no trailing comma)
+	// Basic Async Generic Arrow Functions (Svelte context)
+	// Single unconstrained type params stay bare here; prettier forces `<T,>` —
+	// see README and single_type_param_prettier_divergence.
 	//
 
-	// Basic (trailing comma for JSX disambiguation)
+	// Basic (single unconstrained — tsv bare, prettier `<T,>`)
 	const basic = async <T,>() => {};
 
 	// With constraint (no trailing comma needed)
 	const withConstraint = async <T extends object>() => {};
 
-	// With default (trailing comma needed)
+	// With default (default-only, no constraint)
 	const withDefault = async <T = string,>() => {};
 
 	// Constraint + default on same param

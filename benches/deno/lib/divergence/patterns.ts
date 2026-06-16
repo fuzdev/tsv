@@ -1785,6 +1785,53 @@ const instantiation_parens: DivergencePattern = {
 	},
 };
 
+const single_type_param_comma: DivergencePattern = {
+	id: 'single_type_param_comma',
+	description:
+		'Single unconstrained arrow type param stays bare `<T>`; prettier-in-Svelte forces `<T,>`',
+	languages: ['svelte'],
+	conformance_sections: ['TypeScript'],
+	fixtures: [
+		'typescript/expressions/arrow/generic/single_type_param_prettier_divergence',
+		'typescript/typescript_specific/generics/const_type_param_arrow_prettier_divergence',
+	],
+	detect(ctx) {
+		// Svelte only: prettier force-adds the JSX-disambiguating comma to a single
+		// unconstrained arrow type param when it has no `.ts` filepath — exactly the
+		// embedded-Svelte case. On the pure-.ts path prettier strips it, so tsv and
+		// prettier agree and there is nothing to detect.
+		if (ctx.language !== 'svelte') return null;
+
+		// Prettier: `<T,>` / `<T = string,>` / `<const T,>` — a single type param (no
+		// interior `<`, `>`, or `,`) immediately followed by `,>` on the same line. A
+		// wrapped multi-line list puts the comma and `>` on different lines, so it can't
+		// match here (and tsv emits that trailing comma too — not a divergence).
+		const prettier_comma = /<([^<>,\n]+),>/;
+
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			for (const removed of hunk.removed_lines) {
+				const m = prettier_comma.exec(removed);
+				if (!m) continue;
+				// Ours has the same construct without the disambiguating comma.
+				const bare = `<${m[1]}>`;
+				if (hunk.added_lines.some((added) => added.includes(bare))) return true;
+			}
+			return false;
+		});
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'single_type_param_comma',
+				confidence: 'certain',
+				hunk_indices,
+				reason:
+					'Single unconstrained arrow type param stays bare `<T>` (tsv emits no JSX); prettier-in-Svelte forces `<T,>`',
+			};
+		}
+		return null;
+	},
+};
+
 const block_comment_computed_member: DivergencePattern = {
 	id: 'block_comment_computed_member',
 	description: 'Block comment preserved inside computed member brackets',
@@ -1992,6 +2039,7 @@ export const PATTERNS: DivergencePattern[] = [
 
 	// 5. Semantic preservation patterns
 	instantiation_parens,
+	single_type_param_comma,
 	block_comment_computed_member,
 	block_comment_chain,
 	jsdoc_type_cast_parens,

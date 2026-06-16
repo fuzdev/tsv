@@ -8,8 +8,7 @@
 //!
 //! Runtime *state* that genuinely varies per input is not configuration and
 //! lives on dedicated context types: embedding offsets / layout mode on
-//! [`EmbedContext`] here, and the standalone-vs-Svelte TypeScript distinction
-//! on `tsv_ts::TsContext`.
+//! [`EmbedContext`] here.
 
 /// Maximum line width used by the formatter (matches Prettier default).
 ///

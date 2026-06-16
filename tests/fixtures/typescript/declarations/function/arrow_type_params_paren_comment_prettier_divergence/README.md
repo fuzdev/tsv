@@ -1,11 +1,21 @@
 # Arrow type params paren comment divergence
 
-Prettier moves block comments between type parameters `>` and opening `(` inside
-the parentheses as leading on the first parameter: `<T,>(/* c */ x: T) => x`.
+Two prettier divergences stack on this one arrow:
 
-We preserve the comment between `>` and `(`: `<T,> /* c */(x: T) => x`.
+1. **Comment position.** Prettier moves a block comment between the type-param
+   `>` and the opening `(` inside the parens, as a leading comment on the first
+   parameter. tsv preserves the comment between `>` and `(`.
+2. **Trailing comma.** Prettier forces a `<T,>` trailing comma on the single
+   unconstrained type param; tsv emits bare `<T>` (see
+   single_type_param_prettier_divergence).
 
-Both positions are dual-stable (idempotent in both formatters). Per comment
-placement policy, we preserve user intent.
+- tsv: `<T> /* c */(x: T) => x`
+- Prettier: `<T,>(/* c */ x: T) => x`
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+Per comment-placement policy tsv preserves the user's comment position, and per
+the no-JSX design choice it drops the trailing comma. Because both differ, no
+single form is stable in both formatters — `unformatted_ours_compact.svelte`
+normalizes to the tsv form, and prettier reaches `output_prettier.svelte`.
+
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+§Comment relocation and §TypeScript.

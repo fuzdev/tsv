@@ -42,8 +42,7 @@
 		await fn1();
 	});
 
-	// Generic callbacks (trailing comma required for single type param in TSX-compatible syntax)
-	fn(<T,>(x: T) => x);
+	// Generic callbacks
 	fn(<T, U>(x: T, y: U) => x);
 
 	// Callback returning object literal (needs parens)

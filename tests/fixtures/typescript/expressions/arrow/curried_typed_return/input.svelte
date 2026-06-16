@@ -51,14 +51,14 @@
 
 	// Type parameters on outer arrow - ALWAYS breaks
 	const i =
-		<T,>(x: T) =>
+		<T extends A>(x: T) =>
 		(y) =>
 			x + y;
 
 	// Type parameters on inner arrow - ALWAYS breaks
 	const j =
 		(x: T) =>
-		<U,>(y: U) =>
+		<U extends B>(y: U) =>
 			x + y;
 
 	// Destructuring param - ALWAYS breaks

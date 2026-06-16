@@ -331,16 +331,16 @@ The table lists the settings that diverge from Prettier's defaults; everything e
 
 There is no runtime configuration. Print width / tab width / indent are compile-time `pub const`s in `tsv_lang::config` (`PRINT_WIDTH`, `TAB_WIDTH`, `INDENT`), read directly by the renderer — not threaded through any signature. Quote preference is likewise hardcoded (single quotes) inside `tsv_lang::printing::format_string_literal`. The doc-builder unit tests exercise the layout at smaller widths via the internal `RenderConfig` seam (`doc::render_config`, `pub(crate)`), never at runtime.
 
-Two types carry genuine per-input *state* (not configuration), threaded only where they vary:
+One type carries genuine per-input *state* (not configuration), threaded only where it varies:
 
 - `tsv_lang::EmbedContext { base_indent_offset, first_line_offset, suffix_width, mode: LayoutMode }` — embedding state for nested formatting (CSS in `<style>`, Svelte template expressions). `LayoutMode { Standalone, Embedded }` controls binary-expression indent style.
-- `tsv_ts::TsContext { Standalone, Svelte }` — whether the TypeScript is standalone or embedded in a Svelte file. Derived from the file kind, not a user option; `TsContext::Svelte` enables `<T,>` arrow-type-param disambiguation. `tsv_svelte` passes it when embedding TS.
+
+TypeScript formatting is identical for standalone `.ts` and Svelte-embedded TS, so there is a single entry point:
 
 ```rust
-use tsv_ts::{TsContext, format, format_with_context};
+use tsv_ts::format;
 
-let formatted = format(&ast, source);                                   // pure TS (Standalone)
-let formatted = format_with_context(&ast, source, TsContext::Svelte);   // Svelte-embedded TS
+let formatted = format(&ast, source); // same output standalone or Svelte-embedded
 ```
 
 ## Project Structure

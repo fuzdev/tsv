@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 154,
+	"end": 153,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -29,16 +29,16 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 124,
-			"end": 131,
+			"start": 123,
+			"end": 130,
 			"loc": {
 				"start": {
 					"line": 3,
-					"column": 16
+					"column": 15
 				},
 				"end": {
 					"line": 3,
-					"column": 23
+					"column": 22
 				}
 			}
 		}
@@ -46,12 +46,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 153,
+		"end": 152,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 144,
+			"end": 143,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -66,7 +66,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 109,
-					"end": 143,
+					"end": 142,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -74,14 +74,14 @@
 						},
 						"end": {
 							"line": 3,
-							"column": 35
+							"column": 34
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 115,
-							"end": 142,
+							"end": 141,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -89,7 +89,7 @@
 								},
 								"end": {
 									"line": 3,
-									"column": 34
+									"column": 33
 								}
 							},
 							"id": {
@@ -111,7 +111,7 @@
 							"init": {
 								"type": "ArrowFunctionExpression",
 								"start": 119,
-								"end": 142,
+								"end": 141,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -119,7 +119,7 @@
 									},
 									"end": {
 										"line": 3,
-										"column": 34
+										"column": 33
 									}
 								},
 								"id": null,
@@ -129,59 +129,59 @@
 								"params": [
 									{
 										"type": "Identifier",
-										"start": 132,
-										"end": 136,
+										"start": 131,
+										"end": 135,
 										"loc": {
 											"start": {
 												"line": 3,
-												"column": 24
+												"column": 23
 											},
 											"end": {
 												"line": 3,
-												"column": 28
+												"column": 27
 											}
 										},
 										"name": "x",
 										"typeAnnotation": {
 											"type": "TSTypeAnnotation",
-											"start": 133,
-											"end": 136,
+											"start": 132,
+											"end": 135,
 											"loc": {
 												"start": {
 													"line": 3,
-													"column": 25
+													"column": 24
 												},
 												"end": {
 													"line": 3,
-													"column": 28
+													"column": 27
 												}
 											},
 											"typeAnnotation": {
 												"type": "TSTypeReference",
-												"start": 135,
-												"end": 136,
+												"start": 134,
+												"end": 135,
 												"loc": {
 													"start": {
 														"line": 3,
-														"column": 27
+														"column": 26
 													},
 													"end": {
 														"line": 3,
-														"column": 28
+														"column": 27
 													}
 												},
 												"typeName": {
 													"type": "Identifier",
-													"start": 135,
-													"end": 136,
+													"start": 134,
+													"end": 135,
 													"loc": {
 														"start": {
 															"line": 3,
-															"column": 27
+															"column": 26
 														},
 														"end": {
 															"line": 3,
-															"column": 28
+															"column": 27
 														}
 													},
 													"name": "T"
@@ -192,24 +192,24 @@
 											{
 												"type": "Block",
 												"value": " c ",
-												"start": 124,
-												"end": 131
+												"start": 123,
+												"end": 130
 											}
 										]
 									}
 								],
 								"body": {
 									"type": "Identifier",
-									"start": 141,
-									"end": 142,
+									"start": 140,
+									"end": 141,
 									"loc": {
 										"start": {
 											"line": 3,
-											"column": 33
+											"column": 32
 										},
 										"end": {
 											"line": 3,
-											"column": 34
+											"column": 33
 										}
 									},
 									"name": "x"
@@ -217,7 +217,7 @@
 								"typeParameters": {
 									"type": "TSTypeParameterDeclaration",
 									"start": 119,
-									"end": 123,
+									"end": 122,
 									"loc": {
 										"start": {
 											"line": 3,
@@ -225,7 +225,7 @@
 										},
 										"end": {
 											"line": 3,
-											"column": 15
+											"column": 14
 										}
 									},
 									"params": [
@@ -245,10 +245,7 @@
 											},
 											"name": "T"
 										}
-									],
-									"extra": {
-										"trailingComma": 121
-									}
+									]
 								}
 							}
 						}

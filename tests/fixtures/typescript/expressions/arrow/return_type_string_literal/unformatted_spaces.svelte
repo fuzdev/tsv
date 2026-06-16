@@ -16,7 +16,7 @@
 	 'b' => 'a';
 
 	// Generic with string literal return
-	const generic = < T , >( x : T ) : 'a' | 'b' => 
+	const generic = < T extends string >( x : T ) : 'a' | 'b' =>
 	'a';
 
 	// Async with string literal return

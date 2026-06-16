@@ -37,13 +37,8 @@ impl<'a> Printer<'a> {
         // Template indent fallback (when source has no whitespace) is handled separately
         // in the TypeScript printer with a hardcoded default of 1 for Svelte context.
         let embed = tsv_lang::EmbedContext::default();
-        let script_doc_id = tsv_ts::build_program_doc(
-            self.d(),
-            &script.content,
-            self.source(),
-            embed,
-            tsv_ts::TsContext::Svelte,
-        );
+        let script_doc_id =
+            tsv_ts::build_program_doc(self.d(), &script.content, self.source(), embed);
 
         // Render with indent
         // The Doc system naturally handles template literals: text() newlines are NOT indented

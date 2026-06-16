@@ -11,9 +11,8 @@ use std::path::Path;
 /// `<script lang="ts">` block and checks — with BOTH our formatter and prettier —
 /// whether the embedded form produces the same TypeScript. A fixture is **necessary**
 /// as `.ts` if any of its files is a byte-0 / file-level feature, fails to parse in a
-/// Svelte context, or formats differently embedded (e.g. `<T>` → `<T,>`, JSDoc cast
-/// paren stripping — which often lives in a variant, not `input.ts`). Otherwise it is
-/// **convertible**.
+/// Svelte context, or formats differently embedded (e.g. JSDoc cast paren stripping —
+/// which often lives in a variant, not `input.ts`). Otherwise it is **convertible**.
 ///
 /// Replaces eyeballing directory names with an empirical check. Caveat: **convertible**
 /// means only that formatting is identical in both contexts — it does NOT judge intent

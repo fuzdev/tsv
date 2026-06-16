@@ -1,5 +1,5 @@
-// const type parameter - pure TypeScript (no trailing comma needed for arrow functions)
-// See const_type_param_svelte/ for Svelte version with trailing comma
+// const type parameter - pure TypeScript (arrow type params stay bare)
+// See const_type_param_arrow_prettier_divergence/ for the Svelte arrow (tsv bare, prettier `<const T,>`)
 
 function literal<const T>(value: T): T {
 	return value;

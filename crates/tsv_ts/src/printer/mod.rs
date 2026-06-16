@@ -59,7 +59,6 @@ pub(crate) use types::{should_hug_union_type, unwrap_parenthesized};
 
 use crate::PrinterInputs;
 use crate::ast::internal;
-use crate::config::TsContext;
 use std::cell::Cell;
 use std::rc::Rc;
 use tsv_lang::{
@@ -103,8 +102,6 @@ pub struct Printer<'a> {
     pub(crate) indent_level: usize,
     /// Embedding context (base indent offset, first-line offset, layout mode, etc.).
     pub(crate) embed: EmbedContext,
-    /// Whether this TypeScript is standalone or embedded in a Svelte file.
-    pub(crate) ts_context: TsContext,
     /// Arena allocator for doc nodes (borrowed from caller or locally owned)
     pub(crate) arena: &'a DocArena,
     /// Shared string interner for resolving symbols
@@ -185,7 +182,6 @@ impl<'a> Printer<'a> {
             buffer: OutputBuffer::with_capacity(inputs.source.len()),
             indent_level: 0,
             embed,
-            ts_context: inputs.ts_context,
             arena,
             interner: Rc::clone(&inputs.interner),
             source: inputs.source,
