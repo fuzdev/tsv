@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 283,
+	"end": 284,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " multiple named specifiers, block comment before from",
-			"start": 181,
-			"end": 236,
+			"start": 182,
+			"end": 237,
 			"loc": {
 				"start": {
 					"line": 9,
@@ -93,8 +93,8 @@
 		{
 			"type": "Block",
 			"value": " c3 ",
-			"start": 252,
-			"end": 260,
+			"start": 253,
+			"end": 261,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -110,12 +110,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 282,
+		"end": 283,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 273,
+			"end": 274,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -230,7 +230,7 @@
 				{
 					"type": "ExportNamedDeclaration",
 					"start": 149,
-					"end": 178,
+					"end": 179,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -238,7 +238,7 @@
 						},
 						"end": {
 							"line": 7,
-							"column": 12
+							"column": 13
 						}
 					},
 					"exportKind": "value",
@@ -295,16 +295,16 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 172,
-						"end": 177,
+						"start": 173,
+						"end": 178,
 						"loc": {
 							"start": {
 								"line": 7,
-								"column": 6
+								"column": 7
 							},
 							"end": {
 								"line": 7,
-								"column": 11
+								"column": 12
 							}
 						},
 						"value": "./b",
@@ -329,8 +329,8 @@
 				},
 				{
 					"type": "ExportNamedDeclaration",
-					"start": 238,
-					"end": 272,
+					"start": 239,
+					"end": 273,
 					"loc": {
 						"start": {
 							"line": 10,
@@ -346,8 +346,8 @@
 					"specifiers": [
 						{
 							"type": "ExportSpecifier",
-							"start": 246,
-							"end": 247,
+							"start": 247,
+							"end": 248,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -360,8 +360,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 246,
-								"end": 247,
+								"start": 247,
+								"end": 248,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -376,8 +376,8 @@
 							},
 							"exported": {
 								"type": "Identifier",
-								"start": 246,
-								"end": 247,
+								"start": 247,
+								"end": 248,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -394,8 +394,8 @@
 						},
 						{
 							"type": "ExportSpecifier",
-							"start": 249,
-							"end": 250,
+							"start": 250,
+							"end": 251,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -408,8 +408,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 249,
-								"end": 250,
+								"start": 250,
+								"end": 251,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -424,8 +424,8 @@
 							},
 							"exported": {
 								"type": "Identifier",
-								"start": 249,
-								"end": 250,
+								"start": 250,
+								"end": 251,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -443,8 +443,8 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 266,
-						"end": 271,
+						"start": 267,
+						"end": 272,
 						"loc": {
 							"start": {
 								"line": 10,
@@ -461,8 +461,8 @@
 							{
 								"type": "Block",
 								"value": " c3 ",
-								"start": 252,
-								"end": 260
+								"start": 253,
+								"end": 261
 							}
 						]
 					},
@@ -470,8 +470,8 @@
 						{
 							"type": "Line",
 							"value": " multiple named specifiers, block comment before from",
-							"start": 181,
-							"end": 236
+							"start": 182,
+							"end": 237
 						}
 					]
 				}

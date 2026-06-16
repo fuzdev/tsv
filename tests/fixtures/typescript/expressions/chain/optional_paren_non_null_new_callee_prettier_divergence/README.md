@@ -2,24 +2,28 @@
 
 A non-null assertion sealing a parenthesized optional-chain base, used as a `new`
 callee. An optional chain can't be a `new` callee per spec, so the parens are
-required to seal it. Prettier mishandles them — *inconsistently* — and one of its
-outputs is itself a syntax error. tsv keeps the parens (canonical `!`-outside form).
+required to seal it. Prettier strips them off both forms, and **both** of its
+outputs are themselves syntax errors. tsv keeps the parens (canonical `!`-outside
+form).
 
-| Form             | tsv              | Prettier                        |
-| ---------------- | ---------------- | ------------------------------- |
-| `new (a?.b)!()`  | `new (a?.b)!()`  | `new a?.b!()` (syntax error!)   |
-| `new (a?.())!()` | `new (a?.())!()` | `new (a?.()!)()` (`!` relocated) |
+| Form             | tsv              | Prettier                       |
+| ---------------- | ---------------- | ------------------------------ |
+| `new (a?.b)!()`  | `new (a?.b)!()`  | `new a?.b!()` (syntax error!)  |
+| `new (a?.())!()` | `new (a?.())!()` | `new a?.()!()` (syntax error!) |
 
 ## Reason
 
 Semantic preservation. `new (a?.b)!()` constructs on the asserted result of `a?.b`;
-dropping the parens changes (or breaks) the meaning. Prettier is self-inconsistent:
+dropping the parens changes (or breaks) the meaning. Prettier strips the parens off
+**both** forms, and both results fail to re-parse:
 
 - **Member base** `new (a?.b)!()` → `new a?.b!()`, which **fails to re-parse**
   ("Optional chaining cannot appear in the callee of new expressions"). Prettier's
   own output is invalid — a non-idempotency error, not just a layout difference.
-- **Call base** `new (a?.())!()` → `new (a?.()!)()`: Prettier keeps the parens but
-  relocates the `!` inside them. Valid, but a different paren placement.
+- **Call base** `new (a?.())!()` → `new a?.()!()`, which **also fails to re-parse**
+  with the same error. (Under prettier-plugin-svelte 3.5.2 this form stayed valid
+  as `new (a?.()!)()` — the `!` merely relocated inside the parens; 4.x strips the
+  parens here too, so prettier now mangles both forms identically.)
 
 tsv keeps the parens in the canonical `!`-outside form for both. The `!` is
 type-only, so its position relative to the parens carries no runtime meaning, and

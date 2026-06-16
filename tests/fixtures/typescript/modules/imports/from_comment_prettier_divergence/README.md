@@ -24,19 +24,20 @@ import {
 ```
 import Foo /* c1 */ from './a';
 import Bar // c2
-from './b';
+	from './b';
 import * as ns1 /* c3 */ from './c';
 import * as ns2 // c4
-from './d';
+	from './d';
 import {a} /* c5 */ from './e';
 import {b} // c6
-from './f';
+	from './f';
 ```
 
 The default/namespace **block** comments (c1, c3) are dual-stable — both formatters keep
 them in place. The default/namespace **line** comments (c2, c4) float to a statement-trailing
 position in Prettier (mirroring `source_trailing_comment`), and the **named** comments
 (c5, c6) relocate into the braces (mirroring `type_keyword_comment`). Per Comment Position
-Philosophy.
+Philosophy. When a line comment forces `from` onto its own line, tsv indents that
+continuation one level (a single statement spanning lines).
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

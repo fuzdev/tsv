@@ -450,6 +450,7 @@ tests/fixtures/example_fixture/
 ├── prettier_intermediate_to_variant_*.svelte  # OPTIONAL: Prettier's unstable first-pass output (converges to a variant_*/prettier_variant_*)
 ├── audit_signature.txt             # OPTIONAL: Auto-generated; pins prettier's multi-pass chain from output_prettier.* (F4)
 ├── prettier_nonconvergent.txt      # OPTIONAL: Prettier never reaches a fixed point on input — no oracle; claim live-verified (F5)
+├── prettier_rejects.txt            # OPTIONAL: Prettier throws on input (parse rejection / printer crash) — no oracle; trimmed content is the expected-error substring, claim live-verified (F6)
 ├── unformatted_*.svelte            # OPTIONAL: Variants that normalize to input.svelte (both formatters)
 ├── unformatted_ours_*.svelte       # OPTIONAL: Variants that normalize to input.svelte (our formatter only)
 ├── unformatted_prettier_*.svelte   # OPTIONAL: Variants that normalize to output_prettier.svelte (prettier only)
@@ -473,6 +474,7 @@ tests/fixtures/example_fixture/
 - **Normalization to input divergence**: `unformatted_ours_*.*` normalizes to input with our formatter only
 - **Normalization to output_prettier**: `unformatted_prettier_*.*` normalizes to `output_prettier.*` with prettier
 - **Prettier never converges (no oracle)**: Add `prettier_nonconvergent.txt` + README (requires `_prettier_divergence` suffix; excludes all prettier-claim files)
+- **Prettier rejects/throws on input (no oracle)**: Add `prettier_rejects.txt` (trimmed content = expected-error substring) + README (requires `_prettier_divergence` suffix; excludes all prettier-claim files; mutually exclusive with `prettier_nonconvergent.txt`)
 - **Both differ**: Use `_svelte_prettier_divergence` suffix
 
 **Example Workflow: Handling a Prettier Difference**
@@ -548,7 +550,7 @@ cargo run -p tsv_debug fixtures_validate [pattern...]
 # fixtures_update - regenerate from canonical sources
 cargo run -p tsv_debug fixtures_update            # both parsed + formatted
 cargo run -p tsv_debug fixtures_update_parsed     # expected.json only (Svelte for .svelte, acorn for .ts, parseCss for .css)
-cargo run -p tsv_debug fixtures_update_formatted  # output_prettier.svelte (auto-deletes if identical to input; skips prettier_nonconvergent.txt fixtures — no fixed point to record)
+cargo run -p tsv_debug fixtures_update_formatted  # output_prettier.svelte (auto-deletes if identical to input; skips prettier_nonconvergent.txt / prettier_rejects.txt fixtures — prettier can't format them)
 
 # fixtures_audit - investigate normalization graphs (diagnostic; --all for every fixture, not just divergence)
 cargo run -p tsv_debug fixtures_audit [pattern...]

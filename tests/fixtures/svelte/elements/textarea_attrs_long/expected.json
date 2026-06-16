@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 680,
+	"end": 690,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -81,55 +81,55 @@
 			{
 				"type": "Comment",
 				"start": 77,
-				"end": 160,
-				"data": " Long - attrs wrap, > on its own line (inline whitespace-sensitive element) "
+				"end": 163,
+				"data": " Long - empty, attrs wrap; closing > hugs the last attr (whitespace-sensitive) "
 			},
 			{
 				"type": "Text",
-				"start": 160,
-				"end": 161,
+				"start": 163,
+				"end": 164,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 161,
-				"end": 314,
+				"start": 164,
+				"end": 316,
 				"name": "textarea",
 				"name_loc": {
 					"start": {
 						"line": 5,
 						"column": 1,
-						"character": 162
+						"character": 165
 					},
 					"end": {
 						"line": 5,
 						"column": 9,
-						"character": 170
+						"character": 173
 					}
 				},
 				"attributes": [
 					{
 						"type": "Attribute",
-						"start": 172,
-						"end": 217,
+						"start": 175,
+						"end": 220,
 						"name": "class",
 						"name_loc": {
 							"start": {
 								"line": 6,
 								"column": 1,
-								"character": 172
+								"character": 175
 							},
 							"end": {
 								"line": 6,
 								"column": 6,
-								"character": 177
+								"character": 180
 							}
 						},
 						"value": [
 							{
-								"start": 179,
-								"end": 216,
+								"start": 182,
+								"end": 219,
 								"type": "Text",
 								"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 								"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -138,25 +138,25 @@
 					},
 					{
 						"type": "Attribute",
-						"start": 219,
-						"end": 260,
+						"start": 222,
+						"end": 263,
 						"name": "id",
 						"name_loc": {
 							"start": {
 								"line": 7,
 								"column": 1,
-								"character": 219
+								"character": 222
 							},
 							"end": {
 								"line": 7,
 								"column": 3,
-								"character": 221
+								"character": 224
 							}
 						},
 						"value": [
 							{
-								"start": 223,
-								"end": 259,
+								"start": 226,
+								"end": 262,
 								"type": "Text",
 								"raw": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 								"data": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -165,25 +165,25 @@
 					},
 					{
 						"type": "Attribute",
-						"start": 262,
-						"end": 301,
+						"start": 265,
+						"end": 304,
 						"name": "data-attr",
 						"name_loc": {
 							"start": {
 								"line": 8,
 								"column": 1,
-								"character": 262
+								"character": 265
 							},
 							"end": {
 								"line": 8,
 								"column": 10,
-								"character": 271
+								"character": 274
 							}
 						},
 						"value": [
 							{
-								"start": 273,
-								"end": 300,
+								"start": 276,
+								"end": 303,
 								"type": "Text",
 								"raw": "ccccccccccccccccccccccccccc",
 								"data": "ccccccccccccccccccccccccccc"
@@ -198,63 +198,63 @@
 			},
 			{
 				"type": "Text",
-				"start": 314,
-				"end": 316,
+				"start": 316,
+				"end": 318,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 316,
-				"end": 374,
+				"start": 318,
+				"end": 376,
 				"data": " With content - whitespace-sensitive, hug behavior "
 			},
 			{
 				"type": "Text",
-				"start": 374,
-				"end": 375,
+				"start": 376,
+				"end": 377,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 375,
-				"end": 494,
+				"start": 377,
+				"end": 496,
 				"name": "textarea",
 				"name_loc": {
 					"start": {
-						"line": 12,
+						"line": 11,
 						"column": 1,
-						"character": 376
+						"character": 378
 					},
 					"end": {
-						"line": 12,
+						"line": 11,
 						"column": 9,
-						"character": 384
+						"character": 386
 					}
 				},
 				"attributes": [
 					{
 						"type": "Attribute",
-						"start": 385,
-						"end": 430,
+						"start": 387,
+						"end": 432,
 						"name": "class",
 						"name_loc": {
 							"start": {
-								"line": 12,
+								"line": 11,
 								"column": 10,
-								"character": 385
+								"character": 387
 							},
 							"end": {
-								"line": 12,
+								"line": 11,
 								"column": 15,
-								"character": 390
+								"character": 392
 							}
 						},
 						"value": [
 							{
-								"start": 392,
-								"end": 429,
+								"start": 394,
+								"end": 431,
 								"type": "Text",
 								"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 								"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -263,25 +263,25 @@
 					},
 					{
 						"type": "Attribute",
-						"start": 431,
-						"end": 472,
+						"start": 433,
+						"end": 474,
 						"name": "id",
 						"name_loc": {
 							"start": {
-								"line": 12,
+								"line": 11,
 								"column": 56,
-								"character": 431
+								"character": 433
 							},
 							"end": {
-								"line": 12,
+								"line": 11,
 								"column": 58,
-								"character": 433
+								"character": 435
 							}
 						},
 						"value": [
 							{
-								"start": 435,
-								"end": 471,
+								"start": 437,
+								"end": 473,
 								"type": "Text",
 								"raw": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 								"data": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -293,8 +293,8 @@
 					"type": "Fragment",
 					"nodes": [
 						{
-							"start": 475,
-							"end": 482,
+							"start": 477,
+							"end": 484,
 							"type": "Text",
 							"raw": "content",
 							"data": "content"
@@ -304,70 +304,70 @@
 			},
 			{
 				"type": "Text",
-				"start": 494,
-				"end": 496,
+				"start": 496,
+				"end": 498,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 496,
-				"end": 559,
-				"data": " With expression value - wraps attrs, > on its own line "
+				"start": 498,
+				"end": 570,
+				"data": " With expression value - empty, attrs wrap; > hugs the last attr "
 			},
 			{
 				"type": "Text",
-				"start": 559,
-				"end": 560,
+				"start": 570,
+				"end": 571,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 560,
-				"end": 679,
+				"start": 571,
+				"end": 689,
 				"name": "textarea",
 				"name_loc": {
 					"start": {
-						"line": 17,
+						"line": 16,
 						"column": 1,
-						"character": 561
+						"character": 572
 					},
 					"end": {
-						"line": 17,
+						"line": 16,
 						"column": 9,
-						"character": 569
+						"character": 580
 					}
 				},
 				"attributes": [
 					{
-						"start": 571,
-						"end": 588,
+						"start": 582,
+						"end": 599,
 						"type": "BindDirective",
 						"name": "value",
 						"name_loc": {
 							"start": {
-								"line": 18,
+								"line": 17,
 								"column": 1,
-								"character": 571
+								"character": 582
 							},
 							"end": {
-								"line": 18,
+								"line": 17,
 								"column": 11,
-								"character": 581
+								"character": 592
 							}
 						},
 						"expression": {
 							"type": "Identifier",
-							"start": 583,
-							"end": 587,
+							"start": 594,
+							"end": 598,
 							"loc": {
 								"start": {
-									"line": 18,
+									"line": 17,
 									"column": 13
 								},
 								"end": {
-									"line": 18,
+									"line": 17,
 									"column": 17
 								}
 							},
@@ -377,25 +377,25 @@
 					},
 					{
 						"type": "Attribute",
-						"start": 590,
-						"end": 635,
+						"start": 601,
+						"end": 646,
 						"name": "class",
 						"name_loc": {
 							"start": {
-								"line": 19,
+								"line": 18,
 								"column": 1,
-								"character": 590
+								"character": 601
 							},
 							"end": {
-								"line": 19,
+								"line": 18,
 								"column": 6,
-								"character": 595
+								"character": 606
 							}
 						},
 						"value": [
 							{
-								"start": 597,
-								"end": 634,
+								"start": 608,
+								"end": 645,
 								"type": "Text",
 								"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 								"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -404,50 +404,50 @@
 					},
 					{
 						"type": "Attribute",
-						"start": 637,
-						"end": 666,
+						"start": 648,
+						"end": 677,
 						"name": "placeholder",
 						"name_loc": {
 							"start": {
-								"line": 20,
+								"line": 19,
 								"column": 1,
-								"character": 637
+								"character": 648
 							},
 							"end": {
-								"line": 20,
+								"line": 19,
 								"column": 12,
-								"character": 648
+								"character": 659
 							}
 						},
 						"value": {
 							"type": "ExpressionTag",
-							"start": 649,
-							"end": 666,
+							"start": 660,
+							"end": 677,
 							"expression": {
 								"type": "LogicalExpression",
-								"start": 650,
-								"end": 665,
+								"start": 661,
+								"end": 676,
 								"loc": {
 									"start": {
-										"line": 20,
+										"line": 19,
 										"column": 14
 									},
 									"end": {
-										"line": 20,
+										"line": 19,
 										"column": 29
 									}
 								},
 								"left": {
 									"type": "Identifier",
-									"start": 650,
-									"end": 655,
+									"start": 661,
+									"end": 666,
 									"loc": {
 										"start": {
-											"line": 20,
+											"line": 19,
 											"column": 14
 										},
 										"end": {
-											"line": 20,
+											"line": 19,
 											"column": 19
 										}
 									},
@@ -456,15 +456,15 @@
 								"operator": "||",
 								"right": {
 									"type": "Literal",
-									"start": 659,
-									"end": 665,
+									"start": 670,
+									"end": 676,
 									"loc": {
 										"start": {
-											"line": 20,
+											"line": 19,
 											"column": 23
 										},
 										"end": {
-											"line": 20,
+											"line": 19,
 											"column": 29
 										}
 									},

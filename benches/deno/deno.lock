@@ -12,7 +12,7 @@
     "npm:acorn@8.16.0": "8.16.0",
     "npm:oxc-parser@0.134.0": "0.134.0",
     "npm:oxfmt@0.53.0": "0.53.0_svelte@5.56.1",
-    "npm:prettier-plugin-svelte@3.5.2": "3.5.2_prettier@3.8.3_svelte@5.56.1",
+    "npm:prettier-plugin-svelte@4.1.1": "4.1.1_prettier@3.8.3_svelte@5.56.1",
     "npm:prettier@3.8.3": "3.8.3",
     "npm:svelte@5.56.1": "5.56.1",
     "npm:zod@^4.4.3": "4.4.3"
@@ -434,8 +434,8 @@
       ],
       "bin": true
     },
-    "prettier-plugin-svelte@3.5.2_prettier@3.8.3_svelte@5.56.1": {
-      "integrity": "sha512-ItFouLvzSFE3ulNl4DKoWM3BGcbDCNVpIyy/Y3F2gC3aNiGLxtFUdffVqO5Z5hhYG+DFT5KULWaxmeFFpdbvaQ==",
+    "prettier-plugin-svelte@4.1.1_prettier@3.8.3_svelte@5.56.1": {
+      "integrity": "sha512-wXvbXMjSvb4C9ENWTHXyd+ihakKCsJ6rJhLP6/8HFNj4GkZr48jqL9PoKsl2sk7SyCZRTnJ7O2TTowUpOxP/KA==",
       "dependencies": [
         "prettier",
         "svelte"
@@ -525,7 +525,7 @@
       "npm:acorn@8.16.0",
       "npm:oxc-parser@0.134.0",
       "npm:oxfmt@0.53.0",
-      "npm:prettier-plugin-svelte@3.5.2",
+      "npm:prettier-plugin-svelte@4.1.1",
       "npm:prettier@3.8.3",
       "npm:svelte@5.56.1",
       "npm:zod@^4.4.3"

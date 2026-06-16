@@ -1,0 +1,1 @@
+An optional chain cannot contain private identifiers.

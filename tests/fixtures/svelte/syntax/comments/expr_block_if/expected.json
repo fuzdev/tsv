@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 62,
+	"end": 104,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -138,6 +138,95 @@
 						}
 					]
 				}
+			},
+			{
+				"type": "Text",
+				"start": 61,
+				"end": 62,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 62,
+				"end": 103,
+				"test": {
+					"type": "Identifier",
+					"start": 67,
+					"end": 68,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 5
+						},
+						"end": {
+							"line": 3,
+							"column": 6
+						}
+					},
+					"name": "a"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 69,
+							"end": 70,
+							"raw": "a",
+							"data": "a"
+						}
+					]
+				},
+				"alternate": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 77,
+							"end": 98,
+							"test": {
+								"type": "Identifier",
+								"start": 90,
+								"end": 91,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 28
+									},
+									"end": {
+										"line": 3,
+										"column": 29
+									}
+								},
+								"name": "b",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 82,
+										"end": 89
+									}
+								]
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 92,
+										"end": 93,
+										"raw": "b",
+										"data": "b"
+									}
+								]
+							},
+							"alternate": null
+						}
+					]
+				}
 			}
 		]
 	},
@@ -172,6 +261,22 @@
 				"end": {
 					"line": 2,
 					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 82,
+			"end": 89,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 20
+				},
+				"end": {
+					"line": 3,
+					"column": 27
 				}
 			}
 		}

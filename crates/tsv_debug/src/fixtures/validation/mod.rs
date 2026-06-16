@@ -30,7 +30,7 @@ use phases::{
     validate_formatter_idempotent, validate_formatter_prettier, validate_invalid_syntax,
     validate_normalization_ours, validate_normalization_prettier, validate_parser_external,
     validate_parser_ours, validate_parser_ours_matches_expected, validate_prettier_nonconvergent,
-    validate_typed_walk_parity,
+    validate_prettier_rejects, validate_typed_walk_parity,
 };
 
 /// Result of validating a single fixture
@@ -230,7 +230,14 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
     // F2, F3, F4: Prettier freshness and baseline. All input types validate —
     // `prettier_parser()` routes Svelte/SvelteTs through prettier-plugin-svelte
     // and TypeScript/Css through prettier's own parsers.
-    if files.prettier_nonconvergent {
+    if files.prettier_rejects {
+        // F6: prettier throws on this input (marker live-verified against the
+        // pinned error substring), so the prettier-anchored rules are
+        // inexpressible — same as F5. S18 forbids the prettier-claim files those
+        // rules check; unformatted_ours_* (allowed) keeps its ours-side
+        // validation via N9b/N9c above.
+        validate_prettier_rejects(&mut result, fixture, &input).await;
+    } else if files.prettier_nonconvergent {
         // F5: prettier has no fixed point on this input (marker live-verified),
         // so the prettier-anchored rules are inexpressible. S18 forbids the
         // prettier-claim files those rules check; unformatted_ours_* (allowed)

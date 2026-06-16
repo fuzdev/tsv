@@ -158,6 +158,22 @@ pub(super) fn validate_formatter_idempotent(
     }
 }
 
+/// Find the first `prettier_variant_*` file whose content equals `content`.
+///
+/// A `prettier_variant_*` already asserts ours → input (N2) AND pins prettier's
+/// exact output (N1, prettier == self), so any `unformatted_*` / `unformatted_ours_*`
+/// with identical content is redundant — it adds no coverage. Used by both the N4
+/// and N5 redundancy checks.
+fn matching_prettier_variant<'a>(
+    content: &str,
+    pv_contents: &'a HashMap<String, Vec<String>>,
+) -> Option<&'a String> {
+    pv_contents
+        .iter()
+        .find(|(pv_content, _)| pv_content.as_str() == content)
+        .map(|(_, pv_files)| &pv_files[0])
+}
+
 /// N2, N4, N5, N9b, N9c: Validate our formatter's variant handling
 /// (normalization to input, plus variant_* stability), with duplicate
 /// and redundancy checks across the variant kinds
@@ -292,19 +308,18 @@ pub(super) fn validate_normalization_ours(
 
     // Check for redundant unformatted files (identical to prettier_variant)
     for (unformatted_content, unformatted_files) in &unformatted_contents {
-        for (pv_content, pv_files) in &pv_contents {
-            if unformatted_content == pv_content {
-                for unformatted_file in unformatted_files {
-                    result.add_error(ValidationError::RedundantUnformattedMatchesPrettierVariant(
-                        unformatted_file.clone(),
-                        pv_files[0].clone(),
-                    ));
-                }
+        if let Some(pv_file) = matching_prettier_variant(unformatted_content, &pv_contents) {
+            for unformatted_file in unformatted_files {
+                result.add_error(ValidationError::RedundantUnformattedMatchesPrettierVariant(
+                    unformatted_file.clone(),
+                    pv_file.clone(),
+                ));
             }
         }
     }
 
     // N5: unformatted_ours_* → input file (our formatter only)
+    let mut unformatted_ours_contents: HashMap<String, Vec<String>> = HashMap::new();
 
     for variant_name in &files.unformatted_ours {
         let variant_path = fixture_dir.join(variant_name);
@@ -315,6 +330,12 @@ pub(super) fn validate_normalization_ours(
                 continue;
             }
         };
+
+        // Track for duplicate detection
+        unformatted_ours_contents
+            .entry(variant_content.clone())
+            .or_default()
+            .push(variant_name.clone());
 
         match fixtures::format_with_our_formatter(&variant_content, &fixture.input_file) {
             Ok(formatted) => {
@@ -336,6 +357,29 @@ pub(super) fn validate_normalization_ours(
                 result.add_error(ValidationError::FormatterError(format!(
                     "{variant_name}: {e}"
                 )));
+            }
+        }
+    }
+
+    // Check for duplicate unformatted_ours files (mirrors the unformatted_* guard above)
+    for variants in unformatted_ours_contents.values() {
+        if variants.len() > 1 {
+            result.add_error(ValidationError::DuplicateUnformattedWithinFixture(
+                variants.clone(),
+            ));
+        }
+    }
+
+    // Check for redundant unformatted_ours files (identical to prettier_variant): a
+    // prettier_variant_* already covers ours → input, so a matching unformatted_ours_*
+    // adds nothing.
+    for (variant_content, variant_files) in &unformatted_ours_contents {
+        if let Some(pv_file) = matching_prettier_variant(variant_content, &pv_contents) {
+            for variant_file in variant_files {
+                result.add_error(ValidationError::RedundantUnformattedMatchesPrettierVariant(
+                    variant_file.clone(),
+                    pv_file.clone(),
+                ));
             }
         }
     }
@@ -652,6 +696,60 @@ pub(super) async fn validate_prettier_nonconvergent(
     }
 
     result.add_success(ValidationSuccess::PrettierNonconvergenceVerified);
+}
+
+/// F6: Live-verify a `prettier_rejects.txt` claim.
+///
+/// The marker asserts prettier THROWS on this input (a parse rejection or a
+/// printer crash), so there is no prettier output to record or pin — F2/F3/F4
+/// and the prettier-side N rules are inexpressible. Instead of trusting the
+/// marker, verify the claim still holds: `prettier(input)` must return an error
+/// whose message contains the marker's recorded substring (the position-stripped
+/// error text). This catches both the bug being fixed upstream (prettier accepts
+/// → `RejectsMarkerButPrettierAccepts`) and the error morphing into a different
+/// message (→ `RejectsMarkerWrongMessage`), each with a remediation hint.
+pub(super) async fn validate_prettier_rejects(
+    result: &mut FixtureValidation,
+    fixture: &Fixture,
+    input: &str,
+) {
+    let expected = match read_file(&fixture.prettier_rejects_path()) {
+        Ok(s) => s.trim().to_string(),
+        Err(e) => {
+            result.add_error(ValidationError::FormatterError(format!(
+                "reading prettier_rejects.txt for {}: {e}",
+                fixture.input_file
+            )));
+            return;
+        }
+    };
+    if expected.is_empty() {
+        result.add_error(ValidationError::RejectsMarkerEmpty(
+            fixture.input_file.clone(),
+        ));
+        return;
+    }
+
+    let parser = fixture.input_type().prettier_parser();
+    match run_prettier(input, parser).await {
+        Ok(_) => {
+            result.add_error(ValidationError::RejectsMarkerButPrettierAccepts(
+                fixture.input_file.clone(),
+            ));
+        }
+        Err(e) => {
+            let actual = e.to_string();
+            if actual.contains(&expected) {
+                result.add_success(ValidationSuccess::PrettierRejectionVerified);
+            } else {
+                result.add_error(ValidationError::RejectsMarkerWrongMessage {
+                    input: fixture.input_file.clone(),
+                    expected,
+                    actual,
+                });
+            }
+        }
+    }
 }
 
 /// F2, F3: Validate formatter output matches prettier

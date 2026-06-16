@@ -86,6 +86,22 @@ pub enum ValidationError {
     )]
     NonconvergentMarkerButPrettierConverges(String),
 
+    // Prettier-rejects marker (F6): the claimed rejection no longer holds
+    #[error(
+        "prettier_rejects.txt is stale: prettier accepts {0} now (the rejection is gone). Re-baseline as a normal divergence (output_prettier.*) or retire the marker."
+    )]
+    RejectsMarkerButPrettierAccepts(String),
+    #[error(
+        "prettier_rejects.txt is stale: prettier still errors on {input}, but the message no longer contains the pinned substring.\n  pinned:   {expected}\n  actual:   {actual}\nUpdate prettier_rejects.txt if the bug morphed, or re-examine."
+    )]
+    RejectsMarkerWrongMessage {
+        input: String,
+        expected: String,
+        actual: String,
+    },
+    #[error("prettier_rejects.txt is empty on {0} — it must hold the expected-error substring")]
+    RejectsMarkerEmpty(String),
+
     // Normalization
     #[error("{0} not preserved by prettier")]
     NormalizationPrettierVariantNotPreserved(String),
@@ -280,6 +296,15 @@ impl ValidationError {
             Self::NonconvergentMarkerButPrettierConverges(_) => {
                 "Delete prettier_nonconvergent.txt and document the divergence normally (output_prettier.* / audit_signature.txt): deno task fixtures:update:formatted <pattern>"
             }
+            Self::RejectsMarkerButPrettierAccepts(_) => {
+                "Delete prettier_rejects.txt and document the divergence normally (output_prettier.*): deno task fixtures:update:formatted <pattern>"
+            }
+            Self::RejectsMarkerWrongMessage { .. } => {
+                "Update prettier_rejects.txt with the new error substring (the upstream bug morphed), or re-examine whether the fixture still belongs"
+            }
+            Self::RejectsMarkerEmpty(_) => {
+                "Write the expected prettier-error substring (position-stripped) into prettier_rejects.txt"
+            }
             Self::NormalizationPrettierVariantNotPreserved(_) => {
                 "Prettier doesn't preserve this file - rename to unformatted_*.svelte"
             }
@@ -401,7 +426,10 @@ impl ValidationError {
             | Self::FormatterError(_)
             | Self::FormatterErrorInDivergence(_)
             | Self::NonconvergentMarkerButPrettierIdempotent(_)
-            | Self::NonconvergentMarkerButPrettierConverges(_) => "Formatter",
+            | Self::NonconvergentMarkerButPrettierConverges(_)
+            | Self::RejectsMarkerButPrettierAccepts(_)
+            | Self::RejectsMarkerWrongMessage { .. }
+            | Self::RejectsMarkerEmpty(_) => "Formatter",
 
             Self::NormalizationPrettierVariantNotPreserved(_)
             | Self::NormalizationPrettierVariantNotNormalized(_)
@@ -470,6 +498,7 @@ pub enum ValidationSuccess {
     UnformattedPrettierToOutput(usize),            // N8
     PrettierOutputsPinned(usize),                  // N10
     PrettierNonconvergenceVerified,                // F5
+    PrettierRejectionVerified,                     // F6
 }
 
 impl fmt::Display for ValidationSuccess {
@@ -536,6 +565,9 @@ impl fmt::Display for ValidationSuccess {
             }
             Self::PrettierNonconvergenceVerified => {
                 write!(f, "prettier non-convergence verified live (F5)")
+            }
+            Self::PrettierRejectionVerified => {
+                write!(f, "prettier rejection verified live (F6)")
             }
         }
     }

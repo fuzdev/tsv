@@ -104,14 +104,22 @@ async fn run(filters: &[String]) {
             intermediates,
         } = outcome
         else {
-            // prettier_nonconvergent.txt: prettier has no fixed point on this input —
-            // there is no output_prettier.* to regenerate and the audit-signature walk
-            // can never converge. The validator live-verifies the claim (F5).
-            println!(
-                "- {} skipped ({}: prettier has no fixed point)",
-                fixture.relative_path,
-                fixtures::PRETTIER_NONCONVERGENT_FILENAME
-            );
+            // A prettier no-oracle marker is present: prettier_nonconvergent.txt (no
+            // fixed point) or prettier_rejects.txt (prettier throws). Either way there
+            // is no output_prettier.* to regenerate; the validator live-verifies the
+            // claim (F5 / F6).
+            let (marker, reason) = if fixture.prettier_rejects_path().exists() {
+                (
+                    fixtures::PRETTIER_REJECTS_FILENAME,
+                    "prettier rejects input",
+                )
+            } else {
+                (
+                    fixtures::PRETTIER_NONCONVERGENT_FILENAME,
+                    "prettier has no fixed point",
+                )
+            };
+            println!("- {} skipped ({marker}: {reason})", fixture.relative_path);
             continue;
         };
 
@@ -278,7 +286,9 @@ enum FormattedResult {
 /// Per-fixture results computed in a spawned task and printed by the driver in
 /// fixture order — tasks never print, so concurrent fixtures can't interleave output.
 enum FixtureOutcome {
-    /// `prettier_nonconvergent.txt` marker present — nothing to regenerate (see F5).
+    /// A prettier no-oracle marker (`prettier_nonconvergent.txt`, F5; or
+    /// `prettier_rejects.txt`, F6) is present — prettier cannot format this
+    /// input, so there is nothing to regenerate.
     Skipped,
     Processed {
         /// Result for `output_prettier.*`.
@@ -303,7 +313,7 @@ enum IntermediateOutput {
 /// Run all per-fixture update work (output_prettier, audit signature, intermediates).
 /// Pure compute + fixture-dir-local file IO — safe to run concurrently across fixtures.
 async fn process_fixture(fixture: &fixtures::Fixture) -> FixtureOutcome {
-    if fixture.prettier_nonconvergent_path().exists() {
+    if fixture.prettier_nonconvergent_path().exists() || fixture.prettier_rejects_path().exists() {
         return FixtureOutcome::Skipped;
     }
 

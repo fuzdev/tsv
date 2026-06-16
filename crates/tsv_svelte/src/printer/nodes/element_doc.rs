@@ -1016,6 +1016,15 @@ impl<'a> Printer<'a> {
             (false, true)
         };
 
+        // Opening-tag layout splits on (is_inline, has_content, has-attrs). Each arm
+        // below returns, so order matters. Cases:
+        //   inline + multiline content              → break `>` to its own line (2 levels)
+        //   inline + single-line content + attrs    → if_break: hug `>content` flat, else break `>`
+        //   block  + content + attrs (simple expr)  → hug `>` with the last attr
+        //   inline + empty + attrs                  → hug `></tag>` unless it overflows
+        //   no attrs                                → `<tag>`
+        //   block, otherwise (empty/complex) + attrs → hug `>`, tolerating overflow
+        //
         // Inline elements with multiline content inside whitespace-sensitive context:
         // Always break `>` to new line (indented 2 levels), preserve content literally.
         // Attrs stay inline if short, wrap to separate lines if long.
@@ -1136,30 +1145,35 @@ impl<'a> Printer<'a> {
             // Fall through to normal handling for complex content
         }
 
-        // Build opening tag
-        let opening_tag = if attr_docs.is_empty() {
-            d.concat(&[d.text("<"), d.symbol(tag_sym), d.text(">")])
-        } else if is_inline {
-            // Inline whitespace-sensitive elements (empty textarea):
-            // Break `>` to own line when attrs wrap (like regular inline elements)
-            // Use softline() so it's empty in flat mode, newline in break mode
-            //
-            // Inner group around attrs allows them to stay flat even when the outer
-            // group breaks. Without this, closing tag suffixes (e.g. ></textarea></label>)
-            // are included in fits() evaluation, causing attrs to wrap prematurely.
-            let attr_concat = d.concat(&attr_docs);
-            let attr_group = d.group(attr_concat);
-            let attr_indent = d.indent(attr_group);
-            d.group(d.concat(&[
+        // Empty inline whitespace-sensitive element with attributes (e.g. `<textarea
+        // attrs></textarea>`). Mirror prettier-plugin-svelte's empty hugStart/hugEnd
+        // layout: the closing `>` lives in its OWN group, separate from the attribute
+        // group, so it hugs the last attribute unless `></tag>` (plus any trailing
+        // suffix like `></textarea></label>`) would overflow — only then does it break
+        // to its own line. Attributes wrap independently of that decision. (Block
+        // whitespace-sensitive elements like `<pre>` always hug `>`; see the `else`
+        // branch below — prettier never breaks `>` there, tolerating overflow.)
+        if is_inline && !has_content && !attr_docs.is_empty() {
+            let attr_indent = d.indent(d.group(d.concat(&attr_docs)));
+            // group(['>', '</tag']): the final `>` is appended outside, so the softline's
+            // fits() weighs `></tag>` and the trailing suffix together.
+            let close_seq = d.group(d.concat(&[d.text(">"), d.text("</"), d.symbol(tag_sym)]));
+            let hugged = d.group(d.concat(&[d.softline(), close_seq]));
+            return d.group(d.concat(&[
                 d.text("<"),
                 d.symbol(tag_sym),
                 attr_indent,
-                d.softline(),
+                hugged,
                 d.text(">"),
-            ]))
+            ]));
+        }
+
+        // Build opening tag
+        let opening_tag = if attr_docs.is_empty() {
+            d.concat(&[d.text("<"), d.symbol(tag_sym), d.text(">")])
         } else {
-            // Block whitespace-sensitive elements (pre):
-            // Hug `>` with last attr when attrs wrap
+            // Block whitespace-sensitive elements (pre): hug `>` with the last attr when
+            // attrs wrap (prettier tolerates the overflow rather than breaking `>`).
             let attr_concat = d.concat(&attr_docs);
             let attr_indent = d.indent(attr_concat);
             d.group(d.concat(&[d.text("<"), d.symbol(tag_sym), attr_indent, d.text(">")]))
@@ -1310,14 +1324,7 @@ impl<'a> Printer<'a> {
 
         // Check if this can be flattened to {:else if ...}
         if let Some(else_if) = Self::get_flattenable_else_if(alt) {
-            let opening_offset: usize = if else_if.elseif { 10 } else { 5 };
-            let expr_doc = self.build_expression_doc_for_block(
-                &else_if.test,
-                else_if.opening_tag_span.start + opening_offset as u32,
-                else_if.opening_tag_span.end - 1,
-                opening_offset,
-                false,
-            );
+            let expr_doc = self.build_else_if_expr_doc(else_if, false);
 
             let body_doc = self.build_whitespace_sensitive_content_doc(&else_if.consequent.nodes);
             parts.push(d.text("{:else if "));

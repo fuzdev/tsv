@@ -1,7 +1,9 @@
 //! Single-scan discovery of a fixture directory's variant files.
 
 use crate::fixtures::Fixture;
-use crate::fixtures::{AUDIT_SIGNATURE_FILENAME, PRETTIER_NONCONVERGENT_FILENAME};
+use crate::fixtures::{
+    AUDIT_SIGNATURE_FILENAME, PRETTIER_NONCONVERGENT_FILENAME, PRETTIER_REJECTS_FILENAME,
+};
 use std::fs;
 
 /// A fixture directory's variant files, partitioned by filename prefix in a
@@ -43,6 +45,11 @@ pub struct FixtureFiles {
     /// point on this input, so F2/F3/F4 and the prettier-side N rules are
     /// replaced by the live non-convergence check (F5).
     pub prettier_nonconvergent: bool,
+    /// `prettier_rejects.txt` marker present: prettier throws on this input
+    /// (parse rejection or printer crash), so F2/F3/F4 and the prettier-side N
+    /// rules are replaced by the live rejection check (F6). The file's trimmed
+    /// content is the expected-error substring.
+    pub prettier_rejects: bool,
     /// Files matching no known fixture pattern — catches typos like
     /// "unformated_*.svelte" (missing 't') or accidental additions.
     /// Variant-prefixed files with the wrong extension land here too.
@@ -66,6 +73,10 @@ impl FixtureFiles {
             };
             if filename == PRETTIER_NONCONVERGENT_FILENAME {
                 files.prettier_nonconvergent = true;
+                continue;
+            }
+            if filename == PRETTIER_REJECTS_FILENAME {
+                files.prettier_rejects = true;
                 continue;
             }
             if is_static_fixture_file(filename) {

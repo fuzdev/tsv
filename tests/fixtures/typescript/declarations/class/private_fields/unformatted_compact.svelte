@@ -5,9 +5,6 @@ class A{#a=0;#b(){}}
 // Private field access
 class B{#a=1;get(){return this.#a;}}
 
-// Optional chaining with private fields
-class C{#a=0;access(x?:C){return x?.#a;}}
-
 // Static private fields
 class D{static #a=0;static fn(){D.#a++;}}
 

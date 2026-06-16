@@ -26,8 +26,10 @@ Affected contexts mirror the block-comment sibling, plus the buffer-printed tags
 `{#each}` (collection and key), `{#await}`, `{#key}`, `{...spread}`, `bind:value={}`,
 `{@attach}`, `data-attr={}`, `on:event={}`, `class:name={}`, `use:action={}`.
 
-Prettier also produces broken output for `{@const x = value // c}` (unmatched paren in
-output), so it is not a usable oracle for that context.
+`{@const x = value // c}` drops the comment like the rest. Under
+prettier-plugin-svelte 3.5.2 this one case instead produced broken output with an
+unmatched paren (`{@const y = it) …} // c`); 4.x drops the comment cleanly, so it is
+once again a usable oracle.
 
 ## Reason
 

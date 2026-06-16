@@ -8,9 +8,8 @@
 		items.filter((x) => x).length;
 
 	// Case 2: Line comment before optional chain ?.length
-	const b =
-		// comment
-		items.filter((x) => x)?.length;
+	const b = // comment
+	items.filter((x) => x)?.length;
 
 	// Case 3: Multiple comments before .length
 	const c =

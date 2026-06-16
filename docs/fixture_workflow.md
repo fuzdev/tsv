@@ -230,6 +230,8 @@ cargo run -p tsv_debug canonical_parse tests/fixtures/.../input.svelte | head -8
 
 If prettier **never converges** on the input (each pass keeps changing the output — no fixed point, so no `output_prettier.*` is possible), add a `prettier_nonconvergent.txt` marker + README instead of the claim files above; the validator live-verifies the non-convergence. Rare — one in-tree case. See ./fixture_overview.md (rules F5/S18).
 
+If prettier **throws** on the input (a parse rejection or a printer crash — also no `output_prettier.*` possible), add a `prettier_rejects.txt` marker + README instead. The marker's trimmed content is the position-stripped expected-error substring; the validator live-verifies that prettier still errors with that message (rules F6/S19). The input must be valid by tsv's parse oracle (Svelte / acorn-typescript) and idempotent under tsv. Hand-author it — `fixture_init` runs prettier, which throws — then `deno task fixtures:update:parsed` for `expected.json`. See ./fixture_overview.md (rules F6/S19) and the catalog of in-tree cases in ./conformance_prettier.md §"Prettier rejects valid input".
+
 ---
 
 ## Steps 3-4: See It Fail + Approval Gate

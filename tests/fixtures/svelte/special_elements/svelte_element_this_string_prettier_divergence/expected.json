@@ -1,0 +1,54 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 49,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "SvelteElement",
+				"start": 0,
+				"end": 48,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 15,
+						"character": 15
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"tag": {
+					"type": "Literal",
+					"start": 22,
+					"end": 29,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 22
+						},
+						"end": {
+							"line": 1,
+							"column": 29
+						}
+					},
+					"value": "hello",
+					"raw": "'hello'"
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
