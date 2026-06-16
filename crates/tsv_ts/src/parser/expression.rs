@@ -1294,7 +1294,7 @@ impl<'a> Parser<'a> {
             _ if self.is_type_keyword_at(bytes, pos) => {
                 // Exception: `this.` is member access, not type (allow `this /* comment */ .`)
                 if bytes[pos..].starts_with(b"this") {
-                    let after_this = skip_whitespace_and_comments(bytes, pos + 4);
+                    let after_this = skip_whitespace_and_comments(bytes, pos + b"this".len());
                     if after_this < bytes.len() && bytes[after_this] == b'.' {
                         return false;
                     }
