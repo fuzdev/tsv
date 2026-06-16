@@ -747,8 +747,10 @@ async function get_tsv_version(): Promise<string> {
 	try {
 		const cargo_toml_path = new URL('../../Cargo.toml', import.meta.url).pathname;
 		const content = await Deno.readTextFile(cargo_toml_path);
-		// Match the first `version = "..."` inside the `[workspace.package]` section.
-		const match = content.match(/\[workspace\.package\][^[]*?\bversion\s*=\s*"([^"]+)"/);
+		// Match the line-leading `version = "..."` inside the `[workspace.package]` section.
+		// `^version` (multiline) avoids matching a `rust-version = "..."` MSRV pin; `[^[]*?`
+		// bounds the search to the section by stopping at the next `[` heading.
+		const match = content.match(/\[workspace\.package\][^[]*?^version\s*=\s*"([^"]+)"/m);
 		if (match) return match[1];
 	} catch {
 		// Ignore
