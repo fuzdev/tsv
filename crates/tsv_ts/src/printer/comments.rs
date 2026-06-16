@@ -468,10 +468,14 @@ impl<'a> Printer<'a> {
     /// of the declaration (`continuation`), indenting that continuation one level
     /// when a *line* comment forces the break.
     ///
-    /// `keyword_end` is the byte offset just past the final keyword before the name
-    /// (`function`/`*`, `class`, `enum`, `const`, …); `name_start` is the start of
-    /// the name (or first declarator). The preceding keyword token must be emitted
-    /// **without** a trailing space — the leading space is supplied here.
+    /// `keyword_end` bounds the start of the comment scan and `name_start` its end
+    /// (the start of the name, or first declarator). Usually `keyword_end` is just
+    /// past the final keyword before the name (`function`/`*`, `class`, `const`, …),
+    /// but the `enum` and `declare function` printers pass the declaration start, so
+    /// a comment in an earlier inter-keyword gap (`const /* c */ enum`,
+    /// `declare /* c */ function`) is captured here too and relocated after the
+    /// keyword — matching the pre-refactor behavior. The preceding keyword token must
+    /// be emitted **without** a trailing space; the leading space is supplied here.
     ///
     /// - **Line comment**: ends its line with a hardline, so the whole continuation
     ///   is wrapped in `indent` to read as a statement continuation rather than a
@@ -480,10 +484,17 @@ impl<'a> Printer<'a> {
     /// - **No comment**: just a leading space before the continuation.
     ///
     /// Block and no-comment output is byte-identical to the prior
-    /// `" " + build_keyword_to_name_comments(...)` form. Shared by the
-    /// `function`/`class`/`enum`/`declare function`/variable declaration printers
-    /// and the `export` / `export default`→declaration printers in
-    /// `statements/modules.rs`.
+    /// `build_keyword_to_name_comments(...)` form (which already supplies the leading
+    /// space). Shared by the `function`/`class`/`enum`/`declare function`/variable
+    /// declaration printers and the `export` / `export default`→declaration printers
+    /// in `statements/modules.rs`.
+    ///
+    /// Declaration-side twin of `gap_comment_indented_continuation` (modules.rs):
+    /// both supply a leading space and indent the continuation on a line comment, but
+    /// they use different comment emitters (`build_name_to_type_params_comments` /
+    /// `build_inline_comments_between_doc_opt` here vs `build_rhs_comments_opt`
+    /// there), so a multi-line block comment stays inline here but breaks there. Keep
+    /// the two separate — don't merge.
     pub(crate) fn build_keyword_to_name_continuation(
         &self,
         keyword_end: u32,

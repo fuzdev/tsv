@@ -1191,6 +1191,12 @@ impl<'a> Printer<'a> {
     /// has no trailing space: binding/specifiers→`from`, `from`→source,
     /// source→`with`, `with`→`{`, and `*`→`as`. See conformance_prettier.md
     /// §Comment relocation and §"Import attributes header comments".
+    ///
+    /// Module-side twin of [`Self::build_keyword_to_name_continuation`] (comments.rs):
+    /// same leading-space + indent-on-line-comment shape, but the two use different
+    /// comment emitters (this one via [`Self::gap_comment_continuation_tail`] →
+    /// `build_rhs_comments_opt`), so a multi-line block comment breaks here but stays
+    /// inline there. Intentionally separate — don't merge.
     fn gap_comment_indented_continuation(
         &self,
         start: u32,
