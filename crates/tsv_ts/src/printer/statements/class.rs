@@ -4,7 +4,7 @@ use super::Printer;
 use crate::ast::internal;
 use crate::printer::CommentSpacing;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::{PRINT_WIDTH, SymbolToU32, comments_in_range};
+use tsv_lang::{SymbolToU32, comments_in_range};
 
 /// Printed keyword (with trailing space) for an accessibility modifier.
 fn accessibility_keyword(accessibility: &str) -> &'static str {
@@ -19,71 +19,34 @@ impl<'a> Printer<'a> {
     /// Build a Doc for method signature (params + return type).
     ///
     /// Prefix (modifiers, name, type params) is printed imperatively before this.
-    /// Body is printed separately after. This doc handles width-aware param wrapping.
+    /// Body is printed separately after. Param wrapping is decided by the signature
+    /// group's `fits()` at render time (no hand-rolled width estimate).
     fn build_method_signature_doc(&self, method: &internal::MethodDefinition) -> DocId {
         let d = self.d();
         let func = &method.value;
 
-        // Check if return type will break on its own (object type or multiline).
-        // This matches Prettier's shouldGroupFunctionParameters behavior:
-        // - Object types (TypeLiteral) break when they have multiple members
-        // - Already multiline types (contains '\n') will obviously break
-        // When true, we shouldn't include return type width when deciding if params should break,
-        // and we should wrap params in their own group so they break independently.
+        // Whether the return type breaks on its own (object type or multiline). When it
+        // does, params get wrapped in their own group (below) so they can stay flat even
+        // as the outer signature group breaks — Prettier's shouldGroupFunctionParameters.
         let return_type_will_break = func.return_type.as_ref().is_some_and(|rt| {
-            // Check if it's an object type (TSTypeLiteral)
+            // Object type (TSTypeLiteral) or already multiline in source
             let is_object_type = matches!(
                 rt.type_annotation.as_ref(),
                 internal::TSType::TypeLiteral(_)
             );
-            // Check if it's already multiline in source
             let is_multiline = rt.span.extract(self.source).contains('\n');
             is_object_type || is_multiline
         });
 
-        // Estimate if params should be forced to break based on total signature width.
-        // Similar to build_function_signature_doc in function.rs.
-        // Type params break if: multiple params OR contains multiline content.
-        // When they break, params get a fresh line budget → don't force break.
-        let type_params_will_break = func
-            .type_parameters
-            .as_ref()
-            .is_some_and(|tp| tp.params.len() > 1 || tp.span.extract(self.source).contains('\n'));
-        let force_params_break = if type_params_will_break {
-            false
-        } else {
-            // Estimate total signature width (current column + remaining content).
-            // When the return type breaks on its own, exclude its width and only
-            // check whether the params fit.
-            let current_col = self.current_column();
-            let params_width: usize = func
-                .params
-                .iter()
-                .map(|p| (p.span().end - p.span().start) as usize + 2)
-                .sum();
-            let return_type_width = if return_type_will_break {
-                0
-            } else {
-                func.return_type
-                    .as_ref()
-                    .map_or(0, |rt| (rt.span.end - rt.span.start) as usize)
-            };
-            // +4 accounts for parens and spaces: "()" around params, " {}" body
-            current_col + params_width + return_type_width + 4 > PRINT_WIDTH
-        };
-
         let mut parts = Vec::new();
 
-        // Build params doc with force_break if needed
+        // Params break via the signature group's fits() (prettier's model) — no
+        // hand-rolled width estimate. Matches build_function_signature_doc.
         let params_start = Some(func.params_start);
         let trailing_comments_end =
             Some(self.params_trailing_comments_end(func.params_start, func.body.span.start));
-        let params_doc = self.build_params_doc_with_comments_ext(
-            &func.params,
-            params_start,
-            trailing_comments_end,
-            force_params_break,
-        );
+        let params_doc =
+            self.build_params_doc_with_comments(&func.params, params_start, trailing_comments_end);
 
         // Prettier's shouldGroupFunctionParameters: when return type is object/multiline and
         // we have 1 param, wrap params in their own group. This allows params to stay on one
