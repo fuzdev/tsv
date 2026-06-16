@@ -125,10 +125,13 @@ impl<'a> Printer<'a> {
             parts.push(d.text("*"));
             cursor += 1;
         }
-        if let Some(id) = &decl.id {
-            // Comments between function/function* and the name
-            parts.push(self.build_keyword_to_name_comments(cursor, id.span.start));
-            parts.push(d.symbol(id.name.to_u32()));
+
+        // Everything after the keyword→name gap is collected into `tail`, so a
+        // *line* comment in that gap can indent the whole continuation one level
+        // (uniform declaration-header rule). Block/no-comment cases stay inline.
+        let mut tail: Vec<DocId> = Vec::new();
+        let name_start = if let Some(id) = &decl.id {
+            tail.push(d.symbol(id.name.to_u32()));
 
             // Comments between name and type params/parens: `function fn1/* c */ <T>()` or `fn1 /* c */()`
             // Line comments get a hardline to prevent absorbing type params as comment text
@@ -136,24 +139,22 @@ impl<'a> Printer<'a> {
                 .type_parameters
                 .as_ref()
                 .map_or(decl.params_start, |tp| tp.span.start);
-            parts.push(self.build_name_to_type_params_comments(
+            tail.push(self.build_name_to_type_params_comments(
                 id.span.end,
                 comment_end,
                 CommentSpacing::for_type_params(decl.type_parameters.is_some()),
             ));
+            id.span.start
         } else {
-            // Anonymous function (export default): extract comments between keyword and params
-            // `export default function /* c */ () {}`
-            // Line comments get hardline to prevent absorbing parens: `function // c\n()`
-            let next_start = decl
-                .type_parameters
+            // Anonymous function (export default): the gap runs to the params/type-params.
+            decl.type_parameters
                 .as_ref()
-                .map_or(decl.params_start, |tp| tp.span.start);
-            parts.push(self.build_keyword_to_name_comments(cursor, next_start));
-        }
+                .map_or(decl.params_start, |tp| tp.span.start)
+        };
+
         // Type parameters (TypeScript generics): function foo<T>()
         if let Some(type_params) = &decl.type_parameters {
-            parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
+            tail.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
 
             // Comments between type_params `>` and `(` go after type_params
             if let Some(pp) = find_char_skipping_comments(
@@ -163,7 +164,7 @@ impl<'a> Printer<'a> {
                 b'(',
             ) {
                 self.append_type_params_to_paren_comments(
-                    &mut parts,
+                    &mut tail,
                     type_params.span.end,
                     pp as u32,
                 );
@@ -171,7 +172,7 @@ impl<'a> Printer<'a> {
         }
 
         // Signature (params + return type) in a single group
-        parts.push(self.build_function_signature_doc(decl));
+        tail.push(self.build_function_signature_doc(decl));
 
         // Handle comments between signature and body: function a() /* comment */ {}
         let sig_end = self.signature_end(
@@ -179,7 +180,20 @@ impl<'a> Printer<'a> {
             decl.params_start,
             decl.body.span.start,
         );
-        self.append_body_with_sig_comments(&mut parts, sig_end, &decl.body);
+        self.append_body_with_sig_comments(&mut tail, sig_end, &decl.body);
+
+        if decl.id.is_some() {
+            // Named: a line comment in the `function`/`*`→name gap indents the
+            // whole continuation. `export default function` (anonymous) keeps the
+            // keyword→params gap flat below.
+            let continuation = d.concat(&tail);
+            parts.push(self.build_keyword_to_name_continuation(cursor, name_start, continuation));
+        } else {
+            // Anonymous function (export default): keyword→params gap stays flat.
+            // Line comments get hardline to prevent absorbing parens: `function // c\n()`
+            parts.push(self.build_keyword_to_name_comments(cursor, name_start));
+            parts.extend(tail);
+        }
 
         d.concat(&parts)
     }

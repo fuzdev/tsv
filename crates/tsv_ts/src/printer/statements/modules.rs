@@ -2,7 +2,6 @@
 
 use super::{Printer, build_entity_name_doc};
 use crate::ast::internal;
-use crate::printer::CommentSpacing;
 use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
@@ -81,29 +80,14 @@ impl<'a> Printer<'a> {
             let export_keyword_end = decl.span.start + export_keyword.len() as u32;
             let decl_start = declaration.span().start;
 
-            // Check for comments between `export` and declaration.
-            // Line comments need hardline after to prevent absorbing the declaration.
-            let has_line = self.has_line_comments_between(export_keyword_end, decl_start);
-            let comment_doc = if has_line {
-                self.build_name_to_type_params_comments(
-                    export_keyword_end,
-                    decl_start,
-                    CommentSpacing::Leading,
-                )
-            } else if self.has_comments_between(export_keyword_end, decl_start) {
-                self.build_inline_comments_between_doc(export_keyword_end, decl_start)
-            } else {
-                d.empty()
-            };
-            // After line comments, hardline provides separation; otherwise need a space.
-            // A line comment also indents the declaration one level (uniform
-            // module-header rule): `comment_doc` ends with a hardline, so wrapping the
-            // declaration in `indent` shifts it onto the next line at +1.
-            let space_after = if has_line { d.empty() } else { d.text(" ") };
-
-            // For decorated classes, decorators come before export keyword.
-            // Find the `export` keyword position — decl.span.start may include decorators
-            // in the internal AST, so search from the last decorator end.
+            // A comment between `export` and the declaration is preserved in
+            // place; a line comment indents the declaration one level (uniform
+            // header rule). The keyword→declaration gap routes through the shared
+            // continuation helper, so block/no-comment cases stay inline.
+            //
+            // For decorated classes, decorators come before the export keyword —
+            // find the `export` keyword position from the last decorator end
+            // (decl.span.start may include decorators in the internal AST).
             if let internal::Statement::ClassDeclaration(class) = declaration.as_ref()
                 && let Some(dec_doc) = self.build_decorators_doc(
                     class.decorators.as_deref(),
@@ -114,20 +98,20 @@ impl<'a> Printer<'a> {
                     ),
                 )
             {
-                let body = d.concat(&[
-                    comment_doc,
-                    space_after,
-                    self.build_class_declaration_without_decorators_doc(class),
-                ]);
-                let tail = if has_line { d.indent(body) } else { body };
+                let continuation = self.build_class_declaration_without_decorators_doc(class);
+                let tail = self.build_keyword_to_name_continuation(
+                    export_keyword_end,
+                    decl_start,
+                    continuation,
+                );
                 return d.concat(&[dec_doc, d.text(export_keyword), tail]);
             }
-            let body = d.concat(&[
-                comment_doc,
-                space_after,
-                self.build_statement_doc(declaration),
-            ]);
-            let tail = if has_line { d.indent(body) } else { body };
+            let continuation = self.build_statement_doc(declaration);
+            let tail = self.build_keyword_to_name_continuation(
+                export_keyword_end,
+                decl_start,
+                continuation,
+            );
             d.concat(&[d.text(export_keyword), tail])
         } else {
             // export { x, y as z } or export { x } from "y"
@@ -310,8 +294,7 @@ impl<'a> Printer<'a> {
             }
         };
 
-        // Check for comments between `export default` and declaration.
-        // Line comments need hardline after to prevent absorbing the declaration.
+        // The `export default`→value gap (a line comment indents the value).
         let default_keyword = "export default";
         let keyword_end = decl.span.start + default_keyword.len() as u32;
         let decl_start = match &decl.declaration {
@@ -320,31 +303,13 @@ impl<'a> Printer<'a> {
             internal::ExportDefaultValue::TSDeclareFunction(func) => func.span.start,
             internal::ExportDefaultValue::ClassDeclaration(class) => class.span.start,
         };
-        let has_line = self.has_line_comments_between(keyword_end, decl_start);
-        if has_line {
-            let comment_doc = self.build_name_to_type_params_comments(
-                keyword_end,
-                decl_start,
-                CommentSpacing::Leading,
-            );
-            // `export default`→value gap: a line comment indents the value one level
-            // (uniform module-header rule); the comment ends with a hardline, so the
-            // `indent` shifts the value onto the next line at +1.
-            d.concat(&[
-                d.text("export default"),
-                d.indent(d.concat(&[comment_doc, value_doc])),
-            ])
-        } else if self.has_comments_between(keyword_end, decl_start) {
-            let comment_doc = self.build_inline_comments_between_doc(keyword_end, decl_start);
-            d.concat(&[
-                d.text("export default"),
-                comment_doc,
-                d.text(" "),
-                value_doc,
-            ])
-        } else {
-            d.concat(&[d.text("export default "), value_doc])
-        }
+        // `export default`→value gap: a line comment indents the value one level
+        // (uniform header rule); block/no-comment cases stay inline. Routes through
+        // the shared continuation helper.
+        d.concat(&[
+            d.text("export default"),
+            self.build_keyword_to_name_continuation(keyword_end, decl_start, value_doc),
+        ])
     }
 
     /// Build a Doc for an export all declaration

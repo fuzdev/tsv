@@ -1,7 +1,4 @@
 <script lang="ts">
-// function keyword to name
-function// c1
-f1() {}
-
+// function keyword to name — block comment stays inline (both formatters)
 function/* c2 */f2() {}
 </script>
