@@ -16,64 +16,6 @@ fn accessibility_keyword(accessibility: &str) -> &'static str {
 }
 
 impl<'a> Printer<'a> {
-    /// Build a Doc for method signature (params + return type).
-    ///
-    /// Prefix (modifiers, name, type params) is printed imperatively before this.
-    /// Body is printed separately after. Param wrapping is decided by the signature
-    /// group's `fits()` at render time (no hand-rolled width estimate).
-    fn build_method_signature_doc(&self, method: &internal::MethodDefinition) -> DocId {
-        let d = self.d();
-        let func = &method.value;
-
-        // Whether the return type breaks on its own (object type or multiline). When it
-        // does, params get wrapped in their own group (below) so they can stay flat even
-        // as the outer signature group breaks — Prettier's shouldGroupFunctionParameters.
-        let return_type_will_break = func.return_type.as_ref().is_some_and(|rt| {
-            // Object type (TSTypeLiteral) or already multiline in source
-            let is_object_type = matches!(
-                rt.type_annotation.as_ref(),
-                internal::TSType::TypeLiteral(_)
-            );
-            let is_multiline = rt.span.extract(self.source).contains('\n');
-            is_object_type || is_multiline
-        });
-
-        let mut parts = Vec::new();
-
-        // Params break via the signature group's fits() (prettier's model) — no
-        // hand-rolled width estimate. Matches build_function_signature_doc.
-        let params_start = Some(func.params_start);
-        let trailing_comments_end =
-            Some(self.params_trailing_comments_end(func.params_start, func.body.span.start));
-        let params_doc =
-            self.build_params_doc_with_comments(&func.params, params_start, trailing_comments_end);
-
-        // Prettier's shouldGroupFunctionParameters: when return type is object/multiline and
-        // we have 1 param, wrap params in their own group. This allows params to stay on one
-        // line even when the outer group breaks (due to multiline return type).
-        // See: printMethodValue in prettier/src/language-js/print/function.js
-        let should_group_params =
-            func.params.len() == 1 && return_type_will_break && func.return_type.is_some();
-
-        if should_group_params {
-            // Wrap params in their own group - params break independently from return type
-            parts.push(d.group(params_doc));
-        } else {
-            // No nested group - outer signature group controls all breaking
-            parts.push(params_doc);
-        }
-
-        // Return type annotation (preserving a comment between `)` and `:` in place)
-        if let Some(return_type) = &func.return_type {
-            parts.push(self.build_function_return_type_doc(Some(func.params_start), return_type));
-        }
-
-        // Single outer group for entire signature (params + return type).
-        // When this group breaks, params' softlines become newlines while return type stays flat.
-        // Matches Prettier's printMethodValue structure.
-        d.group(d.concat(&parts))
-    }
-
     /// Build a Doc for a class declaration
     #[inline]
     pub(super) fn build_class_declaration_doc(&self, decl: &internal::ClassDeclaration) -> DocId {
@@ -737,8 +679,15 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Parameters and return type - use the signature builder
-        parts.push(self.build_method_signature_doc(method));
+        // Parameters and return type - shared callable-signature builder (same path
+        // as function declarations; MethodDefinition.value is field-identical).
+        parts.push(self.build_callable_signature_doc(
+            &method.value.params,
+            method.value.type_parameters.as_ref(),
+            method.value.return_type.as_ref(),
+            method.value.params_start,
+            method.value.body.span.start,
+        ));
 
         // Overload signatures have empty body (start == end)
         let is_overload_signature = method.value.body.span.start == method.value.body.span.end;
