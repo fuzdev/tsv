@@ -3,8 +3,8 @@
 
 use crate::fixtures::{
     AUDIT_SIGNATURE_FILENAME, Fixture, FixtureFiles, PRETTIER_NONCONVERGENT_FILENAME,
-    determine_required_suffix, has_prettier_divergence_suffix, has_svelte_divergence_suffix,
-    read_file,
+    PRETTIER_REJECTS_FILENAME, determine_required_suffix, has_prettier_divergence_suffix,
+    has_svelte_divergence_suffix, read_file,
 };
 
 /// Validate fixture structure and conventions
@@ -32,6 +32,9 @@ use crate::fixtures::{
 ///      `prettier_intermediate_*`) — prettier has no fixed point, so no
 ///      prettier-anchored claim is expressible (`unformatted_ours_*` stays allowed:
 ///      it claims only OUR normalization)
+/// S19: `prettier_rejects.txt` — same divergence-dir + claim-file rules as S18
+///      (prettier throws, so no prettier-anchored claim is expressible), AND it is
+///      mutually exclusive with `prettier_nonconvergent.txt`
 /// D1:  README.md required for divergences
 pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Result<(), String> {
     let fixture_dir = &fixture.path;
@@ -170,13 +173,31 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
         ));
     }
 
-    // S18: the prettier non-convergence marker contradicts every prettier-anchored
-    // claim file — prettier has no fixed point here, so there is no canonical
-    // prettier output to record (output_prettier.*), no stable form to preserve
-    // (prettier_variant_*/variant_*), and nothing prettier can normalize a variant
-    // to (unformatted_*/unformatted_prettier_*/prettier_intermediate_*).
-    // unformatted_ours_* stays allowed: it claims only OUR formatter's normalization.
-    if files.prettier_nonconvergent {
+    // S19: the two prettier no-oracle markers make incompatible claims and cannot
+    // coexist — prettier either throws on the input or formats it forever without
+    // a fixed point, never both.
+    if files.prettier_nonconvergent && files.prettier_rejects {
+        return Err(format!(
+            "{PRETTIER_NONCONVERGENT_FILENAME} and {PRETTIER_REJECTS_FILENAME} cannot coexist.\n\
+            They make incompatible claims: non-convergence means prettier formats the input\n\
+            forever without a fixed point, while rejection means prettier throws on it.\n\
+            Keep exactly one."
+        ));
+    }
+
+    // S18/S19: a prettier no-oracle marker (prettier_nonconvergent.txt — no fixed
+    // point; prettier_rejects.txt — prettier throws) contradicts every
+    // prettier-anchored claim file. There is no canonical prettier output to record
+    // (output_prettier.*), no stable form to preserve (prettier_variant_*/variant_*),
+    // and nothing prettier can normalize a variant to (unformatted_*/
+    // unformatted_prettier_*/prettier_intermediate_*). unformatted_ours_* stays
+    // allowed: it claims only OUR formatter's normalization.
+    if files.prettier_nonconvergent || files.prettier_rejects {
+        let marker = if files.prettier_rejects {
+            PRETTIER_REJECTS_FILENAME
+        } else {
+            PRETTIER_NONCONVERGENT_FILENAME
+        };
         let mut conflicts = Vec::new();
         if output_prettier_path.exists() {
             conflicts.push(output_prettier_filename.to_string());
@@ -194,12 +215,12 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
         }
         if !conflicts.is_empty() {
             return Err(format!(
-                "{PRETTIER_NONCONVERGENT_FILENAME} cannot coexist with prettier-claim files.\n\
-                The marker asserts prettier has NO fixed point on this input, so no\n\
+                "{marker} cannot coexist with prettier-claim files.\n\
+                The marker asserts prettier cannot serve as an oracle on this input, so no\n\
                 prettier-anchored claim (output_prettier.*, prettier_variant_*, variant_*,\n\
                 unformatted_*, unformatted_prettier_*, prettier_intermediate_*) is expressible.\n\
                 Conflicting file(s): {}\n\
-                Either delete the marker (if prettier converges now) or remove the claim files.",
+                Either delete the marker (if prettier can format input now) or remove the claim files.",
                 conflicts.join(", ")
             ));
         }
@@ -282,7 +303,8 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
         || !files.unformatted_prettier.is_empty()
         || has_prettier_intermediate_files
         || has_prettier_intermediate_to_variant_files
-        || files.prettier_nonconvergent;
+        || files.prettier_nonconvergent
+        || files.prettier_rejects;
 
     if needs_prettier_divergence_suffix && !is_prettier_divergence_dir {
         let mut reasons = Vec::new();
@@ -333,6 +355,9 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
         }
         if files.prettier_nonconvergent {
             reasons.push(PRETTIER_NONCONVERGENT_FILENAME.to_string());
+        }
+        if files.prettier_rejects {
+            reasons.push(PRETTIER_REJECTS_FILENAME.to_string());
         }
         let reason = reasons.join(" and ");
 
@@ -396,12 +421,12 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
     // unformatted_ours_* + README is acceptable when prettier(input) == input
     // (divergence is about normalization behavior, not formatting the canonical input)
     let has_normalization_divergence_docs = has_unformatted_ours && has_readme;
-    // prettier_nonconvergent.txt + README documents "prettier has no fixed point"
-    // (live-verified by F5 — there is no prettier output file to record)
-    let has_nonconvergence_docs = files.prettier_nonconvergent && has_readme;
-    let has_any_divergence_docs = has_divergence_documentation
-        || has_normalization_divergence_docs
-        || has_nonconvergence_docs;
+    // A prettier no-oracle marker + README documents the divergence: either
+    // "prettier has no fixed point" (F5) or "prettier rejects this input" (F6).
+    // In both cases there is no prettier output file to record.
+    let has_no_oracle_docs = (files.prettier_nonconvergent || files.prettier_rejects) && has_readme;
+    let has_any_divergence_docs =
+        has_divergence_documentation || has_normalization_divergence_docs || has_no_oracle_docs;
 
     if !has_any_divergence_docs && is_prettier_divergence_dir {
         // For pure _prettier_divergence dirs (not combined with _svelte)
@@ -414,7 +439,8 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
                 - prettier_variant_*{input_ext} files (if prettier has stable variants our formatter normalizes)\n\
                 - variant_*{input_ext} files (if both formatters keep the form stable)\n\
                 - unformatted_ours_*{input_ext} files + README.md (if divergence is about normalization)\n\
-                - {PRETTIER_NONCONVERGENT_FILENAME} + README.md (if prettier never reaches a fixed point)"
+                - {PRETTIER_NONCONVERGENT_FILENAME} + README.md (if prettier never reaches a fixed point)\n\
+                - {PRETTIER_REJECTS_FILENAME} + README.md (if prettier throws on the input)"
             ));
         }
         // For combined _svelte_prettier_divergence dirs
@@ -427,6 +453,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
                 - Add {output_prettier_filename} or prettier_variant_*{input_ext} or variant_*{input_ext} to document formatter divergence, OR\n\
                 - Add unformatted_ours_*{input_ext} + README.md for normalization divergence, OR\n\
                 - Add {PRETTIER_NONCONVERGENT_FILENAME} + README.md if prettier never reaches a fixed point, OR\n\
+                - Add {PRETTIER_REJECTS_FILENAME} + README.md if prettier throws on the input, OR\n\
                 - Rename to '{}_svelte_divergence' if there's no formatter divergence",
                 dir_name.trim_end_matches("_svelte_prettier_divergence")
             ));
@@ -527,7 +554,8 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
         || has_variants
         || has_prettier_intermediate
         || has_prettier_intermediate_to_variant
-        || files.prettier_nonconvergent;
+        || files.prettier_nonconvergent
+        || files.prettier_rejects;
 
     if needs_readme && !has_readme {
         let mut reasons = Vec::new();
@@ -562,6 +590,11 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
         if files.prettier_nonconvergent {
             reasons.push(format!(
                 "- Prettier non-convergence ({PRETTIER_NONCONVERGENT_FILENAME})"
+            ));
+        }
+        if files.prettier_rejects {
+            reasons.push(format!(
+                "- Prettier rejection ({PRETTIER_REJECTS_FILENAME})"
             ));
         }
 

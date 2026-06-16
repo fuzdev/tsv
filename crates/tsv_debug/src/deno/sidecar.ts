@@ -1,13 +1,24 @@
 // Deno Sidecar for tsv_debug
 // Long-running process for JS tools. Communicates via JSON-lines over stdio.
 
-// SYNC: Keep versions in sync with benches/deno/deno.json (read by
-// benches/deno/lib/versions.ts at runtime).
+// ⚠ SYNC — each canonical version below is pinned in THREE places that must stay
+// identical: (1) this VERSIONS object, (2) the static `import` specifiers just below
+// (a static import can't interpolate a const, so the literal is repeated by necessity),
+// and (3) the benches/deno/deno.json import map (read by benches/deno/lib/versions.ts).
+// These can't be DRYed: the release binary embeds this file as a string and runs it
+// WITHOUT deno.json, so it can't read the import map at runtime.
+//
+// Bumping prettier / svelte / acorn / @sveltejs/acorn-typescript / prettier-plugin-svelte
+// is NOT a routine refresh — it re-baselines the entire fixture corpus (these tools define
+// every fixture's expected.json + output_prettier.*). After any bump: run
+// `deno task fixtures:update` and review the churn. See benches/deno/CLAUDE.md
+// §"Canonical baseline is coupled" for the full procedure.
+//
 // NOTE: Requires deno.json with "acorn": "npm:acorn@8.16.0" import map
-// to ensure @sveltejs/acorn-typescript uses the same acorn instance
+// to ensure @sveltejs/acorn-typescript uses the same acorn instance.
 const VERSIONS = {
 	prettier: '3.8.3',
-	'prettier-plugin-svelte': '3.5.2',
+	'prettier-plugin-svelte': '4.1.1',
 	svelte: '5.56.1',
 	acorn: '8.16.0',
 	'@sveltejs/acorn-typescript': '1.0.10',
@@ -18,7 +29,7 @@ const VERSIONS = {
 // deno-lint-ignore no-import-prefix
 import * as prettier from 'npm:prettier@3.8.3';
 // deno-lint-ignore no-import-prefix
-import prettierPluginSvelte from 'npm:prettier-plugin-svelte@3.5.2';
+import prettierPluginSvelte from 'npm:prettier-plugin-svelte@4.1.1';
 // deno-lint-ignore no-import-prefix
 import { parse as svelteParse, parseCss } from 'npm:svelte@5.56.1/compiler';
 // deno-lint-ignore no-import-prefix

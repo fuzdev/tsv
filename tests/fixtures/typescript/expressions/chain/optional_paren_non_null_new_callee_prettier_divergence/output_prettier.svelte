@@ -5,5 +5,5 @@
 	// error (an optional chain can't be a `new` callee), so prettier's own output
 	// fails to re-parse. tsv keeps the parens (correct, idempotent).
 	new a?.b!();
-	new (a?.()!)();
+	new a?.()!();
 </script>

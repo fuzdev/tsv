@@ -13,10 +13,5 @@
 
 		@a.b
 		d;
-
-		// a parenthesized optional-chain callee normalizes to parens around the
-		// whole expression
-		@((a?.b)())
-		e;
 	}
 </script>

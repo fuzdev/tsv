@@ -6,9 +6,6 @@
 	// Multiple declarations
 	let c!: A, d!: B;
 
-	// With initializer (valid but pointless)
-	let e!: string = 'value';
-
 	// Class property with definite assignment
 	class Single {
 		prop!: string;

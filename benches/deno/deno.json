@@ -1,11 +1,12 @@
 {
+	"//canonical-sync": "⚠ The 5 canonical packages (prettier, svelte, acorn, @sveltejs/acorn-typescript, prettier-plugin-svelte) are ALSO pinned as literals in crates/tsv_debug/src/deno/sidecar.ts and MUST match. Bumping any re-baselines the whole fixture corpus — see benches/deno/CLAUDE.md §'Canonical baseline is coupled'. The other imports (oxc, oxfmt, biome, etc.) are free to bump independently.",
 	"imports": {
 		"acorn": "npm:acorn@8.16.0",
 		"svelte": "npm:svelte@5.56.1",
 		"svelte/compiler": "npm:svelte@5.56.1/compiler",
 		"@sveltejs/acorn-typescript": "npm:@sveltejs/acorn-typescript@1.0.10",
 		"prettier": "npm:prettier@3.8.3",
-		"prettier-plugin-svelte": "npm:prettier-plugin-svelte@3.5.2",
+		"prettier-plugin-svelte": "npm:prettier-plugin-svelte@4.1.1",
 		"@biomejs/js-api": "npm:@biomejs/js-api@4.0.0",
 		"@biomejs/wasm-bundler": "npm:@biomejs/wasm-bundler@2.4.16",
 		"oxc-parser": "npm:oxc-parser@0.134.0",

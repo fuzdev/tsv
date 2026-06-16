@@ -198,12 +198,15 @@ impl<'a> Printer<'a> {
                 // is the offset past `}`, for the trailing pre-`;` comment scan.
                 let kw_end = self.export_header_end(decl, decl.specifiers[0].span.start);
                 let bound = decl.source.as_ref().map_or(decl.span.end, |s| s.span.start);
+                // Export named specifiers always have the `{` directly after the
+                // header (no default/namespace binding), so the keyword→`{` comment
+                // (`export /* c */ {a}`, `export type /* c */ {a}`) is always captured.
                 close_brace_end = self.push_braced_specifier_list(
                     &mut parts,
                     &decl.specifiers,
                     kw_end,
                     bound,
-                    is_type_export,
+                    true,
                     |s| s.span,
                     |s| self.build_export_specifier_doc(s, is_type_export),
                 );
@@ -738,12 +741,17 @@ impl<'a> Printer<'a> {
                 // Named specifiers: comment-aware braced list. `from_content_end`
                 // is the offset past `}`, for the `}`→`from` gap comment scan.
                 let kw_end = self.import_header_end(decl, named_specs[0].span.start);
+                // Capture the keyword→`{` comment here only when the brace directly
+                // follows the header; with a default/namespace binding its own→`{`
+                // comments are handled above (line builds `x, {…}`), so capturing
+                // here too would double-emit them.
+                let capture_keyword_comment = !has_default && namespace_spec.is_none();
                 from_content_end = Some(self.push_braced_specifier_list(
                     &mut parts,
                     &named_specs,
                     kw_end,
                     decl.source.span.start,
-                    is_type_import,
+                    capture_keyword_comment,
                     |s| s.span,
                     |s| self.build_import_specifier_doc(s, is_type_import),
                 ));
@@ -833,20 +841,13 @@ impl<'a> Printer<'a> {
         let close_search_start = attributes.last().map_or(brace_start, |a| a.span.end);
         let brace_close = self.close_brace_offset(close_search_start, stmt_end);
 
-        // Comments in the attributes header — source→`with` and `with`→`{` —
-        // preserved in place. Prettier keeps a source→`with` block in place but
-        // floats a line past `;`, and relocates a `with`→`{` block to before
-        // `with`. A block trails inline; a line forces the next token onto a new
-        // line. See conformance_prettier.md §Comment relocation.
-        self.push_gap_comment_keyword(parts, source_end, with_start, "with");
-        // `with`→`{` gap; the brace group below emits the `{` itself.
-        self.push_gap_comment(parts, with_end, brace_start);
-
-        // Empty `with {}` — preserved (acorn/prettier keep it). A comment between
-        // the braces is kept in place (`with {/* c */}`); prettier instead
-        // relocates it before `with` — a comment-position divergence, like the
-        // `with`→`{` gap. See attributes_empty_comment_prettier_divergence.
-        if attributes.is_empty() {
+        // Build the `{…}` clause doc (kept as a local so the comment-forced-break
+        // handling below can wrap it in `indent`).
+        let brace_doc = if attributes.is_empty() {
+            // Empty `with {}` — preserved (acorn/prettier keep it). A comment between
+            // the braces is kept in place (`with {/* c */}`); prettier instead
+            // relocates it before `with` — a comment-position divergence, like the
+            // `with`→`{` gap. See attributes_empty_comment_prettier_divergence.
             let mut inner = vec![d.text("{")];
             let mut last_was_line = false;
             let mut any_comment = false;
@@ -863,40 +864,50 @@ impl<'a> Printer<'a> {
                 inner.push(d.hardline());
             }
             inner.push(d.text("}"));
-            parts.push(d.concat(&inner));
-            return brace_close + 1;
-        }
-
-        // Check for line comments between/around attributes (force multiline)
-        let has_line_comments =
-            self.has_line_comments_in_delimited_list(attributes, |a| a.span, stmt_end)
-                || self.has_line_comments_between(brace_start + 1, attributes[0].span.start);
-
-        if has_line_comments {
-            // `None`: the import-attribute `with {…}` brace keeps relocating
-            // a same-line comment (separate, rarer delimiter — scoped out).
-            parts.push(self.build_braced_hardline_comma_list(
-                attributes,
-                brace_start,
-                stmt_end,
-                None,
-                |a| a.span,
-                |a| self.build_import_attribute_doc(a),
-            ));
+            d.concat(&inner)
         } else {
-            let attr_doc = self.build_softline_comma_list(
-                attributes,
-                brace_start,
-                brace_close,
-                |a| a.span,
-                |a| self.build_import_attribute_doc(a),
-            );
+            // Check for line comments between/around attributes (force multiline)
+            let has_line_comments =
+                self.has_line_comments_in_delimited_list(attributes, |a| a.span, stmt_end)
+                    || self.has_line_comments_between(brace_start + 1, attributes[0].span.start);
+            if has_line_comments {
+                // `None`: the import-attribute `with {…}` brace keeps relocating
+                // a same-line comment (separate, rarer delimiter — scoped out).
+                self.build_braced_hardline_comma_list(
+                    attributes,
+                    brace_start,
+                    stmt_end,
+                    None,
+                    |a| a.span,
+                    |a| self.build_import_attribute_doc(a),
+                )
+            } else {
+                let attr_doc = self.build_softline_comma_list(
+                    attributes,
+                    brace_start,
+                    brace_close,
+                    |a| a.span,
+                    |a| self.build_import_attribute_doc(a),
+                );
+                // Own group so the braces fit independently of the outer statement —
+                // a preserved header line comment (source→`with` / `with`→`{`) forces
+                // the outer group to break but must not expand inline attributes.
+                self.braced_softline_group(attr_doc)
+            }
+        };
 
-            // Own group so the braces fit independently of the outer statement —
-            // a preserved header line comment (source→`with` / `with`→`{`) forces
-            // the outer group to break but must not expand inline attributes.
-            parts.push(self.braced_softline_group(attr_doc));
-        }
+        // Header-gap comments (source→`with`, `with`→`{`), preserved in place.
+        // Prettier keeps a source→`with` block inline, relocates a `with`→`{` block
+        // before `with`, floats a `with`→`{` line past `;`, and *throws* on a
+        // source→`with` line — so it can't be the oracle here; see
+        // with_keyword_comment*_prettier_divergence and conformance_prettier.md.
+        // A line comment forces its following token onto a new line, which the
+        // shared helper indents one level (statement continuation).
+        let with_clause = d.concat(&[
+            d.text("with"),
+            self.gap_comment_indented_continuation(with_end, brace_start, brace_doc),
+        ]);
+        parts.push(self.gap_comment_indented_continuation(source_end, with_start, with_clause));
         brace_close + 1
     }
 
@@ -917,9 +928,13 @@ impl<'a> Printer<'a> {
     /// item type and per-item doc builder). `kw_end` is the offset past the
     /// `import`/`export [type]` header, where the `{` search begins; `bound`
     /// caps the brace scans (the source-literal start, or the `;` for a local
-    /// `export {…}`). When `is_type`, a comment in the `type`→`{` gap is preserved
-    /// in place (prettier relocates it into the braces as the first specifier's
-    /// leading comment).
+    /// `export {…}`). When `capture_keyword_comment`, a comment in the keyword→`{`
+    /// gap (`import /* c */ {a}`, `export type /* c */ {a}`) is preserved in place
+    /// (prettier relocates it into the braces as the first specifier's leading
+    /// comment — a comment-position divergence). The caller sets it only when the
+    /// `{` directly follows the header — always so for exports, and for imports only
+    /// without a preceding default/namespace binding (whose own→`{` comments are
+    /// handled separately, so capturing here would double-emit them).
     // Two closures (span + per-item doc) plus positional context — inherent to a
     // generic list builder; sibling `build_braced_hardline_comma_list` is at 7.
     #[allow(clippy::too_many_arguments)]
@@ -929,7 +944,7 @@ impl<'a> Printer<'a> {
         specifiers: &[T],
         kw_end: u32,
         bound: u32,
-        is_type: bool,
+        capture_keyword_comment: bool,
         get_span: impl Fn(&T) -> tsv_lang::Span,
         build_item: impl Fn(&T) -> DocId,
     ) -> u32 {
@@ -943,7 +958,9 @@ impl<'a> Printer<'a> {
             .find_char_outside_comments(kw_end, first_start, b'{')
             .unwrap_or(0);
 
-        if is_type && let Some(comments_doc) = self.build_rhs_comments_opt(kw_end, brace_start) {
+        if capture_keyword_comment
+            && let Some(comments_doc) = self.build_rhs_comments_opt(kw_end, brace_start)
+        {
             parts.push(comments_doc);
         }
 
@@ -1153,32 +1170,35 @@ impl<'a> Printer<'a> {
         d.concat(&spec_parts)
     }
 
-    /// Emit a leading space and any comments in `[start, end)` into `parts`, preserving
-    /// them in place between the preceding token and whatever the caller emits next. A
-    /// block comment trails inline (` /* c */`); a line comment forces a break —
-    /// `build_rhs_comments_opt` supplies the trailing space (block) or hardline (line),
-    /// so the following token carries no separator of its own. An empty range emits ` `.
-    fn push_gap_comment(&self, parts: &mut Vec<DocId>, start: u32, end: u32) {
-        let d = self.d();
-        parts.push(d.text(" "));
-        if let Some(c) = self.build_rhs_comments_opt(start, end) {
-            parts.push(c);
-        }
-    }
-
-    /// `push_gap_comment` followed by a keyword (`from`, `with`) — the keyword carries no
-    /// leading space of its own. Used where prettier relocates the gap comment but tsv
-    /// preserves it (binding/specifiers→`from`, source→`with`). An empty range emits
-    /// just ` kw`. See conformance_prettier.md §Comment relocation.
-    fn push_gap_comment_keyword(
+    /// Build the doc for a header-gap comment in `[start, end)` followed by
+    /// `continuation`, preserving the comment where the user placed it.
+    ///
+    /// A *line* comment forces `continuation` onto a new line; tsv indents that
+    /// continuation one level — a single statement spanning lines reads as a
+    /// continuation, not a second statement. A block comment trails inline
+    /// (` /* c */ `); an empty range emits just a leading space. The leading space
+    /// and the comment stay on the preceding token's line — `indent` applies only
+    /// at the forced hardline within the returned group. Used for the import/export
+    /// header gaps prettier relocates but tsv preserves: binding/specifiers→`from`,
+    /// `from`→source, source→`with`, and `with`→`{`. See conformance_prettier.md
+    /// §Comment relocation and §"Import attributes header comments".
+    fn gap_comment_indented_continuation(
         &self,
-        parts: &mut Vec<DocId>,
         start: u32,
         end: u32,
-        keyword: &'static str,
-    ) {
-        self.push_gap_comment(parts, start, end);
-        parts.push(self.d().text(keyword));
+        continuation: DocId,
+    ) -> DocId {
+        let d = self.d();
+        let tail = match self.build_rhs_comments_opt(start, end) {
+            // Line comment: it ends with a hardline, so indent the continuation.
+            Some(c) if self.has_line_comments_between(start, end) => {
+                d.indent(d.concat(&[c, continuation]))
+            }
+            // Block comment: trails inline (its own trailing space), no break.
+            Some(c) => d.concat(&[c, continuation]),
+            None => continuation,
+        };
+        d.concat(&[d.text(" "), tail])
     }
 
     /// Build ` from [comments] ` followed by source literal.
@@ -1199,18 +1219,6 @@ impl<'a> Printer<'a> {
             .expect("'from' keyword must exist in import/export declaration");
         let from_start = from_end - "from".len() as u32;
 
-        // Comments between the binding/specifiers and `from`, preserved in place.
-        // `content_end` is the end of the last binding/specifier (None to skip — e.g.
-        // empty braces or export-all, which handle their own header comments — emitted
-        // as an empty range so only ` from` is pushed).
-        let mut parts = Vec::new();
-        self.push_gap_comment_keyword(
-            &mut parts,
-            content_end.unwrap_or(from_start),
-            from_start,
-            "from",
-        );
-
         let comment_search_start = if let Some(search_start) = empty_brace_search_start {
             // Include comments from inside empty braces (relocated after "from").
             // Locate `{` outside comments so a `{` glyph in a comment isn't mistaken for it.
@@ -1219,11 +1227,30 @@ impl<'a> Printer<'a> {
         } else {
             from_end
         };
-        // Comments between `from` and the source literal (incl. those relocated out of
-        // empty braces), preserved in place.
-        self.push_gap_comment(&mut parts, comment_search_start, source.span.start);
-        parts.push(self.build_literal_doc(source));
-        d.concat(&parts)
+
+        // `from` + the `from`→source gap (comments incl. those relocated out of empty
+        // braces), kept **flat**: prettier keeps a comment here in place and flat, and
+        // tsv matches it — both formatters agree (regular fixtures
+        // imports/keyword_comment, exports/keyword_comment), so prettier is the oracle
+        // and there is no continuation to indent away from it.
+        let mut from_clause_parts = vec![d.text("from"), d.text(" ")];
+        if let Some(c) = self.build_rhs_comments_opt(comment_search_start, source.span.start) {
+            from_clause_parts.push(c);
+        }
+        from_clause_parts.push(self.build_literal_doc(source));
+        let from_clause = d.concat(&from_clause_parts);
+
+        // Binding/specifiers → `from`: prettier *relocates* a comment here (floats a
+        // line past `;`, or into named braces — a divergence, from_comment_prettier_divergence),
+        // so tsv is free to keep it in place and indent the `from …` continuation when a
+        // line comment forces the break. `content_end` is the end of the last
+        // binding/specifier (None to skip — e.g. empty braces or export-all, which handle
+        // their own header comments — emitted as an empty range so only ` from …` is produced).
+        self.gap_comment_indented_continuation(
+            content_end.unwrap_or(from_start),
+            from_start,
+            from_clause,
+        )
     }
 
     /// Build a comma-separated list with group-based wrapping and comment splitting.

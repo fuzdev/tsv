@@ -8,7 +8,7 @@
 {#each items as item (item.id)}{item}{/each}
 {#await promise then val}{val}{/await}
 {#key expr}text{/key}
-{#each list as it}{@const y = it)}{it}{/each} // c
+{#each list as it}{@const y = it}{it}{/each}
 <div {...expr}></div>
 <input bind:value={val} />
 <div {@attach fn}></div>

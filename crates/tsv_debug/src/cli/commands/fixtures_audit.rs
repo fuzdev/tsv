@@ -373,10 +373,11 @@ async fn audit_fixture(fixture: &Fixture) -> FixtureAudit {
     let mut has_novel = false;
     let mut suggestions = Vec::new();
 
-    // Skip prettier only for prettier_nonconvergent.txt fixtures — prettier has no
-    // fixed point there, so its output of any file is unclassifiable noise. All
-    // input types otherwise audit (prettier_parser() routes .ts/.css correctly).
-    let use_prettier = !files.prettier_nonconvergent;
+    // Skip prettier for the no-oracle markers — prettier_nonconvergent.txt (no
+    // fixed point) and prettier_rejects.txt (prettier throws). In both cases its
+    // output of any file is unclassifiable noise. All input types otherwise audit
+    // (prettier_parser() routes .ts/.css correctly).
+    let use_prettier = !files.prettier_nonconvergent && !files.prettier_rejects;
 
     for filename in &files_to_audit {
         let filepath = fixture_dir.join(filename);

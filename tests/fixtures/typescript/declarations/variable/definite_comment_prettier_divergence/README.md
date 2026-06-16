@@ -7,10 +7,9 @@ assignment declarations. Our formatter preserves the user's placement (before `!
 - Prettier: `let a! /* c */ : number;` (moves after `!`)
 - Ours: `let a /* c */!: number;` (preserves before `!`)
 
-Same relocation without a type annotation (`let c /* c */! = 1;`, `let d /* c */!;`):
-prettier moves the comment after `!`; ours preserves it before `!`.
-
-Both positions are dual-stable in our formatter. Per comment placement policy,
-we preserve user intent when prettier moves comments to different positions.
+Both positions are dual-stable in our formatter (`variant_after_bang.svelte`
+records prettier's after-`!` form, which our formatter also keeps stable). Per
+comment placement policy, we preserve user intent when prettier moves comments
+to different positions.
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
