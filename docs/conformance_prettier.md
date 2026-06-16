@@ -333,6 +333,7 @@ Prettier uses atomic text (no doc structure) when the expression has no structur
 - Multiline indent — [interpolation_multiline_indent_long](../tests/fixtures/typescript/expressions/literals/template/interpolation_multiline_indent_long_prettier_divergence/)
 - Nested template — [interpolation_nested_template](../tests/fixtures/typescript/expressions/literals/template/interpolation_nested_template_prettier_divergence/)
 - Template literal type — [template_literal_type_long](../tests/fixtures/typescript/types/template_literal_type_long_prettier_divergence/)
+- Template literal type (multibyte width) — [template_literal_type_multibyte_long](../tests/fixtures/typescript/types/template_literal_type_multibyte_long_prettier_divergence/)
 - Type with conditional — [template_literal_type_conditional_long](../tests/fixtures/typescript/types/template_literal_type_conditional_long_prettier_divergence/)
 - Ternary consequent — [template_consequent_long](../tests/fixtures/typescript/expressions/ternary/template_consequent_long_prettier_divergence/)
 - Binary operand — [template_operand_long](../tests/fixtures/typescript/expressions/logical/template_operand_long_prettier_divergence/)
