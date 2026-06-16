@@ -536,7 +536,7 @@ impl<'a> SvelteParser<'a> {
         // Calculate the offset of the expression in the source
         // Skip leading whitespace + "..."
         let leading_ws = content.len() - trimmed.len();
-        let expr_offset = content_start + leading_ws + 3; // Skip whitespace + "..."
+        let expr_offset = content_start + leading_ws + "...".len();
 
         // Parse the expression using the TypeScript parser
         let expression = self.parse_ts_expression(expr_str, expr_offset)?;
