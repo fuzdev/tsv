@@ -50,12 +50,8 @@ impl<'a> Printer<'a> {
         let trailing_comments_end =
             Some(self.params_trailing_comments_end(decl.params_start, decl.body.span.start));
 
-        let params_doc = self.build_params_doc_with_comments_ext(
-            &decl.params,
-            params_start,
-            trailing_comments_end,
-            false,
-        );
+        let params_doc =
+            self.build_params_doc_with_comments(&decl.params, params_start, trailing_comments_end);
 
         let return_type_doc = decl
             .return_type

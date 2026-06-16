@@ -1189,19 +1189,6 @@ impl<'a> Printer<'a> {
         params_start: Option<u32>,
         trailing_comments_end: Option<u32>,
     ) -> DocId {
-        self.build_params_doc_with_comments_ext(params, params_start, trailing_comments_end, false)
-    }
-
-    /// Extended version with external force_break flag
-    ///
-    /// `force_break_external` allows callers to force multiline based on width heuristics.
-    pub(in crate::printer) fn build_params_doc_with_comments_ext(
-        &self,
-        params: &[internal::Expression],
-        params_start: Option<u32>,
-        trailing_comments_end: Option<u32>,
-        force_break_external: bool,
-    ) -> DocId {
         let d = self.d();
         if params.is_empty() {
             // Check for dangling comments in empty parens: fn(/* comment */)
@@ -1277,9 +1264,8 @@ impl<'a> Printer<'a> {
                 .iter()
                 .any(|p| matches!(p, internal::Expression::TSParameterProperty(_)));
 
-        // Combined condition for forcing multiline (includes external width-based force)
-        let force_break = force_break_external
-            || has_trailing_line_comment
+        // Force multiline when comments or param-property modifiers require it.
+        let force_break = has_trailing_line_comment
             || has_leading_own_line_comment
             || should_break_for_param_properties;
 
