@@ -203,80 +203,78 @@ impl<'a> Printer<'a> {
         &self,
         call: &internal::TSCallSignatureDeclaration,
     ) -> DocId {
-        let d = self.d();
-        let mut parts = vec![];
-        // Print type parameters if present: `<T>` or `<T, U>`
-        if let Some(type_params) = &call.type_parameters {
-            parts.push(self.build_type_parameter_declaration_doc(type_params));
-        }
-
-        // Find `(` (skip comments so a `(` inside one isn't matched).
-        let paren_search_start = call
-            .type_parameters
-            .as_ref()
-            .map_or(call.span.start, |tp| tp.span.end);
-        let paren_pos = find_char_skipping_comments(
-            self.source.as_bytes(),
-            paren_search_start as usize,
-            self.source.len(),
-            b'(',
-        )
-        .map(|p| p as u32);
-
-        // Comments between type_params and `(` go after type_params
-        if let (Some(tp), Some(pp)) = (call.type_parameters.as_ref().map(|t| t.span.end), paren_pos)
-        {
-            self.append_type_params_to_paren_comments(&mut parts, tp, pp);
-        }
-
-        parts.push(self.build_signature_params_doc(&call.params, paren_pos));
-        if let Some(return_type) = &call.return_type {
-            parts.push(self.build_signature_return_type_doc(paren_pos, return_type));
-        }
-        // Comments between return type (or params) and `;`
-        self.append_signature_end_comments(
-            &mut parts,
+        self.build_call_or_construct_signature_doc(
+            call.type_parameters.as_ref(),
+            &call.params,
             call.return_type.as_ref(),
-            paren_pos,
+            call.span.start,
             call.span.end,
-        );
-        d.group(d.concat(&parts))
+            None,
+        )
     }
 
     /// Build a `TSConstructSignature` member (`new` `<T>`? `(params)` `: Ret`?)
     /// **without** the trailing `;` — shared by the type-literal and interface
     /// type-element printers (the interface caller appends `;`).
-    ///
-    /// Comments after `new`: before `<T>` (`new /* c */ <T>`), or — when there
-    /// are no type params — before `(` (`new /* c */ (a)`, preserved in place;
-    /// prettier relocates them into the parens). The `new ` text carries the
-    /// leading space, so blocks get only a trailing space and line comments a
-    /// hardline.
     pub(crate) fn build_construct_signature_member_doc(
         &self,
         ctor: &internal::TSConstructSignatureDeclaration,
     ) -> DocId {
+        self.build_call_or_construct_signature_doc(
+            ctor.type_parameters.as_ref(),
+            &ctor.params,
+            ctor.return_type.as_ref(),
+            ctor.span.start,
+            ctor.span.end,
+            Some(ctor.span.start + "new".len() as u32),
+        )
+    }
+
+    /// Shared core for call and construct signature members. The two declarations
+    /// are field-identical (`type_parameters` / `params` / `return_type` / `span`)
+    /// and differ only by the `new` prefix on construct signatures.
+    ///
+    /// `new_keyword_end`: `Some(pos)` (the offset just past `new`) for a construct
+    /// signature, `None` for a call signature. When set, the doc gets a leading
+    /// `new ` plus that signature's comment handling — comments after `new` go
+    /// before `<T>` (`new /* c */ <T>`), or, when there are no type params, before
+    /// `(` (`new /* c */ (a)`, preserved in place; prettier relocates them into the
+    /// parens). The `new ` text carries the leading space, so blocks get only a
+    /// trailing space and line comments a hardline.
+    fn build_call_or_construct_signature_doc(
+        &self,
+        type_parameters: Option<&internal::TSTypeParameterDeclaration>,
+        params: &[internal::Expression],
+        return_type: Option<&internal::TSTypeAnnotation>,
+        span_start: u32,
+        span_end: u32,
+        new_keyword_end: Option<u32>,
+    ) -> DocId {
         let d = self.d();
-        let mut parts = vec![d.text("new ")];
-        // Print type parameters if present: `<T>` or `<T, U>`
-        if let Some(type_params) = &ctor.type_parameters {
+        let mut parts = vec![];
+
+        // `new ` prefix + its comment handling (construct signatures only).
+        if let Some(new_end) = new_keyword_end {
+            parts.push(d.text("new "));
             // Comments between `new` and `<T>`: `new /* c */ <T>(...)`
-            let new_end = ctor.span.start + "new".len() as u32;
-            if let Some(doc) = self.build_name_to_type_params_comments_opt(
-                new_end,
-                type_params.span.start,
-                CommentSpacing::Trailing,
-            ) {
+            if let Some(type_params) = type_parameters
+                && let Some(doc) = self.build_name_to_type_params_comments_opt(
+                    new_end,
+                    type_params.span.start,
+                    CommentSpacing::Trailing,
+                )
+            {
                 parts.push(doc);
             }
+        }
+
+        // Print type parameters if present: `<T>` or `<T, U>`
+        if let Some(type_params) = type_parameters {
             parts.push(self.build_type_parameter_declaration_doc(type_params));
         }
 
         // Find `(` (skip comments so a `(` inside one isn't matched).
-        let paren_search_start = ctor
-            .type_parameters
-            .as_ref()
-            .map_or(ctor.span.start, |tp| tp.span.end);
+        let paren_search_start = type_parameters.map_or(span_start, |tp| tp.span.end);
         let paren_pos = find_char_skipping_comments(
             self.source.as_bytes(),
             paren_search_start as usize,
@@ -286,18 +284,17 @@ impl<'a> Printer<'a> {
         .map(|p| p as u32);
 
         // Comments between type_params and `(` go after type_params
-        if let (Some(tp), Some(pp)) = (ctor.type_parameters.as_ref().map(|t| t.span.end), paren_pos)
-        {
+        if let (Some(tp), Some(pp)) = (type_parameters.map(|t| t.span.end), paren_pos) {
             self.append_type_params_to_paren_comments(&mut parts, tp, pp);
         }
 
-        // Without type params, comments between `new` and `(` stay in place.
-        if ctor.type_parameters.is_none()
+        // Construct signature without type params: comments between `new` and `(`
+        // stay in place.
+        if let Some(new_end) = new_keyword_end
+            && type_parameters.is_none()
             && let Some(pp) = paren_pos
         {
-            for comment in
-                comments_in_range(self.comments, ctor.span.start + "new".len() as u32, pp)
-            {
+            for comment in comments_in_range(self.comments, new_end, pp) {
                 parts.push(self.build_comment_doc(comment));
                 if comment.is_block {
                     parts.push(d.text(" "));
@@ -307,17 +304,12 @@ impl<'a> Printer<'a> {
             }
         }
 
-        parts.push(self.build_signature_params_doc(&ctor.params, paren_pos));
-        if let Some(return_type) = &ctor.return_type {
+        parts.push(self.build_signature_params_doc(params, paren_pos));
+        if let Some(return_type) = return_type {
             parts.push(self.build_signature_return_type_doc(paren_pos, return_type));
         }
         // Comments between return type (or params) and `;`
-        self.append_signature_end_comments(
-            &mut parts,
-            ctor.return_type.as_ref(),
-            paren_pos,
-            ctor.span.end,
-        );
+        self.append_signature_end_comments(&mut parts, return_type, paren_pos, span_end);
         d.group(d.concat(&parts))
     }
 
