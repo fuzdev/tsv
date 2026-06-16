@@ -982,6 +982,62 @@ Deno.test('instantiation_parens: negative - normal generic usage', () => {
 	assertEquals(match, null);
 });
 
+// ─── single_type_param_comma ──────────────────────────────────────────────
+
+Deno.test('single_type_param_comma: positive - bare <T> vs prettier <T,>', () => {
+	const prettier = '\tconst identity = <T,>(x: T) => x;';
+	const ours = '\tconst identity = <T>(x: T) => x;';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('single_type_param_comma', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'single_type_param_comma');
+	assertEquals(match!.confidence, 'certain');
+});
+
+Deno.test('single_type_param_comma: positive - const-modified <const T>', () => {
+	const prettier = '\tconst arrow = <const T,>(x: T) => x;';
+	const ours = '\tconst arrow = <const T>(x: T) => x;';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('single_type_param_comma', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('single_type_param_comma: positive - default-only <T = string>', () => {
+	const prettier = '\tconst withDefault = <T = string,>(x: T) => x;';
+	const ours = '\tconst withDefault = <T = string>(x: T) => x;';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('single_type_param_comma', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('single_type_param_comma: negative - not svelte (pure .ts agrees)', () => {
+	// On the .ts path prettier strips the comma, so there is no divergence and the
+	// language guard rejects regardless. Synthesize the diff to prove the guard fires.
+	const prettier = '\tconst identity = <T,>(x: T) => x;';
+	const ours = '\tconst identity = <T>(x: T) => x;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('single_type_param_comma', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('single_type_param_comma: negative - multi-param <T, U> (interior comma)', () => {
+	// `<T, U>` has an interior comma, so the `<...,>` single-param shape never matches.
+	const prettier = '\tconst pair = <T, U>(a: T, b: U) => [a, b];';
+	const ours = '\tconst pair = <T,U>(a: T, b: U) => [a, b];';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('single_type_param_comma', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('single_type_param_comma: negative - both sides keep <T,> (no divergence)', () => {
+	const prettier = '\tconst identity = <T,>(x: T) => x;';
+	const ours = '\tconst identity = <T,>(x: T) => x;';
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(ctx.hunks.length, 0);
+	const match = run_pattern('single_type_param_comma', ctx);
+	assertEquals(match, null);
+});
+
 // ─── block_comment_computed_member ────────────────────────────────────────
 
 Deno.test('block_comment_computed_member: positive - JSDoc hoisted from brackets', () => {
