@@ -7,9 +7,9 @@
 
 	// line comment between export and type keyword
 	export // c3
-	type {C} from './c';
+		type {C} from './c';
 
 	// line comment between type keyword and braces
 	export type // c4
-	{D} from './d';
+		{D} from './d';
 </script>

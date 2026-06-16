@@ -123,17 +123,19 @@ impl<'a> Printer<'a> {
         decl: &internal::VariableDeclaration,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut prefix = Vec::new();
 
         // Declare modifier
         if decl.declare {
-            parts.push(d.text("declare "));
+            prefix.push(d.text("declare "));
         }
 
         // Keyword (const, let, var)
-        parts.push(d.text(decl.kind.as_str()));
+        prefix.push(d.text(decl.kind.as_str()));
 
-        // Handle comments between keyword and first declarator
+        // The keyword→first-declarator gap. A *line* comment here indents the whole
+        // continuation one level (uniform declaration-header rule); block/no-comment
+        // cases stay inline. The leading space is supplied by the gap helper below.
         let keyword_end = if decl.declare {
             decl.span.start + 8 + decl.kind.as_str().len() as u32 // "declare " + keyword
         } else {
@@ -141,13 +143,8 @@ impl<'a> Printer<'a> {
         };
         let first_decl_start = decl.declarations[0].span.start;
 
-        // Use _opt variant to avoid redundant binary search
-        if let Some(comments_doc) =
-            self.build_inline_comments_between_doc_opt(keyword_end, first_decl_start)
-        {
-            parts.push(comments_doc);
-        }
-        parts.push(d.text(" "));
+        // Everything after the gap is collected into `parts` (the continuation).
+        let mut parts = Vec::new();
 
         let is_multi_declarator = decl.declarations.len() > 1;
         let has_any_init = decl.declarations.iter().any(|d| d.init.is_some());
@@ -772,7 +769,7 @@ impl<'a> Printer<'a> {
         self.declaration_indent_depth.set(old_indent_depth);
         self.in_top_level_assignment.set(false);
 
-        if should_break {
+        let continuation = if should_break {
             // Multi-declarator with initializers: hardline breaks already inserted
             d.concat(&parts)
         } else if is_multi_declarator || has_any_init {
@@ -780,6 +777,13 @@ impl<'a> Printer<'a> {
             d.group(d.concat(&parts))
         } else {
             d.concat(&parts)
-        }
+        };
+        // A line comment in the keyword→declarator gap indents the continuation.
+        prefix.push(self.build_keyword_to_name_continuation(
+            keyword_end,
+            first_decl_start,
+            continuation,
+        ));
+        d.concat(&prefix)
     }
 }

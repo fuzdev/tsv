@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 378,
+	"end": 380,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " line comment between type keyword and braces",
-			"start": 284,
-			"end": 331,
+			"start": 285,
+			"end": 332,
 			"loc": {
 				"start": {
 					"line": 12,
@@ -125,8 +125,8 @@
 		{
 			"type": "Line",
 			"value": " c4",
-			"start": 345,
-			"end": 350,
+			"start": 346,
+			"end": 351,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -142,12 +142,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 377,
+		"end": 379,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 368,
+			"end": 370,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -360,7 +360,7 @@
 				{
 					"type": "ImportDeclaration",
 					"start": 247,
-					"end": 281,
+					"end": 282,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -368,53 +368,53 @@
 						},
 						"end": {
 							"line": 10,
-							"column": 21
+							"column": 22
 						}
 					},
 					"importKind": "type",
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
-							"start": 267,
-							"end": 268,
+							"start": 268,
+							"end": 269,
 							"loc": {
 								"start": {
 									"line": 10,
-									"column": 7
+									"column": 8
 								},
 								"end": {
 									"line": 10,
-									"column": 8
+									"column": 9
 								}
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 267,
-								"end": 268,
+								"start": 268,
+								"end": 269,
 								"loc": {
 									"start": {
 										"line": 10,
-										"column": 7
+										"column": 8
 									},
 									"end": {
 										"line": 10,
-										"column": 8
+										"column": 9
 									}
 								},
 								"name": "C"
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 267,
-								"end": 268,
+								"start": 268,
+								"end": 269,
 								"loc": {
 									"start": {
 										"line": 10,
-										"column": 7
+										"column": 8
 									},
 									"end": {
 										"line": 10,
-										"column": 8
+										"column": 9
 									}
 								},
 								"name": "C"
@@ -432,16 +432,16 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 275,
-						"end": 280,
+						"start": 276,
+						"end": 281,
 						"loc": {
 							"start": {
 								"line": 10,
-								"column": 15
+								"column": 16
 							},
 							"end": {
 								"line": 10,
-								"column": 20
+								"column": 21
 							}
 						},
 						"value": "./c",
@@ -458,8 +458,8 @@
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 333,
-					"end": 367,
+					"start": 334,
+					"end": 369,
 					"loc": {
 						"start": {
 							"line": 13,
@@ -467,53 +467,53 @@
 						},
 						"end": {
 							"line": 14,
-							"column": 16
+							"column": 17
 						}
 					},
 					"importKind": "type",
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
-							"start": 353,
-							"end": 354,
+							"start": 355,
+							"end": 356,
 							"loc": {
 								"start": {
 									"line": 14,
-									"column": 2
+									"column": 3
 								},
 								"end": {
 									"line": 14,
-									"column": 3
+									"column": 4
 								}
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 353,
-								"end": 354,
+								"start": 355,
+								"end": 356,
 								"loc": {
 									"start": {
 										"line": 14,
-										"column": 2
+										"column": 3
 									},
 									"end": {
 										"line": 14,
-										"column": 3
+										"column": 4
 									}
 								},
 								"name": "D"
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 353,
-								"end": 354,
+								"start": 355,
+								"end": 356,
 								"loc": {
 									"start": {
 										"line": 14,
-										"column": 2
+										"column": 3
 									},
 									"end": {
 										"line": 14,
-										"column": 3
+										"column": 4
 									}
 								},
 								"name": "D"
@@ -523,24 +523,24 @@
 								{
 									"type": "Line",
 									"value": " c4",
-									"start": 345,
-									"end": 350
+									"start": 346,
+									"end": 351
 								}
 							]
 						}
 					],
 					"source": {
 						"type": "Literal",
-						"start": 361,
-						"end": 366,
+						"start": 363,
+						"end": 368,
 						"loc": {
 							"start": {
 								"line": 14,
-								"column": 10
+								"column": 11
 							},
 							"end": {
 								"line": 14,
-								"column": 15
+								"column": 16
 							}
 						},
 						"value": "./d",
@@ -550,8 +550,8 @@
 						{
 							"type": "Line",
 							"value": " line comment between type keyword and braces",
-							"start": 284,
-							"end": 331
+							"start": 285,
+							"end": 332
 						}
 					]
 				}

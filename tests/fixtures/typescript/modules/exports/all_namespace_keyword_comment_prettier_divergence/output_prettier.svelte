@@ -14,4 +14,8 @@
 
 	// comment between binding and from — dual-stable, both formatters keep
 	export * as ns5 /* c5 */ from './e';
+
+	// line comment between as and binding — tsv indents the binding, prettier flattens it
+	export * as // c6
+	ns6 from './f';
 </script>

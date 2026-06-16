@@ -464,6 +464,63 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Build a declaration header's keyword→name gap comment followed by the rest
+    /// of the declaration (`continuation`), indenting that continuation one level
+    /// when a *line* comment forces the break.
+    ///
+    /// `keyword_end` bounds the start of the comment scan and `name_start` its end
+    /// (the start of the name, or first declarator). Usually `keyword_end` is just
+    /// past the final keyword before the name (`function`/`*`, `class`, `const`, …),
+    /// but the `enum` and `declare function` printers pass the declaration start, so
+    /// a comment in an earlier inter-keyword gap (`const /* c */ enum`,
+    /// `declare /* c */ function`) is captured here too and relocated after the
+    /// keyword — matching the pre-refactor behavior. The preceding keyword token must
+    /// be emitted **without** a trailing space; the leading space is supplied here.
+    ///
+    /// - **Line comment**: ends its line with a hardline, so the whole continuation
+    ///   is wrapped in `indent` to read as a statement continuation rather than a
+    ///   second statement (the uniform declaration-header rule): `function // c⏎\tf()`.
+    /// - **Block comment**: trails inline (` /* c */ ` + continuation), no break.
+    /// - **No comment**: just a leading space before the continuation.
+    ///
+    /// Block and no-comment output is byte-identical to the prior
+    /// `build_keyword_to_name_comments(...)` form (which already supplies the leading
+    /// space). Shared by the `function`/`class`/`enum`/`declare function`/variable
+    /// declaration printers and the `export` / `export default`→declaration printers
+    /// in `statements/modules.rs`.
+    ///
+    /// Declaration-side twin of `gap_comment_indented_continuation` (modules.rs):
+    /// both supply a leading space and indent the continuation on a line comment, but
+    /// they use different comment emitters (`build_name_to_type_params_comments` /
+    /// `build_inline_comments_between_doc_opt` here vs `build_rhs_comments_opt`
+    /// there), so a multi-line block comment stays inline here but breaks there. Keep
+    /// the two separate — don't merge.
+    pub(crate) fn build_keyword_to_name_continuation(
+        &self,
+        keyword_end: u32,
+        name_start: u32,
+        continuation: DocId,
+    ) -> DocId {
+        let d = self.d();
+        let has_line = self.has_line_comments_between(keyword_end, name_start);
+        let comment_doc = if has_line {
+            self.build_name_to_type_params_comments(
+                keyword_end,
+                name_start,
+                CommentSpacing::Leading,
+            )
+        } else if let Some(c) = self.build_inline_comments_between_doc_opt(keyword_end, name_start)
+        {
+            c
+        } else {
+            d.empty()
+        };
+        // After a line comment the hardline provides separation; otherwise a space.
+        let space_after = if has_line { d.empty() } else { d.text(" ") };
+        let body = d.concat(&[comment_doc, space_after, continuation]);
+        if has_line { d.indent(body) } else { body }
+    }
+
     /// Build a Doc for inline comments between a name/key and type params or parens.
     ///
     /// Like `build_comments_between` but handles line comments safely:

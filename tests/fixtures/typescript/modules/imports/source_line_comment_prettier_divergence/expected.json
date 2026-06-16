@@ -1,0 +1,662 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 575,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " bare import: line comment before source indents the source",
+			"start": 20,
+			"end": 81,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 90,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 8
+				},
+				"end": {
+					"line": 3,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " bare import: line comment text contains brace-like glyphs",
+			"start": 104,
+			"end": 164,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " {} from",
+			"start": 173,
+			"end": 183,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 8
+				},
+				"end": {
+					"line": 7,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " empty braces: line comment between from and source",
+			"start": 195,
+			"end": 248,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 265,
+			"end": 269,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 16
+				},
+				"end": {
+					"line": 11,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " empty braces: multiple line comments between from and source",
+			"start": 281,
+			"end": 344,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 361,
+			"end": 366,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 16
+				},
+				"end": {
+					"line": 15,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 369,
+			"end": 374,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " named specifiers: line comment between from and source",
+			"start": 386,
+			"end": 443,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 461,
+			"end": 465,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 17
+				},
+				"end": {
+					"line": 20,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " default binding: line comment between from and source",
+			"start": 477,
+			"end": 533,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 551,
+			"end": 555,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 17
+				},
+				"end": {
+					"line": 24,
+					"column": 21
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 574,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 565,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 26,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 83,
+					"end": 101,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 6
+						}
+					},
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 97,
+						"end": 100,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 2
+							},
+							"end": {
+								"line": 4,
+								"column": 5
+							}
+						},
+						"value": "a",
+						"raw": "'a'",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 90,
+								"end": 94
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " bare import: line comment before source indents the source",
+							"start": 20,
+							"end": 81
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 166,
+					"end": 192,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 8
+						}
+					},
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 186,
+						"end": 191,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 2
+							},
+							"end": {
+								"line": 8,
+								"column": 7
+							}
+						},
+						"value": "./b",
+						"raw": "'./b'",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " {} from",
+								"start": 173,
+								"end": 183
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " bare import: line comment text contains brace-like glyphs",
+							"start": 104,
+							"end": 164
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 250,
+					"end": 278,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 8
+						}
+					},
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 272,
+						"end": 277,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 2
+							},
+							"end": {
+								"line": 12,
+								"column": 7
+							}
+						},
+						"value": "./c",
+						"raw": "'./c'",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 265,
+								"end": 269
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " empty braces: line comment between from and source",
+							"start": 195,
+							"end": 248
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 346,
+					"end": 383,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 8
+						}
+					},
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 377,
+						"end": 382,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 2
+							},
+							"end": {
+								"line": 17,
+								"column": 7
+							}
+						},
+						"value": "./d",
+						"raw": "'./d'",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 361,
+								"end": 366
+							},
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 369,
+								"end": 374
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " empty braces: multiple line comments between from and source",
+							"start": 281,
+							"end": 344
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 445,
+					"end": 474,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 8
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 453,
+							"end": 454,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 9
+								},
+								"end": {
+									"line": 20,
+									"column": 10
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 453,
+								"end": 454,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 9
+									},
+									"end": {
+										"line": 20,
+										"column": 10
+									}
+								},
+								"name": "a"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 453,
+								"end": 454,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 9
+									},
+									"end": {
+										"line": 20,
+										"column": 10
+									}
+								},
+								"name": "a"
+							},
+							"importKind": "value"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 468,
+						"end": 473,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 2
+							},
+							"end": {
+								"line": 21,
+								"column": 7
+							}
+						},
+						"value": "./e",
+						"raw": "'./e'",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 461,
+								"end": 465
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " named specifiers: line comment between from and source",
+							"start": 386,
+							"end": 443
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 535,
+					"end": 564,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 8
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 542,
+							"end": 545,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 8
+								},
+								"end": {
+									"line": 24,
+									"column": 11
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 542,
+								"end": 545,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 8
+									},
+									"end": {
+										"line": 24,
+										"column": 11
+									}
+								},
+								"name": "Foo"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 558,
+						"end": 563,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 2
+							},
+							"end": {
+								"line": 25,
+								"column": 7
+							}
+						},
+						"value": "./f",
+						"raw": "'./f'",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 551,
+								"end": 555
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " default binding: line comment between from and source",
+							"start": 477,
+							"end": 533
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

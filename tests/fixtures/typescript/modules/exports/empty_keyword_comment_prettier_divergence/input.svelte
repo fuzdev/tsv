@@ -4,5 +4,5 @@
 
 	// line comment between export and braces (re-export)
 	export // c2
-	{} from './b';
+		{} from './b';
 </script>

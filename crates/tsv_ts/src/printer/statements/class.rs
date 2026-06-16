@@ -242,27 +242,6 @@ impl<'a> Printer<'a> {
             cursor = cp + 5;
         }
 
-        if let Some(id) = &decl.id {
-            // Comments between class keyword and name
-            parts.push(self.build_keyword_to_name_comments(cursor, id.span.start));
-            parts.push(d.symbol(id.name.to_u32()));
-
-            // Comments between name and type params: `class A/* c */ <T> {}`
-            // Line comments get a hardline to prevent absorbing type params as comment text
-            if let Some(type_params) = &decl.type_parameters {
-                parts.push(self.build_name_to_type_params_comments(
-                    id.span.end,
-                    type_params.span.start,
-                    CommentSpacing::Trailing,
-                ));
-            }
-        }
-
-        // Type params get their own group - break independently of heritage.
-        if let Some(type_params) = &decl.type_parameters {
-            parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
-        }
-
         // Build heritage docs (shared with the class-expression printer).
         let extends_doc = self.build_class_extends_doc(
             decl.super_class.as_deref(),
@@ -275,8 +254,52 @@ impl<'a> Printer<'a> {
             positions.implements_keyword_start,
         );
 
-        // Assemble the header (group-wrapped); the body is appended outside the
-        // group so its hardlines don't affect the header's fit check.
+        if let Some(id) = &decl.id {
+            // Named: collect the name + type params + heritage + body into one
+            // continuation so a *line* comment in the `class`→name gap indents the
+            // whole declaration one level (uniform declaration-header rule). Block
+            // and no-comment cases stay inline.
+            let mut header_parts = vec![d.symbol(id.name.to_u32())];
+            // Comments between name and type params: `class A/* c */ <T> {}`
+            // Line comments get a hardline to prevent absorbing type params as comment text
+            if let Some(type_params) = &decl.type_parameters {
+                header_parts.push(self.build_name_to_type_params_comments(
+                    id.span.end,
+                    type_params.span.start,
+                    CommentSpacing::Trailing,
+                ));
+                // Type params get their own group - break independently of heritage.
+                header_parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
+            }
+            let header_doc = self.build_class_header_doc(
+                header_parts,
+                &positions,
+                extends_doc,
+                implements_doc,
+                &decl.implements,
+                decl.body.body.is_empty(),
+                decl.body.span.start,
+                group_mode,
+                has_heritage_line_comments,
+                true,
+            );
+            let continuation = d.concat(&[
+                header_doc,
+                self.build_class_body_doc(&decl.body, decl.declare),
+            ]);
+            parts.push(self.build_keyword_to_name_continuation(
+                cursor,
+                id.span.start,
+                continuation,
+            ));
+            return d.concat(&parts);
+        }
+
+        // Anonymous class declaration (`export default class {}`): the keyword→body
+        // / →heritage gap is handled by the header builder, unchanged.
+        if let Some(type_params) = &decl.type_parameters {
+            parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
+        }
         let header_doc = self.build_class_header_doc(
             parts,
             &positions,

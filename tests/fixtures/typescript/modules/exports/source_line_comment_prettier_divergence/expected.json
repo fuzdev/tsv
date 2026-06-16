@@ -1,0 +1,364 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 291,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " empty re-export: line comment between from and source",
+			"start": 20,
+			"end": 76,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 93,
+			"end": 97,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 16
+				},
+				"end": {
+					"line": 3,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " export-all: line comment between from and source",
+			"start": 109,
+			"end": 160,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 176,
+			"end": 180,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 15
+				},
+				"end": {
+					"line": 7,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " named specifiers: line comment between from and source",
+			"start": 192,
+			"end": 249,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 267,
+			"end": 271,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 17
+				},
+				"end": {
+					"line": 11,
+					"column": 21
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 290,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 281,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 78,
+					"end": 106,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 8
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 100,
+						"end": 105,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 2
+							},
+							"end": {
+								"line": 4,
+								"column": 7
+							}
+						},
+						"value": "./a",
+						"raw": "'./a'",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 93,
+								"end": 97
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " empty re-export: line comment between from and source",
+							"start": 20,
+							"end": 76
+						}
+					]
+				},
+				{
+					"type": "ExportAllDeclaration",
+					"start": 162,
+					"end": 189,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 8
+						}
+					},
+					"exportKind": "value",
+					"exported": null,
+					"source": {
+						"type": "Literal",
+						"start": 183,
+						"end": 188,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 2
+							},
+							"end": {
+								"line": 8,
+								"column": 7
+							}
+						},
+						"value": "./b",
+						"raw": "'./b'",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 176,
+								"end": 180
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " export-all: line comment between from and source",
+							"start": 109,
+							"end": 160
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 251,
+					"end": 280,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 8
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 259,
+							"end": 260,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 9
+								},
+								"end": {
+									"line": 11,
+									"column": 10
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 259,
+								"end": 260,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 9
+									},
+									"end": {
+										"line": 11,
+										"column": 10
+									}
+								},
+								"name": "a"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 259,
+								"end": 260,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 9
+									},
+									"end": {
+										"line": 11,
+										"column": 10
+									}
+								},
+								"name": "a"
+							},
+							"exportKind": "value"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 274,
+						"end": 279,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 2
+							},
+							"end": {
+								"line": 12,
+								"column": 7
+							}
+						},
+						"value": "./c",
+						"raw": "'./c'",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 267,
+								"end": 271
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " named specifiers: line comment between from and source",
+							"start": 192,
+							"end": 249
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

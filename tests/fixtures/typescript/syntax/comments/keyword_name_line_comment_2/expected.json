@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 93,
+	"end": 121,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " enum keyword to name",
+			"value": " enum keyword to name — block comment stays inline (both formatters)",
 			"start": 20,
-			"end": 43,
+			"end": 90,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,38 +22,22 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 24
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " c1",
-			"start": 50,
-			"end": 55,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 6
-				},
-				"end": {
-					"line": 3,
-					"column": 11
+					"column": 71
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 69,
-			"end": 77,
+			"start": 97,
+			"end": 105,
 			"loc": {
 				"start": {
-					"line": 6,
+					"line": 3,
 					"column": 6
 				},
 				"end": {
-					"line": 6,
+					"line": 3,
 					"column": 14
 				}
 			}
@@ -62,96 +46,48 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 92,
+		"end": 120,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 83,
+			"end": 111,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 7,
+					"line": 4,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "TSEnumDeclaration",
-					"start": 45,
-					"end": 61,
+					"start": 92,
+					"end": 110,
 					"loc": {
 						"start": {
 							"line": 3,
 							"column": 1
 						},
 						"end": {
-							"line": 4,
-							"column": 5
-						}
-					},
-					"id": {
-						"type": "Identifier",
-						"start": 57,
-						"end": 58,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 1
-							},
-							"end": {
-								"line": 4,
-								"column": 2
-							}
-						},
-						"name": "A",
-						"leadingComments": [
-							{
-								"type": "Line",
-								"value": " c1",
-								"start": 50,
-								"end": 55
-							}
-						]
-					},
-					"members": [],
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " enum keyword to name",
-							"start": 20,
-							"end": 43
-						}
-					]
-				},
-				{
-					"type": "TSEnumDeclaration",
-					"start": 64,
-					"end": 82,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
+							"line": 3,
 							"column": 19
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 78,
-						"end": 79,
+						"start": 106,
+						"end": 107,
 						"loc": {
 							"start": {
-								"line": 6,
+								"line": 3,
 								"column": 15
 							},
 							"end": {
-								"line": 6,
+								"line": 3,
 								"column": 16
 							}
 						},
@@ -160,12 +96,20 @@
 							{
 								"type": "Block",
 								"value": " c2 ",
-								"start": 69,
-								"end": 77
+								"start": 97,
+								"end": 105
 							}
 						]
 					},
-					"members": []
+					"members": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " enum keyword to name — block comment stays inline (both formatters)",
+							"start": 20,
+							"end": 90
+						}
+					]
 				}
 			],
 			"sourceType": "module"

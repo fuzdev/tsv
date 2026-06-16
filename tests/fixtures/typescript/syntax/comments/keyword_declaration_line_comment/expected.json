@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 346,
+	"end": 132,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " function keyword to name",
+			"value": " function keyword to name — block comment stays inline (both formatters)",
 			"start": 20,
-			"end": 47,
+			"end": 94,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,151 +22,23 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 28
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " c1",
-			"start": 58,
-			"end": 63,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 10
-				},
-				"end": {
-					"line": 3,
-					"column": 15
+					"column": 75
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 84,
-			"end": 92,
+			"start": 105,
+			"end": 113,
 			"loc": {
 				"start": {
-					"line": 6,
+					"line": 3,
 					"column": 10
 				},
 				"end": {
-					"line": 6,
+					"line": 3,
 					"column": 18
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " export keyword to declaration",
-			"start": 103,
-			"end": 135,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 1
-				},
-				"end": {
-					"line": 8,
-					"column": 33
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " c3",
-			"start": 144,
-			"end": 149,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 8
-				},
-				"end": {
-					"line": 9,
-					"column": 13
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " c4",
-			"start": 173,
-			"end": 178,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 8
-				},
-				"end": {
-					"line": 12,
-					"column": 13
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " c5",
-			"start": 206,
-			"end": 211,
-			"loc": {
-				"start": {
-					"line": 15,
-					"column": 8
-				},
-				"end": {
-					"line": 15,
-					"column": 13
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " c6",
-			"start": 239,
-			"end": 244,
-			"loc": {
-				"start": {
-					"line": 18,
-					"column": 8
-				},
-				"end": {
-					"line": 18,
-					"column": 13
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " export default to declaration",
-			"start": 263,
-			"end": 295,
-			"loc": {
-				"start": {
-					"line": 21,
-					"column": 1
-				},
-				"end": {
-					"line": 21,
-					"column": 33
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " c7",
-			"start": 312,
-			"end": 317,
-			"loc": {
-				"start": {
-					"line": 22,
-					"column": 16
-				},
-				"end": {
-					"line": 22,
-					"column": 21
 				}
 			}
 		}
@@ -174,115 +46,48 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 345,
+		"end": 131,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 336,
+			"end": 122,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 24,
+					"line": 4,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "FunctionDeclaration",
-					"start": 49,
-					"end": 72,
+					"start": 96,
+					"end": 121,
 					"loc": {
 						"start": {
 							"line": 3,
 							"column": 1
 						},
 						"end": {
-							"line": 4,
-							"column": 8
-						}
-					},
-					"id": {
-						"type": "Identifier",
-						"start": 65,
-						"end": 67,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 1
-							},
-							"end": {
-								"line": 4,
-								"column": 3
-							}
-						},
-						"name": "f1",
-						"leadingComments": [
-							{
-								"type": "Line",
-								"value": " c1",
-								"start": 58,
-								"end": 63
-							}
-						]
-					},
-					"expression": false,
-					"generator": false,
-					"async": false,
-					"params": [],
-					"body": {
-						"type": "BlockStatement",
-						"start": 70,
-						"end": 72,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 6
-							},
-							"end": {
-								"line": 4,
-								"column": 8
-							}
-						},
-						"body": []
-					},
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " function keyword to name",
-							"start": 20,
-							"end": 47
-						}
-					]
-				},
-				{
-					"type": "FunctionDeclaration",
-					"start": 75,
-					"end": 100,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
+							"line": 3,
 							"column": 26
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 93,
-						"end": 95,
+						"start": 114,
+						"end": 116,
 						"loc": {
 							"start": {
-								"line": 6,
+								"line": 3,
 								"column": 19
 							},
 							"end": {
-								"line": 6,
+								"line": 3,
 								"column": 21
 							}
 						},
@@ -291,8 +96,8 @@
 							{
 								"type": "Block",
 								"value": " c2 ",
-								"start": 84,
-								"end": 92
+								"start": 105,
+								"end": 113
 							}
 						]
 					},
@@ -302,423 +107,26 @@
 					"params": [],
 					"body": {
 						"type": "BlockStatement",
-						"start": 98,
-						"end": 100,
+						"start": 119,
+						"end": 121,
 						"loc": {
 							"start": {
-								"line": 6,
+								"line": 3,
 								"column": 24
 							},
 							"end": {
-								"line": 6,
+								"line": 3,
 								"column": 26
 							}
 						},
 						"body": []
-					}
-				},
-				{
-					"type": "ExportNamedDeclaration",
-					"start": 137,
-					"end": 163,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 13
-						}
-					},
-					"exportKind": "value",
-					"declaration": {
-						"type": "VariableDeclaration",
-						"start": 151,
-						"end": 163,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 1
-							},
-							"end": {
-								"line": 10,
-								"column": 13
-							}
-						},
-						"declarations": [
-							{
-								"type": "VariableDeclarator",
-								"start": 157,
-								"end": 162,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 7
-									},
-									"end": {
-										"line": 10,
-										"column": 12
-									}
-								},
-								"id": {
-									"type": "Identifier",
-									"start": 157,
-									"end": 158,
-									"loc": {
-										"start": {
-											"line": 10,
-											"column": 7
-										},
-										"end": {
-											"line": 10,
-											"column": 8
-										}
-									},
-									"name": "a"
-								},
-								"init": {
-									"type": "Literal",
-									"start": 161,
-									"end": 162,
-									"loc": {
-										"start": {
-											"line": 10,
-											"column": 11
-										},
-										"end": {
-											"line": 10,
-											"column": 12
-										}
-									},
-									"value": 1,
-									"raw": "1"
-								}
-							}
-						],
-						"kind": "const",
-						"leadingComments": [
-							{
-								"type": "Line",
-								"value": " c3",
-								"start": 144,
-								"end": 149
-							}
-						]
-					},
-					"specifiers": [],
-					"source": null,
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " export keyword to declaration",
-							"start": 103,
-							"end": 135
-						}
-					]
-				},
-				{
-					"type": "ExportNamedDeclaration",
-					"start": 166,
-					"end": 196,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 13,
-							"column": 17
-						}
-					},
-					"exportKind": "value",
-					"declaration": {
-						"type": "FunctionDeclaration",
-						"start": 180,
-						"end": 196,
-						"loc": {
-							"start": {
-								"line": 13,
-								"column": 1
-							},
-							"end": {
-								"line": 13,
-								"column": 17
-							}
-						},
-						"id": {
-							"type": "Identifier",
-							"start": 189,
-							"end": 191,
-							"loc": {
-								"start": {
-									"line": 13,
-									"column": 10
-								},
-								"end": {
-									"line": 13,
-									"column": 12
-								}
-							},
-							"name": "f3"
-						},
-						"expression": false,
-						"generator": false,
-						"async": false,
-						"params": [],
-						"body": {
-							"type": "BlockStatement",
-							"start": 194,
-							"end": 196,
-							"loc": {
-								"start": {
-									"line": 13,
-									"column": 15
-								},
-								"end": {
-									"line": 13,
-									"column": 17
-								}
-							},
-							"body": []
-						},
-						"leadingComments": [
-							{
-								"type": "Line",
-								"value": " c4",
-								"start": 173,
-								"end": 178
-							}
-						]
-					},
-					"specifiers": [],
-					"source": null
-				},
-				{
-					"type": "ExportNamedDeclaration",
-					"start": 199,
-					"end": 229,
-					"loc": {
-						"start": {
-							"line": 15,
-							"column": 1
-						},
-						"end": {
-							"line": 16,
-							"column": 17
-						}
-					},
-					"exportKind": "type",
-					"declaration": {
-						"type": "TSTypeAliasDeclaration",
-						"start": 213,
-						"end": 229,
-						"loc": {
-							"start": {
-								"line": 16,
-								"column": 1
-							},
-							"end": {
-								"line": 16,
-								"column": 17
-							}
-						},
-						"id": {
-							"type": "Identifier",
-							"start": 218,
-							"end": 219,
-							"loc": {
-								"start": {
-									"line": 16,
-									"column": 6
-								},
-								"end": {
-									"line": 16,
-									"column": 7
-								}
-							},
-							"name": "A"
-						},
-						"typeAnnotation": {
-							"type": "TSStringKeyword",
-							"start": 222,
-							"end": 228,
-							"loc": {
-								"start": {
-									"line": 16,
-									"column": 10
-								},
-								"end": {
-									"line": 16,
-									"column": 16
-								}
-							}
-						},
-						"leadingComments": [
-							{
-								"type": "Line",
-								"value": " c5",
-								"start": 206,
-								"end": 211
-							}
-						]
-					},
-					"specifiers": [],
-					"source": null
-				},
-				{
-					"type": "ExportNamedDeclaration",
-					"start": 232,
-					"end": 260,
-					"loc": {
-						"start": {
-							"line": 18,
-							"column": 1
-						},
-						"end": {
-							"line": 19,
-							"column": 15
-						}
-					},
-					"exportKind": "type",
-					"declaration": {
-						"type": "TSInterfaceDeclaration",
-						"start": 246,
-						"end": 260,
-						"loc": {
-							"start": {
-								"line": 19,
-								"column": 1
-							},
-							"end": {
-								"line": 19,
-								"column": 15
-							}
-						},
-						"id": {
-							"type": "Identifier",
-							"start": 256,
-							"end": 257,
-							"loc": {
-								"start": {
-									"line": 19,
-									"column": 11
-								},
-								"end": {
-									"line": 19,
-									"column": 12
-								}
-							},
-							"name": "B"
-						},
-						"body": {
-							"type": "TSInterfaceBody",
-							"start": 258,
-							"end": 260,
-							"loc": {
-								"start": {
-									"line": 19,
-									"column": 13
-								},
-								"end": {
-									"line": 19,
-									"column": 15
-								}
-							},
-							"body": []
-						},
-						"leadingComments": [
-							{
-								"type": "Line",
-								"value": " c6",
-								"start": 239,
-								"end": 244
-							}
-						]
-					},
-					"specifiers": [],
-					"source": null
-				},
-				{
-					"type": "ExportDefaultDeclaration",
-					"start": 297,
-					"end": 335,
-					"loc": {
-						"start": {
-							"line": 22,
-							"column": 1
-						},
-						"end": {
-							"line": 23,
-							"column": 17
-						}
-					},
-					"exportKind": "value",
-					"declaration": {
-						"type": "FunctionDeclaration",
-						"start": 319,
-						"end": 335,
-						"loc": {
-							"start": {
-								"line": 23,
-								"column": 1
-							},
-							"end": {
-								"line": 23,
-								"column": 17
-							}
-						},
-						"id": {
-							"type": "Identifier",
-							"start": 328,
-							"end": 330,
-							"loc": {
-								"start": {
-									"line": 23,
-									"column": 10
-								},
-								"end": {
-									"line": 23,
-									"column": 12
-								}
-							},
-							"name": "f4"
-						},
-						"expression": false,
-						"generator": false,
-						"async": false,
-						"params": [],
-						"body": {
-							"type": "BlockStatement",
-							"start": 333,
-							"end": 335,
-							"loc": {
-								"start": {
-									"line": 23,
-									"column": 15
-								},
-								"end": {
-									"line": 23,
-									"column": 17
-								}
-							},
-							"body": []
-						},
-						"leadingComments": [
-							{
-								"type": "Line",
-								"value": " c7",
-								"start": 312,
-								"end": 317
-							}
-						]
 					},
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " export default to declaration",
-							"start": 263,
-							"end": 295
+							"value": " function keyword to name — block comment stays inline (both formatters)",
+							"start": 20,
+							"end": 94
 						}
 					]
 				}
