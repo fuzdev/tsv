@@ -9,8 +9,9 @@
 
 use super::{CommentSpacing, Printer};
 use crate::ast::internal::{TSLiteralType, TSType, TemplateLiteralType};
-use tsv_lang::PRINT_WIDTH;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::printing::visual_width;
+use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a literal type
@@ -52,7 +53,9 @@ impl<'a> Printer<'a> {
         let mut pos: usize = 1; // Start after backtick
 
         for (i, quasi) in template.quasis.iter().enumerate() {
-            pos += quasi.raw.len();
+            // Visual columns, not bytes: a CJK char is 3 bytes but 2 columns, so a
+            // byte sum would break a template whose rendered width is well under print width.
+            pos += visual_width(&quasi.raw, TAB_WIDTH);
             if i < template.types.len() {
                 let t = &template.types[i];
                 let is_conditional = matches!(t, TSType::Conditional(_));
@@ -75,7 +78,8 @@ impl<'a> Printer<'a> {
 
                 // Position includes: current pos + "${" (2) + type + "}" (1)
                 // (comment width is small enough to ignore for width calculation)
-                let interp_end = pos + 2 + flat_str.len() + 1;
+                // `${`/`}` are exact ASCII column counts; the type uses visual width.
+                let interp_end = pos + 2 + visual_width(&flat_str, TAB_WIDTH) + 1;
                 let exceeds_width = interp_end > PRINT_WIDTH;
 
                 type_data.push((
