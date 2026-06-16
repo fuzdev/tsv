@@ -9,7 +9,7 @@
 	// Arrow function with type predicate
 	const isBool=(x:unknown):x is boolean=>typeof x==='boolean';
 
-	const isArr=<T,>(x:unknown):x is T[]=>Array.isArray(x);
+	const isArr=<T extends object>(x:unknown):x is T[]=>Array.isArray(x);
 
 	// Method with type predicate
 	class Guard{isObj(x:unknown):x is object{return typeof x==='object'&&x!==null;}

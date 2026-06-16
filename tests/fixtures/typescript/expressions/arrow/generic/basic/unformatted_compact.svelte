@@ -2,12 +2,8 @@
 //
 // Generic Arrow Functions
 //
-
-// Basic identity with trailing comma
-const identity=<T,>(x:T)=>x;
-
-// Type parameter with default only (no constraint)
-const withDefault=<T=string,>(x:T)=>x;
+// Single-unconstrained and default-only type params (`<T>` / `<T = string>`)
+// live in single_type_param_prettier_divergence — prettier forces `<T,>` there.
 
 // Multiple params with as const
 const pair=<T,U>(a:T,b:U)=>[a,b]as const;

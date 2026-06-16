@@ -46,8 +46,12 @@ Deno.test('canonical: an existing `<T,>` is normalized to `<T>` in pure .ts', as
 Deno.test('canonical: single-type-param arrow keeps `<T,>` in .svelte (JSX disambiguation)', async () => {
 	const impl = await make_canonical();
 	try {
-		// In a Svelte `<script lang="ts">`, `<T>` is ambiguous with template syntax, so the
-		// disambiguating comma is correct — mirroring tsv's `TsContext::Svelte`.
+		// In a Svelte `<script lang="ts">`, prettier force-adds the JSX-disambiguating
+		// comma (no `.ts` filepath, so its `shouldForceTrailingComma` guard fires). This
+		// pins that canonical baseline behavior — the corpus comparison depends on it. tsv
+		// itself diverges here, emitting the bare `<T>` (it has no JSX, and Svelte's parser
+		// accepts the bare form); see the single_type_param_prettier_divergence fixture and
+		// docs/conformance_prettier.md §TypeScript.
 		const out = await impl.format_async(
 			'<script lang="ts">\n\tconst f = <T>(x: T) => x;\n</script>\n',
 			'svelte',
