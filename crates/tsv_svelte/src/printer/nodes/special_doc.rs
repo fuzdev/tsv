@@ -66,7 +66,7 @@ impl<'a> Printer<'a> {
             && self.span_was_self_closing(element.span);
 
         // Build attribute docs (including this={...} for component/element)
-        let attr_docs = self.build_special_element_attrs_doc(element);
+        let attr_docs = self.build_special_element_attrs_doc(element, self.d().line());
         let has_attrs = !attr_docs.is_empty();
 
         // Check if any attribute doc will break (e.g., multiline string value)
@@ -119,7 +119,7 @@ impl<'a> Printer<'a> {
                 ]);
 
                 // State 2: Hug mode - attrs inline (space-separated), > on new line
-                let hug_attrs = self.build_special_element_attrs_doc_spaces(element);
+                let hug_attrs = self.build_special_element_attrs_doc(element, self.d().text(" "));
                 let hug_attrs_concat = d.concat(&hug_attrs);
                 let hug_state = d.concat(&[
                     d.text("<"),
@@ -381,24 +381,11 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build docs for special element attributes (line-separated)
+    /// Build docs for special element attributes.
+    ///
+    /// `separator`: emitted between attributes — `d.line()` for the wrapping
+    /// (line-separated) layout, `d.text(" ")` for hug mode (space-separated).
     pub(crate) fn build_special_element_attrs_doc(
-        &self,
-        element: &internal::SpecialElement,
-    ) -> Vec<DocId> {
-        self.build_special_element_attrs_doc_impl(element, self.d().line())
-    }
-
-    /// Build docs for special element attributes (space-separated, for hug mode)
-    pub(crate) fn build_special_element_attrs_doc_spaces(
-        &self,
-        element: &internal::SpecialElement,
-    ) -> Vec<DocId> {
-        self.build_special_element_attrs_doc_impl(element, self.d().text(" "))
-    }
-
-    /// Build docs for special element attributes with configurable separator
-    fn build_special_element_attrs_doc_impl(
         &self,
         element: &internal::SpecialElement,
         separator: DocId,

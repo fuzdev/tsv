@@ -156,6 +156,7 @@ impl<'a> Printer<'a> {
         // Build attribute docs (needed for all paths)
         let attr_docs = self.build_element_attrs_doc(
             &element.attributes,
+            self.d().line(),
             element.name_span.end,
             element.open_tag_end,
             is_html,
@@ -600,6 +601,7 @@ impl<'a> Printer<'a> {
             // Rebuild attr_docs since we're in a different branch
             let hug_attr_docs = self.build_element_attrs_doc(
                 &element.attributes,
+                self.d().line(),
                 element.name_span.end,
                 element.open_tag_end,
                 is_html,
@@ -647,8 +649,9 @@ impl<'a> Printer<'a> {
                         d.concat(&[d.text("<"), d.symbol(tag_sym), attr_indent1, closing]);
 
                     // State 2: Hug mode - attrs inline (space-separated), > on new line
-                    let hug_space_attrs = self.build_element_attrs_doc_spaces(
+                    let hug_space_attrs = self.build_element_attrs_doc(
                         &element.attributes,
+                        self.d().text(" "),
                         element.name_span.end,
                         element.open_tag_end,
                         is_html,
@@ -801,8 +804,9 @@ impl<'a> Printer<'a> {
             let inline_state = d.concat(&[opening_tag, closing]);
 
             // State 2: Hug mode - attrs inline (space-separated), > on new line
-            let hug_attrs = self.build_element_attrs_doc_spaces(
+            let hug_attrs = self.build_element_attrs_doc(
                 &element.attributes,
+                self.d().text(" "),
                 element.name_span.end,
                 element.open_tag_end,
                 is_html,
@@ -818,6 +822,7 @@ impl<'a> Printer<'a> {
             // State 3: Full multiline - attrs on separate lines, > on new line
             let multiline_attrs = self.build_element_attrs_doc(
                 &element.attributes,
+                self.d().line(),
                 element.name_span.end,
                 element.open_tag_end,
                 is_html,
@@ -851,8 +856,9 @@ impl<'a> Printer<'a> {
 
         // Opening tag: <template attrs> — use space-separated attrs (no wrapping)
         // Foreign template elements are always HTML, so is_html=true
-        let space_attrs = self.build_element_attrs_doc_spaces(
+        let space_attrs = self.build_element_attrs_doc(
             &element.attributes,
+            self.d().text(" "),
             element.name_span.end,
             element.open_tag_end,
             true,
@@ -1078,8 +1084,9 @@ impl<'a> Printer<'a> {
         if is_inline && has_content && !attr_docs.is_empty() {
             let content_doc = self.build_whitespace_sensitive_content_doc(&element.fragment.nodes);
             // Rebuild as space-separated (caller passes line-separated which we can't use here)
-            let space_attrs = self.build_element_attrs_doc_spaces(
+            let space_attrs = self.build_element_attrs_doc(
                 &element.attributes,
+                self.d().text(" "),
                 element.name_span.end,
                 element.open_tag_end,
                 is_html,
@@ -1228,6 +1235,7 @@ impl<'a> Printer<'a> {
                 // Always use whitespace-sensitive path when nested inside whitespace-sensitive elements
                 let attr_docs = self.build_element_attrs_doc(
                     &element.attributes,
+                    self.d().line(),
                     element.name_span.end,
                     element.open_tag_end,
                     ws_is_html,
@@ -1414,45 +1422,15 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Build docs for element attributes (line-separated)
+    /// Build docs for element attributes.
     ///
+    /// `separator`: emitted between attributes — `d.line()` for the wrapping
+    /// (line-separated) layout, `d.text(" ")` for hug mode (attributes stay on
+    /// one line, space-separated).
     /// `name_end`: end position of the element tag name (for finding comments before first attr).
     /// `open_tag_end`: position of the `>` that closes the open tag (for trailing comment range).
     /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
     pub(crate) fn build_element_attrs_doc(
-        &self,
-        attrs: &[internal::AttributeNode],
-        name_end: u32,
-        open_tag_end: u32,
-        is_html: bool,
-    ) -> Vec<DocId> {
-        self.build_element_attrs_doc_impl(attrs, self.d().line(), name_end, open_tag_end, is_html)
-    }
-
-    /// Build docs for element attributes (space-separated, for hug mode)
-    ///
-    /// In hug mode, attributes stay on the same line with space separators.
-    /// `name_end`: end position of the element tag name (for finding comments before first attr).
-    /// `open_tag_end`: position of the `>` that closes the open tag (for trailing comment range).
-    /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
-    pub(crate) fn build_element_attrs_doc_spaces(
-        &self,
-        attrs: &[internal::AttributeNode],
-        name_end: u32,
-        open_tag_end: u32,
-        is_html: bool,
-    ) -> Vec<DocId> {
-        self.build_element_attrs_doc_impl(
-            attrs,
-            self.d().text(" "),
-            name_end,
-            open_tag_end,
-            is_html,
-        )
-    }
-
-    /// Build docs for element attributes with configurable separator
-    fn build_element_attrs_doc_impl(
         &self,
         attrs: &[internal::AttributeNode],
         separator: DocId,
