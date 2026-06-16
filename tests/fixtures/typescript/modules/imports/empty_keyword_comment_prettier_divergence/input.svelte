@@ -4,5 +4,5 @@
 
 	// line comment between import and braces
 	import // c2
-	{} from './b';
+		{} from './b';
 </script>

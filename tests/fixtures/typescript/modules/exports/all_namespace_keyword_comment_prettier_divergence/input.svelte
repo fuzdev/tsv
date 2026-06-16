@@ -7,11 +7,15 @@
 
 	// line comment between star and as
 	export * // c3
-	as ns3 from './c';
+		as ns3 from './c';
 
 	// comment between as and binding — dual-stable, both formatters keep
 	export * as /* c4 */ ns4 from './d';
 
 	// comment between binding and from — dual-stable, both formatters keep
 	export * as ns5 /* c5 */ from './e';
+
+	// line comment between as and binding — tsv indents the binding, prettier flattens it
+	export * as // c6
+		ns6 from './f';
 </script>

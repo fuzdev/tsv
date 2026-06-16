@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 169,
+	"end": 170,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -78,12 +78,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 168,
+		"end": 169,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 159,
+			"end": 160,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -148,7 +148,7 @@
 				{
 					"type": "ImportDeclaration",
 					"start": 130,
-					"end": 158,
+					"end": 159,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -156,22 +156,22 @@
 						},
 						"end": {
 							"line": 7,
-							"column": 15
+							"column": 16
 						}
 					},
 					"specifiers": [],
 					"source": {
 						"type": "Literal",
-						"start": 152,
-						"end": 157,
+						"start": 153,
+						"end": 158,
 						"loc": {
 							"start": {
 								"line": 7,
-								"column": 9
+								"column": 10
 							},
 							"end": {
 								"line": 7,
-								"column": 14
+								"column": 15
 							}
 						},
 						"value": "./b",

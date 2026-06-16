@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 219,
+	"end": 220,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -78,12 +78,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 218,
+		"end": 219,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 209,
+			"end": 210,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -197,7 +197,7 @@
 				{
 					"type": "ImportDeclaration",
 					"start": 179,
-					"end": 208,
+					"end": 209,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -205,53 +205,53 @@
 						},
 						"end": {
 							"line": 7,
-							"column": 16
+							"column": 17
 						}
 					},
 					"importKind": "value",
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
-							"start": 194,
-							"end": 195,
+							"start": 195,
+							"end": 196,
 							"loc": {
 								"start": {
 									"line": 7,
-									"column": 2
+									"column": 3
 								},
 								"end": {
 									"line": 7,
-									"column": 3
+									"column": 4
 								}
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 194,
-								"end": 195,
+								"start": 195,
+								"end": 196,
 								"loc": {
 									"start": {
 										"line": 7,
-										"column": 2
+										"column": 3
 									},
 									"end": {
 										"line": 7,
-										"column": 3
+										"column": 4
 									}
 								},
 								"name": "b"
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 194,
-								"end": 195,
+								"start": 195,
+								"end": 196,
 								"loc": {
 									"start": {
 										"line": 7,
-										"column": 2
+										"column": 3
 									},
 									"end": {
 										"line": 7,
-										"column": 3
+										"column": 4
 									}
 								},
 								"name": "b"
@@ -269,16 +269,16 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 202,
-						"end": 207,
+						"start": 203,
+						"end": 208,
 						"loc": {
 							"start": {
 								"line": 7,
-								"column": 10
+								"column": 11
 							},
 							"end": {
 								"line": 7,
-								"column": 15
+								"column": 16
 							}
 						},
 						"value": "./b",

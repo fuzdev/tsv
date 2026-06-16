@@ -4,5 +4,5 @@
 
 	// line comment between export and the named-specifier brace
 	export // c2
-	{b} from './b';
+		{b} from './b';
 </script>

@@ -14,4 +14,12 @@
 
 	// comment between namespace star and as
 	import * as /* c5 */ ns5 from './e';
+
+	// line comment between import and namespace star
+	import // c6
+	* as ns6 from './f';
+
+	// line comment between type keyword and namespace star
+	import type // c7
+	* as ns7 from './g';
 </script>

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 488,
+	"end": 615,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " comment between as and binding — dual-stable, both formatters keep",
-			"start": 258,
-			"end": 327,
+			"start": 259,
+			"end": 328,
 			"loc": {
 				"start": {
 					"line": 12,
@@ -125,8 +125,8 @@
 		{
 			"type": "Block",
 			"value": " c4 ",
-			"start": 341,
-			"end": 349,
+			"start": 342,
+			"end": 350,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -141,8 +141,8 @@
 		{
 			"type": "Line",
 			"value": " comment between binding and from — dual-stable, both formatters keep",
-			"start": 368,
-			"end": 439,
+			"start": 369,
+			"end": 440,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -157,8 +157,8 @@
 		{
 			"type": "Block",
 			"value": " c5 ",
-			"start": 457,
-			"end": 465,
+			"start": 458,
+			"end": 466,
 			"loc": {
 				"start": {
 					"line": 16,
@@ -169,24 +169,56 @@
 					"column": 25
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment between as and binding — tsv indents the binding, prettier flattens it",
+			"start": 481,
+			"end": 567,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 581,
+			"end": 586,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 13
+				},
+				"end": {
+					"line": 19,
+					"column": 18
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 487,
+		"end": 614,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 478,
+			"end": 605,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 17,
+					"line": 21,
 					"column": 9
 				}
 			},
@@ -324,7 +356,7 @@
 				{
 					"type": "ExportAllDeclaration",
 					"start": 221,
-					"end": 255,
+					"end": 256,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -332,22 +364,22 @@
 						},
 						"end": {
 							"line": 10,
-							"column": 19
+							"column": 20
 						}
 					},
 					"exportKind": "value",
 					"exported": {
 						"type": "Identifier",
-						"start": 240,
-						"end": 243,
+						"start": 241,
+						"end": 244,
 						"loc": {
 							"start": {
 								"line": 10,
-								"column": 4
+								"column": 5
 							},
 							"end": {
 								"line": 10,
-								"column": 7
+								"column": 8
 							}
 						},
 						"name": "ns3",
@@ -362,16 +394,16 @@
 					},
 					"source": {
 						"type": "Literal",
-						"start": 249,
-						"end": 254,
+						"start": 250,
+						"end": 255,
 						"loc": {
 							"start": {
 								"line": 10,
-								"column": 13
+								"column": 14
 							},
 							"end": {
 								"line": 10,
-								"column": 18
+								"column": 19
 							}
 						},
 						"value": "./c",
@@ -388,8 +420,8 @@
 				},
 				{
 					"type": "ExportAllDeclaration",
-					"start": 329,
-					"end": 365,
+					"start": 330,
+					"end": 366,
 					"loc": {
 						"start": {
 							"line": 13,
@@ -403,8 +435,8 @@
 					"exportKind": "value",
 					"exported": {
 						"type": "Identifier",
-						"start": 350,
-						"end": 353,
+						"start": 351,
+						"end": 354,
 						"loc": {
 							"start": {
 								"line": 13,
@@ -420,15 +452,15 @@
 							{
 								"type": "Block",
 								"value": " c4 ",
-								"start": 341,
-								"end": 349
+								"start": 342,
+								"end": 350
 							}
 						]
 					},
 					"source": {
 						"type": "Literal",
-						"start": 359,
-						"end": 364,
+						"start": 360,
+						"end": 365,
 						"loc": {
 							"start": {
 								"line": 13,
@@ -446,15 +478,15 @@
 						{
 							"type": "Line",
 							"value": " comment between as and binding — dual-stable, both formatters keep",
-							"start": 258,
-							"end": 327
+							"start": 259,
+							"end": 328
 						}
 					]
 				},
 				{
 					"type": "ExportAllDeclaration",
-					"start": 441,
-					"end": 477,
+					"start": 442,
+					"end": 478,
 					"loc": {
 						"start": {
 							"line": 16,
@@ -468,8 +500,8 @@
 					"exportKind": "value",
 					"exported": {
 						"type": "Identifier",
-						"start": 453,
-						"end": 456,
+						"start": 454,
+						"end": 457,
 						"loc": {
 							"start": {
 								"line": 16,
@@ -485,15 +517,15 @@
 							{
 								"type": "Block",
 								"value": " c5 ",
-								"start": 457,
-								"end": 465
+								"start": 458,
+								"end": 466
 							}
 						]
 					},
 					"source": {
 						"type": "Literal",
-						"start": 471,
-						"end": 476,
+						"start": 472,
+						"end": 477,
 						"loc": {
 							"start": {
 								"line": 16,
@@ -511,8 +543,73 @@
 						{
 							"type": "Line",
 							"value": " comment between binding and from — dual-stable, both formatters keep",
-							"start": 368,
-							"end": 439
+							"start": 369,
+							"end": 440
+						}
+					]
+				},
+				{
+					"type": "ExportAllDeclaration",
+					"start": 569,
+					"end": 604,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 17
+						}
+					},
+					"exportKind": "value",
+					"exported": {
+						"type": "Identifier",
+						"start": 589,
+						"end": 592,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 2
+							},
+							"end": {
+								"line": 20,
+								"column": 5
+							}
+						},
+						"name": "ns6",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c6",
+								"start": 581,
+								"end": 586
+							}
+						]
+					},
+					"source": {
+						"type": "Literal",
+						"start": 598,
+						"end": 603,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 11
+							},
+							"end": {
+								"line": 20,
+								"column": 16
+							}
+						},
+						"value": "./f",
+						"raw": "'./f'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment between as and binding — tsv indents the binding, prettier flattens it",
+							"start": 481,
+							"end": 567
 						}
 					]
 				}
