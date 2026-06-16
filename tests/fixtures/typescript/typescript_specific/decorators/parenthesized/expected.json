@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 383,
+	"end": 266,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -41,56 +41,24 @@
 					"column": 76
 				}
 			}
-		},
-		{
-			"type": "Line",
-			"value": " a parenthesized optional-chain callee normalizes to parens around the",
-			"start": 256,
-			"end": 328,
-			"loc": {
-				"start": {
-					"line": 17,
-					"column": 2
-				},
-				"end": {
-					"line": 17,
-					"column": 74
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " whole expression",
-			"start": 331,
-			"end": 350,
-			"loc": {
-				"start": {
-					"line": 18,
-					"column": 2
-				},
-				"end": {
-					"line": 18,
-					"column": 21
-				}
-			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 382,
+		"end": 265,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 373,
+			"end": 256,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 22,
+					"line": 17,
 					"column": 9
 				}
 			},
@@ -98,14 +66,14 @@
 				{
 					"type": "ClassDeclaration",
 					"start": 20,
-					"end": 372,
+					"end": 255,
 					"loc": {
 						"start": {
 							"line": 2,
 							"column": 1
 						},
 						"end": {
-							"line": 21,
+							"line": 16,
 							"column": 2
 						}
 					},
@@ -129,14 +97,14 @@
 					"body": {
 						"type": "ClassBody",
 						"start": 33,
-						"end": 372,
+						"end": 255,
 						"loc": {
 							"start": {
 								"line": 2,
 								"column": 14
 							},
 							"end": {
-								"line": 21,
+								"line": 16,
 								"column": 2
 							}
 						},
@@ -649,152 +617,6 @@
 											},
 											"computed": false
 										}
-									}
-								]
-							},
-							{
-								"type": "PropertyDefinition",
-								"start": 353,
-								"end": 369,
-								"loc": {
-									"start": {
-										"line": 19,
-										"column": 2
-									},
-									"end": {
-										"line": 20,
-										"column": 4
-									}
-								},
-								"static": false,
-								"computed": false,
-								"key": {
-									"type": "Identifier",
-									"start": 367,
-									"end": 368,
-									"loc": {
-										"start": {
-											"line": 20,
-											"column": 2
-										},
-										"end": {
-											"line": 20,
-											"column": 3
-										}
-									},
-									"name": "e"
-								},
-								"value": null,
-								"decorators": [
-									{
-										"type": "Decorator",
-										"start": 353,
-										"end": 364,
-										"loc": {
-											"start": {
-												"line": 19,
-												"column": 2
-											},
-											"end": {
-												"line": 19,
-												"column": 13
-											}
-										},
-										"expression": {
-											"type": "CallExpression",
-											"start": 355,
-											"end": 363,
-											"loc": {
-												"start": {
-													"line": 19,
-													"column": 4
-												},
-												"end": {
-													"line": 19,
-													"column": 12
-												}
-											},
-											"callee": {
-												"type": "ChainExpression",
-												"start": 356,
-												"end": 360,
-												"loc": {
-													"start": {
-														"line": 19,
-														"column": 5
-													},
-													"end": {
-														"line": 19,
-														"column": 9
-													}
-												},
-												"expression": {
-													"type": "MemberExpression",
-													"start": 356,
-													"end": 360,
-													"loc": {
-														"start": {
-															"line": 19,
-															"column": 5
-														},
-														"end": {
-															"line": 19,
-															"column": 9
-														}
-													},
-													"object": {
-														"type": "Identifier",
-														"start": 356,
-														"end": 357,
-														"loc": {
-															"start": {
-																"line": 19,
-																"column": 5
-															},
-															"end": {
-																"line": 19,
-																"column": 6
-															}
-														},
-														"name": "a"
-													},
-													"property": {
-														"type": "Identifier",
-														"start": 359,
-														"end": 360,
-														"loc": {
-															"start": {
-																"line": 19,
-																"column": 8
-															},
-															"end": {
-																"line": 19,
-																"column": 9
-															}
-														},
-														"name": "b"
-													},
-													"computed": false,
-													"optional": true
-												}
-											},
-											"arguments": [],
-											"optional": false
-										}
-									}
-								],
-								"leadingComments": [
-									{
-										"type": "Line",
-										"value": " a parenthesized optional-chain callee normalizes to parens around the",
-										"start": 256,
-										"end": 328
-									},
-									{
-										"type": "Line",
-										"value": " whole expression",
-										"start": 331,
-										"end": 350
 									}
 								]
 							}

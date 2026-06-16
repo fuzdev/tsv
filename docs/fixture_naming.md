@@ -467,6 +467,19 @@ no canonical output to record. Add the fixed-name marker file instead:
 - The validator live-verifies the claim (F5): `prettier(input) != input` AND `prettier²(input) != prettier(input)`
 - Rare — use only when `deno task fixtures:update:formatted` cannot converge (see ./fixture_overview.md rules F5/S18)
 
+**For documenting prettier rejection** (`prettier_rejects.txt`):
+
+When prettier *throws* on the input (a parse rejection or a printer crash), no
+prettier-anchored claim file is expressible — prettier can't produce any output.
+Add the fixed-name marker file instead:
+
+- Fixed filename `prettier_rejects.txt` (not a variant pattern; its trimmed content is the position-stripped expected-error substring, matched with `contains` — all prose lives in README.md)
+- Must be in a `_prettier_divergence` directory with README.md
+- Cannot coexist with any prettier-claim file (same forbid-set as `prettier_nonconvergent.txt`) — S19; `unformatted_ours_*` is allowed. Mutually exclusive with `prettier_nonconvergent.txt` (prettier either throws or oscillates)
+- The validator live-verifies the claim (F6): `prettier(input)` errors with a message containing the pinned substring
+- The input must be valid by tsv's parse oracle (Svelte / acorn-typescript). Hand-author it (`fixture_init` runs prettier, which throws), then `deno task fixtures:update:parsed` for `expected.json`
+- Rare — use only for genuine upstream prettier parser/printer bugs (see ./fixture_overview.md rules F6/S19)
+
 ---
 
 ## Line Wrapping Tests (`long` / `_long`)

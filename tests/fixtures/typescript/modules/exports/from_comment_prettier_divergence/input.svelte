@@ -4,7 +4,7 @@
 
 	// named specifiers, line comment before from
 	export {b} // c2
-	from './b';
+		from './b';
 
 	// multiple named specifiers, block comment before from
 	export {c, d} /* c3 */ from './c';

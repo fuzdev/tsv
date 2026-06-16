@@ -22,6 +22,20 @@ pub const EXPECTED_SVELTE_ERROR_JSON: &str = "{\"error\": \"failed to parse\"}\n
 /// with a README; content is free-form prose describing the non-convergence.
 pub const PRETTIER_NONCONVERGENT_FILENAME: &str = "prettier_nonconvergent.txt";
 
+/// Marker file asserting prettier *rejects* the fixture's input — its parser
+/// throws (e.g. a typescript-estree parse error) or its printer crashes — so
+/// prettier cannot serve as a formatter oracle (no `output_prettier.*`, no
+/// chain to pin in `audit_signature.txt`). The validator live-verifies the
+/// claim instead of running F2/F3/F4 and the prettier-side N rules (rule F6):
+/// `prettier(input)` must return an error whose message contains this file's
+/// trimmed content (the position-stripped error text, matched with `contains`).
+/// Catches the bug being fixed upstream (prettier accepts → stale) and the
+/// error morphing (different message → stale). Only sanctioned in
+/// `_prettier_divergence` directories with a README; the marker holds exactly
+/// the expected-error substring — prose lives in README.md. Mutually exclusive
+/// with `prettier_nonconvergent.txt` (prettier either throws or oscillates).
+pub const PRETTIER_REJECTS_FILENAME: &str = "prettier_rejects.txt";
+
 /// Type of input file for a fixture
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InputType {
@@ -176,6 +190,11 @@ impl Fixture {
     /// Get the full path to the prettier non-convergence marker file
     pub fn prettier_nonconvergent_path(&self) -> PathBuf {
         self.path.join(PRETTIER_NONCONVERGENT_FILENAME)
+    }
+
+    /// Get the full path to the prettier-rejects marker file
+    pub fn prettier_rejects_path(&self) -> PathBuf {
+        self.path.join(PRETTIER_REJECTS_FILENAME)
     }
 
     /// Check if this fixture matches any of the given filter terms

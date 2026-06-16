@@ -698,6 +698,60 @@ pub(super) async fn validate_prettier_nonconvergent(
     result.add_success(ValidationSuccess::PrettierNonconvergenceVerified);
 }
 
+/// F6: Live-verify a `prettier_rejects.txt` claim.
+///
+/// The marker asserts prettier THROWS on this input (a parse rejection or a
+/// printer crash), so there is no prettier output to record or pin — F2/F3/F4
+/// and the prettier-side N rules are inexpressible. Instead of trusting the
+/// marker, verify the claim still holds: `prettier(input)` must return an error
+/// whose message contains the marker's recorded substring (the position-stripped
+/// error text). This catches both the bug being fixed upstream (prettier accepts
+/// → `RejectsMarkerButPrettierAccepts`) and the error morphing into a different
+/// message (→ `RejectsMarkerWrongMessage`), each with a remediation hint.
+pub(super) async fn validate_prettier_rejects(
+    result: &mut FixtureValidation,
+    fixture: &Fixture,
+    input: &str,
+) {
+    let expected = match read_file(&fixture.prettier_rejects_path()) {
+        Ok(s) => s.trim().to_string(),
+        Err(e) => {
+            result.add_error(ValidationError::FormatterError(format!(
+                "reading prettier_rejects.txt for {}: {e}",
+                fixture.input_file
+            )));
+            return;
+        }
+    };
+    if expected.is_empty() {
+        result.add_error(ValidationError::RejectsMarkerEmpty(
+            fixture.input_file.clone(),
+        ));
+        return;
+    }
+
+    let parser = fixture.input_type().prettier_parser();
+    match run_prettier(input, parser).await {
+        Ok(_) => {
+            result.add_error(ValidationError::RejectsMarkerButPrettierAccepts(
+                fixture.input_file.clone(),
+            ));
+        }
+        Err(e) => {
+            let actual = e.to_string();
+            if actual.contains(&expected) {
+                result.add_success(ValidationSuccess::PrettierRejectionVerified);
+            } else {
+                result.add_error(ValidationError::RejectsMarkerWrongMessage {
+                    input: fixture.input_file.clone(),
+                    expected,
+                    actual,
+                });
+            }
+        }
+    }
+}
+
 /// F2, F3: Validate formatter output matches prettier
 pub(super) async fn validate_formatter_prettier(
     result: &mut FixtureValidation,

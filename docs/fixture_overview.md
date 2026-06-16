@@ -232,6 +232,9 @@ Does prettier format input.svelte differently?
 Special case: prettier NEVER converges (every pass changes the output — no fixed point)
    └─> input.* + prettier_nonconvergent.txt + README.md, no prettier-claim files (F5/S18)
 
+Special case: prettier THROWS on the input (parse rejection or printer crash — no oracle)
+   └─> input.* + prettier_rejects.txt + README.md, no prettier-claim files (F6/S19)
+
 Note: in _prettier_divergence dirs, use unformatted_ours_*.svelte when only our formatter
 normalizes to input; plain unformatted_*.svelte is allowed (and N3-validated) when the dir
 has no output_prettier.* and prettier also normalizes the variant to input
@@ -249,6 +252,7 @@ Tip: Use `deno task fixtures:audit <pattern>` to classify novel prettier outputs
 - `prettier_intermediate_to_variant_*.svelte` — Prettier's unstable first-pass output (from `unformatted_ours_*`, converges to a `variant_*`/`prettier_variant_*`)
 - `audit_signature.txt` — Pins prettier's multi-pass chain from `output_prettier.*` to fixed point (auto-generated; see F4)
 - `prettier_nonconvergent.txt` — Prettier never reaches a fixed point on input (no oracle exists); claim live-verified (see F5/S18)
+- `prettier_rejects.txt` — Prettier throws on the input (parse rejection or printer crash; no oracle exists); the file's trimmed content is the expected-error substring, claim live-verified (see F6/S19)
 - `unformatted_*.svelte` — Normalization tests - both formatters normalize to `input.svelte`
 - `unformatted_ours_*.svelte` — Normalization tests - only our formatter normalizes to `input.svelte`
 - `unformatted_prettier_*.svelte` — Normalization tests - prettier normalizes to `output_prettier.svelte`
@@ -309,18 +313,21 @@ All fixtures use `input.svelte` as canonical source.
    - `variant_*.*` files (dual-stable forms), OR
    - `unformatted_ours_*.*` files (testing our formatter only), OR
    - `prettier_intermediate_*.*` or `prettier_intermediate_to_variant_*.*` files (multi-pass convergence), OR
-   - `prettier_nonconvergent.txt` (prettier never reaches a fixed point)
+   - `prettier_nonconvergent.txt` (prettier never reaches a fixed point), OR
+   - `prettier_rejects.txt` (prettier throws on the input)
 9. **S8-rev**: `_prettier_divergence` directories MUST document the divergence with one of:
    - `output_prettier.*` (shows what prettier produces), OR
    - `prettier_variant_*.*` files (shows prettier's stable variants), OR
    - `variant_*.*` files (shows dual-stable forms), OR
    - `unformatted_ours_*.*` + README.md (for normalization divergence), OR
-   - `prettier_nonconvergent.txt` + README.md (prettier has no fixed point — see F5)
+   - `prettier_nonconvergent.txt` + README.md (prettier has no fixed point — see F5), OR
+   - `prettier_rejects.txt` + README.md (prettier throws on the input — see F6)
 10. **S9**: `_prettier_divergence` directories with `output_prettier.*` CANNOT have `unformatted_*.*` files (use `unformatted_prettier_*` or `unformatted_ours_*`). Without `output_prettier.*`, input is prettier-stable (F3), so `unformatted_*` is allowed and N3 validates it — a `prettier_variant_*`-style divergence dir can still hold variants both formatters normalize to input
 11. **S10**: `prettier_variant_*.*` files MUST be in `_prettier_divergence` directories (enforced by S8)
 12. **S11**: `unformatted_ours_*.*` files MUST be in `_prettier_divergence` directories (enforced by S8)
 13. **S12**: `_svelte_divergence` or `_svelte_prettier_divergence` suffix required when `expected_ours.json`/`expected_svelte.json` exist
 14. **S18**: `prettier_nonconvergent.txt` CANNOT coexist with prettier-claim files (`output_prettier.*`, `unformatted_*`, `unformatted_prettier_*`, `prettier_variant_*`, `variant_*`, `prettier_intermediate_*`) — prettier has no fixed point, so no prettier-anchored claim is expressible. `unformatted_ours_*` stays allowed (it claims only our formatter's normalization)
+15. **S19**: `prettier_rejects.txt` follows the same claim-file rules as S18 (prettier throws, so no prettier-anchored claim is expressible; `unformatted_ours_*` stays allowed) AND is mutually exclusive with `prettier_nonconvergent.txt` (prettier either throws or oscillates, never both)
 
 **TypeScript fixture rules** (`input.ts`):
 
@@ -377,6 +384,7 @@ on real codebases.
 - **F3**: `prettier(input)` equals `input` when no `output_prettier.*` exists (applies to ALL directories including `_prettier_divergence`)
 - **F4**: `audit_signature.txt`, when present, byte-matches the live prettier chain from `output_prettier.*` to its fixed point. Pins multi-pass non-idempotent behavior so the audit doesn't flag it as novel, and catches pass-2+ drift that F2 alone (pass-1 only) would miss
 - **F5**: when `prettier_nonconvergent.txt` exists, F2/F3/F4 and the prettier-side N rules are replaced by a live check of the claim: `prettier(input) != input` AND `prettier²(input) != prettier(input)`. If prettier converges (either check fails), validation fails with a hint to delete the marker and re-document the divergence normally
+- **F6**: when `prettier_rejects.txt` exists, F2/F3/F4 and the prettier-side N rules are replaced by a live check of the claim: `prettier(input)` must return an error whose message contains the marker's trimmed content (the position-stripped error substring). If prettier accepts the input (bug fixed) or throws a different message (bug morphed), validation fails with a hint to re-document or update the marker
 
 **Normalization validations (N)** - Variants normalize correctly:
 
@@ -457,8 +465,10 @@ Test failing?
 ├─ Formatter (not idempotent / differs from prettier)
 │  ├─ Stale? → deno task fixtures:update:formatted
 │  ├─ Real diff? → cargo run -p tsv_debug compare input.svelte
-│  └─ Stale prettier_nonconvergent.txt (F5)? → prettier converges now; delete the
-│     marker and document normally (the error's hint names which check failed)
+│  ├─ Stale prettier_nonconvergent.txt (F5)? → prettier converges now; delete the
+│  │  marker and document normally (the error's hint names which check failed)
+│  └─ Stale prettier_rejects.txt (F6)? → prettier accepts now (delete marker,
+│     document normally) or throws a different message (update the marker substring)
 │
 └─ Normalization (unformatted_* doesn't normalize)
    └─ Check prettier: cargo run -p tsv_debug format_prettier unformatted_X.svelte | diff - input.svelte
@@ -972,7 +982,7 @@ When `output_prettier.*` exists, certain validations are **automatically skipped
 **What ALWAYS runs:**
 
 - Our formatter validation (F1 - validates our behavior regardless)
-- Prettier baseline (F2, F3, or F5 - exactly one of these always runs; F5 replaces F2/F3 when `prettier_nonconvergent.txt` declares prettier has no fixed point)
+- Prettier baseline (F2, F3, F5, or F6 - exactly one of these always runs; F5 replaces F2/F3 when `prettier_nonconvergent.txt` declares prettier has no fixed point, F6 when `prettier_rejects.txt` declares prettier throws on the input)
 - Prettier normalization on `unformatted_*` files (N3) — S9 only allows them where input is prettier-stable, including `prettier_variant_*`-style divergence dirs
 
 **Key invariant:** Every `_prettier_divergence` directory must document divergence with one of:
@@ -982,6 +992,7 @@ When `output_prettier.*` exists, certain validations are **automatically skipped
 - `variant_*.*` (dual-stable forms)
 - `unformatted_ours_*.*` + README.md (normalization divergence where prettier(input) == input)
 - `prettier_nonconvergent.txt` + README.md (prettier never reaches a fixed point — no oracle exists)
+- `prettier_rejects.txt` + README.md (prettier throws on the input — no oracle exists)
 
 #### Example: CSS Comment Whitespace
 
@@ -1073,6 +1084,7 @@ Pattern → validation applied — notes:
 - `output_prettier.*` → F2: Must equal prettier(input) — When exists, F3 skipped
 - (no output_prettier) → F3: prettier(input) must = input — Always checked, even in `_prettier_divergence` dirs
 - `prettier_nonconvergent.txt` → F5: prettier(input) ≠ input AND prettier²(input) ≠ prettier(input) — Replaces F2/F3/F4 + prettier-side N rules (no fixed point exists)
+- `prettier_rejects.txt` → F6: prettier(input) errors with the pinned substring — Replaces F2/F3/F4 + prettier-side N rules (prettier throws on the input)
 - `prettier_variant_*.*` → Rule 1 (prettier idempotent) — Rule 3 (differs from input)
 - `unformatted_*.*` → Both formatters validated — N3 (prettier → input) + N4 (ours → input)
 - `input_invalid_*` → Must fail to parse — Both our parser and canonical

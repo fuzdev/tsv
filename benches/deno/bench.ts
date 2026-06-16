@@ -703,6 +703,8 @@ interface BaselineEntry {
 
 /** Package versions used in the benchmark run */
 interface BaselineVersions {
+	/** tsv's own version, from `Cargo.toml` `[workspace.package]` (the binary under test). */
+	tsv: string;
 	svelte: string;
 	acorn: string;
 	acorn_ts: string;
@@ -733,6 +735,25 @@ interface Baseline {
 	 * report). Empty `{}` when nothing was suppressed.
 	 */
 	suppressed_noise: Record<string, number>;
+}
+
+/**
+ * Read tsv's own version from the workspace `Cargo.toml` (`[workspace.package]`),
+ * the single source of truth every crate inherits via `version.workspace = true`
+ * and that the published npm packages move together at. Returns `'unknown'` if it
+ * can't be read or parsed.
+ */
+async function get_tsv_version(): Promise<string> {
+	try {
+		const cargo_toml_path = new URL('../../Cargo.toml', import.meta.url).pathname;
+		const content = await Deno.readTextFile(cargo_toml_path);
+		// Match the first `version = "..."` inside the `[workspace.package]` section.
+		const match = content.match(/\[workspace\.package\][^[]*?\bversion\s*=\s*"([^"]+)"/);
+		if (match) return match[1];
+	} catch {
+		// Ignore
+	}
+	return 'unknown';
 }
 
 /** Get current git commit hash */
@@ -826,7 +847,7 @@ function generate_markdown_report(
 	const lines: string[] = [];
 	lines.push('# tsv benchmark results\n');
 	const commit_str = git_commit ? ` (${git_commit})` : '';
-	lines.push(`**Date:** ${timestamp}${commit_str}\n`);
+	lines.push(`**Date:** ${timestamp} — tsv ${versions.tsv}${commit_str}\n`);
 
 	const total_files = corpus.svelte + corpus.typescript + corpus.css;
 	const total_bytes = corpus_bytes.svelte + corpus_bytes.typescript + corpus_bytes.css;
@@ -1111,6 +1132,7 @@ const corpus = {
 const alt_versions = get_alternative_versions(impls);
 const v = impls.versions.canonical;
 const versions: BaselineVersions = {
+	tsv: await get_tsv_version(),
 	svelte: v.svelte,
 	acorn: v.acorn,
 	acorn_ts: v['@sveltejs/acorn-typescript'],

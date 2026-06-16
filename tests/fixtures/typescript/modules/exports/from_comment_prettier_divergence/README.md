@@ -20,12 +20,13 @@ export {c, d /* c3 */} from './c';
 ```
 export {a} /* c1 */ from './a';
 export {b} // c2
-from './b';
+	from './b';
 export {c, d} /* c3 */ from './c';
 ```
 
 Per Comment Position Philosophy. The into-braces relocation matches the sibling import
 `from_comment` and `type_keyword_comment` fixtures; the no-`from` analog (`}`→`;`) is
-`close_brace_comment`.
+`close_brace_comment`. When the c2 line comment forces `from` onto its own line, tsv
+indents that continuation one level (a single statement spanning lines).
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
