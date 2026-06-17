@@ -725,9 +725,12 @@ impl<'a> Printer<'a> {
             let has_newline_before = self.has_newline_between(pos, comment.span.start);
 
             if is_first && !has_newline_before {
-                // First comment on same line as operator: `a && // comment`
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
+                // First comment on same line as operator: `a && // comment`. A
+                // line comment goes through `line_suffix` (zero width), so a long
+                // trailing comment never forces the preceding operand group to
+                // break — matching prettier's `lineSuffix`. Block comments stay
+                // inline, width counted.
+                parts.push(self.build_trailing_comment_doc(comment));
             } else {
                 // Comment on its own line
                 parts.push(d.hardline());
@@ -1170,13 +1173,9 @@ impl<'a> Printer<'a> {
                     if self.has_newline_between(pos, comment.span.start) {
                         break;
                     }
-                    if comment.is_block {
-                        od.push(d.text(" "));
-                        od.push(self.build_comment_doc(comment));
-                    } else {
-                        let suffix = d.concat(&[d.text(" "), self.build_comment_doc(comment)]);
-                        od.push(d.line_suffix(suffix));
-                    }
+                    // Same-line trailing comment: block inline before the comma, line
+                    // comment deferred via `line_suffix` to render after the comma.
+                    od.push(self.build_trailing_comment_doc(comment));
                     pos = comment.span.end;
                 }
             }

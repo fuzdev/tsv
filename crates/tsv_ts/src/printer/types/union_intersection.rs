@@ -363,8 +363,15 @@ impl<'a> Printer<'a> {
                 if let Some(pipe_pos) =
                     find_separator_position(self.source, prev_type_end, type_start, b'|')
                 {
-                    // Comments before the pipe (trailing on previous type's line or on own lines)
-                    parts.extend(self.build_trailing_comments_multiline(prev_type_end, pipe_pos));
+                    // Comments before the pipe (trailing on previous type's line or on
+                    // own lines). A same-line line comment is line_suffix'd (zero width)
+                    // so it can't force the previous member to break — the leading-`|`
+                    // form puts the next separator on a new line, where it flushes.
+                    parts.extend(self.build_trailing_comments_multiline_ext(
+                        prev_type_end,
+                        pipe_pos,
+                        true,
+                    ));
 
                     // Relocated paren leading line comments: trail prev member
                     for comment in &relocated_paren_leading {

@@ -188,10 +188,14 @@ impl<'a> Printer<'a> {
                             if needs_hardline {
                                 parts.push(d.hardline());
                                 parts.push(d.text(INDENT));
+                                parts.push(self.build_comment_doc(comment));
                             } else {
-                                parts.push(d.text(" "));
+                                // Same-line comment trailing the comma: a line comment
+                                // goes through `line_suffix` (zero width) so it never
+                                // forces the preceding declarator's value to break
+                                // (prettier's `lineSuffix`); a block stays inline.
+                                parts.push(self.build_trailing_comment_doc(comment));
                             }
-                            parts.push(self.build_comment_doc(comment));
                             needs_hardline = !comment.is_block;
                         }
                     } else {

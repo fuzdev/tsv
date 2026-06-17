@@ -1368,13 +1368,34 @@ impl<'a> Printer<'a> {
     ///
     /// Used when line comments force multiline formatting (unions, tuples, etc.)
     pub(crate) fn build_trailing_comments_multiline(&self, start: u32, end: u32) -> Vec<DocId> {
+        self.build_trailing_comments_multiline_ext(start, end, false)
+    }
+
+    /// As `build_trailing_comments_multiline`, but when `suffix_same_line_lines` is set
+    /// a same-line **line** comment is routed through `line_suffix` (zero width) so it
+    /// can't force the preceding element to break. Only safe where the following
+    /// separator lands on a *new* line (so the suffix flushes at that hardline without
+    /// crossing the separator) — true for the union's leading-`|` form, but NOT the
+    /// intersection's trailing-`&` form (a same-line `//` there would otherwise comment
+    /// out the `&`; that case is handled as a comment-position divergence instead).
+    pub(crate) fn build_trailing_comments_multiline_ext(
+        &self,
+        start: u32,
+        end: u32,
+        suffix_same_line_lines: bool,
+    ) -> Vec<DocId> {
         let d = self.d();
         let mut parts = Vec::new();
         for comment in comments_in_range(self.comments, start, end) {
             if self.is_same_line(start, comment.span.start) {
-                // Same line as start: trailing comment (both block and line)
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
+                if suffix_same_line_lines {
+                    // Block → inline (width counted); line → line_suffix (zero width).
+                    parts.push(self.build_trailing_comment_doc(comment));
+                } else {
+                    // Same line as start: trailing comment (block or line), inline.
+                    parts.push(d.text(" "));
+                    parts.push(self.build_comment_doc(comment));
+                }
             } else {
                 // Own line comment (block or line)
                 parts.push(d.hardline());
@@ -2246,12 +2267,14 @@ impl<'a> Printer<'a> {
         // Comma
         parts.push(d.text(","));
 
-        // Same-line trailing comments after comma (line comments that consume the line)
+        // Same-line trailing comments after comma (line comments that consume the line).
+        // A line comment goes through `line_suffix` (zero width) so it never forces the
+        // preceding element to break; it flushes at the hardline below (prettier's
+        // `lineSuffix`). A block stays inline, width counted.
         let mut after_comma_end = comma_pos + 1;
         for comment in comments_in_range(self.comments, comma_pos + 1, next_start) {
             if self.is_same_line(elem_end, comment.span.start) {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
+                parts.push(self.build_trailing_comment_doc(comment));
                 after_comma_end = comment.span.end;
             }
         }
