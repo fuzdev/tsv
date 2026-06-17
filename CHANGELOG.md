@@ -18,6 +18,13 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
   or runtime options, and none are planned (opinionated like `gofmt` and Black).
   Policy only — no change to formatter output or the published API
   (`format_*` / `parse_*` / the `tsv` bin).
+- parse AST: each comment now appears **once** in the public AST everywhere. tsv
+  previously replicated acorn-typescript's backtrack-and-reparse comment
+  duplication for type-space constructs (type literals, mapped/function types,
+  type assertions, type-member index/computed signatures, typed-param arrows);
+  it now corrects the duplication uniformly, matching the existing class-body
+  behavior. The set of distinct comments is unchanged; only the duplicate
+  entries are gone. Formatter output is unaffected.
 
 ## 0.1.0
 
