@@ -15,17 +15,16 @@ use tsv_lang::printing::has_blank_line_between_strict;
 ///
 /// Encapsulates the logic for interleaving comments, line breaks, and groups
 /// when building the rest of a chain (everything after the first group).
-pub(crate) struct ChainPartsBuilder<'a, 'p, P: ChainPrinter> {
+pub(crate) struct ChainPartsBuilder<'a, P: ChainPrinter> {
     parts: Vec<DocId>,
-    printer: &'p P,
+    printer: &'a P,
     use_hardline: bool,
     use_expanded: bool,
-    _phantom: std::marker::PhantomData<&'a ()>,
 }
 
-impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
+impl<'a, P: ChainPrinter> ChainPartsBuilder<'a, P> {
     pub(crate) fn new(
-        printer: &'p P,
+        printer: &'a P,
         use_hardline: bool,
         use_expanded: bool,
         group_count: usize,
@@ -37,19 +36,18 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
             printer,
             use_hardline,
             use_expanded,
-            _phantom: std::marker::PhantomData,
         }
     }
 
     /// Add a group with its associated comments and line breaks
-    pub(crate) fn add_group(&mut self, group: &ChainGroup<'a>) {
+    pub(crate) fn add_group(&mut self, group: &ChainGroup<'_>) {
         self.add_comments_and_break(group);
         self.add_group_doc(group);
     }
 
     /// Add a group without a preceding line break, but with trailing comments
     /// Used for trailing member accesses that should stay on same line as `})`
-    pub(crate) fn add_group_no_break(&mut self, group: &ChainGroup<'a>) {
+    pub(crate) fn add_group_no_break(&mut self, group: &ChainGroup<'_>) {
         self.add_trailing_comments_only(group);
         self.add_group_doc(group);
     }
@@ -66,7 +64,7 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
     /// a trailing member are a complex case - Prettier moves them elsewhere
     /// (e.g., after `=`), which requires structural transformation beyond what
     /// this function handles.
-    fn add_trailing_comments_only(&mut self, group: &ChainGroup<'a>) {
+    fn add_trailing_comments_only(&mut self, group: &ChainGroup<'_>) {
         if let Some((object_end, property_start)) = group.first_member_range() {
             let classified = self.printer.classify_comments(object_end, property_start);
 
@@ -101,7 +99,7 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
     ///
     /// Uses single-pass comment classification (O(log n + k)) instead of 4 separate
     /// filter calls (O(4 log n + 4k)).
-    fn add_comments_and_break(&mut self, group: &ChainGroup<'a>) {
+    fn add_comments_and_break(&mut self, group: &ChainGroup<'_>) {
         if let Some((object_end, property_start)) = group.first_member_range() {
             // Classify all comments in one pass (single binary search)
             let classified = self.printer.classify_comments(object_end, property_start);
@@ -192,7 +190,7 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
     ///
     /// Skips block comments for the first member since `add_comments_and_break`
     /// already handles them (emitting before the line break).
-    fn add_group_doc(&mut self, group: &ChainGroup<'a>) {
+    fn add_group_doc(&mut self, group: &ChainGroup<'_>) {
         self.parts.push(if self.use_expanded {
             print_group_expanded_skip_first_comments(group, self.printer)
         } else {
