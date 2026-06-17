@@ -2,7 +2,7 @@
 
 > a formatter, parser, and future linter + more for Svelte, TypeScript, and CSS
 
-High-performance Rust parser as a drop-in replacement for Svelte's modern parser (acorn + acorn-typescript) with a near-Prettier formatter that tracks Prettier closely.
+High-performance Rust parser as a drop-in replacement for Svelte's modern parser (acorn + acorn-typescript), paired with a formatter that took Prettier as its initial guide and still tracks it closely for the common case — while making deliberate, cataloged choices to diverge where tsv's own judgment is more defensible.
 
 **Non-configurable by design**: formatting options are fixed at Prettier's defaults except printWidth=100, useTabs=true, singleQuote=true, and bracketSpacing=false — no config files, CLI flags, or runtime options, ever (opinionated like `gofmt` and Black). See [Configuration](#configuration).
 
@@ -13,8 +13,8 @@ this repo — make the edits and stop, the user commits.
 
 ## Priorities
 
-1. **Correctness**: Match Svelte's parser and Prettier's formatter exactly. Fixtures are the source of truth for correct behavior - when tests fail, fix the code.
-2. **Performance**: Pure Rust for speed. Embedded Deno sidecar (dev tooling) is orders of magnitude faster than spawning a process per call.
+1. **Correctness**: Match Svelte's parser exactly — it's a drop-in replacement. The formatter began with Prettier as its guide and tracks it for the common case, but tsv has its own identity and makes deliberate, cataloged choices to diverge where they're more defensible (spec, print width, comment position, its own taste). tsv also fixes numerous Prettier bugs. Fixtures are the source of truth for correct behavior — when tests fail, fix the code; when tsv diverges on purpose, the fixture records it.
+2. **Performance**: Pure Rust for speed. Dev tools use an embedded Deno sidecar that minimizes process overhead.
 
 ## Development Philosophy: Test-Driven Development with Fixtures
 
@@ -427,10 +427,11 @@ See [Development Philosophy](#development-philosophy-test-driven-development-wit
 
 **When our formatter differs from prettier:**
 
-- Default: fix our formatter to match prettier
-- Exception (spec precedence): when the spec defines a canonical form prettier doesn't emit, follow the spec — even if prettier's output is itself valid. Document with spec refs in a `_prettier_divergence`
-- Exception: when prettier moves comments to different syntactic positions, preserve the user's placement. See ./docs/conformance_prettier.md#comment-position-philosophy
-- `_prettier_divergence` suffix: rare, documented intentional differences only. Requires README. Never use to hide bugs.
+- Default: for cosmetic or ambiguous differences, match prettier — but a mismatch is a question, not automatically a bug. Diverge when there's a defensible reason, recorded in a `_prettier_divergence`
+- Spec precedence: when the spec defines a canonical form prettier doesn't emit, follow the spec — even if prettier's output is itself valid. Document with spec refs in a `_prettier_divergence`
+- Comment position: when prettier moves comments to different syntactic positions, preserve the user's placement. See ./docs/conformance_prettier.md#comment-position-philosophy
+- Other defensible tsv-native choices (print width as a hard limit, a clearly better layout) are legitimate too — just sanction them deliberately, never to hide a bug
+- `_prettier_divergence` suffix: deliberate, documented intentional differences only. Requires README. Never use to hide bugs.
 
 ---
 

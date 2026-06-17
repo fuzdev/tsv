@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 323,
+	"end": 320,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -23,7 +23,7 @@
 			{
 				"type": "RegularElement",
 				"start": 80,
-				"end": 322,
+				"end": 319,
 				"name": "p",
 				"name_loc": {
 					"start": {
@@ -44,49 +44,49 @@
 						{
 							"type": "Text",
 							"start": 83,
-							"end": 131,
-							"raw": "\n\tThis is a very long paragraph that contains a ",
-							"data": "\n\tThis is a very long paragraph that contains a "
+							"end": 132,
+							"raw": "\n\tThis is a very long paragraph that contains a\n\t",
+							"data": "\n\tThis is a very long paragraph that contains a\n\t"
 						},
 						{
 							"type": "Component",
-							"start": 131,
-							"end": 208,
+							"start": 132,
+							"end": 204,
 							"name": "Link",
 							"name_loc": {
 								"start": {
-									"line": 3,
-									"column": 48,
-									"character": 132
+									"line": 4,
+									"column": 2,
+									"character": 133
 								},
 								"end": {
-									"line": 3,
-									"column": 52,
-									"character": 136
+									"line": 4,
+									"column": 6,
+									"character": 137
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 137,
-									"end": 177,
+									"start": 138,
+									"end": 178,
 									"name": "href",
 									"name_loc": {
 										"start": {
-											"line": 3,
-											"column": 53,
-											"character": 137
+											"line": 4,
+											"column": 7,
+											"character": 138
 										},
 										"end": {
-											"line": 3,
-											"column": 57,
-											"character": 141
+											"line": 4,
+											"column": 11,
+											"character": 142
 										}
 									},
 									"value": [
 										{
-											"start": 143,
-											"end": 176,
+											"start": 144,
+											"end": 177,
 											"type": "Text",
 											"raw": "https://fuz.dev/aaaaaaaaaaaaaaaaa",
 											"data": "https://fuz.dev/aaaaaaaaaaaaaaaaa"
@@ -99,8 +99,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 181,
-										"end": 199,
+										"start": 179,
+										"end": 197,
 										"raw": "documentation link",
 										"data": "documentation link"
 									}
@@ -109,10 +109,10 @@
 						},
 						{
 							"type": "Text",
-							"start": 208,
-							"end": 318,
-							"raw": " in the middle and continues with more text that should wrap naturally across multiple lines when\n\tformatted.\n",
-							"data": " in the middle and continues with more text that should wrap naturally across multiple lines when\n\tformatted.\n"
+							"start": 204,
+							"end": 315,
+							"raw": "\n\tin the middle and continues with more text that should wrap naturally across multiple lines when\n\tformatted.\n",
+							"data": "\n\tin the middle and continues with more text that should wrap naturally across multiple lines when\n\tformatted.\n"
 						}
 					]
 				}
