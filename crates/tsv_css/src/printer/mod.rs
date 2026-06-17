@@ -33,7 +33,7 @@ use tsv_lang::{
         self,
         arena::{DocArena, DocId},
     },
-    printing,
+    is_format_ignore_directive, printing,
 };
 
 /// Check if function args have wrappable content (break points)
@@ -224,10 +224,10 @@ impl<'a> Printer<'a> {
             let comments_before =
                 self.print_leading_comments(prev_end, node_start, &mut comment_idx);
 
-            // Check printed comments for prettier-ignore (O(k) where k = comments_before)
+            // Check printed comments for a format-ignore directive (O(k) where k = comments_before)
             let has_ignore = self.comments[idx_before..comment_idx]
                 .iter()
-                .any(|c| c.content.trim() == "prettier-ignore");
+                .any(|c| is_format_ignore_directive(&c.content));
 
             // Add separator before node
             if printed_any || comments_before > 0 {
@@ -247,7 +247,7 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            // prettier-ignore: emit raw source instead of formatting
+            // format-ignore: emit raw source instead of formatting
             if has_ignore {
                 self.write(node.span().extract(self.source));
             } else {

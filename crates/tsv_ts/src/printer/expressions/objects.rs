@@ -178,9 +178,9 @@ impl<'a> Printer<'a> {
                     parts.push(d.hardline());
                 }
 
-                // Build property doc — a preceding `// prettier-ignore` keeps the
+                // Build property doc — a preceding format-ignore directive keeps the
                 // property's source verbatim (trailing comment/comma handled normally)
-                let prop_doc = if self.has_prettier_ignore_in_range(search_start, prop_start) {
+                let prop_doc = if self.has_format_ignore_in_range(search_start, prop_start) {
                     self.raw_source_doc(prop.span())
                 } else {
                     self.build_object_property_doc(prop)

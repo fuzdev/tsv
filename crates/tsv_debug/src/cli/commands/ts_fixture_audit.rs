@@ -66,6 +66,10 @@ const INTENTIONAL_TS: &[(&str, &str)] = &[
         "typescript/syntax/unicode_line_terminators",
         "pins U+2028/U+2029 line counting on the standalone tsv_ts loc path (LocationTracker::new_ecmascript, acorn's LineTerminator set) — formatting is context-invariant but the .svelte path tracks LF-only locations (Svelte's locate-character), so embedding would pin different locs",
     ),
+    (
+        "typescript/syntax/comments/format_ignore_prettier_divergence",
+        "format-convertible (the directive works the same embedded), but kept .ts on purpose to pin the standalone tsv_ts + prettier-typescript-parser path for the format-ignore directive — the Svelte-embedded coverage lives in svelte/syntax/format_ignore/",
+    ),
 ];
 
 /// Look up a fixture in `INTENTIONAL_TS` by relative-path suffix.

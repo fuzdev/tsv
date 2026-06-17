@@ -591,6 +591,10 @@ for comment in comments {
 
 Higher-level comment attachment helpers were evaluated for extraction to tsv_lang. The current primitives (binary search + classification) are the right abstraction. Per-printer comment handling is language-specific — each language has different rules for where comments attach relative to node types. Re-evaluate if genuine duplication emerges across multiple tools.
 
+### Format-Ignore Directives
+
+A `format-ignore` / `prettier-ignore` comment suppresses formatting of the construct that follows it (single directive), or — in Svelte templates — a `format-ignore-start` … `format-ignore-end` pair suppresses a range. Recognition is a thin string-level layer over this detached model: `tsv_lang::is_format_ignore_directive` (and `is_format_ignore_range_start` / `_end`) match the trimmed comment text and are the single source of truth for the directive set. Each printer checks them via `comments_in_range()` in the gap before a node and emits the node's raw source span (`span.extract(source)`) instead of a formatted doc. The tsv-native `format-ignore` family is canonical; the `prettier-ignore` family is honored as a drop-in alias. See [directives.md](./directives.md) and [conformance_prettier.md §Format-ignore directive](./conformance_prettier.md#format-ignore-directive).
+
 ## Allocation & Memory
 
 tsv runs on the system allocator — no `#[global_allocator]`, no alternative-allocator dependency. The performance posture is structural: each layer avoids allocation by design rather than allocating faster. (An allocator swap remains an open lever; it is a dependency decision, not an architectural one.)

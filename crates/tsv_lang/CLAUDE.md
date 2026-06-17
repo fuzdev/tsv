@@ -138,6 +138,10 @@ See [../../CLAUDE.md §Comment Handling](../../CLAUDE.md#comment-handling-detach
 | `has_line_comments_in_range()`            | Existence check restricted to line comments                                |
 | `has_multiline_block_comments_in_range()` | Existence check for multi-line block comments (force expansion)            |
 
+### Directive Recognition
+
+`is_format_ignore_directive()` / `is_format_ignore_range_start()` / `is_format_ignore_range_end()` are the single source of truth for the format-suppression directive set — the tsv-native `format-ignore` family plus prettier's `prettier-ignore` family (drop-in compat). Each operates on trimmed comment text and is called by all three language printers (`tsv_ts`, `tsv_css`, `tsv_svelte`), since the comment types differ across crates. See [docs/directives.md](../../docs/directives.md) and [docs/conformance_prettier.md §Format-ignore directive](../../docs/conformance_prettier.md#format-ignore-directive).
+
 ## Interner Traits
 
 String interning deduplicates identifiers across all languages in a file. Symbols flow from parser through doc builder to renderer:

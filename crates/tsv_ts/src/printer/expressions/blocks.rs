@@ -140,7 +140,7 @@ impl<'a> Printer<'a> {
         };
 
         // Build statements (leading comments, blank-line separators,
-        // prettier-ignore, trailing same-line comments) via the shared walk.
+        // format-ignore, trailing same-line comments) via the shared walk.
         let (mut body_parts, _prev_end, prev_stmt_end) = self.build_statement_list_docs(
             &block.body,
             block_start,
@@ -181,7 +181,7 @@ impl<'a> Printer<'a> {
     /// walk for block-statement bodies and `namespace`/`module` bodies.
     ///
     /// For each statement, appends (in order): blank-line separators, leading
-    /// comments, the statement doc (or raw source under `prettier-ignore`), and
+    /// comments, the statement doc (or raw source under format-ignore), and
     /// trailing same-line comments. `leading_content` (outer comments hoisted into
     /// the body) is emitted first.
     ///
@@ -248,8 +248,8 @@ impl<'a> Printer<'a> {
                 self.build_leading_comments_with_blank_lines(&leading_comments, stmt_start),
             );
 
-            // prettier-ignore: emit raw source instead of formatting
-            if self.has_prettier_ignore_in_range(prev_end, stmt_start) {
+            // format-ignore: emit raw source instead of formatting
+            if self.has_format_ignore_in_range(prev_end, stmt_start) {
                 body_parts.push(self.raw_source_doc(stmt.span()));
             } else {
                 body_parts.push(self.build_statement_doc(stmt));

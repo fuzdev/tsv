@@ -566,10 +566,10 @@ impl<'a> Printer<'a> {
                     is_first,
                     delimiter_pull_pos,
                 ));
-                // A preceding `// prettier-ignore` keeps the member's source
-                // verbatim (matches prettier). Use the content span (no trailing
+                // A preceding format-ignore directive keeps the member's source
+                // verbatim. Use the content span (no trailing
                 // `;`); the loop's semicolon handling below re-adds the `;`.
-                let member_doc = if self.has_prettier_ignore_in_range(prev_end, m.span().start) {
+                let member_doc = if self.has_format_ignore_in_range(prev_end, m.span().start) {
                     self.raw_source_range(m.span().start, member_content_end)
                 } else {
                     self.build_type_member_doc_inner(m)

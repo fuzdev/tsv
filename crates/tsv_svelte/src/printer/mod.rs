@@ -33,6 +33,7 @@ use std::rc::Rc;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{
     Comment, EmbedContext, INDENT, OutputBuffer, SharedInterner, SymbolResolver, TAB_WIDTH,
+    is_format_ignore_directive, is_format_ignore_range_end, is_format_ignore_range_start,
 };
 
 /// Pending whitespace state - buffers whitespace decisions until next node is known
@@ -302,8 +303,8 @@ pub(crate) fn format_svelte(root: &internal::Root, source: &str) -> String {
 
 impl<'a> Printer<'a> {
     /// Check if the last non-whitespace fragment node before `target_start` is
-    /// a `<!-- prettier-ignore -->` comment.
-    fn has_prettier_ignore_before(&self, fragment: &internal::Fragment, target_start: u32) -> bool {
+    /// a `<!-- format-ignore -->` (or `prettier-ignore`) comment.
+    fn has_format_ignore_before(&self, fragment: &internal::Fragment, target_start: u32) -> bool {
         let mut last_comment = None;
         for node in &fragment.nodes {
             let node_end = node.span().end;
@@ -323,7 +324,7 @@ impl<'a> Printer<'a> {
                 }
             }
         }
-        last_comment.is_some_and(|c| c.content.trim() == "prettier-ignore")
+        last_comment.is_some_and(|c| is_format_ignore_directive(&c.content))
     }
 
     /// Classify which section a fragment comment should travel with during
@@ -335,10 +336,11 @@ impl<'a> Printer<'a> {
         comment_idx: usize,
         root: &internal::Root,
     ) -> CommentSection {
-        // prettier-ignore-start/end mark ranges within the template —
+        // format-ignore-start/end mark ranges within the template —
         // they must stay in the fragment so the range preservation logic sees them
-        let trimmed = comment.content.trim();
-        if trimmed == "prettier-ignore-start" || trimmed == "prettier-ignore-end" {
+        if is_format_ignore_range_start(&comment.content)
+            || is_format_ignore_range_end(&comment.content)
+        {
             return CommentSection::Template;
         }
 
@@ -487,7 +489,7 @@ impl<'a> Printer<'a> {
                     self.write("\n"); // Blank line between sections
                 }
                 self.print_section_comments(comments, &root.fragment, script.span.start);
-                if self.has_prettier_ignore_before(&root.fragment, script.span.start) {
+                if self.has_format_ignore_before(&root.fragment, script.span.start) {
                     self.write(script.span.extract(self.source));
                     self.write("\n");
                 } else {
@@ -516,7 +518,7 @@ impl<'a> Printer<'a> {
 
         // Format style (if present)
         if let Some(style) = &root.css {
-            let ignore_style = self.has_prettier_ignore_before(&root.fragment, style.span.start);
+            let ignore_style = self.has_format_ignore_before(&root.fragment, style.span.start);
             if has_previous_section {
                 self.write("\n"); // Blank line between sections
             }
@@ -802,16 +804,14 @@ impl<'a> Printer<'a> {
 
                     self.print_comment(comment);
 
-                    let trimmed = comment.content.trim();
-
-                    // prettier-ignore-start/end: preserve all nodes between as raw source
+                    // format-ignore-start/end: preserve all nodes between as raw source
                     // Only active at root level (nested ranges are treated as regular comments)
-                    if trimmed == "prettier-ignore-start" {
-                        // Find the matching prettier-ignore-end
+                    if is_format_ignore_range_start(&comment.content) {
+                        // Find the matching range-end marker
                         let mut end_idx = None;
                         for j in (i + 1)..fragment.nodes.len() {
                             if let FragmentNode::Comment(end_comment) = &fragment.nodes[j]
-                                && end_comment.content.trim() == "prettier-ignore-end"
+                                && is_format_ignore_range_end(&end_comment.content)
                             {
                                 end_idx = Some(j);
                                 break;
@@ -831,8 +831,8 @@ impl<'a> Printer<'a> {
                         }
                     }
 
-                    // prettier-ignore: preserve next non-whitespace node as raw source
-                    if trimmed == "prettier-ignore" {
+                    // format-ignore: preserve next non-whitespace node as raw source
+                    if is_format_ignore_directive(&comment.content) {
                         let mut next_idx = i + 1;
                         while next_idx < fragment.nodes.len() {
                             if let FragmentNode::Text(text) = &fragment.nodes[next_idx]
