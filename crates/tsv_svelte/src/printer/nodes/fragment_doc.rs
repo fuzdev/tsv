@@ -135,16 +135,9 @@ impl<'a> Printer<'a> {
                     | FragmentNode::KeyBlock(_)
             );
             let doc = if is_control_flow {
-                let has_preceding_breakable = nodes[..i].iter().any(|n| {
-                    matches!(
-                        n,
-                        FragmentNode::ExpressionTag(_)
-                            | FragmentNode::Element(_)
-                            | FragmentNode::SpecialElement(_)
-                            | FragmentNode::HtmlTag(_)
-                            | FragmentNode::RenderTag(_)
-                    )
-                });
+                // "Breakable preceding content" is exactly the inline-content set — text never
+                // breaks before a control-flow block, so reuse the one predicate.
+                let has_preceding_breakable = nodes[..i].iter().any(Self::is_inline_content);
                 self.build_fragment_node_doc_with_preceding_context(
                     node,
                     trim_text,
@@ -294,16 +287,8 @@ impl<'a> Printer<'a> {
                 // This affects whether block conditions should use remove_lines() or not:
                 // - With preceding breakable content: use remove_lines() so that content breaks first
                 // - Without preceding breakable content: allow wrapping to respect print_width
-                let has_preceding_breakable = trimmed_nodes[..i].iter().any(|n| {
-                    matches!(
-                        n,
-                        FragmentNode::ExpressionTag(_)
-                            | FragmentNode::Element(_)
-                            | FragmentNode::SpecialElement(_)
-                            | FragmentNode::HtmlTag(_)
-                            | FragmentNode::RenderTag(_)
-                    )
-                });
+                let has_preceding_breakable =
+                    trimmed_nodes[..i].iter().any(Self::is_inline_content);
                 if let Some(node_doc) = self.build_fragment_node_doc_with_preceding_context(
                     node,
                     false,
@@ -327,6 +312,10 @@ impl<'a> Printer<'a> {
     /// This is NOT the same as `!tsv_html::is_block_element` which checks HTML classification.
     /// Here we check if a fragment node is a non-text element that appears inline with text
     /// (elements, expressions, tags) for the purpose of fill whitespace handling.
+    ///
+    /// Also serves as the `has_preceding_breakable` test in the node loops: this same set
+    /// (elements + expression/html/render tags) is exactly what can break before a
+    /// control-flow block — text never does.
     fn is_inline_content(node: &FragmentNode) -> bool {
         matches!(
             node,
@@ -354,9 +343,13 @@ impl<'a> Printer<'a> {
     /// `build_nodes_doc_*` accumulation loops.
     ///
     // TODO: also recognize a native `format-ignore` directive (tool-neutral, simpler than
-    // borrowing prettier's spelling) alongside `prettier-ignore`. When added, this is the one
-    // spot to extend — but `has_prettier_ignore_before` in `printer/mod.rs` matches the same
-    // literal on `&HtmlComment` and must move in lockstep.
+    // borrowing prettier's spelling) alongside `prettier-ignore`. This is the one spot to
+    // extend *for the fragment loops*, but the `"prettier-ignore"` literal is matched in
+    // several other places that must move in lockstep — `printer/mod.rs` checks it on
+    // `&HtmlComment` (`has_prettier_ignore_before`, the script/style ignore path) plus the
+    // `prettier-ignore` / `prettier-ignore-start` / `prettier-ignore-end` range handling.
+    // When adding the second spelling, hoist the recognition into one shared primitive over
+    // the trimmed comment text rather than threading a new literal through each site.
     fn is_format_ignore_comment(node: &FragmentNode) -> bool {
         matches!(node, FragmentNode::Comment(c) if c.content.trim() == "prettier-ignore")
     }
@@ -737,22 +730,28 @@ impl<'a> Printer<'a> {
                             let remaining_parts_have_content =
                                 merged_parts[idx + 1..].iter().any(|p| !p.trim().is_empty());
                             let is_last_node = i == trimmed_nodes.len() - 1;
-                            if part.ends_with(char::is_whitespace)
+                            // ASCII whitespace only, matching the leading boundary in
+                            // `emit_text_part`: a trailing non-breaking space (U+00A0 / U+202F)
+                            // is welded to its word, not a collapsible boundary, so it must not
+                            // emit a separating space before the next node.
+                            if part.ends_with(|c: char| c.is_ascii_whitespace())
                                 && (remaining_parts_have_content || !is_last_node)
                             {
                                 current_line.push(d.text(" "));
                             }
                         }
                     }
-                    // Last part's trailing space affects next node
+                    // Last part's trailing space affects next node (ASCII-only — see above).
                     prev_text_has_trailing_space = merged_parts
                         .last()
-                        .is_some_and(|p| p.ends_with(char::is_whitespace));
+                        .is_some_and(|p| p.ends_with(|c: char| c.is_ascii_whitespace()));
                 } else {
                     // No newlines - add to current line with fill for word-level breaking,
                     // folding into a preceding inline element when the boundary allows (keeps
                     // its closing `>` intact; see the comment at the top of this Text arm).
-                    let has_trailing = text.raw.ends_with(char::is_whitespace);
+                    // ASCII whitespace only (see the newline branch above): a trailing
+                    // non-breaking space stays glued to its word and emits no separating space.
+                    let has_trailing = text.raw.ends_with(|c: char| c.is_ascii_whitespace());
                     self.emit_text_part(&mut current_line, &text.raw, prev_is_inline_element);
 
                     // Add trailing space if source has it, but NOT for the last node
