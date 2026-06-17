@@ -51,6 +51,17 @@ All methods take `&self` (interior mutability via `RefCell`):
 | Line suffix  | `line_suffix()`, `line_suffix_boundary()`, `break_parent()`        |
 | Convenience  | `wrap()`, `parens()`, `brackets()`, `braces()`, `trailing_comma()` |
 | Inspection   | `will_break()`, `has_forced_break()`                               |
+| Diagnostics  | `line_comment_text_owned()` (tags `//` text for the swallow check) |
+
+The `doc::swallow` module is a render-time guard against the
+line-comment-swallow bug class (a `//` emitted inline runs to EOL and consumes
+the following token). It lives behind the **`swallow_check` cargo feature** (off
+by default, like tsv_ts's `convert`), so production builds compile it out
+entirely — no `DocArena` side-set, no render hook; `line_comment_text_owned`
+collapses to `text_owned`. With the feature, `set_swallow_check(true)` arms it
+and the renderer (via `SwallowTracker`) records every swallow into a thread-local
+sink drained by `take_swallow_reports()`. Output-neutral. `tsv_debug` enables the
+feature to drive `tsv_debug swallow_audit`.
 
 ### Rendering Pipeline
 

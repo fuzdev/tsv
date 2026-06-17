@@ -348,9 +348,21 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
     let nodes: &[DocNode] = &nodes_outer;
     let children_vec: &[DocId] = &children_outer;
 
+    // Opt-in diagnostic (`swallow_check` feature): flag a line comment that
+    // swallows the content emitted after it on the same physical line. The
+    // tracker owns the state machine and is inert when the check is disabled.
+    // Compiled out entirely without the feature. See `crate::doc::swallow`.
+    #[cfg(feature = "swallow_check")]
+    let mut swallow = crate::doc::swallow::SwallowTracker::new();
+
     while let Some(cmd) = commands.pop() {
         match &nodes[cmd.doc.index()] {
             DocNode::Text(t) => {
+                #[cfg(feature = "swallow_check")]
+                if swallow.enabled() {
+                    let s = resolve_text(t, resolver);
+                    swallow.on_text(arena.is_line_comment(cmd.doc), s, output);
+                }
                 render_text(t, output, pos, resolver);
             }
 
@@ -368,7 +380,13 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                         resolver,
                     );
                 }
-                render_line_break(kind, cmd.mode, cmd.indent, output, pos, render, embed);
+                // A real newline ends the comment's line → clears the pending swallow.
+                let emitted_newline =
+                    render_line_break(kind, cmd.mode, cmd.indent, output, pos, render, embed);
+                #[cfg(feature = "swallow_check")]
+                swallow.on_newline(emitted_newline);
+                #[cfg(not(feature = "swallow_check"))]
+                let _ = emitted_newline;
             }
 
             DocNode::Indent(inner) => {
