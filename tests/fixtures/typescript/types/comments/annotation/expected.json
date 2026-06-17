@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 235,
+	"end": 133,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " Union type: comment stays before, type indented",
+			"value": " Union type: comment stays before, type indented one level",
 			"start": 20,
-			"end": 70,
+			"end": 80,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 51
+					"column": 61
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " union",
-			"start": 91,
-			"end": 99,
+			"start": 101,
+			"end": 109,
 			"loc": {
 				"start": {
 					"line": 4,
@@ -41,64 +41,32 @@
 					"column": 13
 				}
 			}
-		},
-		{
-			"type": "Line",
-			"value": " Intersection type: comment stays before, type NOT indented",
-			"start": 115,
-			"end": 176,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 1
-				},
-				"end": {
-					"line": 8,
-					"column": 62
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " intersection",
-			"start": 197,
-			"end": 212,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 5
-				},
-				"end": {
-					"line": 10,
-					"column": 20
-				}
-			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 234,
+		"end": 132,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 225,
+			"end": 123,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 13,
+					"line": 7,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "TSInterfaceDeclaration",
-					"start": 72,
-					"end": 112,
+					"start": 82,
+					"end": 122,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -111,8 +79,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 82,
-						"end": 83,
+						"start": 92,
+						"end": 93,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -127,8 +95,8 @@
 					},
 					"body": {
 						"type": "TSInterfaceBody",
-						"start": 84,
-						"end": 112,
+						"start": 94,
+						"end": 122,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -142,8 +110,8 @@
 						"body": [
 							{
 								"type": "TSPropertySignature",
-								"start": 88,
-								"end": 109,
+								"start": 98,
+								"end": 119,
 								"loc": {
 									"start": {
 										"line": 4,
@@ -157,8 +125,8 @@
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 88,
-									"end": 89,
+									"start": 98,
+									"end": 99,
 									"loc": {
 										"start": {
 											"line": 4,
@@ -173,8 +141,8 @@
 								},
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 89,
-									"end": 108,
+									"start": 99,
+									"end": 118,
 									"loc": {
 										"start": {
 											"line": 4,
@@ -187,8 +155,8 @@
 									},
 									"typeAnnotation": {
 										"type": "TSUnionType",
-										"start": 103,
-										"end": 108,
+										"start": 113,
+										"end": 118,
 										"loc": {
 											"start": {
 												"line": 5,
@@ -202,8 +170,8 @@
 										"types": [
 											{
 												"type": "TSTypeReference",
-												"start": 103,
-												"end": 104,
+												"start": 113,
+												"end": 114,
 												"loc": {
 													"start": {
 														"line": 5,
@@ -216,8 +184,8 @@
 												},
 												"typeName": {
 													"type": "Identifier",
-													"start": 103,
-													"end": 104,
+													"start": 113,
+													"end": 114,
 													"loc": {
 														"start": {
 															"line": 5,
@@ -233,8 +201,8 @@
 											},
 											{
 												"type": "TSTypeReference",
-												"start": 107,
-												"end": 108,
+												"start": 117,
+												"end": 118,
 												"loc": {
 													"start": {
 														"line": 5,
@@ -247,8 +215,8 @@
 												},
 												"typeName": {
 													"type": "Identifier",
-													"start": 107,
-													"end": 108,
+													"start": 117,
+													"end": 118,
 													"loc": {
 														"start": {
 															"line": 5,
@@ -267,8 +235,8 @@
 											{
 												"type": "Line",
 												"value": " union",
-												"start": 91,
-												"end": 99
+												"start": 101,
+												"end": 109
 											}
 										]
 									}
@@ -279,199 +247,9 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Union type: comment stays before, type indented",
+							"value": " Union type: comment stays before, type indented one level",
 							"start": 20,
-							"end": 70
-						}
-					]
-				},
-				{
-					"type": "TSInterfaceDeclaration",
-					"start": 178,
-					"end": 224,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 12,
-							"column": 2
-						}
-					},
-					"id": {
-						"type": "Identifier",
-						"start": 188,
-						"end": 189,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 11
-							},
-							"end": {
-								"line": 9,
-								"column": 12
-							}
-						},
-						"name": "C"
-					},
-					"body": {
-						"type": "TSInterfaceBody",
-						"start": 190,
-						"end": 224,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 13
-							},
-							"end": {
-								"line": 12,
-								"column": 2
-							}
-						},
-						"body": [
-							{
-								"type": "TSPropertySignature",
-								"start": 194,
-								"end": 221,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 2
-									},
-									"end": {
-										"line": 11,
-										"column": 8
-									}
-								},
-								"computed": false,
-								"key": {
-									"type": "Identifier",
-									"start": 194,
-									"end": 195,
-									"loc": {
-										"start": {
-											"line": 10,
-											"column": 2
-										},
-										"end": {
-											"line": 10,
-											"column": 3
-										}
-									},
-									"name": "c"
-								},
-								"typeAnnotation": {
-									"type": "TSTypeAnnotation",
-									"start": 195,
-									"end": 220,
-									"loc": {
-										"start": {
-											"line": 10,
-											"column": 3
-										},
-										"end": {
-											"line": 11,
-											"column": 7
-										}
-									},
-									"typeAnnotation": {
-										"type": "TSIntersectionType",
-										"start": 215,
-										"end": 220,
-										"loc": {
-											"start": {
-												"line": 11,
-												"column": 2
-											},
-											"end": {
-												"line": 11,
-												"column": 7
-											}
-										},
-										"types": [
-											{
-												"type": "TSTypeReference",
-												"start": 215,
-												"end": 216,
-												"loc": {
-													"start": {
-														"line": 11,
-														"column": 2
-													},
-													"end": {
-														"line": 11,
-														"column": 3
-													}
-												},
-												"typeName": {
-													"type": "Identifier",
-													"start": 215,
-													"end": 216,
-													"loc": {
-														"start": {
-															"line": 11,
-															"column": 2
-														},
-														"end": {
-															"line": 11,
-															"column": 3
-														}
-													},
-													"name": "X"
-												}
-											},
-											{
-												"type": "TSTypeReference",
-												"start": 219,
-												"end": 220,
-												"loc": {
-													"start": {
-														"line": 11,
-														"column": 6
-													},
-													"end": {
-														"line": 11,
-														"column": 7
-													}
-												},
-												"typeName": {
-													"type": "Identifier",
-													"start": 219,
-													"end": 220,
-													"loc": {
-														"start": {
-															"line": 11,
-															"column": 6
-														},
-														"end": {
-															"line": 11,
-															"column": 7
-														}
-													},
-													"name": "Y"
-												}
-											}
-										],
-										"leadingComments": [
-											{
-												"type": "Line",
-												"value": " intersection",
-												"start": 197,
-												"end": 212
-											}
-										]
-									}
-								}
-							}
-						]
-					},
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " Intersection type: comment stays before, type NOT indented",
-							"start": 115,
-							"end": 176
+							"end": 80
 						}
 					]
 				}

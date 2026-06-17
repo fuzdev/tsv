@@ -1,24 +1,24 @@
 <script lang="ts">
 	interface A {
 		a: // simple
-		X;
+			X;
 		b?: // optional
-		X;
+			X;
 		readonly c: // readonly
-		X;
+			X;
 		['d']: // computed
-		X;
+			X;
 		e: // generic
-		Array<X>;
+			Array<X>;
 	}
 
 	type B = {
 		f: // leading
-		X; // trailing
+			X; // trailing
 		g: // c1
-		// c2
-		X;
+			// c2
+			X;
 		h: // leading
-		X; /* trailing */
+			X; /* trailing */
 	};
 </script>

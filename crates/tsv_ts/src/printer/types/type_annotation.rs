@@ -43,29 +43,23 @@ impl<'a> Printer<'a> {
             // comments, so the first comment trails `:` and any remaining
             // comments land on their own lines.
             let comments_doc = self.build_trailing_comments_break_for_line(colon_end, type_start);
-            if matches!(&*annotation.type_annotation, TSType::Union(_)) {
-                // Union: the remaining comments and the type indent one level.
-                // The `indent` wraps the leading space + comments + type, so only
-                // the first comment stays flush on the `:` line; the breaks inside
-                // (between comments, and before the type) land at the indent.
-                d.concat(&[
-                    d.text(":"),
-                    d.indent(d.concat(&[
-                        d.text(" "),
-                        comments_doc,
-                        self.build_type_doc(&annotation.type_annotation),
-                    ])),
-                ])
-            } else {
-                // Intersection and simple types: comments and the type stay flush
-                // (no extra indent), matching prettier.
-                d.concat(&[
-                    d.text(":"),
+            // Uniform forced-continuation indent: the first comment trails `:` on its
+            // line, then the remaining comments and the type drop one indent level so
+            // the continuation reads as part of this member, not a sibling. The
+            // `indent` wraps the leading space + comments + type, so only the first
+            // comment stays flush on the `:` line; the breaks inside (between
+            // comments, and before the type) land at the indent. Uniform across union,
+            // intersection, and simple types — see conformance_prettier.md §Uniform
+            // forced-continuation indent. (Prettier indents only the union here and
+            // leaves intersection/simple flush, so this diverges for those.)
+            d.concat(&[
+                d.text(":"),
+                d.indent(d.concat(&[
                     d.text(" "),
                     comments_doc,
                     self.build_type_doc(&annotation.type_annotation),
-                ])
-            }
+                ])),
+            ])
         } else {
             // Handle unions/intersections with width-based breaking
             // Short: `param: Type1 | Type2`

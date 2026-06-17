@@ -1,20 +1,27 @@
 # annotation_simple_prettier_divergence
 
 A line comment between `:` and an inline-renderable type annotation in a
-property signature. "Simple" here refers to the **layout** path (the
-non-union, non-intersection branch of `build_type_annotation_doc`), not to
-identifier-only types — the same divergence applies to optional, readonly,
-computed keys, and generics. In each case prettier moves the comment past
-the implicit `;` to end-of-line; tsv keeps it inline after the `:`.
+**property signature** — the context where prettier **relocates** the comment.
+"Simple" here refers to the **layout** path (the non-union, non-intersection
+branch of `build_type_annotation_doc`), not to identifier-only types — the same
+divergence applies to optional, readonly, computed keys, and generics. In each
+case prettier moves the comment past the implicit `;` to end-of-line; tsv keeps
+it after the `:` and drops the type to a continuation line **indented one level**
+(the uniform forced-continuation indent).
 
-- tsv: `prop: // c\n X;` — comment stays inline after `:`, type on next line
+- tsv: `prop: // c\n\tX;` — comment stays after `:`, type on the next line,
+  indented one level
 - Prettier: `prop: X; // c` — comment moves past the `;` to end-of-line
 
 Both formats are stable under their respective formatters.
 
-When the property's type is a multi-member union or intersection,
-**both formatters preserve the comment** in place — see the non-divergent
-[annotation](../annotation/) fixture for the boundary.
+This fixture is the **relocation** face of the rule. The other faces:
+
+- prettier keeps the type **flush** (variable / class-prop / fn-param / return /
+  intersection) — tsv still indents → see
+  [annotation_continuation_indent](../annotation_continuation_indent_prettier_divergence/).
+- prettier also **indents** (multi-member union) — a **match**, not a divergence
+  — see the non-divergent [annotation](../annotation/) fixture for the boundary.
 
 ## Reason
 
@@ -40,14 +47,11 @@ This fixture captures three families:
 tsv keeps each comment at its authored position as a separate comment node,
 preserving identity, order, and kind.
 
-**Internally consistent.** Variable declarations (`const e: // c\n X = ...`),
-class properties (`class C { prop: // c\n X }`), and property signatures all
-keep the line comment between `:` and the type. Prettier moves the comment
-past the implicit `;` only for property signatures with an inline-renderable
-type — a special case that doesn't apply to variable declarations or class
-properties.
-
-Matching Prettier here would require a property-signature-aware special case
-in `build_type_annotation_doc`, recreating the inconsistency. Pre-1.0, tsv
-keeps the simpler, uniform layout; if real-world corpus pressure shifts the
-trade-off, this divergence is a candidate for revisiting.
+**One uniform rule.** Every `: Type` annotation — property signatures, variable
+declarations, class properties, function params/returns, index signatures —
+shares the same continuation layout via `build_type_annotation_doc`: the comment
+stays after `:`, the type indents one level. Prettier's behavior splits by
+context (relocate here, flush elsewhere, indent for unions), but tsv keeps one
+layout everywhere. See
+[conformance_prettier.md](../../../../../docs/conformance_prettier.md)
+§Uniform forced-continuation indent.
