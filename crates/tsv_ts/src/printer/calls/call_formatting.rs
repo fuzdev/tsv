@@ -150,7 +150,11 @@ pub(super) fn build_call_doc_with_wrapping(
                 inner.push(printer.build_comment_doc(comment));
                 inner.push(d.hardline());
             }
-            inner.push(printer.build_expression_doc(first_arg));
+            // Use the argument-context builder so a binary/logical chain (or
+            // conditional) gets its continuation indent — matching the no-leading-
+            // comment path. `build_expression_doc` would emit the Grouped chain
+            // (flush continuation), losing the indent prettier applies here.
+            inner.push(printer.build_arg_expression_doc(first_arg));
 
             return d.concat(&[
                 callee,
@@ -169,7 +173,10 @@ pub(super) fn build_call_doc_with_wrapping(
             .build_rhs_comments_opt(paren_open, arg_start)
             .filter(|_| !has_own_line_trailing_comment)
         {
-            let arg_doc = printer.build_expression_doc(first_arg);
+            // Argument-context builder so a binary/logical chain gets its
+            // continuation indent (matches the no-comment path); see the leading
+            // line-comment branch above for the same reasoning.
+            let arg_doc = printer.build_arg_expression_doc(first_arg);
 
             // Build comment + arg, including any trailing comments after the arg
             // Note: build_rhs_comments_opt already adds trailing space after each comment
