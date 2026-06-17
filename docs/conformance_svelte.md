@@ -270,6 +270,7 @@ Acorn-typescript's backtrack-reparse behavior causes comment duplication in `tra
 | Return type to `;` (type members)     | `trailingComments` on type annotation (duplicate)          | Not duplicated | [trailing_semicolon_comment](../tests/fixtures/typescript/types/type_members/trailing_semicolon_comment_svelte_divergence/)                               |
 | Index-signature in-bracket comments   | Root `comments` duplicate (before-key; type-lit after-key) | Single entry   | [index_signature_bracket_comment_positions](../tests/fixtures/typescript/types/type_members/index_signature_bracket_comment_positions_svelte_divergence/), [open_bracket_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_open_bracket_line_comment_svelte_prettier_divergence/) |
 | Class index-signature in-bracket cmts | Root `comments` duplicate (before-key, after-key)          | Single entry   | [index_signature_bracket_comment_positions](../tests/fixtures/typescript/declarations/class/index_signature_bracket_comment_positions_svelte_divergence/), [bracket_line_comment_positions](../tests/fixtures/typescript/declarations/class/index_signature_bracket_line_comment_positions_svelte_prettier_divergence/) |
+| Class computed-key `[`→key comment    | Root `comments` duplicate (before-key)                     | Single entry   | [computed_key_open_bracket_line_comment](../tests/fixtures/typescript/statements/class/computed_key_open_bracket_line_comment_svelte_prettier_divergence/) |
 
 ### Known Acorn-TypeScript Bugs (Not Corrections)
 

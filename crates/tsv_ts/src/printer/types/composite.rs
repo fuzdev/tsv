@@ -851,15 +851,10 @@ impl<'a> Printer<'a> {
             // Leading comments (after previous comma or `[`). For the first
             // element, drop comments pulled onto the `[` line (emitted as the
             // bracket-line prefix below).
-            if i == 0
-                && let Some(delim) = delimiter_pull_pos
-            {
-                inner_parts.extend(
-                    self.build_leading_comments_multiline_after_delim(prev_end, elem_start, delim),
-                );
-            } else {
-                inner_parts.extend(self.build_leading_comments_multiline(prev_end, elem_start));
-            }
+            let skip_delim = if i == 0 { delimiter_pull_pos } else { None };
+            inner_parts.extend(
+                self.build_leading_comments_multiline_opt(prev_end, elem_start, skip_delim),
+            );
 
             inner_parts.push(self.build_type_doc(elem));
 

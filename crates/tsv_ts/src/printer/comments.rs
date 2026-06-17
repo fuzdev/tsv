@@ -1333,26 +1333,13 @@ impl<'a> Printer<'a> {
         self.build_leading_comments_multiline_opt(start, end, None)
     }
 
-    /// Like `build_leading_comments_multiline`, but skips comments on the same
-    /// source line as `delim_pos`.
-    ///
-    /// Used for the first element of a forced-multiline list when those same-line
-    /// comments were already emitted as a trailing prefix on the opening delimiter's
-    /// line (see `delimiter_line_comment_prefix`) — calling this for the first element
-    /// avoids emitting them twice. `delim_pos` is the opening `<`/`(`/etc.
-    pub(crate) fn build_leading_comments_multiline_after_delim(
-        &self,
-        start: u32,
-        end: u32,
-        delim_pos: u32,
-    ) -> Vec<DocId> {
-        self.build_leading_comments_multiline_opt(start, end, Some(delim_pos))
-    }
-
-    /// Shared body for `build_leading_comments_multiline` and its `_after_delim`
-    /// variant. When `skip_delim` is `Some(pos)`, comments sharing `pos`'s source
-    /// line are skipped (already emitted as the delimiter-line prefix).
-    fn build_leading_comments_multiline_opt(
+    /// Like `build_leading_comments_multiline`, but when `skip_delim` is `Some(pos)`,
+    /// comments sharing `pos`'s source line are skipped — they were already emitted
+    /// as a trailing prefix on the opening delimiter's line (see
+    /// `delimiter_line_comment_prefix`), so emitting them here too would duplicate
+    /// them. Pass the `Option<u32>` that `delimiter_line_comment_prefix` returns
+    /// (gated to the first element of the list; `None` for the rest).
+    pub(in crate::printer) fn build_leading_comments_multiline_opt(
         &self,
         start: u32,
         end: u32,

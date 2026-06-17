@@ -816,7 +816,20 @@ impl<'a> Printer<'a> {
 
     /// Build a `[key]` doc with comments preserved inside brackets.
     /// Returns `(doc, key_region_end)` where key_region_end is the position after `]`.
-    /// Used by object properties, class methods, and class properties.
+    /// Used by object properties/methods, class methods/properties, destructuring
+    /// patterns, and interface/type-literal members (via `build_type_member_key_doc`).
+    ///
+    /// `[`→key comment placement: a block comment hugs `[` inline (`[/* c */ foo]`)
+    /// and the bracket stays flat; a **line** comment can't sit inline before the
+    /// key (a `//` runs to EOL and would swallow it), so it forces the bracket to
+    /// break — preserved where the author wrote it (on the `[` line via
+    /// `delimiter_line_comment_prefix`, or on its own line) with the key dropped to
+    /// an indented continuation. Prettier relocates such a comment (out to the
+    /// member's leading line, or glued flush to the key) — a divergence
+    /// (conformance_prettier.md §Comment relocation, "Object/array/block
+    /// open-delimiter trailing"). A computed key never breaks on width alone
+    /// (prettier keeps a long key inline), so the flat, no-line-comment path stays
+    /// verbatim — only a `[`→key line comment switches to the breaking layout.
     pub(in crate::printer) fn build_computed_key_bracket_doc(
         &self,
         search_start: u32,
@@ -829,22 +842,51 @@ impl<'a> Printer<'a> {
         let bracket_start = self.find_opening_bracket_after(search_start, key_start);
         let bracket_end = self.find_closing_bracket_after(key_end);
 
-        let mut parts = vec![d.text("[")];
-
-        for comment in comments_in_range(self.comments, bracket_start + 1, key_start) {
-            parts.push(self.build_comment_doc(comment));
-            parts.push(d.text(" "));
-        }
-
-        parts.push(key_doc);
-
+        // key→`]` gap comments (`[foo /* c */]`): a block trails the key inline.
+        // (A line comment here is a separate content-loss case prettier relocates
+        // differently — out of scope, tracked as a follow-up.)
+        let mut after_key = Vec::new();
         for comment in comments_in_range(self.comments, key_end, bracket_end) {
-            parts.push(d.text(" "));
-            parts.push(self.build_comment_doc(comment));
+            after_key.push(d.text(" "));
+            after_key.push(self.build_comment_doc(comment));
         }
 
-        parts.push(d.text("]"));
-        (d.concat(&parts), bracket_end + 1)
+        // Flat path (no `[`→key line comment): block comments hug inline, the key
+        // never breaks on width. Byte-identical to the pre-divergence behavior.
+        if !self.has_line_comments_between(bracket_start + 1, key_start) {
+            let mut parts = vec![d.text("[")];
+            for comment in comments_in_range(self.comments, bracket_start + 1, key_start) {
+                parts.push(self.build_comment_doc(comment));
+                parts.push(d.text(" "));
+            }
+            parts.push(key_doc);
+            parts.extend_from_slice(&after_key);
+            parts.push(d.text("]"));
+            return (d.concat(&parts), bracket_end + 1);
+        }
+
+        // Breaking path: a `[`-line comment is pulled onto the `[` line; an own-line
+        // comment keeps its own line. The bracket force-breaks so the `//` can't
+        // swallow the key. `build_leading_comments_multiline*` lays out the
+        // not-pulled leading comments (own-line on its own line, a same-line block
+        // hugging the key inline) — the shared open-delimiter leading-comment builder.
+        let (bracket_line_prefix, bracket_pull_pos) =
+            self.delimiter_line_comment_prefix(bracket_start, key_start);
+        let mut inner_parts = self.build_leading_comments_multiline_opt(
+            bracket_start + 1,
+            key_start,
+            bracket_pull_pos,
+        );
+        inner_parts.push(key_doc);
+        inner_parts.extend_from_slice(&after_key);
+        let bracket_body = d.concat(&[
+            d.text("["),
+            d.concat(&bracket_line_prefix),
+            d.indent_softline(d.concat(&inner_parts)),
+            d.softline(),
+            d.text("]"),
+        ]);
+        (d.group_break(bracket_body), bracket_end + 1)
     }
 
     /// Find the opening `[` bracket between two positions (for computed properties).

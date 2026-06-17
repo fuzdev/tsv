@@ -784,7 +784,6 @@ formatting behavior. Key files: `src/language-js/print/assignment.js` (assignmen
 ## Development conventions
 
 - **Leave `// TODO:` comments** - when there's known future work or the code smells
-- **Do not use the `cd` Bash command** - instead of cd use relative paths from the cwd
 
 ## Documentation
 
