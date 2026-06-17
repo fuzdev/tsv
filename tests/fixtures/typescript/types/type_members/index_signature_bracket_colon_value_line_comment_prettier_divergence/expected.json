@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 144,
+	"end": 364,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -73,24 +73,88 @@
 					"column": 28
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " `]`→`:` itself a line comment: two stacked continuations — the value `:` drops",
+			"start": 136,
+			"end": 217,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " one level, then its type drops another, so the type lands two levels in.",
+			"start": 219,
+			"end": 294,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " f",
+			"start": 324,
+			"end": 328,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 14
+				},
+				"end": {
+					"line": 15,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " g",
+			"start": 334,
+			"end": 338,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 5
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 143,
+		"end": 363,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 134,
+			"end": 354,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 11,
+					"line": 19,
 					"column": 9
 				}
 			},
@@ -408,6 +472,177 @@
 							}
 						]
 					}
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 296,
+					"end": 353,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 306,
+						"end": 307,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 11
+							},
+							"end": {
+								"line": 14,
+								"column": 12
+							}
+						},
+						"name": "J"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 308,
+						"end": 353,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 13
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSIndexSignature",
+								"start": 312,
+								"end": 350,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 11
+									}
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 313,
+										"end": 322,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 3
+											},
+											"end": {
+												"line": 15,
+												"column": 12
+											}
+										},
+										"name": "k",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 314,
+											"end": 322,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 4
+												},
+												"end": {
+													"line": 15,
+													"column": 12
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 316,
+												"end": 322,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 6
+													},
+													"end": {
+														"line": 15,
+														"column": 12
+													}
+												}
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 332,
+									"end": 349,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 3
+										},
+										"end": {
+											"line": 17,
+											"column": 10
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 343,
+										"end": 349,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 4
+											},
+											"end": {
+												"line": 17,
+												"column": 10
+											}
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " g",
+												"start": 334,
+												"end": 338
+											}
+										]
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " f",
+											"start": 324,
+											"end": 328
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `]`→`:` itself a line comment: two stacked continuations — the value `:` drops",
+							"start": 136,
+							"end": 217
+						},
+						{
+							"type": "Line",
+							"value": " one level, then its type drops another, so the type lands two levels in.",
+							"start": 219,
+							"end": 294
+						}
+					]
 				}
 			],
 			"sourceType": "module"

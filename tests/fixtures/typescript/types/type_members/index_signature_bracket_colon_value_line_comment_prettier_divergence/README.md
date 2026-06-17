@@ -17,6 +17,21 @@ The `]`→`:` block comment (`/* x */`) stays after `]` in both formatters (pret
 relocates a *line* comment there into the brackets — covered separately by
 [index_signature_bracket_colon_line_comment](../index_signature_bracket_colon_line_comment_prettier_divergence/)).
 
+When the `]`→`:` comment is **itself a line comment** (case `J`: `[k: T] // f⏎: // g⏎V`),
+the two forced continuations **stack**: the `]`→`:` line comment drops the value `:`
+one level, then the value-`:`→type line comment drops the type another, so the type
+lands **two** levels in. Each step is the same one-level continuation indent applied
+independently — the composition is the natural result, idempotent and lossless.
+Prettier instead relocates `// f` into the brackets and keeps `]: // g⏎V` flush.
+
+```ts
+// tsv (two stacked continuations)   // prettier
+[k: string] // f                     [
+	: // g                           	k: string // f
+		string;                      ]: // g
+                                     string;
+```
+
 Previously the `]`→`:`-comment branch built the value type manually and **swallowed**
 this `// c` (rendering `// c number;` on one line — content loss, non-idempotent);
 delegating the value type to `build_type_annotation_doc` (what the no-`]`→`:`-comment

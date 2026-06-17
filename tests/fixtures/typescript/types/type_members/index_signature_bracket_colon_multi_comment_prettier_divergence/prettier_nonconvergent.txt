@@ -1,0 +1,7 @@
+Prettier never reaches a fixed point on this input. With two line comments in the
+`]`→value-`:` gap it cannot settle where the second comment goes: it oscillates
+forever between `…// b⏎]: number` (second comment pulled inside the brackets, value
+`:` rejoined) and `] // b⏎: number` (second comment after `]`, value `:` on its own
+line), flipping on every pass. No prettier-anchored claim file (output_prettier.*,
+audit_signature.txt, variants) is expressible. The validator live-verifies this
+claim (rule F5). See README.md and docs/conformance_prettier.md §Comment relocation.

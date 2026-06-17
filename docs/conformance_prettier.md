@@ -94,6 +94,22 @@ its tail:
   ([index_signature_key_type_line_comments](../tests/fixtures/typescript/types/type_members/index_signature_key_type_line_comments_prettier_divergence/))
   and value-type
   ([index_signature_value_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_value_line_comment_prettier_divergence/)).
+- **Before-`:` key/binding gap** — the complement of the colon→type case: a line
+  comment between a key/binding name (or its `?`/`!` marker) and the `:`
+  (`prop // c⏎\t\t: T`) keeps the comment after the marker and indents the whole
+  `: type` continuation one level, via the shared `build_marker_colon_line_continuation`.
+  Uniform across index signatures
+  ([index_signature_key_colon_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_key_colon_line_comment_prettier_divergence/)),
+  property signatures and class properties — key→`:`
+  ([key_colon_line_comment](../tests/fixtures/typescript/syntax/comments/key_colon_line_comment_prettier_divergence/))
+  and `?`→`:`
+  ([optional_marker_line_comment](../tests/fixtures/typescript/syntax/comments/optional_marker_line_comment_prettier_divergence/)),
+  variable bindings
+  ([binding_key_colon_line_comment](../tests/fixtures/typescript/declarations/variable/binding_key_colon_line_comment_prettier_divergence/)),
+  and function parameters
+  ([param_key_colon_line_comment](../tests/fixtures/typescript/declarations/function/param_key_colon_line_comment_prettier_divergence/)).
+  Prettier keeps the continuation flush — and for property signatures / class
+  properties relocates the comment to end-of-line.
 - **Index-signature bracket gaps** — the `]`→value-`:` continuation
   (`[k: T] // c⏎\t: V`). See [Index signature `]`→value-`:`](#comment-relocation).
 
@@ -515,7 +531,9 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Index signature `[` trailing (line) → Onto its own line (key's leading comment) — [index_signature_open_bracket_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_open_bracket_line_comment_svelte_prettier_divergence/)
 - Index signature before `]` (own-line line) → After `]` (value `:` to next line) — [index_signature_close_bracket_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_close_bracket_line_comment_prettier_divergence/)
 - Index signature `]`→value-`:` (line) → Into brackets, trailing key type — [index_signature_bracket_colon_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_bracket_colon_line_comment_prettier_divergence/)
+- Index signature `]`→value-`:` (≥2 line comments) → No fixed point (prettier oscillates); tsv keeps each on its own line — [index_signature_bracket_colon_multi_comment](../tests/fixtures/typescript/types/type_members/index_signature_bracket_colon_multi_comment_prettier_divergence/)
 - Index signature value-`:`→type under a `]`→`:` comment (line) → Type kept flush (tsv indents continuation) — [index_signature_bracket_colon_value_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_bracket_colon_value_line_comment_prettier_divergence/)
+- Index signature in-bracket line comments, **class** context (four positions) → `[`/`:`→type/own-line-before-`]` relocate or stay flush, key→`:` matches — [index_signature_bracket_line_comment_positions](../tests/fixtures/typescript/declarations/class/index_signature_bracket_line_comment_positions_svelte_prettier_divergence/)
 - Type-argument `<` trailing (multi) → Onto its own line — [type_argument_open_angle_comment](../tests/fixtures/typescript/types/type_argument_open_angle_comment_prettier_divergence/)
 - Call/`new`-expr type-arg `<` trailing (multi) → Onto its own line — [type_args_open_angle_comment](../tests/fixtures/typescript/expressions/calls/type_args_open_angle_comment_prettier_divergence/)
 
