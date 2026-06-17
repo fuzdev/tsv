@@ -12,11 +12,11 @@
  * Two uses:
  *   1. Completeness — confirm the duplicating-construct set tsv corrects is the whole set
  *      (cross-checks the deep-dive's mechanism enumeration against acorn's full catalog).
- *   2. Upstream-fix validation — after applying the A+B patch from
- *      grimoire `lore/tsv/TODO_ACORN_COMMENT_DUP.md` to a built acorn-typescript fork,
- *      re-run pointing at the fork's build; a correct fix drops the double-fire count to 0.
+ *   2. Upstream-fix validation — after applying the comment-dedup patch to a patched
+ *      acorn-typescript build, re-run pointing at that build; a correct fix drops the
+ *      double-fire count to 0.
  *
- * Run (default reads ~/dev/acorn-typescript-fork/test; pass a path to override):
+ * Run (default reads ../test of a sibling acorn-typescript checkout; pass a path to override):
  *   deno run --allow-read --allow-env --allow-net --allow-sys \
  *     --config benches/deno/deno.json benches/deno/diagnostics/acorn_dup_fuzz.ts [TEST_DIR]
  */
@@ -28,9 +28,9 @@ import { tsPlugin } from '@sveltejs/acorn-typescript';
 // deno-lint-ignore no-explicit-any
 const P = acorn.Parser.extend(tsPlugin() as any);
 
-// default: the sibling acorn-typescript-fork clone next to this repo; override via argv[0]
+// default: a sibling acorn-typescript checkout next to this repo; override via argv[0]
 const TEST_ROOT = Deno.args[0] ??
-	new URL('../../../../acorn-typescript-fork/test', import.meta.url).pathname;
+	new URL('../../../../acorn-typescript/test', import.meta.url).pathname;
 const COMMENT = '/*Z*/';
 
 /** Parse `src`; return a span string if any comment span is emitted >=2x, else null; null on parse error. */
