@@ -6,7 +6,7 @@ use tsv_lang::{ParseError, Span};
 /// Parse attribute selector: [attr], [attr="value"], [attr^="prefix"]
 /// Supports namespace prefixes: [ns|attr], [*|attr], [|attr]
 pub(crate) fn parse_attribute_selector(
-    parser: &mut CssParser,
+    parser: &mut CssParser<'_>,
     start: usize,
 ) -> Result<SimpleSelector, ParseError> {
     parser.expect(TokenKind::LeftBracket)?;
@@ -264,7 +264,7 @@ pub(crate) fn parse_attribute_selector(
 }
 
 /// Parse attribute matcher: =, ~=, |=, ^=, $=, *=
-fn parse_attribute_matcher(parser: &mut CssParser) -> Result<AttributeMatcher, ParseError> {
+fn parse_attribute_matcher(parser: &mut CssParser<'_>) -> Result<AttributeMatcher, ParseError> {
     let matcher = match &parser.current_kind {
         TokenKind::Equals => AttributeMatcher::Exact, // =
         TokenKind::Tilde => {

@@ -17,7 +17,7 @@ use tsv_lang::doc::arena::DocId;
 /// - First arg stays on same line as `import(`
 /// - Only the options object expands with its properties indented
 pub(super) fn build_import_expression_doc(
-    printer: &Printer,
+    printer: &Printer<'_>,
     import_expr: &internal::ImportExpression,
 ) -> DocId {
     let d = printer.d();
@@ -201,7 +201,10 @@ pub(super) fn build_import_expression_doc(
 }
 
 /// Build a Doc for a meta property: `import.meta`, `new.target`
-pub(super) fn build_meta_property_doc(printer: &Printer, meta: &internal::MetaProperty) -> DocId {
+pub(super) fn build_meta_property_doc(
+    printer: &Printer<'_>,
+    meta: &internal::MetaProperty,
+) -> DocId {
     let d = printer.d();
     let meta_name = printer.resolve_symbol(meta.meta.name);
     let prop_name = printer.resolve_symbol(meta.property.name);

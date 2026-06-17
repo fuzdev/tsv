@@ -17,7 +17,7 @@ use tsv_lang::{ParseError, Span};
 ///
 /// For identifiers, we need to look ahead: if next non-whitespace/comment token is `:`, it's a declaration.
 /// Custom-property identifiers (`--*`) are always declarations and bypass the lookahead.
-pub(crate) fn is_nested_rule_start(parser: &mut CssParser) -> Result<bool, ParseError> {
+pub(crate) fn is_nested_rule_start(parser: &CssParser<'_>) -> Result<bool, ParseError> {
     match &parser.current_kind {
         // Unambiguous selector start tokens
         TokenKind::Ampersand
@@ -75,7 +75,7 @@ pub(crate) fn is_nested_rule_start(parser: &mut CssParser) -> Result<bool, Parse
 ///
 /// Approach: create a temporary lexer from after the identifier and scan forward,
 /// skipping parenthesized groups, until we find `{` (nested rule) or `;`/`}` (declaration).
-fn is_type_selector_with_pseudo(parser: &CssParser) -> Result<bool, ParseError> {
+fn is_type_selector_with_pseudo(parser: &CssParser<'_>) -> Result<bool, ParseError> {
     let remaining = &parser.source()[parser.current_end..];
     let mut temp = Lexer::new(remaining);
     let mut paren_depth: i32 = 0;
@@ -96,7 +96,7 @@ fn is_type_selector_with_pseudo(parser: &CssParser) -> Result<bool, ParseError> 
 ///
 /// When `nested` is true, the selector list allows leading combinators (CSS Nesting relative selectors).
 /// For example: `> .child {}`, `+ .sibling {}`, `~ .general {}`
-pub(crate) fn parse_rule(parser: &mut CssParser, nested: bool) -> Result<CssRule, ParseError> {
+pub(crate) fn parse_rule(parser: &mut CssParser<'_>, nested: bool) -> Result<CssRule, ParseError> {
     let start = parser.base_offset() + parser.current_start;
 
     // Nested rules use relative selectors (can start with combinators like `> .child`)
@@ -181,7 +181,7 @@ pub(crate) fn parse_rule(parser: &mut CssParser, nested: bool) -> Result<CssRule
 }
 
 /// Parse a CSS declaration: `property: value;`
-pub(crate) fn parse_declaration(parser: &mut CssParser) -> Result<CssDeclaration, ParseError> {
+pub(crate) fn parse_declaration(parser: &mut CssParser<'_>) -> Result<CssDeclaration, ParseError> {
     let start = parser.base_offset() + parser.current_start;
 
     // Parse property

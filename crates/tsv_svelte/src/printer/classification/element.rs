@@ -65,7 +65,7 @@ mod tests {
 
     /// Find the first child element of `parent` whose resolved tag name is `tag`.
     fn child<'p>(
-        printer: &Printer,
+        printer: &Printer<'_>,
         parent: &'p internal::Element,
         tag: &str,
     ) -> &'p internal::Element {

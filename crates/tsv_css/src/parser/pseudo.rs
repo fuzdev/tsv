@@ -8,7 +8,7 @@ use tsv_lang::{ParseError, Span};
 
 /// Parse pseudo-class or pseudo-element: :hover, ::before, :nth-child(2n+1)
 pub(crate) fn parse_pseudo_selector(
-    parser: &mut CssParser,
+    parser: &mut CssParser<'_>,
     start: usize,
 ) -> Result<SimpleSelector, ParseError> {
     parser.advance()?; // consume first :
@@ -69,7 +69,7 @@ pub(crate) fn parse_pseudo_selector(
 /// - :is(), :not(), :where(), :has(), :global() → PseudoClassArgs::SelectorList
 /// - Others: returns None (unknown pseudo-classes)
 fn parse_pseudo_args(
-    parser: &mut CssParser,
+    parser: &mut CssParser<'_>,
     pseudo_name: &str,
 ) -> Result<(Option<PseudoClassArgs>, u32), ParseError> {
     parser.expect(TokenKind::LeftParen)?;

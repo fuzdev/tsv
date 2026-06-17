@@ -738,7 +738,7 @@ impl<'de> Deserialize<'de> for TSMappedTypeModifier {
         impl<'de> Visitor<'de> for ModifierVisitor {
             type Value = TSMappedTypeModifier;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 formatter.write_str("true, \"+\", or \"-\"")
             }
 

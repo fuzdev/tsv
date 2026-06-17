@@ -27,7 +27,7 @@ pub(crate) const KEY_BLOCK_OPEN: &str = "{#key ";
 ///
 /// Returns `(body_doc, has_trailing)` — the indented body doc and whether the
 /// fragment had trailing whitespace (needed for section separator logic).
-fn build_await_section_body(printer: &Printer, fragment: &Fragment) -> (DocId, bool) {
+fn build_await_section_body(printer: &Printer<'_>, fragment: &Fragment) -> (DocId, bool) {
     let has_leading = printer.fragment_has_leading_ws(fragment);
     let has_trailing = printer.fragment_has_trailing_ws(fragment);
     let force_break = printer.fragment_should_force_break_content(&fragment.nodes);
@@ -44,7 +44,7 @@ fn build_await_section_body(printer: &Printer, fragment: &Fragment) -> (DocId, b
 ///
 /// In flat mode (fits): ` body_doc` (space + content)
 /// In break mode (exceeds print width): newline + indent + body_doc
-fn indent_body_soft(printer: &Printer, body_doc: DocId) -> DocId {
+fn indent_body_soft(printer: &Printer<'_>, body_doc: DocId) -> DocId {
     let line = printer.d().line();
     let inner = printer.d().concat(&[line, body_doc]);
     printer.d().indent(inner)
