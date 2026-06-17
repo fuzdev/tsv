@@ -249,6 +249,10 @@ impl<'a> Printer<'a> {
     /// `{:then pattern}`, and `{:catch pattern}` binding contexts. Object braces
     /// hug uniformly with `bracketSpacing: false` (like `{@const}` and every
     /// other object tsv emits); prettier-plugin-svelte keeps the spaced form here.
+    /// Literal **default values** likewise normalize through the TS printer
+    /// (string quotes + numeric form), where prettier-plugin-svelte preserves the
+    /// author's source token — both deliberate divergences (see
+    /// conformance_prettier.md §Svelte: destructuring literal normalization).
     pub(super) fn build_pattern_doc(&self, expr: &tsv_ts::Expression) -> DocId {
         let d = self.d();
         match expr {
@@ -352,12 +356,14 @@ impl<'a> Printer<'a> {
                 let right = self.build_pattern_doc(&assign.right);
                 d.concat(&[left, eq, right])
             }
-            tsv_ts::Expression::Literal(lit) => {
-                // Preserve source text for literals (maintains original quote style)
-                let text = self.extract_source_range(lit.span.start_usize(), lit.span.end_usize());
-                d.text_owned(text.to_string())
-            }
-            // Default: build doc directly in shared arena
+            // Default: build doc directly in shared arena. Literals route here too,
+            // so string and numeric defaults normalize through the TS printer
+            // (single quotes + escaping, lowercase hex/exponent, leading/trailing zeros) —
+            // identical to `{@const}` and every other literal tsv emits.
+            // prettier-plugin-svelte instead prints these binding patterns from raw
+            // source, preserving the author's quote style and numeric form; tsv
+            // normalizes uniformly (a deliberate divergence — see conformance_prettier.md
+            // §Svelte: destructuring literal normalization).
             _ => self.build_ts_expression_doc_no_comments(expr),
         }
     }
