@@ -31,11 +31,11 @@ mod tests {
     fn trims_inner_whitespace_preserving_content_and_casing() {
         // Inner whitespace trimmed; colons/slashes in the opaque content kept.
         assert_eq!(
-            trim_url_raw("url( http://x.com )").as_deref(),
-            Some("url(http://x.com)")
+            trim_url_raw("url( https://fuz.dev )").as_deref(),
+            Some("url(https://fuz.dev)")
         );
         // Original url/URL casing is preserved.
-        assert_eq!(trim_url_raw("URL(  a  )").as_deref(), Some("URL(a)"));
+        assert_eq!(trim_url_raw("URL(  foo  )").as_deref(), Some("URL(foo)"));
         // Whitespace-only content collapses to empty parens.
         assert_eq!(trim_url_raw("url(  )").as_deref(), Some("url()"));
     }
@@ -44,13 +44,13 @@ mod tests {
     fn returns_none_when_not_parenthesized() {
         assert_eq!(trim_url_raw("noparens"), None);
         // A ')' before the '(' is not a valid token.
-        assert_eq!(trim_url_raw(")x("), None);
+        assert_eq!(trim_url_raw(")foo("), None);
     }
 
     #[test]
     fn matches_any_parenthesized_token_and_uses_last_paren() {
         // Not restricted to the `url` prefix — any parenthesized token works.
-        assert_eq!(trim_url_raw("(x)").as_deref(), Some("(x)"));
+        assert_eq!(trim_url_raw("(foo)").as_deref(), Some("(foo)"));
         // rfind(')') is used, so inner content may itself contain ')'.
         assert_eq!(trim_url_raw("url(a)b)").as_deref(), Some("url(a)b)"));
     }
