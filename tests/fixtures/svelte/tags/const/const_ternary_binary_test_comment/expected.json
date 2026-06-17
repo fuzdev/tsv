@@ -1,0 +1,214 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 142,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 0,
+				"end": 141,
+				"test": {
+					"type": "Identifier",
+					"start": 5,
+					"end": 6,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 5
+						},
+						"end": {
+							"line": 1,
+							"column": 6
+						}
+					},
+					"name": "x"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 7,
+							"end": 9,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ConstTag",
+							"start": 9,
+							"end": 135,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "Identifier",
+											"name": "y",
+											"start": 17,
+											"end": 18,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 9,
+													"character": 17
+												},
+												"end": {
+													"line": 2,
+													"column": 10,
+													"character": 18
+												}
+											}
+										},
+										"init": {
+											"type": "ConditionalExpression",
+											"start": 23,
+											"end": 134,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 2
+												},
+												"end": {
+													"line": 5,
+													"column": 6
+												}
+											},
+											"test": {
+												"type": "BinaryExpression",
+												"start": 23,
+												"end": 38,
+												"loc": {
+													"start": {
+														"line": 3,
+														"column": 2
+													},
+													"end": {
+														"line": 3,
+														"column": 17
+													}
+												},
+												"left": {
+													"type": "Identifier",
+													"start": 23,
+													"end": 28,
+													"loc": {
+														"start": {
+															"line": 3,
+															"column": 2
+														},
+														"end": {
+															"line": 3,
+															"column": 7
+														}
+													},
+													"name": "aaaaa"
+												},
+												"operator": "===",
+												"right": {
+													"type": "Identifier",
+													"start": 33,
+													"end": 38,
+													"loc": {
+														"start": {
+															"line": 3,
+															"column": 12
+														},
+														"end": {
+															"line": 3,
+															"column": 17
+														}
+													},
+													"name": "bbbbb"
+												},
+												"trailingComments": [
+													{
+														"type": "Line",
+														"value": " comment that pushes the const test line well over the print width xxxxxxxxxxxx",
+														"start": 39,
+														"end": 120
+													}
+												]
+											},
+											"consequent": {
+												"type": "Literal",
+												"start": 126,
+												"end": 127,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 5
+													},
+													"end": {
+														"line": 4,
+														"column": 6
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											},
+											"alternate": {
+												"type": "Literal",
+												"start": 133,
+												"end": 134,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 5
+													},
+													"end": {
+														"line": 5,
+														"column": 6
+													}
+												},
+												"value": 2,
+												"raw": "2"
+											}
+										},
+										"start": 17,
+										"end": 134
+									}
+								],
+								"start": 11,
+								"end": 134
+							}
+						},
+						{
+							"type": "Text",
+							"start": 135,
+							"end": 136,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": null
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " comment that pushes the const test line well over the print width xxxxxxxxxxxx",
+			"start": 39,
+			"end": 120,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 18
+				},
+				"end": {
+					"line": 3,
+					"column": 99
+				}
+			}
+		}
+	]
+}

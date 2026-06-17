@@ -220,8 +220,11 @@ impl<'a> Printer<'a> {
             tsv_lang::comments_in_range(self.comments, case_label_end, inline_comment_end)
         {
             if self.is_same_line(case_label_end, comment.span.start) {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
+                // A line comment goes through `line_suffix` (zero width) so it never
+                // forces the case test (e.g. a binary expression) to break; it flushes
+                // at the consequent's hardline (prettier's `lineSuffix`). A block stays
+                // inline, width counted.
+                parts.push(self.build_trailing_comment_doc(comment));
                 if !comment.is_block {
                     has_inline_line_comment = true;
                 }
