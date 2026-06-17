@@ -289,9 +289,9 @@ impl<'a> Printer<'a> {
             member_parts
                 .extend(self.build_leading_comments_with_blank_lines(&comments, member_start));
 
-            // A preceding `// prettier-ignore` keeps the member's source verbatim
-            // (matches prettier). The member span includes its trailing `;`.
-            let member_doc = if self.has_prettier_ignore_in_range(prev_end, member_start) {
+            // A preceding format-ignore directive keeps the member's source verbatim.
+            // The member span includes its trailing `;`.
+            let member_doc = if self.has_format_ignore_in_range(prev_end, member_start) {
                 self.raw_source_doc(member.span())
             } else {
                 self.build_class_member_doc(member)

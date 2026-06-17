@@ -192,13 +192,12 @@ impl<'a> Printer<'a> {
     /// 2. Group nodes by natural break points
     /// 3. Build doc with conditionalGroup for oneLine/expanded alternatives
     pub(super) fn build_member_doc(&self, member: &internal::MemberExpression) -> DocId {
-        // A `// prettier-ignore` attached to this member access (in the gap between
+        // A format-ignore directive attached to this member access (in the gap between
         // the object and the property) makes prettier print the entire member
         // expression verbatim from source — preserving inner call args (numbers,
         // etc.) that the chain formatter would otherwise reformat. Mirrors
         // prettier's `hasPrettierIgnore` → verbatim-print behavior.
-        if self.has_prettier_ignore_in_range(member.object.span().end, member.property.span().start)
-        {
+        if self.has_format_ignore_in_range(member.object.span().end, member.property.span().start) {
             return self.raw_source_doc(member.span);
         }
 

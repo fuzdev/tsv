@@ -708,6 +708,28 @@ Prettier has multiple stable forms for comment positioning. tsv normalizes to a 
 
 **Property signature leading line comment**: For a line comment between `:` and an inline-renderable type in a property signature (`{ prop: // c\n X }` — covers identifiers, optional `?:`, readonly, computed keys, generics like `Array<X>`, tuples, function types, `typeof`, etc.), Prettier moves the comment past the implicit `;` to end-of-line (`prop: X; // c`); tsv keeps the comment after `:` and drops the type to a continuation line indented one level (`prop: // c\n\t X;`, the [Uniform Forced-Continuation Indent](#uniform-forced-continuation-indent)). Both forms are stable under their own formatter. A multi-member **union** in the same position is a **match** — both formatters indent the continuation (the non-divergent [annotation](../tests/fixtures/typescript/types/comments/annotation/) fixture); a multi-member **intersection** instead **diverges** (prettier keeps it flush, tsv indents — see [annotation_continuation_indent](../tests/fixtures/typescript/types/comments/annotation_continuation_indent_prettier_divergence/)). Notably, prettier's end-of-line motion is information-destructive when more than one comment touches the property: leading line + trailing line collapses to `f: X; // leading // trailing` (second `//` becomes text inside the first comment); two leading lines merge **and reverse** order (`g: // c1\n // c2\n X;` → `g: // c2 // c1\n X;`); leading line + trailing block reorders to `h: X; /* trailing */ // leading`. tsv preserves each comment at its authored position as a separate comment node. The end-of-line **relocation** is property-signature-only — prettier keeps variable declarations (`const e: // c\n X = ...`) and class properties (`class C { prop: // c\n X }`) in place — but tsv's continuation **indent** is universal across all these contexts, so those keep-in-place cases become an indent-only divergence too (the same [annotation_continuation_indent](../tests/fixtures/typescript/types/comments/annotation_continuation_indent_prettier_divergence/) fixture).
 
+### Format-ignore directive
+
+A comment can suppress formatting of the construct that follows it. tsv honors its own tool-neutral `format-ignore` family — `<!-- format-ignore -->`, `// format-ignore`, `/* format-ignore */`, and the range markers `format-ignore-start` / `format-ignore-end` — **in addition to** prettier's `prettier-ignore` family, which tsv keeps for drop-in compatibility (corpus files use it). Recognition is centralized in `tsv_lang::is_format_ignore_directive` and the two range predicates, shared across the TypeScript, CSS, and Svelte printers.
+
+The `prettier-ignore` family matches prettier exactly (both emit the construct raw), so it needs no divergence fixture of its own. The `format-ignore` family is tsv-native: prettier doesn't recognize it, so prettier reformats the construct while tsv preserves it — that difference is the divergence. Most fixtures pair the spellings in one input: a `prettier-ignore`d construct (preserved by both tools, so unchanged in `output_prettier`) sits beside a `format-ignore`d one (reformatted only by prettier), making the `format-ignore` construct the sole divergence and doubling as a drop-in-compat check. The `basic` (template node) and `js_css` (embedded `<script>` + `<style>`) Svelte fixtures carry this control, as do both standalone fixtures.
+
+| Feature                                   | Reason        | Fixture                                                                              |
+| ----------------------------------------- | ------------- | ----------------------------------------------------------------------------------- |
+| `format-ignore` in `<script>` / `<style>` | Design choice | [js_css](../tests/fixtures/svelte/syntax/format_ignore/js_css_prettier_divergence/)         |
+| `format-ignore` template element          | Design choice | [basic](../tests/fixtures/svelte/syntax/format_ignore/basic_prettier_divergence/)           |
+| `format-ignore` nested CSS                 | Design choice | [css_nested](../tests/fixtures/svelte/syntax/format_ignore/css_nested_prettier_divergence/) |
+| `format-ignore-start` / `-end` range      | Design choice | [range](../tests/fixtures/svelte/syntax/format_ignore/range_prettier_divergence/)           |
+| `format-ignore` standalone `.ts`          | Design choice | [ts_standalone](../tests/fixtures/typescript/syntax/comments/format_ignore_prettier_divergence/) |
+| `format-ignore` standalone `.css`         | Design choice | [css_standalone](../tests/fixtures/css/syntax/comments/format_ignore_prettier_divergence/) |
+
+The first four rows are Svelte-embedded; the last two pin the **standalone**
+`.ts` / `.css` paths (acorn-typescript / `parseCss` + `tsv_ts` / `tsv_css`
+directly), so the directive is covered in every language outside a Svelte host
+too.
+
+See [directives.md](./directives.md) for the user-facing reference.
+
 ---
 
 ## Tooling

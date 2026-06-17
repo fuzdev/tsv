@@ -67,7 +67,7 @@ use tsv_lang::{
         self,
         arena::{DocArena, DocId},
     },
-    has_comments_in_range, has_line_comments_in_range, printing,
+    has_comments_in_range, has_line_comments_in_range, is_format_ignore_directive, printing,
 };
 
 /// The parent context that routes a curried arrow chain (`(a) => (b) => …`)
@@ -850,14 +850,14 @@ impl<'a> Printer<'a> {
         None
     }
 
-    /// Check if any comment in the range has content "prettier-ignore".
+    /// Check if any comment in the range is a format-ignore directive.
     /// Used to emit the next node as raw source text instead of formatting.
-    fn has_prettier_ignore_in_range(&self, start: u32, end: u32) -> bool {
-        comments_in_range(self.comments, start, end).any(|c| c.content.trim() == "prettier-ignore")
+    fn has_format_ignore_in_range(&self, start: u32, end: u32) -> bool {
+        comments_in_range(self.comments, start, end).any(|c| is_format_ignore_directive(&c.content))
     }
 
     /// Emit a node's source span verbatim. Used to round-trip the source of a
-    /// `// prettier-ignore`d node (statement, block statement, object/pattern
+    /// format-ignored node (statement, block statement, object/pattern
     /// property, class/enum/interface/type-literal member) instead of
     /// reformatting it.
     /// Trailing whitespace is trimmed: a node's significant tokens never end in
@@ -869,7 +869,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Emit `[start, end)` of the source verbatim. Like `raw_source_doc` but for a
-    /// `// prettier-ignore`d member whose verbatim slice must exclude a separator
+    /// format-ignored member whose verbatim slice must exclude a separator
     /// the surrounding loop emits itself (e.g. a type-literal member's `;`), so
     /// the terminator isn't duplicated.
     fn raw_source_range(&self, start: u32, end: u32) -> DocId {

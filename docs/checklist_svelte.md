@@ -607,6 +607,8 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - `svelte-ignore` warnings (`<!-- svelte-ignore a11y_* -->`)
 - Multiple ignores (`<!-- svelte-ignore a, b -->`)
 - `@component` JSDoc (`<!-- @component -->`)
+- `format-ignore` / `prettier-ignore` directive (`<!-- format-ignore -->` emits the next node verbatim — see [directives.md](./directives.md))
+- `format-ignore-start` / `-end` range (`<!-- format-ignore-start -->` … `<!-- format-ignore-end -->` preserves a top-level range)
 
 ---
 
