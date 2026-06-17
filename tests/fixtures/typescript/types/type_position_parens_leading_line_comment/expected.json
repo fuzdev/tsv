@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 348,
+	"end": 279,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -137,56 +137,24 @@
 					"column": 26
 				}
 			}
-		},
-		{
-			"type": "Line",
-			"value": " variable type annotation",
-			"start": 271,
-			"end": 298,
-			"loc": {
-				"start": {
-					"line": 23,
-					"column": 1
-				},
-				"end": {
-					"line": 23,
-					"column": 28
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " leading",
-			"start": 309,
-			"end": 319,
-			"loc": {
-				"start": {
-					"line": 24,
-					"column": 10
-				},
-				"end": {
-					"line": 24,
-					"column": 20
-				}
-			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 347,
+		"end": 278,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 338,
+			"end": 269,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 26,
+					"line": 22,
 					"column": 9
 				}
 			},
@@ -694,164 +662,6 @@
 							"value": " function type return",
 							"start": 214,
 							"end": 237
-						}
-					]
-				},
-				{
-					"type": "VariableDeclaration",
-					"start": 300,
-					"end": 337,
-					"loc": {
-						"start": {
-							"line": 24,
-							"column": 1
-						},
-						"end": {
-							"line": 25,
-							"column": 17
-						}
-					},
-					"declarations": [
-						{
-							"type": "VariableDeclarator",
-							"start": 306,
-							"end": 336,
-							"loc": {
-								"start": {
-									"line": 24,
-									"column": 7
-								},
-								"end": {
-									"line": 25,
-									"column": 16
-								}
-							},
-							"id": {
-								"type": "Identifier",
-								"start": 306,
-								"end": 322,
-								"loc": {
-									"start": {
-										"line": 24,
-										"column": 7
-									},
-									"end": {
-										"line": 25,
-										"column": 2
-									}
-								},
-								"name": "e",
-								"typeAnnotation": {
-									"type": "TSTypeAnnotation",
-									"start": 307,
-									"end": 322,
-									"loc": {
-										"start": {
-											"line": 24,
-											"column": 8
-										},
-										"end": {
-											"line": 25,
-											"column": 2
-										}
-									},
-									"typeAnnotation": {
-										"type": "TSTypeReference",
-										"start": 321,
-										"end": 322,
-										"loc": {
-											"start": {
-												"line": 25,
-												"column": 1
-											},
-											"end": {
-												"line": 25,
-												"column": 2
-											}
-										},
-										"typeName": {
-											"type": "Identifier",
-											"start": 321,
-											"end": 322,
-											"loc": {
-												"start": {
-													"line": 25,
-													"column": 1
-												},
-												"end": {
-													"line": 25,
-													"column": 2
-												}
-											},
-											"name": "a"
-										},
-										"leadingComments": [
-											{
-												"type": "Line",
-												"value": " leading",
-												"start": 309,
-												"end": 319
-											}
-										]
-									}
-								}
-							},
-							"init": {
-								"type": "TSAsExpression",
-								"start": 325,
-								"end": 336,
-								"loc": {
-									"start": {
-										"line": 25,
-										"column": 5
-									},
-									"end": {
-										"line": 25,
-										"column": 16
-									}
-								},
-								"expression": {
-									"type": "Literal",
-									"start": 325,
-									"end": 329,
-									"loc": {
-										"start": {
-											"line": 25,
-											"column": 5
-										},
-										"end": {
-											"line": 25,
-											"column": 9
-										}
-									},
-									"value": null,
-									"raw": "null"
-								},
-								"typeAnnotation": {
-									"type": "TSAnyKeyword",
-									"start": 333,
-									"end": 336,
-									"loc": {
-										"start": {
-											"line": 25,
-											"column": 13
-										},
-										"end": {
-											"line": 25,
-											"column": 16
-										}
-									}
-								}
-							}
-						}
-					],
-					"kind": "const",
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " variable type annotation",
-							"start": 271,
-							"end": 298
 						}
 					]
 				}

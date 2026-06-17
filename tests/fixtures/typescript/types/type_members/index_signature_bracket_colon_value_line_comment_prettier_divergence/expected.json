@@ -1,0 +1,680 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 364,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " x ",
+			"start": 45,
+			"end": 52,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 14
+				},
+				"end": {
+					"line": 3,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 55,
+			"end": 59,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 24
+				},
+				"end": {
+					"line": 3,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 105,
+			"end": 112,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 14
+				},
+				"end": {
+					"line": 8,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " e",
+			"start": 115,
+			"end": 119,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 24
+				},
+				"end": {
+					"line": 8,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `]`→`:` itself a line comment: two stacked continuations — the value `:` drops",
+			"start": 136,
+			"end": 217,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " one level, then its type drops another, so the type lands two levels in.",
+			"start": 219,
+			"end": 294,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " f",
+			"start": 324,
+			"end": 328,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 14
+				},
+				"end": {
+					"line": 15,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " g",
+			"start": 334,
+			"end": 338,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 5
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 363,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 354,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 19,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 20,
+					"end": 74,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 25,
+						"end": 26,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 6
+							},
+							"end": {
+								"line": 2,
+								"column": 7
+							}
+						},
+						"name": "T"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 29,
+						"end": 73,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 10
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"members": [
+							{
+								"type": "TSIndexSignature",
+								"start": 33,
+								"end": 70,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 10
+									}
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 34,
+										"end": 43,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 3
+											},
+											"end": {
+												"line": 3,
+												"column": 12
+											}
+										},
+										"name": "k",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 35,
+											"end": 43,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 4
+												},
+												"end": {
+													"line": 3,
+													"column": 12
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 37,
+												"end": 43,
+												"loc": {
+													"start": {
+														"line": 3,
+														"column": 6
+													},
+													"end": {
+														"line": 3,
+														"column": 12
+													}
+												}
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 53,
+									"end": 69,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 22
+										},
+										"end": {
+											"line": 4,
+											"column": 9
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 63,
+										"end": 69,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 3
+											},
+											"end": {
+												"line": 4,
+												"column": 9
+											}
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 55,
+												"end": 59
+											}
+										]
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " x ",
+											"start": 45,
+											"end": 52
+										}
+									]
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 77,
+					"end": 133,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 87,
+						"end": 88,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 11
+							},
+							"end": {
+								"line": 7,
+								"column": 12
+							}
+						},
+						"name": "I"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 89,
+						"end": 133,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 13
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSIndexSignature",
+								"start": 93,
+								"end": 130,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 10
+									}
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 94,
+										"end": 103,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 3
+											},
+											"end": {
+												"line": 8,
+												"column": 12
+											}
+										},
+										"name": "k",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 95,
+											"end": 103,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 4
+												},
+												"end": {
+													"line": 8,
+													"column": 12
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 97,
+												"end": 103,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 6
+													},
+													"end": {
+														"line": 8,
+														"column": 12
+													}
+												}
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 113,
+									"end": 129,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 22
+										},
+										"end": {
+											"line": 9,
+											"column": 9
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 123,
+										"end": 129,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 3
+											},
+											"end": {
+												"line": 9,
+												"column": 9
+											}
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " e",
+												"start": 115,
+												"end": 119
+											}
+										]
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " d ",
+											"start": 105,
+											"end": 112
+										}
+									]
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 296,
+					"end": 353,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 306,
+						"end": 307,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 11
+							},
+							"end": {
+								"line": 14,
+								"column": 12
+							}
+						},
+						"name": "J"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 308,
+						"end": 353,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 13
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSIndexSignature",
+								"start": 312,
+								"end": 350,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 11
+									}
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 313,
+										"end": 322,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 3
+											},
+											"end": {
+												"line": 15,
+												"column": 12
+											}
+										},
+										"name": "k",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 314,
+											"end": 322,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 4
+												},
+												"end": {
+													"line": 15,
+													"column": 12
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 316,
+												"end": 322,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 6
+													},
+													"end": {
+														"line": 15,
+														"column": 12
+													}
+												}
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 332,
+									"end": 349,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 3
+										},
+										"end": {
+											"line": 17,
+											"column": 10
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 343,
+										"end": 349,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 4
+											},
+											"end": {
+												"line": 17,
+												"column": 10
+											}
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " g",
+												"start": 334,
+												"end": 338
+											}
+										]
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " f",
+											"start": 324,
+											"end": 328
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `]`→`:` itself a line comment: two stacked continuations — the value `:` drops",
+							"start": 136,
+							"end": 217
+						},
+						{
+							"type": "Line",
+							"value": " one level, then its type drops another, so the type lands two levels in.",
+							"start": 219,
+							"end": 294
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

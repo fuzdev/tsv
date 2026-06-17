@@ -8,7 +8,7 @@
 		]: boolean;
 	}
 
-	// Interface pre-colon comment forces a space before `:`; key-type comments break, stay flush
+	// Interface pre-colon comment forces a space before `:`; key-type comments indent one level
 	interface B {
 		[
 			k /* x */ : // c
@@ -17,7 +17,7 @@
 		]: boolean;
 	}
 
-	// Interface plain key: comments break onto their own lines, stay flush
+	// Interface plain key: comments and type indent one level
 	interface C {
 		[
 			k: // e
@@ -35,7 +35,7 @@
 		]: boolean;
 	};
 
-	// Type-literal plain key: comments break, stay flush
+	// Type-literal plain key: comments and type indent one level
 	type E = {
 		[
 			k: // i

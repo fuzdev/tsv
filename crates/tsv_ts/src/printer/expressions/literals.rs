@@ -314,26 +314,14 @@ impl<'a> Printer<'a> {
             raw_name_end
         };
 
-        // Handle type annotations
+        // Type annotation, handling a before-`:` comment between the name (and any
+        // `?`) and `:` — line → indented continuation, block → inline before `:`.
         if let Some(type_annotation) = &id.type_annotation {
-            // Extract comments between name/modifier and `:` (e.g., `a /* c */: number`)
-            if self.has_comments_between(after_modifier, type_annotation.span.start) {
-                let comment_doc = self
-                    .build_inline_comments_between_doc(after_modifier, type_annotation.span.start);
-                if self.has_line_comments_between(after_modifier, type_annotation.span.start) {
-                    // Line comment forces break: `a // c\n: number` → keep on separate line
-                    parts.push(comment_doc);
-                    parts.push(d.hardline());
-                } else {
-                    // Trailing space separates comment from `:` in the type annotation
-                    parts.push(d.concat(&[comment_doc, d.text(" ")]));
-                }
-            }
-            if wrap_type_args {
-                parts.push(self.build_type_annotation_doc_wrapping(type_annotation));
-            } else {
-                parts.push(self.build_type_annotation_doc(type_annotation));
-            }
+            parts.push(self.build_binding_type_annotation_doc(
+                after_modifier,
+                type_annotation,
+                wrap_type_args,
+            ));
         }
 
         // Optimize for common case: single part (just the name)

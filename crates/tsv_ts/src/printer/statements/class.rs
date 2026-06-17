@@ -459,17 +459,11 @@ impl<'a> Printer<'a> {
             key_region_end
         };
 
-        // Type annotation - use width-aware wrapping for generics and union types
+        // Type annotation - width-aware wrapping for generics and union types,
+        // handling a before-`:` comment between the modifier (or key) and `:`
+        // (`c! /* c */ : number`) — line → indented continuation, block → inline.
         if let Some(type_ann) = &prop.type_annotation {
-            // Comments between modifier (or key) and `:` (e.g., `c! /* c */ : number`)
-            // stay after the modifier; a line comment forces a break so it can't
-            // swallow the annotation (`c? // c⏎: number`)
-            if let Some(comment_doc) =
-                self.build_marker_to_colon_comments_doc(after_modifier, type_ann.span.start)
-            {
-                parts.push(comment_doc);
-            }
-            parts.push(self.build_type_annotation_doc_wrapping(type_ann));
+            parts.push(self.build_binding_type_annotation_doc(after_modifier, type_ann, true));
         }
 
         // Value if present - use assignment layout (matches prettier's printAssignment)
