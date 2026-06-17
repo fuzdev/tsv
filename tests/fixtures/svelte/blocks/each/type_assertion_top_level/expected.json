@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 402,
+	"end": 406,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -453,24 +453,24 @@
 			{
 				"type": "Comment",
 				"start": 294,
-				"end": 339,
-				"data": " as with array type and destructuring "
+				"end": 345,
+				"data": " as with array type and array destructuring "
 			},
 			{
 				"type": "Text",
-				"start": 339,
-				"end": 340,
+				"start": 345,
+				"end": 346,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "EachBlock",
-				"start": 340,
-				"end": 401,
+				"start": 346,
+				"end": 405,
 				"expression": {
 					"type": "TSAsExpression",
-					"start": 347,
-					"end": 359,
+					"start": 353,
+					"end": 365,
 					"loc": {
 						"start": {
 							"line": 20,
@@ -483,8 +483,8 @@
 					},
 					"expression": {
 						"type": "Identifier",
-						"start": 347,
-						"end": 352,
+						"start": 353,
+						"end": 358,
 						"loc": {
 							"start": {
 								"line": 20,
@@ -499,8 +499,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSArrayType",
-						"start": 356,
-						"end": 359,
+						"start": 362,
+						"end": 365,
 						"loc": {
 							"start": {
 								"line": 20,
@@ -513,8 +513,8 @@
 						},
 						"elementType": {
 							"type": "TSTypeReference",
-							"start": 356,
-							"end": 357,
+							"start": 362,
+							"end": 363,
 							"loc": {
 								"start": {
 									"line": 20,
@@ -527,8 +527,8 @@
 							},
 							"typeName": {
 								"type": "Identifier",
-								"start": 356,
-								"end": 357,
+								"start": 362,
+								"end": 363,
 								"loc": {
 									"start": {
 										"line": 20,
@@ -549,26 +549,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 372,
-							"end": 374,
+							"start": 376,
+							"end": 378,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 374,
-							"end": 393,
+							"start": 378,
+							"end": 397,
 							"name": "div",
 							"name_loc": {
 								"start": {
 									"line": 21,
 									"column": 2,
-									"character": 375
+									"character": 379
 								},
 								"end": {
 									"line": 21,
 									"column": 5,
-									"character": 378
+									"character": 382
 								}
 							},
 							"attributes": [],
@@ -577,12 +577,12 @@
 								"nodes": [
 									{
 										"type": "ExpressionTag",
-										"start": 379,
-										"end": 382,
+										"start": 383,
+										"end": 386,
 										"expression": {
 											"type": "Identifier",
-											"start": 380,
-											"end": 381,
+											"start": 384,
+											"end": 385,
 											"loc": {
 												"start": {
 													"line": 21,
@@ -598,19 +598,19 @@
 									},
 									{
 										"type": "Text",
-										"start": 382,
-										"end": 384,
+										"start": 386,
+										"end": 388,
 										"raw": ": ",
 										"data": ": "
 									},
 									{
 										"type": "ExpressionTag",
-										"start": 384,
-										"end": 387,
+										"start": 388,
+										"end": 391,
 										"expression": {
 											"type": "Identifier",
-											"start": 385,
-											"end": 386,
+											"start": 389,
+											"end": 390,
 											"loc": {
 												"start": {
 													"line": 21,
@@ -629,17 +629,17 @@
 						},
 						{
 							"type": "Text",
-							"start": 393,
-							"end": 394,
+							"start": 397,
+							"end": 398,
 							"raw": "\n",
 							"data": "\n"
 						}
 					]
 				},
 				"context": {
-					"type": "ObjectPattern",
-					"start": 363,
-					"end": 371,
+					"type": "ArrayPattern",
+					"start": 369,
+					"end": 375,
 					"loc": {
 						"start": {
 							"line": 20,
@@ -647,111 +647,41 @@
 						},
 						"end": {
 							"line": 20,
-							"column": 32
+							"column": 30
 						}
 					},
-					"properties": [
+					"elements": [
 						{
-							"type": "Property",
-							"start": 365,
-							"end": 366,
+							"type": "Identifier",
+							"start": 370,
+							"end": 371,
 							"loc": {
 								"start": {
+									"line": 20,
+									"column": 25
+								},
+								"end": {
 									"line": 20,
 									"column": 26
-								},
-								"end": {
-									"line": 20,
-									"column": 27
 								}
 							},
-							"method": false,
-							"shorthand": true,
-							"computed": false,
-							"key": {
-								"type": "Identifier",
-								"start": 365,
-								"end": 366,
-								"loc": {
-									"start": {
-										"line": 20,
-										"column": 26
-									},
-									"end": {
-										"line": 20,
-										"column": 27
-									}
-								},
-								"name": "a"
-							},
-							"value": {
-								"type": "Identifier",
-								"start": 365,
-								"end": 366,
-								"loc": {
-									"start": {
-										"line": 20,
-										"column": 26
-									},
-									"end": {
-										"line": 20,
-										"column": 27
-									}
-								},
-								"name": "a"
-							},
-							"kind": "init"
+							"name": "a"
 						},
 						{
-							"type": "Property",
-							"start": 368,
-							"end": 369,
+							"type": "Identifier",
+							"start": 373,
+							"end": 374,
 							"loc": {
 								"start": {
 									"line": 20,
-									"column": 29
+									"column": 28
 								},
 								"end": {
 									"line": 20,
-									"column": 30
+									"column": 29
 								}
 							},
-							"method": false,
-							"shorthand": true,
-							"computed": false,
-							"key": {
-								"type": "Identifier",
-								"start": 368,
-								"end": 369,
-								"loc": {
-									"start": {
-										"line": 20,
-										"column": 29
-									},
-									"end": {
-										"line": 20,
-										"column": 30
-									}
-								},
-								"name": "b"
-							},
-							"value": {
-								"type": "Identifier",
-								"start": 368,
-								"end": 369,
-								"loc": {
-									"start": {
-										"line": 20,
-										"column": 29
-									},
-									"end": {
-										"line": 20,
-										"column": 30
-									}
-								},
-								"name": "b"
-							},
-							"kind": "init"
+							"name": "b"
 						}
 					]
 				}
