@@ -210,6 +210,14 @@ pub struct DocArena {
     /// (depends only on the fixed `TAB_WIDTH` + the interner, both fixed for a
     /// render).
     flat_width_cache: RefCell<Vec<u32>>,
+    /// Diagnostic side-set: indices of text nodes that are line comments,
+    /// recorded by `line_comment_text_owned` only while the swallow check is
+    /// enabled (empty and untouched otherwise). Appended in `alloc` order, so
+    /// the vec is sorted ascending — the renderer membership-tests via binary
+    /// search. See [`super::swallow`]. Compiled in only under the `swallow_check`
+    /// feature, so production builds carry no diagnostic state.
+    #[cfg(feature = "swallow_check")]
+    line_comment_ids: RefCell<Vec<u32>>,
 }
 
 impl DocArena {
@@ -220,6 +228,8 @@ impl DocArena {
             children: RefCell::new(Vec::new()),
             will_break_cache: RefCell::new(Vec::new()),
             flat_width_cache: RefCell::new(Vec::new()),
+            #[cfg(feature = "swallow_check")]
+            line_comment_ids: RefCell::new(Vec::new()),
         }
     }
 
@@ -234,6 +244,8 @@ impl DocArena {
             children: RefCell::new(Vec::with_capacity(estimated_children)),
             will_break_cache: RefCell::new(Vec::new()),
             flat_width_cache: RefCell::new(Vec::new()),
+            #[cfg(feature = "swallow_check")]
+            line_comment_ids: RefCell::new(Vec::new()),
         }
     }
 
@@ -302,6 +314,34 @@ impl DocArena {
             visual_width(&s, TAB_WIDTH) as u16
         };
         self.alloc(DocNode::Text(DocText::Owned(s, w)))
+    }
+
+    /// Create an owned-text doc for a *line comment* (`// …` or hashbang) — text
+    /// whose content runs to end-of-line.
+    ///
+    /// Identical to [`Self::text_owned`] for output. Under the `swallow_check`
+    /// feature, while the check is enabled ([`super::swallow`]) it additionally
+    /// records the node's id so the renderer can flag any content emitted on the
+    /// same physical line after it (silent content loss). Without the feature it
+    /// is exactly `text_owned` — no recording, no side-set.
+    #[inline]
+    pub fn line_comment_text_owned(&self, s: String) -> DocId {
+        let id = self.text_owned(s);
+        #[cfg(feature = "swallow_check")]
+        if super::swallow::swallow_check_enabled() {
+            // Recorded in alloc order → sorted ascending (see field doc).
+            self.line_comment_ids.borrow_mut().push(id.0);
+        }
+        id
+    }
+
+    /// Whether `id` is a line-comment text node (diagnostic; binary search over
+    /// the sorted side-set). Only meaningful while the swallow check is enabled.
+    /// Internal to the renderer's swallow check — not part of the builder API.
+    #[cfg(feature = "swallow_check")]
+    #[inline]
+    pub(crate) fn is_line_comment(&self, id: DocId) -> bool {
+        self.line_comment_ids.borrow().binary_search(&id.0).is_ok()
     }
 
     /// Create an empty doc that produces no output.

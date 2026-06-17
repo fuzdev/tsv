@@ -19,7 +19,7 @@
 		"typecheck": "cargo check --workspace",
 		"test": "cargo test --workspace",
 		"lint": "cargo clippy --workspace -- -D warnings",
-		"check": "deno task typecheck && deno task test && deno task test:deno && deno task conformance:audit && cargo fmt --check && deno task check:ast-types && deno task lint",
+		"check": "deno task typecheck && deno task test && deno task test:deno && deno task conformance:audit && deno task swallow:audit && cargo fmt --check && deno task check:ast-types && deno task lint",
 		"check:ast-types": "deno run --allow-read --allow-write=scripts --allow-run=cargo,deno scripts/check_ast_types.ts",
 
 		"fixture:init": "cargo run -p tsv_debug --quiet fixture_init",
@@ -31,6 +31,7 @@
 		"fixtures:audit": "cargo run -p tsv_debug --quiet fixtures_audit",
 		"fixtures:ts-audit": "cargo run -p tsv_debug --quiet ts_fixture_audit",
 		"conformance:audit": "cargo run -p tsv_debug --quiet conformance_audit",
+		"swallow:audit": "cargo run -p tsv_debug --quiet swallow_audit",
 		"metrics": "cargo run -p tsv_debug --quiet metrics",
 
 		"bench": "deno task build:ffi && deno task build:ffi:format && deno task build:ffi:parse && deno task build:wasm:deno && deno task build:wasm:parse:deno && deno task build:wasm:all:deno && deno task bench:run",
