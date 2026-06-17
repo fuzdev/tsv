@@ -14,6 +14,7 @@ pub mod json_profile;
 pub mod line_width;
 pub mod metrics;
 pub mod profile;
+pub mod swallow_audit;
 pub mod test262;
 pub mod ts_fixture_audit;
 

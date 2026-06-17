@@ -701,11 +701,14 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            // Trailing comments after value type (before `;` or `}`)
+            // Trailing comments after the value type. A block comment trails
+            // inline before the `;` (`V /* c */;`); a line comment goes through
+            // `line_suffix` (`build_trailing_comment_doc`) so it floats to
+            // end-of-line *after* the `;` (`V; // c`) instead of swallowing it —
+            // the `;` is emitted separately by the multiline/one-line branch below.
             let body_end = m.span.end.saturating_sub(1); // before `}`
             for comment in comments_in_range(self.comments, type_end, body_end) {
-                body_parts.push(d.text(" "));
-                body_parts.push(self.build_comment_doc(comment));
+                body_parts.push(self.build_trailing_comment_doc(comment));
             }
         } else {
             body_parts.push(d.text(": "));

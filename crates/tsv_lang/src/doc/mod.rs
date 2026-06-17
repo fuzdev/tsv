@@ -24,10 +24,16 @@ pub mod arena;
 mod arena_fits;
 mod arena_render;
 mod render_config;
+#[cfg(feature = "swallow_check")]
+pub mod swallow;
 mod types;
 
 // Types
 pub use types::{DocContext, DocText, GroupId, LineKind, Mode, TextResolver};
+
+// Diagnostic: line-comment swallow check (opt-in, render-time; `swallow_check` feature)
+#[cfg(feature = "swallow_check")]
+pub use swallow::{SwallowReport, set_swallow_check, swallow_check_enabled, take_swallow_reports};
 
 // Arena render
 pub use arena_render::{
