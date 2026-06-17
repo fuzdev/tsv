@@ -20,8 +20,6 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
 - numerous new Prettier divergences including uniform indentation on continuations
 - object destructuring patterns in Svelte blocks now hug their braces,
   consistent with `bracketSpacing: false` (which is not respected by prettier-plugin-svelte)
-- values in Svelte templates now consistently use TS printing paths,
-  fixing oversights prettier-plugin-svelte
 - reduce allocations using `SmallVec` and memoizations
 
 ## 0.1.0
