@@ -516,11 +516,9 @@ impl<'a> Printer<'a> {
         };
         parts.push(bracket_group);
 
-        // Handle comments between `]` and `:` of value type annotation
+        // Handle comments between `]` and the value `:`
         // Only search up to the colon position, not the type start
         let val_colon_pos = idx.type_annotation.span.start;
-        let val_colon_end = val_colon_pos + 1;
-        let val_type_start = idx.type_annotation.type_annotation.span().start;
         let mut has_bracket_colon_comment = false;
         let mut bracket_colon_has_line = false;
         if let Some(close_pos) = bracket_close_pos {
@@ -532,51 +530,28 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Build value type annotation with proper breaking for long unions/intersections
-        //
-        // TODO: this manual branch builds the value type via `build_comments_between` +
-        // `build_type_doc`, which (1) swallows a `:`→value-type LINE comment
-        // (`[k: T] /* x */: // c⏎V` renders `// c V`, content loss) and (2) skips the
-        // union/intersection break-after-`:` layout the else branch gets for free from
-        // `build_type_annotation_doc` (a long union under a `]`→`:` comment clings the
-        // first `|` to `:` and leaves continuations flush — diverges from prettier).
-        // Fix by delegating the value type to `build_type_annotation_doc` here too,
-        // emitting only the `]`→`:` comment manually, which also drops the
-        // `bracket_colon_has_line` indent logic. Behavior-changing → fixtures-first.
+        // Build the value type annotation. Both branches delegate to the shared
+        // `build_type_annotation_doc`, which owns the value-`:`→type comment handling
+        // (a line comment breaks + indents so the `//` can't swallow the type), the
+        // redundant comment-free paren stripping, and the union (break-after-`:` to
+        // leading-`|`) / intersection (hug `:`, continuations wrap) layouts. The only
+        // difference is the `]`→value-`:` comment, emitted manually just above: when
+        // present it sits after `]` (prettier relocates it into the brackets), and a
+        // line comment there drops the value `:` to the next line, indented one level so
+        // the continuation reads as part of this member (uniform forced-continuation
+        // indent); a block keeps the value `:` inline (`[k: T] /* c */ : V`).
+        let val_annotation = self.build_type_annotation_doc(&idx.type_annotation);
         if has_bracket_colon_comment {
-            // A `]`→`:` comment is preserved after `]` (prettier relocates it into the
-            // brackets, trailing the key type). A line comment runs to EOL, so the value
-            // `:` drops to the next line (content-loss-safe); a block stays inline
-            // (`] /* c */ : V`).
-            let val_comments = self.build_comments_between(
-                val_colon_end,
-                val_type_start,
-                CommentSpacing::Trailing,
-            );
-            let val_type = self.build_type_doc(&idx.type_annotation.type_annotation);
             if bracket_colon_has_line {
-                // The value annotation drops to the next line, indented one level so the
-                // continuation reads as part of this member rather than a sibling
-                // (uniform forced-continuation indent).
-                parts.push(d.indent(d.concat(&[
-                    d.hardline(),
-                    d.text(": "),
-                    val_comments,
-                    val_type,
-                ])));
+                parts.push(d.indent(d.concat(&[d.hardline(), val_annotation])));
             } else {
-                parts.push(d.text(" : "));
-                parts.push(val_comments);
-                parts.push(val_type);
+                // Space before the `:` that `build_type_annotation_doc` emits, so the
+                // `]`→`:` comment reads `[k: T] /* c */ : V`.
+                parts.push(d.text(" "));
+                parts.push(val_annotation);
             }
         } else {
-            // No bracket-colon comment: delegate the value type to the shared
-            // annotation printer. It owns colon→type comment handling (including a
-            // line comment between `:` and the value, which must break so it can't
-            // swallow the type), redundant comment-free paren stripping, and the
-            // union (break-after-`:` to leading-`|`) / intersection (hug `:`,
-            // continuations wrap) break layouts.
-            parts.push(self.build_type_annotation_doc(&idx.type_annotation));
+            parts.push(val_annotation);
         }
 
         d.concat(&parts)

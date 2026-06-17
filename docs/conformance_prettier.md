@@ -515,6 +515,7 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Index signature `[` trailing (line) → Onto its own line (key's leading comment) — [index_signature_open_bracket_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_open_bracket_line_comment_svelte_prettier_divergence/)
 - Index signature before `]` (own-line line) → After `]` (value `:` to next line) — [index_signature_close_bracket_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_close_bracket_line_comment_prettier_divergence/)
 - Index signature `]`→value-`:` (line) → Into brackets, trailing key type — [index_signature_bracket_colon_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_bracket_colon_line_comment_prettier_divergence/)
+- Index signature value-`:`→type under a `]`→`:` comment (line) → Type kept flush (tsv indents continuation) — [index_signature_bracket_colon_value_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_bracket_colon_value_line_comment_prettier_divergence/)
 - Type-argument `<` trailing (multi) → Onto its own line — [type_argument_open_angle_comment](../tests/fixtures/typescript/types/type_argument_open_angle_comment_prettier_divergence/)
 - Call/`new`-expr type-arg `<` trailing (multi) → Onto its own line — [type_args_open_angle_comment](../tests/fixtures/typescript/expressions/calls/type_args_open_angle_comment_prettier_divergence/)
 
