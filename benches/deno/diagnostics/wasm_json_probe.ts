@@ -11,11 +11,11 @@
  * JSON.parse cost.
  *
  * Run: deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys \
- *   benches/deno/wasm_json_probe.ts 2>&1 >/dev/null
+ *   benches/deno/diagnostics/wasm_json_probe.ts 2>&1 >/dev/null
  */
 
-import { DevReposLoader, group_by_language } from './lib/corpus.ts';
-import { init_implementations } from './lib/implementations.ts';
+import { DevReposLoader, group_by_language } from '../lib/corpus.ts';
+import { init_implementations } from '../lib/implementations.ts';
 
 const ITERS = 5;
 

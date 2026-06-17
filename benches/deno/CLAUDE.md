@@ -479,6 +479,12 @@ benches/deno/
 ├── corpus_compare_format.ts  # Formatting comparison vs prettier (entry point)
 ├── corpus_compare_parse.ts   # Parse/AST comparison vs canonical parsers (entry point)
 ├── divergence_audit.ts    # Divergence audit entry point
+├── diagnostics/           # ad-hoc diagnostic scripts (not wired into `deno task` — see §Diagnostic scripts)
+│   ├── skip_triage.ts        # parse-gap triage (tsv vs canonical)
+│   ├── wasm_json_probe.ts    # WASM-vs-native JSON parse penalty attribution
+│   ├── wasm_format_probe.ts  # WASM format wall-time A/B
+│   ├── comment_dup_scan.ts   # comment-dup fixture-corpus completeness guard
+│   └── acorn_dup_fuzz.ts     # comment-dup fuzz over acorn-typescript's construct corpus
 ├── results/baseline.json  # Saved baseline for regression detection (gitignored; written by @fuzdev/fuz_util's benchmark_baseline module)
 ├── lib/
 │   ├── binary_sizes.ts    # Binary/WASM size collection and reporting
@@ -729,13 +735,33 @@ Implementation: `lib/binary_sizes.ts`
 
 ## Diagnostic scripts (ad-hoc, not wired into `deno task`)
 
-- `skip_triage.ts` — parse every corpus file with tsv + the canonical parser,
+These live under `diagnostics/`. The parser-analysis ones (`comment_dup_scan`,
+`acorn_dup_fuzz`) need the canonical-parser import map, so pass `--config
+benches/deno/deno.json`; all run from the repo root (corpus/artifact paths are
+CWD-relative).
+
+- `diagnostics/skip_triage.ts` — parse every corpus file with tsv + the canonical parser,
   bucket into tsv-fails-canonical-ok / canonical-fails-tsv-ok / both-fail.
   Run:
-  `deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/skip_triage.ts`
-- `wasm_json_probe.ts` — split parse cost into pure-parse vs materialization for
+  `deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/diagnostics/skip_triage.ts`
+- `diagnostics/comment_dup_scan.ts` — comment-duplication fixture-corpus completeness guard.
+  Walks all fixtures with two oracles (live `svelte/compiler` parse + committed expected
+  JSON), flagging any comment span emitted ≥2× within one array (the acorn backtrack-reparse
+  signature tsv corrects to single). RED buckets must stay empty. Re-run after touching the
+  comment-convert layer or bumping `@sveltejs/acorn-typescript`.
+  Run:
+  `deno run --allow-read --allow-env --allow-net --allow-sys --config benches/deno/deno.json benches/deno/diagnostics/comment_dup_scan.ts`
+- `diagnostics/acorn_dup_fuzz.ts` — fuzzes a comment into every position of
+  acorn-typescript's own ~200 construct test inputs and flags any `onComment` double-fire;
+  the broadest net for an un-enumerated duplicating construct, and the upstream-fix
+  validation harness (a correct A+B patch drops the count to 0). Default reads
+  `~/dev/acorn-typescript-fork/test`; pass a path to override. See grimoire
+  `lore/tsv/TODO_ACORN_COMMENT_DUP.md`.
+  Run:
+  `deno run --allow-read --allow-env --allow-net --allow-sys --config benches/deno/deno.json benches/deno/diagnostics/acorn_dup_fuzz.ts`
+- `diagnostics/wasm_json_probe.ts` — split parse cost into pure-parse vs materialization for
   native + WASM, isolating JS-side `JSON.parse`.
-- `wasm_format_probe.ts` — measure WASM **format** wall-time at the resolution
+- `diagnostics/wasm_format_probe.ts` — measure WASM **format** wall-time at the resolution
   the full bench folds into noise (single-digit-% changes). A/Bs two WASM builds
   (copy `pkg/all/deno` aside before editing, rebuild, pass `--baseline
   …/tsv_wasm.js`) with the ../../docs/performance.md §5 paired discipline:

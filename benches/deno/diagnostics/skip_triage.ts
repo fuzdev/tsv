@@ -6,12 +6,12 @@
  * asymmetry buckets (tsv-fails-canonical-ok = real gaps). Not wired
  * into `deno task` — run ad hoc (full JSON to stdout, summary to stderr):
  *   deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys \
- *     benches/deno/skip_triage.ts 2>/dev/null > /tmp/triage.json
+ *     benches/deno/diagnostics/skip_triage.ts 2>/dev/null > /tmp/triage.json
  */
 
-import { DevReposLoader, group_by_language } from './lib/corpus.ts';
-import { init_implementations } from './lib/implementations.ts';
-import type { Language } from './lib/types.ts';
+import { DevReposLoader, group_by_language } from '../lib/corpus.ts';
+import { init_implementations } from '../lib/implementations.ts';
+import type { Language } from '../lib/types.ts';
 
 const [files, impls] = await Promise.all([
 	new DevReposLoader().load((m) => console.error(m)),

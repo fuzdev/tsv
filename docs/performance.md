@@ -245,7 +245,7 @@ target-independent (heaptrack reads the same on either), but WASM *wall-time* is
 not: `@fuzdev/tsv_format_wasm` runs on dlmalloc, which memcpys on every heap
 growth, so an allocation-count win can move WASM format time even when the same
 change is a wash on native glibc. The full `deno task bench` is too coarse to
-see those single-digit-% moves; `benches/deno/wasm_format_probe.ts` resolves
+see those single-digit-% moves; `benches/deno/diagnostics/wasm_format_probe.ts` resolves
 them.
 
 It applies the §5 paired discipline in a single invocation: interleaved pairs
@@ -262,7 +262,7 @@ cp -r crates/tsv_wasm/pkg/all/deno crates/tsv_wasm/pkg/all/deno.baseline
 # ... edit source, then rebuild and A/B:
 deno task build:wasm:all:deno
 deno run --allow-read --allow-env --allow-net --allow-sys \
-  benches/deno/wasm_format_probe.ts \
+  benches/deno/diagnostics/wasm_format_probe.ts \
   --baseline crates/tsv_wasm/pkg/all/deno.baseline/tsv_wasm.js
 ```
 

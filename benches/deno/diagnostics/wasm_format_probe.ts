@@ -28,7 +28,7 @@
  *   # ... make the source change, then rebuild:
  *   deno task build:wasm:all:deno
  *   deno run --allow-read --allow-env --allow-net --allow-sys \
- *     benches/deno/wasm_format_probe.ts \
+ *     benches/deno/diagnostics/wasm_format_probe.ts \
  *     --baseline crates/tsv_wasm/pkg/all/deno.baseline/tsv_wasm.js
  *
  * Add --control <copy-of-the-rebuilt-artifact>/tsv_wasm.js for a two-instance
@@ -37,7 +37,7 @@
  * A/A only (no source change — just capture the baseline number + floor):
  *
  *   deno run --allow-read --allow-env --allow-net --allow-sys \
- *     benches/deno/wasm_format_probe.ts
+ *     benches/deno/diagnostics/wasm_format_probe.ts
  *
  * Defaults to the zzz corpus the native profiling tools use, for comparability.
  * Human output goes to stderr; stdout stays clean for a future --json.
@@ -45,9 +45,9 @@
 
 import { resolve } from 'node:path';
 
-import { DirectoryLoader, group_by_language } from './lib/corpus.ts';
-import { LANGUAGES } from './lib/types.ts';
-import type { Language, SourceFile } from './lib/types.ts';
+import { DirectoryLoader, group_by_language } from '../lib/corpus.ts';
+import { LANGUAGES } from '../lib/types.ts';
+import type { Language, SourceFile } from '../lib/types.ts';
 
 /** A loaded WASM build: the three format entry points, keyed by language. */
 type FormatBuild = Record<Language, (source: string) => string>;

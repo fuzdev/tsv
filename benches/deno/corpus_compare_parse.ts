@@ -32,7 +32,7 @@
  *   deno task corpus:compare:parse --all --json 2>/dev/null > report.json
  *
  * Parse FAILURES (one side throws) are counted but not the focus —
- * skip_triage.ts is the dedicated tool for parse-gap triage.
+ * diagnostics/skip_triage.ts is the dedicated tool for parse-gap triage.
  */
 
 import process from 'node:process';
@@ -830,7 +830,7 @@ async function main(): Promise<void> {
 	const total_skipped = totals.tsv_errors + totals.canonical_errors + totals.both_errors;
 	if (total_skipped > 0) {
 		console.log(
-			`\n\x1b[2mParse failures skipped (tsv ${totals.tsv_errors} / canonical ${totals.canonical_errors} / both ${totals.both_errors}) — triage with skip_triage.ts\x1b[0m`,
+			`\n\x1b[2mParse failures skipped (tsv ${totals.tsv_errors} / canonical ${totals.canonical_errors} / both ${totals.both_errors}) — triage with diagnostics/skip_triage.ts\x1b[0m`,
 		);
 	}
 
