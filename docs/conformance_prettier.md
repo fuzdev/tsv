@@ -252,6 +252,7 @@ columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 | Fill boundary             | Print width          | [inline_element_fill_long](../tests/fixtures/svelte/elements/inline_element_fill_long_prettier_divergence/)                   |
 | Fill after breaking attr  | Print width          | [multiline_value_inline_long](../tests/fixtures/svelte/attributes/multiline_value_inline_long_prettier_divergence/)           |
 | Component fill boundary   | Print width          | [inline_component_fill_long](../tests/fixtures/svelte/elements/inline_component_fill_long_prettier_divergence/)               |
+| Inline closing intact     | Print width          | [inline_closing_intact_long](../tests/fixtures/svelte/elements/inline_closing_intact_long_prettier_divergence/)               |
 | Fill multiple expr        | Print width          | [fill_multiple_expr_long](../tests/fixtures/svelte/elements/fill_multiple_expr_long_prettier_divergence/)                     |
 | Inline content hug        | Design choice        | [inline_content_hug_long](../tests/fixtures/svelte/elements/inline_content_hug_long_prettier_divergence/)                     |
 | Block multiline attrs hug | Print width          | [block_multiline_attrs_content_hug](../tests/fixtures/svelte/elements/block_multiline_attrs_content_hug_prettier_divergence/) |

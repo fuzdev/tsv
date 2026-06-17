@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 386,
+	"end": 402,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 63,
-				"data": " 100 chars: component in fill content, fits on one line "
+				"end": 79,
+				"data": " 100 chars: inline <code> with a trailing word fits — stays on one line "
 			},
 			{
 				"type": "Text",
-				"start": 63,
-				"end": 64,
+				"start": 79,
+				"end": 80,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 64,
-				"end": 172,
+				"start": 80,
+				"end": 188,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 2,
 						"column": 1,
-						"character": 65
+						"character": 81
 					},
 					"end": {
 						"line": 2,
 						"column": 2,
-						"character": 66
+						"character": 82
 					}
 				},
 				"attributes": [],
@@ -43,26 +43,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 67,
-							"end": 144,
+							"start": 83,
+							"end": 160,
 							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 ",
 							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 "
 						},
 						{
-							"type": "Component",
-							"start": 144,
-							"end": 161,
-							"name": "Comp",
+							"type": "RegularElement",
+							"start": 160,
+							"end": 175,
+							"name": "code",
 							"name_loc": {
 								"start": {
 									"line": 3,
 									"column": 77,
-									"character": 145
+									"character": 161
 								},
 								"end": {
 									"line": 3,
 									"column": 81,
-									"character": 149
+									"character": 165
 								}
 							},
 							"attributes": [],
@@ -71,59 +71,59 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 150,
-										"end": 154,
-										"raw": "text",
-										"data": "text"
+										"start": 166,
+										"end": 168,
+										"raw": ".x",
+										"data": ".x"
 									}
 								]
 							}
 						},
 						{
 							"type": "Text",
-							"start": 161,
-							"end": 168,
-							"raw": " texta\n",
-							"data": " texta\n"
+							"start": 175,
+							"end": 184,
+							"raw": " textabc\n",
+							"data": " textabc\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 172,
-				"end": 174,
+				"start": 188,
+				"end": 190,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 174,
-				"end": 274,
+				"start": 190,
+				"end": 290,
 				"data": " 101 chars: closing tag stays intact, break falls at the whitespace before the trailing word "
 			},
 			{
 				"type": "Text",
-				"start": 274,
-				"end": 275,
+				"start": 290,
+				"end": 291,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 275,
-				"end": 385,
+				"start": 291,
+				"end": 401,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 7,
 						"column": 1,
-						"character": 276
+						"character": 292
 					},
 					"end": {
 						"line": 7,
 						"column": 2,
-						"character": 277
+						"character": 293
 					}
 				},
 				"attributes": [],
@@ -132,26 +132,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 278,
-							"end": 355,
+							"start": 294,
+							"end": 371,
 							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 ",
 							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 "
 						},
 						{
-							"type": "Component",
-							"start": 355,
-							"end": 372,
-							"name": "Comp",
+							"type": "RegularElement",
+							"start": 371,
+							"end": 386,
+							"name": "code",
 							"name_loc": {
 								"start": {
 									"line": 8,
 									"column": 77,
-									"character": 356
+									"character": 372
 								},
 								"end": {
 									"line": 8,
 									"column": 81,
-									"character": 360
+									"character": 376
 								}
 							},
 							"attributes": [],
@@ -160,20 +160,20 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 361,
-										"end": 365,
-										"raw": "text",
-										"data": "text"
+										"start": 377,
+										"end": 379,
+										"raw": ".x",
+										"data": ".x"
 									}
 								]
 							}
 						},
 						{
 							"type": "Text",
-							"start": 372,
-							"end": 381,
-							"raw": "\n\ttextab\n",
-							"data": "\n\ttextab\n"
+							"start": 386,
+							"end": 397,
+							"raw": "\n\ttextabcd\n",
+							"data": "\n\ttextabcd\n"
 						}
 					]
 				}

@@ -118,9 +118,7 @@ impl<'a> Printer<'a> {
                 prettier_ignore_next = false;
                 continue;
             }
-            if let FragmentNode::Comment(comment) = node
-                && comment.content.trim() == "prettier-ignore"
-            {
+            if Self::is_format_ignore_comment(node) {
                 if let Some(doc) = self.build_fragment_node_doc_with_context(node, trim_text) {
                     docs.push(doc);
                 }
@@ -167,6 +165,18 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Find the inclusive-exclusive index range of `nodes` after trimming boundary nodes for
+    /// which `skip` returns true. Returns `None` when every node is skipped (the range is empty),
+    /// so callers can short-circuit to an empty doc.
+    fn trimmed_node_bounds(
+        nodes: &[FragmentNode],
+        skip: impl Fn(&FragmentNode) -> bool,
+    ) -> Option<(usize, usize)> {
+        let start = nodes.iter().position(|n| !skip(n))?;
+        let end = nodes.iter().rposition(|n| !skip(n)).map_or(0, |i| i + 1);
+        Some((start, end))
+    }
+
     /// Build a doc for a node slice with boundary whitespace trimmed
     ///
     /// Matches prettier-plugin-svelte's printChildren behavior:
@@ -209,18 +219,10 @@ impl<'a> Printer<'a> {
             }
         };
 
-        let start_idx = nodes
-            .iter()
-            .position(|n| !should_skip_at_boundary(n))
-            .unwrap_or(nodes.len());
-        let end_idx = nodes
-            .iter()
-            .rposition(|n| !should_skip_at_boundary(n))
-            .map_or(0, |i| i + 1);
-
-        if start_idx >= end_idx {
+        let Some((start_idx, end_idx)) = Self::trimmed_node_bounds(nodes, should_skip_at_boundary)
+        else {
             return d.empty();
-        }
+        };
 
         let trimmed_nodes = &nodes[start_idx..end_idx];
         let trimmed_len = trimmed_nodes.len();
@@ -250,9 +252,7 @@ impl<'a> Printer<'a> {
                 prettier_ignore_next = false;
                 continue;
             }
-            if let FragmentNode::Comment(comment) = node
-                && comment.content.trim() == "prettier-ignore"
-            {
+            if Self::is_format_ignore_comment(node) {
                 prettier_ignore_next = true;
             }
 
@@ -347,6 +347,18 @@ impl<'a> Printer<'a> {
             node,
             FragmentNode::ExpressionTag(_) | FragmentNode::HtmlTag(_) | FragmentNode::RenderTag(_)
         )
+    }
+
+    /// Check if a node is a format-ignore comment — the directive that pins the next node's
+    /// raw source instead of formatting it. Single recognition point for the three
+    /// `build_nodes_doc_*` accumulation loops.
+    ///
+    // TODO: also recognize a native `format-ignore` directive (tool-neutral, simpler than
+    // borrowing prettier's spelling) alongside `prettier-ignore`. When added, this is the one
+    // spot to extend — but `has_prettier_ignore_before` in `printer/mod.rs` matches the same
+    // literal on `&HtmlComment` and must move in lockstep.
+    fn is_format_ignore_comment(node: &FragmentNode) -> bool {
+        matches!(node, FragmentNode::Comment(c) if c.content.trim() == "prettier-ignore")
     }
 
     /// Handle a text child node - matches prettier-plugin-svelte's handleTextChild
@@ -549,18 +561,11 @@ impl<'a> Printer<'a> {
         }
 
         // Find first and last non-whitespace indices
-        let start_idx = nodes
-            .iter()
-            .position(|n| !n.is_whitespace_only_text())
-            .unwrap_or(nodes.len());
-        let end_idx = nodes
-            .iter()
-            .rposition(|n| !n.is_whitespace_only_text())
-            .map_or(0, |i| i + 1);
-
-        if start_idx >= end_idx {
+        let Some((start_idx, end_idx)) =
+            Self::trimmed_node_bounds(nodes, FragmentNode::is_whitespace_only_text)
+        else {
             return d.empty();
-        }
+        };
 
         let trimmed_nodes = &nodes[start_idx..end_idx];
 
@@ -597,59 +602,22 @@ impl<'a> Printer<'a> {
                 prettier_ignore_next = false;
                 continue;
             }
-            if let FragmentNode::Comment(comment) = node
-                && comment.content.trim() == "prettier-ignore"
-            {
+            if Self::is_format_ignore_comment(node) {
                 prettier_ignore_next = true;
             }
 
             let is_block = self.is_block_fragment_node(node);
 
             if is_block {
-                // Block element - check if it should stay on the same line as previous content
-                //
-                // Control flow blocks ({#if}, {#each}, etc.) can hug when:
-                // 1. Directly adjacent to previous node (no whitespace between)
-                // 2. Previous text had trailing space AND on same source line
-                //
-                // HTML block elements (<div>, <p>, etc.) can stay inline when:
-                // - Block is the second trimmed child (i==1) AND first child is content text
-                //   with trailing space AND on same source line.
-                //   This matches prettier: only first-child text keeps blocks inline.
-                //   When non-text nodes (elements, expressions) precede the whitespace,
-                //   prettier adds softline + breakParent to force a line break.
+                // Block element - decide whether it hugs the preceding/following content or
+                // takes its own line. See block_keeps_inline_with_prev / block_next_hugs_closing.
                 let is_control_flow = super::helpers::is_control_flow_block(node);
-                let keep_inline_with_prev = if i > 0 {
-                    let prev_span = trimmed_nodes[i - 1].span();
-                    let curr_span = node.span();
-                    // Directly adjacent: prev.end == curr.start (no text node between)
-                    // Only control flow blocks can hug when directly adjacent
-                    let directly_adjacent = is_control_flow && prev_span.end == curr_span.start;
-                    // Previous text had trailing space and on same line
-                    let text_with_space = prev_text_has_trailing_space
-                        && tsv_lang::printing::spans_on_same_line(
-                            self.source,
-                            prev_span,
-                            curr_span,
-                        );
-                    // For HTML block elements (not control flow), only keep inline
-                    // when the block is the second child and the first child is
-                    // content text. This matches prettier where forceBreakContent
-                    // (breakParent) forces all softlines to break, and only
-                    // first-child text avoids getting a softline before the block.
-                    let text_with_space = if !is_control_flow && text_with_space {
-                        i == 1
-                            && matches!(
-                                &trimmed_nodes[0],
-                                FragmentNode::Text(t) if !t.raw.is_whitespace_only()
-                            )
-                    } else {
-                        text_with_space
-                    };
-                    directly_adjacent || text_with_space
-                } else {
-                    false
-                };
+                let keep_inline_with_prev = self.block_keeps_inline_with_prev(
+                    trimmed_nodes,
+                    i,
+                    is_control_flow,
+                    prev_text_has_trailing_space,
+                );
 
                 if let Some(node_doc) = self.build_fragment_node_doc_in_multiline(node, true) {
                     if keep_inline_with_prev {
@@ -664,42 +632,22 @@ impl<'a> Printer<'a> {
                         current_line.push(node_doc);
                     }
 
-                    // Check if next node should hug the closing tag (no break)
-                    //
-                    // For control flow blocks, hug when:
-                    // 1. Next non-text node is directly adjacent (no whitespace between)
-                    // 2. Next text has content and is on same source line
-                    //
-                    // Whitespace-only text between nodes means NO hugging (expands to line break).
-                    // For HTML block elements, always break after.
-                    let next_hugs_closing = is_control_flow
-                        && trimmed_nodes.get(i + 1).is_some_and(|next| {
-                            let curr_span = node.span();
-                            let next_span = next.span();
-
-                            // Whitespace-only text means no hugging
-                            if let FragmentNode::Text(next_text) = next {
-                                if next_text.raw.trim().is_empty() {
-                                    return false;
-                                }
-                                // Text with content - hug if on same source line as block
-                                return tsv_lang::printing::spans_on_same_line(
-                                    self.source,
-                                    curr_span,
-                                    next_span,
-                                );
-                            }
-                            // Non-text node - check if directly adjacent
-                            curr_span.end == next_span.start
-                        });
-
-                    if !next_hugs_closing {
+                    if !self.block_next_hugs_closing(trimmed_nodes, i, is_control_flow) {
                         // New line after block (unless next node hugs)
                         lines.push(std::mem::take(&mut current_line));
                     }
                 }
                 prev_text_has_trailing_space = false;
             } else if let FragmentNode::Text(text) = node {
+                // The fold below (breakable whitespace boundary) targets the closing tag of an
+                // immediately-preceding inline element — that is the only construct whose `>`
+                // would otherwise be split off on its own. Expression tags and other content
+                // have no closing `>` and keep prettier's own break behavior, so restrict it.
+                let prev_is_inline_element = i > 0
+                    && matches!(
+                        &trimmed_nodes[i - 1],
+                        FragmentNode::Element(_) | FragmentNode::SpecialElement(_)
+                    );
                 // Text - split on newlines to preserve source line structure
                 if text.raw.is_whitespace_only() {
                     let newline_count = text.raw.chars().filter(|&c| c == '\n').count();
@@ -777,15 +725,11 @@ impl<'a> Printer<'a> {
                                 }
                             }
                         }
-                        // Preserve leading space if part has it
-                        if part.starts_with(char::is_whitespace) && !current_line.is_empty() {
-                            current_line.push(d.text(" "));
-                        }
-                        // Use fill for word-level breaking
-                        if let Some(fill_doc) =
-                            self.build_text_fill_doc_trimmed(part, true, true, false, false)
-                        {
-                            current_line.push(fill_doc);
+                        // Emit this part's words, folding into a preceding inline element when
+                        // the boundary allows so the line can break after its closing `>`
+                        // (keeping the `>` intact) instead of the element splitting it off. A
+                        // collapsed newline becomes the source space.
+                        if self.emit_text_part(&mut current_line, part, prev_is_inline_element) {
                             consecutive_blank_count = 0;
 
                             let remaining_parts_have_content =
@@ -803,21 +747,11 @@ impl<'a> Printer<'a> {
                         .last()
                         .is_some_and(|p| p.ends_with(char::is_whitespace));
                 } else {
-                    // No newlines - add to current line with fill for word-level breaking
-                    let has_leading = text.raw.starts_with(char::is_whitespace);
+                    // No newlines - add to current line with fill for word-level breaking,
+                    // folding into a preceding inline element when the boundary allows (keeps
+                    // its closing `>` intact; see the comment at the top of this Text arm).
                     let has_trailing = text.raw.ends_with(char::is_whitespace);
-
-                    // Add leading space if source has it AND line has content
-                    if has_leading && !current_line.is_empty() {
-                        current_line.push(d.text(" "));
-                    }
-
-                    // Use fill for multi-word text to enable word-level line breaking
-                    if let Some(fill_doc) =
-                        self.build_text_fill_doc_trimmed(&text.raw, true, true, false, false)
-                    {
-                        current_line.push(fill_doc);
-                    }
+                    self.emit_text_part(&mut current_line, &text.raw, prev_is_inline_element);
 
                     // Add trailing space if source has it, but NOT for the last node
                     // (boundary whitespace at end of fragment should be trimmed)
@@ -840,10 +774,16 @@ impl<'a> Printer<'a> {
             lines.push(current_line);
         }
 
-        // Build output: join lines with hardlines, preserving blank lines
-        // - Content lines: hardline (adds \n + indent)
-        // - Blank lines: literalline (adds \n only, no indent)
-        // Skip leading and trailing empty lines (boundaries handled by element structure)
+        self.emit_lines(lines)
+    }
+
+    /// Join accumulated multiline output lines into a single doc.
+    ///
+    /// Content lines are separated by `hardline` (newline + indent); internal blank lines use
+    /// `literalline` (newline only, no indent). Leading and trailing blank lines are skipped —
+    /// the element structure supplies the boundary breaks.
+    fn emit_lines(&self, lines: Vec<LineBuf>) -> DocId {
+        let d = self.d();
         let mut docs = Vec::new();
         let total_lines = lines.len();
         let mut found_first_content = false;
@@ -880,6 +820,76 @@ impl<'a> Printer<'a> {
         } else {
             d.concat(&docs)
         }
+    }
+
+    /// Whether a block node at `trimmed_nodes[i]` stays on the same line as the preceding
+    /// content in the multiline path.
+    ///
+    /// Control-flow blocks (`{#if}`, `{#each}`, …) hug a directly-adjacent previous node (no
+    /// whitespace between) or a preceding text with a trailing space on the same source line.
+    /// HTML block elements (`<div>`, `<p>`, …) hug only as the second child after content text —
+    /// matching Prettier, where `forceBreakContent` otherwise inserts a softline before the block.
+    fn block_keeps_inline_with_prev(
+        &self,
+        trimmed_nodes: &[FragmentNode],
+        i: usize,
+        is_control_flow: bool,
+        prev_text_has_trailing_space: bool,
+    ) -> bool {
+        if i == 0 {
+            return false;
+        }
+        let prev_span = trimmed_nodes[i - 1].span();
+        let curr_span = trimmed_nodes[i].span();
+        // Directly adjacent (prev.end == curr.start): only control-flow blocks hug here.
+        let directly_adjacent = is_control_flow && prev_span.end == curr_span.start;
+        // Previous text had a trailing space and sits on the same source line.
+        let text_with_space = prev_text_has_trailing_space
+            && tsv_lang::printing::spans_on_same_line(self.source, prev_span, curr_span);
+        // HTML block elements only hug as the second child after content text.
+        let text_with_space = if !is_control_flow && text_with_space {
+            i == 1
+                && matches!(
+                    &trimmed_nodes[0],
+                    FragmentNode::Text(t) if !t.raw.is_whitespace_only()
+                )
+        } else {
+            text_with_space
+        };
+        directly_adjacent || text_with_space
+    }
+
+    /// Whether the node after a control-flow block at `trimmed_nodes[i]` hugs its closing tag
+    /// (no line break after the block).
+    ///
+    /// Hugs when the next node is directly adjacent (no whitespace between), or is content text
+    /// on the same source line. Whitespace-only text between the two forces a break, and only
+    /// control-flow blocks hug at all — HTML block elements always break after.
+    fn block_next_hugs_closing(
+        &self,
+        trimmed_nodes: &[FragmentNode],
+        i: usize,
+        is_control_flow: bool,
+    ) -> bool {
+        is_control_flow
+            && trimmed_nodes.get(i + 1).is_some_and(|next| {
+                let curr_span = trimmed_nodes[i].span();
+                let next_span = next.span();
+                if let FragmentNode::Text(next_text) = next {
+                    // Whitespace-only text means no hugging; content text hugs when on the
+                    // same source line as the block.
+                    if next_text.raw.trim().is_empty() {
+                        return false;
+                    }
+                    return tsv_lang::printing::spans_on_same_line(
+                        self.source,
+                        curr_span,
+                        next_span,
+                    );
+                }
+                // Non-text node - hug only if directly adjacent.
+                curr_span.end == next_span.start
+            })
     }
 
     /// Check if a fragment node is a block-level node (needs its own line)
@@ -1030,6 +1040,67 @@ impl<'a> Printer<'a> {
     //
     // Text nodes
     //
+
+    /// Split `s` into `[word, line, word, …]` fill parts (ASCII-whitespace separated,
+    /// matching `build_text_fill_doc_trimmed`'s word split, so non-breaking spaces stay
+    /// attached). Used by the inline-element fold so the words after a folded element pack
+    /// greedily into the surrounding fill rather than moving as one nested unit.
+    fn word_fill_parts(&self, s: &str) -> Vec<DocId> {
+        let d = self.d();
+        let mut parts: Vec<DocId> = Vec::new();
+        for word in s.split_ascii_whitespace() {
+            if !parts.is_empty() {
+                parts.push(d.line());
+            }
+            parts.push(d.text_owned(word.to_string()));
+        }
+        parts
+    }
+
+    /// If the current line ends with an inline element, fold it together with `raw`'s words
+    /// into one `fill` (`element line word line word …`) so the boundary after the element
+    /// can break — keeping its closing `>` intact — while the words still pack greedily after
+    /// it. Returns `false` (no change) when the line is empty.
+    fn fold_text_after_inline_element(&self, line: &mut LineBuf, raw: &str) -> bool {
+        let d = self.d();
+        let Some(prev) = line.pop() else { return false };
+        let words = self.word_fill_parts(raw);
+        let mut parts: Vec<DocId> = Vec::with_capacity(2 + words.len());
+        parts.push(prev);
+        parts.push(d.line());
+        parts.extend(words);
+        line.push(d.fill(&parts));
+        true
+    }
+
+    /// Emit one text `part` into `line` for the multiline path: fold it into an
+    /// immediately-preceding inline element when the boundary allows (keeping the element's
+    /// closing `>` intact via [`Self::fold_text_after_inline_element`]), otherwise push the
+    /// optional leading space + word fill. Returns whether a fill was produced — `false` for an
+    /// empty/whitespace-only `part`, so callers can skip blank-line and trailing-space bookkeeping.
+    fn emit_text_part(&self, line: &mut LineBuf, part: &str, prev_is_inline_element: bool) -> bool {
+        let d = self.d();
+        let has_leading = part.starts_with(char::is_whitespace) && !line.is_empty();
+        let Some(fill_doc) = self.build_text_fill_doc_trimmed(part, true, true, false, false)
+        else {
+            // No words (empty or whitespace-only part): just carry the boundary space.
+            if has_leading {
+                line.push(d.text(" "));
+            }
+            return false;
+        };
+        // Fold only after an inline element, to keep its closing `>` intact.
+        let folded = has_leading
+            && prev_is_inline_element
+            && self.fold_text_after_inline_element(line, part);
+        if !folded {
+            if has_leading {
+                line.push(d.text(" "));
+            }
+            line.push(fill_doc);
+        }
+        true
+    }
 
     /// Build a doc for a text node
     ///
