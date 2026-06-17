@@ -11,23 +11,16 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
 ## Unreleased
 <!-- bump: minor -->
 
+- formatting is now non-configurable by design - tsv has no config files, CLI flags,
+  or runtime options, and none will be added
+  (this has no observable API changes because options had been deferred)
+- support `format-ignore` as an alias to `prettier-ignore`
+  (along with `format-ignore-start` and `format-ignore-end` for templates)
 - various conformance fixes to the formatter and parser
 - numerous new Prettier divergences including uniform indentation on continuations
 - object destructuring patterns in Svelte blocks now hug their braces,
-  consistent with `bracketSpacing: false` (which is not
-  respected by prettier-plugin-svelte even when set)
+  consistent with `bracketSpacing: false` (which is not respected by prettier-plugin-svelte)
 - reduce allocations using `SmallVec` and memoizations
-- formatting is now **non-configurable by design** — no config files, CLI flags,
-  or runtime options, and none are planned (opinionated like `gofmt` and Black).
-  Policy only — no change to formatter output or the published API
-  (`format_*` / `parse_*` / the `tsv` bin).
-- parse AST: each comment now appears **once** in the public AST everywhere. tsv
-  previously replicated acorn-typescript's backtrack-and-reparse comment
-  duplication for type-space constructs (type literals, mapped/function types,
-  type assertions, type-member index/computed signatures, typed-param arrows);
-  it now corrects the duplication uniformly, matching the existing class-body
-  behavior. The set of distinct comments is unchanged; only the duplicate
-  entries are gone. Formatter output is unaffected.
 
 ## 0.1.0
 

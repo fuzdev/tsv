@@ -35,6 +35,7 @@ Foundation for all parsing.
 - Nested comment handling
 - Comment preservation in AST
 - Leading/trailing comment attachment
+- `format-ignore` / `prettier-ignore` directive (`// format-ignore` emits the next construct verbatim — see [directives.md](./directives.md))
 
 ### Identifiers
 

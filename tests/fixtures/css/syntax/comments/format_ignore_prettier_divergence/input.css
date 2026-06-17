@@ -1,0 +1,9 @@
+/* format-ignore */
+.a   {   color:   red;   }
+
+/* prettier-ignore */
+.b   {   color:   blue;   }
+
+.c {
+	color: green;
+}

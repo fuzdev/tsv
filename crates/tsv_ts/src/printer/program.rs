@@ -1,7 +1,7 @@
 // Program-level printing for TypeScript
 //
 // Top-level orchestration: statement iteration with blank-line preservation,
-// leading/trailing comment placement, and `// prettier-ignore` raw emission.
+// leading/trailing comment placement, and format-ignore raw emission.
 
 use crate::ast::internal;
 use tsv_lang::{
@@ -98,7 +98,7 @@ impl<'a> Printer<'a> {
             }
 
             // Leading comments (allow inline comments since statement will be printed)
-            let has_ignore = self.has_prettier_ignore_in_range(prev_end, statement.span().start);
+            let has_ignore = self.has_format_ignore_in_range(prev_end, statement.span().start);
             if let Some(leading_doc) = self.build_leading_comments_doc(
                 prev_end,
                 statement.span().start,
@@ -108,7 +108,7 @@ impl<'a> Printer<'a> {
                 parts.push(leading_doc);
             }
 
-            // Statement — if preceded by prettier-ignore, emit raw source
+            // Statement — if preceded by a format-ignore directive, emit raw source
             if has_ignore {
                 parts.push(self.raw_source_doc(statement.span()));
             } else {

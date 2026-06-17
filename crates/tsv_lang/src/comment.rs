@@ -22,6 +22,42 @@ pub struct Comment {
 }
 
 //
+// Format-Ignore Directive Recognition
+//
+//
+// A comment can suppress formatting of the construct that follows it. tsv
+// recognizes its own tool-neutral `format-ignore` family as canonical and
+// prettier's `prettier-ignore` family as a drop-in-compatible alias — both
+// spellings are honored everywhere. These predicates are the single source of
+// truth for the directive set, called by each language printer (the comment
+// types differ across crates, so the shared atom operates on the trimmed text).
+
+/// Whether `content` is a `format-ignore` / `prettier-ignore` directive — emit
+/// the following construct as raw source instead of formatting it.
+#[inline]
+pub fn is_format_ignore_directive(content: &str) -> bool {
+    matches!(content.trim(), "format-ignore" | "prettier-ignore")
+}
+
+/// Whether `content` opens an ignore range (`format-ignore-start` /
+/// `prettier-ignore-start`). Everything through the matching range-end marker is
+/// emitted as raw source.
+#[inline]
+pub fn is_format_ignore_range_start(content: &str) -> bool {
+    matches!(
+        content.trim(),
+        "format-ignore-start" | "prettier-ignore-start"
+    )
+}
+
+/// Whether `content` closes an ignore range (`format-ignore-end` /
+/// `prettier-ignore-end`). See `is_format_ignore_range_start`.
+#[inline]
+pub fn is_format_ignore_range_end(content: &str) -> bool {
+    matches!(content.trim(), "format-ignore-end" | "prettier-ignore-end")
+}
+
+//
 // Comment Classification
 //
 //
@@ -249,6 +285,28 @@ mod tests {
             span: Span::new(start, end),
             emit_character_field: false,
         }
+    }
+
+    #[test]
+    fn format_ignore_directives_recognize_both_spellings() {
+        // The tsv-native `format-ignore` family and prettier's `prettier-ignore`
+        // family are both honored, with surrounding whitespace trimmed (block
+        // comments arrive as ` format-ignore `).
+        assert!(is_format_ignore_directive("format-ignore"));
+        assert!(is_format_ignore_directive("prettier-ignore"));
+        assert!(is_format_ignore_directive("  format-ignore  "));
+        assert!(!is_format_ignore_directive("format-ignore-start"));
+        assert!(!is_format_ignore_directive("eslint-disable"));
+
+        assert!(is_format_ignore_range_start("format-ignore-start"));
+        assert!(is_format_ignore_range_start("prettier-ignore-start"));
+        assert!(!is_format_ignore_range_start("format-ignore"));
+        assert!(!is_format_ignore_range_start("format-ignore-end"));
+
+        assert!(is_format_ignore_range_end("format-ignore-end"));
+        assert!(is_format_ignore_range_end("prettier-ignore-end"));
+        assert!(!is_format_ignore_range_end("format-ignore"));
+        assert!(!is_format_ignore_range_end("format-ignore-start"));
     }
 
     #[test]

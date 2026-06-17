@@ -15,6 +15,7 @@
 
 use super::Printer;
 use crate::ast::internal;
+use tsv_lang::is_format_ignore_directive;
 
 impl<'a> Printer<'a> {
     /// Format a CSS rule (selector + declarations block)
@@ -49,7 +50,7 @@ impl<'a> Printer<'a> {
         // Format declarations and comments with indentation
         self.indent_level += 1;
         let mut i = start_index;
-        let mut prettier_ignore_next = false;
+        let mut format_ignore_next = false;
         while i < rule.declarations.len() {
             let child = &rule.declarations[i];
             match child {
@@ -58,7 +59,7 @@ impl<'a> Printer<'a> {
                     if i > start_index && self.has_blank_line_before_child(&rule.declarations, i) {
                         self.write("\n");
                     }
-                    if prettier_ignore_next {
+                    if format_ignore_next {
                         // Emit raw source instead of formatting
                         // Span doesn't include semicolon — add it like write_declaration_end
                         self.write_indent();
@@ -67,7 +68,7 @@ impl<'a> Printer<'a> {
                             self.write(" !important");
                         }
                         self.write(";\n");
-                        prettier_ignore_next = false;
+                        format_ignore_next = false;
                     } else {
                         self.print_css_declaration(decl);
                     }
@@ -89,9 +90,9 @@ impl<'a> Printer<'a> {
                         self.write("\n");
                     }
 
-                    // Check for prettier-ignore
-                    if comment.content.trim() == "prettier-ignore" {
-                        prettier_ignore_next = true;
+                    // Check for a format-ignore directive
+                    if is_format_ignore_directive(&comment.content) {
+                        format_ignore_next = true;
                     }
 
                     self.write_indent();
@@ -105,9 +106,9 @@ impl<'a> Printer<'a> {
                         self.write("\n");
                     }
                     self.write_indent();
-                    if prettier_ignore_next {
+                    if format_ignore_next {
                         self.write(nested_rule.span.extract(self.source));
-                        prettier_ignore_next = false;
+                        format_ignore_next = false;
                     } else {
                         self.print_css_rule(nested_rule);
                     }
@@ -127,9 +128,9 @@ impl<'a> Printer<'a> {
                         self.write("\n");
                     }
                     self.write_indent();
-                    if prettier_ignore_next {
+                    if format_ignore_next {
                         self.write(nested_atrule.span.extract(self.source));
-                        prettier_ignore_next = false;
+                        format_ignore_next = false;
                     } else {
                         self.print_css_atrule(nested_atrule);
                     }
