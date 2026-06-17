@@ -97,15 +97,12 @@ impl<'a> Printer<'a> {
 
             // Leading comments (after previous comma or `<`); for the first param,
             // exclude comments already pulled onto the `<` line.
-            if i == 0 && angle_pull_pos.is_some() {
-                inner_parts.extend(self.build_leading_comments_multiline_after_delim(
-                    prev_end,
-                    param_start,
-                    decl.span.start,
-                ));
-            } else {
-                inner_parts.extend(self.build_leading_comments_multiline(prev_end, param_start));
-            }
+            let skip_delim = if i == 0 { angle_pull_pos } else { None };
+            inner_parts.extend(self.build_leading_comments_multiline_opt(
+                prev_end,
+                param_start,
+                skip_delim,
+            ));
 
             inner_parts.push(self.build_type_parameter_doc(param, false));
 
@@ -600,17 +597,12 @@ impl<'a> Printer<'a> {
             // Leading comments (after previous comma or `<`). For the first arg,
             // drop comments pulled onto the `<` line (emitted as the angle-line
             // prefix below).
-            if i == 0
-                && let Some(delim) = delimiter_pull_pos
-            {
-                inner_parts.extend(self.build_leading_comments_multiline_after_delim(
-                    prev_end,
-                    param_start,
-                    delim,
-                ));
-            } else {
-                inner_parts.extend(self.build_leading_comments_multiline(prev_end, param_start));
-            }
+            let skip_delim = if i == 0 { delimiter_pull_pos } else { None };
+            inner_parts.extend(self.build_leading_comments_multiline_opt(
+                prev_end,
+                param_start,
+                skip_delim,
+            ));
 
             inner_parts.push(self.build_type_doc(param));
 
