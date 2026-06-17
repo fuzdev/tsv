@@ -149,6 +149,7 @@ Future features (unknown order):
 
 - **[CLAUDE.md](CLAUDE.md)** - development guide (commands, structure, conventions)
 - **[docs/architecture.md](docs/architecture.md)** - the major design decisions
+- **[docs/directives.md](docs/directives.md)** - `format-ignore` / `prettier-ignore` formatting directives
 - **[docs/conformance_prettier.md](docs/conformance_prettier.md)** - where formatting diverges from Prettier (and why)
 - **[docs/conformance_svelte.md](docs/conformance_svelte.md)** - where the parser diverges from Svelte (and why)
 - **[docs/conformance_test262.md](docs/conformance_test262.md)** - ECMAScript parser conformance

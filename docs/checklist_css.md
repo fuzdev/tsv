@@ -55,6 +55,7 @@ Foundation for all CSS parsing. Spec: `css-syntax-3` (REC)
 - Comments in at-rules
 - Consecutive comments
 - Nested comment closing (spec-compliant)
+- `format-ignore` / `prettier-ignore` directive (`/* format-ignore */` emits the next rule/declaration verbatim — see [directives.md](./directives.md))
 
 ### Escapes
 

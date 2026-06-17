@@ -16,6 +16,7 @@ use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
 use smallvec::SmallVec;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::is_format_ignore_directive;
 
 /// Inline buffer for one output line's docs. Most lines hold only a few, so
 /// `SmallVec` keeps the common case off the heap.
@@ -104,10 +105,10 @@ impl<'a> Printer<'a> {
         trim_text: bool,
     ) -> DocId {
         let mut docs: Vec<DocId> = Vec::new();
-        let mut prettier_ignore_next = false;
+        let mut format_ignore_next = false;
         for (i, node) in nodes.iter().enumerate() {
-            // prettier-ignore: skip whitespace, emit raw source for ignored node
-            if prettier_ignore_next {
+            // format-ignore: skip whitespace, emit raw source for ignored node
+            if format_ignore_next {
                 if let FragmentNode::Text(text) = node
                     && text.raw.is_whitespace_only()
                 {
@@ -115,14 +116,14 @@ impl<'a> Printer<'a> {
                 }
                 let raw = node.span().extract(self.source);
                 docs.push(self.d().text_owned(raw.to_string()));
-                prettier_ignore_next = false;
+                format_ignore_next = false;
                 continue;
             }
             if Self::is_format_ignore_comment(node) {
                 if let Some(doc) = self.build_fragment_node_doc_with_context(node, trim_text) {
                     docs.push(doc);
                 }
-                prettier_ignore_next = true;
+                format_ignore_next = true;
                 continue;
             }
 
@@ -227,13 +228,13 @@ impl<'a> Printer<'a> {
         let mut child_docs: Vec<DocId> = Vec::new();
         let mut handle_whitespace_of_prev_text = false;
 
-        let mut prettier_ignore_next = false;
+        let mut format_ignore_next = false;
         for (i, node) in trimmed_nodes.iter().enumerate() {
             let is_first = i == 0;
             let is_last = i == trimmed_len - 1;
 
-            // prettier-ignore: skip whitespace, emit raw source for ignored node
-            if prettier_ignore_next {
+            // format-ignore: skip whitespace, emit raw source for ignored node
+            if format_ignore_next {
                 if let FragmentNode::Text(text) = node
                     && text.raw.is_whitespace_only()
                 {
@@ -242,11 +243,11 @@ impl<'a> Printer<'a> {
                 let raw = node.span().extract(self.source);
                 child_docs.push(d.text_owned(raw.to_string()));
                 handle_whitespace_of_prev_text = false;
-                prettier_ignore_next = false;
+                format_ignore_next = false;
                 continue;
             }
             if Self::is_format_ignore_comment(node) {
-                prettier_ignore_next = true;
+                format_ignore_next = true;
             }
 
             if let FragmentNode::Text(text) = node {
@@ -342,16 +343,10 @@ impl<'a> Printer<'a> {
     /// raw source instead of formatting it. Single recognition point for the three
     /// `build_nodes_doc_*` accumulation loops.
     ///
-    // TODO: also recognize a native `format-ignore` directive (tool-neutral, simpler than
-    // borrowing prettier's spelling) alongside `prettier-ignore`. This is the one spot to
-    // extend *for the fragment loops*, but the `"prettier-ignore"` literal is matched in
-    // several other places that must move in lockstep — `printer/mod.rs` checks it on
-    // `&HtmlComment` (`has_prettier_ignore_before`, the script/style ignore path) plus the
-    // `prettier-ignore` / `prettier-ignore-start` / `prettier-ignore-end` range handling.
-    // When adding the second spelling, hoist the recognition into one shared primitive over
-    // the trimmed comment text rather than threading a new literal through each site.
+    // Recognition lives in `tsv_lang::is_format_ignore_directive` — the single source of
+    // truth for the directive set, shared across all three language printers.
     fn is_format_ignore_comment(node: &FragmentNode) -> bool {
-        matches!(node, FragmentNode::Comment(c) if c.content.trim() == "prettier-ignore")
+        matches!(node, FragmentNode::Comment(c) if is_format_ignore_directive(&c.content))
     }
 
     /// Handle a text child node - matches prettier-plugin-svelte's handleTextChild
@@ -575,10 +570,10 @@ impl<'a> Printer<'a> {
         // Track if previous text ended with space (for inline-before-block pattern)
         let mut prev_text_has_trailing_space = false;
 
-        let mut prettier_ignore_next = false;
+        let mut format_ignore_next = false;
         for (i, node) in trimmed_nodes.iter().enumerate() {
-            // prettier-ignore: skip whitespace, emit raw source for ignored node
-            if prettier_ignore_next {
+            // format-ignore: skip whitespace, emit raw source for ignored node
+            if format_ignore_next {
                 if let FragmentNode::Text(text) = node
                     && text.raw.is_whitespace_only()
                 {
@@ -592,11 +587,11 @@ impl<'a> Printer<'a> {
                 current_line.push(raw_doc);
                 // Don't close the line — let subsequent inline content stay on same line
                 prev_text_has_trailing_space = false;
-                prettier_ignore_next = false;
+                format_ignore_next = false;
                 continue;
             }
             if Self::is_format_ignore_comment(node) {
-                prettier_ignore_next = true;
+                format_ignore_next = true;
             }
 
             let is_block = self.is_block_fragment_node(node);

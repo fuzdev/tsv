@@ -945,9 +945,9 @@ impl<'a> Printer<'a> {
                 self.build_leading_comments_with_blank_lines(&leading_comments, member_start),
             );
 
-            // A preceding `// prettier-ignore` keeps the member's source verbatim
-            // (matches prettier). The member span includes its trailing `;`.
-            let member_doc = if self.has_prettier_ignore_in_range(prev_end, member_start) {
+            // A preceding format-ignore directive keeps the member's source verbatim.
+            // The member span includes its trailing `;`.
+            let member_doc = if self.has_format_ignore_in_range(prev_end, member_start) {
                 self.raw_source_doc(member.span())
             } else {
                 self.build_type_element_doc(member)
@@ -1123,10 +1123,10 @@ impl<'a> Printer<'a> {
                     }
                 }
 
-                // A preceding `// prettier-ignore` keeps the member's source
-                // verbatim (matches prettier). The member span excludes the
+                // A preceding format-ignore directive keeps the member's source
+                // verbatim. The member span excludes the
                 // trailing `,`, which the loop still appends below.
-                let member_doc = if self.has_prettier_ignore_in_range(prev_end, member_start) {
+                let member_doc = if self.has_format_ignore_in_range(prev_end, member_start) {
                     self.raw_source_doc(member.span)
                 } else {
                     self.build_enum_member_doc(member)
@@ -1350,7 +1350,7 @@ impl<'a> Printer<'a> {
                     parts.push(d.concat(&brace_line_prefix));
 
                     // Shared per-statement walk (leading comments, blank-line
-                    // separators, prettier-ignore, trailing same-line comments) —
+                    // separators, format-ignore, trailing same-line comments) —
                     // same as block-statement bodies.
                     let body_start = block.span.start + 1; // After opening '{'
                     let body_end = block.span.end.saturating_sub(1); // Before '}'

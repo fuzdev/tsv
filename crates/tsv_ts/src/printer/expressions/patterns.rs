@@ -599,9 +599,9 @@ impl<'a> Printer<'a> {
                 self.build_leading_comments_with_blank_lines(&leading_comments, prop_start),
             );
 
-            // A preceding `// prettier-ignore` keeps the property's source verbatim
+            // A preceding format-ignore directive keeps the property's source verbatim
             // (trailing comment/comma handled normally)
-            if self.has_prettier_ignore_in_range(prev_end, prop_start) {
+            if self.has_format_ignore_in_range(prev_end, prop_start) {
                 prop_parts.push(self.raw_source_doc(prop.span()));
             } else {
                 prop_parts.push(self.build_object_pattern_property_doc(prop));
