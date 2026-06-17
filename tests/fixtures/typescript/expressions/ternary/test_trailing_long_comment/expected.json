@@ -1,0 +1,266 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 245,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Trailing line comment on test - binary test fits, comment pushes line over 100 chars",
+			"start": 10,
+			"end": 97,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment that pushes the test line well over the print width xxxxxxxxxxxxxxxxxx",
+			"start": 127,
+			"end": 208,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 18
+				},
+				"end": {
+					"line": 4,
+					"column": 99
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 244,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 235,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 99,
+					"end": 234,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 15
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 105,
+							"end": 233,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 14
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 105,
+								"end": 106,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "x"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 111,
+								"end": 233,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 14
+									}
+								},
+								"test": {
+									"type": "BinaryExpression",
+									"start": 111,
+									"end": 126,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 17
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 111,
+										"end": 116,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 7
+											}
+										},
+										"name": "aaaaa"
+									},
+									"operator": "===",
+									"right": {
+										"type": "Identifier",
+										"start": 121,
+										"end": 126,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 12
+											},
+											"end": {
+												"line": 4,
+												"column": 17
+											}
+										},
+										"name": "bbbbb"
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " comment that pushes the test line well over the print width xxxxxxxxxxxxxxxxxx",
+											"start": 127,
+											"end": 208
+										}
+									]
+								},
+								"consequent": {
+									"type": "Literal",
+									"start": 214,
+									"end": 218,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 5
+										},
+										"end": {
+											"line": 5,
+											"column": 9
+										}
+									},
+									"value": null,
+									"raw": "null"
+								},
+								"alternate": {
+									"type": "CallExpression",
+									"start": 224,
+									"end": 233,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 5
+										},
+										"end": {
+											"line": 6,
+											"column": 14
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 224,
+										"end": 226,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 5
+											},
+											"end": {
+												"line": 6,
+												"column": 7
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 227,
+											"end": 232,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 8
+												},
+												"end": {
+													"line": 6,
+													"column": 13
+												}
+											},
+											"name": "value"
+										}
+									],
+									"optional": false
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Trailing line comment on test - binary test fits, comment pushes line over 100 chars",
+							"start": 10,
+							"end": 97
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

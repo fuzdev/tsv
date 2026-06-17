@@ -433,9 +433,11 @@ impl<'a> Printer<'a> {
                             arg_parts.push(self.build_comment_doc(comment));
                         }
                         arg_parts.push(d.text(","));
+                        // Line comment via `line_suffix` (zero width) so it never forces
+                        // the argument's own group to break; flushes at the hardline
+                        // before the closing paren (prettier's `lineSuffix`).
                         for comment in &pc.trailing_line {
-                            arg_parts.push(d.text(" "));
-                            arg_parts.push(self.build_comment_doc(comment));
+                            arg_parts.push(self.build_trailing_line_comment_doc(comment));
                         }
                         has_trailing_comma_on_last = true;
                     } else if pc.has_trailing_block() {

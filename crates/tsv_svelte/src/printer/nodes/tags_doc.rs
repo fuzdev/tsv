@@ -55,9 +55,25 @@ impl<'a> Printer<'a> {
         );
 
         // Choose layout matching prettier's assignment layout selection.
-        if d.will_break(init_doc) {
-            // Init has forced breaks (ternary, multi-line template, etc.)
-            // Keep "= init" together — init's own breaks handle formatting.
+        if Self::const_should_break_after_op(&tag.init) {
+            // Binary expressions, conditional with binary test, etc.
+            // Break-after-operator: group with line at "=" so the doc printer
+            // can break when the flat form exceeds print width. This takes
+            // precedence over the `will_break` keep-together branch below — a
+            // break-after-operator RHS still breaks after `=` even when it has a
+            // forced internal break (e.g. a conditional whose binary test carries
+            // a trailing line comment), matching prettier and our own TS
+            // assignment printer.
+            // Prettier ref: shouldBreakAfterOperator (assignment.js:196-259)
+            let rhs = d.concat(&[d.line(), init_doc]);
+            let rhs_indented = d.indent(rhs);
+            let assignment = d.group(d.concat(&[d.text(" ="), rhs_indented, d.text("}")]));
+
+            d.concat(&[d.text("{@const "), id_doc, assignment])
+        } else if d.will_break(init_doc) {
+            // Init has forced breaks (object/array/template, etc.) that aren't
+            // break-after-operator — keep "= init" together, init's own breaks
+            // handle formatting.
             d.concat(&[
                 d.text("{@const "),
                 id_doc,
@@ -65,16 +81,6 @@ impl<'a> Printer<'a> {
                 init_doc,
                 d.text("}"),
             ])
-        } else if Self::const_should_break_after_op(&tag.init) {
-            // Binary expressions, conditional with binary test, etc.
-            // Break-after-operator: group with line at "=" so the doc printer
-            // can break when the flat form exceeds print width.
-            // Prettier ref: shouldBreakAfterOperator (assignment.js:196-259)
-            let rhs = d.concat(&[d.line(), init_doc]);
-            let rhs_indented = d.indent(rhs);
-            let assignment = d.group(d.concat(&[d.text(" ="), rhs_indented, d.text("}")]));
-
-            d.concat(&[d.text("{@const "), id_doc, assignment])
         } else {
             // Fluid layout: break at `=` only when the full line exceeds
             // print width. Uses indentIfBreak so the RHS is evaluated

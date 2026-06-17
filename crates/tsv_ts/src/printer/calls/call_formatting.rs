@@ -1094,12 +1094,15 @@ pub(super) fn build_call_doc_with_wrapping(
                     }
 
                     if pc.has_trailing_line() {
-                        // Trailing line comments: comma, comment, hardline
+                        // Trailing line comments: comma, comment, hardline. The comment
+                        // goes through `line_suffix` (zero width) so it never counts
+                        // against the argument's own group — a long trailing comment
+                        // can't force a binary/conditional arg to break (prettier's
+                        // `lineSuffix`). It still renders after the comma at end-of-line.
                         force_expansion = true;
                         arg_parts.push(d.text(","));
                         for comment in &pc.trailing_line {
-                            arg_parts.push(d.text(" "));
-                            arg_parts.push(printer.build_comment_doc(comment));
+                            arg_parts.push(printer.build_trailing_line_comment_doc(comment));
                         }
                         if has_blank_line {
                             arg_parts.push(d.literalline());
@@ -1202,15 +1205,11 @@ pub(super) fn build_call_doc_with_wrapping(
                     // comment means the call must break to multiple lines.
                     force_expansion = true;
 
-                    // Arrays/objects have their own groups that decide internal expansion.
-                    // Use line_suffix to exclude the comment from width calculations, so
-                    // the array/object can stay inline even when the comment exceeds print_width.
-                    // The force_expansion above ensures the call itself expands.
-                    if is_array_or_object_unwrapped(arg) {
-                        arg_parts.push(d.line_suffix(comments));
-                    } else {
-                        arg_parts.push(comments);
-                    }
+                    // A trailing line comment never counts toward width (prettier's
+                    // `lineSuffix`), so the argument's own group (array/object, binary,
+                    // conditional, …) can stay inline even when the comment exceeds
+                    // print_width. The force_expansion above ensures the call expands.
+                    arg_parts.push(d.line_suffix(comments));
                     has_trailing_comma_on_last = true;
                 } else if pc.has_trailing_block() {
                     // Trailing block comments: place relative to the source comma.

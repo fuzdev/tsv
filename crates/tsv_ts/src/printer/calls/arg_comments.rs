@@ -524,6 +524,9 @@ impl<'a> PartitionedComments<'a> {
     /// Emit trailing comments (block then line) with leading spaces to a parts vector.
     ///
     /// Used for comments that follow an argument, formatted as ` /* block */ // line`.
+    /// Line comments go through `line_suffix` (zero width) so they never count against
+    /// the argument's own group — flushing at the caller's following hardline (every
+    /// caller is a forced-multiline context). Prettier's `lineSuffix`.
     pub fn emit_trailing_comments(&self, parts: &mut Vec<DocId>, printer: &Printer<'_>) {
         let d = printer.d();
         for comment in &self.trailing_block {
@@ -531,8 +534,7 @@ impl<'a> PartitionedComments<'a> {
             parts.push(printer.build_comment_doc(comment));
         }
         for comment in &self.trailing_line {
-            parts.push(d.text(" "));
-            parts.push(printer.build_comment_doc(comment));
+            parts.push(printer.build_trailing_line_comment_doc(comment));
         }
     }
 

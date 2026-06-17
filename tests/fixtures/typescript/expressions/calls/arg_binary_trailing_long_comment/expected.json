@@ -1,0 +1,200 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 233,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Trailing line comment after a binary argument - the binary fits, the comment pushes over 100",
+			"start": 10,
+			"end": 105,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 96
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment that pushes the argument line over the print width xxxxxxxx",
+			"start": 140,
+			"end": 210,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 29
+				},
+				"end": {
+					"line": 4,
+					"column": 99
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 232,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 223,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 107,
+					"end": 222,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 107,
+						"end": 221,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 107,
+							"end": 109,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 113,
+								"end": 138,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 27
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 113,
+									"end": 123,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 12
+										}
+									},
+									"name": "aaaaaaaaaa"
+								},
+								"operator": "===",
+								"right": {
+									"type": "Identifier",
+									"start": 128,
+									"end": 138,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 17
+										},
+										"end": {
+											"line": 4,
+											"column": 27
+										}
+									},
+									"name": "bbbbbbbbbb"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " comment that pushes the argument line over the print width xxxxxxxx",
+										"start": 140,
+										"end": 210
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 213,
+								"end": 217,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 6
+									}
+								},
+								"name": "cccc"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Trailing line comment after a binary argument - the binary fits, the comment pushes over 100",
+							"start": 10,
+							"end": 105
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

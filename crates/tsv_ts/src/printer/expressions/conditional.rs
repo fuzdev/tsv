@@ -305,11 +305,13 @@ impl<'a> Printer<'a> {
 
         let mut parts = vec![test];
 
-        // Comments between test and ? (inline after test)
+        // Comments between test and ? (inline after test). A line comment goes
+        // through `line_suffix` (zero width), so a long trailing comment never
+        // forces the test (e.g. a binary expression) to break — matching
+        // prettier's `lineSuffix`. Block comments stay inline, width counted.
         let comments_before_q_end = question_pos.unwrap_or(consequent_start);
         for comment in tsv_lang::comments_in_range(self.comments, test_end, comments_before_q_end) {
-            parts.push(d.text(" "));
-            parts.push(self.build_comment_doc(comment));
+            parts.push(self.build_trailing_comment_doc(comment));
         }
 
         // Start the indented part with ? on new line
