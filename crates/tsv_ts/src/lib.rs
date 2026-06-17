@@ -225,7 +225,7 @@ pub fn parse_expression_with_comments(
 /// context.
 pub fn format_expression(
     expression: &Expression,
-    inputs: &PrinterInputs,
+    inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
 ) -> String {
     let arena = DocArena::for_source(inputs.source);
@@ -331,7 +331,7 @@ pub fn parse_expression_partial_with_comments(
 pub fn build_expression_doc_with_comments(
     arena: &DocArena,
     expression: &Expression,
-    inputs: &PrinterInputs,
+    inputs: &PrinterInputs<'_>,
     embed: &EmbedContext,
 ) -> DocId {
     let printer = make_printer(arena, inputs, *embed);

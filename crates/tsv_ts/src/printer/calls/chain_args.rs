@@ -60,7 +60,7 @@ fn get_call_type_arguments(
 /// - Block comments on the same line as paren_open (trailing_block)
 /// - Block comments on the same line as the first arg (from leading)
 fn build_inline_leading_comments(
-    printer: &Printer,
+    printer: &Printer<'_>,
     paren_open: u32,
     arg_start: u32,
 ) -> Option<DocId> {
@@ -95,7 +95,7 @@ fn build_inline_leading_comments(
 /// Used for the last arg (comments before closing paren) and single-arg paths
 /// where there's no comma to split around.
 fn build_inline_trailing_comments(
-    printer: &Printer,
+    printer: &Printer<'_>,
     arg_end: u32,
     next_boundary: u32,
 ) -> Option<DocId> {
@@ -124,7 +124,7 @@ fn build_inline_trailing_comments(
 /// For `fn(a, /** @type {T} */ b)`, the comment is after the comma and should
 /// be emitted as `/** @type {T} */ ` before `b`, not as trailing on `a`.
 fn build_after_comma_leading_comments(
-    printer: &Printer,
+    printer: &Printer<'_>,
     prev_arg_end: u32,
     arg_start: u32,
 ) -> Option<DocId> {
@@ -152,7 +152,7 @@ fn build_after_comma_leading_comments(
 /// For `fn(a /* comment */, b)`, the comment is before the comma and should
 /// be emitted as ` /* comment */` after `a`.
 fn build_before_comma_trailing_comments(
-    printer: &Printer,
+    printer: &Printer<'_>,
     arg_end: u32,
     next_arg_start: u32,
 ) -> Option<DocId> {
@@ -183,7 +183,7 @@ fn build_before_comma_trailing_comments(
 /// 2. Args broken but chain inline (if args are in their own group)
 /// 3. Chain broken (if args broken still doesn't fit)
 pub(super) fn build_call_args_doc_for_chain(
-    printer: &Printer,
+    printer: &Printer<'_>,
     call: &internal::CallExpression,
     optional: bool,
 ) -> DocId {
@@ -210,7 +210,7 @@ fn is_single_arrow_with_breakable_body(arg: &Expression) -> bool {
 ///
 /// Used for the "args expanded, chain inline" state in conditionalGroup.
 pub(super) fn build_call_args_doc_for_chain_expanded(
-    printer: &Printer,
+    printer: &Printer<'_>,
     call: &internal::CallExpression,
     optional: bool,
 ) -> DocId {
@@ -225,7 +225,7 @@ pub(super) fn build_call_args_doc_for_chain_expanded(
 /// the chain doesn't break between groups, so the arrow signature would add
 /// too much to the first line.
 pub(super) fn build_call_args_doc_for_chain_standard_expanded(
-    printer: &Printer,
+    printer: &Printer<'_>,
     call: &internal::CallExpression,
     optional: bool,
 ) -> DocId {
@@ -234,7 +234,7 @@ pub(super) fn build_call_args_doc_for_chain_standard_expanded(
 
 /// Implementation for call args doc building
 fn build_call_args_doc_for_chain_impl(
-    printer: &Printer,
+    printer: &Printer<'_>,
     call: &internal::CallExpression,
     optional: bool,
     force_expand: bool,

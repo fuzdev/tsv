@@ -542,7 +542,7 @@ impl<'a> Printer<'a> {
     fn push_element_comma_trailing(
         &self,
         parts: &mut Vec<DocId>,
-        trailing: &TrailingComments,
+        trailing: &TrailingComments<'_>,
         comma: DocId,
     ) {
         parts.push(self.build_block_comments_doc(&trailing.block));

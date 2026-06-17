@@ -51,7 +51,7 @@ use tsv_lang::doc::arena::DocId;
 /// )
 /// ```
 pub(super) fn build_call_doc_with_wrapping(
-    printer: &Printer,
+    printer: &Printer<'_>,
     call: &internal::CallExpression,
 ) -> DocId {
     let d = printer.d();

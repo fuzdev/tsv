@@ -24,7 +24,7 @@ use tsv_lang::doc::arena::{DocArena, DocId};
 /// Does NOT include the ` =>` - caller adds that.
 /// Only handles untyped arrows (no type params, no return type, no param types).
 pub(crate) fn build_arrow_inline_signature(
-    printer: &Printer,
+    printer: &Printer<'_>,
     arrow: &internal::ArrowFunctionExpression,
 ) -> DocId {
     let d = printer.d();
@@ -66,7 +66,7 @@ pub(crate) fn build_arrow_inline_signature(
 /// Typed arrows use the full signature wrapped in a group (can break internally).
 /// Does NOT include the ` =>` - caller adds that.
 pub(crate) fn build_arrow_sig_doc(
-    printer: &Printer,
+    printer: &Printer<'_>,
     arrow: &internal::ArrowFunctionExpression,
 ) -> DocId {
     if arrow_has_type_annotations(arrow) {
@@ -83,7 +83,7 @@ pub(crate) fn build_arrow_sig_doc(
 /// and the body are not part of either doc. This finds them and prepends
 /// to `body_doc`, returning it unchanged if none exist.
 pub(crate) fn prepend_arrow_body_comments(
-    printer: &Printer,
+    printer: &Printer<'_>,
     arrow: &internal::ArrowFunctionExpression,
     body_start: u32,
     body_doc: DocId,
@@ -379,7 +379,7 @@ pub(super) fn wrap_huggable_arg(d: &DocArena, prefix: &'static str, arg: DocId) 
 /// - all_args_broken: all args joined with comma_line() for fallback (includes inline block comments)
 pub(crate) fn build_args_split_last(
     arguments: &[internal::Expression],
-    printer: &Printer,
+    printer: &Printer<'_>,
     paren_open: u32,
 ) -> (Vec<DocId>, DocId, DocId) {
     let d = printer.d();
@@ -667,11 +667,11 @@ pub(crate) fn build_arrow_call_body_states(
 /// When false, separators are soft lines (break only when the group breaks).
 /// Trailing line comments always force a hardline regardless of this setting.
 pub(crate) fn build_args_joined_with_comments(
-    printer: &Printer,
+    printer: &Printer<'_>,
     arguments: &[internal::Expression],
     paren_open: u32,
     use_hardline: bool,
-    build_arg: impl Fn(&Printer, &internal::Expression) -> DocId,
+    build_arg: impl Fn(&Printer<'_>, &internal::Expression) -> DocId,
 ) -> DocId {
     let d = printer.d();
     let mut parts = Vec::new();
@@ -765,7 +765,10 @@ pub(crate) fn build_args_joined_with_comments(
 /// - First arg is function/arrow with block body
 /// - Remaining args are "hopefully short" (simple values)
 /// - Result: first arg expands, tail args stay inline after closing `}`
-pub(super) fn should_expand_first_arg(printer: &Printer, args: &[internal::Expression]) -> bool {
+pub(super) fn should_expand_first_arg(
+    printer: &Printer<'_>,
+    args: &[internal::Expression],
+) -> bool {
     // Need exactly 2 args (first is function, second is short)
     if args.len() != 2 {
         return false;
@@ -799,7 +802,7 @@ pub(super) fn should_expand_first_arg(printer: &Printer, args: &[internal::Expre
 ///
 /// Uses `build_name_to_type_params_comments` for safe line comment handling.
 pub(super) fn append_type_args_with_gap_comments(
-    printer: &Printer,
+    printer: &Printer<'_>,
     callee: DocId,
     callee_end: u32,
     type_arguments: Option<&internal::TSTypeParameterInstantiation>,
@@ -828,7 +831,7 @@ pub(super) fn append_type_args_with_gap_comments(
 /// when there are none); the actual `(` is located to separate pre-paren
 /// comments from inside-paren comments, e.g. `fn<string> /* c */()`.
 pub(super) fn build_empty_args_doc(
-    printer: &Printer,
+    printer: &Printer<'_>,
     callee: DocId,
     after_type_args: u32,
     paren_close: u32,
@@ -871,7 +874,7 @@ pub(super) fn build_empty_args_doc(
 /// - Expanded: template on its own line → returns None so the caller falls
 ///   through to the has_multiline_content path (hardline expansion).
 pub(super) fn try_hug_multiline_template_arg(
-    printer: &Printer,
+    printer: &Printer<'_>,
     callee: DocId,
     args: &[internal::Expression],
     paren_close: u32,
@@ -901,7 +904,7 @@ pub(super) fn try_hug_multiline_template_arg(
 /// line at the top of the next iteration. The caller wraps the result with
 /// `wrap_call_with_hard_breaks`.
 pub(super) fn build_args_with_blank_lines(
-    printer: &Printer,
+    printer: &Printer<'_>,
     args: &[internal::Expression],
 ) -> DocId {
     let d = printer.d();

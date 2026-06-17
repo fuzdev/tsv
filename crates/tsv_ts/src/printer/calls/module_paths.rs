@@ -17,7 +17,7 @@ use tsv_lang::SymbolResolver;
 ///
 /// Prettier doesn't add continuation indent for binary expressions inside Boolean() calls.
 /// This appears to be a specific quirk, treating Boolean() like !!() for type coercion.
-pub(super) fn is_boolean_call(call: &internal::CallExpression, printer: &Printer) -> bool {
+pub(super) fn is_boolean_call(call: &internal::CallExpression, printer: &Printer<'_>) -> bool {
     if let internal::Expression::Identifier(id) = call.callee.as_ref() {
         return printer.resolve_symbol(id.name) == "Boolean";
     }
@@ -28,7 +28,10 @@ pub(super) fn is_boolean_call(call: &internal::CallExpression, printer: &Printer
 ///
 /// Patterns:
 /// - `require.resolve(string)` → don't break args, let assignment break
-pub(super) fn is_module_path_no_break(call: &internal::CallExpression, printer: &Printer) -> bool {
+pub(super) fn is_module_path_no_break(
+    call: &internal::CallExpression,
+    printer: &Printer<'_>,
+) -> bool {
     // Must have exactly 1 argument that is a string literal
     if call.arguments.len() != 1 || !is_string_literal(&call.arguments[0]) {
         return false;
@@ -57,7 +60,7 @@ pub(super) fn is_module_path_no_break(call: &internal::CallExpression, printer: 
 /// - `import.meta.resolve(string)` → break before `.resolve`
 pub(super) fn get_module_path_chain_break<'a>(
     call: &'a internal::CallExpression,
-    printer: &Printer,
+    printer: &Printer<'_>,
 ) -> Option<(&'a internal::Expression, &'a internal::Identifier)> {
     // Must have exactly 1 argument that is a string literal
     if call.arguments.len() != 1 || !is_string_literal(&call.arguments[0]) {

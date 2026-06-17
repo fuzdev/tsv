@@ -164,7 +164,7 @@ impl<'a> Printer<'a> {
             // and should normalize to trailing position (matches prettier).
             // Only line comments preserve own-line position.
             // inline_next (comments on same line as body `{`) are treated same as own_line.
-            let mut own_line_lines: CommentVec = SmallVec::new();
+            let mut own_line_lines: CommentVec<'_> = SmallVec::new();
             for comment in own_line.into_iter().chain(inline_next) {
                 if comment.is_block {
                     inline_prev.push(comment);

@@ -120,7 +120,7 @@ pub(super) fn is_inline_block_after_comma(
 /// Check if a call expression has comments between any of its arguments
 pub(super) fn has_inter_argument_comments(
     call: &internal::CallExpression,
-    printer: &Printer,
+    printer: &Printer<'_>,
 ) -> bool {
     has_inter_argument_comments_slice(&call.arguments, printer)
 }
@@ -128,7 +128,7 @@ pub(super) fn has_inter_argument_comments(
 /// Check if there are comments between arguments in a slice
 pub(crate) fn has_inter_argument_comments_slice(
     arguments: &[internal::Expression],
-    printer: &Printer,
+    printer: &Printer<'_>,
 ) -> bool {
     if arguments.len() < 2 {
         return false;
@@ -176,7 +176,7 @@ fn has_stripped_paren_gap(source: &str, start: u32, end: u32) -> bool {
 /// True if they share a source line, or if the gap between them contains only stripped
 /// grouping parens on the same line as the comment (e.g., `/** @type {T} */ (\n\texpr)`).
 pub(super) fn is_comment_inline_with_next(
-    printer: &Printer,
+    printer: &Printer<'_>,
     comment_end: u32,
     next_pos: u32,
 ) -> bool {
@@ -195,7 +195,7 @@ pub(super) fn is_comment_inline_with_next(
 /// Only truly standalone block comments (different line from both `start` AND `next_code_pos`)
 /// force expansion.
 pub(crate) fn should_force_expansion_for_comments(
-    printer: &Printer,
+    printer: &Printer<'_>,
     start: u32,
     next_code_pos: u32,
 ) -> bool {
@@ -221,7 +221,7 @@ pub(crate) fn should_force_expansion_for_comments(
 /// not inline with either neighbor). Inline block comments do not force expansion.
 pub(super) fn any_comment_forces_expansion(
     call: &internal::CallExpression,
-    printer: &Printer,
+    printer: &Printer<'_>,
     paren_open: u32,
 ) -> bool {
     if call.arguments.is_empty() {
@@ -274,7 +274,7 @@ pub(super) fn any_comment_forces_expansion(
 /// since prettier's shouldExpandLastArg returns false in that case.
 pub(super) fn last_arg_has_comments(
     arguments: &[internal::Expression],
-    printer: &Printer,
+    printer: &Printer<'_>,
     call_end: u32,
     paren_open: u32,
 ) -> bool {
@@ -314,7 +314,7 @@ pub(super) fn last_arg_has_comments(
 /// since prettier's shouldExpandFirstArg returns false in that case.
 pub(super) fn first_arg_has_any_comments(
     arguments: &[internal::Expression],
-    printer: &Printer,
+    printer: &Printer<'_>,
     paren_open: u32,
 ) -> bool {
     if arguments.is_empty() {
@@ -346,7 +346,7 @@ pub(super) fn first_arg_has_any_comments(
 /// Example: `fn(a && b, // trailing)` - the `// trailing` is a trailing comment on `a && b`
 pub(super) fn has_trailing_comments_on_args(
     call: &internal::CallExpression,
-    printer: &Printer,
+    printer: &Printer<'_>,
 ) -> bool {
     has_trailing_line_comments_slice(&call.arguments, call.span.end, printer)
 }
@@ -357,7 +357,7 @@ pub(super) fn has_trailing_comments_on_args(
 pub(crate) fn has_trailing_line_comments_slice(
     arguments: &[internal::Expression],
     call_span_end: u32,
-    printer: &Printer,
+    printer: &Printer<'_>,
 ) -> bool {
     has_trailing_comments_slice_impl(arguments, call_span_end, |start, end| {
         printer.has_line_comments_between(start, end)
@@ -371,7 +371,7 @@ pub(crate) fn has_trailing_line_comments_slice(
 /// leading comments for args `1..n` (via the previous arg's gap), so the first
 /// arg's leading comment must be emitted explicitly or it's dropped.
 pub(crate) fn emit_first_arg_leading_comments(
-    printer: &Printer,
+    printer: &Printer<'_>,
     parts: &mut Vec<DocId>,
     paren_open: u32,
     first_arg_start: u32,
@@ -401,7 +401,7 @@ pub(crate) fn emit_first_arg_leading_comments(
 pub(crate) fn has_trailing_comments_slice(
     arguments: &[internal::Expression],
     call_span_end: u32,
-    printer: &Printer,
+    printer: &Printer<'_>,
 ) -> bool {
     has_trailing_comments_slice_impl(arguments, call_span_end, |start, end| {
         printer.has_comments_between(start, end)
@@ -524,7 +524,7 @@ impl<'a> PartitionedComments<'a> {
     /// Emit trailing comments (block then line) with leading spaces to a parts vector.
     ///
     /// Used for comments that follow an argument, formatted as ` /* block */ // line`.
-    pub fn emit_trailing_comments(&self, parts: &mut Vec<DocId>, printer: &Printer) {
+    pub fn emit_trailing_comments(&self, parts: &mut Vec<DocId>, printer: &Printer<'_>) {
         let d = printer.d();
         for comment in &self.trailing_block {
             parts.push(d.text(" "));
@@ -547,7 +547,7 @@ impl<'a> PartitionedComments<'a> {
     pub fn emit_last_arg_dangling_comments(
         &self,
         parts: &mut Vec<DocId>,
-        printer: &Printer,
+        printer: &Printer<'_>,
         comma_added: &mut bool,
     ) {
         if self.leading.is_empty() {
@@ -567,7 +567,7 @@ impl<'a> PartitionedComments<'a> {
     /// Emit leading comments (on their own lines) with hardlines after each.
     ///
     /// Used for comments that precede an argument on separate lines.
-    pub fn emit_leading_comments(&self, parts: &mut Vec<DocId>, printer: &Printer) {
+    pub fn emit_leading_comments(&self, parts: &mut Vec<DocId>, printer: &Printer<'_>) {
         let d = printer.d();
         for comment in &self.leading {
             parts.push(printer.build_comment_doc(comment));
@@ -587,7 +587,7 @@ impl<'a> PartitionedComments<'a> {
     pub fn emit_leading_comments_inline_aware(
         &self,
         parts: &mut Vec<DocId>,
-        printer: &Printer,
+        printer: &Printer<'_>,
         next_pos: u32,
     ) {
         let d = printer.d();

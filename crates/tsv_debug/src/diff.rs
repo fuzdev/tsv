@@ -376,7 +376,7 @@ pub fn diff_to_string(expected: &str, actual: &str, options: &DiffOptions) -> St
     }
 
     // Apply context filtering if requested
-    let filtered_lines: Vec<DiffLine> = if let Some(context) = options.context_lines {
+    let filtered_lines: Vec<DiffLine<'_>> = if let Some(context) = options.context_lines {
         apply_context_filter(&changes, context, options.show_header)
     } else {
         changes.iter().map(|c| DiffLine::Change(*c)).collect()

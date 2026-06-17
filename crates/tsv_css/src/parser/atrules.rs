@@ -15,7 +15,7 @@ fn is_keyframes_atrule(name: &str) -> bool {
 }
 
 /// Check if current token is a CSS boolean operator keyword (and, or, not)
-fn is_boolean_operator(parser: &CssParser) -> bool {
+fn is_boolean_operator(parser: &CssParser<'_>) -> bool {
     if let TokenKind::Identifier = &parser.current_kind {
         let identifier = parser
             .current_identifier()
@@ -36,7 +36,9 @@ fn is_boolean_operator(parser: &CssParser) -> bool {
 /// - `(display: grid) and (flex: 1)` - conjunction
 /// - `not (color: red)` - negation
 /// - `(a) and (b) or (c)` - mixed (parsed left-to-right)
-fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, Span), ParseError> {
+fn parse_supports_prelude(
+    parser: &mut CssParser<'_>,
+) -> Result<(SupportsCondition, Span), ParseError> {
     let start = parser.base_offset() + parser.current_start;
     let mut parts = Vec::new();
     let mut current_connector: Option<SupportsConnector> = None;
@@ -285,7 +287,7 @@ fn parse_supports_prelude(parser: &mut CssParser) -> Result<(SupportsCondition, 
 /// - `sidebar (min-width: 100px)` - named container
 /// - `sidebar (min-width: 100px) and (max-width: 200px)` - named container with conjunction
 fn parse_container_prelude(
-    parser: &mut CssParser,
+    parser: &mut CssParser<'_>,
 ) -> Result<(Option<String>, SupportsCondition, Span), ParseError> {
     let start = parser.base_offset() + parser.current_start;
 
@@ -537,7 +539,7 @@ fn parse_container_prelude(
 /// - `(.card) to (.footer)` - scope root and limit
 /// - `(article > header)` - with combinator
 fn parse_scope_prelude(
-    parser: &mut CssParser,
+    parser: &mut CssParser<'_>,
 ) -> Result<(SelectorList, Option<SelectorList>, Span), ParseError> {
     let start = parser.base_offset() + parser.current_start;
 
@@ -618,7 +620,7 @@ fn parse_scope_prelude(
 /// - `url('tabs.css') layer(framework)`
 /// - `url('override.css') layer`
 /// - `url('narrow.css') supports(display: flex) screen`
-fn parse_import_prelude(parser: &mut CssParser) -> Result<(Vec<CssValue>, Span), ParseError> {
+fn parse_import_prelude(parser: &mut CssParser<'_>) -> Result<(Vec<CssValue>, Span), ParseError> {
     let start = parser.base_offset() + parser.current_start;
     let mut values = Vec::new();
 
@@ -733,7 +735,7 @@ fn parse_import_prelude(parser: &mut CssParser) -> Result<(Vec<CssValue>, Span),
 }
 
 /// Parse a function value (e.g., url(), layer(), supports())
-fn parse_function_value(parser: &mut CssParser) -> Result<CssValue, ParseError> {
+fn parse_function_value(parser: &mut CssParser<'_>) -> Result<CssValue, ParseError> {
     let value_start = (parser.base_offset() + parser.current_start) as u32;
 
     // Get function name (current token should be identifier)
@@ -932,7 +934,7 @@ fn parse_function_value(parser: &mut CssParser) -> Result<CssValue, ParseError> 
 ///
 /// `nested_in_rule`: true if this at-rule is nested inside a regular rule's declaration block
 pub(crate) fn parse_atrule(
-    parser: &mut CssParser,
+    parser: &mut CssParser<'_>,
     nested_in_rule: bool,
 ) -> Result<CssAtrule, ParseError> {
     let start = parser.base_offset() + parser.current_start;
@@ -1036,7 +1038,7 @@ pub(crate) fn parse_atrule(
 /// whitespace verbatim, matching prettier and Svelte. `url()` inner whitespace is trimmed
 /// in both modes (a spec-mandated `<url-token>` normalization).
 fn parse_raw_prelude_content(
-    parser: &mut CssParser,
+    parser: &mut CssParser<'_>,
     is_selector_list_prelude: bool,
     normalize_whitespace: bool,
 ) -> Result<(String, Span), ParseError> {
@@ -1272,7 +1274,7 @@ fn parse_raw_prelude_content(
 ///
 /// `nested_in_rule`: true if this at-rule is nested inside a regular rule's declaration block
 fn parse_atrule_block(
-    parser: &mut CssParser,
+    parser: &mut CssParser<'_>,
     atrule_name: &str,
     nested_in_rule: bool,
 ) -> Result<CssAtruleBlock, ParseError> {

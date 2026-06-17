@@ -59,7 +59,7 @@ fn get_identifier_name(expr: &internal::Expression) -> Option<DefaultSymbol> {
 /// callee text) so the two stay in lockstep.
 pub(super) fn callee_chain_string(
     expr: &internal::Expression,
-    printer: &Printer,
+    printer: &Printer<'_>,
 ) -> Option<String> {
     let parts = get_member_chain_parts(expr)?;
     Some(
@@ -103,7 +103,7 @@ fn get_member_chain_parts(expr: &internal::Expression) -> Option<Vec<DefaultSymb
 }
 
 /// Check if a call expression is a test function call that should stay on one line
-pub(super) fn is_test_call(call: &internal::CallExpression, printer: &Printer) -> bool {
+pub(super) fn is_test_call(call: &internal::CallExpression, printer: &Printer<'_>) -> bool {
     // Optional calls (`describe?.(...)`) are never test calls — they format like
     // a normal call (wrap when long), preserving the `?.`. Mirrors prettier's
     // isTestCall guard (`utilities/test-libraries.js`: `node.optional` → false).

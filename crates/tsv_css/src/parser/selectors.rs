@@ -21,7 +21,7 @@ use tsv_lang::{ParseError, Span};
 ///
 /// Not needed by `parse_forgiving_selector_list`, whose terminator is `)` (not `{`); it can
 /// skip comments unconditionally before its comma check.
-fn skip_comments_before_comma(parser: &mut CssParser) -> Result<(), ParseError> {
+fn skip_comments_before_comma(parser: &mut CssParser<'_>) -> Result<(), ParseError> {
     if matches!(&parser.current_kind, TokenKind::Comment)
         && parser.peek_past_whitespace()? == TokenKind::Comma
     {
@@ -31,7 +31,7 @@ fn skip_comments_before_comma(parser: &mut CssParser) -> Result<(), ParseError> 
 }
 
 pub(crate) fn parse_complex_selector_list(
-    parser: &mut CssParser,
+    parser: &mut CssParser<'_>,
 ) -> Result<SelectorList, ParseError> {
     let start = parser.base_offset() + parser.current_start();
     let mut selectors = Vec::new();
@@ -89,7 +89,7 @@ pub(crate) fn parse_complex_selector_list(
 ///
 /// See: CSS Selectors Level 4 - <<forgiving-selector-list>>
 pub(crate) fn parse_forgiving_selector_list(
-    parser: &mut CssParser,
+    parser: &mut CssParser<'_>,
 ) -> Result<SelectorList, ParseError> {
     let start = parser.base_offset() + parser.current_start();
     let mut selectors = Vec::new();
@@ -170,7 +170,7 @@ fn create_invalid_selector(raw: String, start: usize, end: usize) -> ComplexSele
 /// - Right paren at depth 0 (end of pseudo-class args)
 /// - EOF (unexpected but handled)
 fn extract_selector_until_comma_or_end(
-    parser: &mut CssParser,
+    parser: &mut CssParser<'_>,
     start_pos: usize,
 ) -> Result<String, ParseError> {
     let mut depth = 0; // Track nesting depth for parens/brackets
@@ -228,7 +228,7 @@ fn extract_selector_until_comma_or_end(
 ///
 /// See: CSS Selectors Level 4 - <<relative-selector-list>>
 pub(crate) fn parse_relative_selector_list(
-    parser: &mut CssParser,
+    parser: &mut CssParser<'_>,
 ) -> Result<SelectorList, ParseError> {
     let start = parser.base_offset() + parser.current_start();
     let mut selectors = Vec::new();
@@ -273,7 +273,9 @@ pub(crate) fn parse_relative_selector_list(
 /// - `div > span` - combinator in middle (relative or regular)
 ///
 /// See: CSS Selectors Level 4 - <<relative-selector>> vs <<complex-selector>>
-fn parse_relative_complex_selector(parser: &mut CssParser) -> Result<ComplexSelector, ParseError> {
+fn parse_relative_complex_selector(
+    parser: &mut CssParser<'_>,
+) -> Result<ComplexSelector, ParseError> {
     let start = parser.base_offset() + parser.current_start();
     let mut children = Vec::new();
 
@@ -326,7 +328,7 @@ fn parse_relative_complex_selector(parser: &mut CssParser) -> Result<ComplexSele
 
 /// Parse a complex selector: `div > span + .class`
 pub(crate) fn parse_complex_selector(
-    parser: &mut CssParser,
+    parser: &mut CssParser<'_>,
 ) -> Result<ComplexSelector, ParseError> {
     let start = parser.base_offset() + parser.current_start();
     let mut children = Vec::new();
@@ -375,7 +377,7 @@ pub(crate) fn parse_complex_selector(
 ///
 /// This is different from `parse_combinator()` which also returns Descendant for whitespace.
 pub(crate) fn parse_explicit_combinator(
-    parser: &mut CssParser,
+    parser: &mut CssParser<'_>,
 ) -> Result<Option<(Combinator, Span)>, ParseError> {
     parser.skip_whitespace()?;
 
@@ -409,7 +411,7 @@ pub(crate) fn parse_explicit_combinator(
 /// Parse a combinator: `>`, `+`, `~`, `||`, or whitespace (descendant)
 /// Returns (combinator type, combinator span)
 pub(crate) fn parse_combinator(
-    parser: &mut CssParser,
+    parser: &mut CssParser<'_>,
 ) -> Result<Option<(Combinator, Span)>, ParseError> {
     // Capture position before skipping whitespace for descendant combinator
     let whitespace_start = parser.base_offset() + parser.current_start();
@@ -466,7 +468,7 @@ pub(crate) fn parse_combinator(
 }
 
 /// Check if current token could start a selector
-fn is_selector_start(parser: &CssParser) -> bool {
+fn is_selector_start(parser: &CssParser<'_>) -> bool {
     matches!(
         parser.current_kind,
         TokenKind::Identifier
@@ -481,7 +483,7 @@ fn is_selector_start(parser: &CssParser) -> bool {
 
 /// Parse a relative selector: combinator + simple selectors
 fn parse_relative_selector(
-    parser: &mut CssParser,
+    parser: &mut CssParser<'_>,
     combinator: Option<Combinator>,
     combinator_span: Option<Span>,
 ) -> Result<RelativeSelector, ParseError> {
@@ -526,7 +528,7 @@ fn parse_relative_selector(
 /// appear mid-compound (`&__a`, `div&`, `&&`, `*&`) — a space yields a `Whitespace` token and ends
 /// the chain. Type-not-first compounds (`&div`, `a&b`) are grammar-invalid per Selectors 4 but
 /// parsed for parity with Svelte's `parseCss` (validity is the future diagnostics layer's job).
-fn is_simple_selector_chain(parser: &CssParser) -> bool {
+fn is_simple_selector_chain(parser: &CssParser<'_>) -> bool {
     matches!(
         parser.current_kind,
         TokenKind::Dot
@@ -540,7 +542,9 @@ fn is_simple_selector_chain(parser: &CssParser) -> bool {
 }
 
 /// Parse a simple selector: type, class, id, attribute, pseudo-class, pseudo-element
-pub(crate) fn parse_simple_selector(parser: &mut CssParser) -> Result<SimpleSelector, ParseError> {
+pub(crate) fn parse_simple_selector(
+    parser: &mut CssParser<'_>,
+) -> Result<SimpleSelector, ParseError> {
     let start = parser.base_offset() + parser.current_start();
 
     match &parser.current_kind {

@@ -223,7 +223,7 @@ pub(crate) fn has_nested_block_flow(nodes: &[FragmentNode]) -> bool {
 ///
 /// This pattern is used consistently across all block types (if, each, await, snippet, key)
 /// to ensure proper indentation of nested content when it breaks across lines.
-pub(super) fn indent_body(printer: &Printer, body_doc: DocId, has_leading_ws: bool) -> DocId {
+pub(super) fn indent_body(printer: &Printer<'_>, body_doc: DocId, has_leading_ws: bool) -> DocId {
     if has_leading_ws {
         let hardline = printer.d().hardline();
         let inner = printer.d().concat(&[hardline, body_doc]);
