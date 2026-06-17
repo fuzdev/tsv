@@ -13,6 +13,9 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
 
 - various conformance fixes to the formatter and parser
 - numerous new Prettier divergences including uniform indentation on continuations
+- object destructuring patterns in Svelte blocks now hug their braces,
+  consistent with `bracketSpacing: false` (which is not
+  respected by prettier-plugin-svelte even when set)
 - reduce allocations using `SmallVec` and memoizations
 - formatting is now **non-configurable by design** — no config files, CLI flags,
   or runtime options, and none are planned (opinionated like `gofmt` and Black).

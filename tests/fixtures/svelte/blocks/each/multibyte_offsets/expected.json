@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 324,
+	"end": 322,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -151,7 +151,7 @@
 			{
 				"type": "EachBlock",
 				"start": 269,
-				"end": 323,
+				"end": 321,
 				"expression": {
 					"type": "ArrayExpression",
 					"start": 276,
@@ -191,26 +191,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 295,
-							"end": 297,
+							"start": 293,
+							"end": 295,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 297,
-							"end": 315,
+							"start": 295,
+							"end": 313,
 							"name": "div",
 							"name_loc": {
 								"start": {
 									"line": 9,
 									"column": 2,
-									"character": 298
+									"character": 296
 								},
 								"end": {
 									"line": 9,
 									"column": 5,
-									"character": 301
+									"character": 299
 								}
 							},
 							"attributes": [],
@@ -219,12 +219,12 @@
 								"nodes": [
 									{
 										"type": "ExpressionTag",
-										"start": 302,
-										"end": 305,
+										"start": 300,
+										"end": 303,
 										"expression": {
 											"type": "Identifier",
-											"start": 303,
-											"end": 304,
+											"start": 301,
+											"end": 302,
 											"loc": {
 												"start": {
 													"line": 9,
@@ -240,19 +240,19 @@
 									},
 									{
 										"type": "Text",
-										"start": 305,
-										"end": 306,
+										"start": 303,
+										"end": 304,
 										"raw": " ",
 										"data": " "
 									},
 									{
 										"type": "ExpressionTag",
-										"start": 306,
-										"end": 309,
+										"start": 304,
+										"end": 307,
 										"expression": {
 											"type": "Identifier",
-											"start": 307,
-											"end": 308,
+											"start": 305,
+											"end": 306,
 											"loc": {
 												"start": {
 													"line": 9,
@@ -271,17 +271,17 @@
 						},
 						{
 							"type": "Text",
-							"start": 315,
-							"end": 316,
+							"start": 313,
+							"end": 314,
 							"raw": "\n",
 							"data": "\n"
 						}
 					]
 				},
 				"context": {
-					"type": "ObjectPattern",
+					"type": "ArrayPattern",
 					"start": 286,
-					"end": 294,
+					"end": 292,
 					"loc": {
 						"start": {
 							"line": 8,
@@ -289,111 +289,41 @@
 						},
 						"end": {
 							"line": 8,
-							"column": 26
+							"column": 24
 						}
 					},
-					"properties": [
+					"elements": [
 						{
-							"type": "Property",
-							"start": 288,
-							"end": 289,
+							"type": "Identifier",
+							"start": 287,
+							"end": 288,
 							"loc": {
 								"start": {
+									"line": 8,
+									"column": 19
+								},
+								"end": {
 									"line": 8,
 									"column": 20
-								},
-								"end": {
-									"line": 8,
-									"column": 21
 								}
 							},
-							"method": false,
-							"shorthand": true,
-							"computed": false,
-							"key": {
-								"type": "Identifier",
-								"start": 288,
-								"end": 289,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 20
-									},
-									"end": {
-										"line": 8,
-										"column": 21
-									}
-								},
-								"name": "a"
-							},
-							"value": {
-								"type": "Identifier",
-								"start": 288,
-								"end": 289,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 20
-									},
-									"end": {
-										"line": 8,
-										"column": 21
-									}
-								},
-								"name": "a"
-							},
-							"kind": "init"
+							"name": "a"
 						},
 						{
-							"type": "Property",
-							"start": 291,
-							"end": 292,
+							"type": "Identifier",
+							"start": 290,
+							"end": 291,
 							"loc": {
 								"start": {
 									"line": 8,
-									"column": 23
+									"column": 22
 								},
 								"end": {
 									"line": 8,
-									"column": 24
+									"column": 23
 								}
 							},
-							"method": false,
-							"shorthand": true,
-							"computed": false,
-							"key": {
-								"type": "Identifier",
-								"start": 291,
-								"end": 292,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 23
-									},
-									"end": {
-										"line": 8,
-										"column": 24
-									}
-								},
-								"name": "b"
-							},
-							"value": {
-								"type": "Identifier",
-								"start": 291,
-								"end": 292,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 23
-									},
-									"end": {
-										"line": 8,
-										"column": 24
-									}
-								},
-								"name": "b"
-							},
-							"kind": "init"
+							"name": "b"
 						}
 					]
 				}

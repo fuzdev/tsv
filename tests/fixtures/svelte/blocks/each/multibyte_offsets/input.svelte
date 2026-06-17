@@ -5,6 +5,6 @@
 	<div>{item}</div>
 {/each}
 
-{#each ['😀'] as { a, b }}
+{#each ['😀'] as [a, b]}
 	<div>{a} {b}</div>
 {/each}

@@ -242,15 +242,18 @@ impl<'a> Printer<'a> {
     /// Build a doc for a pattern (destructuring context)
     ///
     /// Patterns use specific whitespace rules:
-    /// - Object patterns: `{ a, b }` (spaces inside braces)
+    /// - Object patterns: `{a, b}` (hugged braces, `bracketSpacing: false`)
     /// - Array patterns: `[a, b]` (no spaces inside brackets)
     ///
-    /// Used for `{#each ... as pattern}` contexts.
+    /// Used for `{#each ... as pattern}`, `{#await ... then pattern}`,
+    /// `{:then pattern}`, and `{:catch pattern}` binding contexts. Object braces
+    /// hug uniformly with `bracketSpacing: false` (like `{@const}` and every
+    /// other object tsv emits); prettier-plugin-svelte keeps the spaced form here.
     pub(super) fn build_pattern_doc(&self, expr: &tsv_ts::Expression) -> DocId {
         let d = self.d();
         match expr {
             tsv_ts::Expression::ObjectPattern(obj) => {
-                let mut parts = vec![d.text("{ ")];
+                let mut parts = vec![d.text("{")];
                 for (i, prop) in obj.properties.iter().enumerate() {
                     if i > 0 {
                         parts.push(d.text(", "));
@@ -274,12 +277,12 @@ impl<'a> Printer<'a> {
                         }
                     }
                 }
-                parts.push(d.text(" }"));
+                parts.push(d.text("}"));
                 d.concat(&parts)
             }
             tsv_ts::Expression::ObjectExpression(obj) => {
                 // Legacy AST - treat same as ObjectPattern
-                let mut parts = vec![d.text("{ ")];
+                let mut parts = vec![d.text("{")];
                 for (i, prop) in obj.properties.iter().enumerate() {
                     if i > 0 {
                         parts.push(d.text(", "));
@@ -301,7 +304,7 @@ impl<'a> Printer<'a> {
                         }
                     }
                 }
-                parts.push(d.text(" }"));
+                parts.push(d.text("}"));
                 d.concat(&parts)
             }
             tsv_ts::Expression::ArrayPattern(arr) => {

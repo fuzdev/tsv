@@ -308,6 +308,16 @@ columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 
 **Short expr 100+**: Prettier tolerates exceeding print width (100+ chars) for short comparison expressions in block conditions like `{#if typeof x === 'string'}`. tsv breaks to respect print width strictly. This affects expressions that are just slightly over the limit (e.g., 103 chars).
 
+### Svelte: destructuring bracket spacing
+
+**Design choice.** `bracketSpacing: false` is one of tsv's four fixed identity settings; tsv hugs object braces everywhere, including object **destructuring patterns** in template binding positions. prettier-plugin-svelte ignores `bracketSpacing` for those binding patterns — `{#each … as PATTERN}`, `{#await … then PATTERN}`, `{:then PATTERN}`, `{:catch PATTERN}` — and hardcodes the spaced `{ … }` form, even though it honors the option for the same destructuring in `{@const}` (which routes through Prettier's JS printer, and which tsv already matched). tsv hugs uniformly so a destructuring pattern reads the same wherever it appears (`{#each items as {a, b}}` vs prettier's `{#each items as { a, b }}`), including object values nested inside defaults (`c = {x: 1}`). Array patterns (`[a, b]`) have no interior spacing in either formatter and are unaffected.
+
+- `{#each as {…}}` basic — [destructure_object](../tests/fixtures/svelte/blocks/each/destructure_object_prettier_divergence/)
+- `{#each as {…}}` rest element — [destructure_object_rest](../tests/fixtures/svelte/blocks/each/destructure_object_rest_prettier_divergence/)
+- `{#each as {…}}` defaults + nested object value — [destructure_object_default](../tests/fixtures/svelte/blocks/each/destructure_object_default_prettier_divergence/)
+- `{#each as {…}, i (key)}` with index + key — [destructure_with_index_key](../tests/fixtures/svelte/blocks/each/destructure_with_index_key_prettier_divergence/)
+- `{#await then}` / `{:then}` / `{:catch}` — [destructure_default](../tests/fixtures/svelte/blocks/await/destructure_default_prettier_divergence/)
+
 ### TypeScript
 
 | Feature                                   | Reason                | Fixture                                                                                                                                          |

@@ -16,7 +16,7 @@
 	<div>{item}</div>
 {/each}
 
-<!-- as with array type and destructuring -->
-{#each items as A[] as { a, b }}
+<!-- as with array type and array destructuring -->
+{#each items as A[] as [a, b]}
 	<div>{a}: {b}</div>
 {/each}
