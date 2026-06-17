@@ -4,6 +4,13 @@ version.workspace = true
 edition.workspace = true
 description = "Language-agnostic foundation primitives for tsv"
 
+[features]
+# Opt-in render-time line-comment swallow check (diagnostic). Off by default so
+# production artifacts (wasm/cli/ffi — none depend on tsv_debug) compile it out
+# entirely: no `DocArena` side-set field, no render-loop hook. `tsv_debug` enables
+# it to drive `swallow_audit`. See src/doc/swallow.rs.
+swallow_check = []
+
 [dependencies]
 smallvec.workspace = true
 string-interner.workspace = true

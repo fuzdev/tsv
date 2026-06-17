@@ -1138,34 +1138,76 @@ impl<'a> Printer<'a> {
             let body_doc = self.build_statement_doc(&stmt.body);
 
             let (tail, group_it) = if self.has_comments_between(header_end, body_start) {
-                let comment_doc =
-                    self.build_inline_comments_between_doc_no_leading_space(header_end, body_start);
                 if has_line_comment && !is_block_body {
-                    // Line comment, non-block body: comment + body on their own lines.
-                    // for (;;)\n\t// c\n\texpr;
-                    (
-                        d.indent(d.concat(&[d.hardline(), comment_doc, d.hardline(), body_doc])),
-                        false,
-                    )
+                    // Line comment(s), non-block body: each comment on its own
+                    // indented line, then the body — break-safe so a `//` can't
+                    // swallow the next comment or the body (matches Prettier's
+                    // adjustClause; multiple comments previously collapsed inline).
+                    let mut inner = Vec::new();
+                    let mut prev = header_end;
+                    for comment in
+                        tsv_lang::comments_in_range(self.comments, header_end, body_start)
+                    {
+                        if prev != header_end
+                            && self.has_blank_line_between(prev, comment.span.start)
+                        {
+                            inner.push(d.literalline());
+                        }
+                        inner.push(d.hardline());
+                        inner.push(self.build_comment_doc(comment));
+                        prev = comment.span.end;
+                    }
+                    inner.push(d.hardline());
+                    inner.push(body_doc);
+                    (d.indent(d.concat(&inner)), false)
                 } else if has_line_comment {
-                    // Line comment, block body: comment trailing `)`, block on next line.
-                    (
-                        d.concat(&[d.text(" "), comment_doc, d.hardline(), body_doc]),
-                        false,
-                    )
-                } else if is_block_body {
-                    // Block comment, block body: `) /* c */ {`
-                    (
-                        d.concat(&[d.text(" "), comment_doc, d.text(" "), body_doc]),
-                        false,
-                    )
+                    // Line comment(s), block body. Preserve each comment's position
+                    // (no inline collapse → no swallow): a comment trailing `)`
+                    // stays on the `)` line, own-line comments each keep their own
+                    // line; then the block drops to the next line. Mirrors the
+                    // shared `append_close_paren_with_comments` (which the C-style
+                    // for can't call directly — its `)` is already in the header).
+                    let (mut inline_prev, own_line, inline_next) =
+                        self.partition_comments_by_line(header_end, body_start);
+                    let mut own_line_lines: Vec<&tsv_lang::Comment> = Vec::new();
+                    for comment in own_line.into_iter().chain(inline_next) {
+                        if comment.is_block {
+                            inline_prev.push(comment);
+                        } else {
+                            own_line_lines.push(comment);
+                        }
+                    }
+                    let mut tail = Vec::new();
+                    let effective_prev_end = inline_prev.last().map_or(header_end, |c| c.span.end);
+                    self.build_comments_between_parts(
+                        &mut tail,
+                        &inline_prev,
+                        &own_line_lines,
+                        effective_prev_end,
+                    );
+                    tail.push(d.hardline());
+                    tail.push(body_doc);
+                    (d.concat(&tail), false)
                 } else {
-                    // Block comment, non-block body: adjustClause keeps `) /* c */ body`
-                    // flat but drops `\n\t/* c */ body` when the header breaks.
-                    (
-                        d.indent_line(d.concat(&[comment_doc, d.text(" "), body_doc])),
-                        true,
-                    )
+                    // Block comment(s) only — built here so the line-comment paths
+                    // above don't compute an unused doc.
+                    let comment_doc = self
+                        .build_inline_comments_between_doc_no_leading_space(header_end, body_start);
+                    if is_block_body {
+                        // Block comment, block body: `) /* c */ {`
+                        (
+                            d.concat(&[d.text(" "), comment_doc, d.text(" "), body_doc]),
+                            false,
+                        )
+                    } else {
+                        // Block comment, non-block body: adjustClause keeps
+                        // `) /* c */ body` flat but drops `\n\t/* c */ body` when the
+                        // header breaks.
+                        (
+                            d.indent_line(d.concat(&[comment_doc, d.text(" "), body_doc])),
+                            true,
+                        )
+                    }
                 }
             } else if matches!(stmt.body.as_ref(), Statement::EmptyStatement(_)) {
                 // Empty body attaches directly: `);` (no space, no adjustClause).

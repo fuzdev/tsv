@@ -1774,11 +1774,12 @@ impl<'a> Printer<'a> {
             }
         } else if comment.span.start == 0 && comment.content.starts_with("#!") {
             // Hashbang comment: #!/usr/bin/env node (no // prefix)
-            // Content already includes the #! prefix
-            d.text_owned(comment.content.clone())
+            // Content already includes the #! prefix. Like a line comment it runs
+            // to end-of-line, so tag it for the swallow check.
+            d.line_comment_text_owned(comment.content.clone())
         } else {
-            // Line comment: // content
-            d.text_owned(format!("//{}", comment.content))
+            // Line comment: // content. Tagged for the swallow check (runs to EOL).
+            d.line_comment_text_owned(format!("//{}", comment.content))
         }
     }
 

@@ -10,7 +10,8 @@ use commands::{
     fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
     json_profile::JsonProfileCommand, line_width::LineWidthCommand, metrics::MetricsCommand,
-    profile::ProfileCommand, test262::Test262Command, ts_fixture_audit::TsFixtureAuditCommand,
+    profile::ProfileCommand, swallow_audit::SwallowAuditCommand, test262::Test262Command,
+    ts_fixture_audit::TsFixtureAuditCommand,
 };
 
 /// tsv_debug — internal debugging tools (fixtures, comparisons, conformance).
@@ -39,6 +40,7 @@ pub enum Subcommand {
     Profile(ProfileCommand),
     JsonProfile(JsonProfileCommand),
     Metrics(MetricsCommand),
+    SwallowAudit(SwallowAuditCommand),
     Test262(Test262Command),
     TsFixtureAudit(TsFixtureAuditCommand),
 }
@@ -62,6 +64,7 @@ impl TopLevel {
             Subcommand::Profile(c) => c.run(),
             Subcommand::JsonProfile(c) => c.run(),
             Subcommand::Metrics(c) => c.run(),
+            Subcommand::SwallowAudit(c) => c.run(),
             Subcommand::Test262(c) => c.run(),
             Subcommand::TsFixtureAudit(c) => c.run(),
         }

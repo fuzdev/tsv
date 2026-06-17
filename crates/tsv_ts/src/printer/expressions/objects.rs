@@ -842,34 +842,35 @@ impl<'a> Printer<'a> {
         let bracket_start = self.find_opening_bracket_after(search_start, key_start);
         let bracket_end = self.find_closing_bracket_after(key_end);
 
-        // key→`]` gap comments (`[foo /* c */]`): a block trails the key inline.
-        // (A line comment here is a separate content-loss case prettier relocates
-        // differently — out of scope, tracked as a follow-up.)
-        let mut after_key = Vec::new();
-        for comment in comments_in_range(self.comments, key_end, bracket_end) {
-            after_key.push(d.text(" "));
-            after_key.push(self.build_comment_doc(comment));
-        }
+        let bracket_line = self.has_line_comments_between(bracket_start + 1, key_start);
+        let after_key_line = self.has_line_comments_between(key_end, bracket_end);
 
-        // Flat path (no `[`→key line comment): block comments hug inline, the key
-        // never breaks on width. Byte-identical to the pre-divergence behavior.
-        if !self.has_line_comments_between(bracket_start + 1, key_start) {
+        // Flat path (no line comment in either in-bracket gap): block comments hug
+        // inline (`[/* d */ foo]`, `[foo /* c */]`), the key never breaks on width.
+        // Byte-identical to the pre-divergence behavior.
+        if !bracket_line && !after_key_line {
             let mut parts = vec![d.text("[")];
             for comment in comments_in_range(self.comments, bracket_start + 1, key_start) {
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.text(" "));
             }
             parts.push(key_doc);
-            parts.extend_from_slice(&after_key);
+            for comment in comments_in_range(self.comments, key_end, bracket_end) {
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
+            }
             parts.push(d.text("]"));
             return (d.concat(&parts), bracket_end + 1);
         }
 
-        // Breaking path: a `[`-line comment is pulled onto the `[` line; an own-line
-        // comment keeps its own line. The bracket force-breaks so the `//` can't
-        // swallow the key. `build_leading_comments_multiline*` lays out the
-        // not-pulled leading comments (own-line on its own line, a same-line block
-        // hugging the key inline) — the shared open-delimiter leading-comment builder.
+        // Breaking path: a line comment in either in-bracket gap forces the bracket
+        // to break so the `//` can't swallow the key or `]`, preserving each comment
+        // in place. `[`→key: a `[`-line comment is pulled onto the `[` line, an
+        // own-line one stays on its own line (`build_leading_comments_multiline*`,
+        // the shared open-delimiter leading-comment builder, hugging a same-line
+        // block to the key). key→`]`: a same-line comment trails the key with a
+        // space, an own-line comment keeps its own line. Prettier relocates instead
+        // (conformance_prettier.md §Comment relocation).
         let (bracket_line_prefix, bracket_pull_pos) =
             self.delimiter_line_comment_prefix(bracket_start, key_start);
         let mut inner_parts = self.build_leading_comments_multiline_opt(
@@ -878,7 +879,16 @@ impl<'a> Printer<'a> {
             bracket_pull_pos,
         );
         inner_parts.push(key_doc);
-        inner_parts.extend_from_slice(&after_key);
+        let mut prev = key_end;
+        for comment in comments_in_range(self.comments, key_end, bracket_end) {
+            if self.is_same_line(prev, comment.span.start) {
+                inner_parts.push(d.text(" "));
+            } else {
+                inner_parts.push(d.hardline());
+            }
+            inner_parts.push(self.build_comment_doc(comment));
+            prev = comment.span.end;
+        }
         let bracket_body = d.concat(&[
             d.text("["),
             d.concat(&bracket_line_prefix),
