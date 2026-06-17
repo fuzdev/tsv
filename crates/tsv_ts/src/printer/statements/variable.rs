@@ -93,23 +93,10 @@ impl<'a> Printer<'a> {
             after_modifier = self.push_modifier_marker_doc(&mut parts, after_modifier, b'?');
         }
         if let Some(type_ann) = &ident.type_annotation {
-            // Extract comments between modifiers and `:` (e.g., `a! /* c */: number`)
-            if self.has_comments_between(after_modifier, type_ann.span.start) {
-                let comment_doc =
-                    self.build_inline_comments_between_doc(after_modifier, type_ann.span.start);
-                if self.has_line_comments_between(after_modifier, type_ann.span.start) {
-                    // Line comment forces break: `a! // c\n: number`
-                    parts.push(comment_doc);
-                    parts.push(d.hardline());
-                } else {
-                    parts.push(d.concat(&[comment_doc, d.text(" ")]));
-                }
-            }
-            if wrap_type {
-                parts.push(self.build_type_annotation_doc_wrapping(type_ann));
-            } else {
-                parts.push(self.build_type_annotation_doc(type_ann));
-            }
+            // `: type` annotation, handling a before-`:` comment between the binding
+            // name (and any `!`/`?`) and `:` — line → indented continuation, block →
+            // inline before `:`.
+            parts.push(self.build_binding_type_annotation_doc(after_modifier, type_ann, wrap_type));
         }
         d.concat(&parts)
     }

@@ -142,7 +142,7 @@ Future features (unknown order):
 - later
   - Svelte compiler (exact mirror)
   - bundler
-  - typechecker? Claude seems up to it
+  - typechecker isn't off the table
   - more? see the issues and discussions, suggestions welcome
 
 ## Docs

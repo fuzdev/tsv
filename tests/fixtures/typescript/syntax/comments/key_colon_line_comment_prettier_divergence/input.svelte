@@ -1,16 +1,16 @@
 <script lang="ts">
 	interface I {
 		a // c1
-		: number;
+			: number;
 	}
 
 	type T = {
 		b // c2
-		: number;
+			: number;
 	};
 
 	class A {
 		c // c3
-		: number = 1;
+			: number = 1;
 	}
 </script>

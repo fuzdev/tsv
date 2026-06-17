@@ -309,7 +309,8 @@ impl<'a> Printer<'a> {
     /// §Comment relocation).
     ///
     /// Shared by the three type-element property arms (type-literal, interface,
-    /// class). Returns `None` when the range has no comments.
+    /// class) and the index-signature key→`:` gap (where the "marker" is the key
+    /// name). Returns `None` when the range has no comments.
     pub(crate) fn build_marker_to_colon_comments_doc(
         &self,
         after: u32,
@@ -329,6 +330,98 @@ impl<'a> Printer<'a> {
             // Block-only: single space before `:` (matches bare `?:` spacing).
             Some(d.concat(&[comments, d.text(" ")]))
         }
+    }
+
+    /// The uniform forced-continuation indent shape, the single definition shared by
+    /// every `head // c⏎ tail` continuation. Emits a leading space, then the gap's
+    /// comments via `build_trailing_comments_break_for_line` (each line comment
+    /// terminated at end-of-line so a `//` can't swallow what follows), then `tail` —
+    /// all wrapped in one `indent`, so only the first comment stays flush on the head
+    /// line and everything after (remaining comments and `tail`) drops one level and
+    /// reads as part of the construct, not a sibling.
+    ///
+    /// `start`/`end` bound the comment gap; `tail` is the continued content (a type,
+    /// a `: type` annotation, …) the caller has already built. Used by the `:`→type
+    /// annotation (`build_type_annotation_doc`), the marker→`:` before-colon gap
+    /// (`build_marker_colon_line_continuation`), and the index-signature `]`→value-`:`
+    /// gap (`build_index_signature_member_doc`). See conformance_prettier.md
+    /// §Uniform Forced-Continuation Indent.
+    pub(crate) fn build_continuation_indent(&self, start: u32, end: u32, tail: DocId) -> DocId {
+        let d = self.d();
+        d.indent(d.concat(&[
+            d.text(" "),
+            self.build_trailing_comments_break_for_line(start, end),
+            tail,
+        ]))
+    }
+
+    /// When a **line** comment sits in the marker→`:` gap of a key/binding's type
+    /// annotation, build the indented continuation: the first comment trails the
+    /// marker on its line, then any remaining comments and the `: type` (`type_doc`,
+    /// built by the caller) drop to a continuation line indented one level — the
+    /// uniform forced-continuation indent (`build_continuation_indent`), so the
+    /// annotation reads as part of its key/binding rather than a sibling. Returns
+    /// `None` when the gap has no line comment, leaving the caller's block /
+    /// no-comment handling in place.
+    ///
+    /// `marker_end` is the offset just past the key (and any `?`/`!`); `colon_pos`
+    /// is the type annotation's `:` (its span start). Callers gate on
+    /// `has_comments_between` first, so the common (no-comment) path never reaches
+    /// the `has_line_comments_between` probe here.
+    ///
+    /// Shared by the before-`:` sites: index/property signatures, class properties,
+    /// variable bindings, and function parameters (`build_identifier_doc_inner`).
+    /// Prettier keeps the continuation flush — and for property signatures / class
+    /// properties relocates the comment to end-of-line — see conformance_prettier.md
+    /// §Uniform Forced-Continuation Indent.
+    pub(crate) fn build_marker_colon_line_continuation(
+        &self,
+        marker_end: u32,
+        colon_pos: u32,
+        type_doc: DocId,
+    ) -> Option<DocId> {
+        self.has_line_comments_between(marker_end, colon_pos)
+            .then(|| self.build_continuation_indent(marker_end, colon_pos, type_doc))
+    }
+
+    /// Build a binding/identifier `: type` annotation including any before-`:`
+    /// comment. A **line** comment keeps the comment after the marker and indents the
+    /// `: type` continuation one level (`build_marker_colon_line_continuation`); a
+    /// **block** stays inline with a space before `:` (` /* c */ : T`); no comment is
+    /// just `: T`. `marker_end` is the offset past the name and any `!`/`?`; `wrap`
+    /// selects the width-aware annotation builder (generics / wrapping type args).
+    ///
+    /// Gates on `has_comments_between` once, so the common no-comment path is a single
+    /// binary search. Shared by every before-`:` site whose block form keeps the space
+    /// before `:`: index-signature keys, class properties, variable bindings, and
+    /// function parameters/identifiers. (Property signatures handle the gap inline:
+    /// their non-optional block form omits that space.)
+    pub(crate) fn build_binding_type_annotation_doc(
+        &self,
+        marker_end: u32,
+        type_ann: &internal::TSTypeAnnotation,
+        wrap: bool,
+    ) -> DocId {
+        let d = self.d();
+        let colon_pos = type_ann.span.start;
+        let type_doc = if wrap {
+            self.build_type_annotation_doc_wrapping(type_ann)
+        } else {
+            self.build_type_annotation_doc(type_ann)
+        };
+        if !self.has_comments_between(marker_end, colon_pos) {
+            return type_doc;
+        }
+        if let Some(doc) =
+            self.build_marker_colon_line_continuation(marker_end, colon_pos, type_doc)
+        {
+            return doc;
+        }
+        d.concat(&[
+            self.build_inline_comments_between_doc(marker_end, colon_pos),
+            d.text(" "),
+            type_doc,
+        ])
     }
 
     /// Build a Doc for trailing comments where a line comment must force the
@@ -524,8 +617,10 @@ impl<'a> Printer<'a> {
     /// Build a Doc for inline comments between a name/key and type params or parens.
     ///
     /// Like `build_comments_between` but handles line comments safely:
-    /// block comments use the given `block_spacing`, line comments always get
-    /// a leading space and hardline after (to prevent absorbing following code).
+    /// block comments use the given `block_spacing`, line comments get a leading
+    /// space and a hardline after (to prevent absorbing following code). The leading
+    /// space is skipped for any comment that follows a line comment's hardline — it
+    /// starts a fresh line, so a leading space would render as a stray `\t // c`.
     ///
     /// Used for: declaration name → type params, method key → type params/parens,
     /// getter/setter key → parens.
@@ -541,6 +636,10 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let first_idx = tsv_lang::find_first_comment_from(self.comments, start);
         let mut parts = Vec::new();
+        // After a line comment's hardline the next comment starts a fresh (indented)
+        // line, so it must not get a leading space — otherwise a 2nd+ own-line comment
+        // renders as `\t // c` (stray leading space).
+        let mut at_line_start = false;
         for comment in self.comments[first_idx..]
             .iter()
             .take_while(|c| c.span.end <= end)
@@ -549,7 +648,9 @@ impl<'a> Printer<'a> {
                 // Block comment: use caller-specified spacing
                 match block_spacing {
                     CommentSpacing::Leading => {
-                        parts.push(d.text(" "));
+                        if !at_line_start {
+                            parts.push(d.text(" "));
+                        }
                         parts.push(self.build_comment_doc(comment));
                     }
                     CommentSpacing::Trailing => {
@@ -560,12 +661,16 @@ impl<'a> Printer<'a> {
                         parts.push(self.build_comment_doc(comment));
                     }
                 }
+                at_line_start = false;
             } else {
-                // Line comment: leading space + hardline after
-                // `class A // c\n<T> {}`
-                parts.push(d.text(" "));
+                // Line comment: leading space (unless already at line start) +
+                // hardline after — `class A // c\n<T> {}`
+                if !at_line_start {
+                    parts.push(d.text(" "));
+                }
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.hardline());
+                at_line_start = true;
             }
         }
         d.concat(&parts)

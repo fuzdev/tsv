@@ -1,0 +1,217 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 190,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A line comment between a binding name and its `:` keeps the comment after the",
+			"start": 20,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " name; the `: type` continuation indents one level.",
+			"start": 102,
+			"end": 155,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 163,
+			"end": 167,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 7
+				},
+				"end": {
+					"line": 4,
+					"column": 11
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 189,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 180,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 157,
+					"end": 179,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 161,
+							"end": 178,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 5
+								},
+								"end": {
+									"line": 5,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 161,
+								"end": 178,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 5
+									},
+									"end": {
+										"line": 5,
+										"column": 10
+									}
+								},
+								"name": "x",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 170,
+									"end": 178,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 10
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 172,
+										"end": 178,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 4
+											},
+											"end": {
+												"line": 5,
+												"column": 10
+											}
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 163,
+											"end": 167
+										}
+									]
+								}
+							},
+							"init": null
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment between a binding name and its `:` keeps the comment after the",
+							"start": 20,
+							"end": 100
+						},
+						{
+							"type": "Line",
+							"value": " name; the `: type` continuation indents one level.",
+							"start": 102,
+							"end": 155
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

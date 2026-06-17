@@ -376,6 +376,24 @@ tsv/
 
 ### Conformance
 
+**Comment position is preserved, not relocated.** A core tsv stance and the
+single largest category of deliberate divergence from Prettier: a comment's
+placement is an authoring choice that communicates what it refers to, so tsv
+keeps comments where the author wrote them instead of moving them to a
+"canonical" position. Prettier routinely relocates comments across syntactic
+boundaries (into adjacent blocks, parens, onto their own line, past `;`); tsv
+treats every such boundary as semantic and holds the comment in place. The intent
+is **universal** — preserve everywhere. Where tsv today still matches a Prettier
+relocation (a few spots like the method/call/construct-signature `(`, the
+union-member alignment rendering, or the `with {…}` import-attribute brace), that
+is an un-converted implementation gap being closed incrementally — **not** a
+deliberate exception. The one sanctioned safety valve is adopting Prettier's
+position only if preserving the author's would be genuinely wrong (e.g. it lands
+inside a token boundary); no such case exists in the catalog today. When a fix
+changes comment handling, default to preserving position and add a
+`_prettier_divergence` fixture. Full principles + the divergence catalog:
+./docs/conformance_prettier.md §Comment Position Philosophy.
+
 - ./docs/conformance_prettier.md - Where we differ from Prettier (and why)
 - ./docs/conformance_svelte.md - Where we differ from Svelte (and why)
 

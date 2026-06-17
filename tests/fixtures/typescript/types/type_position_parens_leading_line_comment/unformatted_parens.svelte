@@ -14,8 +14,4 @@
 	// function type return
 	type D = () => (// leading
 		a);
-
-	// variable type annotation
-	const e: (// leading
-		a) = null as any;
 </script>

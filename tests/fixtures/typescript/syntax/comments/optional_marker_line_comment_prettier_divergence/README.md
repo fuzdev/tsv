@@ -2,8 +2,9 @@
 
 A **line** comment in the gap between an optional `?` marker and the member's
 `:` annotation. tsv preserves the comment after `?`; because a line comment must
-end its line, the annotation is forced onto the next line. Prettier relocates
-the comment to trail the member's `;`.
+end its line, the `: type` annotation drops to a continuation line **indented one
+level** (the uniform forced-continuation indent — it reads as part of the member,
+not a sibling). Prettier relocates the comment to trail the member's `;`.
 
 Applies to all three type-element contexts — interface members, type-literal
 members, and class properties:
@@ -11,12 +12,13 @@ members, and class properties:
 ```
 interface I {        type T = {           class A {
   a? // c1             b? // c2             c? // c3
-  : number;           : number;            : number = 1;
+    : number;           : number;            : number = 1;
 }                    };                   }
 ```
 
 - Prettier: `a?: number; // c1` (relocates the comment after `;`)
-- Ours: keeps `// c` after `?`, the annotation on the next line (above)
+- Ours: keeps `// c` after `?`, the `: type` on a continuation line indented one
+  level (above)
 
 This is also a **content-loss fix**: rendering the line comment inline would
 swallow the `: number` annotation as comment text (`a? // c : number` →
