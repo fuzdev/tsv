@@ -134,9 +134,10 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - With key (`{#each items as item (item.id)}`)
 - With index and key (`{#each items as item, i (key)}`)
 - Each else (`{:else}`)
-- Destructuring - object (`{#each items as {a, b}}`)
+- Destructuring - object (`{#each items as {a, b}}`) — prettier divergence: tsv hugs braces (`bracketSpacing: false`)
 - Destructuring - array (`{#each items as [a, b]}`)
 - Destructuring with rest (`{#each items as {a, ...rest}}`)
+- Destructuring with defaults (`{#each items as {a = 1}}`) — prettier divergences: literal defaults normalize (single quotes + numeric form), and a renamed property keeps its key where prettier drops it. See [conformance_prettier.md](./conformance_prettier.md)
 - Each without `as` (`{#each items}`)
 - Nested each blocks
 
@@ -148,6 +149,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Catch clause (`{:catch error}`)
 - Shorthand then (`{#await promise then value}`)
 - Shorthand catch (`{#await promise catch error}`)
+- Destructuring in `then`/`catch` bindings (`{:then {a = 1}}`) — same brace-hugging + default-value divergences as each blocks
 - Nested await blocks
 
 ### Key Blocks

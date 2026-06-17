@@ -1,0 +1,815 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 447,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 66,
+				"data": " then-shorthand: string default normalizes to single quote "
+			},
+			{
+				"type": "Text",
+				"start": 66,
+				"end": 67,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 67,
+				"end": 123,
+				"expression": {
+					"type": "Identifier",
+					"start": 75,
+					"end": 82,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 8
+						},
+						"end": {
+							"line": 2,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": {
+					"type": "ObjectPattern",
+					"start": 88,
+					"end": 97,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 22
+						},
+						"end": {
+							"line": 2,
+							"column": 31
+						}
+					},
+					"properties": [
+						{
+							"type": "Property",
+							"start": 89,
+							"end": 96,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 23
+								},
+								"end": {
+									"line": 2,
+									"column": 30
+								}
+							},
+							"method": false,
+							"shorthand": true,
+							"computed": false,
+							"key": {
+								"type": "Identifier",
+								"start": 89,
+								"end": 90,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 23
+									},
+									"end": {
+										"line": 2,
+										"column": 24
+									}
+								},
+								"name": "a"
+							},
+							"value": {
+								"type": "AssignmentPattern",
+								"start": 89,
+								"end": 96,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 23
+									},
+									"end": {
+										"line": 2,
+										"column": 30
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 89,
+									"end": 90,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 23
+										},
+										"end": {
+											"line": 2,
+											"column": 24
+										}
+									},
+									"name": "a"
+								},
+								"right": {
+									"type": "Literal",
+									"start": 93,
+									"end": 96,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 27
+										},
+										"end": {
+											"line": 2,
+											"column": 30
+										}
+									},
+									"value": "x",
+									"raw": "'x'"
+								}
+							},
+							"kind": "init"
+						}
+					]
+				},
+				"error": null,
+				"pending": null,
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 98,
+							"end": 100,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 100,
+							"end": 114,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 101
+								},
+								"end": {
+									"line": 3,
+									"column": 5,
+									"character": 104
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 105,
+										"end": 108,
+										"expression": {
+											"type": "Identifier",
+											"start": 106,
+											"end": 107,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 7
+												},
+												"end": {
+													"line": 3,
+													"column": 8
+												}
+											},
+											"name": "a"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 114,
+							"end": 115,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"catch": null
+			},
+			{
+				"type": "Text",
+				"start": 123,
+				"end": 125,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 125,
+				"end": 192,
+				"data": " :then branch: numeric default normalizes to canonical form "
+			},
+			{
+				"type": "Text",
+				"start": 192,
+				"end": 193,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 193,
+				"end": 262,
+				"expression": {
+					"type": "Identifier",
+					"start": 201,
+					"end": 208,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 8
+						},
+						"end": {
+							"line": 7,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": {
+					"type": "ObjectPattern",
+					"start": 226,
+					"end": 236,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 8
+						},
+						"end": {
+							"line": 9,
+							"column": 18
+						}
+					},
+					"properties": [
+						{
+							"type": "Property",
+							"start": 227,
+							"end": 235,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 9
+								},
+								"end": {
+									"line": 9,
+									"column": 17
+								}
+							},
+							"method": false,
+							"shorthand": true,
+							"computed": false,
+							"key": {
+								"type": "Identifier",
+								"start": 227,
+								"end": 228,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 9
+									},
+									"end": {
+										"line": 9,
+										"column": 10
+									}
+								},
+								"name": "a"
+							},
+							"value": {
+								"type": "AssignmentPattern",
+								"start": 227,
+								"end": 235,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 9
+									},
+									"end": {
+										"line": 9,
+										"column": 17
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 227,
+									"end": 228,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 9
+										},
+										"end": {
+											"line": 9,
+											"column": 10
+										}
+									},
+									"name": "a"
+								},
+								"right": {
+									"type": "Literal",
+									"start": 231,
+									"end": 235,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 13
+										},
+										"end": {
+											"line": 9,
+											"column": 17
+										}
+									},
+									"value": 255,
+									"raw": "0xff"
+								}
+							},
+							"kind": "init"
+						}
+					]
+				},
+				"error": null,
+				"pending": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 209,
+							"end": 219,
+							"raw": "\n\tloading\n",
+							"data": "\n\tloading\n"
+						}
+					]
+				},
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 237,
+							"end": 239,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 239,
+							"end": 253,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 10,
+									"column": 2,
+									"character": 240
+								},
+								"end": {
+									"line": 10,
+									"column": 5,
+									"character": 243
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 244,
+										"end": 247,
+										"expression": {
+											"type": "Identifier",
+											"start": 245,
+											"end": 246,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 7
+												},
+												"end": {
+													"line": 10,
+													"column": 8
+												}
+											},
+											"name": "a"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 253,
+							"end": 254,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"catch": null
+			},
+			{
+				"type": "Text",
+				"start": 262,
+				"end": 264,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 264,
+				"end": 342,
+				"data": " :catch branch: string default keeps double quotes (escape-minimizing) "
+			},
+			{
+				"type": "Text",
+				"start": 342,
+				"end": 343,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 343,
+				"end": 446,
+				"expression": {
+					"type": "Identifier",
+					"start": 351,
+					"end": 358,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 8
+						},
+						"end": {
+							"line": 14,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": {
+					"type": "ObjectPattern",
+					"start": 376,
+					"end": 383,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 8
+						},
+						"end": {
+							"line": 16,
+							"column": 15
+						}
+					},
+					"properties": [
+						{
+							"type": "Property",
+							"start": 377,
+							"end": 382,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 9
+								},
+								"end": {
+									"line": 16,
+									"column": 14
+								}
+							},
+							"method": false,
+							"shorthand": true,
+							"computed": false,
+							"key": {
+								"type": "Identifier",
+								"start": 377,
+								"end": 378,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 9
+									},
+									"end": {
+										"line": 16,
+										"column": 10
+									}
+								},
+								"name": "a"
+							},
+							"value": {
+								"type": "AssignmentPattern",
+								"start": 377,
+								"end": 382,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 9
+									},
+									"end": {
+										"line": 16,
+										"column": 14
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 377,
+									"end": 378,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 9
+										},
+										"end": {
+											"line": 16,
+											"column": 10
+										}
+									},
+									"name": "a"
+								},
+								"right": {
+									"type": "Literal",
+									"start": 381,
+									"end": 382,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 13
+										},
+										"end": {
+											"line": 16,
+											"column": 14
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							"kind": "init"
+						}
+					]
+				},
+				"error": {
+					"type": "ObjectPattern",
+					"start": 409,
+					"end": 420,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 9
+						},
+						"end": {
+							"line": 18,
+							"column": 20
+						}
+					},
+					"properties": [
+						{
+							"type": "Property",
+							"start": 410,
+							"end": 419,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 10
+								},
+								"end": {
+									"line": 18,
+									"column": 19
+								}
+							},
+							"method": false,
+							"shorthand": true,
+							"computed": false,
+							"key": {
+								"type": "Identifier",
+								"start": 410,
+								"end": 411,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 10
+									},
+									"end": {
+										"line": 18,
+										"column": 11
+									}
+								},
+								"name": "a"
+							},
+							"value": {
+								"type": "AssignmentPattern",
+								"start": 410,
+								"end": 419,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 10
+									},
+									"end": {
+										"line": 18,
+										"column": 19
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 410,
+									"end": 411,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 10
+										},
+										"end": {
+											"line": 18,
+											"column": 11
+										}
+									},
+									"name": "a"
+								},
+								"right": {
+									"type": "Literal",
+									"start": 414,
+									"end": 419,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 14
+										},
+										"end": {
+											"line": 18,
+											"column": 19
+										}
+									},
+									"value": "a'b",
+									"raw": "\"a'b\""
+								}
+							},
+							"kind": "init"
+						}
+					]
+				},
+				"pending": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 359,
+							"end": 369,
+							"raw": "\n\tloading\n",
+							"data": "\n\tloading\n"
+						}
+					]
+				},
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 384,
+							"end": 386,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 386,
+							"end": 400,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 17,
+									"column": 2,
+									"character": 387
+								},
+								"end": {
+									"line": 17,
+									"column": 5,
+									"character": 390
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 391,
+										"end": 394,
+										"expression": {
+											"type": "Identifier",
+											"start": 392,
+											"end": 393,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 7
+												},
+												"end": {
+													"line": 17,
+													"column": 8
+												}
+											},
+											"name": "a"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 400,
+							"end": 401,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 421,
+							"end": 423,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 423,
+							"end": 437,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 19,
+									"column": 2,
+									"character": 424
+								},
+								"end": {
+									"line": 19,
+									"column": 5,
+									"character": 427
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 428,
+										"end": 431,
+										"expression": {
+											"type": "Identifier",
+											"start": 429,
+											"end": 430,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 7
+												},
+												"end": {
+													"line": 19,
+													"column": 8
+												}
+											},
+											"name": "a"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 437,
+							"end": 438,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

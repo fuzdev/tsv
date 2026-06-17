@@ -318,6 +318,20 @@ columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 - `{#each as {…}, i (key)}` with index + key — [destructure_with_index_key](../tests/fixtures/svelte/blocks/each/destructure_with_index_key_prettier_divergence/)
 - `{#await then}` / `{:then}` / `{:catch}` — [destructure_default](../tests/fixtures/svelte/blocks/await/destructure_default_prettier_divergence/)
 
+### Svelte: destructuring literal normalization
+
+**Design choice.** tsv routes the binding patterns of `{#each … as}`, `{#await … then}`, `{:then}`, and `{:catch}` through its TypeScript printer, so **literal default values** normalize to tsv's canonical form — string literals to single quotes (`{a = "x"}` → `{a = 'x'}`, with escape-minimizing keeping double quotes when single would need escaping, so `"a'b"` stays double) and numeric literals to canonical shape (lowercase hex/exponent, leading/trailing-zero rules: `0xFF` → `0xff`, `1.50` → `1.5`, `.5` → `0.5`, `1E10` → `1e10`, `0xFFn` → `0xffn`). This is the same normalization `{@const}` (and every other literal tsv emits) already applies. prettier-plugin-svelte instead prints these patterns from raw source, preserving the author's quote style and numeric token verbatim — the same binding positions where it ignores `bracketSpacing` (above), it also ignores `singleQuote` and numeric normalization. tsv normalizes uniformly so a destructuring default reads the same wherever it appears. Booleans, `null`, and regex literals are already canonical in both formatters and are unaffected.
+
+- `{#each as {x = …}}` strings + numbers — [destructure_literal_default](../tests/fixtures/svelte/blocks/each/destructure_literal_default_prettier_divergence/)
+- `{#await then}` / `{:then}` / `{:catch}` strings + numbers — [destructure_literal_default](../tests/fixtures/svelte/blocks/await/destructure_literal_default_prettier_divergence/)
+
+### Svelte: destructuring rename-with-default key drop
+
+**Prettier bug.** A renamed (non-shorthand) destructuring property that carries a **default value** loses its source key in prettier-plugin-svelte's binding-pattern printer for `{#each … as}`, `{#await … then}`, `{:then}`, and `{:catch}`. `{a: b = 1}` (read property `a`, bind to `b`) prints as `{ b = 1 }` (read property `b`) — a **semantic change**, since the output reads a different source property. The bug is specific to a non-shorthand property whose value is an `AssignmentPattern`: plain renames without a default (`{a: b}`) print correctly, only the defaulted property in a list loses its key (`{a: b = 1, c: d}` → `{ b = 1, c: d }`), and a nested pattern with a default drops its key the same way (`{a: {b} = c}` → `{ { b } = c }`). prettier's wrong output is itself stable. tsv prints these patterns through its TypeScript printer, which preserves the key in every case (and hugs the braces, per the bracket-spacing divergence above).
+
+- `{#each as}` rename + default, sibling, nested — [destructure_rename_default](../tests/fixtures/svelte/blocks/each/destructure_rename_default_prettier_divergence/)
+- `{#await then}` / `{:then}` / `{:catch}` rename + default — [destructure_rename_default](../tests/fixtures/svelte/blocks/await/destructure_rename_default_prettier_divergence/)
+
 ### TypeScript
 
 | Feature                                   | Reason                | Fixture                                                                                                                                          |

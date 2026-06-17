@@ -4,7 +4,7 @@
 
 {#await promise}
 	loading
-{:then {a,b="x"}}
+{:then {a,b='x'}}
 	<div>{a} {b}</div>
 {/await}
 
