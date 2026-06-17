@@ -89,19 +89,14 @@ pub(super) fn convert_script(
     let mut program_json = to_json_value(&program);
 
     // Convert comments to JSON and build the queue (sorted by position, already in order).
-    // Comments within acorn type re-parse ranges get duplicated (see collect_acorn_type_reparse_ranges).
-    // The duplicate appears just before the first original from each range, matching acorn's
-    // behavior where type re-parsing causes onComment to fire twice for the same comment.
-    let reparse_ranges =
-        tsv_ts::ast::convert::collect_acorn_type_reparse_ranges(&script.content, source);
-
-    let comment_queue: std::collections::VecDeque<serde_json::Value> =
-        tsv_ts::ast::convert::build_comments_with_duplicates(
-            &script.content.comments,
-            &reparse_ranges,
-            |c| comment_to_json(c, source),
-        )
-        .into_iter()
+    // Each comment is emitted once: tsv corrects acorn-typescript's backtrack-reparse comment
+    // duplication rather than replicating it (see docs/conformance_svelte.md §Comment Attachment
+    // Differences).
+    let comment_queue: std::collections::VecDeque<serde_json::Value> = script
+        .content
+        .comments
+        .iter()
+        .map(|c| comment_to_json(c, source))
         .collect();
 
     // Create context for comment attachment (acorn-style queue algorithm)

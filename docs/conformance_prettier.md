@@ -91,7 +91,7 @@ its tail:
   intersection types
   ([annotation_continuation_indent](../tests/fixtures/typescript/types/comments/annotation_continuation_indent_prettier_divergence/)),
   plus an index signature's key-type
-  ([index_signature_key_type_line_comments](../tests/fixtures/typescript/types/type_members/index_signature_key_type_line_comments_prettier_divergence/))
+  ([index_signature_key_type_line_comments](../tests/fixtures/typescript/types/type_members/index_signature_key_type_line_comments_svelte_prettier_divergence/))
   and value-type
   ([index_signature_value_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_value_line_comment_prettier_divergence/)).
 - **Before-`:` key/binding gap** — the complement of the colon→type case: a line
@@ -99,7 +99,7 @@ its tail:
   (`prop // c⏎\t\t: T`) keeps the comment after the marker and indents the whole
   `: type` continuation one level, via the shared `build_marker_colon_line_continuation`.
   Uniform across index signatures
-  ([index_signature_key_colon_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_key_colon_line_comment_prettier_divergence/)),
+  ([index_signature_key_colon_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_key_colon_line_comment_svelte_prettier_divergence/)),
   property signatures and class properties — key→`:`
   ([key_colon_line_comment](../tests/fixtures/typescript/syntax/comments/key_colon_line_comment_prettier_divergence/))
   and `?`→`:`
@@ -435,7 +435,7 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Class property modifier → Before `?`/`!` modifier — [property_modifier_comment](../tests/fixtures/typescript/statements/class/property_modifier_comment_prettier_divergence/)
 - Between member modifiers → After the last modifier — [modifier_pair_comment](../tests/fixtures/typescript/declarations/class/modifier_pair_comment_prettier_divergence/)
 - Interface member after `?` → Before `?` or inside parens — [modifier_after_comment](../tests/fixtures/typescript/types/type_members/modifier_after_comment_prettier_divergence/)
-- Type-literal member after `?` → Before `?` or inside parens — [optional_marker_comment](../tests/fixtures/typescript/types/type_literal/optional_marker_comment_prettier_divergence/)
+- Type-literal member after `?` → Before `?` or inside parens — [optional_marker_comment](../tests/fixtures/typescript/types/type_literal/optional_marker_comment_svelte_prettier_divergence/)
 - Class method after `?` → Before `?` modifier — [optional_marker_comment](../tests/fixtures/typescript/declarations/class/optional_marker_comment_prettier_divergence/)
 - Optional `?` to `:` line comment (all contexts) → Trailing the member `;` — [optional_marker_line_comment](../tests/fixtures/typescript/syntax/comments/optional_marker_line_comment_prettier_divergence/)
 - Member key to `:` line comment (non-optional) → Trailing the member `;` — [key_colon_line_comment](../tests/fixtures/typescript/syntax/comments/key_colon_line_comment_prettier_divergence/)
@@ -518,14 +518,14 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Block body `{` trailing → Onto its own line — [block_open_brace_comment](../tests/fixtures/typescript/statements/block_open_brace_comment_prettier_divergence/)
 - Type-parameter `<` trailing → Onto its own line — [open_angle_comment](../tests/fixtures/typescript/types/type_params/open_angle_comment_prettier_divergence/)
 - Function/constructor-type `(` trailing → Onto its own line — [open_paren_comment](../tests/fixtures/typescript/types/function_type/open_paren_comment_prettier_divergence/)
-- Fn/ctor-type empty-params `(` trailing → After `)` (out of empty parens) — [empty_param_line_comment](../tests/fixtures/typescript/types/function_type/empty_param_line_comment_prettier_divergence/)
+- Fn/ctor-type empty-params `(` trailing → After `)` (out of empty parens) — [empty_param_line_comment](../tests/fixtures/typescript/types/function_type/empty_param_line_comment_svelte_prettier_divergence/)
 - Fn/ctor-type pre-arrow `)` trailing (params) → Onto the last param (`a: T, // c`) — [pre_arrow_param_line_comment](../tests/fixtures/typescript/types/function_type/pre_arrow_param_line_comment_prettier_divergence/)
 - Call/construct signature `(` trailing → Onto its own line (method keeps) — [signature_params_leading_line_comment](../tests/fixtures/typescript/types/comments/signature_params_leading_line_comment_prettier_divergence/)
 - Object destructuring `{` trailing → Onto its own line — [object_open_brace_comment](../tests/fixtures/typescript/expressions/destructuring/object_open_brace_comment_prettier_divergence/)
 - Array destructuring `[` trailing → Onto its own line — [array_open_bracket_comment](../tests/fixtures/typescript/expressions/destructuring/array_open_bracket_comment_prettier_divergence/)
 - Namespace/module body `{` trailing → Onto its own line — [open_brace_comment](../tests/fixtures/typescript/declarations/namespace/open_brace_comment_prettier_divergence/)
 - Class/interface/enum body `{` trailing → Onto its own line — [class](../tests/fixtures/typescript/statements/class/open_brace_comment_prettier_divergence/), [interface](../tests/fixtures/typescript/statements/interface/open_brace_comment_prettier_divergence/), [enum](../tests/fixtures/typescript/declarations/enum/open_brace_comment_prettier_divergence/)
-- Type literal body `{` trailing → Onto its own line — [type_literal_open_brace_comment](../tests/fixtures/typescript/types/type_literal_open_brace_comment_prettier_divergence/)
+- Type literal body `{` trailing → Onto its own line — [type_literal_open_brace_comment](../tests/fixtures/typescript/types/type_literal_open_brace_comment_svelte_prettier_divergence/)
 - Import/export specifier `{` trailing → Onto its own line — [imports](../tests/fixtures/typescript/modules/imports/open_brace_comment_prettier_divergence/), [exports](../tests/fixtures/typescript/modules/exports/open_brace_comment_prettier_divergence/)
 - Tuple type `[` trailing → Onto its own line — [open_bracket_comment](../tests/fixtures/typescript/types/tuple/open_bracket_comment_prettier_divergence/)
 - Index signature `[` trailing (line) → Onto its own line (key's leading comment) — [index_signature_open_bracket_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_open_bracket_line_comment_svelte_prettier_divergence/)
