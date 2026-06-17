@@ -640,14 +640,16 @@ impl<'a> Printer<'a> {
                 prev_text_has_trailing_space = false;
             } else if let FragmentNode::Text(text) = node {
                 // The fold below (breakable whitespace boundary) targets the closing tag of an
-                // immediately-preceding inline element — that is the only construct whose `>`
-                // would otherwise be split off on its own. Expression tags and other content
-                // have no closing `>` and keep prettier's own break behavior, so restrict it.
+                // immediately-preceding *inline* element — the only construct whose `>` would
+                // otherwise be split off on its own. Block elements flush the current line, and
+                // expression tags / other content have no closing `>` and keep prettier's own
+                // break behavior, so restrict the fold to inline elements explicitly.
                 let prev_is_inline_element = i > 0
                     && matches!(
                         &trimmed_nodes[i - 1],
                         FragmentNode::Element(_) | FragmentNode::SpecialElement(_)
-                    );
+                    )
+                    && !self.is_block_fragment_node(&trimmed_nodes[i - 1]);
                 // Text - split on newlines to preserve source line structure
                 if text.raw.is_whitespace_only() {
                     let newline_count = text.raw.chars().filter(|&c| c == '\n').count();
@@ -1080,23 +1082,29 @@ impl<'a> Printer<'a> {
     /// empty/whitespace-only `part`, so callers can skip blank-line and trailing-space bookkeeping.
     fn emit_text_part(&self, line: &mut LineBuf, part: &str, prev_is_inline_element: bool) -> bool {
         let d = self.d();
-        let has_leading = part.starts_with(char::is_whitespace) && !line.is_empty();
-        let Some(fill_doc) = self.build_text_fill_doc_trimmed(part, true, true, false, false)
-        else {
+        // Gate on ASCII whitespace, matching the word split used everywhere else here
+        // (`build_text_fill_doc_trimmed` / `word_fill_parts`): a leading non-breaking space
+        // (U+00A0 / U+202F) is content welded to its word, not a collapsible/breakable
+        // boundary, so it must not insert a separating space or trigger the fold.
+        let has_leading = part.starts_with(|c: char| c.is_ascii_whitespace()) && !line.is_empty();
+        if part.split_ascii_whitespace().next().is_none() {
             // No words (empty or whitespace-only part): just carry the boundary space.
             if has_leading {
                 line.push(d.text(" "));
             }
             return false;
-        };
-        // Fold only after an inline element, to keep its closing `>` intact.
-        let folded = has_leading
-            && prev_is_inline_element
-            && self.fold_text_after_inline_element(line, part);
-        if !folded {
-            if has_leading {
-                line.push(d.text(" "));
-            }
+        }
+        // Fold into an immediately-preceding inline element when the boundary allows, keeping
+        // its closing `>` intact (see `fold_text_after_inline_element`). Done before building
+        // the fill so the fold path never allocates a discarded `build_text_fill_doc_trimmed`.
+        if has_leading && prev_is_inline_element && self.fold_text_after_inline_element(line, part)
+        {
+            return true;
+        }
+        if has_leading {
+            line.push(d.text(" "));
+        }
+        if let Some(fill_doc) = self.build_text_fill_doc_trimmed(part, true, true, false, false) {
             line.push(fill_doc);
         }
         true

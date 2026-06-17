@@ -1,6 +1,6 @@
 # Prettier Conformance
 
-The tsv formatter tracks Prettier closely, matching its output except where it **intentionally differs**. This document catalogs those divergences.
+Prettier was tsv's initial guide, and the formatter still tracks it closely for the common case — but tsv has its own identity and makes **intentional, cataloged choices** to diverge where they're more defensible. This document catalogs those divergences along with bugs that tsv does not replicate.
 
 ## Terminology
 
