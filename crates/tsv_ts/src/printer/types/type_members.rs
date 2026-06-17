@@ -529,14 +529,10 @@ impl<'a> Printer<'a> {
         // Detect comments between `]` and the value `:` (search only up to the colon,
         // not the type start). Emission is below, after the value type is built.
         let val_colon_pos = idx.type_annotation.span.start;
-        let mut has_bracket_colon_comment = false;
-        let mut bracket_colon_has_line = false;
-        if let Some(close_pos) = bracket_close_pos {
-            for comment in comments_in_range(self.comments, close_pos + 1, val_colon_pos) {
-                has_bracket_colon_comment = true;
-                bracket_colon_has_line |= !comment.is_block;
-            }
-        }
+        let has_bracket_colon_comment =
+            bracket_close_pos.is_some_and(|cp| self.has_comments_between(cp + 1, val_colon_pos));
+        let bracket_colon_has_line = bracket_close_pos
+            .is_some_and(|cp| self.has_line_comments_between(cp + 1, val_colon_pos));
 
         // Build the value type annotation. Both branches delegate to the shared
         // `build_type_annotation_doc`, which owns the value-`:`→type comment handling
@@ -550,15 +546,15 @@ impl<'a> Printer<'a> {
             Some(close_pos) if has_bracket_colon_comment && bracket_colon_has_line => {
                 // A line comment in this gap: the first comment trails `]` on its line,
                 // then the remaining comments and the value `:` drop to continuation
-                // lines indented one level (uniform forced-continuation indent). Each
-                // line comment ends its own line via `build_trailing_comments_break_for_line`
-                // so a `//` can't swallow the next comment or the `: V` (content loss).
-                // Mirrors the `: Type` line-comment layout in `build_type_annotation_doc`.
-                parts.push(d.indent(d.concat(&[
-                    d.text(" "),
-                    self.build_trailing_comments_break_for_line(close_pos + 1, val_colon_pos),
+                // lines indented one level (uniform forced-continuation indent, the
+                // shared `build_continuation_indent` — each line comment ends its own
+                // line so a `//` can't swallow the next comment or the `: V`). Mirrors
+                // the `: Type` line-comment layout in `build_type_annotation_doc`.
+                parts.push(self.build_continuation_indent(
+                    close_pos + 1,
+                    val_colon_pos,
                     val_annotation,
-                ])));
+                ));
             }
             Some(close_pos) if has_bracket_colon_comment => {
                 // Block-only comment(s): stay inline before the value `:`, which keeps

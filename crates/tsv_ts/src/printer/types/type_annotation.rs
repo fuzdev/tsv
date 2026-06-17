@@ -35,30 +35,19 @@ impl<'a> Printer<'a> {
 
         // Check if there's a line comment between : and the type
         if self.has_line_comments_between(colon_end, type_start) {
-            // Each comment is emitted with a break after a LINE comment so it
-            // terminates at end-of-line — otherwise a following comment (or the
-            // type) is swallowed into the line comment's text (`// a // b`
-            // reparses as one comment: a content loss). `break_for_line` keeps
-            // block comments inline (trailing space) and breaks after line
-            // comments, so the first comment trails `:` and any remaining
-            // comments land on their own lines.
-            let comments_doc = self.build_trailing_comments_break_for_line(colon_end, type_start);
-            // Uniform forced-continuation indent: the first comment trails `:` on its
-            // line, then the remaining comments and the type drop one indent level so
-            // the continuation reads as part of this member, not a sibling. The
-            // `indent` wraps the leading space + comments + type, so only the first
-            // comment stays flush on the `:` line; the breaks inside (between
-            // comments, and before the type) land at the indent. Uniform across union,
-            // intersection, and simple types — see conformance_prettier.md §Uniform
-            // forced-continuation indent. (Prettier indents only the union here and
-            // leaves intersection/simple flush, so this diverges for those.)
+            // Uniform forced-continuation indent (`build_continuation_indent`): the
+            // first comment trails `:` on its line, then the remaining comments and the
+            // type drop one indent level so the continuation reads as part of this
+            // member, not a sibling. Each line comment terminates at end-of-line —
+            // otherwise a following comment (or the type) is swallowed into its text
+            // (`// a // b` reparses as one comment: a content loss). Uniform across
+            // union, intersection, and simple types — see conformance_prettier.md
+            // §Uniform forced-continuation indent. (Prettier indents only the union
+            // here and leaves intersection/simple flush, so this diverges for those.)
+            let type_doc = self.build_type_doc(&annotation.type_annotation);
             d.concat(&[
                 d.text(":"),
-                d.indent(d.concat(&[
-                    d.text(" "),
-                    comments_doc,
-                    self.build_type_doc(&annotation.type_annotation),
-                ])),
+                self.build_continuation_indent(colon_end, type_start, type_doc),
             ])
         } else {
             // Handle unions/intersections with width-based breaking

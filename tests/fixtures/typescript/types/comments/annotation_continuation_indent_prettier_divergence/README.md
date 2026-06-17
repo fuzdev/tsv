@@ -3,7 +3,8 @@
 A line comment between a `:` annotation and its type
 (`X: // c\nType`) — for the contexts where prettier keeps the type **flush**:
 variable declarations, class properties, function parameters, function return
-types, and **intersection** types in any position.
+types (declaration and arrow), and **intersection** types in any position
+(variable and type-element, with one comment or several).
 
 tsv applies the **uniform forced-continuation indent**: the comment trails `:`
 where the author wrote it and the type drops to a continuation line **indented

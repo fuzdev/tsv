@@ -17,6 +17,10 @@ reads as part of the member, not a sibling.
   continuation one level.
 - **Intersection value** (`A & B`, cases J/U) — **diverges**: tsv indents,
   prettier leaves the type flush.
+- **Simple value** (`number`, case K) — **diverges**: tsv indents, prettier
+  leaves it flush. Index signatures have no implicit-`;` end-of-line relocation
+  (unlike a *property* signature, where prettier moves a simple type's comment to
+  EOL — see [annotation_simple](../../comments/annotation_simple_prettier_divergence/)).
 
 A **block** comment in this gap (`[k: string]: /* c */ A & B`) stays inline in
 both formatters and is not a divergence — only a line comment (which runs to EOL,

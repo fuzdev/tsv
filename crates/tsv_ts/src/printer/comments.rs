@@ -332,13 +332,37 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The uniform forced-continuation indent shape, the single definition shared by
+    /// every `head // c⏎ tail` continuation. Emits a leading space, then the gap's
+    /// comments via `build_trailing_comments_break_for_line` (each line comment
+    /// terminated at end-of-line so a `//` can't swallow what follows), then `tail` —
+    /// all wrapped in one `indent`, so only the first comment stays flush on the head
+    /// line and everything after (remaining comments and `tail`) drops one level and
+    /// reads as part of the construct, not a sibling.
+    ///
+    /// `start`/`end` bound the comment gap; `tail` is the continued content (a type,
+    /// a `: type` annotation, …) the caller has already built. Used by the `:`→type
+    /// annotation (`build_type_annotation_doc`), the marker→`:` before-colon gap
+    /// (`build_marker_colon_line_continuation`), and the index-signature `]`→value-`:`
+    /// gap (`build_index_signature_member_doc`). See conformance_prettier.md
+    /// §Uniform Forced-Continuation Indent.
+    pub(crate) fn build_continuation_indent(&self, start: u32, end: u32, tail: DocId) -> DocId {
+        let d = self.d();
+        d.indent(d.concat(&[
+            d.text(" "),
+            self.build_trailing_comments_break_for_line(start, end),
+            tail,
+        ]))
+    }
+
     /// When a **line** comment sits in the marker→`:` gap of a key/binding's type
     /// annotation, build the indented continuation: the first comment trails the
     /// marker on its line, then any remaining comments and the `: type` (`type_doc`,
     /// built by the caller) drop to a continuation line indented one level — the
-    /// uniform forced-continuation indent, so the annotation reads as part of its
-    /// key/binding rather than a sibling. Returns `None` when the gap has no line
-    /// comment, leaving the caller's block / no-comment handling in place.
+    /// uniform forced-continuation indent (`build_continuation_indent`), so the
+    /// annotation reads as part of its key/binding rather than a sibling. Returns
+    /// `None` when the gap has no line comment, leaving the caller's block /
+    /// no-comment handling in place.
     ///
     /// `marker_end` is the offset just past the key (and any `?`/`!`); `colon_pos`
     /// is the type annotation's `:` (its span start). Callers gate on
@@ -357,14 +381,7 @@ impl<'a> Printer<'a> {
         type_doc: DocId,
     ) -> Option<DocId> {
         self.has_line_comments_between(marker_end, colon_pos)
-            .then(|| {
-                let d = self.d();
-                d.indent(d.concat(&[
-                    d.text(" "),
-                    self.build_trailing_comments_break_for_line(marker_end, colon_pos),
-                    type_doc,
-                ]))
-            })
+            .then(|| self.build_continuation_indent(marker_end, colon_pos, type_doc))
     }
 
     /// Build a binding/identifier `: type` annotation including any before-`:`

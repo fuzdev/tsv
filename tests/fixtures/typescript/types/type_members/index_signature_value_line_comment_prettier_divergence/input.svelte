@@ -18,4 +18,9 @@
 		[k: string]: // c4
 			A & B;
 	};
+
+	interface K {
+		[k: string]: // c5
+			number;
+	}
 </script>
