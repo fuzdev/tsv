@@ -234,24 +234,10 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
             .as_ref()
             .map(|opts| convert_svelte_options(opts, source, &loc, &interner)),
         comments: {
-            // Collect acorn type re-parse ranges from scripts.
-            // Comments within these ranges get duplicated in acorn's output because
-            // acorn-typescript re-parses certain type construct bodies, causing
-            // the onComment callback to fire twice for comments in the re-parsed region.
-            let mut reparse_ranges = Vec::new();
-            if let Some(ref script) = root.instance {
-                reparse_ranges.extend(tsv_ts::ast::convert::collect_acorn_type_reparse_ranges(
-                    &script.content,
-                    source,
-                ));
-            }
-            if let Some(ref script) = root.module {
-                reparse_ranges.extend(tsv_ts::ast::convert::collect_acorn_type_reparse_ranges(
-                    &script.content,
-                    source,
-                ));
-            }
-
+            // Each comment is emitted once: tsv corrects acorn-typescript's backtrack-reparse
+            // comment duplication rather than replicating it (see docs/conformance_svelte.md
+            // §Comment Attachment Differences).
+            //
             // Helper to convert a Comment to its JSON representation:
             // the shared type/value/start/end shape plus a `loc` field
             let comment_to_json_value = |comment: &Comment| {
@@ -288,11 +274,7 @@ pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
                 value
             };
 
-            tsv_ts::ast::convert::build_comments_with_duplicates(
-                &root.comments,
-                &reparse_ranges,
-                comment_to_json_value,
-            )
+            root.comments.iter().map(comment_to_json_value).collect()
         },
         instance: root
             .instance

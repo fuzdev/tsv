@@ -60,22 +60,6 @@
 		},
 		{
 			"type": "Block",
-			"value": " b ",
-			"start": 166,
-			"end": 173,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 5
-				},
-				"end": {
-					"line": 7,
-					"column": 12
-				}
-			}
-		},
-		{
-			"type": "Block",
 			"value": " c ",
 			"start": 212,
 			"end": 219,
@@ -135,22 +119,6 @@
 				"end": {
 					"line": 17,
 					"column": 10
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": " f ",
-			"start": 385,
-			"end": 392,
-			"loc": {
-				"start": {
-					"line": 20,
-					"column": 5
-				},
-				"end": {
-					"line": 20,
-					"column": 12
 				}
 			}
 		},
@@ -501,12 +469,6 @@
 												}
 											},
 											"leadingComments": [
-												{
-													"type": "Block",
-													"value": " b ",
-													"start": 166,
-													"end": 173
-												},
 												{
 													"type": "Block",
 													"value": " b ",
@@ -1175,12 +1137,6 @@
 												}
 											},
 											"leadingComments": [
-												{
-													"type": "Block",
-													"value": " f ",
-													"start": 385,
-													"end": 392
-												},
 												{
 													"type": "Block",
 													"value": " f ",

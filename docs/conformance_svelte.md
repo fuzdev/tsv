@@ -262,15 +262,65 @@ All corrections exist because of upstream bugs. If fixed upstream, tsv would rem
 
 ### Comment Attachment Differences
 
-Acorn-typescript's backtrack-reparse behavior causes comment duplication in `trailingComments`/`leadingComments` (and, for some constructs, in the root `comments` array itself) that tsv doesn't replicate. These are cosmetic AST differences — the set of distinct comments is identical, only multiplicity differs, and `ast_diff` confirms semantic equivalence. Fixtures use `expected_ours.json` + `expected_svelte.json`.
+Acorn-typescript speculatively re-parses many TypeScript constructs (a backtrack-and-reparse), and its `onComment` callback fires **twice** for any comment inside the re-parsed region — duplicating that comment in the root `comments` array (and in any `leadingComments`/`trailingComments` attachment). **tsv emits each comment once everywhere**: it corrects this duplication rather than replicating it. The set of distinct comments is identical, only multiplicity differs, `ast_diff` confirms semantic equivalence, and the formatter is unaffected (it locates comments by position, not by their count). Fixtures carry `expected_ours.json` + `expected_svelte.json`; one that also diverges from prettier on the comment's placement additionally carries the `_svelte_prettier_divergence` suffix.
 
-| Context                               | Acorn attachment                                           | tsv attachment | Fixture                                                                                                                                                   |
-| ------------------------------------- | ---------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Return type to `;` (class methods)    | `trailingComments` on type annotation (duplicate)          | Not duplicated | [method_trailing_semicolon_comment](../tests/fixtures/typescript/declarations/class/method_trailing_semicolon_comment_svelte_prettier_divergence/)                 |
-| Return type to `;` (type members)     | `trailingComments` on type annotation (duplicate)          | Not duplicated | [trailing_semicolon_comment](../tests/fixtures/typescript/types/type_members/trailing_semicolon_comment_svelte_divergence/)                               |
-| Index-signature in-bracket comments   | Root `comments` duplicate (before-key; type-lit after-key) | Single entry   | [index_signature_bracket_comment_positions](../tests/fixtures/typescript/types/type_members/index_signature_bracket_comment_positions_svelte_divergence/), [open_bracket_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_open_bracket_line_comment_svelte_prettier_divergence/) |
-| Class index-signature in-bracket cmts | Root `comments` duplicate (before-key, after-key)          | Single entry   | [index_signature_bracket_comment_positions](../tests/fixtures/typescript/declarations/class/index_signature_bracket_comment_positions_svelte_divergence/), [bracket_line_comment_positions](../tests/fixtures/typescript/declarations/class/index_signature_bracket_line_comment_positions_svelte_prettier_divergence/) |
-| Class computed-key `[`→key comment    | Root `comments` duplicate (before-key)                     | Single entry   | [computed_key_open_bracket_line_comment](../tests/fixtures/typescript/statements/class/computed_key_open_bracket_line_comment_svelte_prettier_divergence/) |
+The constructs acorn re-parses (root `comments` duplication tsv corrects):
+
+- **Type literal `{ … }` body — a comment between `{` and the first member (or on a member key):**
+  - [type_literal_open_brace_comment_svelte_divergence](../tests/fixtures/typescript/types/type_literal_open_brace_comment_svelte_divergence/)
+  - [type_literal_open_brace_comment_svelte_prettier_divergence](../tests/fixtures/typescript/types/type_literal_open_brace_comment_svelte_prettier_divergence/)
+  - [type_literal_property_keys_svelte_divergence](../tests/fixtures/typescript/types/type_literal_property_keys_svelte_divergence/)
+  - [type_literal_member_trailing_comment_long_svelte_divergence](../tests/fixtures/typescript/types/type_literal_member_trailing_comment_long_svelte_divergence/)
+  - [optional_marker_before_comment_svelte_divergence](../tests/fixtures/typescript/types/type_literal/optional_marker_before_comment_svelte_divergence/)
+  - [optional_marker_comment_svelte_prettier_divergence](../tests/fixtures/typescript/types/type_literal/optional_marker_comment_svelte_prettier_divergence/)
+  - [literal_body_empty_svelte_divergence](../tests/fixtures/typescript/types/comments/literal_body_empty_svelte_divergence/)
+  - [type_literal_jsdoc_svelte_divergence](../tests/fixtures/typescript/types/comments/type_literal_jsdoc_svelte_divergence/)
+  - [type_literal_leading_svelte_divergence](../tests/fixtures/typescript/types/comments/type_literal_leading_svelte_divergence/)
+  - [type_literal_leading_mixed_svelte_divergence](../tests/fixtures/typescript/types/comments/type_literal_leading_mixed_svelte_divergence/)
+  - [type_literal_line_before_block_svelte_divergence](../tests/fixtures/typescript/types/comments/type_literal_line_before_block_svelte_divergence/)
+  - [union_hug_object_interior_comment_svelte_divergence](../tests/fixtures/typescript/types/union_hug_object_interior_comment_svelte_divergence/)
+  - [union_nonhug_object_interior_comment_svelte_divergence](../tests/fixtures/typescript/types/union_nonhug_object_interior_comment_svelte_divergence/)
+  - [prettier_ignore_members_svelte_divergence](../tests/fixtures/typescript/syntax/comments/prettier_ignore_members_svelte_divergence/)
+
+- **Mapped type `{ [K in … ] }` header — a comment from `{` up to `in`:**
+  - [mapped_bracket_comment_svelte_divergence](../tests/fixtures/typescript/types/mapped_bracket_comment_svelte_divergence/)
+  - [mapped_leading_comment_svelte_divergence](../tests/fixtures/typescript/types/mapped_leading_comment_svelte_divergence/)
+
+- **Function type parameter list — a comment in the parens before the param colon (the `tsIsUnambiguouslyStartOfFunctionType` lookahead; typed params are not exempt):**
+  - [function_type_empty_param_comment_svelte_divergence](../tests/fixtures/typescript/types/function_type_empty_param_comment_svelte_divergence/)
+  - [empty_param_line_comment_svelte_prettier_divergence](../tests/fixtures/typescript/types/function_type/empty_param_line_comment_svelte_prettier_divergence/)
+  - [typed_param_comment_positions_svelte_divergence](../tests/fixtures/typescript/types/function_type/typed_param_comment_positions_svelte_divergence/)
+  - [function_type_param_trailing_svelte_divergence](../tests/fixtures/typescript/types/comments/function_type_param_trailing_svelte_divergence/)
+
+- **Index signature `[k: T]` — a comment before the colon (type-member and class):**
+  - [index_signature_comment_svelte_divergence](../tests/fixtures/typescript/types/type_members/index_signature_comment_svelte_divergence/)
+  - [index_signature_union_intersection_value_svelte_divergence](../tests/fixtures/typescript/types/type_members/index_signature_union_intersection_value_svelte_divergence/)
+  - [index_signature_bracket_comment_positions_svelte_divergence](../tests/fixtures/typescript/types/type_members/index_signature_bracket_comment_positions_svelte_divergence/)
+  - [index_signature_key_colon_line_comment_svelte_prettier_divergence](../tests/fixtures/typescript/types/type_members/index_signature_key_colon_line_comment_svelte_prettier_divergence/)
+  - [index_signature_key_type_line_comments_svelte_prettier_divergence](../tests/fixtures/typescript/types/type_members/index_signature_key_type_line_comments_svelte_prettier_divergence/)
+  - [index_signature_open_bracket_line_comment_svelte_prettier_divergence](../tests/fixtures/typescript/types/type_members/index_signature_open_bracket_line_comment_svelte_prettier_divergence/)
+  - [index_signature_bracket_comment_positions_svelte_divergence](../tests/fixtures/typescript/declarations/class/index_signature_bracket_comment_positions_svelte_divergence/)
+  - [index_signature_bracket_line_comment_positions_svelte_prettier_divergence](../tests/fixtures/typescript/declarations/class/index_signature_bracket_line_comment_positions_svelte_prettier_divergence/)
+
+- **Computed key `[ … ]` — a class computed method or a type-member computed method:**
+  - [computed_key_comment_svelte_divergence](../tests/fixtures/typescript/types/type_members/computed_key_comment_svelte_divergence/)
+  - [computed_key_open_bracket_line_comment_svelte_prettier_divergence](../tests/fixtures/typescript/statements/class/computed_key_open_bracket_line_comment_svelte_prettier_divergence/)
+
+- **Angle-bracket type assertion `<T>x` — a comment inside `<…>`:**
+  - [type_assertion_comment_svelte_divergence](../tests/fixtures/typescript/types/type_assertion_comment_svelte_divergence/)
+
+- **Arrow return type — a comment between the return type and `=>`:**
+  - [after_return_type_comment_svelte_divergence](../tests/fixtures/typescript/expressions/arrow/after_return_type_comment_svelte_divergence/)
+  - [return_type_untyped_param_comment_svelte_divergence](../tests/fixtures/typescript/expressions/arrow/return_type_untyped_param_comment_svelte_divergence/)
+
+- **Empty call type-argument list `<>` — a comment inside the brackets:**
+  - [call_type_arg_empty_comment_svelte_divergence](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_empty_comment_svelte_divergence/)
+
+Attachment-only duplication (`trailingComments` on the type annotation, not the root array) — a return type immediately followed by `;`:
+
+- [method_trailing_semicolon_comment_svelte_prettier_divergence](../tests/fixtures/typescript/declarations/class/method_trailing_semicolon_comment_svelte_prettier_divergence/)
+- [trailing_semicolon_comment_svelte_divergence](../tests/fixtures/typescript/types/type_members/trailing_semicolon_comment_svelte_divergence/)
+
 
 ### Known Acorn-TypeScript Bugs (Not Corrections)
 

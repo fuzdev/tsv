@@ -29,7 +29,6 @@ impl Schema {
 }
 
 // Submodules
-mod acorn_comments;
 mod control_flow;
 mod declarations;
 mod expressions;
@@ -40,7 +39,6 @@ mod statements;
 mod translate_typed;
 mod types;
 
-pub use acorn_comments::{build_comments_with_duplicates, collect_acorn_type_reparse_ranges};
 pub use translate_typed::translate_byte_to_char_offsets_typed;
 
 // Re-export conversion functions (pub(in crate::ast) for internal use)

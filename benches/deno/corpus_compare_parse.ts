@@ -201,12 +201,15 @@ interface DocumentedMatcher {
 
 const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 	{
-		// Acorn-typescript's backtrack-reparse duplicates comments into
-		// trailingComments/leadingComments; tsv doesn't replicate (root
-		// `comments` array is identical).
+		// Acorn-typescript's backtrack-reparse duplicates a comment inside any
+		// re-parsed construct — into trailingComments/leadingComments AND into
+		// the root `comments` array. tsv emits each comment once everywhere, so
+		// the divergence surfaces as extra entries on the acorn side of any
+		// `comments` array (root or attached).
 		name: 'comment_attachment',
 		conformance_section: 'Comment Attachment Differences',
-		matches: (entry) => /(^|\.)(trailingComments|leadingComments)(\[|\.|$)/.test(entry.path),
+		matches: (entry) =>
+			/(^|\.)(trailingComments|leadingComments|comments)(\[|\.|$)/.test(entry.path),
 	},
 	{
 		// acorn-typescript drops ALL params from async arrows with type params
