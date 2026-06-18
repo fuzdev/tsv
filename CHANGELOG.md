@@ -22,6 +22,9 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
   consistent with `bracketSpacing: false` (which is not respected by prettier-plugin-svelte)
 - values in Svelte block tags now consistently use TS printing paths,
   fixing oversights prettier-plugin-svelte
+- dynamic `import()` no longer drops comments in or after its argument list
+  (inter-argument and own-line trailing comments), and preserves a blank line
+  between its arguments
 - reduce allocations using `SmallVec` and memoizations
 
 ## 0.1.0
