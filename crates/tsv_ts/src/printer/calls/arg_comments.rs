@@ -17,11 +17,41 @@ use tsv_lang::doc::arena::DocId;
 
 /// Find the comma position between two argument spans
 ///
-/// Returns the absolute position of the comma in the source, or None if not found.
+/// Returns the absolute position of the separating comma in the source, or None
+/// if not found. Commas inside comments are skipped: the gap between two argument
+/// expressions only ever holds whitespace, comments, stripped parens, and the
+/// separating comma — never strings or code — so skipping `/* … */` and `// …`
+/// spans is enough to avoid mistaking a comment-internal comma (`a /* p, q */, b`)
+/// for the separator.
 #[inline]
 pub(crate) fn find_comma_pos(source: &str, start: u32, end: u32) -> Option<usize> {
-    let between = &source[start as usize..end as usize];
-    between.find(',').map(|offset| start as usize + offset)
+    // Byte scan is safe: `,`, `/`, `*`, `\n` are ASCII and never appear as a
+    // UTF-8 continuation byte, so multibyte content in a comment can't false-match.
+    let bytes = source.as_bytes();
+    let (s, e) = (start as usize, end as usize);
+    let mut i = s;
+    while i < e {
+        match bytes[i] {
+            b',' => return Some(i),
+            b'/' if i + 1 < e && bytes[i + 1] == b'*' => {
+                // Skip a block comment, including its internal commas.
+                i += 2;
+                while i + 1 < e && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
+                    i += 1;
+                }
+                i += 2;
+            }
+            b'/' if i + 1 < e && bytes[i + 1] == b'/' => {
+                // Skip a line comment to end of line.
+                i += 2;
+                while i < e && bytes[i] != b'\n' {
+                    i += 1;
+                }
+            }
+            _ => i += 1,
+        }
+    }
+    None
 }
 
 /// Find the effective start position for blank-line checking before an arg.
@@ -446,11 +476,12 @@ where
 /// - `leading`: Comments on their own lines (not on same line as reference_pos)
 ///
 /// Uses `SmallVec` to avoid heap allocations for the common case (0-2 comments per range).
-// TODO: this same-line-vs-own-line partition + its emit_* helpers are the call-arg
-// instance of a rule also implemented in `conditional.rs` split_pre_operator_comments
-// and `chain/builder/helpers.rs` push_gap_comments_and_break. Three parallel copies;
-// unify if/when the Printer/ChainPrinter trait split and the differing emission
-// shapes (operator / comma / dot) allow.
+///
+/// `new` shares the same-line/later-line classification with the ternary
+/// (`conditional.rs`) and member-chain (`chain/builder/helpers.rs`) gap printers via
+/// `tsv_lang::ClassifiedComments`. This type adds the call-argument-specific emission
+/// (`emit_*`) and comma-relative helpers on top; only the emission differs per shape
+/// (operator / comma / dot), which is intentional.
 pub(crate) struct PartitionedComments<'a> {
     pub trailing_line: SmallVec<[&'a internal::Comment; 2]>,
     pub trailing_block: SmallVec<[&'a internal::Comment; 2]>,
@@ -468,27 +499,55 @@ impl<'a> PartitionedComments<'a> {
         start: u32,
         end: u32,
     ) -> Self {
-        let mut trailing_line = SmallVec::new();
-        let mut trailing_block = SmallVec::new();
-        let mut leading = SmallVec::new();
-
-        for comment in tsv_lang::comments_in_range(comments, start, end) {
-            if tsv_lang::printing::is_same_line_fast(line_breaks, start, comment.span.start) {
-                if comment.is_block {
-                    trailing_block.push(comment);
-                } else {
-                    trailing_line.push(comment);
-                }
-            } else {
-                leading.push(comment);
-            }
-        }
-
+        // Share the same-line/later-line classification with the chain and ternary
+        // gap printers (`tsv_lang::ClassifiedComments`). `leading` keeps the two
+        // own-line buckets merged in source order — the inline-aware emitter and its
+        // JSDoc-cast detection rely on the authored order.
+        let classified =
+            tsv_lang::ClassifiedComments::from_range(comments, start, end, line_breaks);
+        let leading = classified.leading_in_source_order();
         Self {
-            trailing_line,
-            trailing_block,
+            trailing_line: classified.trailing_line,
+            trailing_block: classified.trailing_block,
             leading,
         }
+    }
+
+    /// Respect-the-newline split for a non-last argument gap: move after-comma block
+    /// comments that **hug** the next argument out of `trailing_block` and into
+    /// `leading`, so they render as a leading comment on the next argument (`C`).
+    /// A **stranded** after-comma block (a newline separates it from the next argument)
+    /// stays in `trailing_block` and renders after the comma on the same line (`A`).
+    ///
+    /// The author's placement is preserved in both cases: a comment hugging the next
+    /// arg leads it; a comment left alone on the comma line stays there. Callers then
+    /// emit `trailing_block` (before-comma blocks + stranded after-comma) via
+    /// [`emit_trailing_comments_around_comma`], the line break, then `leading` (own-line
+    /// comments + hugged after-comma) via [`emit_leading_comments_inline_aware`] — so the
+    /// rule lives here once and every argument path inherits it.
+    pub fn route_after_comma_hugging_to_leading(
+        &mut self,
+        printer: &Printer<'_>,
+        arg_end: u32,
+        next_arg_start: u32,
+    ) {
+        let Some(comma_pos) = find_comma_pos(printer.source, arg_end, next_arg_start) else {
+            return;
+        };
+        let mut kept: SmallVec<[&'a internal::Comment; 2]> = SmallVec::new();
+        for comment in self.trailing_block.drain(..) {
+            if is_comment_after_comma(comment, comma_pos)
+                && is_comment_inline_with_next(printer, comment.span.end, next_arg_start)
+            {
+                // Hugs the next arg → leads it. Source order holds: the hug sits on the
+                // next arg's line, after any own-line leading comments, so appending keeps
+                // `leading` sorted.
+                self.leading.push(comment);
+            } else {
+                kept.push(comment);
+            }
+        }
+        self.trailing_block = kept;
     }
 
     pub fn has_trailing_line(&self) -> bool {
@@ -609,17 +668,6 @@ impl<'a> PartitionedComments<'a> {
         for comment in &self.leading {
             parts.push(d.hardline());
             parts.push(printer.build_comment_doc(comment));
-        }
-    }
-
-    /// Emit leading comments (on their own lines) with hardlines after each.
-    ///
-    /// Used for comments that precede an argument on separate lines.
-    pub fn emit_leading_comments(&self, parts: &mut Vec<DocId>, printer: &Printer<'_>) {
-        let d = printer.d();
-        for comment in &self.leading {
-            parts.push(printer.build_comment_doc(comment));
-            parts.push(d.hardline());
         }
     }
 

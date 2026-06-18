@@ -452,12 +452,12 @@ impl<'a> Printer<'a> {
     /// quirk, here in a ternary). The two before-operator sites share this helper
     /// so they cannot drift apart (the original merge bug was exactly such a drift
     /// from the correct after-operator handling).
-    // TODO: this "classify a gap's comments — same-line ones trail, later-line ones
-    // break to their own line, never merge" rule is reimplemented for call args
-    // (`calls/arg_comments.rs` PartitionedComments + emit_*) and for member chains
-    // (`chain/builder/helpers.rs` push_gap_comments_and_break). Worth unifying into
-    // one primitive once the Printer/ChainPrinter trait split allows (the three
-    // emission shapes — operator / comma / dot — differ, so it's non-trivial).
+    // The same-line/later-line classification is shared via
+    // `tsv_lang::ClassifiedComments` (also used by `calls/arg_comments.rs`
+    // PartitionedComments and the member-chain `push_gap_comments_and_break`), so the
+    // "same-line trails, later-line breaks, never merge" rule lives in one place. Only
+    // the emission differs per shape — operator (here) / comma / dot — which is
+    // intentional (separator placement genuinely differs), not drift.
     fn split_pre_operator_comments(
         &self,
         operand_end: u32,
@@ -466,13 +466,30 @@ impl<'a> Printer<'a> {
         own_line: &mut Vec<DocId>,
     ) {
         let d = self.d();
-        for comment in tsv_lang::comments_in_range(self.comments, operand_end, gap_end) {
-            if self.is_same_line(operand_end, comment.span.start) {
-                trailing.push(self.build_trailing_comment_doc(comment));
-            } else {
-                own_line.push(d.hardline());
-                own_line.push(self.build_comment_doc(comment));
-            }
+        // Same shared same-line/later-line classification as the call-argument
+        // (`PartitionedComments`) and member-chain (`push_gap_comments_and_break`)
+        // gap printers.
+        let classified = tsv_lang::ClassifiedComments::from_range(
+            self.comments,
+            operand_end,
+            gap_end,
+            self.line_breaks,
+        );
+        // Same-line comments (blocks, then the at-most-one line comment) trail the
+        // operand in source order; `build_trailing_comment_doc` keeps a block inline
+        // and routes a line comment through `line_suffix`.
+        for &comment in classified
+            .trailing_block
+            .iter()
+            .chain(&classified.trailing_line)
+        {
+            trailing.push(self.build_trailing_comment_doc(comment));
+        }
+        // Later-line comments drop to their own line before the operator, in source
+        // order.
+        for comment in classified.leading_in_source_order() {
+            own_line.push(d.hardline());
+            own_line.push(self.build_comment_doc(comment));
         }
     }
 
