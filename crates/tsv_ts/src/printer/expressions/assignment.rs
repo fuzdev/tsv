@@ -852,19 +852,15 @@ impl<'a> Printer<'a> {
         {
             layout = AssignmentLayout::BreakAfterOperator;
         }
-        // For member-only chains with line comments, force BreakAfterOperator.
-        // Line comments cause Prettier's first pass to break at `=`.
-        //
-        // For call chains with line comments, do NOT use BreakAfterOperator.
-        // The chain formatter handles breaking at the comment location.
-        // Use NeverBreakAfterOperator so the chain stays with `=` and breaks internally.
-        if layout != AssignmentLayout::BreakAfterOperator
-            && self.has_line_comments_in_member_chain(right_expr)
-        {
-            layout = AssignmentLayout::BreakAfterOperator;
-        } else if layout == AssignmentLayout::BreakAfterOperator
-            && matches!(right_expr, Expression::CallExpression(_))
-            && self.has_line_comments_in_call_chain(right_expr)
+        // Member-only AND call chains with line comments break internally at the
+        // comment location (the chain formatter does this — see
+        // build_member_only_chain_with_comments_doc and the call-chain breaking path).
+        // Keep the chain with `=` (NeverBreakAfterOperator) so it doesn't also break
+        // after the operator, which would double-indent the broken chain.
+        if self.has_line_comments_in_member_chain(right_expr)
+            || (layout == AssignmentLayout::BreakAfterOperator
+                && matches!(right_expr, Expression::CallExpression(_))
+                && self.has_line_comments_in_call_chain(right_expr))
         {
             layout = AssignmentLayout::NeverBreakAfterOperator;
         }
@@ -954,7 +950,7 @@ impl<'a> Printer<'a> {
     ///
     /// Member-only chains with line comments between segments should force
     /// BreakAfterOperator layout to match Prettier's first-pass behavior.
-    fn has_line_comments_in_member_chain(&self, expr: &Expression) -> bool {
+    pub(crate) fn has_line_comments_in_member_chain(&self, expr: &Expression) -> bool {
         // Only check member-only chains (no calls)
         if !is_member_only_chain(expr) {
             return false;

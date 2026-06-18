@@ -386,11 +386,14 @@ impl<'a> Printer<'a> {
                 // (handles `await import('./x' // comment)`)
                 let is_import_with_trailing_comments = self.has_import_with_trailing_comments(init);
 
-                // Call chains with line comments should NOT be treated as fluid.
-                // The chain formatter handles breaking at the comment location.
-                // E.g., `const a = items // comment\n  .foo()` keeps `= items // comment` together.
-                let has_line_comments_in_chain = matches!(init, Expression::CallExpression(_))
-                    && self.has_line_comments_in_call_chain(init);
+                // Call chains AND member-only chains with line comments should NOT be
+                // treated as fluid / break-after-operator. The chain formatter breaks
+                // internally at the comment location, so keep the chain with `=`
+                // (otherwise it breaks after `=` too → double indent). E.g.
+                // `const a = items // comment\n  .foo()` and `const b = foo.bar // c\n  .baz`.
+                let has_line_comments_in_chain = (matches!(init, Expression::CallExpression(_))
+                    && self.has_line_comments_in_call_chain(init))
+                    || self.has_line_comments_in_member_chain(init);
 
                 // Combined flag for expressions with trailing comments that expand internally
                 let has_trailing_comment_expansion =

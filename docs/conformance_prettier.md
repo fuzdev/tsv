@@ -1,6 +1,6 @@
 # Prettier Conformance
 
-Prettier was tsv's initial guide, and the formatter still tracks it closely for the common case — but tsv has its own identity and makes **intentional, cataloged choices** to diverge where they're more defensible. This document catalogs those divergences along with bugs that tsv does not replicate.
+Prettier was tsv's initial guide, and the formatter still tracks it for the common case — but tsv has its own identity and makes **intentional, cataloged choices** to diverge where they're more defensible. This document catalogs those divergences along with bugs that tsv does not replicate.
 
 ## Terminology
 
@@ -436,6 +436,7 @@ Prettier relocates certain comments during formatting. tsv preserves comments wh
 Prettier moves comments between syntactic boundaries into adjacent blocks, parens, or other positions. tsv preserves them where the user placed them.
 
 - Conditional type after `:` → Trailing on true branch — [comment_after_colon](../tests/fixtures/typescript/types/conditional/comment_after_colon_prettier_divergence/)
+- Ternary operand to operator (≥2 line comments; test→`?`, consequent→`:`) → Every comment after the first relocated across the operator (`cond // c1⏎ ? // c2`); tsv keeps each before the operator on its own line — [consecutive_operand_comment](../tests/fixtures/typescript/expressions/ternary/consecutive_operand_comment_prettier_divergence/)
 - Switch empty body → Discriminant parens — [empty_comment](../tests/fixtures/typescript/statements/switch/empty_comment_prettier_divergence/)
 - Switch case before `{` → After opening brace — [case_block_comment](../tests/fixtures/typescript/statements/switch/case_block_comment_prettier_divergence/)
 - Switch discriminant trailing → Switch body — [discriminant_trailing_comment](../tests/fixtures/typescript/statements/switch/discriminant_trailing_comment_prettier_divergence/)
@@ -455,6 +456,7 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - While before `{}` (block/line) → Into block body (expands block) — [absorbed_body_comment](../tests/fixtures/typescript/statements/while/absorbed_body_comment_prettier_divergence/)
 - Do-while between `}` and `while` → Into while condition — [line_before_while_comment](../tests/fixtures/typescript/statements/do_while/line_before_while_comment_prettier_divergence/), [while_leading_block_comment](../tests/fixtures/typescript/statements/do_while/while_leading_block_comment_prettier_divergence/)
 - Trailing member chain → After `=` — [trailing_member_comment](../tests/fixtures/typescript/expressions/calls/chained/trailing_member_comment_prettier_divergence/)
+- Member-only chain interior line comment (no calls) → Hoisted before the expression / trailed on the statement (merging consecutive); tsv breaks the chain and keeps each comment in place — [member_only_interior_line_comment](../tests/fixtures/typescript/expressions/calls/chained/member_only_interior_line_comment_prettier_divergence/)
 - Block comment in computed `[]` → Before member chain (hoisted) — [block_comment_computed_member_long](../tests/fixtures/typescript/syntax/comments/block_comment_computed_member_long_prettier_divergence/)
 - Switch case colon comment → Before colon or into body — [case_colon_comment](../tests/fixtures/typescript/statements/switch/case_colon_comment_prettier_divergence/)
 - Class property definite `!` → Before `!` modifier — [property_definite_comment](../tests/fixtures/typescript/statements/class/property_definite_comment_prettier_divergence/)

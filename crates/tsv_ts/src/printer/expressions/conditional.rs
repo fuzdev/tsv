@@ -305,17 +305,22 @@ impl<'a> Printer<'a> {
 
         let mut parts = vec![test];
 
-        // Comments between test and ? (inline after test). A line comment goes
-        // through `line_suffix` (zero width), so a long trailing comment never
-        // forces the test (e.g. a binary expression) to break — matching
-        // prettier's `lineSuffix`. Block comments stay inline, width counted.
+        // Comments between test and ? (see split_pre_operator_comments): same-line
+        // comments trail the test, later-line comments precede the `?` on their own
+        // lines.
         let comments_before_q_end = question_pos.unwrap_or(consequent_start);
-        for comment in tsv_lang::comments_in_range(self.comments, test_end, comments_before_q_end) {
-            parts.push(self.build_trailing_comment_doc(comment));
-        }
+        let mut pre_question_own_line = Vec::new();
+        self.split_pre_operator_comments(
+            test_end,
+            comments_before_q_end,
+            &mut parts,
+            &mut pre_question_own_line,
+        );
 
-        // Start the indented part with ? on new line
-        let mut q_parts = vec![d.hardline(), d.text("?")];
+        // Start the indented part: own-line pre-? comments, then ? on a new line
+        let mut q_parts = pre_question_own_line;
+        q_parts.push(d.hardline());
+        q_parts.push(d.text("?"));
 
         // Comments between ? and consequent
         // When multiple comments exist, each subsequent one goes on its own line
@@ -366,13 +371,19 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Comments between consequent and : (inline after consequent)
+        // Comments between consequent and :. Mirrors the test→? handling above
+        // (same shared helper): same-line comments trail the consequent, later-line
+        // comments precede the `:` on their own lines — both flow into q_parts in
+        // source order (trailing run first, then own-line run).
         let comments_before_colon_end = colon_pos.unwrap_or(alternate_start);
-        for comment in
-            tsv_lang::comments_in_range(self.comments, consequent_end, comments_before_colon_end)
-        {
-            q_parts.push(self.build_trailing_comment_doc(comment));
-        }
+        let mut colon_own_line = Vec::new();
+        self.split_pre_operator_comments(
+            consequent_end,
+            comments_before_colon_end,
+            &mut q_parts,
+            &mut colon_own_line,
+        );
+        q_parts.append(&mut colon_own_line);
 
         // : on new line
         q_parts.push(d.hardline());
@@ -420,6 +431,49 @@ impl<'a> Printer<'a> {
         parts.push(d.indent(d.concat(&q_parts)));
 
         d.concat(&parts)
+    }
+
+    /// Split the comments in a ternary operand→operator gap into trailing vs
+    /// own-line docs, shared by the test→`?` and consequent→`:` sites.
+    ///
+    /// A comment on the operand's own source line trails it (a block stays inline
+    /// with its width counted; a line comment uses `line_suffix`, zero width, so a
+    /// long trailing comment never forces a binary operand to break — see
+    /// `test_trailing_long_comment`) and is pushed to `trailing`. A comment the
+    /// author placed on a *later* line drops to its own line, aligned with the
+    /// operator it precedes, and is pushed to `own_line` (a `d.hardline()` then the
+    /// comment). A `//` ends its line, so a same-line run trails at most one line
+    /// comment; everything after it already starts on a later line.
+    ///
+    /// This preserves the author's "before the operator" placement — prettier
+    /// instead relocates later-line comments across the operator — and never merges
+    /// consecutive line comments onto the operand line, which would reverse their
+    /// order and fuse them into one node (the property-signature `// c2 // c1`
+    /// quirk, here in a ternary). The two before-operator sites share this helper
+    /// so they cannot drift apart (the original merge bug was exactly such a drift
+    /// from the correct after-operator handling).
+    // TODO: this "classify a gap's comments — same-line ones trail, later-line ones
+    // break to their own line, never merge" rule is reimplemented for call args
+    // (`calls/arg_comments.rs` PartitionedComments + emit_*) and for member chains
+    // (`chain/builder/helpers.rs` push_gap_comments_and_break). Worth unifying into
+    // one primitive once the Printer/ChainPrinter trait split allows (the three
+    // emission shapes — operator / comma / dot — differ, so it's non-trivial).
+    fn split_pre_operator_comments(
+        &self,
+        operand_end: u32,
+        gap_end: u32,
+        trailing: &mut Vec<DocId>,
+        own_line: &mut Vec<DocId>,
+    ) {
+        let d = self.d();
+        for comment in tsv_lang::comments_in_range(self.comments, operand_end, gap_end) {
+            if self.is_same_line(operand_end, comment.span.start) {
+                trailing.push(self.build_trailing_comment_doc(comment));
+            } else {
+                own_line.push(d.hardline());
+                own_line.push(self.build_comment_doc(comment));
+            }
+        }
     }
 
     /// Build expression doc for a ternary branch (consequent/alternate).
