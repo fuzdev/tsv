@@ -588,39 +588,14 @@ fn build_call_args_doc_for_chain_impl(
                     arg_end,
                     next_boundary,
                 );
-                // Last argument - same-line trailing comments before closing paren.
-                // Split block comments around the trailing comma (like the non-last
-                // path above) so a before-comma block isn't relocated past it
-                // (`a /* c */, // c2` → `a, /* c */ // c2`). When the source has no
-                // trailing comma, every block precedes the synthetic one.
-                if pc.has_trailing_line() || pc.has_trailing_block() {
-                    let comma_pos = find_comma_pos(printer.source, arg_end, next_boundary);
-                    for comment in &pc.trailing_block {
-                        if comma_pos.is_none_or(|cpos| is_comment_before_comma(comment, cpos)) {
-                            arg_parts.push(d.text(" "));
-                            arg_parts.push(printer.build_comment_doc(comment));
-                        }
-                    }
-                    arg_parts.push(d.text(","));
-                    trailing_comma_already_added = true;
-                    if let Some(cpos) = comma_pos {
-                        for comment in &pc.trailing_block {
-                            if is_comment_after_comma(comment, cpos) {
-                                arg_parts.push(d.text(" "));
-                                arg_parts.push(printer.build_comment_doc(comment));
-                            }
-                        }
-                    }
-                    for comment in &pc.trailing_line {
-                        arg_parts.push(printer.build_trailing_line_comment_doc(comment));
-                    }
-                }
-
-                // Own-line comments (block or line) after the last arg, before the
-                // closing paren. Emitted after the trailing comma, each on its own line.
-                pc.emit_last_arg_dangling_comments(
+                // Last argument - same-line trailing comments split around the (synthetic)
+                // trailing comma (before-comma blocks trail the arg, after-comma blocks +
+                // line stay past it), then own-line dangling comments past the comma.
+                pc.emit_last_arg_comments(
                     &mut arg_parts,
                     printer,
+                    arg_end,
+                    next_boundary,
                     &mut trailing_comma_already_added,
                 );
             }
