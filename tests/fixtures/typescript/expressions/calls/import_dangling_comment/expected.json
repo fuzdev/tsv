@@ -1,0 +1,780 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 551,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " own-line block comment after the source arg (no options) — its own line",
+			"start": 20,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 124,
+			"end": 131,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line line comment after the source arg (no options)",
+			"start": 138,
+			"end": 196,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 226,
+			"end": 230,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 2
+				},
+				"end": {
+					"line": 11,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line block comment after the options arg",
+			"start": 237,
+			"end": 284,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 319,
+			"end": 326,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 2
+				},
+				"end": {
+					"line": 18,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line line comment after the options arg",
+			"start": 333,
+			"end": 379,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 414,
+			"end": 418,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 2
+				},
+				"end": {
+					"line": 25,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " multiple own-line dangling comments after the options arg",
+			"start": 425,
+			"end": 485,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 520,
+			"end": 528,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 2
+				},
+				"end": {
+					"line": 32,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 531,
+			"end": 536,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 2
+				},
+				"end": {
+					"line": 33,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 550,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 541,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 35,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 96,
+					"end": 135,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 102,
+							"end": 134,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 102,
+								"end": 103,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 106,
+								"end": 134,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 6,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 116,
+									"end": 121,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 7
+										}
+									},
+									"value": "./a",
+									"raw": "'./a'"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " own-line block comment after the source arg (no options) — its own line",
+							"start": 20,
+							"end": 94
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 198,
+					"end": 234,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 204,
+							"end": 233,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 204,
+								"end": 205,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 208,
+								"end": 233,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 11
+									},
+									"end": {
+										"line": 12,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 218,
+									"end": 223,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 7
+										}
+									},
+									"value": "./a",
+									"raw": "'./a'"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 124,
+							"end": 131
+						},
+						{
+							"type": "Line",
+							"value": " own-line line comment after the source arg (no options)",
+							"start": 138,
+							"end": 196
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 286,
+					"end": 330,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 292,
+							"end": 329,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 19,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 292,
+								"end": 293,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 296,
+								"end": 329,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 11
+									},
+									"end": {
+										"line": 19,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 306,
+									"end": 311,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 7
+										}
+									},
+									"value": "./a",
+									"raw": "'./a'"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 315,
+										"end": 316,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 2
+											},
+											"end": {
+												"line": 17,
+												"column": 3
+											}
+										},
+										"name": "x"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c",
+							"start": 226,
+							"end": 230
+						},
+						{
+							"type": "Line",
+							"value": " own-line block comment after the options arg",
+							"start": 237,
+							"end": 284
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 381,
+					"end": 422,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 387,
+							"end": 421,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 7
+								},
+								"end": {
+									"line": 26,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 387,
+								"end": 388,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 7
+									},
+									"end": {
+										"line": 22,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 391,
+								"end": 421,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 11
+									},
+									"end": {
+										"line": 26,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 401,
+									"end": 406,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 2
+										},
+										"end": {
+											"line": 23,
+											"column": 7
+										}
+									},
+									"value": "./a",
+									"raw": "'./a'"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 410,
+										"end": 411,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 2
+											},
+											"end": {
+												"line": 24,
+												"column": 3
+											}
+										},
+										"name": "x"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 319,
+							"end": 326
+						},
+						{
+							"type": "Line",
+							"value": " own-line line comment after the options arg",
+							"start": 333,
+							"end": 379
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 487,
+					"end": 540,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 493,
+							"end": 539,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 7
+								},
+								"end": {
+									"line": 34,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 493,
+								"end": 494,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 7
+									},
+									"end": {
+										"line": 29,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 497,
+								"end": 539,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 11
+									},
+									"end": {
+										"line": 34,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 507,
+									"end": 512,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 2
+										},
+										"end": {
+											"line": 30,
+											"column": 7
+										}
+									},
+									"value": "./a",
+									"raw": "'./a'"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 516,
+										"end": 517,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 2
+											},
+											"end": {
+												"line": 31,
+												"column": 3
+											}
+										},
+										"name": "x"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c",
+							"start": 414,
+							"end": 418
+						},
+						{
+							"type": "Line",
+							"value": " multiple own-line dangling comments after the options arg",
+							"start": 425,
+							"end": 485
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c1 ",
+							"start": 520,
+							"end": 528
+						},
+						{
+							"type": "Line",
+							"value": " c2",
+							"start": 531,
+							"end": 536
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

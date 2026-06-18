@@ -643,14 +643,27 @@ impl<'a> PartitionedComments<'a> {
         }
     }
 
+    /// Emit own-line ("leading") comments each on its own line (hardline before),
+    /// with no comma. The bare dangling-comment emission shared by every last-argument
+    /// path; callers needing a trailing comma first use
+    /// [`emit_last_arg_dangling_comments`], while comma-less shapes (dynamic `import()`,
+    /// which takes no trailing comma) call this directly. Without it, own-line comments
+    /// before the closing paren are dropped (content loss).
+    pub fn emit_dangling_comments(&self, parts: &mut Vec<DocId>, printer: &Printer<'_>) {
+        let d = printer.d();
+        for comment in &self.leading {
+            parts.push(d.hardline());
+            parts.push(printer.build_comment_doc(comment));
+        }
+    }
+
     /// Emit own-line ("leading") comments after the last argument, past its
     /// trailing comma — each on its own line (hardline before).
     ///
-    /// Ensures the trailing comma is present first, updating `comma_added`. Used by
-    /// the last-argument path of every call-shaped printer (plain, `new`, and
-    /// member-callee chains); without it, own-line line comments before the closing
-    /// paren are dropped (content loss). Block-only callers already worked via their
-    /// own filters, but line comments need this shared path.
+    /// Ensures the trailing comma is present first, updating `comma_added`, then defers
+    /// to [`emit_dangling_comments`]. Used by the last-argument path of every
+    /// call-shaped printer (plain, `new`, and member-callee chains). Block-only callers
+    /// already worked via their own filters, but line comments need this shared path.
     pub fn emit_last_arg_dangling_comments(
         &self,
         parts: &mut Vec<DocId>,
@@ -660,15 +673,11 @@ impl<'a> PartitionedComments<'a> {
         if self.leading.is_empty() {
             return;
         }
-        let d = printer.d();
         if !*comma_added {
-            parts.push(d.text(","));
+            parts.push(printer.d().text(","));
             *comma_added = true;
         }
-        for comment in &self.leading {
-            parts.push(d.hardline());
-            parts.push(printer.build_comment_doc(comment));
-        }
+        self.emit_dangling_comments(parts, printer);
     }
 
     /// Emit leading comments, keeping inline block comments on the same line as `next_pos`.
