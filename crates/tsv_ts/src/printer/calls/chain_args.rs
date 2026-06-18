@@ -541,31 +541,14 @@ fn build_call_args_doc_for_chain_impl(
                 call.span.end
             };
 
-            let mut pc = PartitionedComments::new(
-                printer.comments,
-                printer.line_breaks,
-                arg_end,
-                next_boundary,
-            );
-
             if i < call.arguments.len() - 1 {
                 // Not the last argument
                 let next_arg_start = call.arguments[i + 1].span().start;
 
-                // Respect-the-newline: an after-comma block hugging the next arg leads it,
-                // a stranded one stays on the comma line.
-                pc.route_after_comma_hugging_to_leading(printer, arg_end, next_arg_start);
-
-                // Trailing comments split around the comma via the shared helper:
-                // before-comma blocks trail the arg, stranded after-comma blocks stay on the
-                // comma line where the author wrote them, and a same-line line comment trails
-                // via `line_suffix` (so it can't run to EOL and swallow an after-comma block).
-                pc.emit_trailing_comments_around_comma(
-                    &mut arg_parts,
-                    printer,
-                    arg_end,
-                    next_arg_start,
-                );
+                // Reclassify a hugging after-comma block as leading, emit the
+                // before/after-comma trailing comments + comma; the separator + leading
+                // comments below finish the gap.
+                let pc = printer.open_inter_arg_gap(&mut arg_parts, arg_end, next_arg_start);
 
                 // Skip hardline if next arg has blank line
                 // (blank line preservation at the top of the loop handles the line break)
@@ -599,6 +582,12 @@ fn build_call_args_doc_for_chain_impl(
                 // blank line preservation at top of next iteration adds literalline + hardline
                 pc.emit_leading_comments_inline_aware(&mut arg_parts, printer, next_arg_start);
             } else {
+                let pc = PartitionedComments::new(
+                    printer.comments,
+                    printer.line_breaks,
+                    arg_end,
+                    next_boundary,
+                );
                 // Last argument - same-line trailing comments before closing paren.
                 // Split block comments around the trailing comma (like the non-last
                 // path above) so a before-comma block isn't relocated past it
