@@ -11,21 +11,20 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
 ## Unreleased
 <!-- bump: minor -->
 
-- formatting is now non-configurable by design - tsv has no config files, CLI flags,
-  or runtime options, and none will be added
-  (this has no observable API changes because options had been deferred)
-- support `format-ignore` as an alias to `prettier-ignore`
+Formatting is now non-configurable by design -
+tsv has no config that changes its formatting behavior, and none will be added.
+(this has no observable API changes because options had been deferred)
+
+- feat: support `format-ignore` as an alias to `prettier-ignore`
   (along with `format-ignore-start` and `format-ignore-end` for templates)
-- various conformance fixes to the formatter and parser
-- numerous new Prettier divergences including uniform indentation on continuations
-- object destructuring patterns in Svelte blocks now hug their braces,
-  consistent with `bracketSpacing: false` (which is not respected by prettier-plugin-svelte)
-- values in Svelte block tags now consistently use TS printing paths,
+  ([#41](https://github.com/fuzdev/tsv/pull/41))
+- fix: various conformance fixes to the formatter and parser
+- fix: numerous new Prettier divergences including uniform indentation on continuations
+- fix: expressions in Svelte block tags now consistently use TS printing paths,
   fixing oversights prettier-plugin-svelte
-- dynamic `import()` no longer drops comments in or after its argument list
-  (inter-argument and own-line trailing comments), and preserves a blank line
-  between its arguments
-- reduce allocations using `SmallVec` and memoizations
+- perf: reduce allocations using `SmallVec` and memoizations
+  ([#17](https://github.com/fuzdev/tsv/pull/17), [#19](https://github.com/fuzdev/tsv/pull/19),
+  [#20](https://github.com/fuzdev/tsv/pull/20), [#23](https://github.com/fuzdev/tsv/pull/23))
 
 ## 0.1.0
 
