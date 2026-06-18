@@ -1073,16 +1073,10 @@ pub(super) fn build_call_doc_with_wrapping(
                         force_expansion = true;
                     }
 
-                    let mut pc = PartitionedComments::new(
-                        printer.comments,
-                        printer.line_breaks,
-                        arg_end,
-                        next_arg_start,
-                    );
-                    // Respect-the-newline: an after-comma block hugging the next arg leads it
-                    // (`C`); a stranded one stays on the comma line (`A`). Reclassify here so
-                    // the shared emit_* helpers below place each correctly.
-                    pc.route_after_comma_hugging_to_leading(printer, arg_end, next_arg_start);
+                    // Open the gap (reclassify hugging blocks, emit before/after-comma
+                    // trailing comments + the comma); the separator + leading comments
+                    // below finish it.
+                    let pc = printer.open_inter_arg_gap(&mut arg_parts, arg_end, next_arg_start);
 
                     let has_blank_line = pc.has_blank_line_in_gap(
                         printer.source,
@@ -1093,17 +1087,6 @@ pub(super) fn build_call_doc_with_wrapping(
                     if has_blank_line || pc.has_trailing_line() {
                         force_expansion = true;
                     }
-
-                    // before-comma blocks trail the arg, then the comma, then stranded
-                    // after-comma blocks (`A`), then the same-line line comment via
-                    // `line_suffix`. When there are no trailing comments this just emits the
-                    // comma.
-                    pc.emit_trailing_comments_around_comma(
-                        &mut arg_parts,
-                        printer,
-                        arg_end,
-                        next_arg_start,
-                    );
                     if has_blank_line {
                         arg_parts.push(d.literalline());
                     }

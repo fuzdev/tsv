@@ -10,8 +10,8 @@ use super::super::{
     is_curried_arrow_chain, is_multiline_template_expression,
 };
 use super::arg_comments::{
-    PartitionedComments, emit_first_arg_leading_comments, find_comma_pos,
-    has_blank_line_between_args, is_inline_block_after_comma, is_inline_block_before_comma,
+    emit_first_arg_leading_comments, find_comma_pos, has_blank_line_between_args,
+    is_inline_block_after_comma, is_inline_block_before_comma,
 };
 use super::arg_predicates::{is_block_function, is_short_second_arg_for_expand_first};
 use crate::ast::internal;
@@ -693,23 +693,7 @@ pub(crate) fn build_args_joined_with_comments(
             let next_arg_start = arguments[i + 1].span().start;
 
             if printer.has_comments_between(arg_end, next_arg_start) {
-                let mut pc = PartitionedComments::new(
-                    printer.comments,
-                    printer.line_breaks,
-                    arg_end,
-                    next_arg_start,
-                );
-                // Respect-the-newline: an after-comma block hugging the next arg leads it
-                // (`C`); a stranded one stays on the comma line (`A`).
-                pc.route_after_comma_hugging_to_leading(printer, arg_end, next_arg_start);
-                // before-comma blocks trail the arg, the comma, stranded after-comma blocks
-                // (`A`), then a same-line line comment via `line_suffix` (zero width).
-                pc.emit_trailing_comments_around_comma(
-                    &mut parts,
-                    printer,
-                    arg_end,
-                    next_arg_start,
-                );
+                let pc = printer.open_inter_arg_gap(&mut parts, arg_end, next_arg_start);
                 // A line comment runs to EOL → hard-break; otherwise honor the caller's style.
                 parts.push(if pc.has_trailing_line() || use_hardline {
                     d.hardline()
@@ -904,24 +888,7 @@ pub(super) fn build_args_with_blank_lines(
             let next_start = args[i + 1].span().start;
 
             if printer.has_comments_between(arg_end, next_start) {
-                let mut pc = PartitionedComments::new(
-                    printer.comments,
-                    printer.line_breaks,
-                    arg_end,
-                    next_start,
-                );
-                // Respect-the-newline: an after-comma block hugging the next arg leads it
-                // (`C`); a stranded one stays on the comma line (`A`).
-                pc.route_after_comma_hugging_to_leading(printer, arg_end, next_start);
-
-                // before-comma blocks trail the arg, the comma, stranded after-comma blocks
-                // (`A`), then a same-line line comment via `line_suffix`.
-                pc.emit_trailing_comments_around_comma(
-                    &mut arg_parts,
-                    printer,
-                    arg_end,
-                    next_start,
-                );
+                let pc = printer.open_inter_arg_gap(&mut arg_parts, arg_end, next_start);
 
                 let next_has_blank = pc.has_blank_line_in_gap(
                     printer.source,

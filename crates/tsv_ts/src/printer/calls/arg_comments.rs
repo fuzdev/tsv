@@ -11,6 +11,35 @@ use super::super::Printer;
 use crate::ast::internal;
 use tsv_lang::doc::arena::DocId;
 
+impl<'a> Printer<'a> {
+    /// Open a non-last argument gap that may carry comments and emit its head into
+    /// `parts`: partition the comments, reclassify an after-comma block that **hugs**
+    /// the next arg as leading (`C`) while a **stranded** one stays on the comma line
+    /// (`A`), then emit the before-comma blocks, the comma, the stranded after-comma
+    /// blocks, and the same-line line comment.
+    ///
+    /// Returns the routed [`PartitionedComments`] so the caller supplies the rest of the
+    /// gap — its own separator policy (soft vs. hard line, blank-line preservation, any
+    /// force-expansion feedback), then the next arg's leading comments via
+    /// [`PartitionedComments::emit_leading_comments_inline_aware`]. Every per-argument
+    /// loop (`call`, `new`, member-chain, and the wrapping helpers) shares this head so
+    /// the route-then-emit ordering — and the respect-the-newline rule it encodes —
+    /// lives in one place; only the separator, which genuinely differs per layout, stays
+    /// at the call site.
+    pub(super) fn open_inter_arg_gap(
+        &self,
+        parts: &mut Vec<DocId>,
+        arg_end: u32,
+        next_arg_start: u32,
+    ) -> PartitionedComments<'a> {
+        let mut pc =
+            PartitionedComments::new(self.comments, self.line_breaks, arg_end, next_arg_start);
+        pc.route_after_comma_hugging_to_leading(self, arg_end, next_arg_start);
+        pc.emit_trailing_comments_around_comma(parts, self, arg_end, next_arg_start);
+        pc
+    }
+}
+
 //
 // Comma-relative comment helpers
 //
