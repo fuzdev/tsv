@@ -7,8 +7,7 @@ use super::super::{ParenContext, Printer, has_multiline_content, needs_parens};
 use super::arg_comments::{
     PartitionedComments, any_comment_forces_expansion, find_comma_pos, first_arg_has_any_comments,
     has_blank_line_between_args, has_inter_argument_comments, has_trailing_comments_on_args,
-    is_comment_after_comma, is_comment_before_comma, last_arg_has_comments,
-    should_force_expansion_for_comments,
+    is_comment_after_comma, last_arg_has_comments, should_force_expansion_for_comments,
 };
 use super::arg_predicates::{
     arrow_has_trailing_param_comments, is_array_or_object_unwrapped, is_concise_numeric_array,
@@ -1074,14 +1073,16 @@ pub(super) fn build_call_doc_with_wrapping(
                         force_expansion = true;
                     }
 
-                    let pc = PartitionedComments::new(
+                    let mut pc = PartitionedComments::new(
                         printer.comments,
                         printer.line_breaks,
                         arg_end,
                         next_arg_start,
                     );
-
-                    let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start);
+                    // Respect-the-newline: an after-comma block hugging the next arg leads it
+                    // (`C`); a stranded one stays on the comma line (`A`). Reclassify here so
+                    // the shared emit_* helpers below place each correctly.
+                    pc.route_after_comma_hugging_to_leading(printer, arg_end, next_arg_start);
 
                     let has_blank_line = pc.has_blank_line_in_gap(
                         printer.source,
@@ -1089,65 +1090,33 @@ pub(super) fn build_call_doc_with_wrapping(
                         arg_end,
                         next_arg_start,
                     );
-                    if has_blank_line {
+                    if has_blank_line || pc.has_trailing_line() {
                         force_expansion = true;
                     }
 
-                    if pc.has_trailing_line() || pc.has_trailing_block() {
-                        // Trailing comments after this arg, in source order. Block and
-                        // line comments are emitted together (not either/or) so an arg
-                        // carrying both — `a /* c */, // c2` — never drops the block.
-                        let has_line = pc.has_trailing_line();
-
-                        // Before-comma block comments trail the arg, before the comma.
-                        if let Some(cpos) = comma_pos {
-                            for comment in &pc.trailing_block {
-                                if is_comment_before_comma(comment, cpos) {
-                                    arg_parts.push(d.text(" "));
-                                    arg_parts.push(printer.build_comment_doc(comment));
-                                }
-                            }
-                        }
-                        arg_parts.push(d.text(","));
-
-                        // Same-line line comments, after the comma. The comment goes
-                        // through `line_suffix` (zero width) so it never counts against
-                        // the argument's own group — a long trailing comment can't force
-                        // a binary/conditional arg to break (prettier's `lineSuffix`). It
-                        // forces the call to expand and renders after the comma at EOL.
-                        if has_line {
-                            force_expansion = true;
-                            for comment in &pc.trailing_line {
-                                arg_parts.push(printer.build_trailing_line_comment_doc(comment));
-                            }
-                        }
-                        if has_blank_line {
-                            arg_parts.push(d.literalline());
-                        }
-                        // A line comment forces a hard break (it runs to EOL); a
-                        // block-only arg uses a soft line so it can stay inline.
-                        arg_parts.push(if has_line { d.hardline() } else { d.line() });
-
-                        // After-comma block comments (e.g., `arg1, /** @type {T} */ arg2`)
-                        // go AFTER the line break so they stay with the next arg when breaking.
-                        if let Some(cpos) = comma_pos {
-                            for comment in &pc.trailing_block {
-                                if is_comment_after_comma(comment, cpos) {
-                                    arg_parts.push(printer.build_comment_doc(comment));
-                                    arg_parts.push(d.text(" "));
-                                }
-                            }
-                        }
-                    } else {
-                        // No trailing comments, add comma and line
-                        arg_parts.push(d.text(","));
-                        if has_blank_line {
-                            arg_parts.push(d.literalline());
-                        }
-                        arg_parts.push(d.line());
+                    // before-comma blocks trail the arg, then the comma, then stranded
+                    // after-comma blocks (`A`), then the same-line line comment via
+                    // `line_suffix`. When there are no trailing comments this just emits the
+                    // comma.
+                    pc.emit_trailing_comments_around_comma(
+                        &mut arg_parts,
+                        printer,
+                        arg_end,
+                        next_arg_start,
+                    );
+                    if has_blank_line {
+                        arg_parts.push(d.literalline());
                     }
+                    // A line comment runs to EOL → hard-break; otherwise a soft line so a
+                    // block-only arg can still collapse inline.
+                    arg_parts.push(if pc.has_trailing_line() {
+                        d.hardline()
+                    } else {
+                        d.line()
+                    });
 
-                    // Add leading comments - inline with next arg if on same line
+                    // Leading: own-line comments + after-comma comments that hug the next arg
+                    // (`C`), emitted inline with it.
                     pc.emit_leading_comments_inline_aware(&mut arg_parts, printer, next_arg_start);
                 } else {
                     let has_blank_line = has_blank_line_between_args(

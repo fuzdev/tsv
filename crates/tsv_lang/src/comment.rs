@@ -203,6 +203,33 @@ impl<'a> ClassifiedComments<'a> {
             && self.leading_block.is_empty()
             && self.leading_line.is_empty()
     }
+
+    /// All leading (own-line) comments in source order, merging the `leading_block`
+    /// and `leading_line` buckets.
+    ///
+    /// `from_range` splits leading comments by kind because chain printers emit the
+    /// two runs separately (all blocks, then all lines). Callers that emit a gap's
+    /// leading comments in authored order — ternary operand→operator gaps,
+    /// call-argument gaps — use this instead, so an interleaved block/line sequence
+    /// keeps the order the author wrote it. Each bucket is already source-sorted, so
+    /// this is a linear two-way merge on `span.start`.
+    pub fn leading_in_source_order(&self) -> SmallVec<[&'a Comment; 2]> {
+        let (block, line) = (&self.leading_block, &self.leading_line);
+        let mut out: SmallVec<[&'a Comment; 2]> = SmallVec::with_capacity(block.len() + line.len());
+        let (mut bi, mut li) = (0, 0);
+        while bi < block.len() && li < line.len() {
+            if block[bi].span.start <= line[li].span.start {
+                out.push(block[bi]);
+                bi += 1;
+            } else {
+                out.push(line[li]);
+                li += 1;
+            }
+        }
+        out.extend_from_slice(&block[bi..]);
+        out.extend_from_slice(&line[li..]);
+        out
+    }
 }
 
 //
@@ -391,6 +418,39 @@ mod tests {
             0,
             6
         ));
+    }
+
+    #[test]
+    fn leading_in_source_order_merges_interleaved_block_and_line() {
+        // Each leading bucket is source-sorted; the merge must restore authored order
+        // across an interleaved line / block / line sequence.
+        let line1 = comment(2, 8, false, " l1");
+        let block = comment(15, 22, true, " b ");
+        let line2 = comment(30, 36, false, " l2");
+        let classified = ClassifiedComments {
+            trailing_block: SmallVec::new(),
+            trailing_line: SmallVec::new(),
+            leading_block: SmallVec::from_slice(&[&block]),
+            leading_line: SmallVec::from_slice(&[&line1, &line2]),
+        };
+        let order: Vec<u32> = classified
+            .leading_in_source_order()
+            .iter()
+            .map(|c| c.span.start)
+            .collect();
+        assert_eq!(order, vec![2, 15, 30]);
+
+        // Single-bucket inputs pass through unchanged.
+        let only_line = ClassifiedComments {
+            leading_line: SmallVec::from_slice(&[&line1, &line2]),
+            ..Default::default()
+        };
+        let starts: Vec<u32> = only_line
+            .leading_in_source_order()
+            .iter()
+            .map(|c| c.span.start)
+            .collect();
+        assert_eq!(starts, vec![2, 30]);
     }
 
     #[test]

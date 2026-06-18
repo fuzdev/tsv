@@ -24,10 +24,12 @@ use tsv_lang::printing::has_blank_line_between_strict;
 /// member-only breaking path, so the two cannot drift (the historical member-only
 /// `line_suffix`-everything approach was exactly such a drift — it merged/reversed
 /// consecutive mid-chain line comments).
-// TODO: same gap-comment rule as `conditional.rs` split_pre_operator_comments and
-// `calls/arg_comments.rs` PartitionedComments — three parallel implementations of
-// "same-line comments trail, later-line ones break to their own line". Unify if/when
-// the Printer/ChainPrinter trait boundary and the differing emission shapes allow.
+// The same-line/later-line classification (`classify_comments` →
+// `tsv_lang::ClassifiedComments`) is shared with `conditional.rs`
+// split_pre_operator_comments and `calls/arg_comments.rs` PartitionedComments, so the
+// "same-line trails, later-line breaks, never merge" rule lives in one place. Only the
+// emission differs per shape — dot (here) / operator / comma — which is intentional
+// (this dot path also owns blank-line preservation around the leading run).
 pub(crate) fn push_gap_comments_and_break<P: ChainPrinter>(
     parts: &mut Vec<DocId>,
     printer: &P,
