@@ -22,7 +22,10 @@ use helpers::{
     build_expanded_doc, build_first_groups_doc, build_first_groups_expanded_doc,
     build_rest_parts_with_comments,
 };
-use member_only::build_member_only_chain_doc;
+use member_only::{
+    build_member_only_chain_doc, build_member_only_chain_with_comments_doc,
+    member_only_has_interior_line_comments,
+};
 
 use super::analysis::should_merge_first_groups;
 use super::printing::{
@@ -169,6 +172,13 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
         .any(|n| has_inside_bracket_comments(n, printer));
 
     if !has_calls && !first_has_parens && !has_bracket_comments {
+        // Member-only chain with interior line comments: break the chain and emit
+        // each comment in place (shared comment-aware path), instead of the fill
+        // path's line_suffix — which defers mid-chain line comments to end of line,
+        // merging/reversing multiple. Prettier hoists these; tsv preserves position.
+        if member_only_has_interior_line_comments(groups, printer) {
+            return build_member_only_chain_with_comments_doc(groups, printer);
+        }
         // Member-only chain: use fill for greedy packing
         return build_member_only_chain_doc(groups, printer);
     }
