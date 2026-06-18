@@ -702,15 +702,11 @@ pub(crate) fn build_args_joined_with_comments(
                 );
                 let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start);
 
-                if pc.has_trailing_line() {
-                    // Trailing line comments always force hardline: `arg, // comment\n`
-                    parts.push(d.text(","));
-                    for comment in &pc.trailing_line {
-                        parts.push(d.text(" "));
-                        parts.push(printer.build_comment_doc(comment));
-                    }
-                    parts.push(d.hardline());
-                } else if pc.has_trailing_block() {
+                if pc.has_trailing_line() || pc.has_trailing_block() {
+                    // Block and line comments are emitted together (not either/or) so an
+                    // arg carrying both — `a /* c */, // c2` — never drops the block.
+                    let has_line = pc.has_trailing_line();
+
                     // Before-comma block comments: `arg /* c */,`
                     if let Some(cpos) = comma_pos {
                         for comment in &pc.trailing_block {
@@ -721,8 +717,26 @@ pub(crate) fn build_args_joined_with_comments(
                         }
                     }
                     parts.push(d.text(","));
-                    if use_hardline {
-                        // Hardline: break first, comment starts next line
+
+                    if has_line {
+                        // A line comment runs to EOL and forces a hardline. After-comma
+                        // blocks and the line comment stay on the comma line, in order:
+                        // `arg, /* after */ // comment`.
+                        if let Some(cpos) = comma_pos {
+                            for comment in &pc.trailing_block {
+                                if is_comment_after_comma(comment, cpos) {
+                                    parts.push(d.text(" "));
+                                    parts.push(printer.build_comment_doc(comment));
+                                }
+                            }
+                        }
+                        for comment in &pc.trailing_line {
+                            parts.push(d.text(" "));
+                            parts.push(printer.build_comment_doc(comment));
+                        }
+                        parts.push(d.hardline());
+                    } else if use_hardline {
+                        // Block-only, hardline: break first, comment starts next line
                         parts.push(d.hardline());
                         if let Some(cpos) = comma_pos {
                             for comment in &pc.trailing_block {
@@ -733,7 +747,7 @@ pub(crate) fn build_args_joined_with_comments(
                             }
                         }
                     } else {
-                        // Soft: comment stays inline after comma, break follows
+                        // Block-only, soft: comment stays inline after comma, break follows
                         if let Some(cpos) = comma_pos {
                             for comment in &pc.trailing_block {
                                 if is_comment_after_comma(comment, cpos) {
@@ -943,8 +957,15 @@ pub(super) fn build_args_with_blank_lines(
                     next_start,
                 );
 
-                arg_parts.push(d.text(","));
-                pc.emit_trailing_comments(&mut arg_parts, printer);
+                // Split trailing comments around the comma (shared with the `new`
+                // non-last path) so a before-comma block stays put instead of being
+                // relocated past the comma.
+                pc.emit_trailing_comments_around_comma(
+                    &mut arg_parts,
+                    printer,
+                    arg_end,
+                    next_start,
+                );
 
                 let next_has_blank = pc.has_blank_line_in_gap(
                     printer.source,

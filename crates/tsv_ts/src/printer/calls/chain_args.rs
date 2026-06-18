@@ -572,6 +572,11 @@ fn build_call_args_doc_for_chain_impl(
                 }
 
                 // Emit trailing block comments that are AFTER the comma (as leading on next arg)
+                // TODO: when a line comment is also present, the line above emits it first
+                // and a `//` runs to EOL — so an after-comma block here is swallowed
+                // (`a, /* c */ // c2` → `a, // c2 /* c */`, content loss). Fold into the
+                // cross-path "after-comma trailing block+line" pass (see TODO_REFACTORING.md);
+                // not fixed in isolation because the four arg paths diverge on this case.
                 if let Some(cpos) = comma_pos {
                     for comment in &pc.trailing_block {
                         if is_comment_after_comma(comment, cpos) {
@@ -613,11 +618,32 @@ fn build_call_args_doc_for_chain_impl(
                 // blank line preservation at top of next iteration adds literalline + hardline
                 pc.emit_leading_comments_inline_aware(&mut arg_parts, printer, next_arg_start);
             } else {
-                // Last argument - same-line trailing comments before closing paren
+                // Last argument - same-line trailing comments before closing paren.
+                // Split block comments around the trailing comma (like the non-last
+                // path above) so a before-comma block isn't relocated past it
+                // (`a /* c */, // c2` → `a, /* c */ // c2`). When the source has no
+                // trailing comma, every block precedes the synthetic one.
                 if pc.has_trailing_line() || pc.has_trailing_block() {
+                    let comma_pos = find_comma_pos(printer.source, arg_end, next_boundary);
+                    for comment in &pc.trailing_block {
+                        if comma_pos.is_none_or(|cpos| is_comment_before_comma(comment, cpos)) {
+                            arg_parts.push(d.text(" "));
+                            arg_parts.push(printer.build_comment_doc(comment));
+                        }
+                    }
                     arg_parts.push(d.text(","));
-                    pc.emit_trailing_comments(&mut arg_parts, printer);
                     trailing_comma_already_added = true;
+                    if let Some(cpos) = comma_pos {
+                        for comment in &pc.trailing_block {
+                            if is_comment_after_comma(comment, cpos) {
+                                arg_parts.push(d.text(" "));
+                                arg_parts.push(printer.build_comment_doc(comment));
+                            }
+                        }
+                    }
+                    for comment in &pc.trailing_line {
+                        arg_parts.push(printer.build_trailing_line_comment_doc(comment));
+                    }
                 }
 
                 // Own-line comments (block or line) after the last arg, before the

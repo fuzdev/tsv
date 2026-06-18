@@ -212,7 +212,7 @@ Language-agnostic primitives shared across all implementations:
 | `Span`            | Source positions (u32 for memory efficiency)                                               |
 | `LocationTracker` | Lazy line/column computation (O(log n) binary search)                                      |
 | `ParseError`      | Language-agnostic errors (String-based for flexibility)                                    |
-| `doc`             | **Document builder for prettier-compatible formatting**                                    |
+| `doc`             | **Document builder for Prettier-style formatting**                                         |
 | `printing`        | Shared formatting utilities (string literals, whitespace)                                  |
 | `OutputBuffer`    | Pre-allocated output string building with column tracking                                  |
 | `config`          | `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts, `EmbedContext`, `LayoutMode` (no runtime config)     |
@@ -659,7 +659,7 @@ Scales at O(features) rather than O(tools × features).
 | Pratt parsing                 | Clean operator precedence for TS expressions                           |
 | Shared interner               | Identifiers deduplicated across embedded regions of a file             |
 | Detached comments             | Simple AST, O(log n) lookup, matches prettier                          |
-| Doc builder                   | Prettier-compatible declarative formatting                             |
+| Doc builder                   | Prettier-style declarative formatting                                  |
 | Source threading              | Preserve escapes without AST duplication                               |
 | Lazy locations                | Parse-time speed, serialize-time computation                           |
 | Fixtures as data              | Reusable across tools, O(features) scaling                             |

@@ -1,0 +1,981 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 896,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Two line comments between the test and `?`: the first trails the test, the",
+			"start": 20,
+			"end": 97,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " second drops to its own line aligned with `?`. A trailing comment on the",
+			"start": 99,
+			"end": 174,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " consequent (`// c3`) stays put. Neither merges nor reverses.",
+			"start": 176,
+			"end": 239,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 256,
+			"end": 261,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 16
+				},
+				"end": {
+					"line": 5,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 264,
+			"end": 269,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 276,
+			"end": 281,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 6
+				},
+				"end": {
+					"line": 7,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Three line comments between the test and `?`: each after the first gets its",
+			"start": 291,
+			"end": 369,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own line.",
+			"start": 371,
+			"end": 383,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 400,
+			"end": 405,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 16
+				},
+				"end": {
+					"line": 12,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 408,
+			"end": 413,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 416,
+			"end": 421,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Two line comments between the consequent and `:`: the first trails the",
+			"start": 437,
+			"end": 510,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " consequent, the second drops to its own line aligned with `:`.",
+			"start": 512,
+			"end": 577,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 600,
+			"end": 605,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 6
+				},
+				"end": {
+					"line": 21,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 608,
+			"end": 613,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 2
+				},
+				"end": {
+					"line": 22,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Boundary (a MATCH, not a divergence): a block + line comment authored on the",
+			"start": 623,
+			"end": 702,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " test's own line both stay trailing — only later-line comments move. A `//`",
+			"start": 704,
+			"end": 781,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " ends its line, so it is always last in a same-line run.",
+			"start": 783,
+			"end": 841,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 858,
+			"end": 866,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 16
+				},
+				"end": {
+					"line": 28,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 867,
+			"end": 872,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 25
+				},
+				"end": {
+					"line": 28,
+					"column": 30
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 895,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 886,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 31,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 241,
+					"end": 288,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 247,
+							"end": 287,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 247,
+								"end": 248,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 251,
+								"end": 287,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 11
+									},
+									"end": {
+										"line": 8,
+										"column": 5
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 251,
+									"end": 255,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 11
+										},
+										"end": {
+											"line": 5,
+											"column": 15
+										}
+									},
+									"name": "cond",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 256,
+											"end": 261
+										}
+									]
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 274,
+									"end": 275,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 4
+										},
+										"end": {
+											"line": 7,
+											"column": 5
+										}
+									},
+									"name": "x",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c2",
+											"start": 264,
+											"end": 269
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c3",
+											"start": 276,
+											"end": 281
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 286,
+									"end": 287,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 4
+										},
+										"end": {
+											"line": 8,
+											"column": 5
+										}
+									},
+									"name": "y"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Two line comments between the test and `?`: the first trails the test, the",
+							"start": 20,
+							"end": 97
+						},
+						{
+							"type": "Line",
+							"value": " second drops to its own line aligned with `?`. A trailing comment on the",
+							"start": 99,
+							"end": 174
+						},
+						{
+							"type": "Line",
+							"value": " consequent (`// c3`) stays put. Neither merges nor reverses.",
+							"start": 176,
+							"end": 239
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 385,
+					"end": 434,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 391,
+							"end": 433,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 16,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 391,
+								"end": 392,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 395,
+								"end": 433,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 11
+									},
+									"end": {
+										"line": 16,
+										"column": 5
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 395,
+									"end": 399,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 11
+										},
+										"end": {
+											"line": 12,
+											"column": 15
+										}
+									},
+									"name": "cond",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 400,
+											"end": 405
+										}
+									]
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 426,
+									"end": 427,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 4
+										},
+										"end": {
+											"line": 15,
+											"column": 5
+										}
+									},
+									"name": "x",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c2",
+											"start": 408,
+											"end": 413
+										},
+										{
+											"type": "Line",
+											"value": " c3",
+											"start": 416,
+											"end": 421
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 432,
+									"end": 433,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 4
+										},
+										"end": {
+											"line": 16,
+											"column": 5
+										}
+									},
+									"name": "y"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Three line comments between the test and `?`: each after the first gets its",
+							"start": 291,
+							"end": 369
+						},
+						{
+							"type": "Line",
+							"value": " own line.",
+							"start": 371,
+							"end": 383
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 579,
+					"end": 620,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 585,
+							"end": 619,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 7
+								},
+								"end": {
+									"line": 23,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 585,
+								"end": 586,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 7
+									},
+									"end": {
+										"line": 20,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 589,
+								"end": 619,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 11
+									},
+									"end": {
+										"line": 23,
+										"column": 5
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 589,
+									"end": 593,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 11
+										},
+										"end": {
+											"line": 20,
+											"column": 15
+										}
+									},
+									"name": "cond"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 598,
+									"end": 599,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 4
+										},
+										"end": {
+											"line": 21,
+											"column": 5
+										}
+									},
+									"name": "x",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 600,
+											"end": 605
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 618,
+									"end": 619,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 4
+										},
+										"end": {
+											"line": 23,
+											"column": 5
+										}
+									},
+									"name": "y",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c2",
+											"start": 608,
+											"end": 613
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Two line comments between the consequent and `:`: the first trails the",
+							"start": 437,
+							"end": 510
+						},
+						{
+							"type": "Line",
+							"value": " consequent, the second drops to its own line aligned with `:`.",
+							"start": 512,
+							"end": 577
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 843,
+					"end": 885,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 849,
+							"end": 884,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 7
+								},
+								"end": {
+									"line": 30,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 849,
+								"end": 850,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 7
+									},
+									"end": {
+										"line": 28,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 853,
+								"end": 884,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 11
+									},
+									"end": {
+										"line": 30,
+										"column": 5
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 853,
+									"end": 857,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 11
+										},
+										"end": {
+											"line": 28,
+											"column": 15
+										}
+									},
+									"name": "cond",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 858,
+											"end": 866
+										}
+									]
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 877,
+									"end": 878,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 4
+										},
+										"end": {
+											"line": 29,
+											"column": 5
+										}
+									},
+									"name": "x",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c2",
+											"start": 867,
+											"end": 872
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 883,
+									"end": 884,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 4
+										},
+										"end": {
+											"line": 30,
+											"column": 5
+										}
+									},
+									"name": "y"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Boundary (a MATCH, not a divergence): a block + line comment authored on the",
+							"start": 623,
+							"end": 702
+						},
+						{
+							"type": "Line",
+							"value": " test's own line both stay trailing — only later-line comments move. A `//`",
+							"start": 704,
+							"end": 781
+						},
+						{
+							"type": "Line",
+							"value": " ends its line, so it is always last in a same-line run.",
+							"start": 783,
+							"end": 841
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

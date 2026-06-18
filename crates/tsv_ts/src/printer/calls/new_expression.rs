@@ -408,8 +408,16 @@ impl<'a> Printer<'a> {
                         next_arg_start,
                     );
 
-                    arg_parts.push(d.text(","));
-                    pc.emit_trailing_comments(&mut arg_parts, self);
+                    // Split trailing comments around the comma so a before-comma block
+                    // (`a /* c */, // c2`) stays put instead of being pushed past the
+                    // comma (`emit_trailing_comments` would, since the comma is emitted
+                    // first). Shared with the blank-line args path.
+                    pc.emit_trailing_comments_around_comma(
+                        &mut arg_parts,
+                        self,
+                        arg_end,
+                        next_arg_start,
+                    );
                     arg_parts.push(d.hardline());
                     pc.emit_leading_comments(&mut arg_parts, self);
                 } else {

@@ -1093,23 +1093,13 @@ pub(super) fn build_call_doc_with_wrapping(
                         force_expansion = true;
                     }
 
-                    if pc.has_trailing_line() {
-                        // Trailing line comments: comma, comment, hardline. The comment
-                        // goes through `line_suffix` (zero width) so it never counts
-                        // against the argument's own group — a long trailing comment
-                        // can't force a binary/conditional arg to break (prettier's
-                        // `lineSuffix`). It still renders after the comma at end-of-line.
-                        force_expansion = true;
-                        arg_parts.push(d.text(","));
-                        for comment in &pc.trailing_line {
-                            arg_parts.push(printer.build_trailing_line_comment_doc(comment));
-                        }
-                        if has_blank_line {
-                            arg_parts.push(d.literalline());
-                        }
-                        arg_parts.push(d.hardline());
-                    } else if pc.has_trailing_block() {
-                        // Trailing block comments: place relative to comma based on source position
+                    if pc.has_trailing_line() || pc.has_trailing_block() {
+                        // Trailing comments after this arg, in source order. Block and
+                        // line comments are emitted together (not either/or) so an arg
+                        // carrying both — `a /* c */, // c2` — never drops the block.
+                        let has_line = pc.has_trailing_line();
+
+                        // Before-comma block comments trail the arg, before the comma.
                         if let Some(cpos) = comma_pos {
                             for comment in &pc.trailing_block {
                                 if is_comment_before_comma(comment, cpos) {
@@ -1119,10 +1109,25 @@ pub(super) fn build_call_doc_with_wrapping(
                             }
                         }
                         arg_parts.push(d.text(","));
+
+                        // Same-line line comments, after the comma. The comment goes
+                        // through `line_suffix` (zero width) so it never counts against
+                        // the argument's own group — a long trailing comment can't force
+                        // a binary/conditional arg to break (prettier's `lineSuffix`). It
+                        // forces the call to expand and renders after the comma at EOL.
+                        if has_line {
+                            force_expansion = true;
+                            for comment in &pc.trailing_line {
+                                arg_parts.push(printer.build_trailing_line_comment_doc(comment));
+                            }
+                        }
                         if has_blank_line {
                             arg_parts.push(d.literalline());
                         }
-                        arg_parts.push(d.line());
+                        // A line comment forces a hard break (it runs to EOL); a
+                        // block-only arg uses a soft line so it can stay inline.
+                        arg_parts.push(if has_line { d.hardline() } else { d.line() });
+
                         // After-comma block comments (e.g., `arg1, /** @type {T} */ arg2`)
                         // go AFTER the line break so they stay with the next arg when breaking.
                         if let Some(cpos) = comma_pos {
@@ -1176,21 +1181,36 @@ pub(super) fn build_call_doc_with_wrapping(
                     paren_close,
                 );
 
-                // Own-line comments (block or line) after the last arg (before closing
-                // paren). These appear as siblings after the trailing comma, forcing
-                // expansion. Also handles spread with stripped parens via effective_arg_end.
-                if !pc.leading.is_empty() {
-                    force_expansion = true;
-                    pc.emit_last_arg_dangling_comments(
-                        &mut arg_parts,
-                        printer,
-                        &mut has_trailing_comma_on_last,
-                    );
+                // Trailing comments after the last arg, before the closing paren, in
+                // source order: same-line block comments first (split around the source
+                // comma), then the same-line line comment (after the comma, via
+                // `line_suffix`), then own-line comments (each on its own line). Emitting
+                // same-line comments before own-line ones — and never dropping a block —
+                // avoids merging consecutive comments onto one line (which reverses their
+                // order) and content loss. The `new`/member-chain last-arg paths do the
+                // same via the shared emit_* helpers; this path keeps its own loop only
+                // for the block comma-split (`b /* c */,` vs past the trailing comma).
+
+                // (1) Same-line block comments: before-comma blocks trail the arg, after-
+                // comma blocks are preserved past the trailing comma. Don't force
+                // expansion on their own — let width/source newlines decide.
+                // e.g., fn({short} /* c */) stays inline, fn({long...} /* c */) expands.
+                let comma_pos = find_comma_pos(printer.source, effective_arg_end, paren_close);
+                for comment in &pc.trailing_block {
+                    if comma_pos.is_some_and(|cp| is_comment_after_comma(comment, cp)) {
+                        last_after_comma.push(d.text(" "));
+                        last_after_comma.push(printer.build_comment_doc(comment));
+                    } else {
+                        arg_parts.push(d.text(" "));
+                        arg_parts.push(printer.build_comment_doc(comment));
+                    }
                 }
 
+                // (2) Same-line line comment, after the comma, via `line_suffix`.
                 if pc.has_trailing_line() {
                     if !has_trailing_comma_on_last {
                         arg_parts.push(d.text(","));
+                        has_trailing_comma_on_last = true;
                     }
 
                     // Build comment docs: " // comment" for each
@@ -1199,34 +1219,27 @@ pub(super) fn build_call_doc_with_wrapping(
                         .iter()
                         .flat_map(|c| [d.text(" "), printer.build_comment_doc(c)])
                         .collect();
-                    let comments = d.concat(&comment_docs);
 
                     // Line comments always force the CALL to expand - the newline after the
-                    // comment means the call must break to multiple lines.
+                    // comment means the call must break to multiple lines. A trailing line
+                    // comment never counts toward width (prettier's `lineSuffix`), so the
+                    // argument's own group (array/object, binary, conditional, …) can stay
+                    // inline even when the comment exceeds print_width; force_expansion
+                    // ensures the call expands.
                     force_expansion = true;
+                    arg_parts.push(d.line_suffix(d.concat(&comment_docs)));
+                }
 
-                    // A trailing line comment never counts toward width (prettier's
-                    // `lineSuffix`), so the argument's own group (array/object, binary,
-                    // conditional, …) can stay inline even when the comment exceeds
-                    // print_width. The force_expansion above ensures the call expands.
-                    arg_parts.push(d.line_suffix(comments));
-                    has_trailing_comma_on_last = true;
-                } else if pc.has_trailing_block() {
-                    // Trailing block comments: place relative to the source comma.
-                    // Before-comma stay after the arg; after-comma are preserved past
-                    // the trailing comma (emitted by the wrappers below). Don't force
-                    // expansion - let content decide based on width/source newlines.
-                    // e.g., fn({short} /* c */) stays inline, fn({long...} /* c */) expands
-                    let comma_pos = find_comma_pos(printer.source, effective_arg_end, paren_close);
-                    for comment in &pc.trailing_block {
-                        if comma_pos.is_some_and(|cp| is_comment_after_comma(comment, cp)) {
-                            last_after_comma.push(d.text(" "));
-                            last_after_comma.push(printer.build_comment_doc(comment));
-                        } else {
-                            arg_parts.push(d.text(" "));
-                            arg_parts.push(printer.build_comment_doc(comment));
-                        }
-                    }
+                // (3) Own-line comments (block or line) after the last arg, before the
+                // closing paren — emitted after the trailing comma, each on its own line.
+                // Also handles spread with stripped parens via effective_arg_end.
+                if !pc.leading.is_empty() {
+                    force_expansion = true;
+                    pc.emit_last_arg_dangling_comments(
+                        &mut arg_parts,
+                        printer,
+                        &mut has_trailing_comma_on_last,
+                    );
                 }
             }
         }

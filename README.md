@@ -3,8 +3,8 @@
 > a formatter, parser, and future linter + more for Svelte, TypeScript, and CSS - [tsv.fuz.dev](https://tsv.fuz.dev/)
 
 tsv is a toolchain for Svelte, TypeScript, and CSS, written in Rust.
-The first release has a near-[Prettier](https://prettier.io/) formatter that
-closely follows [prettier-plugin-svelte](https://github.com/sveltejs/prettier-plugin-svelte),
+The first release has a near-[Prettier](https://prettier.io/) formatter,
+similar to [prettier-plugin-svelte](https://github.com/sveltejs/prettier-plugin-svelte),
 and a drop-in replacement for [Svelte](https://svelte.dev/)'s parser +
 [acorn](https://github.com/acornjs/acorn) +
 [acorn-typescript](https://github.com/sveltejs/acorn-typescript).
@@ -62,8 +62,8 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
 ## Design
 
 - supports Svelte, TypeScript, CSS, JS, and HTML
-- formatting tracks Prettier and prettier-plugin-svelte closely, but intentionally diverges
-  in some cases - see [docs/conformance_prettier.md](docs/conformance_prettier.md)
+- formatting tracks Prettier and prettier-plugin-svelte for the common case, but intentionally
+  diverges in some cases - see [docs/conformance_prettier.md](docs/conformance_prettier.md)
 - tsv can generate a public JSON AST that should exactly match
   Svelte 5's modern AST with acorn and acorn-typescript
   (see [docs/conformance_svelte.md](docs/conformance_svelte.md)),

@@ -2,7 +2,7 @@
 
 > a formatter, parser, and future linter + more for Svelte, TypeScript, and CSS
 
-High-performance Rust parser as a drop-in replacement for Svelte's modern parser (acorn + acorn-typescript), paired with a formatter that took Prettier as its initial guide and still tracks it closely for the common case — while making deliberate, cataloged choices to diverge where tsv's own judgment is more defensible.
+High-performance Rust parser as a drop-in replacement for Svelte's modern parser (acorn + acorn-typescript), paired with a formatter that took Prettier as its initial guide and still tracks it for the common case — while making deliberate, cataloged choices to diverge where tsv's own judgment is more defensible.
 
 **Non-configurable by design**: formatting options are fixed at Prettier's defaults except printWidth=100, useTabs=true, singleQuote=true, and bracketSpacing=false — no config files, CLI flags, or runtime options, ever (opinionated like `gofmt` and Black). See [Configuration](#configuration).
 

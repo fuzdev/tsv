@@ -446,6 +446,11 @@ where
 /// - `leading`: Comments on their own lines (not on same line as reference_pos)
 ///
 /// Uses `SmallVec` to avoid heap allocations for the common case (0-2 comments per range).
+// TODO: this same-line-vs-own-line partition + its emit_* helpers are the call-arg
+// instance of a rule also implemented in `conditional.rs` split_pre_operator_comments
+// and `chain/builder/helpers.rs` push_gap_comments_and_break. Three parallel copies;
+// unify if/when the Printer/ChainPrinter trait split and the differing emission
+// shapes (operator / comma / dot) allow.
 pub(crate) struct PartitionedComments<'a> {
     pub trailing_line: SmallVec<[&'a internal::Comment; 2]>,
     pub trailing_block: SmallVec<[&'a internal::Comment; 2]>,
@@ -532,6 +537,47 @@ impl<'a> PartitionedComments<'a> {
         for comment in &self.trailing_block {
             parts.push(d.text(" "));
             parts.push(printer.build_comment_doc(comment));
+        }
+        for comment in &self.trailing_line {
+            parts.push(printer.build_trailing_line_comment_doc(comment));
+        }
+    }
+
+    /// Emit a non-last arg's trailing comments split around its comma, then push the
+    /// comma itself: before-comma block comments trail the arg (`arg /* c */,`),
+    /// after-comma blocks and the same-line line comment follow the comma
+    /// (`arg, /* c */ // c2`). The caller adds the line break after.
+    ///
+    /// Unlike [`emit_trailing_comments`] (which the caller invokes *after* pushing
+    /// the comma, so every block lands after it), this keeps a before-comma block in
+    /// its authored position. Shared by the `new`-argument non-last paths
+    /// (`build_new_doc_with_wrapping` and `build_args_with_blank_lines`) so they
+    /// can't drift — both used to relocate the block past the comma.
+    pub fn emit_trailing_comments_around_comma(
+        &self,
+        parts: &mut Vec<DocId>,
+        printer: &Printer<'_>,
+        arg_end: u32,
+        next_arg_start: u32,
+    ) {
+        let d = printer.d();
+        let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start);
+        if let Some(cpos) = comma_pos {
+            for comment in &self.trailing_block {
+                if is_comment_before_comma(comment, cpos) {
+                    parts.push(d.text(" "));
+                    parts.push(printer.build_comment_doc(comment));
+                }
+            }
+        }
+        parts.push(d.text(","));
+        if let Some(cpos) = comma_pos {
+            for comment in &self.trailing_block {
+                if is_comment_after_comma(comment, cpos) {
+                    parts.push(d.text(" "));
+                    parts.push(printer.build_comment_doc(comment));
+                }
+            }
         }
         for comment in &self.trailing_line {
             parts.push(printer.build_trailing_line_comment_doc(comment));

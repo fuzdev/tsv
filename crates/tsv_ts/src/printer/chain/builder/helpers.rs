@@ -11,6 +11,86 @@ use super::super::types::ChainGroup;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::has_blank_line_between_strict;
 
+/// Emit a chain gap's comments and the line break into `parts`, for the gap
+/// between `object_end` and `property_start` (i.e. before a `.member`).
+///
+/// Order: trailing block comments (`prev /* c */`), trailing line comments (same
+/// line, via `line_suffix`), the line break (blank-line aware), then leading block
+/// and line comments on their own lines — with blank-line preservation around the
+/// leading run. Uses single-pass classification (one binary search).
+///
+/// This is the single definition of "how a forced chain break renders the comments
+/// in its gap", shared by the call-chain group path ([`ChainPartsBuilder`]) and the
+/// member-only breaking path, so the two cannot drift (the historical member-only
+/// `line_suffix`-everything approach was exactly such a drift — it merged/reversed
+/// consecutive mid-chain line comments).
+// TODO: same gap-comment rule as `conditional.rs` split_pre_operator_comments and
+// `calls/arg_comments.rs` PartitionedComments — three parallel implementations of
+// "same-line comments trail, later-line ones break to their own line". Unify if/when
+// the Printer/ChainPrinter trait boundary and the differing emission shapes allow.
+pub(crate) fn push_gap_comments_and_break<P: ChainPrinter>(
+    parts: &mut Vec<DocId>,
+    printer: &P,
+    object_end: u32,
+    property_start: u32,
+    use_hardline: bool,
+) {
+    // Classify all comments in one pass (single binary search)
+    let classified = printer.classify_comments(object_end, property_start);
+
+    // Trailing block comments (same line as previous element): `method() /* c */`
+    parts.push(printer.build_trailing_block_doc(&classified.trailing_block));
+    // Trailing line comments (same line as previous element), via line_suffix
+    parts.push(printer.build_trailing_line_doc(&classified.trailing_line));
+    // Line break with blank line preservation
+    parts.push(build_chain_line_break(
+        printer,
+        object_end,
+        property_start,
+        use_hardline,
+    ));
+
+    // When comments exist, build_chain_line_break skips blank line detection.
+    // Check for blank lines before the first comment and after the last comment.
+    let has_leading_comments =
+        !classified.leading_block.is_empty() || !classified.leading_line.is_empty();
+
+    // Blank line before first leading comment
+    if use_hardline && has_leading_comments {
+        let first_start = classified
+            .leading_block
+            .first()
+            .map(|c| c.span.start)
+            .into_iter()
+            .chain(classified.leading_line.first().map(|c| c.span.start))
+            .min();
+        if let Some(start) = first_start
+            && has_blank_line_between_strict(printer.get_source(), object_end, start)
+        {
+            parts.push(printer.arena().hardline());
+        }
+    }
+
+    // Leading block comments (on their own line)
+    parts.push(printer.build_leading_comments_doc(&classified.leading_block));
+    // Leading line comments (on their own line)
+    parts.push(printer.build_leading_comments_doc(&classified.leading_line));
+
+    // Blank line after last leading comment (before property)
+    if use_hardline && has_leading_comments {
+        let last_end = classified
+            .leading_line
+            .last()
+            .or_else(|| classified.leading_block.last())
+            .map(|c| c.span.end);
+        if let Some(end) = last_end
+            && has_blank_line_between_strict(printer.get_source(), end, property_start)
+        {
+            parts.push(printer.arena().hardline());
+        }
+    }
+}
+
 /// Builder for constructing chain parts with proper comment handling.
 ///
 /// Encapsulates the logic for interleaving comments, line breaks, and groups
@@ -88,93 +168,18 @@ impl<'a, P: ChainPrinter> ChainPartsBuilder<'a, P> {
         }
     }
 
-    /// Add trailing comments, line break, and leading comments before a group
-    ///
-    /// Emits comments in this order:
-    /// 1. Trailing block comments (same line as previous element) - before line break
-    /// 2. Trailing line comments (same line) - via line_suffix
-    /// 3. Line break
-    /// 4. Leading block comments (on their own line)
-    /// 5. Leading line comments (on their own line)
-    ///
-    /// Uses single-pass comment classification (O(log n + k)) instead of 4 separate
-    /// filter calls (O(4 log n + 4k)).
+    /// Add trailing comments, line break, and leading comments before a group.
+    /// Delegates to the shared [`push_gap_comments_and_break`] so this group path
+    /// and the member-only breaking path render gap comments identically.
     fn add_comments_and_break(&mut self, group: &ChainGroup<'_>) {
         if let Some((object_end, property_start)) = group.first_member_range() {
-            // Classify all comments in one pass (single binary search)
-            let classified = self.printer.classify_comments(object_end, property_start);
-
-            // Trailing block comments (same line as previous element)
-            // Use Leading spacing (space before comment): `method() /* c */`
-            self.parts.push(
-                self.printer
-                    .build_trailing_block_doc(&classified.trailing_block),
-            );
-
-            // Trailing line comments (same line as previous element)
-            self.parts.push(
-                self.printer
-                    .build_trailing_line_doc(&classified.trailing_line),
-            );
-
-            // Line break with blank line preservation
-            self.parts.push(build_chain_line_break(
+            push_gap_comments_and_break(
+                &mut self.parts,
                 self.printer,
                 object_end,
                 property_start,
                 self.use_hardline,
-            ));
-
-            // When comments exist, build_chain_line_break skips blank line detection.
-            // Check for blank lines before the first comment and after the last comment.
-            let has_leading_comments =
-                !classified.leading_block.is_empty() || !classified.leading_line.is_empty();
-
-            // Blank line before first leading comment
-            if self.use_hardline && has_leading_comments {
-                let first_start = classified
-                    .leading_block
-                    .first()
-                    .map(|c| c.span.start)
-                    .into_iter()
-                    .chain(classified.leading_line.first().map(|c| c.span.start))
-                    .min();
-                if let Some(start) = first_start {
-                    let source = self.printer.get_source();
-                    if has_blank_line_between_strict(source, object_end, start) {
-                        let d = self.printer.arena();
-                        self.parts.push(d.hardline());
-                    }
-                }
-            }
-
-            // Leading block comments (on their own line)
-            self.parts.push(
-                self.printer
-                    .build_leading_comments_doc(&classified.leading_block),
             );
-
-            // Leading line comments (on their own line)
-            self.parts.push(
-                self.printer
-                    .build_leading_comments_doc(&classified.leading_line),
-            );
-
-            // Blank line after last leading comment (before property)
-            if self.use_hardline && has_leading_comments {
-                let last_end = classified
-                    .leading_line
-                    .last()
-                    .or_else(|| classified.leading_block.last())
-                    .map(|c| c.span.end);
-                if let Some(end) = last_end {
-                    let source = self.printer.get_source();
-                    if has_blank_line_between_strict(source, end, property_start) {
-                        let d = self.printer.arena();
-                        self.parts.push(d.hardline());
-                    }
-                }
-            }
         } else {
             // No member range - just add line break
             let d = self.printer.arena();
