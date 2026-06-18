@@ -1,0 +1,347 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 269,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A non-last argument of a chained call with a block comment after the comma and",
+			"start": 20,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a line comment after it: the block stays on the comma line, the line comment",
+			"start": 103,
+			"end": 182,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trails the comma.",
+			"start": 184,
+			"end": 204,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 224,
+			"end": 232,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 6
+				},
+				"end": {
+					"line": 7,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 233,
+			"end": 238,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 15
+				},
+				"end": {
+					"line": 7,
+					"column": 20
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 268,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 259,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 206,
+					"end": 258,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 9
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 206,
+						"end": 257,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 8
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 206,
+							"end": 255,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 1
+								},
+								"end": {
+									"line": 10,
+									"column": 6
+								}
+							},
+							"object": {
+								"type": "CallExpression",
+								"start": 206,
+								"end": 248,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 1
+									},
+									"end": {
+										"line": 9,
+										"column": 3
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 206,
+									"end": 216,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 1
+										},
+										"end": {
+											"line": 6,
+											"column": 6
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 206,
+										"end": 209,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 1
+											},
+											"end": {
+												"line": 5,
+												"column": 4
+											}
+										},
+										"name": "foo"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 213,
+										"end": 216,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 3
+											},
+											"end": {
+												"line": 6,
+												"column": 6
+											}
+										},
+										"name": "bar"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 221,
+										"end": 222,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 3
+											},
+											"end": {
+												"line": 7,
+												"column": 4
+											}
+										},
+										"name": "a",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 224,
+												"end": 232
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 242,
+										"end": 243,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 3
+											},
+											"end": {
+												"line": 8,
+												"column": 4
+											}
+										},
+										"name": "b",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c2",
+												"start": 233,
+												"end": 238
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 252,
+								"end": 255,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 3
+									},
+									"end": {
+										"line": 10,
+										"column": 6
+									}
+								},
+								"name": "baz"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A non-last argument of a chained call with a block comment after the comma and",
+							"start": 20,
+							"end": 101
+						},
+						{
+							"type": "Line",
+							"value": " a line comment after it: the block stays on the comma line, the line comment",
+							"start": 103,
+							"end": 182
+						},
+						{
+							"type": "Line",
+							"value": " trails the comma.",
+							"start": 184,
+							"end": 204
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

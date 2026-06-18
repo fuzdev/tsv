@@ -401,17 +401,18 @@ impl<'a> Printer<'a> {
                     let arg_end = arg.span().end;
                     let next_arg_start = new_expr.arguments[i + 1].span().start;
 
-                    let pc = PartitionedComments::new(
+                    let mut pc = PartitionedComments::new(
                         self.comments,
                         self.line_breaks,
                         arg_end,
                         next_arg_start,
                     );
+                    // Respect-the-newline: an after-comma block hugging the next arg leads
+                    // it (`C`); a stranded one stays on the comma line (`A`).
+                    pc.route_after_comma_hugging_to_leading(self, arg_end, next_arg_start);
 
-                    // Split trailing comments around the comma so a before-comma block
-                    // (`a /* c */, // c2`) stays put instead of being pushed past the
-                    // comma (`emit_trailing_comments` would, since the comma is emitted
-                    // first). Shared with the blank-line args path.
+                    // before-comma blocks trail the arg, the comma, stranded after-comma
+                    // blocks (`A`), then a same-line line comment via `line_suffix`.
                     pc.emit_trailing_comments_around_comma(
                         &mut arg_parts,
                         self,
@@ -419,7 +420,8 @@ impl<'a> Printer<'a> {
                         next_arg_start,
                     );
                     arg_parts.push(d.hardline());
-                    pc.emit_leading_comments(&mut arg_parts, self);
+                    // hugging after-comma + own-line comments lead the next arg (`C`).
+                    pc.emit_leading_comments_inline_aware(&mut arg_parts, self, next_arg_start);
                 } else {
                     // Last argument - check for trailing comments before closing paren
                     let arg_end = arg.span().end;
