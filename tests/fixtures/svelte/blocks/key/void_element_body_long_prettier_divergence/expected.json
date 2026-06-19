@@ -1,0 +1,527 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 982,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 981,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 5,
+							"end": 7,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 7,
+							"end": 78,
+							"data": " void element body @100 (head + body == 100): fits fully inline "
+						},
+						{
+							"type": "Text",
+							"start": 78,
+							"end": 80,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "KeyBlock",
+							"start": 80,
+							"end": 178,
+							"expression": {
+								"type": "CallExpression",
+								"start": 86,
+								"end": 160,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 81
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 86,
+									"end": 93,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 7
+										},
+										"end": {
+											"line": 3,
+											"column": 14
+										}
+									},
+									"name": "fn00000"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 94,
+										"end": 159,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 15
+											},
+											"end": {
+												"line": 3,
+												"column": 80
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									}
+								],
+								"optional": false
+							},
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Component",
+										"start": 161,
+										"end": 172,
+										"name": "Spinner",
+										"name_loc": {
+											"start": {
+												"line": 3,
+												"column": 83,
+												"character": 162
+											},
+											"end": {
+												"line": 3,
+												"column": 90,
+												"character": 169
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": []
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 178,
+							"end": 181,
+							"raw": "\n\n\t",
+							"data": "\n\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 181,
+							"end": 348,
+							"data": " void element body @101 (head + body > 100, head alone <= 100): construct overflows but the head fits alone → body drops to its own line (one-pass middle zone) "
+						},
+						{
+							"type": "Text",
+							"start": 348,
+							"end": 350,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "KeyBlock",
+							"start": 350,
+							"end": 454,
+							"expression": {
+								"type": "CallExpression",
+								"start": 356,
+								"end": 431,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 82
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 356,
+									"end": 363,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 7
+										},
+										"end": {
+											"line": 6,
+											"column": 14
+										}
+									},
+									"name": "fn00000"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 364,
+										"end": 430,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 15
+											},
+											"end": {
+												"line": 6,
+												"column": 81
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									}
+								],
+								"optional": false
+							},
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 432,
+										"end": 435,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "Component",
+										"start": 435,
+										"end": 446,
+										"name": "Spinner",
+										"name_loc": {
+											"start": {
+												"line": 7,
+												"column": 3,
+												"character": 436
+											},
+											"end": {
+												"line": 7,
+												"column": 10,
+												"character": 443
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": []
+										}
+									},
+									{
+										"type": "Text",
+										"start": 446,
+										"end": 448,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 454,
+							"end": 457,
+							"raw": "\n\n\t",
+							"data": "\n\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 457,
+							"end": 528,
+							"data": " void element body, head alone > 100: head wraps AND body drops "
+						},
+						{
+							"type": "Text",
+							"start": 528,
+							"end": 530,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "KeyBlock",
+							"start": 530,
+							"end": 664,
+							"expression": {
+								"type": "CallExpression",
+								"start": 536,
+								"end": 641,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 536,
+									"end": 543,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 7
+										},
+										"end": {
+											"line": 11,
+											"column": 14
+										}
+									},
+									"name": "fn00000"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 547,
+										"end": 637,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 2
+											},
+											"end": {
+												"line": 12,
+												"column": 92
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									}
+								],
+								"optional": false
+							},
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 642,
+										"end": 645,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "Component",
+										"start": 645,
+										"end": 656,
+										"name": "Spinner",
+										"name_loc": {
+											"start": {
+												"line": 14,
+												"column": 3,
+												"character": 646
+											},
+											"end": {
+												"line": 14,
+												"column": 10,
+												"character": 653
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": []
+										}
+									},
+									{
+										"type": "Text",
+										"start": 656,
+										"end": 658,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 664,
+							"end": 667,
+							"raw": "\n\n\t",
+							"data": "\n\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 667,
+							"end": 838,
+							"data": " an attributed element body drops the same way — no breakable-hug special case (uniform body-expand); prettier instead hugs the } and breaks the element internally "
+						},
+						{
+							"type": "Text",
+							"start": 838,
+							"end": 840,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "KeyBlock",
+							"start": 840,
+							"end": 974,
+							"expression": {
+								"type": "CallExpression",
+								"start": 846,
+								"end": 921,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 82
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 846,
+									"end": 853,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 7
+										},
+										"end": {
+											"line": 18,
+											"column": 14
+										}
+									},
+									"name": "fn00000"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 854,
+										"end": 920,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 15
+											},
+											"end": {
+												"line": 18,
+												"column": 81
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									}
+								],
+								"optional": false
+							},
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 922,
+										"end": 925,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "Component",
+										"start": 925,
+										"end": 966,
+										"name": "Spinner",
+										"name_loc": {
+											"start": {
+												"line": 19,
+												"column": 3,
+												"character": 926
+											},
+											"end": {
+												"line": 19,
+												"column": 10,
+												"character": 933
+											}
+										},
+										"attributes": [
+											{
+												"type": "Attribute",
+												"start": 934,
+												"end": 963,
+												"name": "class",
+												"name_loc": {
+													"start": {
+														"line": 19,
+														"column": 11,
+														"character": 934
+													},
+													"end": {
+														"line": 19,
+														"column": 16,
+														"character": 939
+													}
+												},
+												"value": [
+													{
+														"start": 941,
+														"end": 962,
+														"type": "Text",
+														"raw": "loading-spinner-class",
+														"data": "loading-spinner-class"
+													}
+												]
+											}
+										],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": []
+										}
+									},
+									{
+										"type": "Text",
+										"start": 966,
+										"end": 968,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 974,
+							"end": 975,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

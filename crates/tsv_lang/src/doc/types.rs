@@ -23,6 +23,13 @@ pub enum GroupId {
     /// terminal body's `indent_if_break` keys on this group so it indents only
     /// when the heads broke.
     ArrowChain,
+    /// Svelte block-tag head (`{#if …}`, `{#each …}`, …): the breakable head
+    /// expression breaks as a unit when it exceeds print width, and the closing
+    /// `}` keys on this group via `if_break` so it dangles on its own line only
+    /// when the head broke. The dangle's `if_break` is read immediately after the
+    /// head group resolves (before the body), so a shared variant is safe under
+    /// block nesting.
+    BlockHead,
 }
 
 /// Context for doc rendering - provides hints about trailing punctuation

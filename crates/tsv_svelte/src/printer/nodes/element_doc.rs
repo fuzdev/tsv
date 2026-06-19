@@ -1205,10 +1205,16 @@ impl<'a> Printer<'a> {
     /// Expressions, blocks, and other dynamic content are formatted normally
     /// (their internal whitespace is not significant).
     fn build_whitespace_sensitive_content_doc(&self, nodes: &[FragmentNode]) -> DocId {
+        // Whitespace is significant here (`<pre>`/`<textarea>`): a block must not
+        // dangle its `}` or expand its body — that would inject rendered whitespace.
+        // The dedicated ws-sensitive if/each builders already hug; this also gates
+        // await/key/snippet, which fall through to the normal (dangling) builders.
+        let prev_dangle = self.set_block_dangle_allowed(false);
         let node_docs: Vec<_> = nodes
             .iter()
             .map(|node| self.build_whitespace_sensitive_node_doc(node))
             .collect();
+        self.set_block_dangle_allowed(prev_dangle);
         self.d().concat(&node_docs)
     }
 

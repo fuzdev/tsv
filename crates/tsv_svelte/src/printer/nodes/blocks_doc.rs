@@ -9,6 +9,7 @@
 
 use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
+use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
 
 use super::helpers::indent_body;
@@ -89,7 +90,299 @@ fn split_raw_params_at_commas(raw: &str) -> Vec<&str> {
     result
 }
 
+/// Whether a wrapped block head's clause + `}` should hug the expression's last
+/// line (`) as item}`, `)}`) rather than dropping to their own line.
+///
+/// True only for a single call/`new` whose callee contains no other call: when its
+/// arguments wrap, the `)` dedents to the tag's base indent, so the rendered last
+/// line starts with `)` and (per the layout rule) must not be broken — the clause +
+/// `}` continue on it. A binary/logical chain (last line is an operand), a
+/// multi-segment member chain (last line is a `.method(...)` segment, not a bare
+/// `)`), or anything else breaks the clause + `}` to their own line at base.
+fn clause_hugs_expr(expr: &tsv_ts::Expression) -> bool {
+    use tsv_ts::Expression as E;
+    // A callee with no nested call means the only `(` belongs to this call, so its
+    // `)` lands at the tag base when the args wrap (vs. a chain, whose segments indent).
+    fn callee_has_no_call(e: &E) -> bool {
+        match e {
+            E::Identifier(_) | E::ThisExpression(_) | E::Super(_) => true,
+            E::MemberExpression(m) => callee_has_no_call(&m.object),
+            _ => false,
+        }
+    }
+    match expr {
+        E::CallExpression(c) => callee_has_no_call(&c.callee),
+        E::NewExpression(n) => callee_has_no_call(&n.callee),
+        _ => false,
+    }
+}
+
 impl<'a> Printer<'a> {
+    /// Whether the trailing comments in `[start, end)` end with a line (`//`) comment.
+    ///
+    /// A trailing line comment is emitted (by `build_trailing_js_comment_doc`) with a
+    /// closing `hardline` — a `//` runs to end of line, so the following clause + `}`
+    /// already drop to the next line. The head dangle (and the flat hug) must then not
+    /// add their own break, or a spurious blank line / leading space appears. A trailing
+    /// *block* comment carries no `hardline`, so it does not suppress the dangle.
+    pub(super) fn head_trailing_line_comment(&self, start: u32, end: u32) -> bool {
+        tsv_lang::comments_in_range(self.comments, start, end)
+            .last()
+            .is_some_and(|c| !c.is_block)
+    }
+
+    /// Whether a wrapped block head may dangle its `}` (and expand its body) here. The
+    /// head expression is allowed to break (`allow_wrapping` or a multiline context) AND
+    /// the context permits the dangle — false only inside a whitespace-significant element
+    /// (`<pre>` / `<textarea>`), gated by [`Printer::block_dangle_allowed`]. Gating it off
+    /// only hugs the `}`; the expression still wraps to respect printWidth either way.
+    fn block_head_can_wrap(&self, allow_wrapping: bool, in_multiline_context: bool) -> bool {
+        (allow_wrapping || in_multiline_context) && self.block_dangle_allowed()
+    }
+
+    /// Wrap a block-tag head so its closing `}` dangles on its own line when the head wraps.
+    ///
+    /// `open` is the opening literal (`{#if `, `{#each `, …) and `head_inner` is everything
+    /// between it and the closing `}` — the breakable expression plus any clause (` as item`,
+    /// ` then value`). When `can_wrap` is set (the same condition under which the expression is
+    /// allowed to break), `[head_inner, softline]` is grouped so the trailing softline — and thus
+    /// `}` — drops to its own line at the tag's base indent whenever the head exceeds print width
+    /// (a deliberate `_prettier_divergence`, consistent with tsv's JS `if (⏎…⏎) {` and broken-element
+    /// `>`). When the head fits, the softline collapses and `}` hugs the head, byte-identical to the
+    /// inline form. When `can_wrap` is false (inline context, `remove_lines` applied) the head is
+    /// emitted flat with `}` hugged, unchanged.
+    ///
+    /// `expr_ends_with_line_comment` (from `head_trailing_line_comment`) short-circuits both
+    /// paths: the comment's own `hardline` already drops the clause + `}` to the next line, so
+    /// the dangle/hug break is skipped to avoid a spurious blank line.
+    pub(super) fn build_block_head_doc(
+        &self,
+        open: &'static str,
+        expr_doc: DocId,
+        clause: Option<DocId>,
+        can_wrap: bool,
+        hug: bool,
+        expr_ends_with_line_comment: bool,
+    ) -> DocId {
+        let d = self.d();
+        let open_doc = d.text(open);
+        let close = d.text("}");
+        if expr_ends_with_line_comment {
+            // The trailing line comment already emitted a `hardline` that drops the
+            // clause + `}` to the next line at base indent. Emit them directly with no
+            // dangle/hug break. Still group the expression on the wrapping path so the
+            // body-expand keyed to `BlockHead` sees the (comment-forced) break.
+            let head = if can_wrap {
+                d.group_with_id(expr_doc, GroupId::BlockHead)
+            } else {
+                expr_doc
+            };
+            return match clause {
+                Some(c) => d.concat(&[open_doc, head, c, close]),
+                None => d.concat(&[open_doc, head, close]),
+            };
+        }
+        if can_wrap {
+            // Key the breakable expression to `GroupId::BlockHead`. The head group's
+            // `fits()` counts the trailing clause + `}` (they sit in rest-commands /
+            // resolve flat during the fits test), so the head breaks at the right
+            // boundary; reading anything keyed to `BlockHead` immediately after the
+            // group resolves keeps the shared id nesting-safe.
+            let grouped = d.group_with_id(expr_doc, GroupId::BlockHead);
+            if hug {
+                // The expression renders ending with `)` on its own line at base (a
+                // single call whose args wrapped). Per the layout rule, don't break a
+                // line that starts with `)` — the clause + `}` continue on it
+                // (`) as item}`, `)}`), in both the flat and broken head.
+                match clause {
+                    Some(c) => {
+                        let space = d.text(" ");
+                        d.concat(&[open_doc, grouped, space, c, close])
+                    }
+                    None => d.concat(&[open_doc, grouped, close]),
+                }
+            } else {
+                // Binary chain / member chain / etc.: the clause + `}` drop to their
+                // own line at the tag's base indent when the head wraps (`expr⏎as item}`,
+                // `expr⏎}`); when it fits they hug inline (`expr as item}`).
+                let hardline = d.hardline();
+                let (break_tail, flat_tail) = match clause {
+                    Some(c) => {
+                        let space = d.text(" ");
+                        (d.concat(&[hardline, c]), d.concat(&[space, c]))
+                    }
+                    None => (hardline, d.empty()),
+                };
+                let dangle = d.if_break_with_id(break_tail, flat_tail, GroupId::BlockHead);
+                d.concat(&[open_doc, grouped, dangle, close])
+            }
+        } else {
+            match clause {
+                Some(c) => {
+                    let space = d.text(" ");
+                    d.concat(&[open_doc, expr_doc, space, c, close])
+                }
+                None => d.concat(&[open_doc, expr_doc, close]),
+            }
+        }
+    }
+
+    /// Build a **section-free** block (key, plain each/if/await, snippet) whose body
+    /// is inline-authored, expanding the body + `{/tag}` onto their own lines when the
+    /// head goes multiline.
+    ///
+    /// `head_doc` is the opening tag through its `}` (including the `BlockHead`
+    /// head-wrap group + dangle); `body_doc` / `close` are the inline body and the
+    /// `{/tag}` close.
+    ///
+    /// A `conditional_group` chooses in one pass among (1) fully inline, (2) flat head +
+    /// expanded body (the construct overflows but the head fits alone — the expanded
+    /// body's leading `hardline` ends the head's `fits()` lookahead, so the head
+    /// measures *head-alone*), and (3) wrapped head + expanded body (the head alone
+    /// overflows, so it wraps and its `}` dangles). Decoupling head-wrap (head-alone
+    /// width) from body-expand (head+body width) keeps every layout a one-pass fixed
+    /// point: a one-line input in the "middle zone" (head fits alone, head+body
+    /// doesn't) converges directly to layout 2 instead of wrapping then un-wrapping
+    /// across two passes. This holds for **every** body shape — text, expression,
+    /// void, and element/component — which all drop to their own line on overflow.
+    fn build_expanding_block(&self, head_doc: DocId, body_doc: DocId, close: DocId) -> DocId {
+        let d = self.d();
+        let lead = d.hardline();
+        let trail = d.hardline();
+        let multiline_tail = d.concat(&[d.indent(d.concat(&[lead, body_doc])), trail, close]);
+        // Inline tail keeps the body's own `indent()` wrapper (so a body that breaks
+        // internally still indents); the close hugs the body.
+        let inline_tail = d.concat(&[d.indent(body_doc), close]);
+        self.build_expanding_construct(head_doc, inline_tail, multiline_tail)
+    }
+
+    /// Core of the expand-when-the-construct-overflows layout, over a precomputed
+    /// `inline_tail` (everything after the head's `}` hugged onto one line) and
+    /// `multiline_tail` (the same content with each body/section/branch on its own
+    /// line). Shared by the section-free blocks (via `build_expanding_block`),
+    /// `{#if}`/`{#each}` with `{:else}`/`{:else if}` alternates, and `{#await}`
+    /// (multiple sections, via `build_await_tail`).
+    ///
+    /// A `conditional_group` picks fully-inline / flat-head + expanded / wrapped-head +
+    /// expanded in one pass, decoupling head-wrap (head-alone width) from body-expand
+    /// (head+tail width) so every layout is a one-pass fixed point (no two-pass
+    /// wrap-then-unwrap in the middle zone). The body **always drops to its own line**
+    /// when the construct overflows — uniformly across text, expression, void, and
+    /// element/component bodies (a deliberate divergence from prettier, which hugs the
+    /// `}` and breaks an element body internally; see
+    /// `conformance_prettier.md` §Svelte: Blocks). The `conditional_group` fits-tests
+    /// each candidate in flat mode, so an element body's inline candidate does not
+    /// "fit by breaking internally" — it falls through to the expanded (drop) state.
+    ///
+    /// **Head forced multiline** (a trailing line comment) → expand directly; its
+    /// hardline would otherwise short-circuit the `conditional_group`'s `fits()` to
+    /// "fits" and wrongly hug the tail.
+    fn build_expanding_construct(
+        &self,
+        head_doc: DocId,
+        inline_tail: DocId,
+        multiline_tail: DocId,
+    ) -> DocId {
+        let d = self.d();
+        if d.will_break(head_doc) {
+            return d.concat(&[head_doc, multiline_tail]);
+        }
+        let inline = d.concat(&[head_doc, inline_tail]);
+        let expanded = d.concat(&[head_doc, multiline_tail]);
+        d.conditional_group(&[inline, expanded])
+    }
+
+    /// Whether every if-block branch (consequent, each `{:else if}` consequent,
+    /// `{:else}`) is inline-authored — the precondition for the body-expand fast path.
+    fn if_branches_all_inline(&self, block: &internal::IfBlock, imc: bool) -> bool {
+        let mut all_inline = self.fragment_inline_authored(&block.consequent, imc);
+        let mut alt = block.alternate.as_ref();
+        while let Some(a) = alt {
+            if let Some(else_if) = Self::get_flattenable_else_if(a) {
+                all_inline &= self.fragment_inline_authored(&else_if.consequent, imc);
+                alt = else_if.alternate.as_ref();
+            } else {
+                all_inline &= self.fragment_inline_authored(a, imc);
+                alt = None;
+            }
+        }
+        all_inline
+    }
+
+    /// Indent a section body, dropping it to its own line (leading `hardline`) when
+    /// `multiline`; otherwise indent it in place (so a body that breaks internally still
+    /// indents). The shared body-expand primitive for every block tail's body / branch /
+    /// section / fallback.
+    fn indent_body_expand(&self, body: DocId, multiline: bool) -> DocId {
+        let d = self.d();
+        if multiline {
+            d.indent(d.concat(&[d.hardline(), body]))
+        } else {
+            d.indent(body)
+        }
+    }
+
+    /// Build the if-block tail (consequent body + alternate branches + `{/if}`) in
+    /// inline (`multiline = false`) or expanded (`multiline = true`) form, for
+    /// `build_expanding_construct`. Each `{:else if}` keeps its own head (with dangle),
+    /// so a long else-if head still wraps within the expanded form.
+    fn build_if_tail(&self, block: &internal::IfBlock, multiline: bool) -> DocId {
+        let d = self.d();
+        let mut parts: Vec<DocId> = Vec::new();
+        let cons = self.build_fragment_doc(&block.consequent);
+        parts.push(self.indent_body_expand(cons, multiline));
+        if let Some(alt) = &block.alternate {
+            parts.push(self.build_if_alternate_tail(alt, multiline));
+        }
+        if multiline {
+            parts.push(d.hardline());
+        }
+        parts.push(d.text("{/if}"));
+        d.concat(&parts)
+    }
+
+    /// Build the alternate part of an if tail (`{:else if …}` chains / `{:else}`),
+    /// recursively, in inline or expanded form. Excludes the closing `{/if}` (added by
+    /// `build_if_tail`).
+    fn build_if_alternate_tail(&self, alt: &Fragment, multiline: bool) -> DocId {
+        let d = self.d();
+        let mut parts: Vec<DocId> = Vec::new();
+        if let Some(else_if) = Self::get_flattenable_else_if(alt) {
+            // Build the else-if head with wrapping enabled so it can dangle within the
+            // expanded form; in the inline form `BlockHead` resolves flat (no dangle).
+            let expr_doc = self.build_else_if_expr_doc(else_if, true);
+            let comment = self.head_trailing_line_comment(
+                else_if.test.span().end,
+                else_if.opening_tag_span.end - 1,
+            );
+            let head_doc = self.build_block_head_doc(
+                ELSE_IF_BLOCK_OPEN,
+                expr_doc,
+                None,
+                self.block_dangle_allowed(),
+                clause_hugs_expr(&else_if.test),
+                comment,
+            );
+            if multiline {
+                parts.push(d.hardline());
+            }
+            parts.push(head_doc);
+            let body = self.build_fragment_doc(&else_if.consequent);
+            parts.push(self.indent_body_expand(body, multiline));
+            if let Some(nested) = &else_if.alternate {
+                parts.push(self.build_if_alternate_tail(nested, multiline));
+            }
+        } else {
+            if multiline {
+                parts.push(d.hardline());
+            }
+            parts.push(d.text("{:else}"));
+            let body = self.build_nodes_doc(&alt.nodes);
+            parts.push(self.indent_body_expand(body, multiline));
+        }
+        d.concat(&parts)
+    }
+
     /// Build a doc for an if block
     ///
     /// For inline blocks (no leading/trailing whitespace in body), hugs content directly:
@@ -159,7 +452,28 @@ impl<'a> Printer<'a> {
         // Always wrap body in indent() for proper internal break indentation
         let indented_body = indent_body(self, body_doc, has_leading);
 
-        let mut parts = vec![d.text(IF_BLOCK_OPEN), expr_doc, d.text("}"), indented_body];
+        let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
+        let expr_ends_with_line_comment =
+            self.head_trailing_line_comment(block.test.span().end, block.opening_tag_span.end - 1);
+        let head_doc = self.build_block_head_doc(
+            IF_BLOCK_OPEN,
+            expr_doc,
+            None,
+            can_wrap,
+            clause_hugs_expr(&block.test),
+            expr_ends_with_line_comment,
+        );
+
+        // Inline-authored block (consequent + every alternate branch): expand the
+        // whole block — bodies, `{:else if}`/`{:else}` sections, and `{/if}` — onto
+        // their own lines when the head wraps (or the construct overflows).
+        if self.if_branches_all_inline(block, in_multiline_context) && can_wrap {
+            let inline_tail = self.build_if_tail(block, false);
+            let multiline_tail = self.build_if_tail(block, true);
+            return self.build_expanding_construct(head_doc, inline_tail, multiline_tail);
+        }
+
+        let mut parts = vec![head_doc, indented_body];
 
         // Handle alternate (else/else-if) and determine final trailing status
         let final_has_trailing = if let Some(alt) = &block.alternate {
@@ -282,12 +596,21 @@ impl<'a> Printer<'a> {
 
             let indented_body = indent_body(self, body_doc, has_leading);
 
-            let mut parts = vec![
-                d.text(ELSE_IF_BLOCK_OPEN),
+            // `build_else_if_expr_doc` builds the condition with `in_multiline_context`
+            // as its wrapping flag, so the dangle keys on the same condition.
+            let expr_ends_with_line_comment = self.head_trailing_line_comment(
+                else_if.test.span().end,
+                else_if.opening_tag_span.end - 1,
+            );
+            let head_doc = self.build_block_head_doc(
+                ELSE_IF_BLOCK_OPEN,
                 expr_doc,
-                d.text("}"),
-                indented_body,
-            ];
+                None,
+                in_multiline_context && self.block_dangle_allowed(),
+                clause_hugs_expr(&else_if.test),
+                expr_ends_with_line_comment,
+            );
+            let mut parts = vec![head_doc, indented_body];
 
             // Handle nested alternate or trailing
             if let Some(nested_alt) = &else_if.alternate {
@@ -353,6 +676,38 @@ impl<'a> Printer<'a> {
         has_trailing
     }
 
+    /// Whether the each block's body and its optional `{:else}` fallback are both
+    /// inline-authored — the precondition for the body-expand fast path.
+    fn each_branches_all_inline(&self, block: &internal::EachBlock, imc: bool) -> bool {
+        let mut all_inline = self.fragment_inline_authored(&block.body, imc);
+        if let Some(fallback) = &block.fallback {
+            all_inline &= self.fragment_inline_authored(fallback, imc);
+        }
+        all_inline
+    }
+
+    /// Build the each-block tail (body + optional `{:else}` fallback + `{/each}`) in
+    /// inline or expanded form, for `build_expanding_construct`.
+    fn build_each_tail(&self, block: &internal::EachBlock, multiline: bool) -> DocId {
+        let d = self.d();
+        let mut parts: Vec<DocId> = Vec::new();
+        let body = self.build_fragment_doc(&block.body);
+        parts.push(self.indent_body_expand(body, multiline));
+        if let Some(fallback) = &block.fallback {
+            if multiline {
+                parts.push(d.hardline());
+            }
+            parts.push(d.text("{:else}"));
+            let fb = self.build_fragment_doc(fallback);
+            parts.push(self.indent_body_expand(fb, multiline));
+        }
+        if multiline {
+            parts.push(d.hardline());
+        }
+        parts.push(d.text("{/each}"));
+        d.concat(&parts)
+    }
+
     /// Build a doc for an each block
     ///
     /// Uses same inline/multiline pattern as if blocks.
@@ -392,28 +747,10 @@ impl<'a> Printer<'a> {
             allow_wrapping || in_multiline_context,
         );
 
-        let mut opening = vec![d.text(EACH_BLOCK_OPEN), expr_doc];
-
-        // Pattern (context) - only add " as " when there's a context or index
-        if let Some(context) = &block.context {
-            opening.push(d.text(" as "));
-            // Format pattern through TypeScript formatter for proper whitespace normalization
-            let pattern_doc = self.build_pattern_doc(context);
-            opening.push(pattern_doc);
-            if let Some(index) = &block.index {
-                opening.push(d.text(", "));
-                opening.push(d.text_owned(index.clone()));
-            }
-        } else if let Some(index) = &block.index {
-            // No context but has index: ", i" pattern
-            opening.push(d.text(", "));
-            opening.push(d.text_owned(index.clone()));
-        }
-
-        if let Some(key) = &block.key {
-            // Build key doc with context-dependent behavior
-            // The key expression is inside parens, so opening offset accounts for that
-            let key_doc = if let Some(key_span) = block.key_span {
+        // Build the optional key doc (shared between the clause and degenerate paths).
+        let key_doc = block.key.as_ref().map(|key| {
+            // The key expression is inside parens, so the offset accounts for that.
+            if let Some(key_span) = block.key_span {
                 self.build_expression_doc_for_block(
                     key,
                     key_span.start + 1, // after "("
@@ -424,13 +761,41 @@ impl<'a> Printer<'a> {
             } else {
                 // No key_span: build doc directly
                 self.build_ts_expression_doc(key)
-            };
-            opening.push(d.text(" ("));
-            opening.push(key_doc);
-            opening.push(d.text(")"));
-        }
+            }
+        });
 
-        opening.push(d.text("}"));
+        // Separate the breakable expression from its clause so the clause + `}` can
+        // dedent together onto their own line when the head wraps. `clause` is the
+        // `as pattern[, index][ (key)]` tail WITHOUT its leading space (added by
+        // `build_block_head_doc`); the degenerate index/key-without-`as` cases (not
+        // valid Svelte) keep hugging the expression unchanged.
+        let (head_expr, clause) = if let Some(context) = &block.context {
+            let mut clause_parts = vec![d.text("as ")];
+            clause_parts.push(self.build_pattern_doc(context));
+            if let Some(index) = &block.index {
+                clause_parts.push(d.text(", "));
+                clause_parts.push(d.text_owned(index.clone()));
+            }
+            if let Some(kd) = key_doc {
+                clause_parts.push(d.text(" ("));
+                clause_parts.push(kd);
+                clause_parts.push(d.text(")"));
+            }
+            (expr_doc, Some(d.concat(&clause_parts)))
+        } else {
+            // No `as`: any index/key is degenerate — keep it hugging the expression.
+            let mut e = vec![expr_doc];
+            if let Some(index) = &block.index {
+                e.push(d.text(", "));
+                e.push(d.text_owned(index.clone()));
+            }
+            if let Some(kd) = key_doc {
+                e.push(d.text(" ("));
+                e.push(kd);
+                e.push(d.text(")"));
+            }
+            (d.concat(&e), None)
+        };
 
         // Check leading/trailing whitespace, considering multiline context.
         // Space-only whitespace (no newlines) also triggers expansion to match prettier.
@@ -450,8 +815,28 @@ impl<'a> Printer<'a> {
 
         let indented_body = indent_body(self, body_doc, has_leading);
 
-        let opening_concat = d.concat(&opening);
-        let mut parts = vec![opening_concat, indented_body];
+        let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
+        let expr_ends_with_line_comment =
+            self.head_trailing_line_comment(block.expression.span().end, expr_comment_end);
+        let head_doc = self.build_block_head_doc(
+            EACH_BLOCK_OPEN,
+            head_expr,
+            clause,
+            can_wrap,
+            clause_hugs_expr(&block.expression),
+            expr_ends_with_line_comment,
+        );
+
+        // Inline-authored block (body + `{:else}` fallback): expand the body,
+        // `{:else}` section, and `{/each}` onto their own lines when the head wraps
+        // (or the construct overflows).
+        if self.each_branches_all_inline(block, in_multiline_context) && can_wrap {
+            let inline_tail = self.build_each_tail(block, false);
+            let multiline_tail = self.build_each_tail(block, true);
+            return self.build_expanding_construct(head_doc, inline_tail, multiline_tail);
+        }
+
+        let mut parts = vec![head_doc, indented_body];
 
         // Determine final trailing status (from body or fallback if present)
         let final_has_trailing = if let Some(fallback) = &block.fallback {
@@ -495,6 +880,83 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
+    /// Whether a fragment is inline-authored (no leading/trailing whitespace — incl.
+    /// space-only — and no forced break) — the precondition for the body-expand fast
+    /// path on `{#if}` / `{#each}` / `{#await}` bodies, branches, and sections. Uses
+    /// the same `fragment_ws_status` the non-fast-path `is_inline` uses, so space-only
+    /// / newline-authored fragments fall through to the existing whitespace-respecting
+    /// paths.
+    fn fragment_inline_authored(&self, frag: &Fragment, in_multiline_context: bool) -> bool {
+        let (has_leading, has_trailing) = self.fragment_ws_status(frag, in_multiline_context);
+        !has_leading && !has_trailing && !self.fragment_should_force_break_content(&frag.nodes)
+    }
+
+    /// Build one await section body, indented; in multiline mode it drops to its own
+    /// line (leading `hardline`), matching the other blocks' body-expand.
+    fn await_section_body_expand(&self, frag: &Fragment, multiline: bool) -> DocId {
+        self.indent_body_expand(self.build_fragment_doc(frag), multiline)
+    }
+
+    /// Build the await tail (everything after the head's `}`): the section bodies, the
+    /// `{:then …}` / `{:catch …}` keywords (only the ones NOT carried in the head by a
+    /// shorthand), and `{/await}`. In `multiline` mode every section + keyword +
+    /// `{/await}` is on its own line; otherwise they hug. Feeds
+    /// `build_expanding_construct`, so a wrapped await head expands all sections like
+    /// the other blocks.
+    fn build_await_tail(&self, block: &internal::AwaitBlock, multiline: bool) -> DocId {
+        let d = self.d();
+        // Shorthands carry their clause in the head: `then v` → no `{:then}` keyword in
+        // the tail; `catch e` (no value/pending) → no `{:catch}` keyword.
+        let is_then_shorthand = block.value.is_some() && block.pending.is_none();
+        let is_catch_shorthand =
+            block.value.is_none() && block.pending.is_none() && block.error.is_some();
+        let mut parts: Vec<DocId> = Vec::new();
+        if let Some(pending) = &block.pending {
+            parts.push(self.await_section_body_expand(pending, multiline));
+        }
+        if !is_then_shorthand {
+            if let Some(value) = &block.value {
+                if multiline {
+                    parts.push(d.hardline());
+                }
+                parts.push(d.text("{:then "));
+                parts.push(self.build_pattern_doc(value));
+                parts.push(d.text("}"));
+            } else if block.then.as_ref().is_some_and(|t| !t.nodes.is_empty()) {
+                if multiline {
+                    parts.push(d.hardline());
+                }
+                parts.push(d.text("{:then}"));
+            }
+        }
+        if let Some(then_block) = &block.then {
+            parts.push(self.await_section_body_expand(then_block, multiline));
+        }
+        if !is_catch_shorthand {
+            if let Some(error) = &block.error {
+                if multiline {
+                    parts.push(d.hardline());
+                }
+                parts.push(d.text("{:catch "));
+                parts.push(self.build_pattern_doc(error));
+                parts.push(d.text("}"));
+            } else if block.catch.as_ref().is_some_and(|c| !c.nodes.is_empty()) {
+                if multiline {
+                    parts.push(d.hardline());
+                }
+                parts.push(d.text("{:catch}"));
+            }
+        }
+        if let Some(catch_block) = &block.catch {
+            parts.push(self.await_section_body_expand(catch_block, multiline));
+        }
+        if multiline {
+            parts.push(d.hardline());
+        }
+        parts.push(d.text("{/await}"));
+        d.concat(&parts)
+    }
+
     /// Build a doc for an await block
     ///
     /// Uses same inline/multiline pattern as if blocks.
@@ -529,14 +991,68 @@ impl<'a> Printer<'a> {
             allow_wrapping || in_multiline_context,
         );
 
-        let mut parts = vec![d.text(AWAIT_BLOCK_OPEN), expr_doc];
+        let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
+        let expr_ends_with_line_comment = self.head_trailing_line_comment(
+            block.expression.span().end,
+            block.opening_tag_span.end - 1,
+        );
+
+        // Fast path: every present section is inline-authored → body-expand like the
+        // other blocks. The head carries the `then v` / `catch e` clause; the section
+        // bodies + `{:then}`/`{:catch}` keywords + `{/await}` all drop to their own
+        // lines when the head wraps, chosen in one pass by `build_expanding_construct`.
+        let sections = [&block.pending, &block.then, &block.catch];
+        let has_section = sections
+            .iter()
+            .any(|f| f.as_ref().is_some_and(|f| !f.nodes.is_empty()));
+        // `fragment_inline_authored` (via `fragment_ws_status`) already treats a
+        // space-only section as non-inline, so space-only await blocks fall through to
+        // the `has_space_only` group path below.
+        let all_sections_inline = sections
+            .iter()
+            .filter_map(|f| f.as_ref())
+            .all(|f| self.fragment_inline_authored(f, in_multiline_context));
+        if can_wrap && has_section && all_sections_inline {
+            // Shorthand clause lives in the head: `then v` (value, no pending) or
+            // `catch e` (error, no value/pending); the full form has none.
+            let clause = match (block.pending.is_none(), &block.value, &block.error) {
+                (true, Some(value), _) => {
+                    Some(d.concat(&[d.text("then "), self.build_pattern_doc(value)]))
+                }
+                (true, None, Some(error)) => {
+                    Some(d.concat(&[d.text("catch "), self.build_pattern_doc(error)]))
+                }
+                _ => None,
+            };
+            let head_doc = self.build_block_head_doc(
+                AWAIT_BLOCK_OPEN,
+                expr_doc,
+                clause,
+                can_wrap,
+                clause_hugs_expr(&block.expression),
+                expr_ends_with_line_comment,
+            );
+            let inline_tail = self.build_await_tail(block, false);
+            let multiline_tail = self.build_await_tail(block, true);
+            return self.build_expanding_construct(head_doc, inline_tail, multiline_tail);
+        }
+
+        let mut parts: Vec<DocId> = Vec::new();
 
         // Shorthand: {#await expr then value}...{/await}
         // Also handles: {#await expr then value}...{:catch error}...{/await}
         if let (Some(value), None) = (&block.value, &block.pending) {
-            parts.push(d.text(" then "));
-            parts.push(self.build_pattern_doc(value));
-            parts.push(d.text("}"));
+            let then_kw = d.text("then ");
+            let value_doc = self.build_pattern_doc(value);
+            let then_clause = d.concat(&[then_kw, value_doc]);
+            parts.push(self.build_block_head_doc(
+                AWAIT_BLOCK_OPEN,
+                expr_doc,
+                Some(then_clause),
+                can_wrap,
+                clause_hugs_expr(&block.expression),
+                expr_ends_with_line_comment,
+            ));
 
             // Check if any section has space-only whitespace
             let has_space_only = block
@@ -613,9 +1129,17 @@ impl<'a> Printer<'a> {
             && block.value.is_none()
             && let Some(error) = &block.error
         {
-            parts.push(d.text(" catch "));
-            parts.push(self.build_pattern_doc(error));
-            parts.push(d.text("}"));
+            let catch_kw = d.text("catch ");
+            let error_doc = self.build_pattern_doc(error);
+            let catch_clause = d.concat(&[catch_kw, error_doc]);
+            parts.push(self.build_block_head_doc(
+                AWAIT_BLOCK_OPEN,
+                expr_doc,
+                Some(catch_clause),
+                can_wrap,
+                clause_hugs_expr(&block.expression),
+                expr_ends_with_line_comment,
+            ));
 
             // Check if any section has space-only whitespace
             let has_space_only = block
@@ -645,7 +1169,14 @@ impl<'a> Printer<'a> {
             return d.concat(&parts);
         }
 
-        parts.push(d.text("}"));
+        parts.push(self.build_block_head_doc(
+            AWAIT_BLOCK_OPEN,
+            expr_doc,
+            None,
+            can_wrap,
+            clause_hugs_expr(&block.expression),
+            expr_ends_with_line_comment,
+        ));
 
         // Check if any section has space-only whitespace (spaces, no newlines).
         // Space-only await blocks stay inline when short but break when exceeding
@@ -811,14 +1342,33 @@ impl<'a> Printer<'a> {
 
         let indented_body = indent_body(self, body_doc, has_leading);
 
-        let mut parts = vec![d.text(KEY_BLOCK_OPEN), expr_doc, d.text("}"), indented_body];
+        let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
+        let expr_ends_with_line_comment = self.head_trailing_line_comment(
+            block.expression.span().end,
+            block.opening_tag_span.end - 1,
+        );
+        let head_doc = self.build_block_head_doc(
+            KEY_BLOCK_OPEN,
+            expr_doc,
+            None,
+            can_wrap,
+            clause_hugs_expr(&block.expression),
+            expr_ends_with_line_comment,
+        );
+        let close = d.text("{/key}");
+        if is_inline && can_wrap {
+            // Inline-authored body: expand it + `{/key}` when the head wraps.
+            return self.build_expanding_block(head_doc, body_doc, close);
+        }
+
+        let mut parts = vec![head_doc, indented_body];
 
         // Add endline before {/key} only if trailing whitespace exists
         if has_trailing {
             parts.push(d.hardline());
         }
 
-        parts.push(d.text("{/key}"));
+        parts.push(close);
         d.concat(&parts)
     }
 
@@ -894,6 +1444,9 @@ impl<'a> Printer<'a> {
             let indent_sl = d.indent_softline(params_doc);
             let trailing = d.trailing_comma();
             let softline = d.softline();
+            // The params are a call-like `(…)`: when they wrap, `)` dedents to base,
+            // so `}` hugs it (`)}`) — no dangle. Key the opening group to `BlockHead`
+            // so the body can expand when the params wrap (below).
             let inner = d.concat(&[
                 d.text("{#snippet "),
                 d.text_owned(name.to_string()),
@@ -904,10 +1457,8 @@ impl<'a> Printer<'a> {
                 softline,
                 d.text(")}"),
             ]);
-            d.group(inner)
+            d.group_with_id(inner, GroupId::BlockHead)
         };
-
-        let mut parts = vec![opening_doc];
 
         // Body: inline hugs directly, multiline uses hardlines
         let body_doc = if is_inline {
@@ -916,6 +1467,15 @@ impl<'a> Printer<'a> {
             self.build_nodes_doc_multiline(&block.body.nodes)
         };
 
+        // Inline-authored body: expand the body + `{/snippet}` onto their own lines
+        // when the construct overflows (params wrap, or head + body exceeds width) —
+        // uniformly, including paramless snippets. Keyed to the opening group above.
+        if is_inline && self.block_dangle_allowed() {
+            let close = d.text("{/snippet}");
+            return self.build_expanding_block(opening_doc, body_doc, close);
+        }
+
+        let mut parts = vec![opening_doc];
         parts.push(indent_body(self, body_doc, has_leading));
 
         // Add endline before {/snippet} only if trailing whitespace exists
