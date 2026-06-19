@@ -80,6 +80,37 @@ impl PendingWhitespace {
             _ => "\n", // Newline, Space, None all become newline for blocks
         }
     }
+
+    /// Classify a root text node's **leading** whitespace into its pending-whitespace level
+    /// (`None` when it has none). Shared by the inline-run boundary and the content-text
+    /// node handler, which both `upgrade()` with the result.
+    fn leading_of(raw: &str) -> Self {
+        if raw.leading_whitespace().has_blank_line() {
+            Self::BlankLine
+        } else if raw.has_leading_newline() {
+            Self::Newline
+        } else if raw.has_leading_space_only() {
+            Self::Space
+        } else {
+            Self::None
+        }
+    }
+
+    /// Classify a root text node's **trailing** whitespace into its pending-whitespace level
+    /// (`None` when it has none). A trailing space-only run maps to `Space`; the content-text
+    /// handler, which writes that space inline, remaps it to `AlreadyHandled`, while the
+    /// inline-run path (whose doc trimmed the boundary) keeps `Space` to re-emit it.
+    fn trailing_of(raw: &str) -> Self {
+        if raw.has_trailing_blank_line() {
+            Self::BlankLine
+        } else if raw.has_trailing_newline() {
+            Self::Newline
+        } else if raw.has_trailing_space_only() {
+            Self::Space
+        } else {
+            Self::None
+        }
+    }
 }
 
 /// Which section a fragment comment should travel with during canonical reordering.
@@ -626,10 +657,36 @@ impl<'a> Printer<'a> {
                 continue;
             }
 
-            // Detect inline runs: inline node directly adjacent (span-touching) to a
-            // control flow block. Route these through the doc-based printer which handles
-            // `has_preceding_breakable` correctly, breaking fn() args before inserting newlines.
+            // Detect inline runs: a maximal span-adjacent (no whitespace gap) sequence
+            // mixing content text / inline nodes with a control-flow block. Route these
+            // through the doc-based element-content path so the block hugs its
+            // directly-adjacent neighbors (`text{#if}…{/if}text`) instead of getting a
+            // forced newline, while inter-line newlines, spaces, and `has_preceding_breakable`
+            // (fn-arg wrapping before block expansion) all resolve exactly as they do for
+            // element children.
             if let Some(run_end) = self.detect_root_inline_run(&fragment.nodes, i) {
+                let run = &fragment.nodes[i..=run_end];
+                // A run that spans multiple source lines — a root-level text node carries
+                // a newline (`text{#if}…{/if}text⏎{#each}…`) — renders through the
+                // multiline element-content layout so the inter-line structure is kept and
+                // boundary whitespace is trimmed (carried as pending_ws). A single-line run
+                // (`{fn(…)}{#if …}…{/if}`, `a{#if}…{/if}c`) uses the inline path, where a
+                // long block keeps its body inline and breaks its inner content via
+                // `has_preceding_breakable` (matching prettier) rather than expanding.
+                let multiline = run
+                    .iter()
+                    .any(|n| matches!(n, FragmentNode::Text(t) if t.raw.contains('\n')));
+
+                // Leading boundary: the multiline path trims a content-text run-start's
+                // leading whitespace, so fold it into pending_ws here (the separator from
+                // any preceding root content). The inline path renders boundary whitespace
+                // verbatim, so it needs no upgrade.
+                if multiline && let FragmentNode::Text(text) = &fragment.nodes[i] {
+                    state
+                        .pending_ws
+                        .upgrade(PendingWhitespace::leading_of(&text.raw));
+                }
+
                 // Resolve pending whitespace before the run (same as ExpressionTag handling)
                 if state.has_output_content {
                     match state.pending_ws {
@@ -647,13 +704,25 @@ impl<'a> Printer<'a> {
                     }
                 }
 
-                // Build and render the inline run through the doc-based path
-                let doc = self.build_nodes_doc_with_context(&fragment.nodes[i..=run_end], false);
+                // Build and render the run through the doc-based content path.
+                let doc = if multiline {
+                    self.build_nodes_doc_multiline(run)
+                } else {
+                    self.build_nodes_doc_with_context(run, false)
+                };
                 self.render_doc_immediate(doc);
 
                 state.has_output_content = true;
                 state.prev_kind = PrevNodeKind::Block; // control flow blocks are block-like
-                state.pending_ws = PendingWhitespace::None;
+                // Trailing boundary: the multiline path trimmed a content-text run-end's
+                // trailing whitespace — carry it as pending_ws so an inter-line newline /
+                // blank line / space is preserved. The inline path rendered it verbatim.
+                state.pending_ws = match &fragment.nodes[run_end] {
+                    FragmentNode::Text(text) if multiline && !text.raw.is_whitespace_only() => {
+                        PendingWhitespace::trailing_of(&text.raw)
+                    }
+                    _ => PendingWhitespace::None,
+                };
                 i = run_end + 1;
                 continue;
             }
@@ -681,19 +750,10 @@ impl<'a> Printer<'a> {
                         // (Prettier behavior: <div>block</div><span> becomes two lines)
                         // continue to next iteration for whitespace-only nodes
                     } else {
-                        // Text with content - analyze whitespace using TextAnalysis trait
-                        let text_has_leading_newline = text.raw.has_leading_newline();
-                        let text_has_leading_space = text.raw.has_leading_space_only();
-                        let text_has_trailing_newline = text.raw.has_trailing_newline();
-
-                        // Upgrade pending whitespace based on text's leading whitespace
-                        if text.raw.leading_whitespace().has_blank_line() {
-                            state.pending_ws.upgrade(PendingWhitespace::BlankLine);
-                        } else if text_has_leading_newline {
-                            state.pending_ws.upgrade(PendingWhitespace::Newline);
-                        } else if text_has_leading_space {
-                            state.pending_ws.upgrade(PendingWhitespace::Space);
-                        }
+                        // Text with content - upgrade pending whitespace from its leading ws.
+                        state
+                            .pending_ws
+                            .upgrade(PendingWhitespace::leading_of(&text.raw));
 
                         // Resolve pending whitespace before outputting text
                         if state.has_output_content {
@@ -725,15 +785,13 @@ impl<'a> Printer<'a> {
                         };
                         self.write(&normalized);
 
-                        // Set pending whitespace for next node based on trailing whitespace
+                        // Set pending whitespace for next node based on trailing whitespace.
+                        // A trailing space was already written inline above (AlreadyHandled);
+                        // otherwise classify the trailing ws like the inline-run boundary.
                         let trailing_ws = if has_trailing_space {
                             PendingWhitespace::AlreadyHandled
-                        } else if text.raw.has_trailing_blank_line() {
-                            PendingWhitespace::BlankLine
-                        } else if text_has_trailing_newline {
-                            PendingWhitespace::Newline
                         } else {
-                            PendingWhitespace::None
+                            PendingWhitespace::trailing_of(&text.raw)
                         };
                         state.after_text(trailing_ws);
                     }
@@ -963,61 +1021,73 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Detect an inline run starting at `start_idx` in the root fragment.
+    /// Detect a "root inline run" starting at `start_idx` in the root fragment.
     ///
-    /// An inline run is an inline node (ExpressionTag, HtmlTag, RenderTag, or inline Element)
-    /// directly span-adjacent to a control flow block (no whitespace between `}` and `{#if`),
-    /// optionally with text nodes between them. Multiple control flow blocks may be chained.
-    /// These must be routed through the doc-based printer so that function call args
-    /// break before the control flow block gets a forced newline.
+    /// A run is a maximal span-adjacent (no whitespace gap in source) sequence that
+    /// contains at least one control-flow block **and** at least one content-text or
+    /// inline node — e.g. `text{#if}…{/if}text`, `{#each}…{/each}text`, `{x}{#if}…`,
+    /// or several chained together. The run renders through the element-content path
+    /// (`build_nodes_doc_multiline`) so a directly-adjacent block hugs its text/inline
+    /// neighbors (matching prettier and the inside-an-element layout) instead of the
+    /// per-node root printer forcing a newline around the block (which would inject
+    /// render-significant whitespace — a no-whitespace boundary must never gain a space).
     ///
-    /// Returns `Some(end_idx)` (inclusive) if an inline run was detected, None otherwise.
+    /// The walk starts at content text, an inline node, or a control-flow block, and
+    /// breaks on whitespace-only text, a non-adjacent node, or any other node (block
+    /// element, comment, `{@const}`/`{@debug}`). A content-text node bridges across the
+    /// boundary (its content hugs, its own internal/edge newlines become line breaks in
+    /// the multiline layout); the run's leading/trailing edge whitespace is carried as
+    /// `pending_ws` by the caller. Lone blocks and pure-inline (no control-flow)
+    /// sequences return `None`, keeping the per-node path's behavior for them.
+    ///
+    /// Returns `Some(end_idx)` (inclusive) for a qualifying run, else `None`.
     fn detect_root_inline_run(&self, nodes: &[FragmentNode], start_idx: usize) -> Option<usize> {
-        // Must start with an inline node (not text, not control flow)
-        if !self.is_inline_run_node(&nodes[start_idx]) {
+        let is_content_text =
+            |n: &FragmentNode| matches!(n, FragmentNode::Text(t) if !t.raw.is_whitespace_only());
+
+        // The start must be a node that can participate in a run.
+        let start = &nodes[start_idx];
+        if !(is_content_text(start)
+            || self.is_inline_run_node(start)
+            || nodes::is_control_flow_block(start))
+        {
             return None;
         }
 
-        // Walk forward through span-adjacent nodes looking for a control flow block.
-        // Track last_cf separately — the run ends at the last control flow block,
-        // not at trailing text/whitespace that happens to be span-adjacent.
-        let mut last_cf_idx = None;
+        let mut last_idx = start_idx;
+        let mut has_control_flow = nodes::is_control_flow_block(start);
+        let mut has_content_or_inline = is_content_text(start) || self.is_inline_run_node(start);
 
         for j in (start_idx + 1)..nodes.len() {
-            let prev_end = nodes[j - 1].span().end;
-            let curr_start = nodes[j].span().start;
-
-            // Must be directly adjacent (no whitespace gap in source)
-            if prev_end != curr_start {
+            // Must be directly adjacent (no whitespace gap in source).
+            if nodes[j - 1].span().end != nodes[j].span().start {
                 break;
             }
 
-            match &nodes[j] {
-                FragmentNode::Text(text) => {
-                    // Whitespace-only text nodes break inline runs — they signal
-                    // intentional separation between nodes. Inline runs are for
-                    // span-adjacent sequences like `{expr}{#if cond}` or
-                    // `{expr} content text {#if cond}` (text with actual content).
-                    if text.raw.is_whitespace_only() {
-                        break;
-                    }
-                    // Text nodes with content can appear between start and control flow
+            let node = &nodes[j];
+            if let FragmentNode::Text(text) = node {
+                // Whitespace-only text separates runs (intentional separation).
+                if text.raw.is_whitespace_only() {
+                    break;
                 }
-                FragmentNode::IfBlock(_)
-                | FragmentNode::EachBlock(_)
-                | FragmentNode::AwaitBlock(_)
-                | FragmentNode::KeyBlock(_) => {
-                    last_cf_idx = Some(j);
-                    // Don't break - continue scanning for chained control flow blocks
-                }
-                node if self.is_inline_run_node(node) => {
-                    // Inline nodes (expressions, html tags, render tags, inline elements)
-                }
-                _ => break,
+                last_idx = j;
+                has_content_or_inline = true;
+            } else if nodes::is_control_flow_block(node) {
+                last_idx = j;
+                has_control_flow = true;
+            } else if self.is_inline_run_node(node) {
+                last_idx = j;
+                has_content_or_inline = true;
+            } else {
+                // Block element, comment, `{@const}`/`{@debug}`, etc. end the run.
+                break;
             }
         }
 
-        last_cf_idx
+        // Only route runs that genuinely need hugging: a control-flow block plus an
+        // adjacent content-text/inline node. A lone block (`last_idx == start_idx`) or a
+        // pure-inline / pure-block sequence keeps the per-node path's existing behavior.
+        (has_control_flow && has_content_or_inline && last_idx > start_idx).then_some(last_idx)
     }
 
     /// Check if a fragment node can participate in an inline run (as start or intermediate node).
