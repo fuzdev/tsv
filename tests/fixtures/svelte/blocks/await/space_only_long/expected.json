@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1259,
+	"end": 1561,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -1189,6 +1189,230 @@
 					]
 				},
 				"catch": null
+			},
+			{
+				"type": "Text",
+				"start": 1258,
+				"end": 1260,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1260,
+				"end": 1310,
+				"data": " Catch-shorthand: 100 chars - stays inline "
+			},
+			{
+				"type": "Text",
+				"start": 1310,
+				"end": 1311,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 1311,
+				"end": 1411,
+				"expression": {
+					"type": "Identifier",
+					"start": 1319,
+					"end": 1326,
+					"loc": {
+						"start": {
+							"line": 40,
+							"column": 8
+						},
+						"end": {
+							"line": 40,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": null,
+				"error": {
+					"type": "Identifier",
+					"name": "error",
+					"start": 1333,
+					"end": 1338,
+					"loc": {
+						"start": {
+							"line": 40,
+							"column": 22,
+							"character": 1333
+						},
+						"end": {
+							"line": 40,
+							"column": 27,
+							"character": 1338
+						}
+					}
+				},
+				"pending": null,
+				"then": null,
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1339,
+							"end": 1340,
+							"raw": " ",
+							"data": " "
+						},
+						{
+							"type": "RegularElement",
+							"start": 1340,
+							"end": 1402,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 40,
+									"column": 30,
+									"character": 1341
+								},
+								"end": {
+									"line": 40,
+									"column": 31,
+									"character": 1342
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1343,
+										"end": 1398,
+										"raw": "text text text text text text text text text txxxxxxxxx",
+										"data": "text text text text text text text text text txxxxxxxxx"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1402,
+							"end": 1403,
+							"raw": " ",
+							"data": " "
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1411,
+				"end": 1413,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1413,
+				"end": 1457,
+				"data": " Catch-shorthand: 101 chars - breaks "
+			},
+			{
+				"type": "Text",
+				"start": 1457,
+				"end": 1458,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 1458,
+				"end": 1560,
+				"expression": {
+					"type": "Identifier",
+					"start": 1466,
+					"end": 1473,
+					"loc": {
+						"start": {
+							"line": 43,
+							"column": 8
+						},
+						"end": {
+							"line": 43,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": null,
+				"error": {
+					"type": "Identifier",
+					"name": "error",
+					"start": 1480,
+					"end": 1485,
+					"loc": {
+						"start": {
+							"line": 43,
+							"column": 22,
+							"character": 1480
+						},
+						"end": {
+							"line": 43,
+							"column": 27,
+							"character": 1485
+						}
+					}
+				},
+				"pending": null,
+				"then": null,
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1486,
+							"end": 1488,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1488,
+							"end": 1551,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 44,
+									"column": 2,
+									"character": 1489
+								},
+								"end": {
+									"line": 44,
+									"column": 3,
+									"character": 1490
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1491,
+										"end": 1547,
+										"raw": "text text text text text text text text text txxxxxxxxxx",
+										"data": "text text text text text text text text text txxxxxxxxxx"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1551,
+							"end": 1552,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
 			}
 		]
 	},

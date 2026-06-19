@@ -176,27 +176,53 @@ pub(crate) fn has_any_expanding_blocks(nodes: &[FragmentNode]) -> bool {
     nodes.iter().any(is_expanding_control_flow_block) || has_expanding_block_in_await(nodes)
 }
 
-/// Whether any control-flow block is preceded by a sibling — i.e. it is not the first
-/// non-whitespace child.
+/// Whether a fragment node is inline content (a non-text node that participates in fill).
+///
+/// This is NOT the same as `!tsv_html::is_block_element` (HTML classification): a block
+/// element like `<div>` is still inline *content* here. The set is elements / components /
+/// expression-or-html-or-render tags — the nodes that can break before a control-flow
+/// block. Plain text, comments, and the control-flow blocks themselves are not.
+///
+/// Single source of truth for the `has_preceding_breakable` test in `fragment_doc`'s node
+/// loops and for [`has_control_flow_after_sibling`]'s breakable-sibling gate.
+pub(crate) fn is_inline_content(node: &FragmentNode) -> bool {
+    matches!(
+        node,
+        FragmentNode::Element(_)
+            | FragmentNode::SpecialElement(_)
+            | FragmentNode::ExpressionTag(_)
+            | FragmentNode::RenderTag(_)
+            | FragmentNode::HtmlTag(_)
+    )
+}
+
+/// Whether a control-flow block is preceded by a **breakable** sibling — one that is
+/// [`is_inline_content`], the same set that sets `has_preceding_breakable`.
 ///
 /// `{#await}` / `{#snippet}` don't force their parent multiline on their own (a lone
 /// `<div>{#await p}x{/await}</div>` stays inline, matching prettier), unlike if/each/key
-/// (`has_any_expanding_blocks`). But once such a block follows a sibling, the parent goes
-/// multiline so the layout resolves in one pass: the block reaches the multiline-fragment
-/// path where its body-drop decision matches if/each (`can_wrap`), an inline-element
-/// sibling lets it dangle that element's closing `>` (`try_block_sibling_gt_dangle`), and a
-/// block-element sibling drops to its own line. if/each/key already force multiline
-/// unconditionally; this extends the same trigger to await/snippet when they have a sibling.
+/// (`has_any_expanding_blocks`). They need a force only when a preceding **breakable**
+/// sibling *suppresses* the body-drop: there, forcing the parent multiline lets the
+/// body-drop (`can_wrap`), the inline-element closing-`>` dangle
+/// (`try_block_sibling_gt_dangle`), and a block-element sibling's own-line separation all
+/// resolve in one pass. A non-breakable preceding sibling (plain text, a comment) does
+/// **not** suppress the body-drop — await/snippet already drop on their own — so forcing
+/// there only diverges from prettier (which keeps the short construct inline); such
+/// siblings are skipped. (Block elements are `Element`, hence breakable, so their
+/// separation still fires.) The force is also gated on `kind.is_block()` at the call site,
+/// so it only applies to block-element parents.
 pub(crate) fn has_control_flow_after_sibling(nodes: &[FragmentNode]) -> bool {
-    let mut seen_non_ws = false;
+    let mut seen_breakable = false;
     for node in nodes {
         if node.is_whitespace_only_text() {
             continue;
         }
-        if seen_non_ws && is_control_flow_block(node) {
+        if seen_breakable && is_control_flow_block(node) {
             return true;
         }
-        seen_non_ws = true;
+        if is_inline_content(node) {
+            seen_breakable = true;
+        }
     }
     false
 }
