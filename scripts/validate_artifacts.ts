@@ -197,7 +197,7 @@ for (const { label, entry, has_format, has_parse } of smoke_targets) {
 				| undefined;
 			if (!ctor) return false;
 			const stack = new ctor();
-			stack.push_gitignore('', 'build/\n');
+			stack.push_gitignore('', 'build/\nignored.ts\n');
 			stack.push_tsv('', '!build/keep.ts\n'); // tsv layer can't re-include under an excluded dir
 			return (
 				stack.is_ignored('build/x.ts', false) &&
@@ -209,7 +209,7 @@ for (const { label, entry, has_format, has_parse } of smoke_targets) {
 				stack.classify_dir('build', 'build', false) === 'prune' && // gitignored dir
 				stack.classify_dir('src', 'src', false) === 'descend' &&
 				stack.should_format_file('app.ts', 'src/app.ts') === true &&
-				stack.should_format_file('x.ts', 'build/x.ts') === false && // ignored
+				stack.should_format_file('ignored.ts', 'ignored.ts') === false && // leaf-matched ignore (should_format_file is leaf-only; build/ is kept out via classify_dir's dir prune above)
 				stack.should_format_file('notes.md', 'notes.md') === false // wrong extension
 			);
 		});
