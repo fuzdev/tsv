@@ -1022,6 +1022,7 @@ impl<'a> Printer<'a> {
             ),
             FragmentNode::HtmlTag(tag) => Some(self.build_html_tag_doc(tag)),
             FragmentNode::ConstTag(tag) => Some(self.build_const_tag_doc(tag)),
+            FragmentNode::DeclarationTag(tag) => Some(self.build_declaration_tag_doc(tag)),
             FragmentNode::DebugTag(tag) => Some(self.build_debug_tag_doc(tag)),
             FragmentNode::RenderTag(tag) => Some(self.build_render_tag_doc(tag)),
         }

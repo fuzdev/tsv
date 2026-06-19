@@ -342,9 +342,9 @@ impl<'a> SvelteParser<'a> {
                 last_end = comment.span.end_usize();
                 child_nodes.push(FragmentNode::Comment(comment));
             } else if self.check(TokenKind::LeftBrace) {
-                let expression_tag = self.parse_expression_tag()?;
-                last_end = expression_tag.span.end_usize();
-                child_nodes.push(FragmentNode::ExpressionTag(expression_tag));
+                let tag = self.parse_brace_tag()?;
+                last_end = tag.span().end_usize();
+                child_nodes.push(tag);
             } else if self.check(TokenKind::LeftAngle) {
                 if self.is_next_token(TokenKind::Slash)? {
                     break;

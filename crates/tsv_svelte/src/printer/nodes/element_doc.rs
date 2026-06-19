@@ -1370,6 +1370,10 @@ impl<'a> Printer<'a> {
                 let inner = self.build_const_tag_doc(tag);
                 d.indent(inner)
             }
+            FragmentNode::DeclarationTag(tag) => {
+                let inner = self.build_declaration_tag_doc(tag);
+                d.indent(inner)
+            }
             FragmentNode::DebugTag(tag) => {
                 let inner = self.build_debug_tag_doc(tag);
                 d.indent(inner)
@@ -1957,6 +1961,7 @@ impl<'a> Printer<'a> {
                 FragmentNode::ExpressionTag(_) => true,
                 FragmentNode::HtmlTag(_)
                 | FragmentNode::ConstTag(_)
+                | FragmentNode::DeclarationTag(_)
                 | FragmentNode::DebugTag(_)
                 | FragmentNode::RenderTag(_) => true,
                 _ => !super::helpers::is_control_flow_block(n),

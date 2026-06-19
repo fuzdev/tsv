@@ -459,7 +459,7 @@ value_normalization.rs  # Semantic value normalization (numbers, colors, whitesp
 mod.rs              # Printer struct, entry points
 blocks.rs           # Control flow blocks ({#if}, {#each}, etc.)
 attributes.rs       # Attribute formatting
-tags.rs             # Special tags (@html, @debug, @const, @render)
+tags.rs             # Special tags (@html, @debug, @const, @render, {const}/{let})
 text.rs             # Text node handling
 script_style.rs     # <script>/<style> formatting
 helpers.rs          # Shared utilities
@@ -468,7 +468,7 @@ nodes/              # Element and fragment printing
   element_doc.rs    #   Doc construction for HTML/component elements
   fragment_doc.rs   #   Doc construction for fragment content (text fill, node dispatch)
   blocks_doc.rs     #   Doc construction for control flow blocks ({#if}, {#each}, etc.)
-  tags_doc.rs       #   Doc construction for template tags (@html, @const, @debug, @render)
+  tags_doc.rs       #   Doc construction for template tags (@html, @const, {const}/{let}, @debug, @render)
   special_doc.rs    #   Doc construction for svelte:* special elements
   helpers.rs        #   Node-specific helpers
 classification/     # HTML element classification (delegates to tsv_html)

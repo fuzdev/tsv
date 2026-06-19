@@ -1753,6 +1753,7 @@ export type FragmentNode =
 	| SnippetBlock
 	| HtmlTag
 	| ConstTag
+	| DeclarationTag
 	| DebugTag
 	| RenderTag;
 
@@ -2064,6 +2065,20 @@ export interface HtmlTag {
  */
 export interface ConstTag {
 	type: 'ConstTag';
+	start: number;
+	end: number;
+	declaration: unknown;
+}
+
+/**
+ * `{const x = expr}` / `{let x = expr}` / `{let x}` — the bare declaration tags
+ * (no `@`).
+ *
+ * `declaration` is a `VariableDeclaration`-shaped value (`kind` is `const` or
+ * `let`) with a single declarator, emitted as raw JSON.
+ */
+export interface DeclarationTag {
+	type: 'DeclarationTag';
 	start: number;
 	end: number;
 	declaration: unknown;

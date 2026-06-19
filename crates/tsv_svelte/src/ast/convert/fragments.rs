@@ -9,8 +9,9 @@ use tsv_lang::{InfallibleResolve, LocationTracker};
 
 use super::{
     convert_attribute_node, convert_await_block, convert_const_tag, convert_debug_tag,
-    convert_each_block, convert_html_tag, convert_if_block, convert_key_block, convert_render_tag,
-    convert_snippet_block, convert_special_element, span_to_name_loc,
+    convert_declaration_tag, convert_each_block, convert_html_tag, convert_if_block,
+    convert_key_block, convert_render_tag, convert_snippet_block, convert_special_element,
+    span_to_name_loc,
 };
 
 pub(super) fn convert_fragment(
@@ -72,6 +73,9 @@ pub(super) fn convert_fragment_node(
         internal::FragmentNode::ConstTag(tag) => {
             public::FragmentNode::ConstTag(convert_const_tag(tag, source, loc, interner))
         }
+        internal::FragmentNode::DeclarationTag(tag) => public::FragmentNode::DeclarationTag(
+            convert_declaration_tag(tag, source, loc, interner),
+        ),
         internal::FragmentNode::DebugTag(tag) => {
             public::FragmentNode::DebugTag(convert_debug_tag(tag, source, loc, interner))
         }

@@ -120,9 +120,9 @@ impl<'a> SvelteParser<'a> {
                         }
                     }
                 } else if self.check(TokenKind::LeftBrace) {
-                    let expression_tag = self.parse_expression_tag()?;
-                    last_end = expression_tag.span.end_usize();
-                    fragment_nodes.push(FragmentNode::ExpressionTag(expression_tag));
+                    let tag = self.parse_brace_tag()?;
+                    last_end = tag.span().end_usize();
+                    fragment_nodes.push(tag);
                 } else if self.check(TokenKind::BlockOpen) {
                     let block = self.parse_block()?;
                     last_end = block.span().end_usize();

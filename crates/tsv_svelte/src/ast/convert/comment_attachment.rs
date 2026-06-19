@@ -634,12 +634,12 @@ fn walk_and_attach_expressions(
                     }
                 }
 
-                // ConstTag: {@const id = init}
+                // ConstTag: {@const id = init}; DeclarationTag: {const id = init} / {let id = init}
                 // Svelte runs `add_comments(init)` on the init expression directly,
                 // THEN constructs the VariableDeclaration wrapper. So we need to attach
                 // comments to the init expression, not the whole declaration.
                 // Also update VariableDeclaration.end to match Svelte's (container_end - 1).
-                "ConstTag" => {
+                "ConstTag" | "DeclarationTag" => {
                     if let (Some(c_start), Some(c_end)) = (container_start, container_end)
                         && let Some(decl) = map.get_mut("declaration")
                     {

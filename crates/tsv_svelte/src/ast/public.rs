@@ -71,6 +71,7 @@ pub enum FragmentNode {
     SnippetBlock(SnippetBlock),
     HtmlTag(HtmlTag),
     ConstTag(ConstTag),
+    DeclarationTag(DeclarationTag),
     DebugTag(DebugTag),
     RenderTag(RenderTag),
 }
@@ -472,6 +473,19 @@ pub struct HtmlTag {
 /// The declaration is a VariableDeclaration-like structure with a single declarator.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConstTag {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub start: u32,
+    pub end: u32,
+    pub declaration: serde_json::Value, // VariableDeclaration structure
+}
+
+/// Svelte DeclarationTag - local `{const …}` / `{let …}` declaration
+///
+/// The declaration is a VariableDeclaration-like structure (`kind` is `const`
+/// or `let`) with a single declarator.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeclarationTag {
     #[serde(rename = "type")]
     pub node_type: String,
     pub start: u32,
