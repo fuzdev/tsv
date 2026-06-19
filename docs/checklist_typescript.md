@@ -662,15 +662,13 @@ Stage 2 proposals and experimental features tsv does not yet parse.
 
 All code in Svelte scripts runs in strict mode (ES modules). These constructs are intentionally not supported:
 
-| Feature                        | Reason                                |
-| ------------------------------ | ------------------------------------- |
-| `with` statement               | Strict mode SyntaxError               |
-| Legacy octal literals (`0777`) | Strict mode SyntaxError (use `0o777`) |
-| Octal escape sequences         | Strict mode SyntaxError in strings    |
-| Duplicate parameter names      | Strict mode SyntaxError               |
-| `arguments.callee`             | Strict mode TypeError (runtime)       |
-| Assigning to undeclared vars   | Strict mode ReferenceError (runtime)  |
-| Deleting plain names           | Strict mode SyntaxError (`delete x`)  |
+- `with` statement — Strict mode SyntaxError
+- Legacy octal literals (`0777`) — Strict mode SyntaxError (use `0o777`)
+- Octal escape sequences — Strict mode SyntaxError in strings
+- Duplicate parameter names — Strict mode SyntaxError
+- `arguments.callee` — Strict mode TypeError (runtime)
+- Assigning to undeclared vars — Strict mode ReferenceError (runtime)
+- Deleting plain names — Strict mode SyntaxError (`delete x`)
 
 The tsv parser may accept some of these for robustness, but fixtures aren't created or tested since they're invalid in Svelte's module context.
 

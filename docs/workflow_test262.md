@@ -118,13 +118,11 @@ Pass rate: 42400/46500 (91.2%)
 
 ### Priority Matrix
 
-| Type                         | Priority | Action                                    |
-| ---------------------------- | -------- | ----------------------------------------- |
-| Positive failed, many tests  | **High** | Fix immediately - blocking valid code     |
-| Positive failed, few tests   | Medium   | Fix when addressing related code          |
-| Negative failed, early error | Lower    | Track for later - code runs but shouldn't |
-| Sloppy-mode required         | Skip     | Out of scope (strict-mode only design)    |
-| AnnexB features              | Lower    | Web-compat, not essential                 |
+- Positive failed, many tests — **High** — Fix immediately - blocking valid code
+- Positive failed, few tests — Medium — Fix when addressing related code
+- Negative failed, early error — Lower — Track for later - code runs but shouldn't
+- Sloppy-mode required — Skip — Out of scope (strict-mode only design)
+- AnnexB features — Lower — Web-compat, not essential
 
 ### Common Failure Patterns
 
@@ -352,9 +350,7 @@ deno task check
 
 ### Red Flags
 
-| Symptom                          | Likely Problem                |
-| -------------------------------- | ----------------------------- |
-| "Let me just fix this one thing" | Missing fixture first         |
-| Many unrelated changes in one PR | Not focused on single pattern |
-| Pass rate dropped                | Regression introduced         |
-| Modified expected.json           | Hiding parser bug             |
+- "Let me just fix this one thing" — Missing fixture first
+- Many unrelated changes in one PR — Not focused on single pattern
+- Pass rate dropped — Regression introduced
+- Modified expected.json — Hiding parser bug

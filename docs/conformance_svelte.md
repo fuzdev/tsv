@@ -47,14 +47,12 @@ catalog entry.
 
 ### CSS Corrections
 
-| Feature                           | Issue                                | Fixture                                                                                             |
-| --------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| :nth-child(An+B of S)             | Incorrect AST structure              | [nth_child_of](../tests/fixtures/css/selectors/pseudo_class/nth_child_of_svelte_divergence/)        |
-| Attribute namespaces `[ns\|attr]` | Not supported                        | [namespace](../tests/fixtures/css/selectors/attribute/namespace_svelte_divergence/)                 |
-| No-namespace `\|element`          | Not supported                        | [no_namespace](../tests/fixtures/css/selectors/namespace/no_namespace_svelte_divergence/)           |
-| Forgiving :is()/:where()          | Strict parsing (should be forgiving) | [forgiving_is_where](../tests/fixtures/css/selectors/forgiving_is_where_svelte_divergence/)         |
-| Empty-after-comment declarations  | Rejected (`css_empty_declaration`)   | [comment_empty_value](../tests/fixtures/css/tokens/comments/comment_empty_value_svelte_divergence/) |
-| Block-valued custom properties    | Rejected (`css_expected_identifier`) | [block_value](../tests/fixtures/css/values/variables/block_value_svelte_prettier_divergence/)       |
+- :nth-child(An+B of S) — Incorrect AST structure — [nth_child_of](../tests/fixtures/css/selectors/pseudo_class/nth_child_of_svelte_divergence/)
+- Attribute namespaces `[ns|attr]` — Not supported — [namespace](../tests/fixtures/css/selectors/attribute/namespace_svelte_divergence/)
+- No-namespace `|element` — Not supported — [no_namespace](../tests/fixtures/css/selectors/namespace/no_namespace_svelte_divergence/)
+- Forgiving :is()/:where() — Strict parsing (should be forgiving) — [forgiving_is_where](../tests/fixtures/css/selectors/forgiving_is_where_svelte_divergence/)
+- Empty-after-comment declarations — Rejected (`css_empty_declaration`) — [comment_empty_value](../tests/fixtures/css/tokens/comments/comment_empty_value_svelte_divergence/)
+- Block-valued custom properties — Rejected (`css_expected_identifier`) — [block_value](../tests/fixtures/css/values/variables/block_value_svelte_prettier_divergence/)
 
 ### CSS Parser Corrections (corpus-enforced)
 
@@ -404,11 +402,9 @@ Documentation of Svelte parser behavior (not compat behaviors or corrections).
 
 Svelte's parser accepts `|modifier` syntax on all directive types (permissive parsing), but only three have official support:
 
-| Directive             | Syntax                                      | Modifiers                                                                                                                      |
-| --------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `OnDirective`         | `on:event\|mod`                             | `preventDefault`, `stopPropagation`, `stopImmediatePropagation`, `passive`, `nonpassive`, `capture`, `once`, `self`, `trusted` |
-| `TransitionDirective` | `transition:\|mod`, `in:\|mod`, `out:\|mod` | `local`, `global`                                                                                                              |
-| `StyleDirective`      | `style:prop\|mod`                           | `important`                                                                                                                    |
+- `OnDirective` — `on:event|mod` — `preventDefault`, `stopPropagation`, `stopImmediatePropagation`, `passive`, `nonpassive`, `capture`, `once`, `self`, `trusted`
+- `TransitionDirective` — `transition:|mod`, `in:|mod`, `out:|mod` — `local`, `global`
+- `StyleDirective` — `style:prop|mod` — `important`
 
 Directives without official modifiers: `AnimateDirective`, `BindDirective`, `ClassDirective`, `LetDirective`, `UseDirective`.
 

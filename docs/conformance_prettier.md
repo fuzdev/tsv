@@ -24,7 +24,7 @@ Prettier was tsv's initial guide, and the formatter still tracks it for the comm
 | **Content preservation**  | Prettier silently drops user comments                   | tsv preserves all comments            |
 | **Design choice**         | Other deliberate behavior differences                   | Documented rationale in fixture       |
 
-> Most `Comment preservation` and `Content preservation` divergences live in the prose-form [TypeScript: Comments](#typescript-comments) and [CSS: Comments](#css-comments) catalogs, not the Reason-column tables — they're the largest divergence category but don't fit a one-word table cell.
+> Most `Comment preservation` and `Content preservation` divergences live in the prose-form [TypeScript: Comments](#typescript-comments) and [CSS: Comments](#css-comments) catalogs, not the Reason-tagged catalog lists — they're the largest divergence category but don't fit a one-word Reason tag.
 
 ## Decision Framework
 
@@ -159,17 +159,15 @@ columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 
 ### CSS: At-Rules
 
-| Feature                | Reason         | Fixture                                                                                                                |
-| ---------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| @container spacing     | Spec violation | [container_spacing](../tests/fixtures/css/at_rules/container_spacing_prettier_divergence/)                             |
-| @container line wrap   | Print width    | [container_long](../tests/fixtures/css/at_rules/container_long_prettier_divergence/)                                   |
-| @import line wrap      | Print width    | [import_media_query_long](../tests/fixtures/css/at_rules/import_media_query_long_prettier_divergence/)                 |
-| @media boolean spacing | Spec violation | [media_boolean_spacing](../tests/fixtures/css/at_rules/media_boolean_spacing_prettier_divergence/)                     |
-| @media line wrap       | Print width    | [media_long](../tests/fixtures/css/at_rules/media_long_prettier_divergence/)                                           |
-| @scope whitespace      | Stable quirk   | [scope_complex](../tests/fixtures/css/at_rules/scope_complex_prettier_divergence/)                                     |
-| @scope newlines        | Stable quirk   | [scope_selector](../tests/fixtures/css/at_rules/scope_selector_prettier_divergence/)                                   |
-| @supports line wrap    | Print width    | [supports_long](../tests/fixtures/css/at_rules/supports_long_prettier_divergence/)                                     |
-| SCSS directive numbers | Design choice  | [scss_directive_number_preserved](../tests/fixtures/css/at_rules/scss_directive_number_preserved_prettier_divergence/) |
+- @container spacing — Spec violation — [container_spacing](../tests/fixtures/css/at_rules/container_spacing_prettier_divergence/)
+- @container line wrap — Print width — [container_long](../tests/fixtures/css/at_rules/container_long_prettier_divergence/)
+- @import line wrap — Print width — [import_media_query_long](../tests/fixtures/css/at_rules/import_media_query_long_prettier_divergence/)
+- @media boolean spacing — Spec violation — [media_boolean_spacing](../tests/fixtures/css/at_rules/media_boolean_spacing_prettier_divergence/)
+- @media line wrap — Print width — [media_long](../tests/fixtures/css/at_rules/media_long_prettier_divergence/)
+- @scope whitespace — Stable quirk — [scope_complex](../tests/fixtures/css/at_rules/scope_complex_prettier_divergence/)
+- @scope newlines — Stable quirk — [scope_selector](../tests/fixtures/css/at_rules/scope_selector_prettier_divergence/)
+- @supports line wrap — Print width — [supports_long](../tests/fixtures/css/at_rules/supports_long_prettier_divergence/)
+- SCSS directive numbers — Design choice — [scss_directive_number_preserved](../tests/fixtures/css/at_rules/scss_directive_number_preserved_prettier_divergence/)
 
 **Spec violations**: CSS Syntax 3 §4.3.4 specifies that an identifier immediately followed by `(` tokenizes as a `<function-token>`, not as an `<ident-token>` plus `(`. Media Queries 4 §3 explicitly notes: "Whitespace is required between a 'not', 'and', or 'or' keyword and the following '(' character, because without it that would instead parse as a `<function-token>`." Container Queries (CSS Conditional 5) use the same grammar pattern. Prettier normalizes this for `@supports` but not `@media` or `@container`.
 
@@ -179,24 +177,20 @@ columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 
 ### CSS: Selectors
 
-| Feature                  | Reason        | Fixture                                                                                  |
-| ------------------------ | ------------- | ---------------------------------------------------------------------------------------- |
-| Column combinator `\|\|` | Parser compat | [column](../tests/fixtures/css/selectors/combinators/column_prettier_divergence/)        |
-| :nth-child() An+B        | Stable quirk  | [nth_child](../tests/fixtures/css/selectors/pseudo_class/nth_child_prettier_divergence/) |
+- Column combinator `||` — Parser compat — [column](../tests/fixtures/css/selectors/combinators/column_prettier_divergence/)
+- :nth-child() An+B — Stable quirk — [nth_child](../tests/fixtures/css/selectors/pseudo_class/nth_child_prettier_divergence/)
 
 ### CSS: Values
 
-| Feature                    | Reason         | Fixture                                                                                                                    |
-| -------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Ratio in media queries     | Stable quirk   | [ratio](../tests/fixtures/css/values/ratio/ratio_prettier_divergence/)                                                     |
-| Transform list wrap        | Print width    | [transform_long](../tests/fixtures/css/values/functions/transform_long_prettier_divergence/)                               |
-| Space-separated value wrap | Print width    | [space_separated_long_wrap](../tests/fixtures/css/values/lists/space_separated_long_wrap_prettier_divergence/)             |
-| Comma+space value boundary | Print width    | [comma_space_separated_long](../tests/fixtures/css/values/lists/comma_space_separated_long_prettier_divergence/)           |
-| Number dot-ident           | Spec violation | [number_dot_ident](../tests/fixtures/css/values/numbers/number_dot_ident_prettier_divergence/)                             |
-| Block-valued custom prop   | Design choice  | [block_value](../tests/fixtures/css/values/variables/block_value_svelte_prettier_divergence/)                              |
-| Empty custom-prop value    | Stable quirk   | [empty_value](../tests/fixtures/css/values/variables/empty_value_prettier_divergence/)                                     |
-| Empty value + `!important` | Prettier bug   | [empty_value_important](../tests/fixtures/css/values/variables/empty_value_important_prettier_divergence/)                 |
-| var() value-less fallback  | Prettier bug   | [var_empty_fallback_degenerate](../tests/fixtures/css/values/variables/var_empty_fallback_degenerate_prettier_divergence/) |
+- Ratio in media queries — Stable quirk — [ratio](../tests/fixtures/css/values/ratio/ratio_prettier_divergence/)
+- Transform list wrap — Print width — [transform_long](../tests/fixtures/css/values/functions/transform_long_prettier_divergence/)
+- Space-separated value wrap — Print width — [space_separated_long_wrap](../tests/fixtures/css/values/lists/space_separated_long_wrap_prettier_divergence/)
+- Comma+space value boundary — Print width — [comma_space_separated_long](../tests/fixtures/css/values/lists/comma_space_separated_long_prettier_divergence/)
+- Number dot-ident — Spec violation — [number_dot_ident](../tests/fixtures/css/values/numbers/number_dot_ident_prettier_divergence/)
+- Block-valued custom prop — Design choice — [block_value](../tests/fixtures/css/values/variables/block_value_svelte_prettier_divergence/)
+- Empty custom-prop value — Stable quirk — [empty_value](../tests/fixtures/css/values/variables/empty_value_prettier_divergence/)
+- Empty value + `!important` — Prettier bug — [empty_value_important](../tests/fixtures/css/values/variables/empty_value_important_prettier_divergence/)
+- var() value-less fallback — Prettier bug — [var_empty_fallback_degenerate](../tests/fixtures/css/values/variables/var_empty_fallback_degenerate_prettier_divergence/)
 
 **Space-separated value wrap**: Prettier doesn't wrap CSS space-separated values (e.g., `box-shadow`) when they exceed print width. A 101-char `box-shadow: var(--a) color-mix(...)` stays on one line. tsv wraps at the print width boundary, breaking between space-separated values. This respects the configured print width rather than allowing arbitrary overflows.
 
@@ -244,22 +238,20 @@ columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 
 ### Svelte/HTML
 
-| Feature                   | Reason               | Fixture                                                                                                                       |
-| ------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Menu block element        | Spec violation       | [menu_block](../tests/fixtures/svelte/elements/menu_block_prettier_divergence/)                                               |
-| Self-closing non-void     | Design choice        | [self_closing_nonvoid](../tests/fixtures/svelte/elements/self_closing_nonvoid_prettier_divergence/)                           |
-| Fill after inline         | Print width          | [fill_after_inline](../tests/fixtures/svelte/elements/fill_after_inline_prettier_divergence/)                                 |
-| Fill boundary             | Print width          | [inline_element_fill_long](../tests/fixtures/svelte/elements/inline_element_fill_long_prettier_divergence/)                   |
-| Fill after breaking attr  | Print width          | [multiline_value_inline_long](../tests/fixtures/svelte/attributes/multiline_value_inline_long_prettier_divergence/)           |
-| Component fill boundary   | Print width          | [inline_component_fill_long](../tests/fixtures/svelte/elements/inline_component_fill_long_prettier_divergence/)               |
-| Inline closing intact     | Print width          | [inline_closing_intact_long](../tests/fixtures/svelte/elements/inline_closing_intact_long_prettier_divergence/)               |
-| Fill multiple expr        | Print width          | [fill_multiple_expr_long](../tests/fixtures/svelte/elements/fill_multiple_expr_long_prettier_divergence/)                     |
-| Inline content hug        | Design choice        | [inline_content_hug_long](../tests/fixtures/svelte/elements/inline_content_hug_long_prettier_divergence/)                     |
-| Block multiline attrs hug | Print width          | [block_multiline_attrs_content_hug](../tests/fixtures/svelte/elements/block_multiline_attrs_content_hug_prettier_divergence/) |
-| Fill expr break boundary  | Print width          | [fill_expr_break_boundary_long](../tests/fixtures/svelte/elements/fill_expr_break_boundary_long_prettier_divergence/)         |
-| @debug comments           | Content preservation | [debug_comment](../tests/fixtures/svelte/tags/debug/debug_comment_prettier_divergence/)                                       |
-| svelte:element `this`     | Prettier bug         | [svelte_element_this_string](../tests/fixtures/svelte/special_elements/svelte_element_this_string_prettier_divergence/)       |
-| svelte:element class ws   | Prettier bug         | [svelte_element_class_whitespace](../tests/fixtures/svelte/special_elements/svelte_element_class_whitespace_prettier_divergence/) |
+- Menu block element — Spec violation — [menu_block](../tests/fixtures/svelte/elements/menu_block_prettier_divergence/)
+- Self-closing non-void — Design choice — [self_closing_nonvoid](../tests/fixtures/svelte/elements/self_closing_nonvoid_prettier_divergence/)
+- Fill after inline — Print width — [fill_after_inline](../tests/fixtures/svelte/elements/fill_after_inline_prettier_divergence/)
+- Fill boundary — Print width — [inline_element_fill_long](../tests/fixtures/svelte/elements/inline_element_fill_long_prettier_divergence/)
+- Fill after breaking attr — Print width — [multiline_value_inline_long](../tests/fixtures/svelte/attributes/multiline_value_inline_long_prettier_divergence/)
+- Component fill boundary — Print width — [inline_component_fill_long](../tests/fixtures/svelte/elements/inline_component_fill_long_prettier_divergence/)
+- Inline closing intact — Print width — [inline_closing_intact_long](../tests/fixtures/svelte/elements/inline_closing_intact_long_prettier_divergence/)
+- Fill multiple expr — Print width — [fill_multiple_expr_long](../tests/fixtures/svelte/elements/fill_multiple_expr_long_prettier_divergence/)
+- Inline content hug — Design choice — [inline_content_hug_long](../tests/fixtures/svelte/elements/inline_content_hug_long_prettier_divergence/)
+- Block multiline attrs hug — Print width — [block_multiline_attrs_content_hug](../tests/fixtures/svelte/elements/block_multiline_attrs_content_hug_prettier_divergence/)
+- Fill expr break boundary — Print width — [fill_expr_break_boundary_long](../tests/fixtures/svelte/elements/fill_expr_break_boundary_long_prettier_divergence/)
+- @debug comments — Content preservation — [debug_comment](../tests/fixtures/svelte/tags/debug/debug_comment_prettier_divergence/)
+- svelte:element `this` — Prettier bug — [svelte_element_this_string](../tests/fixtures/svelte/special_elements/svelte_element_this_string_prettier_divergence/)
+- svelte:element class ws — Prettier bug — [svelte_element_class_whitespace](../tests/fixtures/svelte/special_elements/svelte_element_class_whitespace_prettier_divergence/)
 
 **Fill after inline**: Prettier's fill algorithm allows lines to exceed print width when text follows an inline element closing tag. Prettier produces 111 char lines, tsv breaks at exactly 100 chars.
 
@@ -351,19 +343,17 @@ Same layout inside an inline element (head wraps + body expands, element hugs th
 
 ### TypeScript
 
-| Feature                                   | Reason                | Fixture                                                                                                                                          |
-| ----------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Empty statement blank lines               | Design choice         | [empty_standalone](../tests/fixtures/typescript/statements/empty_standalone_prettier_divergence/)                                                |
-| Return type generic union                 | Print width           | [return_type_generic_union_long](../tests/fixtures/typescript/declarations/function/return_type_generic_union_long_prettier_divergence/)         |
-| Single specifier import                   | Print width           | [single_specifier_long](../tests/fixtures/typescript/modules/imports/single_specifier_long_prettier_divergence/)                                 |
-| Module path calls                         | Print width           | [path_calls_long](../tests/fixtures/typescript/modules/imports/path_calls_long_prettier_divergence/)                                             |
-| Instantiation expression parens           | Semantic preservation | [instantiation_parens](../tests/fixtures/typescript/typescript_specific/assertions/instantiation_parens_prettier_divergence/)                    |
-| Optional-chain base member chain          | Semantic preservation | [optional_paren_member_chain](../tests/fixtures/typescript/expressions/chain/optional_paren_member_chain_prettier_divergence/)                   |
-| Optional-chain non-null base member chain | Semantic preservation | [optional_paren_non_null_member_chain](../tests/fixtures/typescript/expressions/chain/optional_paren_non_null_member_chain_prettier_divergence/) |
-| Optional-chain non-null new callee        | Prettier bug          | [optional_paren_non_null_new_callee](../tests/fixtures/typescript/expressions/chain/optional_paren_non_null_new_callee_prettier_divergence/)     |
-| Non-null parenthesized base               | Design choice         | [non_null_paren_base_long](../tests/fixtures/typescript/expressions/member/non_null_paren_base_long_prettier_divergence/)                        |
-| Constrained infer extends-operand parens  | Prettier bug          | [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens_prettier_divergence/)                           |
-| Arrow type param trailing comma           | Design choice         | [single_type_param](../tests/fixtures/typescript/expressions/arrow/generic/single_type_param_prettier_divergence/)                              |
+- Empty statement blank lines — Design choice — [empty_standalone](../tests/fixtures/typescript/statements/empty_standalone_prettier_divergence/)
+- Return type generic union — Print width — [return_type_generic_union_long](../tests/fixtures/typescript/declarations/function/return_type_generic_union_long_prettier_divergence/)
+- Single specifier import — Print width — [single_specifier_long](../tests/fixtures/typescript/modules/imports/single_specifier_long_prettier_divergence/)
+- Module path calls — Print width — [path_calls_long](../tests/fixtures/typescript/modules/imports/path_calls_long_prettier_divergence/)
+- Instantiation expression parens — Semantic preservation — [instantiation_parens](../tests/fixtures/typescript/typescript_specific/assertions/instantiation_parens_prettier_divergence/)
+- Optional-chain base member chain — Semantic preservation — [optional_paren_member_chain](../tests/fixtures/typescript/expressions/chain/optional_paren_member_chain_prettier_divergence/)
+- Optional-chain non-null base member chain — Semantic preservation — [optional_paren_non_null_member_chain](../tests/fixtures/typescript/expressions/chain/optional_paren_non_null_member_chain_prettier_divergence/)
+- Optional-chain non-null new callee — Prettier bug — [optional_paren_non_null_new_callee](../tests/fixtures/typescript/expressions/chain/optional_paren_non_null_new_callee_prettier_divergence/)
+- Non-null parenthesized base — Design choice — [non_null_paren_base_long](../tests/fixtures/typescript/expressions/member/non_null_paren_base_long_prettier_divergence/)
+- Constrained infer extends-operand parens — Prettier bug — [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens_prettier_divergence/)
+- Arrow type param trailing comma — Design choice — [single_type_param](../tests/fixtures/typescript/expressions/arrow/generic/single_type_param_prettier_divergence/)
 
 **Instantiation expression parens**: Prettier strips parentheses from ternary and binary expressions in `TSInstantiationExpression` (`(x ? y : z)<T>` → `x ? y : z<T>`), changing semantics. Without parens, `<T>` only applies to the last operand. tsv preserves parens to maintain the original meaning. Both formatters agree on preserving parens for assignment expressions (`(x = y)<T>`).
 
@@ -393,11 +383,9 @@ tsv treats these like any other function call—no special-casing for module pat
 
 These inputs are **valid** by tsv's parse oracle (Svelte / acorn-typescript) and our formatter keeps them stable, but prettier's `typescript` parser/printer **throws** on them — so there is no `output_prettier.*` oracle. Each fixture carries a `prettier_rejects.txt` marker pinning the exact error; rule F6 live-verifies that prettier still rejects the input (failing loudly if the bug is fixed upstream or the error morphs). All three reproduce in plain prettier (`parser: 'typescript'`, zero Svelte) and are fine under `babel-ts`; the 4.x prettier-plugin-svelte bump surfaced them because the plugin switched `lang="ts"` formatting from `babel-ts` to the real `typescript` parser.
 
-| Construct                                                     | Prettier error                                              | Fixture                                                                                                                                                       |
-| ------------------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Optional chain to private field (`x?.#a`)                     | `An optional chain cannot contain private identifiers.`     | [private_fields_optional_chain](../tests/fixtures/typescript/declarations/class/private_fields_optional_chain_prettier_divergence/)                           |
-| Parenthesized optional-chain decorator callee (`@((a?.b)())`) | `Cannot read properties of undefined (reading 'type')`      | [parenthesized_optional_chain](../tests/fixtures/typescript/typescript_specific/decorators/parenthesized_optional_chain_prettier_divergence/)                 |
-| Line comment before import-attributes `with`                  | `'(' expected.`                                             | [with_keyword_comment_line](../tests/fixtures/typescript/modules/imports/with_keyword_comment_line_prettier_divergence/)                                      |
+- Optional chain to private field (`x?.#a`) — `An optional chain cannot contain private identifiers.` — [private_fields_optional_chain](../tests/fixtures/typescript/declarations/class/private_fields_optional_chain_prettier_divergence/)
+- Parenthesized optional-chain decorator callee (`@((a?.b)())`) — `Cannot read properties of undefined (reading 'type')` — [parenthesized_optional_chain](../tests/fixtures/typescript/typescript_specific/decorators/parenthesized_optional_chain_prettier_divergence/)
+- Line comment before import-attributes `with` — `'(' expected.` — [with_keyword_comment_line](../tests/fixtures/typescript/modules/imports/with_keyword_comment_line_prettier_divergence/)
 
 **Optional chain to private field**: `x?.#a` is valid modern JS (ecma262 `OptionalChain : ?. PrivateIdentifier`, from the private-fields-in-`in` era). typescript-estree rejects it; tsv keeps it stable. The comprehensive (prettier-formattable) private-field cases live in [private_fields](../tests/fixtures/typescript/declarations/class/private_fields/).
 
@@ -737,16 +725,14 @@ A comment can suppress formatting of the construct that follows it. tsv honors i
 
 The `prettier-ignore` family matches prettier exactly (both emit the construct raw), so it needs no divergence fixture of its own. The `format-ignore` family is tsv-native: prettier doesn't recognize it, so prettier reformats the construct while tsv preserves it — that difference is the divergence. Most fixtures pair the spellings in one input: a `prettier-ignore`d construct (preserved by both tools, so unchanged in `output_prettier`) sits beside a `format-ignore`d one (reformatted only by prettier), making the `format-ignore` construct the sole divergence and doubling as a drop-in-compat check. The `basic` (template node) and `js_css` (embedded `<script>` + `<style>`) Svelte fixtures carry this control, as do both standalone fixtures.
 
-| Feature                                   | Reason        | Fixture                                                                              |
-| ----------------------------------------- | ------------- | ----------------------------------------------------------------------------------- |
-| `format-ignore` in `<script>` / `<style>` | Design choice | [js_css](../tests/fixtures/svelte/syntax/format_ignore/js_css_prettier_divergence/)         |
-| `format-ignore` template element          | Design choice | [basic](../tests/fixtures/svelte/syntax/format_ignore/basic_prettier_divergence/)           |
-| `format-ignore` nested CSS                 | Design choice | [css_nested](../tests/fixtures/svelte/syntax/format_ignore/css_nested_prettier_divergence/) |
-| `format-ignore-start` / `-end` range      | Design choice | [range](../tests/fixtures/svelte/syntax/format_ignore/range_prettier_divergence/)           |
-| `format-ignore` standalone `.ts`          | Design choice | [ts_standalone](../tests/fixtures/typescript/syntax/comments/format_ignore_prettier_divergence/) |
-| `format-ignore` standalone `.css`         | Design choice | [css_standalone](../tests/fixtures/css/syntax/comments/format_ignore_prettier_divergence/) |
+- `format-ignore` in `<script>` / `<style>` — Design choice — [js_css](../tests/fixtures/svelte/syntax/format_ignore/js_css_prettier_divergence/)
+- `format-ignore` template element — Design choice — [basic](../tests/fixtures/svelte/syntax/format_ignore/basic_prettier_divergence/)
+- `format-ignore` nested CSS — Design choice — [css_nested](../tests/fixtures/svelte/syntax/format_ignore/css_nested_prettier_divergence/)
+- `format-ignore-start` / `-end` range — Design choice — [range](../tests/fixtures/svelte/syntax/format_ignore/range_prettier_divergence/)
+- `format-ignore` standalone `.ts` — Design choice — [ts_standalone](../tests/fixtures/typescript/syntax/comments/format_ignore_prettier_divergence/)
+- `format-ignore` standalone `.css` — Design choice — [css_standalone](../tests/fixtures/css/syntax/comments/format_ignore_prettier_divergence/)
 
-The first four rows are Svelte-embedded; the last two pin the **standalone**
+The first four are Svelte-embedded; the last two pin the **standalone**
 `.ts` / `.css` paths (acorn-typescript / `parseCss` + `tsv_ts` / `tsv_css`
 directly), so the directive is covered in every language outside a Svelte host
 too.
