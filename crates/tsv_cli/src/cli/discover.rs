@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use tsv_discover::{DirVerdict, classify_dir, should_format_file};
@@ -139,10 +140,13 @@ pub fn discover_files(paths: &[String]) -> Result<Discovered, Vec<String>> {
 /// Set up the ignore evaluation for one directory `root`, then recurse into it.
 ///
 /// Resolves the **format root** — the repo root inside a git tree, else the
-/// filesystem root — and preloads the [`IgnoreStack`] for the ancestor chain
-/// from there down to `root`: `.formatignore` at each level (with a repo-root
-/// `.prettierignore` shadow), and `.gitignore` at each level when in a repo. The
-/// heuristic is seeded off once any `.gitignore` is in scope. `root`'s display
+/// filesystem root — and preloads the [`IgnoreStack`] for the ancestors *above*
+/// `root` (format root down to `root`'s parent): `.formatignore` at each level
+/// (with a repo-root `.prettierignore` shadow), and `.gitignore` at each level
+/// when in a repo. `root` itself, and everything below it, reads its own ignore
+/// files in [`collect_recursive`] from the directory listing it already fetches,
+/// so an ignore-file-free subtree costs no speculative opens. The heuristic is
+/// seeded off once any `.gitignore` above `root` is in scope. `root`'s display
 /// spelling is preserved for the emitted paths; matching uses the
 /// format-root-relative path threaded down the walk.
 fn collect_root(root: &Path, cwd: &Path, out: &mut Discovered) {
@@ -160,13 +164,19 @@ fn collect_root(root: &Path, cwd: &Path, out: &mut Discovered) {
     // this never fails; `""` means `root` *is* the format root).
     let base_rel = rel_to(&format_root, &root_abs);
 
-    // preload the ancestor chain, format root → `root` (shallow→deep)
-    for ancestor in ancestor_chain(&format_root, &root_abs) {
-        let anchor = rel_to(&format_root, &ancestor);
+    // Preload the ancestors *above* `root` (format root → `root`'s parent). `root`
+    // and every directory below it read their own ignore files in
+    // `collect_recursive`, from the listing they already fetch — so an
+    // ignore-file-free subtree (the common case) costs zero speculative `open`s.
+    // Ancestors above `root` aren't listed (we don't walk them), so they keep the
+    // direct open. `root` is excluded here to avoid reading its ignores twice.
+    let chain = ancestor_chain(&format_root, &root_abs);
+    for ancestor in &chain[..chain.len() - 1] {
+        let anchor = rel_to(&format_root, ancestor);
         // tsv layer: `.formatignore` everywhere; at the repo root only, a
         // `.prettierignore` it shadows (drop-in compat, never hierarchical)
         let tsv_content = if in_repo && anchor.is_empty() {
-            read_first(&ancestor, &TSV_ROOT_FILES)
+            read_first(ancestor, &TSV_ROOT_FILES)
         } else {
             read_optional(&ancestor.join(FORMATIGNORE_FILE))
         };
@@ -203,26 +213,79 @@ fn collect_recursive(
     // whether the format root is a git repo — `.gitignore` is read only then.
     in_repo: bool,
     stack: &mut IgnoreStack,
+    // whether the build-output heuristic is active at *this* dir's level (no
+    // `.gitignore` governs `dir` or above). `dir`'s own `.gitignore`, read below,
+    // turns it off for `dir`'s children.
     heuristic_active: bool,
     out: &mut Discovered,
 ) {
-    let entries = match fs::read_dir(dir) {
-        Ok(entries) => entries,
+    // Materialize the listing once: it's used twice — to read THIS dir's own
+    // ignore files (opening one only when the listing actually contains it, so an
+    // ignore-file-free dir costs zero speculative `open`s) before classifying its
+    // children, then to walk the entries. Each entry's name is taken once here and
+    // reused below.
+    let mut entries: Vec<(fs::DirEntry, OsString)> = Vec::new();
+    match fs::read_dir(dir) {
+        Ok(read_dir) => {
+            for entry in read_dir {
+                match entry {
+                    Ok(entry) => {
+                        let name = entry.file_name();
+                        entries.push((entry, name));
+                    }
+                    Err(e) => out
+                        .errors
+                        .push(format!("{}: read_dir entry failed: {e}", dir.display())),
+                }
+            }
+        }
         Err(e) => {
             out.errors
                 .push(format!("{}: read_dir failed: {e}", dir.display()));
             return;
         }
+    }
+
+    // read THIS dir's own ignore files, opening only those the listing contains
+    let present = |name: &str| {
+        entries
+            .iter()
+            .any(|(_, n)| n.as_os_str() == OsStr::new(name))
     };
-    for entry in entries {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(e) => {
-                out.errors
-                    .push(format!("{}: read_dir entry failed: {e}", dir.display()));
-                continue;
+    // tsv layer: at the repo root only, `.formatignore` shadows `.prettierignore`;
+    // every other level (and outside a repo) uses `.formatignore`
+    let tsv_content = if in_repo && dir_rel.is_empty() {
+        TSV_ROOT_FILES
+            .iter()
+            .copied()
+            .filter(|name| present(name))
+            .find_map(|name| read_optional(&dir.join(name)))
+    } else if present(FORMATIGNORE_FILE) {
+        read_optional(&dir.join(FORMATIGNORE_FILE))
+    } else {
+        None
+    };
+    let tsv_pushed = match tsv_content {
+        Some(content) => {
+            stack.push_tsv(dir_rel, &content);
+            true
+        }
+        None => false,
+    };
+    // `.gitignore` layer: only inside a repo; it turns the heuristic off for this
+    // dir's children
+    let git_pushed = in_repo
+        && present(GITIGNORE_FILE)
+        && match read_optional(&dir.join(GITIGNORE_FILE)) {
+            Some(content) => {
+                stack.push_gitignore(dir_rel, &content);
+                true
             }
+            None => false,
         };
+    let child_heuristic = heuristic_active && !git_pushed;
+
+    for (entry, name) in &entries {
         let file_type = match entry.file_type() {
             Ok(file_type) => file_type,
             Err(e) => {
@@ -232,7 +295,6 @@ fn collect_recursive(
             }
         };
         let path = entry.path();
-        let name = entry.file_name();
         let name = name.to_string_lossy();
         let child_rel = if dir_rel.is_empty() {
             name.to_string()
@@ -246,7 +308,7 @@ fn collect_recursive(
             // lives in `tsv_discover` so the native CLI, the WASM CLI, and the VS
             // Code extension share one verdict. The FS walk + layer push/pop stay
             // here.
-            match classify_dir(&name, &child_rel, heuristic_active, stack) {
+            match classify_dir(&name, &child_rel, child_heuristic, stack) {
                 DirVerdict::Prune => continue,
                 DirVerdict::PruneWithWarning(warning) => {
                     out.warnings.push(warning);
@@ -254,41 +316,19 @@ fn collect_recursive(
                 }
                 DirVerdict::Descend => {}
             }
-            // entering the dir: push its `.formatignore` (hierarchical) and, in a
-            // repo, its `.gitignore` (which turns the heuristic off for its
-            // subtree); pop both on the way back out
-            let tsv_pushed = match read_optional(&path.join(FORMATIGNORE_FILE)) {
-                Some(content) => {
-                    stack.push_tsv(&child_rel, &content);
-                    true
-                }
-                None => false,
-            };
-            let git_pushed = in_repo
-                && match read_optional(&path.join(GITIGNORE_FILE)) {
-                    Some(content) => {
-                        stack.push_gitignore(&child_rel, &content);
-                        true
-                    }
-                    None => false,
-                };
-            collect_recursive(
-                &path,
-                &child_rel,
-                in_repo,
-                stack,
-                heuristic_active && !git_pushed,
-                out,
-            );
-            if git_pushed {
-                stack.pop_gitignore();
-            }
-            if tsv_pushed {
-                stack.pop_tsv();
-            }
+            // the child reads its own ignore files (and pushes/pops its own layers)
+            // when we recurse into it
+            collect_recursive(&path, &child_rel, in_repo, stack, child_heuristic, out);
         } else if file_type.is_file() && should_format_file(&name, &child_rel, stack) {
             out.files.push(path);
         }
+    }
+
+    if git_pushed {
+        stack.pop_gitignore();
+    }
+    if tsv_pushed {
+        stack.pop_tsv();
     }
 }
 
