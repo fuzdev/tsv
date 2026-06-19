@@ -46,12 +46,10 @@ syntactic grammar; early-error enforcement is future diagnostics-layer work.
 
 ### Test Directories
 
-| Directory         | Tests   | Priority                                |
-| ----------------- | ------- | --------------------------------------- |
-| `test/language/`  | ~23,659 | Primary - language syntax               |
-| `test/built-ins/` | ~23,039 | Secondary - valid syntax in test bodies |
-| `test/annexB/`    | Various | Tertiary - web compat features          |
-| `test/staging/`   | Various | Skip - in-progress proposals            |
+- `test/language/` — ~23,659 — Primary - language syntax
+- `test/built-ins/` — ~23,039 — Secondary - valid syntax in test bodies
+- `test/annexB/` — Various — Tertiary - web compat features
+- `test/staging/` — Various — Skip - in-progress proposals
 
 ## Design
 

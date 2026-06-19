@@ -220,20 +220,18 @@ tsv_ts = { version = "0.1", features = ["convert"] }
 
 Language-agnostic primitives shared across all implementations:
 
-| Module            | Purpose                                                                                    |
-| ----------------- | ------------------------------------------------------------------------------------------ |
-| `Span`            | Source positions (u32 for memory efficiency)                                               |
-| `LocationTracker` | Lazy line/column computation (O(log n) binary search)                                      |
-| `ParseError`      | Language-agnostic errors (String-based for flexibility)                                    |
-| `doc`             | **Document builder for Prettier-style formatting**                                         |
-| `printing`        | Shared formatting utilities (string literals, whitespace)                                  |
-| `OutputBuffer`    | Pre-allocated output string building with column tracking                                  |
-| `config`          | `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts, `EmbedContext`, `LayoutMode` (no runtime config)     |
-| `comment`         | Comment type and lookup utilities (see Comment Handling below)                             |
-| `escapes`         | Escape sequence handling                                                                   |
-| `interner`        | String interner utilities (`SymbolResolver` trait)                                         |
-| `parser`          | Shared parser utilities (`PeekData`)                                                       |
-| `source_scan`     | Comment-skipping source scanning (used by AST conversion)                                  |
+- `Span` — Source positions (u32 for memory efficiency)
+- `LocationTracker` — Lazy line/column computation (O(log n) binary search)
+- `ParseError` — Language-agnostic errors (String-based for flexibility)
+- `doc` — **Document builder for Prettier-style formatting**
+- `printing` — Shared formatting utilities (string literals, whitespace)
+- `OutputBuffer` — Pre-allocated output string building with column tracking
+- `config` — `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts, `EmbedContext`, `LayoutMode` (no runtime config)
+- `comment` — Comment type and lookup utilities (see Comment Handling below)
+- `escapes` — Escape sequence handling
+- `interner` — String interner utilities (`SymbolResolver` trait)
+- `parser` — Shared parser utilities (`PeekData`)
+- `source_scan` — Comment-skipping source scanning (used by AST conversion)
 
 See [crates/tsv_lang/CLAUDE.md](../crates/tsv_lang/CLAUDE.md) for detailed module documentation.
 
@@ -569,15 +567,13 @@ pub struct Comment {
 
 The `tsv_lang::comment` module provides O(log n) lookup via binary search:
 
-| Function                           | Purpose                                            |
-| ---------------------------------- | -------------------------------------------------- |
-| `comments_in_range()`              | Find comments between two positions (O(log n))     |
-| `classify_comment()`               | Determine if trailing, leading-own-line, or inline |
-| `classify_comment_fast()`          | Same, using precomputed line breaks (faster)       |
-| `ClassifiedComments::from_range()` | Batch classify all categories in one pass          |
-| `has_comments_in_range()`          | Quick existence check                              |
-| `leading_comments()`               | Comments before a node (excludes trailing)         |
-| `trailing_comments()`              | Comments on same line as previous node             |
+- `comments_in_range()` — Find comments between two positions (O(log n))
+- `classify_comment()` — Determine if trailing, leading-own-line, or inline
+- `classify_comment_fast()` — Same, using precomputed line breaks (faster)
+- `ClassifiedComments::from_range()` — Batch classify all categories in one pass
+- `has_comments_in_range()` — Quick existence check
+- `leading_comments()` — Comments before a node (excludes trailing)
+- `trailing_comments()` — Comments on same line as previous node
 
 ### Printer Strategy
 
@@ -663,19 +659,17 @@ Scales at O(features) rather than O(tools × features).
 
 ## Key Design Decisions
 
-| Decision                      | Rationale                                                              |
-| ----------------------------- | ---------------------------------------------------------------------- |
-| Two ASTs                      | Optimize internal for speed, public for compatibility                  |
-| Multi-crate                   | Compile isolation, independent consumption                             |
-| Closed scope, open convention | Per-language ownership; concrete types end-to-end; no central registry |
-| Separate lexers               | Zero mode-switching overhead                                           |
-| Pratt parsing                 | Clean operator precedence for TS expressions                           |
-| Shared interner               | Identifiers deduplicated across embedded regions of a file             |
-| Detached comments             | Simple AST, O(log n) lookup, matches prettier                          |
-| Doc builder                   | Prettier-style declarative formatting                                  |
-| Source threading              | Preserve escapes without AST duplication                               |
-| Lazy locations                | Parse-time speed, serialize-time computation                           |
-| Fixtures as data              | Reusable across tools, O(features) scaling                             |
+- Two ASTs — Optimize internal for speed, public for compatibility
+- Multi-crate — Compile isolation, independent consumption
+- Closed scope, open convention — Per-language ownership; concrete types end-to-end; no central registry
+- Separate lexers — Zero mode-switching overhead
+- Pratt parsing — Clean operator precedence for TS expressions
+- Shared interner — Identifiers deduplicated across embedded regions of a file
+- Detached comments — Simple AST, O(log n) lookup, matches prettier
+- Doc builder — Prettier-style declarative formatting
+- Source threading — Preserve escapes without AST duplication
+- Lazy locations — Parse-time speed, serialize-time computation
+- Fixtures as data — Reusable across tools, O(features) scaling
 
 ## Traversal and Extensibility
 
@@ -773,13 +767,11 @@ The closest Rust projects embody the alternative shapes, which makes the trade-o
 
 Issues that need architectural decisions before building future tools.
 
-| Topic                       | Issue                                                                                                                                                                                                                        | Needs Decision When                                    |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| **Scope/symbol resolution** | Syntax-only ASTs today. Meaningful linting requires name resolution.                                                                                                                                                         | Before linter                                          |
-| **Error recovery**          | Fail-fast parsers block LSP/linter (need partial ASTs from broken code); also required for full CSS-spec compliance — CSS Syntax §9 recovery (drop the bad rule, keep parsing), see conformance_svelte.md §CSS Parser Scope. | For full CSS-spec compliance (CSS) / before LSP/linter |
-| **Span encoding**           | Byte offsets vs UTF-16 code units. LSP protocol uses UTF-16; mismatch = position bugs.                                                                                                                                       | Before LSP                                             |
-| **Source maps**             | Compiler must map output positions to input. How do spans survive transforms?                                                                                                                                                | Before compiler                                        |
-| **Cancellation**            | LSP operations must be cancellable mid-parse. Current parser has no cancellation points.                                                                                                                                     | Before LSP                                             |
+- **Scope/symbol resolution** — Syntax-only ASTs today. Meaningful linting requires name resolution. *(When: before linter.)*
+- **Error recovery** — Fail-fast parsers block LSP/linter (need partial ASTs from broken code); also required for full CSS-spec compliance — CSS Syntax §9 recovery (drop the bad rule, keep parsing), see conformance_svelte.md §CSS Parser Scope. *(When: for full CSS-spec compliance (CSS) / before LSP/linter.)*
+- **Span encoding** — Byte offsets vs UTF-16 code units. LSP protocol uses UTF-16; mismatch = position bugs. *(When: before LSP.)*
+- **Source maps** — Compiler must map output positions to input. How do spans survive transforms? *(When: before compiler.)*
+- **Cancellation** — LSP operations must be cancellable mid-parse. Current parser has no cancellation points. *(When: before LSP.)*
 
 ## References
 
