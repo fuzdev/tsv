@@ -117,6 +117,32 @@ fn clause_hugs_expr(expr: &tsv_ts::Expression) -> bool {
     }
 }
 
+/// How an `{#await}` carries its first section in the head, keyed on the **absence of a
+/// pending body** (the binding is optional). Single classification shared by the head-clause
+/// builder and the tail builders (which skip the head-carried keyword) — so the two can't drift.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AwaitShorthand {
+    /// `{#await x then v}` / bare `{#await x then}` — no pending body, a `then` section.
+    Then,
+    /// `{#await x catch e}` / bare `{#await x catch}` — no pending, no `then`, a `catch` section.
+    Catch,
+    /// Full form (`{#await x}…{:then}…{:catch}…`) — the head carries no section clause.
+    None,
+}
+
+/// Classify an await block's head shorthand. See [`AwaitShorthand`].
+fn await_shorthand(block: &internal::AwaitBlock) -> AwaitShorthand {
+    if block.pending.is_some() {
+        AwaitShorthand::None
+    } else if block.then.is_some() {
+        AwaitShorthand::Then
+    } else if block.error.is_some() || block.catch.is_some() {
+        AwaitShorthand::Catch
+    } else {
+        AwaitShorthand::None
+    }
+}
+
 impl<'a> Printer<'a> {
     /// Whether the trailing comments in `[start, end)` end with a line (`//`) comment.
     ///
@@ -936,6 +962,53 @@ impl<'a> Printer<'a> {
         self.indent_body_expand(self.build_fragment_doc(frag), multiline)
     }
 
+    /// The `{:then …}` keyword doc — `{:then value}` if a `then` value binds, else
+    /// `{:then}` if the then-section has content, else `None`. Whether to emit it is the
+    /// caller's decision: a `then`-shorthand carries it in the head instead.
+    fn await_then_keyword(&self, block: &internal::AwaitBlock) -> Option<DocId> {
+        let d = self.d();
+        if let Some(value) = &block.value {
+            Some(d.concat(&[
+                d.text("{:then "),
+                self.build_pattern_doc(value),
+                d.text("}"),
+            ]))
+        } else if block.then.as_ref().is_some_and(|t| !t.nodes.is_empty()) {
+            Some(d.text("{:then}"))
+        } else {
+            None
+        }
+    }
+
+    /// The `{:catch …}` keyword doc — `{:catch error}` if an error binds, else `{:catch}`
+    /// if the catch-section has content, else `None`. A `catch`-shorthand carries it in the
+    /// head instead.
+    fn await_catch_keyword(&self, block: &internal::AwaitBlock) -> Option<DocId> {
+        let d = self.d();
+        if let Some(error) = &block.error {
+            Some(d.concat(&[
+                d.text("{:catch "),
+                self.build_pattern_doc(error),
+                d.text("}"),
+            ]))
+        } else if block.catch.as_ref().is_some_and(|c| !c.nodes.is_empty()) {
+            Some(d.text("{:catch}"))
+        } else {
+            None
+        }
+    }
+
+    /// Which shorthand carries its clause in the head, so the tail omits that keyword:
+    /// `(then-shorthand, catch-shorthand)`. Derived from [`await_shorthand`] so it can't drift
+    /// from the head-clause builder.
+    fn await_shorthand_flags(block: &internal::AwaitBlock) -> (bool, bool) {
+        match await_shorthand(block) {
+            AwaitShorthand::Then => (true, false),
+            AwaitShorthand::Catch => (false, true),
+            AwaitShorthand::None => (false, false),
+        }
+    }
+
     /// Build the await tail (everything after the head's `}`): the section bodies, the
     /// `{:then …}` / `{:catch …}` keywords (only the ones NOT carried in the head by a
     /// shorthand), and `{/await}`. In `multiline` mode every section + keyword +
@@ -944,52 +1017,109 @@ impl<'a> Printer<'a> {
     /// the other blocks.
     fn build_await_tail(&self, block: &internal::AwaitBlock, multiline: bool) -> DocId {
         let d = self.d();
-        // Shorthands carry their clause in the head: `then v` → no `{:then}` keyword in
-        // the tail; `catch e` (no value/pending) → no `{:catch}` keyword.
-        let is_then_shorthand = block.value.is_some() && block.pending.is_none();
-        let is_catch_shorthand =
-            block.value.is_none() && block.pending.is_none() && block.error.is_some();
+        let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
         let mut parts: Vec<DocId> = Vec::new();
         if let Some(pending) = &block.pending {
             parts.push(self.await_section_body_expand(pending, multiline));
         }
-        if !is_then_shorthand {
-            if let Some(value) = &block.value {
-                if multiline {
-                    parts.push(d.hardline());
-                }
-                parts.push(d.text("{:then "));
-                parts.push(self.build_pattern_doc(value));
-                parts.push(d.text("}"));
-            } else if block.then.as_ref().is_some_and(|t| !t.nodes.is_empty()) {
-                if multiline {
-                    parts.push(d.hardline());
-                }
-                parts.push(d.text("{:then}"));
+        if !is_then_shorthand && let Some(kw) = self.await_then_keyword(block) {
+            if multiline {
+                parts.push(d.hardline());
             }
+            parts.push(kw);
         }
         if let Some(then_block) = &block.then {
             parts.push(self.await_section_body_expand(then_block, multiline));
         }
-        if !is_catch_shorthand {
-            if let Some(error) = &block.error {
-                if multiline {
-                    parts.push(d.hardline());
-                }
-                parts.push(d.text("{:catch "));
-                parts.push(self.build_pattern_doc(error));
-                parts.push(d.text("}"));
-            } else if block.catch.as_ref().is_some_and(|c| !c.nodes.is_empty()) {
-                if multiline {
-                    parts.push(d.hardline());
-                }
-                parts.push(d.text("{:catch}"));
+        if !is_catch_shorthand && let Some(kw) = self.await_catch_keyword(block) {
+            if multiline {
+                parts.push(d.hardline());
             }
+            parts.push(kw);
         }
         if let Some(catch_block) = &block.catch {
             parts.push(self.await_section_body_expand(catch_block, multiline));
         }
         if multiline {
+            parts.push(d.hardline());
+        }
+        parts.push(d.text("{/await}"));
+        d.concat(&parts)
+    }
+
+    /// Build the await tail for the **space-only** layout: each present section body
+    /// (`indent_body_soft`) and each un-shorthanded `{:then}` / `{:catch}` keyword are
+    /// separated by `line()` docs, so the whole construct breaks together as a unit under
+    /// the caller's `group`. Mirrors `build_await_tail`, but with `line()` separators and
+    /// soft-indented bodies (the head is prepended + grouped by the caller).
+    fn build_await_tail_space_only(&self, block: &internal::AwaitBlock) -> DocId {
+        let d = self.d();
+        let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
+        let mut parts: Vec<DocId> = Vec::new();
+        if let Some(pending) = &block.pending {
+            let body = self.build_nodes_doc_multiline(&pending.nodes);
+            parts.push(indent_body_soft(self, body));
+        }
+        if !is_then_shorthand && let Some(kw) = self.await_then_keyword(block) {
+            parts.push(d.line());
+            parts.push(kw);
+        }
+        if let Some(then_block) = &block.then {
+            let body = self.build_nodes_doc_multiline(&then_block.nodes);
+            parts.push(indent_body_soft(self, body));
+        }
+        if !is_catch_shorthand && let Some(kw) = self.await_catch_keyword(block) {
+            parts.push(d.line());
+            parts.push(kw);
+        }
+        if let Some(catch_block) = &block.catch {
+            let body = self.build_nodes_doc_multiline(&catch_block.nodes);
+            parts.push(indent_body_soft(self, body));
+        }
+        parts.push(d.line());
+        parts.push(d.text("{/await}"));
+        d.concat(&parts)
+    }
+
+    /// Build the await tail for the **newline-authored** layout: section bodies via
+    /// `build_await_section_body` (which reports trailing whitespace), with a `hardline`
+    /// before each keyword and before `{/await}` only when the preceding section had
+    /// trailing whitespace. Mirrors `build_await_tail`, but respects authored trailing
+    /// whitespace instead of a uniform `multiline` flag (the head is prepended by the
+    /// caller).
+    fn build_await_tail_newline(&self, block: &internal::AwaitBlock) -> DocId {
+        let d = self.d();
+        let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
+        let mut parts: Vec<DocId> = Vec::new();
+        let mut prev_has_trailing = false;
+        if let Some(pending) = &block.pending {
+            let (body, has_trailing) = build_await_section_body(self, pending);
+            parts.push(body);
+            prev_has_trailing = has_trailing;
+        }
+        if !is_then_shorthand && let Some(kw) = self.await_then_keyword(block) {
+            if prev_has_trailing {
+                parts.push(d.hardline());
+            }
+            parts.push(kw);
+        }
+        if let Some(then_block) = &block.then {
+            let (body, has_trailing) = build_await_section_body(self, then_block);
+            parts.push(body);
+            prev_has_trailing = has_trailing;
+        }
+        if !is_catch_shorthand && let Some(kw) = self.await_catch_keyword(block) {
+            if prev_has_trailing {
+                parts.push(d.hardline());
+            }
+            parts.push(kw);
+        }
+        if let Some(catch_block) = &block.catch {
+            let (body, has_trailing) = build_await_section_body(self, catch_block);
+            parts.push(body);
+            prev_has_trailing = has_trailing;
+        }
+        if prev_has_trailing {
             parts.push(d.hardline());
         }
         parts.push(d.text("{/await}"));
@@ -1063,26 +1193,34 @@ impl<'a> Printer<'a> {
         // path. A block-parent sibling routes await through the multiline path via
         // `has_control_flow_after_sibling` (so `can_wrap` is true there); an inline parent
         // keeps `can_wrap` false and hugs, matching `{#if}`/`{#each}`.
+        // Shorthand clause lives in the head: `then v` / bare `then`, or `catch e` / bare
+        // `catch`; the full form has none. Built once, shared by the fast path, the
+        // space-only tail, and the newline-authored tail. Classified by `await_shorthand`,
+        // the same source `await_shorthand_flags` uses to skip the head-carried keyword.
+        let clause = match await_shorthand(block) {
+            AwaitShorthand::Then => Some(match &block.value {
+                Some(value) => d.concat(&[d.text("then "), self.build_pattern_doc(value)]),
+                None => d.text("then"),
+            }),
+            AwaitShorthand::Catch => Some(match &block.error {
+                Some(error) => d.concat(&[d.text("catch "), self.build_pattern_doc(error)]),
+                None => d.text("catch"),
+            }),
+            AwaitShorthand::None => None,
+        };
+        let head_doc = self.build_block_head_doc(
+            AWAIT_BLOCK_OPEN,
+            expr_doc,
+            clause,
+            can_wrap,
+            clause_hugs_expr(&block.expression),
+            expr_ends_with_line_comment,
+        );
+
+        // Fast path: every present section is inline-authored → body-expand like the other
+        // blocks. The section bodies + `{:then}`/`{:catch}` keywords + `{/await}` all drop to
+        // their own lines when the head wraps, chosen in one pass by `build_expanding_construct`.
         if can_wrap && has_section && all_sections_inline {
-            // Shorthand clause lives in the head: `then v` (value, no pending) or
-            // `catch e` (error, no value/pending); the full form has none.
-            let clause = match (block.pending.is_none(), &block.value, &block.error) {
-                (true, Some(value), _) => {
-                    Some(d.concat(&[d.text("then "), self.build_pattern_doc(value)]))
-                }
-                (true, None, Some(error)) => {
-                    Some(d.concat(&[d.text("catch "), self.build_pattern_doc(error)]))
-                }
-                _ => None,
-            };
-            let head_doc = self.build_block_head_doc(
-                AWAIT_BLOCK_OPEN,
-                expr_doc,
-                clause,
-                can_wrap,
-                clause_hugs_expr(&block.expression),
-                expr_ends_with_line_comment,
-            );
             let inline_tail = self.build_await_tail(block, false);
             let multiline_tail = self.build_await_tail(block, true);
             return self.build_expanding_construct(
@@ -1093,258 +1231,20 @@ impl<'a> Printer<'a> {
             );
         }
 
-        let mut parts: Vec<DocId> = Vec::new();
-
-        // Shorthand: {#await expr then value}...{/await}
-        // Also handles: {#await expr then value}...{:catch error}...{/await}
-        if let (Some(value), None) = (&block.value, &block.pending) {
-            let then_kw = d.text("then ");
-            let value_doc = self.build_pattern_doc(value);
-            let then_clause = d.concat(&[then_kw, value_doc]);
-            parts.push(self.build_block_head_doc(
-                AWAIT_BLOCK_OPEN,
-                expr_doc,
-                Some(then_clause),
-                can_wrap,
-                clause_hugs_expr(&block.expression),
-                expr_ends_with_line_comment,
-            ));
-
-            // Check if any section has space-only whitespace
-            let has_space_only = block
-                .then
-                .as_ref()
-                .is_some_and(|f| self.fragment_has_space_only_ws(f))
-                || block
-                    .catch
-                    .as_ref()
-                    .is_some_and(|f| self.fragment_has_space_only_ws(f));
-
-            if has_space_only {
-                if let Some(then_block) = &block.then {
-                    let body_doc = self.build_nodes_doc_multiline(&then_block.nodes);
-                    parts.push(indent_body_soft(self, body_doc));
-                }
-                if let Some(error) = &block.error {
-                    parts.push(d.line());
-                    parts.push(d.text("{:catch "));
-                    parts.push(self.build_pattern_doc(error));
-                    parts.push(d.text("}"));
-                } else if block.catch.as_ref().is_some_and(|c| !c.nodes.is_empty()) {
-                    parts.push(d.line());
-                    parts.push(d.text("{:catch}"));
-                }
-                if let Some(catch_block) = &block.catch {
-                    let body_doc = self.build_nodes_doc_multiline(&catch_block.nodes);
-                    parts.push(indent_body_soft(self, body_doc));
-                }
-                parts.push(d.line());
-                parts.push(d.text("{/await}"));
-                let concat = d.concat(&parts);
-                return d.group(concat);
-            }
-
-            let mut prev_has_trailing = false;
-            if let Some(then_block) = &block.then {
-                let (body, trailing) = build_await_section_body(self, then_block);
-                parts.push(body);
-                prev_has_trailing = trailing;
-            }
-
-            // Optional {:catch} continuation after then-shorthand
-            if block.catch.is_some() {
-                if let Some(error) = &block.error {
-                    if prev_has_trailing {
-                        parts.push(d.hardline());
-                    }
-                    parts.push(d.text("{:catch "));
-                    parts.push(self.build_pattern_doc(error));
-                    parts.push(d.text("}"));
-                } else if block.catch.as_ref().is_some_and(|c| !c.nodes.is_empty()) {
-                    if prev_has_trailing {
-                        parts.push(d.hardline());
-                    }
-                    parts.push(d.text("{:catch}"));
-                }
-                if let Some(catch_block) = &block.catch {
-                    let (body, trailing) = build_await_section_body(self, catch_block);
-                    parts.push(body);
-                    prev_has_trailing = trailing;
-                }
-            }
-
-            if prev_has_trailing {
-                parts.push(d.hardline());
-            }
-            parts.push(d.text("{/await}"));
-            return d.concat(&parts);
-        }
-
-        // Shorthand: {#await expr catch error}
-        if block.pending.is_none()
-            && block.value.is_none()
-            && let Some(error) = &block.error
-        {
-            let catch_kw = d.text("catch ");
-            let error_doc = self.build_pattern_doc(error);
-            let catch_clause = d.concat(&[catch_kw, error_doc]);
-            parts.push(self.build_block_head_doc(
-                AWAIT_BLOCK_OPEN,
-                expr_doc,
-                Some(catch_clause),
-                can_wrap,
-                clause_hugs_expr(&block.expression),
-                expr_ends_with_line_comment,
-            ));
-
-            // Check if any section has space-only whitespace
-            let has_space_only = block
-                .catch
-                .as_ref()
-                .is_some_and(|f| self.fragment_has_space_only_ws(f));
-
-            if has_space_only {
-                if let Some(catch_block) = &block.catch {
-                    let body_doc = self.build_nodes_doc_multiline(&catch_block.nodes);
-                    parts.push(indent_body_soft(self, body_doc));
-                }
-                parts.push(d.line());
-                parts.push(d.text("{/await}"));
-                let concat = d.concat(&parts);
-                return d.group(concat);
-            }
-
-            if let Some(catch_block) = &block.catch {
-                let (body, has_trailing) = build_await_section_body(self, catch_block);
-                parts.push(body);
-                if has_trailing {
-                    parts.push(d.hardline());
-                }
-            }
-            parts.push(d.text("{/await}"));
-            return d.concat(&parts);
-        }
-
-        parts.push(self.build_block_head_doc(
-            AWAIT_BLOCK_OPEN,
-            expr_doc,
-            None,
-            can_wrap,
-            clause_hugs_expr(&block.expression),
-            expr_ends_with_line_comment,
-        ));
-
-        // Check if any section has space-only whitespace (spaces, no newlines).
-        // Space-only await blocks stay inline when short but break when exceeding
-        // print width. Use group+line so the renderer decides based on width.
+        // Space-only sections break together as one unit under a single `group` (the tail
+        // uses `line()` separators); newline-authored sections key hardlines on authored
+        // trailing whitespace. Both reuse the hoisted head + the shared tail builders.
         let has_space_only = [&block.pending, &block.then, &block.catch].iter().any(|f| {
             f.as_ref()
                 .is_some_and(|f| self.fragment_has_space_only_ws(f))
         });
-
         if has_space_only {
-            // Build all sections with line() docs — space in flat, newline in break.
-            // All sections break together as a unit via the outer group.
-            if let Some(pending) = &block.pending {
-                let body_doc = self.build_nodes_doc_multiline(&pending.nodes);
-                parts.push(indent_body_soft(self, body_doc));
-            }
-
-            if let Some(value) = &block.value {
-                parts.push(d.line());
-                parts.push(d.text("{:then "));
-                parts.push(self.build_pattern_doc(value));
-                parts.push(d.text("}"));
-            } else if block.then.as_ref().is_some_and(|t| !t.nodes.is_empty()) {
-                parts.push(d.line());
-                parts.push(d.text("{:then}"));
-            }
-            if let Some(then_block) = &block.then {
-                let body_doc = self.build_nodes_doc_multiline(&then_block.nodes);
-                parts.push(indent_body_soft(self, body_doc));
-            }
-
-            if let Some(error) = &block.error {
-                parts.push(d.line());
-                parts.push(d.text("{:catch "));
-                parts.push(self.build_pattern_doc(error));
-                parts.push(d.text("}"));
-            } else if block.catch.as_ref().is_some_and(|c| !c.nodes.is_empty()) {
-                parts.push(d.line());
-                parts.push(d.text("{:catch}"));
-            }
-            if let Some(catch_block) = &block.catch {
-                let body_doc = self.build_nodes_doc_multiline(&catch_block.nodes);
-                parts.push(indent_body_soft(self, body_doc));
-            }
-
-            parts.push(d.line());
-            parts.push(d.text("{/await}"));
-            let concat = d.concat(&parts);
-            return d.group(concat);
+            let tail = self.build_await_tail_space_only(block);
+            return d.group(d.concat(&[head_doc, tail]));
         }
 
-        // Track whitespace status for each section
-        // The final section's trailing determines break before {/await}
-        let mut final_has_trailing = false;
-        let mut prev_has_trailing = false;
-
-        // Pending - newline-based detection only (space-only handled above via group)
-        if let Some(pending) = &block.pending {
-            let (body, has_trailing) = build_await_section_body(self, pending);
-            parts.push(body);
-            final_has_trailing = has_trailing;
-            prev_has_trailing = has_trailing;
-        }
-
-        // Then
-        if let Some(value) = &block.value {
-            if prev_has_trailing {
-                parts.push(d.hardline());
-            }
-            parts.push(d.text("{:then "));
-            parts.push(self.build_pattern_doc(value));
-            parts.push(d.text("}"));
-        } else if block.then.as_ref().is_some_and(|t| !t.nodes.is_empty()) {
-            if prev_has_trailing {
-                parts.push(d.hardline());
-            }
-            parts.push(d.text("{:then}"));
-        }
-        if let Some(then_block) = &block.then {
-            let (body, has_trailing) = build_await_section_body(self, then_block);
-            parts.push(body);
-            final_has_trailing = has_trailing;
-            prev_has_trailing = has_trailing;
-        }
-
-        // Catch
-        if let Some(error) = &block.error {
-            if prev_has_trailing {
-                parts.push(d.hardline());
-            }
-            parts.push(d.text("{:catch "));
-            parts.push(self.build_pattern_doc(error));
-            parts.push(d.text("}"));
-        } else if block.catch.as_ref().is_some_and(|c| !c.nodes.is_empty()) {
-            if prev_has_trailing {
-                parts.push(d.hardline());
-            }
-            parts.push(d.text("{:catch}"));
-        }
-        if let Some(catch_block) = &block.catch {
-            let (body, has_trailing) = build_await_section_body(self, catch_block);
-            parts.push(body);
-            final_has_trailing = has_trailing;
-        }
-
-        // Add endline before {/await} only if final section has trailing whitespace
-        if final_has_trailing {
-            parts.push(d.hardline());
-        }
-
-        parts.push(d.text("{/await}"));
-        d.concat(&parts)
+        let tail = self.build_await_tail_newline(block);
+        d.concat(&[head_doc, tail])
     }
 
     /// Build a doc for a key block

@@ -1,0 +1,583 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 801,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 198,
+				"data": " A then/catch shorthand with no name binding keeps the bare `then` / `catch` in the\nhead — never demoted to {:then}/{:catch}. prettier normalizes an empty-pending full form\nto the shorthand. "
+			},
+			{
+				"type": "Text",
+				"start": 198,
+				"end": 200,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 200,
+				"end": 228,
+				"data": " bare then-shorthand "
+			},
+			{
+				"type": "Text",
+				"start": 228,
+				"end": 229,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 229,
+				"end": 262,
+				"expression": {
+					"type": "Identifier",
+					"start": 237,
+					"end": 244,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 8
+						},
+						"end": {
+							"line": 6,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": null,
+				"error": null,
+				"pending": null,
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 250,
+							"end": 254,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				},
+				"catch": null
+			},
+			{
+				"type": "Text",
+				"start": 262,
+				"end": 264,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 264,
+				"end": 313,
+				"data": " bare then-shorthand + catch with binding "
+			},
+			{
+				"type": "Text",
+				"start": 313,
+				"end": 314,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 314,
+				"end": 365,
+				"expression": {
+					"type": "Identifier",
+					"start": 322,
+					"end": 329,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 8
+						},
+						"end": {
+							"line": 9,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": null,
+				"error": {
+					"type": "Identifier",
+					"name": "error",
+					"start": 347,
+					"end": 352,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 33,
+							"character": 347
+						},
+						"end": {
+							"line": 9,
+							"column": 38,
+							"character": 352
+						}
+					}
+				},
+				"pending": null,
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 335,
+							"end": 339,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				},
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 353,
+							"end": 357,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 365,
+				"end": 367,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 367,
+				"end": 408,
+				"data": " bare then-shorthand + bare catch "
+			},
+			{
+				"type": "Text",
+				"start": 408,
+				"end": 409,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 409,
+				"end": 454,
+				"expression": {
+					"type": "Identifier",
+					"start": 417,
+					"end": 424,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 8
+						},
+						"end": {
+							"line": 12,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": null,
+				"error": null,
+				"pending": null,
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 430,
+							"end": 434,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				},
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 442,
+							"end": 446,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 454,
+				"end": 456,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 456,
+				"end": 485,
+				"data": " bare catch-shorthand "
+			},
+			{
+				"type": "Text",
+				"start": 485,
+				"end": 486,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 486,
+				"end": 520,
+				"expression": {
+					"type": "Identifier",
+					"start": 494,
+					"end": 501,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 8
+						},
+						"end": {
+							"line": 15,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": null,
+				"error": null,
+				"pending": null,
+				"then": null,
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 508,
+							"end": 512,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 520,
+				"end": 522,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 522,
+				"end": 583,
+				"data": " controls: shorthands with bindings (already correct) "
+			},
+			{
+				"type": "Text",
+				"start": 583,
+				"end": 584,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 584,
+				"end": 623,
+				"expression": {
+					"type": "Identifier",
+					"start": 592,
+					"end": 599,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 8
+						},
+						"end": {
+							"line": 18,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": {
+					"type": "Identifier",
+					"name": "value",
+					"start": 605,
+					"end": 610,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 21,
+							"character": 605
+						},
+						"end": {
+							"line": 18,
+							"column": 26,
+							"character": 610
+						}
+					}
+				},
+				"error": null,
+				"pending": null,
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 611,
+							"end": 615,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				},
+				"catch": null
+			},
+			{
+				"type": "Text",
+				"start": 623,
+				"end": 625,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 625,
+				"end": 665,
+				"expression": {
+					"type": "Identifier",
+					"start": 633,
+					"end": 640,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 8
+						},
+						"end": {
+							"line": 20,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": null,
+				"error": {
+					"type": "Identifier",
+					"name": "error",
+					"start": 647,
+					"end": 652,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 22,
+							"character": 647
+						},
+						"end": {
+							"line": 20,
+							"column": 27,
+							"character": 652
+						}
+					}
+				},
+				"pending": null,
+				"then": null,
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 653,
+							"end": 657,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 665,
+				"end": 667,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 667,
+				"end": 728,
+				"data": " multiline (newline-authored path): bare then + catch "
+			},
+			{
+				"type": "Text",
+				"start": 728,
+				"end": 729,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 729,
+				"end": 800,
+				"expression": {
+					"type": "Identifier",
+					"start": 737,
+					"end": 744,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 8
+						},
+						"end": {
+							"line": 23,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": null,
+				"error": {
+					"type": "Identifier",
+					"name": "error",
+					"start": 772,
+					"end": 777,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 8,
+							"character": 772
+						},
+						"end": {
+							"line": 25,
+							"column": 13,
+							"character": 777
+						}
+					}
+				},
+				"pending": null,
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 750,
+							"end": 752,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 752,
+							"end": 763,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 24,
+									"column": 2,
+									"character": 753
+								},
+								"end": {
+									"line": 24,
+									"column": 3,
+									"character": 754
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 755,
+										"end": 759,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 763,
+							"end": 764,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 778,
+							"end": 780,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 780,
+							"end": 791,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 26,
+									"column": 2,
+									"character": 781
+								},
+								"end": {
+									"line": 26,
+									"column": 3,
+									"character": 782
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 783,
+										"end": 787,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 791,
+							"end": 792,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

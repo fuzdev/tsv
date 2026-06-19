@@ -1,0 +1,368 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 565,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 226,
+				"data": " A short {#await}/{#snippet} after a non-breakable sibling (plain text or a\ncomment) stays fully inline — the parent element does not break. await/snippet\nare inline-transparent after such a sibling, matching prettier. "
+			},
+			{
+				"type": "Text",
+				"start": 226,
+				"end": 228,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 228,
+				"end": 257,
+				"data": " text sibling + await "
+			},
+			{
+				"type": "Text",
+				"start": 257,
+				"end": 258,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 258,
+				"end": 305,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 259
+					},
+					"end": {
+						"line": 6,
+						"column": 4,
+						"character": 262
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 263,
+							"end": 268,
+							"raw": "text ",
+							"data": "text "
+						},
+						{
+							"type": "AwaitBlock",
+							"start": 268,
+							"end": 299,
+							"expression": {
+								"type": "Identifier",
+								"start": 276,
+								"end": 283,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 18
+									},
+									"end": {
+										"line": 6,
+										"column": 25
+									}
+								},
+								"name": "promise"
+							},
+							"value": null,
+							"error": null,
+							"pending": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 284,
+										"end": 291,
+										"raw": "loading",
+										"data": "loading"
+									}
+								]
+							},
+							"then": null,
+							"catch": null
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 305,
+				"end": 307,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 307,
+				"end": 339,
+				"data": " comment sibling + await "
+			},
+			{
+				"type": "Text",
+				"start": 339,
+				"end": 340,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 340,
+				"end": 392,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 341
+					},
+					"end": {
+						"line": 9,
+						"column": 4,
+						"character": 344
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Comment",
+							"start": 345,
+							"end": 355,
+							"data": " c "
+						},
+						{
+							"type": "AwaitBlock",
+							"start": 355,
+							"end": 386,
+							"expression": {
+								"type": "Identifier",
+								"start": 363,
+								"end": 370,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 23
+									},
+									"end": {
+										"line": 9,
+										"column": 30
+									}
+								},
+								"name": "promise"
+							},
+							"value": null,
+							"error": null,
+							"pending": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 371,
+										"end": 378,
+										"raw": "loading",
+										"data": "loading"
+									}
+								]
+							},
+							"then": null,
+							"catch": null
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 392,
+				"end": 394,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 394,
+				"end": 425,
+				"data": " text sibling + snippet "
+			},
+			{
+				"type": "Text",
+				"start": 425,
+				"end": 426,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 426,
+				"end": 474,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 427
+					},
+					"end": {
+						"line": 12,
+						"column": 4,
+						"character": 430
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 431,
+							"end": 436,
+							"raw": "text ",
+							"data": "text "
+						},
+						{
+							"type": "SnippetBlock",
+							"start": 436,
+							"end": 468,
+							"expression": {
+								"type": "Identifier",
+								"name": "fn",
+								"start": 446,
+								"end": 448,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 20,
+										"character": 446
+									},
+									"end": {
+										"line": 12,
+										"column": 22,
+										"character": 448
+									}
+								}
+							},
+							"parameters": [],
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 451,
+										"end": 458,
+										"raw": "content",
+										"data": "content"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 474,
+				"end": 476,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 476,
+				"end": 510,
+				"data": " comment sibling + snippet "
+			},
+			{
+				"type": "Text",
+				"start": 510,
+				"end": 511,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 511,
+				"end": 564,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 15,
+						"column": 1,
+						"character": 512
+					},
+					"end": {
+						"line": 15,
+						"column": 4,
+						"character": 515
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Comment",
+							"start": 516,
+							"end": 526,
+							"data": " c "
+						},
+						{
+							"type": "SnippetBlock",
+							"start": 526,
+							"end": 558,
+							"expression": {
+								"type": "Identifier",
+								"name": "fn",
+								"start": 536,
+								"end": 538,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 25,
+										"character": 536
+									},
+									"end": {
+										"line": 15,
+										"column": 27,
+										"character": 538
+									}
+								}
+							},
+							"parameters": [],
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 541,
+										"end": 548,
+										"raw": "content",
+										"data": "content"
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

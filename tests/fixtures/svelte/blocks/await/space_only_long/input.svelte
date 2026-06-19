@@ -35,3 +35,11 @@
 {#await promise then value}
 	<p>text text text text text text text text text text txxxxxx</p>
 {/await}
+
+<!-- Catch-shorthand: 100 chars - stays inline -->
+{#await promise catch error} <p>text text text text text text text text text txxxxxxxxx</p> {/await}
+
+<!-- Catch-shorthand: 101 chars - breaks -->
+{#await promise catch error}
+	<p>text text text text text text text text text txxxxxxxxxx</p>
+{/await}

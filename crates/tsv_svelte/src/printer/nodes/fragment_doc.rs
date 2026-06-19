@@ -132,7 +132,8 @@ impl<'a> Printer<'a> {
             let doc = if is_control_flow {
                 // "Breakable preceding content" is exactly the inline-content set — text never
                 // breaks before a control-flow block, so reuse the one predicate.
-                let has_preceding_breakable = nodes[..i].iter().any(Self::is_inline_content);
+                let has_preceding_breakable =
+                    nodes[..i].iter().any(super::helpers::is_inline_content);
                 self.build_fragment_node_doc_with_preceding_context(
                     node,
                     trim_text,
@@ -250,14 +251,14 @@ impl<'a> Printer<'a> {
                 } else {
                     None
                 };
-                let prev_is_inline = prev_node.is_some_and(Self::is_inline_content);
+                let prev_is_inline = prev_node.is_some_and(super::helpers::is_inline_content);
                 let prev_is_tag = prev_node.is_some_and(Self::is_expression_tag);
                 let next_node = if i + 1 < trimmed_len {
                     Some(&trimmed_nodes[i + 1])
                 } else {
                     None
                 };
-                let next_is_inline = next_node.is_some_and(Self::is_inline_content);
+                let next_is_inline = next_node.is_some_and(super::helpers::is_inline_content);
                 let next_is_tag = next_node.is_some_and(Self::is_expression_tag);
                 let position =
                     SiblingPosition::new(is_first, is_last, prev_is_inline, next_is_inline);
@@ -270,7 +271,7 @@ impl<'a> Printer<'a> {
                     &mut child_docs,
                     &mut handle_whitespace_of_prev_text,
                 );
-            } else if Self::is_inline_content(node) {
+            } else if super::helpers::is_inline_content(node) {
                 self.handle_inline_child(
                     node,
                     &mut child_docs,
@@ -282,8 +283,9 @@ impl<'a> Printer<'a> {
                 // This affects whether block conditions should use remove_lines() or not:
                 // - With preceding breakable content: use remove_lines() so that content breaks first
                 // - Without preceding breakable content: allow wrapping to respect print_width
-                let has_preceding_breakable =
-                    trimmed_nodes[..i].iter().any(Self::is_inline_content);
+                let has_preceding_breakable = trimmed_nodes[..i]
+                    .iter()
+                    .any(super::helpers::is_inline_content);
                 if let Some(node_doc) = self.build_fragment_node_doc_with_preceding_context(
                     node,
                     false,
@@ -300,26 +302,6 @@ impl<'a> Printer<'a> {
         } else {
             d.concat(&child_docs)
         }
-    }
-
-    /// Check if a node is inline content (non-text node that participates in fill).
-    ///
-    /// This is NOT the same as `!tsv_html::is_block_element` which checks HTML classification.
-    /// Here we check if a fragment node is a non-text element that appears inline with text
-    /// (elements, expressions, tags) for the purpose of fill whitespace handling.
-    ///
-    /// Also serves as the `has_preceding_breakable` test in the node loops: this same set
-    /// (elements + expression/html/render tags) is exactly what can break before a
-    /// control-flow block — text never does.
-    fn is_inline_content(node: &FragmentNode) -> bool {
-        matches!(
-            node,
-            FragmentNode::Element(_)
-                | FragmentNode::SpecialElement(_)
-                | FragmentNode::ExpressionTag(_)
-                | FragmentNode::RenderTag(_)
-                | FragmentNode::HtmlTag(_)
-        )
     }
 
     /// Check if a node is an expression-like tag (ExpressionTag, HtmlTag, RenderTag).
