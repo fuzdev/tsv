@@ -6,13 +6,18 @@ in isolation.
 
 - **Breadcrumb shape** — an `{#each}` whose breakable `<a>` body follows an inline
   `<a>Home</a>` sibling (the exact shape that was 2-pass non-idempotent in
-  `fuz_ui/src/lib/Breadcrumb.svelte` before the breakable-hug path was removed). The
-  `</a>{#each …}` sibling boundary stays hugged; the body drops to its own line.
+  `fuz_ui/src/lib/Breadcrumb.svelte` before the breakable-hug path was removed). tsv
+  **dangles the `</a>` closing `>`** onto its own line (axis-3 sibling-`>` dangle) and
+  drops the body to its own line.
 - **Nested if/else** — both `{#if}`/`{:else}` branch bodies drop, two inline `<span>`
-  wrappers deep, with a `<span class="label">` sibling alongside.
+  wrappers deep, with a `<span class="label">` sibling alongside. (This block is the
+  sole content of its `<span class="value">` wrapper, so the wrapper's *opening* `>`
+  already dangles — the same `>`-before-`{#…}` rule from the enclosing-element side.)
 
-tsv drops the body uniformly; prettier hugs the `}` and breaks the element internally
-(`prettier_variant_hug.svelte`). Both are stable under their own formatter; tsv
+tsv dangles the sibling `>` and drops the body uniformly; prettier keeps the
+`</a>{#each}` boundary hugged with the body on its own line (`output_prettier.svelte`),
+and on the compact one-liner hugs the `}` and breaks the element internally
+(`prettier_variant_inline.svelte`). Both are stable under their own formatter; tsv
 normalizes prettier's hug and the compact one-liner (`unformatted_ours_compact.svelte`)
 back to `input.svelte` in one pass.
 

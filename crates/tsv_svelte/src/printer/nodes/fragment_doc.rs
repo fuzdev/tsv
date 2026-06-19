@@ -607,7 +607,27 @@ impl<'a> Printer<'a> {
                     prev_text_has_trailing_space,
                 );
 
-                if let Some(node_doc) = self.build_fragment_node_doc_in_multiline(node, true) {
+                // Axis-3 sibling-`>` dangle: a directly-adjacent inline-element sibling
+                // hands its closing `>` to the expanding block so it dangles onto the
+                // block-head line (`</a⏎>{#each…}`).
+                let dangled = keep_inline_with_prev
+                    .then(|| self.try_block_sibling_gt_dangle(trimmed_nodes, i))
+                    .flatten();
+
+                if let Some((element_doc, block_doc)) = dangled {
+                    // The element is already the last item on the current line — swap in
+                    // the form that sheds its `>`, then hug the block (which now owns it).
+                    if let Some(last) = current_line.last_mut() {
+                        *last = element_doc;
+                    } else {
+                        current_line.push(element_doc);
+                    }
+                    current_line.push(block_doc);
+                    if !self.block_next_hugs_closing(trimmed_nodes, i, is_control_flow) {
+                        lines.push(std::mem::take(&mut current_line));
+                    }
+                } else if let Some(node_doc) = self.build_fragment_node_doc_in_multiline(node, true)
+                {
                     if keep_inline_with_prev {
                         // Add to current line (inline with preceding text)
                         current_line.push(node_doc);
@@ -1009,11 +1029,13 @@ impl<'a> Printer<'a> {
                 block,
                 in_multiline_context,
                 has_preceding_breakable,
+                None,
             )),
             FragmentNode::EachBlock(block) => Some(self.build_each_block_doc_with_full_context(
                 block,
                 in_multiline_context,
                 has_preceding_breakable,
+                None,
             )),
             FragmentNode::AwaitBlock(block) => Some(self.build_await_block_doc_with_full_context(
                 block,
@@ -1024,12 +1046,89 @@ impl<'a> Printer<'a> {
                 block,
                 in_multiline_context,
                 has_preceding_breakable,
+                None,
             )),
             FragmentNode::SnippetBlock(block) => Some(self.build_snippet_block_doc(block)),
             FragmentNode::HtmlTag(tag) => Some(self.build_html_tag_doc(tag)),
             FragmentNode::ConstTag(tag) => Some(self.build_const_tag_doc(tag)),
             FragmentNode::DebugTag(tag) => Some(self.build_debug_tag_doc(tag)),
             FragmentNode::RenderTag(tag) => Some(self.build_render_tag_doc(tag)),
+        }
+    }
+
+    /// Axis-3 sibling-`>` dangle: when a control-flow block directly follows (no
+    /// whitespace) an inline-element sibling, build the element without its closing `>`
+    /// and hand that `>` to the block so it dangles onto the block-head line when the
+    /// block renders multiline. Returns `(element_without_gt, block_with_gt)`, or `None`
+    /// to keep the pair hugged. The `>` only moves *into* the closing tag (`</tag⏎>{#…}`),
+    /// injecting no render-significant whitespace.
+    ///
+    /// The dangle keys on whether the block actually renders multiline, not on how its
+    /// body is authored — so it is a fixed point on its own output (the dangled form's
+    /// own-line body would otherwise read as authored-multiline on a second pass):
+    /// - a block that unconditionally breaks (`will_break`: authored-multiline / forced)
+    ///   gets the `>` dangled unconditionally (`⏎>` prefix);
+    /// - a conditional block (an inline-authored body that may stay inline or expand on
+    ///   width) folds the `>` into its own inline-vs-multiline `conditional_group`.
+    ///
+    /// Limited to `{#if}` / `{#each}` / `{#key}` — the blocks whose body drops cleanly to
+    /// its own line after an inline sibling, keeping the dangle a one-pass fixed point.
+    /// `{#await}` and `{#snippet}` are deferred (see `conformance_prettier.md` §Svelte:
+    /// Blocks): await's body doesn't drop after a sibling (a pre-existing quirk — it
+    /// breaks the element's attributes instead), and snippet's `BlockHead` opening group
+    /// decouples the body-drop from the `>` fold; both would be 2-pass non-idempotent.
+    fn try_block_sibling_gt_dangle(
+        &self,
+        trimmed_nodes: &[FragmentNode],
+        i: usize,
+    ) -> Option<(DocId, DocId)> {
+        let block = trimmed_nodes.get(i)?;
+        if !matches!(
+            block,
+            FragmentNode::IfBlock(_) | FragmentNode::EachBlock(_) | FragmentNode::KeyBlock(_)
+        ) {
+            return None;
+        }
+        let prev = trimmed_nodes.get(i.checked_sub(1)?)?;
+        let FragmentNode::Element(element) = prev else {
+            return None;
+        };
+        // Inline element, directly adjacent (no whitespace between it and the block).
+        if self.is_block_fragment_node(prev) || prev.span().end != block.span().start {
+            return None;
+        }
+        let element_doc = self.build_inline_element_omit_close_gt(element)?;
+        let d = self.d();
+        let gt = d.text(">");
+        let block_normal = self.build_fragment_node_doc_in_multiline(block, true)?;
+        let block_doc = if d.will_break(block_normal) {
+            // Unconditionally multiline → dangle the `>` onto its own line.
+            d.concat(&[d.hardline(), gt, block_normal])
+        } else {
+            // Conditional → fold the `>` into the block's inline-vs-multiline decision so
+            // it hugs while inline and dangles when the block expands.
+            self.build_block_node_doc_with_gt(block, gt)?
+        };
+        Some((element_doc, block_doc))
+    }
+
+    /// Dispatch a control-flow block (`{#if}` / `{#each}` / `{#key}`), threading a
+    /// preceding sibling's split-off closing `>` (`gt`) into its expanding layout. Mirrors
+    /// the block arms of `build_fragment_node_doc_impl` (in-multiline context, no preceding
+    /// breakable). `{#await}` / `{#snippet}` are not handled here — see the caller's gate.
+    fn build_block_node_doc_with_gt(&self, node: &FragmentNode, gt: DocId) -> Option<DocId> {
+        let gp = Some(gt);
+        match node {
+            FragmentNode::IfBlock(b) => {
+                Some(self.build_if_block_doc_with_full_context(b, true, false, gp))
+            }
+            FragmentNode::EachBlock(b) => {
+                Some(self.build_each_block_doc_with_full_context(b, true, false, gp))
+            }
+            FragmentNode::KeyBlock(b) => {
+                Some(self.build_key_block_doc_with_full_context(b, true, false, gp))
+            }
+            _ => None,
         }
     }
 

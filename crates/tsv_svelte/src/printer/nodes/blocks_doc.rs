@@ -245,7 +245,13 @@ impl<'a> Printer<'a> {
     /// doesn't) converges directly to layout 2 instead of wrapping then un-wrapping
     /// across two passes. This holds for **every** body shape — text, expression,
     /// void, and element/component — which all drop to their own line on overflow.
-    fn build_expanding_block(&self, head_doc: DocId, body_doc: DocId, close: DocId) -> DocId {
+    fn build_expanding_block(
+        &self,
+        head_doc: DocId,
+        body_doc: DocId,
+        close: DocId,
+        gt_prefix: Option<DocId>,
+    ) -> DocId {
         let d = self.d();
         let lead = d.hardline();
         let trail = d.hardline();
@@ -253,7 +259,21 @@ impl<'a> Printer<'a> {
         // Inline tail keeps the body's own `indent()` wrapper (so a body that breaks
         // internally still indents); the close hugs the body.
         let inline_tail = d.concat(&[d.indent(body_doc), close]);
-        self.build_expanding_construct(head_doc, inline_tail, multiline_tail)
+        self.build_expanding_construct(head_doc, inline_tail, multiline_tail, gt_prefix)
+    }
+
+    /// Prepend a split-off preceding sibling's closing `>` (`gt_prefix`) to a block
+    /// candidate: hugged in the inline candidate (`>{#…}`) and dangled onto its own line
+    /// in a multiline candidate (`⏎>{#…}`), so the `>` tracks the block's own
+    /// inline-vs-multiline choice. `None` leaves the candidate untouched. See the axis-3
+    /// sibling-`>` dangle in `build_inline_element_omit_close_gt`.
+    fn fold_gt(&self, gt_prefix: Option<DocId>, dangle: bool, body: DocId) -> DocId {
+        let d = self.d();
+        match gt_prefix {
+            Some(gt) if dangle => d.concat(&[d.hardline(), gt, body]),
+            Some(gt) => d.concat(&[gt, body]),
+            None => body,
+        }
     }
 
     /// Core of the expand-when-the-construct-overflows layout, over a precomputed
@@ -282,13 +302,14 @@ impl<'a> Printer<'a> {
         head_doc: DocId,
         inline_tail: DocId,
         multiline_tail: DocId,
+        gt_prefix: Option<DocId>,
     ) -> DocId {
         let d = self.d();
         if d.will_break(head_doc) {
-            return d.concat(&[head_doc, multiline_tail]);
+            return self.fold_gt(gt_prefix, true, d.concat(&[head_doc, multiline_tail]));
         }
-        let inline = d.concat(&[head_doc, inline_tail]);
-        let expanded = d.concat(&[head_doc, multiline_tail]);
+        let inline = self.fold_gt(gt_prefix, false, d.concat(&[head_doc, inline_tail]));
+        let expanded = self.fold_gt(gt_prefix, true, d.concat(&[head_doc, multiline_tail]));
         d.conditional_group(&[inline, expanded])
     }
 
@@ -405,18 +426,23 @@ impl<'a> Printer<'a> {
         block: &internal::IfBlock,
         in_multiline_context: bool,
     ) -> DocId {
-        self.build_if_block_doc_with_full_context(block, in_multiline_context, false)
+        self.build_if_block_doc_with_full_context(block, in_multiline_context, false, None)
     }
 
     /// Build if block doc with full context (multiline + preceding content).
     ///
     /// `has_preceding_breakable`: If true, there's breakable content before this block,
     /// so use remove_lines() to ensure that content breaks first.
+    ///
+    /// `gt_prefix`: a preceding inline-element sibling's split-off closing `>` to fold
+    /// into the block's inline-vs-multiline decision (axis-3 sibling-`>` dangle). Only
+    /// passed for the expanding path (see `block_sibling_gt_dangle_eligible`).
     pub(super) fn build_if_block_doc_with_full_context(
         &self,
         block: &internal::IfBlock,
         in_multiline_context: bool,
         has_preceding_breakable: bool,
+        gt_prefix: Option<DocId>,
     ) -> DocId {
         let d = self.d();
         // Build expression doc with context-dependent behavior
@@ -470,7 +496,12 @@ impl<'a> Printer<'a> {
         if self.if_branches_all_inline(block, in_multiline_context) && can_wrap {
             let inline_tail = self.build_if_tail(block, false);
             let multiline_tail = self.build_if_tail(block, true);
-            return self.build_expanding_construct(head_doc, inline_tail, multiline_tail);
+            return self.build_expanding_construct(
+                head_doc,
+                inline_tail,
+                multiline_tail,
+                gt_prefix,
+            );
         }
 
         let mut parts = vec![head_doc, indented_body];
@@ -721,15 +752,18 @@ impl<'a> Printer<'a> {
         block: &internal::EachBlock,
         in_multiline_context: bool,
     ) -> DocId {
-        self.build_each_block_doc_with_full_context(block, in_multiline_context, false)
+        self.build_each_block_doc_with_full_context(block, in_multiline_context, false, None)
     }
 
     /// Build each block doc with full context (multiline + preceding content).
+    ///
+    /// `gt_prefix`: see `build_if_block_doc_with_full_context`.
     pub(super) fn build_each_block_doc_with_full_context(
         &self,
         block: &internal::EachBlock,
         in_multiline_context: bool,
         has_preceding_breakable: bool,
+        gt_prefix: Option<DocId>,
     ) -> DocId {
         let d = self.d();
         // Build expression doc with context-dependent behavior
@@ -833,7 +867,12 @@ impl<'a> Printer<'a> {
         if self.each_branches_all_inline(block, in_multiline_context) && can_wrap {
             let inline_tail = self.build_each_tail(block, false);
             let multiline_tail = self.build_each_tail(block, true);
-            return self.build_expanding_construct(head_doc, inline_tail, multiline_tail);
+            return self.build_expanding_construct(
+                head_doc,
+                inline_tail,
+                multiline_tail,
+                gt_prefix,
+            );
         }
 
         let mut parts = vec![head_doc, indented_body];
@@ -974,6 +1013,9 @@ impl<'a> Printer<'a> {
     }
 
     /// Build await block doc with full context (multiline + preceding content).
+    ///
+    /// Note: `{#await}` does not participate in the axis-3 sibling-`>` dangle (its body
+    /// doesn't drop cleanly after an inline sibling) — see `try_block_sibling_gt_dangle`.
     pub(super) fn build_await_block_doc_with_full_context(
         &self,
         block: &internal::AwaitBlock,
@@ -1034,7 +1076,7 @@ impl<'a> Printer<'a> {
             );
             let inline_tail = self.build_await_tail(block, false);
             let multiline_tail = self.build_await_tail(block, true);
-            return self.build_expanding_construct(head_doc, inline_tail, multiline_tail);
+            return self.build_expanding_construct(head_doc, inline_tail, multiline_tail, None);
         }
 
         let mut parts: Vec<DocId> = Vec::new();
@@ -1304,15 +1346,18 @@ impl<'a> Printer<'a> {
         block: &internal::KeyBlock,
         in_multiline_context: bool,
     ) -> DocId {
-        self.build_key_block_doc_with_full_context(block, in_multiline_context, false)
+        self.build_key_block_doc_with_full_context(block, in_multiline_context, false, None)
     }
 
     /// Build key block doc with full context (multiline + preceding content).
+    ///
+    /// `gt_prefix`: see `build_if_block_doc_with_full_context`.
     pub(super) fn build_key_block_doc_with_full_context(
         &self,
         block: &internal::KeyBlock,
         in_multiline_context: bool,
         has_preceding_breakable: bool,
+        gt_prefix: Option<DocId>,
     ) -> DocId {
         let d = self.d();
         // Build expression doc with context-dependent behavior
@@ -1358,7 +1403,7 @@ impl<'a> Printer<'a> {
         let close = d.text("{/key}");
         if is_inline && can_wrap {
             // Inline-authored body: expand it + `{/key}` when the head wraps.
-            return self.build_expanding_block(head_doc, body_doc, close);
+            return self.build_expanding_block(head_doc, body_doc, close, gt_prefix);
         }
 
         let mut parts = vec![head_doc, indented_body];
@@ -1376,6 +1421,10 @@ impl<'a> Printer<'a> {
     ///
     /// Uses same inline/multiline pattern as if blocks.
     /// Opening tag uses group() for parameter wrapping when they exceed print width.
+    ///
+    /// Note: `{#snippet}` does not participate in the axis-3 sibling-`>` dangle (its
+    /// `BlockHead` opening group decouples the body-drop from the `>` fold) — see
+    /// `try_block_sibling_gt_dangle`.
     pub(crate) fn build_snippet_block_doc(&self, block: &internal::SnippetBlock) -> DocId {
         let d = self.d();
         // Extract snippet name from the identifier expression
@@ -1472,7 +1521,7 @@ impl<'a> Printer<'a> {
         // uniformly, including paramless snippets. Keyed to the opening group above.
         if is_inline && self.block_dangle_allowed() {
             let close = d.text("{/snippet}");
-            return self.build_expanding_block(opening_doc, body_doc, close);
+            return self.build_expanding_block(opening_doc, body_doc, close, None);
         }
 
         let mut parts = vec![opening_doc];
