@@ -219,6 +219,60 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Build an inline content element that hands its trailing closing `>` to a following
+    /// sibling (the axis-3 sibling-`>` dangle). Returns `Some(doc)` ending in `</tag` (no
+    /// `>`) only when the element uses the flat hug-both content layout — the single shape
+    /// where splitting the `>` off is render-safe and well-defined. Returns `None`
+    /// otherwise so the caller keeps the element (and its `>`) intact. The caller emits the
+    /// `>` itself (see `build_expanding_construct`'s `gt_prefix`).
+    pub(crate) fn build_inline_element_omit_close_gt(
+        &self,
+        element: &internal::Element,
+    ) -> Option<DocId> {
+        let tag_name = self.resolve_symbol(element.name);
+        // Special-content elements (raw `<script>`/`<style>`, foreign `<template>`,
+        // whitespace-sensitive `<pre>`/`<textarea>`) never participate — their closing
+        // tags aren't the simple hug-both shape.
+        if tag_name == "style" || tag_name == "script" {
+            return None;
+        }
+        if tag_name == "template"
+            && self
+                .get_lang_attribute(&element.attributes)
+                .is_some_and(|lang| lang != "html")
+        {
+            return None;
+        }
+        if tsv_html::preserves_whitespace(&tag_name) {
+            return None;
+        }
+        let is_html = element.kind == internal::ElementKind::Html;
+        let attr_docs = self.build_element_attrs_doc(
+            &element.attributes,
+            self.d().line(),
+            element.name_span.end,
+            element.open_tag_end,
+            is_html,
+        );
+        let ctx = self.analyze_element(element, &attr_docs);
+        // Only the flat hug-both content layout has a single trailing `>` we can cleanly
+        // split off. Multiline children, boundary breaks, and the void/empty/self-closing
+        // and non-hug boundary forms all keep their `>` (return None → no dangle).
+        match self.compute_element_layout(&ctx) {
+            ElementLayout::WithContent {
+                start: BoundaryMode::Hug,
+                end: BoundaryMode::Hug,
+                multiline_children: false,
+            } => {
+                let trim_text = !ctx.kind.is_inline() && ctx.only_text_content;
+                let children_doc =
+                    self.build_nodes_doc_with_context(&element.fragment.nodes, trim_text);
+                Some(self.build_hug_both_doc(element, &ctx, children_doc, true))
+            }
+            _ => None,
+        }
+    }
+
     /// Build doc for void or self-closing element
     ///
     /// When any attribute doc will_break (e.g., multiline string value),
@@ -339,7 +393,7 @@ impl<'a> Printer<'a> {
         // Build doc structure based on boundary modes
         match (start_mode, end_mode) {
             (BoundaryMode::Hug, BoundaryMode::Hug) => {
-                self.build_hug_both_doc(element, ctx, children_doc)
+                self.build_hug_both_doc(element, ctx, children_doc, false)
             }
             (BoundaryMode::Hug, _) => {
                 // Hug start: > hugs content
@@ -469,16 +523,40 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for hug-both mode (content hugs both opening and closing)
+    ///
+    /// When `external_close` is true the element's own trailing closing `>` (and the
+    /// boundary break before it) is omitted — the caller emits the `>` elsewhere. This
+    /// powers the axis-3 sibling-`>` dangle: an inline element directly followed by an
+    /// expanding block renders as `</tag` and hands its `>` to the block so it can dangle
+    /// onto the block-head line. See `build_inline_element_omit_close_gt`.
     fn build_hug_both_doc(
         &self,
         element: &internal::Element,
         ctx: &ElementContext,
         children_doc: DocId,
+        external_close: bool,
     ) -> DocId {
         let d = self.d();
         let tag_sym = element.name.to_u32();
         let has_attrs = !element.attributes.is_empty();
         let is_html = element.kind == internal::ElementKind::Html;
+        // When closing externally, drop the trailing `>` and its preceding boundary break
+        // at every arm's final closing position.
+        let close_gt = if external_close {
+            d.empty()
+        } else {
+            d.text(">")
+        };
+        let close_break_soft = if external_close {
+            d.empty()
+        } else {
+            d.softline()
+        };
+        let close_break_hard = if external_close {
+            d.empty()
+        } else {
+            d.hardline()
+        };
 
         // Hug both sides: ><content></tag\n>
         // When attrs break, > stays inline with last attr:
@@ -541,8 +619,8 @@ impl<'a> Printer<'a> {
                     d.text("<"),
                     d.symbol(tag_sym),
                     hugged,
-                    d.hardline(),
-                    d.text(">"),
+                    close_break_hard,
+                    close_gt,
                 ]))
             } else {
                 // Check if any expression has internal break points (ternary, &&, ||, +, etc.)
@@ -566,8 +644,8 @@ impl<'a> Printer<'a> {
                         children_doc,
                         d.text("</"),
                         d.symbol(tag_sym),
-                        d.softline(),
-                        d.text(">"),
+                        close_break_soft,
+                        close_gt,
                     ]))
                 } else {
                     // Text or simple expressions: inner group keeps content together,
@@ -591,8 +669,8 @@ impl<'a> Printer<'a> {
                         d.text("<"),
                         d.symbol(tag_sym),
                         indent_inner,
-                        d.softline(),
-                        d.text(">"),
+                        close_break_soft,
+                        close_gt,
                     ]))
                 }
             }
@@ -630,7 +708,7 @@ impl<'a> Printer<'a> {
                     d.text("</"),
                     d.symbol(tag_sym),
                 ]));
-                d.group(d.concat(&[inner_group, body_indent, d.hardline(), d.text(">")]))
+                d.group(d.concat(&[inner_group, body_indent, close_break_hard, close_gt]))
             } else {
                 // No block flow - check if we need hug mode for inline elements
                 // Inline elements with long attrs use hug mode: attrs inline, > on new line
@@ -640,7 +718,7 @@ impl<'a> Printer<'a> {
                     // 1. All inline: <tag attrs></tag>
                     // 2. Hug mode: <tag attrs\n></tag> (attrs inline, > on new line)
                     // 3. Full multiline: <tag\n\tattr\n></tag>
-                    let closing = d.concat(&[d.text("></"), d.symbol(tag_sym), d.text(">")]);
+                    let closing = d.concat(&[d.text("></"), d.symbol(tag_sym), close_gt]);
 
                     // State 1: All inline
                     let attr_concat1 = d.concat(&hug_attr_docs);
@@ -704,8 +782,8 @@ impl<'a> Printer<'a> {
                         d.symbol(tag_sym),
                         attr_indent,
                         hugged_content,
-                        d.softline(),
-                        d.text(">"),
+                        close_break_soft,
+                        close_gt,
                     ]))
                 } else {
                     // HTML elements with content - use nested groups for breaking:
@@ -729,8 +807,8 @@ impl<'a> Printer<'a> {
                         d.symbol(tag_sym),
                         attr_indent,
                         body_indent_softline,
-                        d.softline(),
-                        d.text(">"),
+                        close_break_soft,
+                        close_gt,
                     ]))
                 }
             }
@@ -1205,10 +1283,16 @@ impl<'a> Printer<'a> {
     /// Expressions, blocks, and other dynamic content are formatted normally
     /// (their internal whitespace is not significant).
     fn build_whitespace_sensitive_content_doc(&self, nodes: &[FragmentNode]) -> DocId {
+        // Whitespace is significant here (`<pre>`/`<textarea>`): a block must not
+        // dangle its `}` or expand its body — that would inject rendered whitespace.
+        // The dedicated ws-sensitive if/each builders already hug; this also gates
+        // await/key/snippet, which fall through to the normal (dangling) builders.
+        let prev_dangle = self.set_block_dangle_allowed(false);
         let node_docs: Vec<_> = nodes
             .iter()
             .map(|node| self.build_whitespace_sensitive_node_doc(node))
             .collect();
+        self.set_block_dangle_allowed(prev_dangle);
         self.d().concat(&node_docs)
     }
 

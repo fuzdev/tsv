@@ -10,8 +10,7 @@ use super::super::{
     is_curried_arrow_chain, is_multiline_template_expression,
 };
 use super::arg_comments::{
-    PartitionedComments, emit_first_arg_leading_comments, find_comma_pos,
-    has_blank_line_between_args, is_comment_after_comma, is_comment_before_comma,
+    emit_first_arg_leading_comments, find_comma_pos, has_blank_line_between_args,
     is_inline_block_after_comma, is_inline_block_before_comma,
 };
 use super::arg_predicates::{is_block_function, is_short_second_arg_for_expand_first};
@@ -114,14 +113,24 @@ pub(super) enum CallBreakStyle {
 /// IMPORTANT: The group only wraps the arguments, NOT the callee. This ensures
 /// that if the callee contains hardlines (e.g., multiline array), they don't
 /// force the arguments to break. The args make their own flat/break decision.
+///
+/// `post_comma` is emitted immediately after the trailing comma (before the closing
+/// `)`), so an after-comma trailing comment stays past the comma; pass `d.empty()` when
+/// there is none.
 #[inline]
-fn wrap_call(d: &DocArena, callee: DocId, args: DocId, style: CallBreakStyle) -> DocId {
+fn wrap_call(
+    d: &DocArena,
+    callee: DocId,
+    args: DocId,
+    post_comma: DocId,
+    style: CallBreakStyle,
+) -> DocId {
     match style {
         CallBreakStyle::Soft => d.concat(&[
             callee,
             d.group(d.concat(&[
                 d.text("("),
-                d.indent_softline(d.concat(&[args, d.trailing_comma()])),
+                d.indent_softline(d.concat(&[args, d.trailing_comma(), post_comma])),
                 d.softline(),
                 d.text(")"),
             ])),
@@ -129,7 +138,7 @@ fn wrap_call(d: &DocArena, callee: DocId, args: DocId, style: CallBreakStyle) ->
         CallBreakStyle::Hard => d.concat(&[
             callee,
             d.text("("),
-            d.indent(d.concat(&[d.hardline(), args, d.text(",")])),
+            d.indent(d.concat(&[d.hardline(), args, d.text(","), post_comma])),
             d.hardline(),
             d.text(")"),
         ]),
@@ -140,14 +149,37 @@ fn wrap_call(d: &DocArena, callee: DocId, args: DocId, style: CallBreakStyle) ->
 /// Uses soft breaks so the call can collapse to a single line if it fits
 #[inline]
 pub(crate) fn wrap_call_with_soft_breaks(d: &DocArena, callee: DocId, args: DocId) -> DocId {
-    wrap_call(d, callee, args, CallBreakStyle::Soft)
+    wrap_call(d, callee, args, d.empty(), CallBreakStyle::Soft)
 }
 
 /// Wrap arguments in an expanded call expression: `callee(\n\targs,\n)`
 /// Uses hard breaks to force multi-line layout
 #[inline]
 pub(crate) fn wrap_call_with_hard_breaks(d: &DocArena, callee: DocId, args: DocId) -> DocId {
-    wrap_call(d, callee, args, CallBreakStyle::Hard)
+    wrap_call(d, callee, args, d.empty(), CallBreakStyle::Hard)
+}
+
+/// Like [`wrap_call_with_soft_breaks`], but emits `post_comma` after the trailing
+/// comma so an after-comma trailing comment is preserved past it (`b, /* c */`).
+#[inline]
+pub(super) fn wrap_call_with_soft_breaks_suffix(
+    d: &DocArena,
+    callee: DocId,
+    args: DocId,
+    post_comma: DocId,
+) -> DocId {
+    wrap_call(d, callee, args, post_comma, CallBreakStyle::Soft)
+}
+
+/// Like [`wrap_call_with_hard_breaks`], but emits `post_comma` after the trailing comma.
+#[inline]
+pub(super) fn wrap_call_with_hard_breaks_suffix(
+    d: &DocArena,
+    callee: DocId,
+    args: DocId,
+    post_comma: DocId,
+) -> DocId {
+    wrap_call(d, callee, args, post_comma, CallBreakStyle::Hard)
 }
 
 /// Wrap arguments with a `will_break` guard: if any arg contains hardlines
@@ -694,75 +726,14 @@ pub(crate) fn build_args_joined_with_comments(
             let next_arg_start = arguments[i + 1].span().start;
 
             if printer.has_comments_between(arg_end, next_arg_start) {
-                let pc = PartitionedComments::new(
-                    printer.comments,
-                    printer.line_breaks,
-                    arg_end,
-                    next_arg_start,
-                );
-                let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start);
-
-                if pc.has_trailing_line() || pc.has_trailing_block() {
-                    // Block and line comments are emitted together (not either/or) so an
-                    // arg carrying both — `a /* c */, // c2` — never drops the block.
-                    let has_line = pc.has_trailing_line();
-
-                    // Before-comma block comments: `arg /* c */,`
-                    if let Some(cpos) = comma_pos {
-                        for comment in &pc.trailing_block {
-                            if is_comment_before_comma(comment, cpos) {
-                                parts.push(d.text(" "));
-                                parts.push(printer.build_comment_doc(comment));
-                            }
-                        }
-                    }
-                    parts.push(d.text(","));
-
-                    if has_line {
-                        // A line comment runs to EOL and forces a hardline. After-comma
-                        // blocks and the line comment stay on the comma line, in order:
-                        // `arg, /* after */ // comment`.
-                        if let Some(cpos) = comma_pos {
-                            for comment in &pc.trailing_block {
-                                if is_comment_after_comma(comment, cpos) {
-                                    parts.push(d.text(" "));
-                                    parts.push(printer.build_comment_doc(comment));
-                                }
-                            }
-                        }
-                        for comment in &pc.trailing_line {
-                            parts.push(d.text(" "));
-                            parts.push(printer.build_comment_doc(comment));
-                        }
-                        parts.push(d.hardline());
-                    } else if use_hardline {
-                        // Block-only, hardline: break first, comment starts next line
-                        parts.push(d.hardline());
-                        if let Some(cpos) = comma_pos {
-                            for comment in &pc.trailing_block {
-                                if is_comment_after_comma(comment, cpos) {
-                                    parts.push(printer.build_comment_doc(comment));
-                                    parts.push(d.text(" "));
-                                }
-                            }
-                        }
-                    } else {
-                        // Block-only, soft: comment stays inline after comma, break follows
-                        if let Some(cpos) = comma_pos {
-                            for comment in &pc.trailing_block {
-                                if is_comment_after_comma(comment, cpos) {
-                                    parts.push(d.text(" "));
-                                    parts.push(printer.build_comment_doc(comment));
-                                }
-                            }
-                        }
-                        parts.push(d.line());
-                    }
+                let pc = printer.open_inter_arg_gap(&mut parts, arg_end, next_arg_start);
+                // A line comment runs to EOL → hard-break; otherwise honor the caller's style.
+                parts.push(if pc.has_trailing_line() || use_hardline {
+                    d.hardline()
                 } else {
-                    parts.push(no_comment_sep);
-                }
-
-                // Leading comments for next arg (own-line comments)
+                    d.line()
+                });
+                // hugging after-comma + own-line comments lead the next arg (`C`).
                 pc.emit_leading_comments_inline_aware(&mut parts, printer, next_arg_start);
             } else {
                 parts.push(no_comment_sep);
@@ -950,22 +921,7 @@ pub(super) fn build_args_with_blank_lines(
             let next_start = args[i + 1].span().start;
 
             if printer.has_comments_between(arg_end, next_start) {
-                let pc = PartitionedComments::new(
-                    printer.comments,
-                    printer.line_breaks,
-                    arg_end,
-                    next_start,
-                );
-
-                // Split trailing comments around the comma (shared with the `new`
-                // non-last path) so a before-comma block stays put instead of being
-                // relocated past the comma.
-                pc.emit_trailing_comments_around_comma(
-                    &mut arg_parts,
-                    printer,
-                    arg_end,
-                    next_start,
-                );
+                let pc = printer.open_inter_arg_gap(&mut arg_parts, arg_end, next_start);
 
                 let next_has_blank = pc.has_blank_line_in_gap(
                     printer.source,
@@ -977,7 +933,8 @@ pub(super) fn build_args_with_blank_lines(
                     arg_parts.push(d.literalline());
                 }
                 arg_parts.push(d.hardline());
-                pc.emit_leading_comments(&mut arg_parts, printer);
+                // hugging after-comma + own-line comments lead the next arg (`C`).
+                pc.emit_leading_comments_inline_aware(&mut arg_parts, printer, next_start);
             } else {
                 arg_parts.push(d.text(","));
                 // Skip hardline if next arg has blank line

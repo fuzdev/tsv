@@ -7,17 +7,25 @@
 {@debug x // c
 }
 {#if cond // c
-}yes{/if}
+}
+	yes
+{/if}
 {#if a}a{:else if b // c
 }b{/if}
 {#each items // c
- as item}{item}{/each}
+as item}
+	{item}
+{/each}
 {#each items as item (item.id // c
 )}{item}{/each}
 {#await promise // c
- then val}{val}{/await}
+then val}
+	{val}
+{/await}
 {#key expr // c
-}text{/key}
+}
+	text
+{/key}
 {#each list as it}{@const y = it // c
 	}{it}{/each}
 <div

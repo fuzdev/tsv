@@ -544,12 +544,15 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
             DocNode::IfBreak {
                 break_doc,
                 flat_doc,
+                group_id,
             } => {
-                let chosen = if cmd.mode == Mode::Break {
-                    *break_doc
-                } else {
-                    *flat_doc
+                let broke = match group_id {
+                    Some(gid) => {
+                        group_mode_map.get(gid).copied().unwrap_or(Mode::Flat) == Mode::Break
+                    }
+                    None => cmd.mode == Mode::Break,
                 };
+                let chosen = if broke { *break_doc } else { *flat_doc };
                 commands.push(cmd.with_doc(chosen));
             }
 
@@ -1119,12 +1122,13 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
             DocNode::IfBreak {
                 break_doc,
                 flat_doc,
+                group_id,
             } => {
-                let chosen = if cmd.mode == Mode::Break {
-                    *break_doc
-                } else {
-                    *flat_doc
-                };
+                // No group_mode_map in this sub-renderer; a group-id if_break
+                // treats its keyed group as unresolved (flat), matching how
+                // IndentIfBreak defaults below.
+                let broke = group_id.is_none() && cmd.mode == Mode::Break;
+                let chosen = if broke { *break_doc } else { *flat_doc };
                 commands.push(cmd.with_doc(chosen));
             }
 

@@ -1,0 +1,347 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 204,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A comma inside a block comment is not the argument separator: both",
+			"start": 20,
+			"end": 89,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " before-comma blocks stay before the real comma.",
+			"start": 91,
+			"end": 141,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " p, q ",
+			"start": 148,
+			"end": 158,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 6
+				},
+				"end": {
+					"line": 4,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " p, q ",
+			"start": 170,
+			"end": 180,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 6
+				},
+				"end": {
+					"line": 5,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " r ",
+			"start": 181,
+			"end": 188,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 17
+				},
+				"end": {
+					"line": 5,
+					"column": 24
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 203,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 143,
+					"end": 163,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 21
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 143,
+						"end": 162,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 4,
+								"column": 20
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 143,
+							"end": 145,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 146,
+								"end": 147,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 4
+									},
+									"end": {
+										"line": 4,
+										"column": 5
+									}
+								},
+								"name": "a",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " p, q ",
+										"start": 148,
+										"end": 158
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 160,
+								"end": 161,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 18
+									},
+									"end": {
+										"line": 4,
+										"column": 19
+									}
+								},
+								"name": "b"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comma inside a block comment is not the argument separator: both",
+							"start": 20,
+							"end": 89
+						},
+						{
+							"type": "Line",
+							"value": " before-comma blocks stay before the real comma.",
+							"start": 91,
+							"end": 141
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 165,
+					"end": 193,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 29
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 165,
+						"end": 192,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 1
+							},
+							"end": {
+								"line": 5,
+								"column": 28
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 165,
+							"end": 167,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 1
+								},
+								"end": {
+									"line": 5,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 168,
+								"end": 169,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 4
+									},
+									"end": {
+										"line": 5,
+										"column": 5
+									}
+								},
+								"name": "a",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " p, q ",
+										"start": 170,
+										"end": 180
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 190,
+								"end": 191,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 26
+									},
+									"end": {
+										"line": 5,
+										"column": 27
+									}
+								},
+								"name": "b",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " r ",
+										"start": 181,
+										"end": 188
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

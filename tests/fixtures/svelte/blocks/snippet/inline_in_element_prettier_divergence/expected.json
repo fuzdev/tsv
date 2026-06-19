@@ -1,0 +1,1223 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1623,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 40,
+				"data": " Basic inline snippet in element "
+			},
+			{
+				"type": "Text",
+				"start": 40,
+				"end": 41,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 41,
+				"end": 104,
+				"name": "A",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 42
+					},
+					"end": {
+						"line": 2,
+						"column": 2,
+						"character": 43
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 44,
+							"end": 48,
+							"raw": "text",
+							"data": "text"
+						},
+						{
+							"type": "SnippetBlock",
+							"start": 48,
+							"end": 100,
+							"expression": {
+								"type": "Identifier",
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"start": 58,
+								"end": 86,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 17,
+										"character": 58
+									},
+									"end": {
+										"line": 2,
+										"column": 45,
+										"character": 86
+									}
+								}
+							},
+							"parameters": [],
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 89,
+										"end": 90,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 104,
+				"end": 106,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 106,
+				"end": 137,
+				"data": " With attribute (short) "
+			},
+			{
+				"type": "Text",
+				"start": 137,
+				"end": 138,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 138,
+				"end": 186,
+				"name": "A",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 139
+					},
+					"end": {
+						"line": 5,
+						"column": 2,
+						"character": 140
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 141,
+						"end": 149,
+						"name": "href",
+						"name_loc": {
+							"start": {
+								"line": 5,
+								"column": 3,
+								"character": 141
+							},
+							"end": {
+								"line": 5,
+								"column": 7,
+								"character": 145
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 146,
+							"end": 149,
+							"expression": {
+								"type": "Identifier",
+								"start": 147,
+								"end": 148,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 9
+									},
+									"end": {
+										"line": 5,
+										"column": 10
+									}
+								},
+								"name": "x"
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 150,
+							"end": 154,
+							"raw": "text",
+							"data": "text"
+						},
+						{
+							"type": "SnippetBlock",
+							"start": 154,
+							"end": 182,
+							"expression": {
+								"type": "Identifier",
+								"name": "icon",
+								"start": 164,
+								"end": 168,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 26,
+										"character": 164
+									},
+									"end": {
+										"line": 5,
+										"column": 30,
+										"character": 168
+									}
+								}
+							},
+							"parameters": [],
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 171,
+										"end": 172,
+										"raw": "y",
+										"data": "y"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 186,
+				"end": 188,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 188,
+				"end": 233,
+				"data": " Exactly 100 chars (fits on one line) "
+			},
+			{
+				"type": "Text",
+				"start": 233,
+				"end": 234,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 234,
+				"end": 334,
+				"name": "A",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 235
+					},
+					"end": {
+						"line": 8,
+						"column": 2,
+						"character": 236
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 237,
+							"end": 241,
+							"raw": "text",
+							"data": "text"
+						},
+						{
+							"type": "SnippetBlock",
+							"start": 241,
+							"end": 330,
+							"expression": {
+								"type": "Identifier",
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"start": 251,
+								"end": 316,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 17,
+										"character": 251
+									},
+									"end": {
+										"line": 8,
+										"column": 82,
+										"character": 316
+									}
+								}
+							},
+							"parameters": [],
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 319,
+										"end": 320,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 334,
+				"end": 336,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 336,
+				"end": 372,
+				"data": " 101 chars (wraps closing >) "
+			},
+			{
+				"type": "Text",
+				"start": 372,
+				"end": 373,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 373,
+				"end": 475,
+				"name": "A",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 1,
+						"character": 374
+					},
+					"end": {
+						"line": 11,
+						"column": 2,
+						"character": 375
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 376,
+							"end": 380,
+							"raw": "text",
+							"data": "text"
+						},
+						{
+							"type": "SnippetBlock",
+							"start": 380,
+							"end": 470,
+							"expression": {
+								"type": "Identifier",
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"start": 390,
+								"end": 456,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 17,
+										"character": 390
+									},
+									"end": {
+										"line": 11,
+										"column": 83,
+										"character": 456
+									}
+								}
+							},
+							"parameters": [],
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 459,
+										"end": 460,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 475,
+				"end": 477,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 477,
+				"end": 566,
+				"data": " 102 chars (wraps opening tag → construct still overflows, so the body drops too) "
+			},
+			{
+				"type": "Text",
+				"start": 566,
+				"end": 567,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 567,
+				"end": 677,
+				"name": "A",
+				"name_loc": {
+					"start": {
+						"line": 15,
+						"column": 1,
+						"character": 568
+					},
+					"end": {
+						"line": 15,
+						"column": 2,
+						"character": 569
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 572,
+							"end": 577,
+							"raw": "ttext",
+							"data": "ttext"
+						},
+						{
+							"type": "SnippetBlock",
+							"start": 577,
+							"end": 672,
+							"expression": {
+								"type": "Identifier",
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"start": 587,
+								"end": 653,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 17,
+										"character": 587
+									},
+									"end": {
+										"line": 16,
+										"column": 83,
+										"character": 653
+									}
+								}
+							},
+							"parameters": [],
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 656,
+										"end": 662,
+										"raw": "\n\t\tx\n\t",
+										"data": "\n\t\tx\n\t"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 677,
+				"end": 679,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 679,
+				"end": 722,
+				"data": " With attribute at 100 chars (fits) "
+			},
+			{
+				"type": "Text",
+				"start": 722,
+				"end": 723,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 723,
+				"end": 823,
+				"name": "A",
+				"name_loc": {
+					"start": {
+						"line": 22,
+						"column": 1,
+						"character": 724
+					},
+					"end": {
+						"line": 22,
+						"column": 2,
+						"character": 725
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 726,
+						"end": 734,
+						"name": "href",
+						"name_loc": {
+							"start": {
+								"line": 22,
+								"column": 3,
+								"character": 726
+							},
+							"end": {
+								"line": 22,
+								"column": 7,
+								"character": 730
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 731,
+							"end": 734,
+							"expression": {
+								"type": "Identifier",
+								"start": 732,
+								"end": 733,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 9
+									},
+									"end": {
+										"line": 22,
+										"column": 10
+									}
+								},
+								"name": "x"
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 735,
+							"end": 739,
+							"raw": "text",
+							"data": "text"
+						},
+						{
+							"type": "SnippetBlock",
+							"start": 739,
+							"end": 819,
+							"expression": {
+								"type": "Identifier",
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"start": 749,
+								"end": 805,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 26,
+										"character": 749
+									},
+									"end": {
+										"line": 22,
+										"column": 82,
+										"character": 805
+									}
+								}
+							},
+							"parameters": [],
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 808,
+										"end": 809,
+										"raw": "y",
+										"data": "y"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 823,
+				"end": 825,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 825,
+				"end": 879,
+				"data": " With attribute at 101 chars (wraps closing >) "
+			},
+			{
+				"type": "Text",
+				"start": 879,
+				"end": 880,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 880,
+				"end": 982,
+				"name": "A",
+				"name_loc": {
+					"start": {
+						"line": 25,
+						"column": 1,
+						"character": 881
+					},
+					"end": {
+						"line": 25,
+						"column": 2,
+						"character": 882
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 883,
+						"end": 891,
+						"name": "href",
+						"name_loc": {
+							"start": {
+								"line": 25,
+								"column": 3,
+								"character": 883
+							},
+							"end": {
+								"line": 25,
+								"column": 7,
+								"character": 887
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 888,
+							"end": 891,
+							"expression": {
+								"type": "Identifier",
+								"start": 889,
+								"end": 890,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 9
+									},
+									"end": {
+										"line": 25,
+										"column": 10
+									}
+								},
+								"name": "x"
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 892,
+							"end": 896,
+							"raw": "text",
+							"data": "text"
+						},
+						{
+							"type": "SnippetBlock",
+							"start": 896,
+							"end": 977,
+							"expression": {
+								"type": "Identifier",
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"start": 906,
+								"end": 963,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 26,
+										"character": 906
+									},
+									"end": {
+										"line": 25,
+										"column": 83,
+										"character": 963
+									}
+								}
+							},
+							"parameters": [],
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 966,
+										"end": 967,
+										"raw": "y",
+										"data": "y"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 982,
+				"end": 984,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 984,
+				"end": 1040,
+				"data": " With attribute at 102 chars (wraps opening tag) "
+			},
+			{
+				"type": "Text",
+				"start": 1040,
+				"end": 1041,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 1041,
+				"end": 1146,
+				"name": "A",
+				"name_loc": {
+					"start": {
+						"line": 29,
+						"column": 1,
+						"character": 1042
+					},
+					"end": {
+						"line": 29,
+						"column": 2,
+						"character": 1043
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 1044,
+						"end": 1052,
+						"name": "href",
+						"name_loc": {
+							"start": {
+								"line": 29,
+								"column": 3,
+								"character": 1044
+							},
+							"end": {
+								"line": 29,
+								"column": 7,
+								"character": 1048
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 1049,
+							"end": 1052,
+							"expression": {
+								"type": "Identifier",
+								"start": 1050,
+								"end": 1051,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 9
+									},
+									"end": {
+										"line": 29,
+										"column": 10
+									}
+								},
+								"name": "x"
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1055,
+							"end": 1060,
+							"raw": "ttext",
+							"data": "ttext"
+						},
+						{
+							"type": "SnippetBlock",
+							"start": 1060,
+							"end": 1141,
+							"expression": {
+								"type": "Identifier",
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"start": 1070,
+								"end": 1127,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 17,
+										"character": 1070
+									},
+									"end": {
+										"line": 30,
+										"column": 74,
+										"character": 1127
+									}
+								}
+							},
+							"parameters": [],
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1130,
+										"end": 1131,
+										"raw": "y",
+										"data": "y"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1146,
+				"end": 1148,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1148,
+				"end": 1188,
+				"data": " With params at 100 chars (fits) "
+			},
+			{
+				"type": "Text",
+				"start": 1188,
+				"end": 1189,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 1189,
+				"end": 1289,
+				"name": "A",
+				"name_loc": {
+					"start": {
+						"line": 34,
+						"column": 1,
+						"character": 1190
+					},
+					"end": {
+						"line": 34,
+						"column": 2,
+						"character": 1191
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1192,
+							"end": 1196,
+							"raw": "text",
+							"data": "text"
+						},
+						{
+							"type": "SnippetBlock",
+							"start": 1196,
+							"end": 1285,
+							"expression": {
+								"type": "Identifier",
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"start": 1206,
+								"end": 1267,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 17,
+										"character": 1206
+									},
+									"end": {
+										"line": 34,
+										"column": 78,
+										"character": 1267
+									}
+								}
+							},
+							"parameters": [
+								{
+									"type": "Identifier",
+									"start": 1268,
+									"end": 1269,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 79
+										},
+										"end": {
+											"line": 34,
+											"column": 80
+										}
+									},
+									"name": "a"
+								},
+								{
+									"type": "Identifier",
+									"start": 1271,
+									"end": 1272,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 82
+										},
+										"end": {
+											"line": 34,
+											"column": 83
+										}
+									},
+									"name": "b"
+								}
+							],
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1274,
+										"end": 1275,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1289,
+				"end": 1291,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1291,
+				"end": 1342,
+				"data": " With params at 101 chars (wraps closing >) "
+			},
+			{
+				"type": "Text",
+				"start": 1342,
+				"end": 1343,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 1343,
+				"end": 1445,
+				"name": "A",
+				"name_loc": {
+					"start": {
+						"line": 37,
+						"column": 1,
+						"character": 1344
+					},
+					"end": {
+						"line": 37,
+						"column": 2,
+						"character": 1345
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1346,
+							"end": 1350,
+							"raw": "text",
+							"data": "text"
+						},
+						{
+							"type": "SnippetBlock",
+							"start": 1350,
+							"end": 1440,
+							"expression": {
+								"type": "Identifier",
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"start": 1360,
+								"end": 1422,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 17,
+										"character": 1360
+									},
+									"end": {
+										"line": 37,
+										"column": 79,
+										"character": 1422
+									}
+								}
+							},
+							"parameters": [
+								{
+									"type": "Identifier",
+									"start": 1423,
+									"end": 1424,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 80
+										},
+										"end": {
+											"line": 37,
+											"column": 81
+										}
+									},
+									"name": "a"
+								},
+								{
+									"type": "Identifier",
+									"start": 1426,
+									"end": 1427,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 83
+										},
+										"end": {
+											"line": 37,
+											"column": 84
+										}
+									},
+									"name": "b"
+								}
+							],
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1429,
+										"end": 1430,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1445,
+				"end": 1447,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1447,
+				"end": 1511,
+				"data": " With params at 102 chars (wraps opening tag AND params) "
+			},
+			{
+				"type": "Text",
+				"start": 1511,
+				"end": 1512,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 1512,
+				"end": 1622,
+				"name": "A",
+				"name_loc": {
+					"start": {
+						"line": 41,
+						"column": 1,
+						"character": 1513
+					},
+					"end": {
+						"line": 41,
+						"column": 2,
+						"character": 1514
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1517,
+							"end": 1522,
+							"raw": "ttext",
+							"data": "ttext"
+						},
+						{
+							"type": "SnippetBlock",
+							"start": 1522,
+							"end": 1617,
+							"expression": {
+								"type": "Identifier",
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"start": 1532,
+								"end": 1594,
+								"loc": {
+									"start": {
+										"line": 42,
+										"column": 17,
+										"character": 1532
+									},
+									"end": {
+										"line": 42,
+										"column": 79,
+										"character": 1594
+									}
+								}
+							},
+							"parameters": [
+								{
+									"type": "Identifier",
+									"start": 1595,
+									"end": 1596,
+									"loc": {
+										"start": {
+											"line": 42,
+											"column": 80
+										},
+										"end": {
+											"line": 42,
+											"column": 81
+										}
+									},
+									"name": "a"
+								},
+								{
+									"type": "Identifier",
+									"start": 1598,
+									"end": 1599,
+									"loc": {
+										"start": {
+											"line": 42,
+											"column": 83
+										},
+										"end": {
+											"line": 42,
+											"column": 84
+										}
+									},
+									"name": "b"
+								}
+							],
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1601,
+										"end": 1607,
+										"raw": "\n\t\tx\n\t",
+										"data": "\n\t\tx\n\t"
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

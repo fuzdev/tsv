@@ -541,50 +541,14 @@ fn build_call_args_doc_for_chain_impl(
                 call.span.end
             };
 
-            let pc = PartitionedComments::new(
-                printer.comments,
-                printer.line_breaks,
-                arg_end,
-                next_boundary,
-            );
-
             if i < call.arguments.len() - 1 {
                 // Not the last argument
                 let next_arg_start = call.arguments[i + 1].span().start;
-                let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start);
 
-                // Emit trailing block comments that are BEFORE the comma
-                if let Some(cpos) = comma_pos {
-                    for comment in &pc.trailing_block {
-                        if is_comment_before_comma(comment, cpos) {
-                            arg_parts.push(d.text(" "));
-                            arg_parts.push(printer.build_comment_doc(comment));
-                        }
-                    }
-                }
-
-                arg_parts.push(d.text(","));
-
-                // Emit trailing line comments (always after comma)
-                for comment in &pc.trailing_line {
-                    arg_parts.push(d.text(" "));
-                    arg_parts.push(printer.build_comment_doc(comment));
-                }
-
-                // Emit trailing block comments that are AFTER the comma (as leading on next arg)
-                // TODO: when a line comment is also present, the line above emits it first
-                // and a `//` runs to EOL — so an after-comma block here is swallowed
-                // (`a, /* c */ // c2` → `a, // c2 /* c */`, content loss). Fold into the
-                // cross-path "after-comma trailing block+line" pass (see TODO_REFACTORING.md);
-                // not fixed in isolation because the four arg paths diverge on this case.
-                if let Some(cpos) = comma_pos {
-                    for comment in &pc.trailing_block {
-                        if is_comment_after_comma(comment, cpos) {
-                            arg_parts.push(d.text(" "));
-                            arg_parts.push(printer.build_comment_doc(comment));
-                        }
-                    }
-                }
+                // Reclassify a hugging after-comma block as leading, emit the
+                // before/after-comma trailing comments + comma; the separator + leading
+                // comments below finish the gap.
+                let pc = printer.open_inter_arg_gap(&mut arg_parts, arg_end, next_arg_start);
 
                 // Skip hardline if next arg has blank line
                 // (blank line preservation at the top of the loop handles the line break)
@@ -618,39 +582,20 @@ fn build_call_args_doc_for_chain_impl(
                 // blank line preservation at top of next iteration adds literalline + hardline
                 pc.emit_leading_comments_inline_aware(&mut arg_parts, printer, next_arg_start);
             } else {
-                // Last argument - same-line trailing comments before closing paren.
-                // Split block comments around the trailing comma (like the non-last
-                // path above) so a before-comma block isn't relocated past it
-                // (`a /* c */, // c2` → `a, /* c */ // c2`). When the source has no
-                // trailing comma, every block precedes the synthetic one.
-                if pc.has_trailing_line() || pc.has_trailing_block() {
-                    let comma_pos = find_comma_pos(printer.source, arg_end, next_boundary);
-                    for comment in &pc.trailing_block {
-                        if comma_pos.is_none_or(|cpos| is_comment_before_comma(comment, cpos)) {
-                            arg_parts.push(d.text(" "));
-                            arg_parts.push(printer.build_comment_doc(comment));
-                        }
-                    }
-                    arg_parts.push(d.text(","));
-                    trailing_comma_already_added = true;
-                    if let Some(cpos) = comma_pos {
-                        for comment in &pc.trailing_block {
-                            if is_comment_after_comma(comment, cpos) {
-                                arg_parts.push(d.text(" "));
-                                arg_parts.push(printer.build_comment_doc(comment));
-                            }
-                        }
-                    }
-                    for comment in &pc.trailing_line {
-                        arg_parts.push(printer.build_trailing_line_comment_doc(comment));
-                    }
-                }
-
-                // Own-line comments (block or line) after the last arg, before the
-                // closing paren. Emitted after the trailing comma, each on its own line.
-                pc.emit_last_arg_dangling_comments(
+                let pc = PartitionedComments::new(
+                    printer.comments,
+                    printer.line_breaks,
+                    arg_end,
+                    next_boundary,
+                );
+                // Last argument - same-line trailing comments split around the (synthetic)
+                // trailing comma (before-comma blocks trail the arg, after-comma blocks +
+                // line stay past it), then own-line dangling comments past the comma.
+                pc.emit_last_arg_comments(
                     &mut arg_parts,
                     printer,
+                    arg_end,
+                    next_boundary,
                     &mut trailing_comma_already_added,
                 );
             }
@@ -1251,53 +1196,62 @@ fn build_call_args_doc_for_chain_impl(
             return d.concat(&parts);
         }
 
-        // Multiple arguments: wrap in group with softlines so they can break
-        // Comments are placed relative to commas: before-comma → trailing on current arg,
-        // after-comma → leading on next arg.
-        let mut arg_docs_with_comments = Vec::new();
+        // Multiple arguments: wrap in group with softlines so they can break. Each gap's
+        // after-comma block comment follows the respect-the-newline rule — hugging the next
+        // arg → leads it (`C`); stranded on the comma line → stays there (`A`) — via the same
+        // shared emit_* helpers the force-expanded paths use. A comment-free gap takes the
+        // cheap `comma_line()` separator (no per-gap comment scan).
+        let mut arg_parts = Vec::new();
         for (i, arg) in call.arguments.iter().enumerate() {
-            let arg_doc = printer.build_arg_expression_doc(arg);
             let arg_start = arg.span().start;
             let arg_end = arg.span().end;
             let is_first = i == 0;
             let is_last = i == call.arguments.len() - 1;
 
-            // Leading inline block comments
-            let leading = if !has_any_comments {
-                None
-            } else if is_first {
-                build_inline_leading_comments(printer, paren_open, arg_start)
-            } else {
-                build_after_comma_leading_comments(
-                    printer,
-                    call.arguments[i - 1].span().end,
-                    arg_start,
-                )
-            };
+            // Leading inline block comments before the first arg (paren → arg gap).
+            if is_first
+                && has_any_comments
+                && let Some(l) = build_inline_leading_comments(printer, paren_open, arg_start)
+            {
+                arg_parts.push(l);
+            }
 
-            // Trailing inline block comments
-            let trailing = if !has_any_comments {
-                None
-            } else if is_last {
-                build_inline_trailing_comments(printer, arg_end, call.span.end)
-            } else {
-                build_before_comma_trailing_comments(
-                    printer,
-                    arg_end,
-                    call.arguments[i + 1].span().start,
-                )
-            };
+            arg_parts.push(printer.build_arg_expression_doc(arg));
 
-            let doc = match (leading, trailing) {
-                (Some(l), Some(t)) => d.concat(&[l, arg_doc, t]),
-                (Some(l), None) => d.concat(&[l, arg_doc]),
-                (None, Some(t)) => d.concat(&[arg_doc, t]),
-                (None, None) => arg_doc,
-            };
-            arg_docs_with_comments.push(doc);
+            if is_last {
+                // Trailing inline block comments after the last arg (before `)`).
+                if has_any_comments
+                    && let Some(t) = build_inline_trailing_comments(printer, arg_end, call.span.end)
+                {
+                    arg_parts.push(t);
+                }
+            } else {
+                let next_arg_start = call.arguments[i + 1].span().start;
+                if has_any_comments && printer.has_comments_between(arg_end, next_arg_start) {
+                    let mut pc = PartitionedComments::new(
+                        printer.comments,
+                        printer.line_breaks,
+                        arg_end,
+                        next_arg_start,
+                    );
+                    pc.route_after_comma_hugging_to_leading(printer, arg_end, next_arg_start);
+                    // before-comma blocks trail the arg, the comma, stranded after-comma
+                    // blocks (`A`).
+                    pc.emit_trailing_comments_around_comma(
+                        &mut arg_parts,
+                        printer,
+                        arg_end,
+                        next_arg_start,
+                    );
+                    arg_parts.push(d.line());
+                    // hugging after-comma + own-line comments lead the next arg (`C`).
+                    pc.emit_leading_comments_inline_aware(&mut arg_parts, printer, next_arg_start);
+                } else {
+                    arg_parts.push(d.comma_line());
+                }
+            }
         }
-        let arg_parts = d.join_doc(arg_docs_with_comments, d.comma_line());
-        parts.push(wrap_args_with_soft_breaks(d, prefix, arg_parts));
+        parts.push(wrap_args_with_soft_breaks(d, prefix, d.concat(&arg_parts)));
         d.concat(&parts)
     }
 }
