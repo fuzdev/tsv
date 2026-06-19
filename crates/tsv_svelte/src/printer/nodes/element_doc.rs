@@ -1994,6 +1994,15 @@ impl<'a> Printer<'a> {
             return true;
         }
 
+        // await/snippet (which don't force-expand on their own) still go multiline when they
+        // follow a sibling, so their body-drop matches if/each (via the multiline path) and
+        // the sibling-`>` dangle / block-on-own-line separation resolves in one pass.
+        if kind.is_block()
+            && super::helpers::has_control_flow_after_sibling(&element.fragment.nodes)
+        {
+            return true;
+        }
+
         // Block flow forces multiline
         if has_block_flow_children && self.block_flow_forces_multiline(element) {
             return true;

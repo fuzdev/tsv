@@ -176,6 +176,31 @@ pub(crate) fn has_any_expanding_blocks(nodes: &[FragmentNode]) -> bool {
     nodes.iter().any(is_expanding_control_flow_block) || has_expanding_block_in_await(nodes)
 }
 
+/// Whether any control-flow block is preceded by a sibling — i.e. it is not the first
+/// non-whitespace child.
+///
+/// `{#await}` / `{#snippet}` don't force their parent multiline on their own (a lone
+/// `<div>{#await p}x{/await}</div>` stays inline, matching prettier), unlike if/each/key
+/// (`has_any_expanding_blocks`). But once such a block follows a sibling, the parent goes
+/// multiline so the layout resolves in one pass: the block reaches the multiline-fragment
+/// path where its body-drop decision matches if/each (`can_wrap`), an inline-element
+/// sibling lets it dangle that element's closing `>` (`try_block_sibling_gt_dangle`), and a
+/// block-element sibling drops to its own line. if/each/key already force multiline
+/// unconditionally; this extends the same trigger to await/snippet when they have a sibling.
+pub(crate) fn has_control_flow_after_sibling(nodes: &[FragmentNode]) -> bool {
+    let mut seen_non_ws = false;
+    for node in nodes {
+        if node.is_whitespace_only_text() {
+            continue;
+        }
+        if seen_non_ws && is_control_flow_block(node) {
+            return true;
+        }
+        seen_non_ws = true;
+    }
+    false
+}
+
 /// Check if any await block contains expanding blocks (if/each/key) in its content.
 ///
 /// Prettier treats expanding blocks inside await blocks as if they were directly

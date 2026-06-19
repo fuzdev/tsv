@@ -21,6 +21,20 @@
 	{/key}
 </div>
 
+<!-- {#await} dangles too — completing all 5 block heads -->
+<div>
+	<span>text</span>{#await promise then value}
+		<Comp prop1={value1} prop2={value2} prop3={value3} prop4={value4} prop5={value5} />
+	{/await}
+</div>
+
+<!-- {#snippet} dangles too -->
+<div>
+	<span>text</span>{#snippet foo()}
+		<Comp prop1={value1} prop2={value2} prop3={value3} prop4={value4} prop5={value5} />
+	{/snippet}
+</div>
+
 <!-- control: short block stays inline → the > keeps hugging, no dangle -->
 <div>
 	<span>text</span>{#if cond}text{/if}

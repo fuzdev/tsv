@@ -1,0 +1,288 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 430,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 278,
+				"data": " await after an expression-tag sibling: its overflowing body drops to its own line (uniform body-expand), independent of the head's } dangle. The preceding {x} marks breakable content, so the } stays hugged — but the body still drops. No inline-element > to dangle here. "
+			},
+			{
+				"type": "Text",
+				"start": 278,
+				"end": 279,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 279,
+				"end": 429,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 280
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 283
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 284,
+							"end": 286,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 286,
+							"end": 289,
+							"expression": {
+								"type": "Identifier",
+								"start": 287,
+								"end": 288,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 3,
+										"column": 3
+									}
+								},
+								"name": "x"
+							}
+						},
+						{
+							"type": "AwaitBlock",
+							"start": 289,
+							"end": 422,
+							"expression": {
+								"type": "Identifier",
+								"start": 297,
+								"end": 304,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 12
+									},
+									"end": {
+										"line": 3,
+										"column": 19
+									}
+								},
+								"name": "promise"
+							},
+							"value": {
+								"type": "Identifier",
+								"name": "value",
+								"start": 310,
+								"end": 315,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 25,
+										"character": 310
+									},
+									"end": {
+										"line": 3,
+										"column": 30,
+										"character": 315
+									}
+								}
+							},
+							"error": null,
+							"pending": null,
+							"then": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 316,
+										"end": 319,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "Component",
+										"start": 319,
+										"end": 412,
+										"name": "Comp",
+										"name_loc": {
+											"start": {
+												"line": 4,
+												"column": 3,
+												"character": 320
+											},
+											"end": {
+												"line": 4,
+												"column": 7,
+												"character": 324
+											}
+										},
+										"attributes": [
+											{
+												"type": "Attribute",
+												"start": 325,
+												"end": 358,
+												"name": "prop1",
+												"name_loc": {
+													"start": {
+														"line": 4,
+														"column": 8,
+														"character": 325
+													},
+													"end": {
+														"line": 4,
+														"column": 13,
+														"character": 330
+													}
+												},
+												"value": {
+													"type": "ExpressionTag",
+													"start": 331,
+													"end": 358,
+													"expression": {
+														"type": "Identifier",
+														"start": 332,
+														"end": 357,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 15
+															},
+															"end": {
+																"line": 4,
+																"column": 40
+															}
+														},
+														"name": "some_longer_variable_name"
+													}
+												}
+											},
+											{
+												"type": "Attribute",
+												"start": 359,
+												"end": 393,
+												"name": "prop2",
+												"name_loc": {
+													"start": {
+														"line": 4,
+														"column": 42,
+														"character": 359
+													},
+													"end": {
+														"line": 4,
+														"column": 47,
+														"character": 364
+													}
+												},
+												"value": {
+													"type": "ExpressionTag",
+													"start": 365,
+													"end": 393,
+													"expression": {
+														"type": "Identifier",
+														"start": 366,
+														"end": 392,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 49
+															},
+															"end": {
+																"line": 4,
+																"column": 75
+															}
+														},
+														"name": "another_variable_name_here"
+													}
+												}
+											},
+											{
+												"type": "Attribute",
+												"start": 394,
+												"end": 409,
+												"name": "prop3",
+												"name_loc": {
+													"start": {
+														"line": 4,
+														"column": 77,
+														"character": 394
+													},
+													"end": {
+														"line": 4,
+														"column": 82,
+														"character": 399
+													}
+												},
+												"value": {
+													"type": "ExpressionTag",
+													"start": 400,
+													"end": 409,
+													"expression": {
+														"type": "Identifier",
+														"start": 401,
+														"end": 408,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 84
+															},
+															"end": {
+																"line": 4,
+																"column": 91
+															}
+														},
+														"name": "a_third"
+													}
+												}
+											}
+										],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": []
+										}
+									},
+									{
+										"type": "Text",
+										"start": 412,
+										"end": 414,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							},
+							"catch": null
+						},
+						{
+							"type": "Text",
+							"start": 422,
+							"end": 423,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
