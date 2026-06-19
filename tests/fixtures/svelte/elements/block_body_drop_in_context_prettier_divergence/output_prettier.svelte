@@ -1,7 +1,6 @@
 <!-- real breadcrumb shape: an {#each} whose breakable <a> body follows an inline <a> sibling — the body drops to its own line (prettier hugs the } and breaks the <a> internally) -->
 <nav>
-	<a href={root}>Home</a
-	>{#each path_pieces as piece (piece)}
+	<a href={root}>Home</a>{#each path_pieces as piece (piece)}
 		<a href={base + piece.path} class={{selected: piece.selected}}>{piece.name}</a>
 	{/each}
 </nav>
