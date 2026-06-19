@@ -64,7 +64,9 @@ impl<'a> Printer<'a> {
         } else {
             key_region_end
         };
-        if let Some(type_ann) = &prop.type_annotation {
+        // Where the trailing (pre-`;`) comment gap begins: after the type annotation
+        // if present, else after the key/`?` marker (the no-annotation gap).
+        let trailing_start = if let Some(type_ann) = &prop.type_annotation {
             let colon_pos = type_ann.span.start;
             // Width-aware wrapping for TypeReference with type arguments.
             let type_doc = self.build_type_annotation_doc_wrapping(type_ann);
@@ -99,13 +101,18 @@ impl<'a> Printer<'a> {
             } else {
                 parts.push(type_doc);
             }
+            type_ann.span.end
+        } else {
+            after_marker
+        };
 
-            // Handle comments between type and semicolon (e.g., `a: A /* block */;`)
-            for comment in comments_in_range(self.comments, type_ann.span.end, prop.span.end) {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-            }
-        }
+        // Trailing comments before the synthetic `;`, shared by both arms: with an
+        // annotation (`a: A /* c */;`) or in the no-annotation marker→`;` gap
+        // (`a /* c */;`, `a? /* c */;`), where they'd otherwise be dropped. Break-safe
+        // (a line comment floats after `;` via `line_suffix`, never swallowing it).
+        // Prettier relocates a no-annotation block before `?` for the optional case —
+        // a cataloged divergence (we preserve the author's position).
+        self.append_trailing_member_comments(&mut parts, trailing_start, prop.span.end);
         d.concat(&parts)
     }
 

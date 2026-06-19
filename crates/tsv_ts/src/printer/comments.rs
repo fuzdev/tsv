@@ -1931,6 +1931,25 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Push every comment in `[start, end)` to `parts` as a **trailing** comment —
+    /// the break-safe idiom for a type member's gap before its `;` terminator. Each
+    /// goes through `build_trailing_comment_doc`, so a block trails inline
+    /// (` /* c */`) and a line comment floats after the terminator via `line_suffix`
+    /// instead of swallowing it. Shared by the property arm
+    /// (`build_property_signature_member_doc`) and the signature arms
+    /// (`append_signature_end_comments`) so every `TSTypeElement` trailing emission
+    /// uses the one break-safe path.
+    pub(crate) fn append_trailing_member_comments(
+        &self,
+        parts: &mut Vec<DocId>,
+        start: u32,
+        end: u32,
+    ) {
+        for comment in comments_in_range(self.comments, start, end) {
+            parts.push(self.build_trailing_comment_doc(comment));
+        }
+    }
+
     /// Emit leading comments in `[keyword_end, value_start)` followed by
     /// `value_doc` broken onto its own indented line. Use when at least one line
     /// comment sits in the gap (a line comment forces the value down). The caller
@@ -2167,7 +2186,6 @@ impl<'a> Printer<'a> {
         paren_pos: Option<u32>,
         span_end: u32,
     ) {
-        let d = self.d();
         let content_end = return_type.map_or_else(
             || {
                 paren_pos
@@ -2176,10 +2194,9 @@ impl<'a> Printer<'a> {
             },
             |rt| rt.span.end,
         );
-        for comment in comments_in_range(self.comments, content_end, span_end) {
-            parts.push(d.text(" "));
-            parts.push(self.build_comment_doc(comment));
-        }
+        // Break-safe: a line comment in the signature→`;` gap floats after `;` via
+        // `line_suffix` instead of swallowing it (`m(): void; // c`).
+        self.append_trailing_member_comments(parts, content_end, span_end);
     }
 
     /// Append leading inline block comments (`/*content*/ ` format) between two positions.
