@@ -3,6 +3,8 @@ resolver = "2"
 members = [
     "crates/tsv_lang",
     "crates/tsv_html",
+    "crates/tsv_ignore",
+    "crates/tsv_discover",
     "crates/tsv_ts",
     "crates/tsv_css",
     "crates/tsv_svelte",
@@ -23,6 +25,8 @@ repository = "https://github.com/fuzdev/tsv"
 # Foundation
 tsv_lang = { path = "crates/tsv_lang" }
 tsv_html = { path = "crates/tsv_html" }
+tsv_ignore = { path = "crates/tsv_ignore" }
+tsv_discover = { path = "crates/tsv_discover" }
 
 # Language implementations
 # Default-features off ships parse + format only; consumers opt into the

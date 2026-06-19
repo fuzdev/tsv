@@ -14,7 +14,11 @@ use std::thread;
 ///
 /// Paths are formatted in place (written only when the output differs);
 /// `--content`/`--stdin` print to stdout. Exit codes: 0 clean, 1 would
-/// change (`--check`), 2 errors.
+/// change (`--check`), 2 errors. Directory discovery is gitignore-aware:
+/// inside a git repo it honors `.gitignore` (hierarchically, like git) plus a
+/// repo-root `.formatignore` / `.prettierignore`; outside one, only
+/// `.formatignore`. An explicitly named file is always formatted. `--list`
+/// prints the discovered in-scope files without formatting (path mode only).
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "format")]
 pub struct FormatCommand {
@@ -33,6 +37,10 @@ pub struct FormatCommand {
     /// check instead of writing/printing: exit 1 if any input would change
     #[argh(switch)]
     check: bool,
+
+    /// list the discovered in-scope files (one per line) without formatting; path mode only
+    #[argh(switch)]
+    list: bool,
 
     /// worker thread count (default: available parallelism)
     #[argh(option)]
@@ -69,6 +77,12 @@ impl FormatCommand {
         if self.jobs.is_some() {
             eprintln!(
                 "Error: --jobs applies to file paths; --content/--stdin format a single input"
+            );
+            process::exit(2);
+        }
+        if self.list {
+            eprintln!(
+                "Error: --list applies to file paths; --content/--stdin format a single input"
             );
             process::exit(2);
         }
@@ -115,6 +129,10 @@ impl FormatCommand {
             );
             process::exit(2);
         }
+        if self.list && self.check {
+            eprintln!("Error: --list and --check cannot be combined");
+            process::exit(2);
+        }
         let discovered = match discover_files(&self.paths) {
             Ok(discovered) => discovered,
             Err(bad_args) => {
@@ -127,9 +145,38 @@ impl FormatCommand {
         for msg in &discovered.errors {
             eprintln!("error: {msg}");
         }
+        // discovery warnings (e.g. the heuristic-shadow no-op) go to stderr but
+        // are NOT errors — no effect on the exit code or stdout, so `--list` /
+        // `--check` output stays clean. Fires in every path mode.
+        for msg in &discovered.warnings {
+            eprintln!("warning: {msg}");
+        }
+        // --list reports the in-scope set and stops — no formatting, and an
+        // empty result is a valid answer (exit 0), unlike the format action
+        // below which treats "nothing found" as a usage error.
+        if self.list {
+            // build the whole listing and emit it in one write: a per-path
+            // `println!` re-locks stdout and re-enters the formatter for each of
+            // (potentially thousands of) lines, which dominates `--list` on a large
+            // tree; one buffered write is dramatically cheaper.
+            use std::fmt::Write as _;
+            let mut listing = String::new();
+            for path in &discovered.files {
+                let _ = writeln!(listing, "{}", path.display());
+            }
+            print!("{listing}");
+            if !discovered.errors.is_empty() {
+                process::exit(2);
+            }
+            return;
+        }
         let files = discovered.files;
         if files.is_empty() && discovered.errors.is_empty() {
-            eprintln!("Error: No supported files found (.ts, .svelte, .css)");
+            // neutral wording: an empty result can mean "no .ts/.svelte/.css here"
+            // *or* "all of them are ignored" (e.g. a target under a gitignored dir),
+            // so don't imply a wrong-extension cause. `--list` reports the empty
+            // set on stdout and exits 0 instead.
+            eprintln!("Error: No files to format — no unignored .ts/.svelte/.css files in scope");
             process::exit(2);
         }
 

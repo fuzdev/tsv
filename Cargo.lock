@@ -489,6 +489,8 @@ dependencies = [
  "serde",
  "serde_json",
  "tsv_css",
+ "tsv_discover",
+ "tsv_ignore",
  "tsv_svelte",
  "tsv_ts",
 ]
@@ -523,6 +525,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "tsv_discover"
+version = "0.1.0"
+dependencies = [
+ "tsv_ignore",
+]
+
+[[package]]
 name = "tsv_ffi"
 version = "0.1.0"
 dependencies = [
@@ -539,6 +548,10 @@ dependencies = [
  "phf",
  "serde_json",
 ]
+
+[[package]]
+name = "tsv_ignore"
+version = "0.1.0"
 
 [[package]]
 name = "tsv_lang"
@@ -584,6 +597,8 @@ version = "0.1.0"
 dependencies = [
  "js-sys",
  "tsv_css",
+ "tsv_discover",
+ "tsv_ignore",
  "tsv_svelte",
  "tsv_ts",
  "wasm-bindgen",

@@ -71,9 +71,12 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
 - non-configurable: formatter settings are fixed at Prettier's defaults except
   `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and
   `bracketSpacing: false` (tight object braces stay distinct from function/block `{`),
-  and there are no config files or CLI config options -
+  and there are no config files or CLI options for formatting style;
   tsv is opinionated like `gofmt` and Python's Black,
   see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
+- `tsv format` discovery is gitignore-aware, honoring `.gitignore`, `.formatignore`,
+  and a repo-root `.prettierignore`
+  ([gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format))
 - Rust-only implementation that never embeds or calls a JS runtime, for performance;
   JS reaches tsv through the WASM bindings, and native N-API bindings are
   undecided (open to requests)
@@ -108,8 +111,8 @@ tool set, instead of more frameworks. Hard non-goals:
   tsv parses standard and Svelte CSS only
 - JS plugins - follows from never embedding a JS runtime; linter extensibility,
   if any, will be WASM plugins and/or pattern-based rules
-- no config settings, simplifying things and
-  making it so hidden state in directories never changes its behavior
+- no style config settings, so on-disk state and caller params
+  never change the output for a given input
 
 Deferred rather than refused:
 
@@ -200,6 +203,8 @@ tsv/
 ├── crates/
 │   ├── tsv_lang/       # foundation (Span, Location, ParseError)
 │   ├── tsv_html/       # HTML classification and whitespace rules
+│   ├── tsv_ignore/     # gitignore-aware discovery matcher (.gitignore/.formatignore/.prettierignore)
+│   ├── tsv_discover/   # file-discovery policy (build-output heuristic + safety nets) over tsv_ignore
 │   ├── tsv_ts/         # TypeScript parser/formatter (standalone)
 │   ├── tsv_css/        # CSS parser/formatter (standalone)
 │   ├── tsv_svelte/     # Svelte parser/formatter (uses tsv_ts + tsv_css)

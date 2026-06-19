@@ -27,7 +27,7 @@ struct CrateGroup {
 const GROUPS: &[CrateGroup] = &[
     CrateGroup {
         name: "foundation",
-        crates: &["tsv_lang", "tsv_html"],
+        crates: &["tsv_lang", "tsv_html", "tsv_ignore"],
     },
     CrateGroup {
         name: "languages",

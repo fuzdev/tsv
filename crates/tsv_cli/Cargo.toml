@@ -12,6 +12,8 @@ path = "src/main.rs"
 tsv_svelte = { workspace = true, features = ["convert"] }
 tsv_ts = { workspace = true, features = ["convert"] }
 tsv_css = { workspace = true, features = ["convert"] }
+tsv_ignore.workspace = true
+tsv_discover.workspace = true
 argh.workspace = true
 serde.workspace = true
 serde_json.workspace = true

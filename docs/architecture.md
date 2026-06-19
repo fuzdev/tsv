@@ -60,6 +60,8 @@ The formatter can absorb looseness; a tool built on a loose model inherits it as
 tsv/
 ├── tsv_lang     # Foundation (Span, Doc, errors, printing utilities)
 ├── tsv_html     # HTML classification (pure functions)
+├── tsv_ignore   # gitignore-aware discovery matcher (hierarchical .gitignore + .formatignore/.prettierignore)
+├── tsv_discover # file-discovery policy (build-output heuristic + safety-net pruning) over tsv_ignore
 ├── tsv_ts       # TypeScript parser/formatter (standalone)
 ├── tsv_css      # CSS parser/formatter (standalone)
 ├── tsv_svelte   # Svelte parser/formatter (uses tsv_ts + tsv_css)
@@ -68,6 +70,17 @@ tsv/
 ├── tsv_ffi      # C FFI bindings
 └── tsv_wasm     # WebAssembly bindings
 ```
+
+`tsv_html` and `tsv_ignore` are independent zero-`tsv_*`-dep leaves (pure
+functions). `tsv_discover` is a thin policy layer whose only `tsv_*` dep is
+`tsv_ignore` — it owns the build-output heuristic + safety-net pruning *decision*
+(the matcher stays a pure gitignore(5) matcher). Both are consumed by `tsv_cli`
+directly and by `tsv_wasm` under its `format` feature (the matcher exposed as the
+`IgnoreStack` class, the policy as that class's verdict methods), so the CLI, the
+WASM CLI, and the VS Code extension all share one discovery matcher *and* one
+prune decision. `tsv_discover` is file-*scope* policy — the one sanctioned config
+carve-out — not a language abstraction (no `Language` trait, registry, or
+dispatch), so it doesn't bear on the closed-scope/open-convention stance below.
 
 ### Dependency Graph
 
