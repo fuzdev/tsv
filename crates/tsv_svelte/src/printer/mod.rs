@@ -29,6 +29,7 @@ mod text;
 
 use self::text::TextAnalysis;
 use crate::ast::internal::{self, FragmentNode};
+use std::cell::Cell;
 use std::rc::Rc;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{
@@ -159,6 +160,18 @@ pub(crate) struct Printer<'a> {
     comments: &'a [Comment],
     /// Precomputed line break positions (byte offsets of '\n' in source)
     line_breaks: Vec<u32>,
+    /// Whether a wrapped block-tag head may dangle its `}` (and, later, expand its
+    /// body) in the current context. True almost everywhere — including inside
+    /// inline elements / components, where the body-expand is render-safe because a
+    /// block's *body-boundary* whitespace is non-significant (the sibling boundary,
+    /// e.g. `</span>{#if …}`, stays hugged regardless, since the expand never injects
+    /// whitespace there). Set false only while building the content of a
+    /// whitespace-significant element (`<pre>` / `<textarea>`), where every injected
+    /// whitespace would render. Save/restore discipline:
+    /// `build_whitespace_sensitive_content_doc` sets it false for its children and
+    /// restores the previous value on the way out (so nested contexts reset
+    /// correctly).
+    block_dangle_allowed: Cell<bool>,
 }
 
 impl<'a> Printer<'a> {
@@ -184,6 +197,7 @@ impl<'a> Printer<'a> {
             interner,
             comments,
             line_breaks,
+            block_dangle_allowed: Cell::new(true),
         }
     }
 
@@ -191,6 +205,21 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(crate) fn d(&self) -> &DocArena {
         &self.arena
+    }
+
+    /// Whether a wrapped block-tag head may dangle its `}` in the current context.
+    /// See [`Printer::block_dangle_allowed`] for the save/restore discipline.
+    #[inline]
+    pub(crate) fn block_dangle_allowed(&self) -> bool {
+        self.block_dangle_allowed.get()
+    }
+
+    /// Set [`Printer::block_dangle_allowed`] to `allowed`, returning the previous
+    /// value for the caller to restore. Used by the whitespace-sensitive element
+    /// builder to gate the dangle off while building `<pre>` / `<textarea>` content.
+    #[inline]
+    pub(crate) fn set_block_dangle_allowed(&self, allowed: bool) -> bool {
+        self.block_dangle_allowed.replace(allowed)
     }
 
     /// Write a string to the buffer

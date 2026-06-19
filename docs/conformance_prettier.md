@@ -291,22 +291,37 @@ columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 
 ### Svelte: Blocks
 
-- `{#each}` line wrap — [each_long](../tests/fixtures/svelte/blocks/each/long_prettier_divergence/)
-- `{#await}` line wrap — [await_long](../tests/fixtures/svelte/blocks/await/long_prettier_divergence/)
-- `{#key}` line wrap — [key_long](../tests/fixtures/svelte/blocks/key/long_prettier_divergence/)
-- `{#if}` logical wrap — [if_long](../tests/fixtures/svelte/blocks/if/long_prettier_divergence/)
-- `{#if}` last block quirk — [last_block](../tests/fixtures/svelte/blocks/if/last_block_prettier_divergence/)
-- `{#if}` short expr 100+ — [in_inline_element_long](../tests/fixtures/svelte/blocks/if/in_inline_element_long_prettier_divergence/)
+Standalone head wrap + dangle + body-expand:
 
-**Print width.** Prettier doesn't apply width-based wrapping to block expressions:
+- `{#each}` — [each_long](../tests/fixtures/svelte/blocks/each/long_prettier_divergence/)
+- `{#await}` — [await_long](../tests/fixtures/svelte/blocks/await/long_prettier_divergence/)
+- `{#key}` — [key_long](../tests/fixtures/svelte/blocks/key/long_prettier_divergence/)
+- `{#if}` (binary / member chain / call / `{:else if}`) — [if_long](../tests/fixtures/svelte/blocks/if/long_prettier_divergence/)
+- `{#if}` last block quirk — [last_block](../tests/fixtures/svelte/blocks/if/last_block_prettier_divergence/)
+
+Same layout inside an inline element (head wraps + body expands, element hugs the outer boundary):
+
+- `{#if}` — [if/inline_element_long](../tests/fixtures/svelte/blocks/if/inline_element_long_prettier_divergence/)
+- `{#each}` — [each/inline_element_long](../tests/fixtures/svelte/blocks/each/inline_element_long_prettier_divergence/)
+- `{#key}` — [key/inline_element_long](../tests/fixtures/svelte/blocks/key/inline_element_long_prettier_divergence/)
+- `{#await}` — [await/inline_element_long](../tests/fixtures/svelte/blocks/await/inline_element_long_prettier_divergence/)
+- `{#snippet}` (params inline + body expand vs prettier's param-wrap) — [snippet/inline_in_element](../tests/fixtures/svelte/blocks/snippet/inline_in_element_prettier_divergence/)
+
+**Print width.** Prettier doesn't apply width-based wrapping to block expressions at all:
 
 - **Method chains** in `{#each}`, `{#await}`, `{#if}`, `{#key}`, etc. don't account for the tag prefix width, resulting in 140+ char lines. tsv passes context offset for proper wrapping.
 - **Logical expressions** (`&&`, `||`) in block conditions are never wrapped internally by Prettier, even when exceeding 100 chars. (In `<script>`, assignments provide a break point so this isn't an issue.) tsv wraps them with proper indentation.
 - **Function calls** in block expressions don't wrap their arguments. tsv wraps function arguments when they exceed print width.
 
-**Last block not expanded**: Prettier expands `{#if a} content {/if}` (symmetric spaces) to multiline, but has a quirk: the last block in a file stays inline. A single block appears preserved only because it's last. tsv expands consistently regardless of position.
+**Head `}` dangle + clause hug.** When a block head wraps, tsv drops the closing `}` (and any `as item` / `then value` clause) to its own line at the tag's base indent — `{#if a &&⏎\t…⏎}`, `{#each …⏎as item}` — consistent with tsv's JS `if (⏎…⏎) {` and its broken-element `>` (`bracketSameLine: false`). The one shape that hugs is a single call/`new` whose arguments wrapped: its `)` already dedents to base, so the clause + `}` continue on it (`) as item}`, `)}`, `) then r}`). Prettier never wraps a block head, so it never faces this.
 
-**Short expr 100+**: Prettier tolerates exceeding print width (100+ chars) for short comparison expressions in block conditions like `{#if typeof x === 'string'}`. tsv breaks to respect print width strictly. This affects expressions that are just slightly over the limit (e.g., 103 chars).
+**Body-expand (whole construct goes multiline).** When the head wraps — or the inline construct simply exceeds printWidth — tsv expands the **entire** block: the body, every `{:then}` / `{:catch}` / `{:else}` / `{:else if}` section/branch, and the `{/tag}` close each drop to their own indented lines, uniformly across `{#if}` / `{#each}` / `{#await}` / `{#key}` / `{#snippet}`. This holds **inside inline elements/components too** (`<span>{#if …}…{/if}</span>`) — block-body boundary whitespace is render-non-significant there (verified against the Svelte compiler), so it is safe; the only gate is `<pre>` / `white-space:pre`. Prettier keeps the construct inline past printWidth (only the enclosing element wraps).
+
+**Middle zone (head fits alone, head + body doesn't).** tsv decouples the head-wrap decision (head-alone width) from the body-expand decision (head + body width): when the head fits on its own line but the whole construct overflows, the head stays flat and only the body expands. This is chosen in one pass (no wrap-then-unwrap across two formats), so every layout is an idempotent fixed point.
+
+**Uniform body drop (no breakable-element hug).** When an inline-authored block body overflows, tsv drops it to its own indented line **uniformly — for every body shape**: text, expression tags (`{x}`), void/empty elements (`<Spinner />`, `<Comp></Comp>`), and elements/components **with attributes or children** alike. Prettier instead leaves the body hugging the `}` and breaks it *internally* (an element wraps its attributes / closing `>`; text just overflows) — prettier's block-body layout is driven by authored boundary whitespace, never by width. tsv's uniform drop keeps the layout idempotent (a one-pass `conditional_group`, no special case keyed on whether the body can break internally) and consistent across all body shapes and contexts (block level, inside inline elements/components, in any section/branch). The earlier breakable-element hug was removed: as a non-first body node (behind leading text, a comment, a void sibling, or an atomic `{:else}` branch) it over-wrapped the head and was non-idempotent across two passes. Cataloged at [if/element_body_long](../tests/fixtures/svelte/blocks/if/element_body_long_prettier_divergence/) (block level), [await/element_body_long](../tests/fixtures/svelte/blocks/await/element_body_long_prettier_divergence/) and [snippet/element_body_long](../tests/fixtures/svelte/blocks/snippet/element_body_long_prettier_divergence/) (inside `<Container>`), [key/void_element_body_long](../tests/fixtures/svelte/blocks/key/void_element_body_long_prettier_divergence/) (void body + an attributed body that now drops the same way), [elements/inline_if_sibling_fill_long](../tests/fixtures/svelte/elements/inline_if_sibling_fill_long_prettier_divergence/) (body drop next to an inline sibling), [elements/inline_component_else_body_long](../tests/fixtures/svelte/elements/inline_component_else_body_long_prettier_divergence/) (breakable element in `{:else}`, behind an atomic consequent), and [components/attrs_nested_long](../tests/fixtures/svelte/components/attrs_nested_long_prettier_divergence/) (deep nesting). Paramless `{#snippet}` bodies drop the same way once the whole construct still overflows after the element boundary wraps — [snippet/inline_in_element](../tests/fixtures/svelte/blocks/snippet/inline_in_element_prettier_divergence/). The drop reads correctly embedded in realistic nested context with inline siblings (incl. the breadcrumb shape that motivated removing the hug) — [elements/block_body_drop_in_context](../tests/fixtures/svelte/elements/block_body_drop_in_context_prettier_divergence/).
+
+**Last block not expanded**: Prettier expands `{#if a} content {/if}` (symmetric spaces) to multiline, but has a quirk: the last block in a file stays inline. A single block appears preserved only because it's last. tsv expands consistently regardless of position.
 
 ### Svelte: destructuring bracket spacing
 

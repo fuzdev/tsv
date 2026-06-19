@@ -1,0 +1,410 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 475,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 279,
+				"data": " A {#if} with an inline <span> sibling before it and a breakable <span> body: when content exceeds printWidth, tsv keeps the </span>{#if} boundary hugged and drops the body to its own line; prettier hugs the } and breaks the inner <span> internally (prettier_variant_hug) "
+			},
+			{
+				"type": "Text",
+				"start": 279,
+				"end": 280,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 280,
+				"end": 474,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 281
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 284
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 285,
+							"end": 287,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 287,
+							"end": 467,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 288
+								},
+								"end": {
+									"line": 3,
+									"column": 5,
+									"character": 291
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 292,
+										"end": 295,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 295,
+										"end": 459,
+										"name": "div",
+										"name_loc": {
+											"start": {
+												"line": 4,
+												"column": 3,
+												"character": 296
+											},
+											"end": {
+												"line": 4,
+												"column": 6,
+												"character": 299
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 300,
+													"end": 304,
+													"raw": "\n\t\t\t",
+													"data": "\n\t\t\t"
+												},
+												{
+													"type": "RegularElement",
+													"start": 304,
+													"end": 450,
+													"name": "small",
+													"name_loc": {
+														"start": {
+															"line": 5,
+															"column": 4,
+															"character": 305
+														},
+														"end": {
+															"line": 5,
+															"column": 9,
+															"character": 310
+														}
+													},
+													"attributes": [],
+													"fragment": {
+														"type": "Fragment",
+														"nodes": [
+															{
+																"type": "Text",
+																"start": 311,
+																"end": 316,
+																"raw": "\n\t\t\t\t",
+																"data": "\n\t\t\t\t"
+															},
+															{
+																"type": "RegularElement",
+																"start": 316,
+																"end": 348,
+																"name": "span",
+																"name_loc": {
+																	"start": {
+																		"line": 6,
+																		"column": 5,
+																		"character": 317
+																	},
+																	"end": {
+																		"line": 6,
+																		"column": 9,
+																		"character": 321
+																	}
+																},
+																"attributes": [],
+																"fragment": {
+																	"type": "Fragment",
+																	"nodes": [
+																		{
+																			"type": "ExpressionTag",
+																			"start": 322,
+																			"end": 341,
+																			"expression": {
+																				"type": "MemberExpression",
+																				"start": 323,
+																				"end": 340,
+																				"loc": {
+																					"start": {
+																						"line": 6,
+																						"column": 11
+																					},
+																					"end": {
+																						"line": 6,
+																						"column": 28
+																					}
+																				},
+																				"object": {
+																					"type": "Identifier",
+																					"start": 323,
+																					"end": 326,
+																					"loc": {
+																						"start": {
+																							"line": 6,
+																							"column": 11
+																						},
+																						"end": {
+																							"line": 6,
+																							"column": 14
+																						}
+																					},
+																					"name": "obj"
+																				},
+																				"property": {
+																					"type": "Identifier",
+																					"start": 327,
+																					"end": 340,
+																					"loc": {
+																						"start": {
+																							"line": 6,
+																							"column": 15
+																						},
+																						"end": {
+																							"line": 6,
+																							"column": 28
+																						}
+																					},
+																					"name": "prop_name_abc"
+																				},
+																				"computed": false,
+																				"optional": false
+																			}
+																		}
+																	]
+																}
+															},
+															{
+																"type": "IfBlock",
+																"elseif": false,
+																"start": 348,
+																"end": 438,
+																"test": {
+																	"type": "MemberExpression",
+																	"start": 353,
+																	"end": 382,
+																	"loc": {
+																		"start": {
+																			"line": 6,
+																			"column": 41
+																		},
+																		"end": {
+																			"line": 6,
+																			"column": 70
+																		}
+																	},
+																	"object": {
+																		"type": "Identifier",
+																		"start": 353,
+																		"end": 356,
+																		"loc": {
+																			"start": {
+																				"line": 6,
+																				"column": 41
+																			},
+																			"end": {
+																				"line": 6,
+																				"column": 44
+																			}
+																		},
+																		"name": "obj"
+																	},
+																	"property": {
+																		"type": "Identifier",
+																		"start": 357,
+																		"end": 382,
+																		"loc": {
+																			"start": {
+																				"line": 6,
+																				"column": 45
+																			},
+																			"end": {
+																				"line": 6,
+																				"column": 70
+																			}
+																		},
+																		"name": "cond_prop_name_abcdefghij"
+																	},
+																	"computed": false,
+																	"optional": false
+																},
+																"consequent": {
+																	"type": "Fragment",
+																	"nodes": [
+																		{
+																			"type": "Text",
+																			"start": 383,
+																			"end": 389,
+																			"raw": "\n\t\t\t\t\t",
+																			"data": "\n\t\t\t\t\t"
+																		},
+																		{
+																			"type": "RegularElement",
+																			"start": 389,
+																			"end": 428,
+																			"name": "span",
+																			"name_loc": {
+																				"start": {
+																					"line": 7,
+																					"column": 6,
+																					"character": 390
+																				},
+																				"end": {
+																					"line": 7,
+																					"column": 10,
+																					"character": 394
+																				}
+																			},
+																			"attributes": [],
+																			"fragment": {
+																				"type": "Fragment",
+																				"nodes": [
+																					{
+																						"type": "ExpressionTag",
+																						"start": 395,
+																						"end": 421,
+																						"expression": {
+																							"type": "MemberExpression",
+																							"start": 396,
+																							"end": 420,
+																							"loc": {
+																								"start": {
+																									"line": 7,
+																									"column": 12
+																								},
+																								"end": {
+																									"line": 7,
+																									"column": 36
+																								}
+																							},
+																							"object": {
+																								"type": "Identifier",
+																								"start": 396,
+																								"end": 399,
+																								"loc": {
+																									"start": {
+																										"line": 7,
+																										"column": 12
+																									},
+																									"end": {
+																										"line": 7,
+																										"column": 15
+																									}
+																								},
+																								"name": "obj"
+																							},
+																							"property": {
+																								"type": "Identifier",
+																								"start": 400,
+																								"end": 420,
+																								"loc": {
+																									"start": {
+																										"line": 7,
+																										"column": 16
+																									},
+																									"end": {
+																										"line": 7,
+																										"column": 36
+																									}
+																								},
+																								"name": "prop_name_abcdefghij"
+																							},
+																							"computed": false,
+																							"optional": false
+																						}
+																					}
+																				]
+																			}
+																		},
+																		{
+																			"type": "Text",
+																			"start": 428,
+																			"end": 433,
+																			"raw": "\n\t\t\t\t",
+																			"data": "\n\t\t\t\t"
+																		}
+																	]
+																},
+																"alternate": null
+															},
+															{
+																"type": "Text",
+																"start": 438,
+																"end": 442,
+																"raw": "\n\t\t\t",
+																"data": "\n\t\t\t"
+															}
+														]
+													}
+												},
+												{
+													"type": "Text",
+													"start": 450,
+													"end": 453,
+													"raw": "\n\t\t",
+													"data": "\n\t\t"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 459,
+										"end": 461,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 467,
+							"end": 468,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

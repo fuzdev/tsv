@@ -21,9 +21,13 @@ this repo — make the edits and stop, the user commits.
 **ALWAYS use TDD when implementing features or fixing bugs:**
 
 0. **Load context FIRST** - Read BOTH ./docs/fixture_workflow.md AND ./docs/fixture_naming.md into context.
-   For a `_prettier_divergence` fixture, ALSO read ./docs/conformance_prettier.md first (§Comment Position
-   Philosophy + §Comment relocation catalog) — the divergence must be sanctioned and cataloged there.
-   Study 2-3 existing fixtures in the target category. No code changes without a failing fixture.
+   For ANY `_prettier_divergence` fixture, ALSO read ./docs/conformance_prettier.md first — the divergence
+   must be sanctioned and **cataloged in the relevant section** there (for a comment divergence that's
+   §Comment Position Philosophy + §Comment relocation catalog; for others it's the matching feature
+   section, e.g. §Svelte: Blocks), AND the fixture's `README.md` MUST link back to that section
+   (`See [conformance_prettier.md §…](…)`) — the README and the catalog entry must agree. This applies to
+   every divergence, not just comment ones. Study 2-3 existing fixtures in the target category (match their
+   README shape). No code changes without a failing fixture.
 1. **Create the fixture FIRST** - Use `fixture_init` to create `input.svelte` (prettier-formatted) and `expected.json` in one step.
    Use `.svelte` unless the feature is file-level (byte 0: hashbang, BOM). See ./docs/fixture_workflow.md#11-create-directory-and-draft.
 2. **Review the input** - Read the generated `input.svelte` to verify structure (formatting is guaranteed correct).
@@ -431,7 +435,7 @@ See [Development Philosophy](#development-philosophy-test-driven-development-wit
 - Spec precedence: when the spec defines a canonical form prettier doesn't emit, follow the spec — even if prettier's output is itself valid. Document with spec refs in a `_prettier_divergence`
 - Comment position: when prettier moves comments to different syntactic positions, preserve the user's placement. See ./docs/conformance_prettier.md#comment-position-philosophy
 - Other defensible tsv-native choices (print width as a hard limit, a clearly better layout) are legitimate too — just sanction them deliberately, never to hide a bug
-- `_prettier_divergence` suffix: deliberate, documented intentional differences only. Requires README. Never use to hide bugs.
+- `_prettier_divergence` suffix: deliberate, documented intentional differences only. Requires a README that **links back to its `conformance_prettier.md` section** (`See [conformance_prettier.md §…](…)`) and a matching catalog entry there. Never use to hide bugs.
 
 ---
 

@@ -1,15 +1,23 @@
 # long_prettier_divergence
 
-Prettier keeps long expressions inline in `{#await}` blocks even when they exceed printWidth.
+A standalone `{#await …}` head that exceeds printWidth. tsv wraps the head, dangles its
+closing `}` (with the ` then v` / ` catch e` shorthand clause) on its own line at the
+tag's base indent, and expands the body + `{/await}` onto their own lines. The full
+`{:then}`/`{:catch}` form expands every section the same way. Prettier never width-wraps
+a block head — it keeps the whole head inline past printWidth.
 
-tsv: wraps expressions at 101+ chars
-Prettier: keeps inline (exceeds printWidth)
-
-| Line width | tsv   | Prettier |
-| ---------- | ----- | -------- |
-| 100 chars  | inline | inline  |
-| 101+ chars | wraps  | inline  |
+Boundary shapes covered: a head that fits (≤100) stays fully inline; a single call whose
+args wrap hugs `)` then the ` then v` / ` catch e` clause + `}`; a binary / multi-group
+member chain drops its clause + `}` to base; a 2-group member chain across the fit →
+middle-zone → wrap boundary; a 3+ group member chain always wraps.
 
 ## Reason
 
-tsv wraps block expressions consistently with how TypeScript formats the same expressions in `<script>` tags. Consistent with tsv's handling of `{#each}`, `{#if}`, and `{#key}` long expressions.
+See [conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks) for the full head-wrap + `}` dangle +
+clause-hug + body-expand + middle-zone model and why tsv diverges (consistent with its
+JS `if (⏎…⏎) {` and broken-element `>`; block-body whitespace is render-non-significant).
+
+## Related
+
+- [if/long](../../if/long_prettier_divergence/) · [each/long](../../each/long_prettier_divergence/) · [key/long](../../key/long_prettier_divergence/) · [await/long](../../await/long_prettier_divergence/) — the same divergence per block head
+- [await/inline_element_long](../inline_element_long_prettier_divergence/) — the same layout inside an inline element
