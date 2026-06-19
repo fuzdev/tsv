@@ -180,6 +180,18 @@ fn collect_root(root: &Path, cwd: &Path, out: &mut Discovered) {
         }
     }
 
+    // The recursion uses the leaf-only matcher query (`tsv_discover` calls
+    // `is_ignored_leaf`), which is exact only when an entry's ancestors are
+    // already cleared. That holds for everything the walk *descends* into, but
+    // NOT for `root` itself when it sits under an ignored ancestor (e.g.
+    // `tsv format build/sub` with a gitignored `build/`). Gate it once here with
+    // the full, ancestor-walking `is_ignored`: an ignored root means nothing
+    // under it is in scope. (The format root itself — `base_rel` empty — has no
+    // ancestors to clear and is never ignored.)
+    if !base_rel.is_empty() && stack.is_ignored(&base_rel, true) {
+        return;
+    }
+
     collect_recursive(root, &base_rel, in_repo, &mut stack, heuristic_active, out);
 }
 

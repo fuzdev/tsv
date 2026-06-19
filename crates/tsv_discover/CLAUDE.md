@@ -58,7 +58,17 @@ crates (the open-convention stance):
   — the per-directory decision: safety-net prune → heuristic prune (with the
   shadow-warning sub-case) → matcher prune → descend.
 - `should_format_file(name, child_rel, &IgnoreStack) -> bool` — the per-file
-  decision (`is_formattable && !is_ignored`).
+  decision (`is_formattable && !ignored`).
+
+  Both the matcher prune and the file check use the leaf-only
+  `IgnoreStack::is_ignored_leaf` (not the ancestor-walking `is_ignored`): discovery
+  only reaches an entry whose ancestor directories are already cleared, so the
+  re-walk is redundant — dropping it roughly halves the matcher's self-time, which
+  dominates discovery on deep trees. **This relies on the caller gating the
+  initial `root` with a full `is_ignored`** (a directory under an ignored ancestor,
+  e.g. `tsv format build/sub` with a gitignored `build/`, isn't walk-cleared) —
+  `tsv_cli`'s `collect_root` and `cli.js`'s do exactly that. See
+  `is_ignored_leaf`'s contract in [`tsv_ignore`](../tsv_ignore/CLAUDE.md).
 - `DirVerdict { Descend, Prune, PruneWithWarning(String) }` — `PruneWithWarning`
   carries the full warning string, so the native caller reports it without
   re-deriving.

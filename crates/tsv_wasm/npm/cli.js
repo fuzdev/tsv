@@ -623,6 +623,15 @@ function collect_root(root, cwd, files, errors, warnings) {
 		}
 	}
 
+	// The recursion uses the leaf-only matcher query (is_ignored_leaf, inside
+	// classify_dir/should_format_file), exact only when an entry's ancestors are
+	// already cleared — true for everything the walk descends into, but not for
+	// `root` itself when it's under an ignored ancestor (e.g. `tsv format
+	// build/sub` with a gitignored `build/`). Gate it once with the full
+	// ancestor-walking is_ignored: an ignored root means nothing under it is in
+	// scope. Mirrors the native collect_root.
+	if (base_rel !== '' && stack.is_ignored(base_rel, true)) return;
+
 	collect_recursive(root, base_rel, in_repo, stack, heuristic_active, files, errors, warnings);
 }
 

@@ -125,13 +125,17 @@
 		},
 		{
 			"name": "fully_ignored_target_is_empty",
-			"note": "a target entirely under an ignored dir discovers nothing (an empty scope is a valid answer)",
+			"note": "a target under an ignored dir discovers nothing (empty scope is valid) — both the dir itself and a deeper subdir. The walk's per-entry matcher query is leaf-only (no ancestor prune), so this pins the root-gate that re-applies the full ancestor walk to the named root, one and two levels deep",
 			"tree": {
 				".git/": null,
 				".gitignore": "build/\n",
-				"build/out.ts": "x"
+				"build/out.ts": "x",
+				"build/sub/app.ts": "x"
 			},
-			"cases": [{"target": "build", "expected": []}]
+			"cases": [
+				{"target": "build", "expected": []},
+				{"target": "build/sub", "expected": []}
+			]
 		},
 		{
 			"name": "cwd_independent_decision",

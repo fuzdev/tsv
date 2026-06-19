@@ -144,17 +144,13 @@ pub fn classify_dir(
         };
     }
     // a dir's own ignore files don't classify the dir itself, so this tests it
-    // against the stack-so-far (its ancestors)
-    //
-    // TODO: optimization — `is_ignored` re-walks every ancestor prefix of
-    // `child_rel`, but discovery only descends into non-ignored dirs, so the
-    // ancestors are already known clean. A leaf-only matcher query (just the last
-    // segment against every layer) would be equivalent for the discovery caller
-    // and drop the O(depth) re-walk; `should_format_file`'s `is_ignored` is the
-    // same. The matcher's standalone `is_ignored` must keep the full walk (its
-    // contract is arbitrary-path), so this is a new `tsv_ignore` method + a swap
-    // here, mirrored in `cli.js`. Followup if profiling flags it.
-    if stack.is_ignored(child_rel, true) {
+    // against the stack-so-far (its ancestors). The leaf-only query is exact here
+    // because discovery only reaches a directory whose ancestors are already
+    // cleared — it prunes ignored dirs before descending, and the caller gates the
+    // initial root with a full `is_ignored`. That drops the O(depth) ancestor
+    // re-walk that dominated discovery (~70% of `--list` on a deep tree); see
+    // `IgnoreStack::is_ignored_leaf`'s contract.
+    if stack.is_ignored_leaf(child_rel, true) {
         return DirVerdict::Prune;
     }
     DirVerdict::Descend
@@ -165,8 +161,13 @@ pub fn classify_dir(
 /// `child_rel` is its format-root-relative, `/`-separated path. Pure — no
 /// filesystem access. (An explicitly named file *argument* bypasses this — the
 /// ignore files govern *discovery*, which is what this drives.)
+///
+/// Uses the leaf-only [`is_ignored_leaf`](tsv_ignore::IgnoreStack::is_ignored_leaf):
+/// the discovery walk only reaches a file whose ancestor directories are already
+/// cleared (it prunes ignored dirs before descending, and the caller gates the
+/// root), so the ancestor walk would be redundant — see [`classify_dir`].
 pub fn should_format_file(name: &str, child_rel: &str, stack: &IgnoreStack) -> bool {
-    is_formattable(name) && !stack.is_ignored(child_rel, false)
+    is_formattable(name) && !stack.is_ignored_leaf(child_rel, false)
 }
 
 /// The stderr warning when the build-output heuristic prunes a directory that a

@@ -238,6 +238,27 @@ impl IgnoreStack {
         walk_ancestors_ignored(path, is_dir, |prefix, dir| self.last_match_at(prefix, dir))
     }
 
+    /// Whether `path`'s **own** last-match polarity is an exclusion — the leaf
+    /// path evaluated against every layer once, with **no ancestor walk**. Unlike
+    /// [`is_ignored`](Self::is_ignored) it does not apply git's parent-directory
+    /// prune, so a file under an excluded `build/` is reported *not* ignored
+    /// unless a rule matches the file path itself.
+    ///
+    /// # Contract
+    ///
+    /// Equivalent to [`is_ignored`](Self::is_ignored) **only when every ancestor
+    /// directory of `path` is already known not-ignored.** tsv's discovery walk
+    /// guarantees that — it prunes ignored directories before descending, and
+    /// gates the initial root with a full [`is_ignored`](Self::is_ignored) — so it
+    /// uses this O(1)-per-level query instead of re-walking O(depth) ancestor
+    /// prefixes per entry (the matcher dominates discovery cost). **Do not** call
+    /// it for an arbitrary path whose ancestors haven't been cleared; that is what
+    /// [`is_ignored`](Self::is_ignored) is for.
+    pub fn is_ignored_leaf(&self, path: &str, is_dir: bool) -> bool {
+        let segments = path_segments(path);
+        !segments.is_empty() && self.last_match_at(&segments, is_dir) == Some(true)
+    }
+
     /// Whether `path` is explicitly *re-included* — the last rule matching this
     /// exact path is a `!` negation (`Some(false)`), with no ancestor prune
     /// applied. Distinct from `!is_ignored`: a path no rule mentions is neither
@@ -1001,5 +1022,33 @@ mod tests {
         assert!(stack.is_ignored("build", true));
         assert!(stack.is_ignored("a/node_modules", true));
         assert!(!stack.is_ignored("src", true));
+    }
+
+    #[test]
+    fn stack_is_ignored_leaf_skips_the_ancestor_prune() {
+        // is_ignored_leaf reports only the leaf path's own last-match — it
+        // diverges from is_ignored exactly where an *ancestor* directory is what
+        // excludes the path. Discovery relies on the two being equivalent *when
+        // ancestors are known clean* (it prunes ignored dirs before descending and
+        // gates the root with full is_ignored), so this pins the difference.
+        let mut stack = IgnoreStack::new();
+        stack.push_gitignore("", "build/\n");
+        // the excluded dir itself: both agree (a rule matches the leaf)
+        assert!(stack.is_ignored("build", true));
+        assert!(stack.is_ignored_leaf("build", true));
+        // a file UNDER it: is_ignored prunes via the `build` ancestor; the
+        // leaf-only query does not (no rule matches `build/app.ts` as a file)
+        assert!(stack.is_ignored("build/app.ts", false));
+        assert!(!stack.is_ignored_leaf("build/app.ts", false));
+        // a deeper subdir under it: same divergence, two levels down
+        assert!(stack.is_ignored("build/sub", true));
+        assert!(!stack.is_ignored_leaf("build/sub", true));
+
+        // a leaf a rule matches directly: both agree at any depth
+        let mut stack = IgnoreStack::new();
+        stack.push_gitignore("", "*.log\n");
+        assert!(stack.is_ignored("a/b/x.log", false));
+        assert!(stack.is_ignored_leaf("a/b/x.log", false));
+        assert!(!stack.is_ignored_leaf("a/b/x.ts", false));
     }
 }

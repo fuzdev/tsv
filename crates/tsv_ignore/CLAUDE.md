@@ -59,7 +59,16 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
   root, `""` = root). Push shallow-first; pop on a DFS unwind.
 - `IgnoreStack::push_tsv(anchor, content)` / `pop_tsv()` — add/drop one
   directory's tsv layer, evaluated after every `.gitignore`.
-- `IgnoreStack::is_ignored(path, is_dir)` — `path` relative to the format root.
+- `IgnoreStack::is_ignored(path, is_dir)` — `path` relative to the format root;
+  walks the ancestor prefixes (git's parent-directory prune). The arbitrary-path
+  query.
+- `IgnoreStack::is_ignored_leaf(path, is_dir)` — like `is_ignored` but evaluates
+  only `path`'s **own** last-match, **no ancestor walk**. Equivalent to
+  `is_ignored` *only when every ancestor is already known not-ignored* — which
+  tsv's discovery guarantees (it prunes ignored dirs before descending and gates
+  the root with full `is_ignored`), letting it skip the O(depth) re-walk per entry
+  (the matcher dominates discovery; this roughly halves its self-time on a deep
+  tree). A sharp contract — see Known edges.
 - `IgnoreStack::is_reincluded(path, is_dir)` — the per-path `!`-negation polarity
   (no ancestor prune), so a caller's heuristic can defer to an explicit re-include.
 - `IgnoreStack::has_negation_under(prefix)` — whether some **tsv-layer** rule is a
@@ -150,3 +159,15 @@ only inside a git repo. The crate itself is layer-agnostic.
   it back down. A bare `!dir/keep.ts` is a no-op; `tsv_discover` uses
   [`has_negation_under`](#public-api) to detect that case and warn (pointing at
   this `!dir/` escape) when the build-output heuristic is what pruned `dir`.
+
+- **`is_ignored_leaf` omits the ancestor prune** — it reports only the query
+  path's *own* last-match exclusion, so a file under an excluded `build/` reads as
+  *not* ignored unless a rule matches the file path itself. It equals `is_ignored`
+  **only when the path's ancestors are already cleared**, which the discovery walk
+  guarantees: it prunes ignored directories before descending, and the CLI/JS
+  walkers gate the initial `root` with a full `is_ignored` (so `tsv format
+  build/sub` under a gitignored `build/` still finds nothing — the gate catches
+  it; the per-entry walk below uses the cheaper leaf query). It exists purely for
+  that hot path — never call it on an arbitrary path whose ancestors haven't been
+  cleared. Pinned by `stack_is_ignored_leaf_skips_the_ancestor_prune` and the
+  `fully_ignored_target_is_empty` discovery scenario.
