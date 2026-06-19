@@ -1,0 +1,636 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 767,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 342,
+				"data": " A short {#await}/{#snippet} after a breakable sibling (an inline element, an\nexpression tag, {@html}, or {@render}) inside a block element drops the children to their\nown line — the block stays hugged to its sibling (no `>` to dangle when short), so only\nthe parent goes multiline. Prettier keeps an inline-authored construct inline. "
+			},
+			{
+				"type": "Text",
+				"start": 342,
+				"end": 344,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 344,
+				"end": 383,
+				"data": " inline-element sibling + await "
+			},
+			{
+				"type": "Text",
+				"start": 383,
+				"end": 384,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 384,
+				"end": 431,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 385
+					},
+					"end": {
+						"line": 7,
+						"column": 4,
+						"character": 388
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 389,
+							"end": 391,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 391,
+							"end": 405,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 2,
+									"character": 392
+								},
+								"end": {
+									"line": 8,
+									"column": 6,
+									"character": 396
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 397,
+										"end": 398,
+										"raw": "s",
+										"data": "s"
+									}
+								]
+							}
+						},
+						{
+							"type": "AwaitBlock",
+							"start": 405,
+							"end": 424,
+							"expression": {
+								"type": "Identifier",
+								"start": 413,
+								"end": 414,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 23
+									},
+									"end": {
+										"line": 8,
+										"column": 24
+									}
+								},
+								"name": "p"
+							},
+							"value": null,
+							"error": null,
+							"pending": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 415,
+										"end": 416,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							},
+							"then": null,
+							"catch": null
+						},
+						{
+							"type": "Text",
+							"start": 424,
+							"end": 425,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 431,
+				"end": 433,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 433,
+				"end": 472,
+				"data": " expression-tag sibling + await "
+			},
+			{
+				"type": "Text",
+				"start": 472,
+				"end": 473,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 473,
+				"end": 509,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 474
+					},
+					"end": {
+						"line": 12,
+						"column": 4,
+						"character": 477
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 478,
+							"end": 480,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 480,
+							"end": 483,
+							"expression": {
+								"type": "Identifier",
+								"start": 481,
+								"end": 482,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 3
+									}
+								},
+								"name": "e"
+							}
+						},
+						{
+							"type": "AwaitBlock",
+							"start": 483,
+							"end": 502,
+							"expression": {
+								"type": "Identifier",
+								"start": 491,
+								"end": 492,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 12
+									},
+									"end": {
+										"line": 13,
+										"column": 13
+									}
+								},
+								"name": "p"
+							},
+							"value": null,
+							"error": null,
+							"pending": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 493,
+										"end": 494,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							},
+							"then": null,
+							"catch": null
+						},
+						{
+							"type": "Text",
+							"start": 502,
+							"end": 503,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 509,
+				"end": 511,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 511,
+				"end": 543,
+				"data": " {@html} sibling + await "
+			},
+			{
+				"type": "Text",
+				"start": 543,
+				"end": 544,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 544,
+				"end": 586,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 1,
+						"character": 545
+					},
+					"end": {
+						"line": 17,
+						"column": 4,
+						"character": 548
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 549,
+							"end": 551,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "HtmlTag",
+							"start": 551,
+							"end": 560,
+							"expression": {
+								"type": "Identifier",
+								"start": 558,
+								"end": 559,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 8
+									},
+									"end": {
+										"line": 18,
+										"column": 9
+									}
+								},
+								"name": "s"
+							}
+						},
+						{
+							"type": "AwaitBlock",
+							"start": 560,
+							"end": 579,
+							"expression": {
+								"type": "Identifier",
+								"start": 568,
+								"end": 569,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 18
+									},
+									"end": {
+										"line": 18,
+										"column": 19
+									}
+								},
+								"name": "p"
+							},
+							"value": null,
+							"error": null,
+							"pending": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 570,
+										"end": 571,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							},
+							"then": null,
+							"catch": null
+						},
+						{
+							"type": "Text",
+							"start": 579,
+							"end": 580,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 586,
+				"end": 588,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 588,
+				"end": 622,
+				"data": " {@render} sibling + await "
+			},
+			{
+				"type": "Text",
+				"start": 622,
+				"end": 623,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 623,
+				"end": 669,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 22,
+						"column": 1,
+						"character": 624
+					},
+					"end": {
+						"line": 22,
+						"column": 4,
+						"character": 627
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 628,
+							"end": 630,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RenderTag",
+							"start": 630,
+							"end": 643,
+							"expression": {
+								"type": "CallExpression",
+								"start": 639,
+								"end": 642,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 10
+									},
+									"end": {
+										"line": 23,
+										"column": 13
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 639,
+									"end": 640,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 10
+										},
+										"end": {
+											"line": 23,
+											"column": 11
+										}
+									},
+									"name": "f"
+								},
+								"arguments": [],
+								"optional": false
+							}
+						},
+						{
+							"type": "AwaitBlock",
+							"start": 643,
+							"end": 662,
+							"expression": {
+								"type": "Identifier",
+								"start": 651,
+								"end": 652,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 22
+									},
+									"end": {
+										"line": 23,
+										"column": 23
+									}
+								},
+								"name": "p"
+							},
+							"value": null,
+							"error": null,
+							"pending": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 653,
+										"end": 654,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							},
+							"then": null,
+							"catch": null
+						},
+						{
+							"type": "Text",
+							"start": 662,
+							"end": 663,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 669,
+				"end": 671,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 671,
+				"end": 712,
+				"data": " inline-element sibling + snippet "
+			},
+			{
+				"type": "Text",
+				"start": 712,
+				"end": 713,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 713,
+				"end": 766,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 27,
+						"column": 1,
+						"character": 714
+					},
+					"end": {
+						"line": 27,
+						"column": 4,
+						"character": 717
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 718,
+							"end": 720,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 720,
+							"end": 734,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 28,
+									"column": 2,
+									"character": 721
+								},
+								"end": {
+									"line": 28,
+									"column": 6,
+									"character": 725
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 726,
+										"end": 727,
+										"raw": "s",
+										"data": "s"
+									}
+								]
+							}
+						},
+						{
+							"type": "SnippetBlock",
+							"start": 734,
+							"end": 759,
+							"expression": {
+								"type": "Identifier",
+								"name": "f",
+								"start": 744,
+								"end": 745,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 25,
+										"character": 744
+									},
+									"end": {
+										"line": 28,
+										"column": 26,
+										"character": 745
+									}
+								}
+							},
+							"parameters": [],
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 748,
+										"end": 749,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 759,
+							"end": 760,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
