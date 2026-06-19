@@ -43,6 +43,20 @@ const formatted = format_svelte('<script>\nconst   x=1\n</script>');
 
 tsv is non-configurable: settings are fixed at Prettier's defaults except `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and `bracketSpacing: false` — no options, like `gofmt` and Black.
 
+### File scoping (`IgnoreStack`)
+
+For tooling that needs tsv's exact file scoping, this package also exports an `IgnoreStack` class — the same hierarchical, git-faithful matcher (per-directory `.gitignore` and `.formatignore` layers, plus a repo-root `.prettierignore`) the `tsv` CLI uses to decide which files it formats. Build it from a repo's ignore files (one layer per directory, anchored at that directory), then query per path; locating the files and walking directories is the caller's job.
+
+```javascript
+import {IgnoreStack} from '@fuzdev/tsv_format_wasm';
+
+const stack = new IgnoreStack();
+stack.push_gitignore('', 'build/\n*.log\n'); // a .gitignore (anchor '' = root)
+stack.push_tsv('', '!keep.log\n'); // a .formatignore, evaluated after the gitignores
+stack.is_ignored('build/out.js', false); // → true
+stack.is_ignored('keep.log', false); // → false (the tsv layer re-includes it)
+```
+
 ## Status
 
 v0.1 — pre-release. API may change.

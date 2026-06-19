@@ -20,6 +20,109 @@ fn err(e: impl ToString) -> JsError {
     JsError::new(&e.to_string())
 }
 
+/// Hierarchical, git-faithful matcher for tsv's discovery ignore files,
+/// wrapping `tsv_ignore::IgnoreStack`. Built up by the caller from a repo's
+/// `.gitignore` files plus the repo-root tsv file
+/// (`.formatignore`/`.prettierignore`), then queried per path — both for the raw
+/// ignore status (`is_ignored`) and for the shared `tsv_discover` discovery
+/// verdict (`classify_dir`/`should_format_file`). Exposed so the JS CLI
+/// (`npm/cli.js`) and the VS Code extension share the exact same matcher **and**
+/// prune decision as the native CLI — agreement by construction. Built only into
+/// the `format`-capable packages (`@fuzdev/tsv_format_wasm`, `@fuzdev/tsv_wasm`);
+/// the parse-only package omits it.
+#[cfg(feature = "format")]
+#[wasm_bindgen]
+pub struct IgnoreStack {
+    inner: tsv_ignore::IgnoreStack,
+}
+
+#[cfg(feature = "format")]
+#[wasm_bindgen]
+impl IgnoreStack {
+    /// An empty stack (ignores nothing until layers are added).
+    #[wasm_bindgen(constructor)]
+    #[allow(clippy::new_without_default)] // wasm-bindgen exports the constructor
+    pub fn new() -> IgnoreStack {
+        IgnoreStack {
+            inner: tsv_ignore::IgnoreStack::new(),
+        }
+    }
+
+    /// Push one directory's `.gitignore`. `anchor` is the directory relative to
+    /// the format root, `/`-separated (`""` = the root). Push shallowest-first.
+    pub fn push_gitignore(&mut self, anchor: &str, content: &str) {
+        self.inner.push_gitignore(anchor, content);
+    }
+
+    /// Pop the most recently pushed `.gitignore` layer (a traversal unwinding
+    /// out of a directory).
+    pub fn pop_gitignore(&mut self) {
+        self.inner.pop_gitignore();
+    }
+
+    /// Push one directory's tsv file, applied after every `.gitignore`. `anchor`
+    /// is the directory relative to the format root (`""` = root). The caller
+    /// resolves which file's content this is — `.formatignore` hierarchically, or
+    /// a repo-root `.prettierignore` shadowed by a repo-root `.formatignore`.
+    pub fn push_tsv(&mut self, anchor: &str, content: &str) {
+        self.inner.push_tsv(anchor, content);
+    }
+
+    /// Pop the most recently pushed tsv layer (a traversal unwinding out of a
+    /// directory).
+    pub fn pop_tsv(&mut self) {
+        self.inner.pop_tsv();
+    }
+
+    /// Whether `path` (relative to the format root, `/`-separated) is ignored;
+    /// `is_dir` marks directories so trailing-`/` patterns apply.
+    pub fn is_ignored(&self, path: &str, is_dir: bool) -> bool {
+        self.inner.is_ignored(path, is_dir)
+    }
+
+    /// The discovery verdict for one child **directory**, delegating to
+    /// `tsv_discover::classify_dir` — the safety-net / build-output-heuristic /
+    /// matcher decision shared with the native CLI. Returns `"descend"`,
+    /// `"prune"`, or `"prune_warn"`. `name` is the directory's final path
+    /// segment, `child_rel` its format-root-relative `/`-separated path, and
+    /// `heuristic_active` is true while no `.gitignore` governs this level. On
+    /// `"prune_warn"` the caller fetches the message via
+    /// [`heuristic_shadow_warning`](IgnoreStack::heuristic_shadow_warning).
+    ///
+    /// A string tag (rather than a wasm-bindgen enum or a returned struct) keeps
+    /// the package facade / `patch_npm_package.ts` unchanged and allocates no JS
+    /// object on the common descend path.
+    pub fn classify_dir(&self, name: &str, child_rel: &str, heuristic_active: bool) -> String {
+        match tsv_discover::classify_dir(name, child_rel, heuristic_active, &self.inner) {
+            tsv_discover::DirVerdict::Descend => "descend".to_string(),
+            tsv_discover::DirVerdict::Prune => "prune".to_string(),
+            tsv_discover::DirVerdict::PruneWithWarning(_) => "prune_warn".to_string(),
+        }
+    }
+
+    /// Whether a child **file** should be formatted (a formattable extension and
+    /// not ignored), delegating to `tsv_discover::should_format_file`. `name` is
+    /// the file's final path segment, `child_rel` its format-root-relative
+    /// `/`-separated path.
+    pub fn should_format_file(&self, name: &str, child_rel: &str) -> bool {
+        tsv_discover::should_format_file(name, child_rel, &self.inner)
+    }
+
+    /// The heuristic-shadow warning text for a pruned directory `dir`
+    /// (format-root relative), delegating to `tsv_discover::heuristic_shadow_warning`.
+    /// A method (not a free function) so it rides the `IgnoreStack` class
+    /// re-export through the package facade; the receiver is unused. Single source
+    /// of truth with the native CLI — the JS CLI never templates this string.
+    pub fn heuristic_shadow_warning(&self, dir: &str) -> String {
+        tsv_discover::heuristic_shadow_warning(dir)
+    }
+
+    /// Whether no layer carries any rule — callers skip per-path matching.
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+}
+
 /// Re-export every type from the bundled `./tsv_ast` declaration file
 /// so consumers of `@fuzdev/tsv_parse_wasm` can `import type { Program } from
 /// '@fuzdev/tsv_parse_wasm'` without reaching into the bundled `.d.ts`.

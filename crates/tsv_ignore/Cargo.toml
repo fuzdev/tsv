@@ -1,0 +1,13 @@
+[package]
+name = "tsv_ignore"
+version.workspace = true
+edition.workspace = true
+description = "gitignore-style path matching for tsv's file discovery (.prettierignore / .formatignore)"
+
+[dependencies]
+# zero dependencies by design — a pure, hand-rolled gitignore(5) matcher keeps
+# the format-only WASM artifact tiny (no regex/globset) and sidesteps the
+# dependency-approval gate. See CLAUDE.md.
+
+[lints]
+workspace = true

@@ -87,7 +87,23 @@ if (!has_parse_exports && has_parse) {
 	console.error(`FAIL: ${variant} variant contains parse_* exports — stale build dir?`);
 	Deno.exit(1);
 }
-console.log(`Exports: ${fns.join(', ')}`);
+
+// wasm-bindgen emits exported structs as `export class` (e.g. IgnoreStack,
+// the discovery matcher). They re-export through the facade like functions, but
+// can't take the per-call init guard — re-exported directly in browser.js.
+const classes = [...generated_js.matchAll(/^export class (\w+)/gm)].map((m) => m[1]).sort();
+
+// IgnoreStack is format-gated, so it rides the format and all variants only.
+if (has_format_exports) {
+	if (!classes.includes('IgnoreStack')) {
+		console.error(`FAIL: generated ${main_js} is missing expected export \`IgnoreStack\``);
+		Deno.exit(1);
+	}
+} else if (classes.length) {
+	console.error(`FAIL: ${variant} variant contains class exports (${classes.join(', ')}) — stale build dir?`);
+	Deno.exit(1);
+}
+console.log(`Exports: ${[...fns, ...classes].join(', ')}`);
 
 // 2. Create index.js — Node.js/Bun entry: auto-init via readFileSync + initSync.
 // WASM is initialized synchronously at import time, so no init guard needed.
@@ -96,13 +112,13 @@ const index_js = `import { readFileSync } from 'node:fs';
 import {
 	default as init,
 	initSync,
-${fns.map((f) => `\t${f},`).join('\n')}
+${[...fns, ...classes].map((f) => `\t${f},`).join('\n')}
 } from './${main_js}';
 
 const wasm = readFileSync(new URL('./${wasm_file}', import.meta.url));
 initSync({ module: wasm });
 
-export { init, initSync as init_sync, ${fns.join(', ')} };
+export { init, initSync as init_sync, ${[...fns, ...classes].join(', ')} };
 `;
 
 Deno.writeTextFileSync(`${pkg_root}/index.js`, index_js);
@@ -117,7 +133,10 @@ const browser_js = `import {
 	initSync,
 ${fns.map((f) => `\t${f} as _${f},`).join('\n')}
 } from './${main_js}';
-
+${
+	// classes re-export as-is — consumers must `await init()` before instantiating
+	classes.length ? `export { ${classes.join(', ')} } from './${main_js}';\n` : ''
+}
 let _ready = false;
 
 function _check() {
@@ -160,7 +179,7 @@ console.log(`Created ${pkg_root}/browser.js`);
 
 const ast_reexport = has_parse_exports ? `export type * from './tsv_ast';\n` : '';
 const index_dts = `${ast_reexport}export {
-${fns.map((f) => `\t${f},`).join('\n')}
+${[...fns, ...classes].map((f) => `\t${f},`).join('\n')}
 } from './${dts_file.replace(/\.d\.ts$/, '')}';
 /** Initialize the WASM module. Required in browsers before calling any other export. No-op if already initialized. */
 export declare function init(module_or_path?: {

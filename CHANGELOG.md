@@ -12,9 +12,13 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
 <!-- bump: minor -->
 
 Formatting is now non-configurable by design -
-tsv has no config that changes its formatting behavior, and none will be added.
+tsv has no config that changes its formatting style behavior, and none will be added.
 (this has no observable API changes because options had been deferred)
 
+- `tsv format` directory discovery now honors `.gitignore`,
+  `.prettierignore` (like Prettier, in the git root only),
+  and the tsv-specific `.formatignore` (nestable like gitignore)
+- `tsv format --list` prints the in-scope files without formatting
 - feat: support `format-ignore` as an alias to `prettier-ignore`
   (along with `format-ignore-start` and `format-ignore-end` for templates)
   ([#41](https://github.com/fuzdev/tsv/pull/41))

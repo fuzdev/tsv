@@ -1,7 +1,8 @@
 /// Integration tests for CLI commands — each test spawns the `tsv` binary.
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Once;
 
 /// Run the tsv binary with the given arguments.
 /// Test helper; panicking on spawn failure is the desired behavior.
@@ -46,6 +47,31 @@ fn temp_dir(name: &str) -> PathBuf {
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).expect("Failed to create temp dir");
     dir
+}
+
+static BUILD: Once = Once::new();
+
+/// Run the built `tsv` binary with `cwd` as its working directory — needed for
+/// ignore-file tests that pass a relative target like `.` (resolved against the
+/// cwd; the format root is then derived from that target, never the cwd itself),
+/// since the `cargo run` helper above always runs in the workspace root. The
+/// binary is built once on first use.
+/// Test helper; panicking on spawn/build failure is the desired behavior.
+#[allow(clippy::expect_used)]
+fn tsv_in_dir(cwd: &Path, args: &[&str]) -> std::process::Output {
+    BUILD.call_once(|| {
+        let status = Command::new("cargo")
+            .args(["build", "-p", "tsv_cli", "-q"])
+            .status()
+            .expect("Failed to build tsv_cli");
+        assert!(status.success(), "tsv_cli build failed");
+    });
+    let bin = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/debug/tsv");
+    Command::new(bin)
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .expect("Failed to execute tsv binary")
 }
 
 const UNFORMATTED_TS: &str = "const   x   =   1;\n";
@@ -671,4 +697,227 @@ fn test_format_content_with_paths_errors() {
         stderr.contains("cannot be combined"),
         "stderr should explain the conflict: {stderr}"
     );
+}
+
+/// Create a temp dir that looks like a git repo root — a `.git` marker directory
+/// is all `find_repo_root` checks for, so this turns on gitignore-aware discovery
+/// without needing a real `git` binary.
+/// Test helper; panicking on IO failure is the desired behavior.
+#[allow(clippy::unwrap_used)]
+fn git_repo(name: &str) -> PathBuf {
+    let dir = temp_dir(name);
+    fs::create_dir(dir.join(".git")).unwrap();
+    dir
+}
+
+#[test]
+fn test_format_list_is_readonly_and_exit_codes() {
+    // --list is a read-only binary contract: it prints the in-scope set, writes
+    // nothing, and exits 0 — including for an all-ignored (empty) target, unlike
+    // the format action which treats "nothing found" as a usage error (exit 2).
+    // *Which* files the ignore files admit is pinned for both CLIs by the shared
+    // table in tests/discovery_parity.rs; this only covers the --list contract.
+    let dir = git_repo("list_readonly");
+    fs::write(dir.join(".gitignore"), "build/\n").unwrap();
+    fs::create_dir_all(dir.join("build")).unwrap();
+    fs::write(dir.join("a.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("build/out.ts"), UNFORMATTED_TS).unwrap();
+
+    let listed = tsv(&["format", "--list", dir.to_str().unwrap()]);
+    assert_eq!(
+        listed.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&listed.stderr)
+    );
+    assert!(String::from_utf8_lossy(&listed.stdout).contains("a.ts"));
+    // --list never writes — the listed file is left exactly as-is
+    assert_eq!(
+        fs::read_to_string(dir.join("a.ts")).unwrap(),
+        UNFORMATTED_TS
+    );
+
+    // an all-ignored target lists nothing and still exits 0
+    let empty = tsv(&["format", "--list", dir.join("build").to_str().unwrap()]);
+    assert_eq!(
+        empty.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&empty.stderr)
+    );
+    assert!(String::from_utf8_lossy(&empty.stdout).trim().is_empty());
+}
+
+#[test]
+fn test_format_list_rejects_check_and_single_mode() {
+    // --list is path-mode and output-only: it can't combine with --check, and
+    // --content/--stdin have nothing to discover
+    let combo = tsv(&["format", "--list", "--check", "."]);
+    assert_eq!(combo.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&combo.stderr).contains("--list and --check"),
+        "stderr: {}",
+        String::from_utf8_lossy(&combo.stderr)
+    );
+
+    let single = tsv(&[
+        "format",
+        "--list",
+        "--content",
+        "const x=1",
+        "--parser",
+        "typescript",
+    ]);
+    assert_eq!(single.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&single.stderr).contains("--list applies to file paths"),
+        "stderr: {}",
+        String::from_utf8_lossy(&single.stderr)
+    );
+}
+
+#[test]
+fn test_format_heuristic_shadow_warns_for_anchored_negation() {
+    // #5 diagnostic: with no `.gitignore` (heuristic regime), a `.formatignore`
+    // `!build/keep.ts` is a silent no-op — the heuristic prunes `build/` before
+    // descending, and git's parent-dir rule bars re-including a file under an
+    // excluded dir. Behavior is unchanged (build/ stays pruned); we only warn,
+    // pointing at the dir-level escape. Fires in `--list` too.
+    let dir = temp_dir("heuristic_shadow_warn");
+    fs::create_dir_all(dir.join("build")).unwrap();
+    fs::write(dir.join(".formatignore"), "!build/keep.ts\n").unwrap();
+    fs::write(dir.join("a.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("build/keep.ts"), UNFORMATTED_TS).unwrap();
+
+    let output = tsv(&["format", "--list", dir.to_str().unwrap()]);
+    // warning is non-fatal: exit code stays 0, stdout (the --list set) stays clean
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("a.ts"), "stdout: {stdout}");
+    // build/ is still pruned — the re-include did NOT take effect
+    assert!(!stdout.contains("keep.ts"), "build/ still pruned: {stdout}");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("warning:"), "stderr: {stderr}");
+    // names the pruned dir + the heuristic, and points at the dir-level escape.
+    // (the dir is named format-root-relative, so outside a repo it carries the
+    // path from the filesystem root — assert on the stable phrasing, not `!build/`)
+    assert!(
+        stderr.contains("build is skipped by tsv's build-output heuristic"),
+        "stderr: {stderr}"
+    );
+    assert!(
+        stderr.contains("re-include the directory itself"),
+        "stderr: {stderr}"
+    );
+}
+
+#[test]
+fn test_format_heuristic_shadow_no_warning_for_floating_or_dir_reinclude() {
+    // a *floating* `!keep.ts` targets any depth, not `build/` specifically, so it
+    // must NOT warn just because a keep.ts sits under a pruned build/
+    let dir = temp_dir("heuristic_shadow_floating");
+    fs::create_dir_all(dir.join("build")).unwrap();
+    fs::write(dir.join(".formatignore"), "!keep.ts\n").unwrap();
+    fs::write(dir.join("a.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("build/keep.ts"), UNFORMATTED_TS).unwrap();
+
+    let output = tsv(&["format", "--list", dir.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stderr.contains("warning:"), "floating: {stderr}");
+    // build/ is still pruned (the floating `!` doesn't re-include the dir)
+    assert!(
+        !String::from_utf8_lossy(&output.stdout).contains("keep.ts"),
+        "stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+
+    // the dir-level escape `!build/` re-includes build/ — no prune, no warning,
+    // and the file is now in scope
+    let dir = temp_dir("heuristic_shadow_dir_reinclude");
+    fs::create_dir_all(dir.join("build")).unwrap();
+    fs::write(dir.join(".formatignore"), "!build/\n").unwrap();
+    fs::write(dir.join("build/keep.ts"), UNFORMATTED_TS).unwrap();
+
+    let output = tsv(&["format", "--list", dir.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stderr.contains("warning:"), "dir-reinclude: {stderr}");
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("keep.ts"),
+        "build/ formatted: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
+
+#[test]
+fn test_format_heuristic_shadow_silent_with_gitignore() {
+    // with a `.gitignore` present the heuristic is OFF, so build/ is governed by
+    // git rules, not the heuristic — `!build/keep.ts` is no longer shadowed by a
+    // heuristic prune, so there is nothing to warn about.
+    let dir = git_repo("heuristic_shadow_gitignore");
+    fs::create_dir_all(dir.join("build")).unwrap();
+    // an unrelated .gitignore turns the heuristic off (presence is the signal)
+    fs::write(dir.join(".gitignore"), "node_modules/\n").unwrap();
+    fs::write(dir.join(".formatignore"), "!build/keep.ts\n").unwrap();
+    fs::write(dir.join("build/keep.ts"), UNFORMATTED_TS).unwrap();
+
+    let output = tsv(&["format", "--list", dir.to_str().unwrap()]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stderr.contains("warning:"), "gitignore regime: {stderr}");
+    // heuristic off → build/ is formatted (the file is in scope)
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("keep.ts"),
+        "stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
+
+#[test]
+fn test_format_target_scope_is_cwd_independent() {
+    // #4: a non-git project's own `.formatignore` is honored whether you cd
+    // into it or name it by path from an unrelated cwd — the format root is the
+    // filesystem root, derived from the target, never the cwd. (`.prettierignore`
+    // is repo-only, so the native `.formatignore` is what governs loose files.)
+    // `gen/` is not a heuristic dir, so the ignore file is the only thing that
+    // can skip it.
+    let base = temp_dir("scope_cwd_indep");
+    let proj = base.join("proj");
+    let other = base.join("other");
+    fs::create_dir_all(proj.join("gen")).unwrap();
+    fs::create_dir_all(&other).unwrap();
+    fs::write(proj.join(".formatignore"), "gen/\n").unwrap();
+    fs::write(proj.join("src.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(proj.join("gen/out.ts"), UNFORMATTED_TS).unwrap();
+
+    // (a) cd into proj and list "."; (b) from a sibling cwd, list proj by path
+    let from_inside = tsv_in_dir(&proj, &["format", "--list", "."]);
+    let from_outside = tsv_in_dir(&other, &["format", "--list", proj.to_str().unwrap()]);
+
+    for (label, out) in [("inside", &from_inside), ("outside", &from_outside)] {
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "{label} stderr: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        assert!(stdout.contains("src.ts"), "{label}: src.ts is in scope");
+        assert!(
+            !stdout.contains("out.ts"),
+            "{label}: gen/ honored regardless of cwd"
+        );
+    }
 }

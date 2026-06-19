@@ -35,6 +35,48 @@ measurably slower.
 forward the wire format (disk, network, another tool) without paying
 `JSON.parse` for an object they don't need.
 
+## Discovery Matcher + Policy (`IgnoreStack`)
+
+The `format` feature exports an `IgnoreStack` class wrapping
+`tsv_ignore::IgnoreStack` — tsv's hierarchical, git-faithful matcher — plus the
+`tsv_discover` discovery *policy* layered on it (the build-output heuristic +
+safety-net pruning). It rides the format-capable packages
+(`@fuzdev/tsv_format_wasm`, `@fuzdev/tsv_wasm`) and is absent from the parse-only
+package; `tsv_ignore` **and** `tsv_discover` are **optional** deps pulled in by
+`format`. This gives the JS CLI (`npm/cli.js`) and the VS Code extension the exact
+same matcher *and* prune decision as the native CLI, so all three agree by
+construction. The caller builds it up: `new IgnoreStack()`, then
+`push_gitignore(anchor, content)` per discovered `.gitignore` and
+`push_tsv(anchor, content)` per discovered `.formatignore` (both shallowest-first;
+`pop_gitignore()`/`pop_tsv()` to unwind a DFS — tsv layers are hierarchical),
+then queries:
+
+- `classify_dir(name, child_rel, heuristic_active) -> 'descend' | 'prune' |
+  'prune_warn'` — the shared per-directory verdict (`tsv_discover::classify_dir`:
+  safety nets, the build-output heuristic, the matcher). On `'prune_warn'` fetch
+  the message via `heuristic_shadow_warning(dir)`.
+- `should_format_file(name, child_rel) -> bool` — the per-file verdict (a
+  formattable extension and not ignored).
+- `heuristic_shadow_warning(dir) -> string` — the one warning template (a method,
+  not a free function, so it rides the class re-export; single source of truth
+  with the native CLI, never re-templated in JS).
+- `is_ignored(path, is_dir)` / `is_empty()` — the raw matcher primitives, still
+  exposed for direct consumers.
+
+The string-tag return for `classify_dir` (rather than a wasm-bindgen enum or a
+returned struct) needs no `patch_npm_package.ts` change and allocates no JS object
+on the common descend path. The earlier `is_reincluded` / `has_negation_under`
+primitives are now folded inside `classify_dir`, so they're no longer exported
+across the WASM boundary (they stay public on the Rust `tsv_ignore::IgnoreStack`) —
+JS callers consume the verdict instead of re-deriving the prune decision.
+
+Unlike the parse exports, the class is emitted as `export class` (not
+`export function`); `scripts/patch_npm_package.ts` detects `export class` and
+re-exports it through the package facade alongside the functions, and
+`scripts/validate_artifacts.ts` smoke-tests it (present in format/all, absent in
+parse-only). The wasm-bindgen-generated `tsv_wasm.d.ts` declares the class, so no
+`tsv_ast.d.ts` entry is needed.
+
 ## TS Type Maintenance
 
 `types/tsv_ast.d.ts` is **hand-maintained**. Any change to `pub` fields,

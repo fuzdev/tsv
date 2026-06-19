@@ -4,7 +4,7 @@
 
 High-performance Rust parser as a drop-in replacement for Svelte's modern parser (acorn + acorn-typescript), paired with a formatter that took Prettier as its initial guide and still tracks it for the common case — while making deliberate, cataloged choices to diverge where tsv's own judgment is more defensible.
 
-**Non-configurable by design**: formatting options are fixed at Prettier's defaults except printWidth=100, useTabs=true, singleQuote=true, and bracketSpacing=false — no config files, CLI flags, or runtime options, ever (opinionated like `gofmt` and Black). See [Configuration](#configuration).
+**Non-configurable by design**: formatting options are fixed at Prettier's defaults except printWidth=100, useTabs=true, singleQuote=true, and bracketSpacing=false — no config files, CLI flags, or runtime options, ever (opinionated like `gofmt` and Black). The one carve-out is file *scope*, not style: `tsv format` honors `.gitignore` (hierarchically, in a git tree) plus a repo-root `.formatignore` / `.prettierignore`. See [Configuration](#configuration).
 
 ## Committing
 
@@ -126,7 +126,7 @@ cargo install cargo-watch  # optional, for `deno task dev`
 
 Parser auto-detected from extension (`.ts`/`.svelte`/`.css`). `--content` and `--stdin` modes require `--parser svelte|typescript|css`.
 
-`format` writes paths **in place** (only when output differs) and prints changed paths to stdout; `--content`/`--stdin` print formatted source to stdout. Directories recurse over `.ts`/`.svelte`/`.css`, skipping hidden directories (`.git`, `.svelte-kit`, …) and `node_modules`/`dist`/`build`/`target`. Files format in parallel (`--jobs N` overrides the thread count; path mode only). Exit codes: 0 clean, 1 would-change (`--check`, which also works with `--content`/`--stdin`), 2 errors; missing path args fail the run upfront, while per-file and traversal errors report and continue.
+`format` writes paths **in place** (only when output differs) and prints changed paths to stdout; `--content`/`--stdin` print formatted source to stdout. Directories recurse over `.ts`/`.svelte`/`.css`, honoring `.gitignore`/`.formatignore`/`.prettierignore` and always skipping the safety nets (`.git`, `node_modules`, `.hg`/`.svn`/`.jj`); an explicitly named file argument bypasses the ignore files. Discovery is gitignore-aware and reproducible, scoped to a cwd-independent **format root** (the repo root in a git tree, else the filesystem root) — see [Configuration](#configuration) for the full two-regime rules. `--list` prints the discovered in-scope files (one per line) without formatting — a read-only view of what `format` would touch (path mode only; an empty scope still exits 0). Files format in parallel (`--jobs N` overrides the thread count; path mode only). Exit codes: 0 clean, 1 would-change (`--check`, which also works with `--content`/`--stdin`), 2 errors; missing path args fail the run upfront, while per-file and traversal errors report and continue.
 
 ```bash
 cargo run -p tsv_cli parse file.ts                                       # compact JSON
@@ -135,6 +135,7 @@ cargo run -p tsv_cli parse --content '<div>x</div>' --parser svelte      # parse
 cargo run -p tsv_cli parse --stdin --parser svelte                       # parse stdin (not preferred for agents)
 cargo run -p tsv_cli format file.svelte src/lib                          # format files/dirs in place
 cargo run -p tsv_cli format --check src/lib                              # list would-change files, exit 1 (CI)
+cargo run -p tsv_cli format --list src/lib                               # list in-scope files (no formatting)
 cargo run -p tsv_cli format --content '<div>x</div>' --parser svelte     # format string to stdout
 ```
 
@@ -318,6 +319,19 @@ See ./docs/performance.md.
 
 **Non-configurable by design.** Formatting options are fixed at Prettier's defaults, except where noted below, and cannot be changed — there are no config files, CLI flags, or runtime options, and none are planned. tsv is opinionated like `gofmt` and Black: one canonical style, always. A narrower user-facing option set may be revisited far down the road, but the 0.x contract is no configuration at all.
 
+**The one carve-out is file *scope*, not style.** `tsv format`'s directory discovery is gitignore-aware, with two regimes keyed on `.git`. The **format root** (the scope boundary, derived from the argument — the cwd never participates) is, **inside a git repo**, the repo root: a hard stop where the upward walk ends, so nothing above the repo is read and `tsv format --check` is reproducible across machines (when the ignore files are committed — a local/uncommitted `.formatignore`/`.prettierignore`, or git's unread `.git/info/exclude` / `core.excludesFile`, makes a clean CI checkout disagree). **Outside a git repo**, it's the filesystem root.
+
+Inside a repo, discovery honors, relative to the repo root:
+
+- **`.gitignore`**, hierarchically and repo-rooted exactly like git ([gitignore(5) syntax](https://git-scm.com/docs/gitignore#_pattern_format); matched against `git check-ignore` on case-sensitive filesystems);
+- **`.formatignore`** (tsv's native file), **hierarchically** — one per directory from the repo root down, deeper wins — applied after `.gitignore`, so its `!` can re-include a gitignore'd path (subject to git's parent-directory rule);
+- a single repo-root **`.prettierignore`** (drop-in compat; a repo-root `.formatignore` shadows it), never hierarchical;
+- always-skipped **safety nets**: `.git`, `node_modules`, `.hg`, `.svn`, `.jj`.
+
+Outside a repo, `.gitignore` and `.prettierignore` are **not read** (matching git, which honors `.gitignore` only in a worktree); `.formatignore` is honored hierarchically from the filesystem root down, so a `~/.formatignore` acts as global config for loose files. Because the boundary is derived by walking up, the repo-root ignore files apply even from a subdirectory invocation, and formatting a subdirectory directly gives the same result as formatting it via an ancestor.
+
+When a `.gitignore` is in scope it is authoritative and the built-in **heuristic is off**; with no `.gitignore` (outside a repo, or a repo without one) the heuristic — hidden directories plus `dist`/`build`/`target` — is the fallback "not source" guess, except that an explicit tsv-layer `!` re-include overrides it. This is *only* about which files are reformatted, never how any file is formatted; it does not reopen style configuration. An explicitly named file argument is always formatted (the ignore files govern directory discovery). The matcher lives in the `tsv_ignore` crate (`IgnoreStack`); the per-directory prune *decision* layered on it (build-output heuristic, safety nets, the heuristic-shadow warning) lives in the `tsv_discover` crate. Both are shared with the JS CLI and the VS Code extension via the `IgnoreStack` WASM export (the matcher as the class, the policy as its `classify_dir`/`should_format_file`/`heuristic_shadow_warning` methods) — so all three surfaces agree by construction, not by hand-mirrored logic.
+
 The table lists the settings that diverge from Prettier's defaults; everything else (e.g. tabWidth=2) matches Prettier.
 
 | Setting          | Value | Notes                                       |
@@ -354,6 +368,8 @@ tsv/
 ├── crates/
 │   ├── tsv_lang/    # Foundation (span, location, error, doc builder, printing utils)
 │   ├── tsv_html/    # HTML element classification and whitespace rules
+│   ├── tsv_ignore/  # gitignore-aware matcher: hierarchical .gitignore + .formatignore/.prettierignore
+│   ├── tsv_discover/# file-discovery policy (build-output heuristic + safety nets) over tsv_ignore
 │   ├── tsv_ts/      # TypeScript: parse(), format(), convert_ast()
 │   ├── tsv_css/     # CSS: parse(), format(), convert_ast()
 │   ├── tsv_svelte/  # Svelte: parse(), format(), convert_ast()
