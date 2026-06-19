@@ -2,19 +2,23 @@ use std::collections::HashSet;
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
-use tsv_discover::{DirVerdict, classify_dir, should_format_file};
+use tsv_discover::{
+    DirVerdict, classify_dir, prettierignore_outside_repo_warning, should_format_file,
+};
 use tsv_ignore::IgnoreStack;
 
 /// tsv's native ignore file, discovered hierarchically (one per directory, in a
 /// repo from the repo root down, outside a repo from the filesystem root down).
 const FORMATIGNORE_FILE: &str = ".formatignore";
 
-/// The repo-root-only tsv files, in precedence order: a repo-root `.formatignore`
-/// (tsv's native name), used alone when present so tsv can be scoped independently
-/// of prettier; otherwise a repo-root `.prettierignore` for drop-in compatibility.
-/// Only consulted at the repo root — `.prettierignore` is never hierarchical, and
-/// neither is read outside a git repo (use `.formatignore`).
-const TSV_ROOT_FILES: [&str; 2] = [".formatignore", ".prettierignore"];
+/// Prettier's ignore file — read only at the repo root for drop-in compat, and
+/// **shadowed by presence** of a repo-root `.formatignore`: when both exist the
+/// `.formatignore` is used alone, even if it's present-but-unreadable (so a read
+/// error can't silently demote tsv's native file to prettier's — see
+/// [`read_ignore_file`]). Never hierarchical, and never read outside a git repo —
+/// there a target-root `.prettierignore` triggers a heads-up warning instead (see
+/// [`prettierignore_outside_repo_warning`]).
+const PRETTIERIGNORE_FILE: &str = ".prettierignore";
 
 /// The git ignore file, discovered hierarchically (one per directory) and only
 /// inside a git repo — matching git, which honors `.gitignore` only in a worktree.
@@ -28,8 +32,12 @@ pub struct Discovered {
     /// `path: detail` messages — reported by the caller, counted as errors.
     pub errors: Vec<String>,
     /// Non-fatal diagnostics — reported to stderr by the caller but **not**
-    /// counted as errors (no effect on the exit code or stdout). Currently the
-    /// heuristic-shadow warning (see [`tsv_discover::heuristic_shadow_warning`]).
+    /// counted as errors (no effect on the exit code or stdout): the
+    /// heuristic-shadow warning ([`tsv_discover::heuristic_shadow_warning`]), the
+    /// `.prettierignore`-outside-a-repo warning
+    /// ([`prettierignore_outside_repo_warning`]), and the unreadable-ignore-file
+    /// warning (a present `.gitignore`/`.formatignore`/`.prettierignore` whose read
+    /// failed; see [`read_ignore_file`]).
     pub warnings: Vec<String>,
 }
 
@@ -63,7 +71,10 @@ pub struct Discovered {
 ///   `.gitignore` is not consulted at all (as git itself does), and
 ///   `.formatignore` is honored hierarchically from the filesystem root down — so
 ///   a `~/.formatignore` is global config for loose files. `.prettierignore` is
-///   repo-only and not read here.
+///   repo-only and not read here — but a `.prettierignore` in the **target root**
+///   raises a non-fatal heads-up (rename it to `.formatignore`, or `git init`),
+///   since prettier would have honored it
+///   ([`prettierignore_outside_repo_warning`]).
 ///
 /// `.formatignore` is hierarchical (a file in any directory governs its subtree,
 /// deeper wins); `.prettierignore` is single and repo-root-only. The
@@ -174,17 +185,31 @@ fn collect_root(root: &Path, cwd: &Path, out: &mut Discovered) {
     for ancestor in &chain[..chain.len() - 1] {
         let anchor = rel_to(&format_root, ancestor);
         // tsv layer: `.formatignore` everywhere; at the repo root only, a
-        // `.prettierignore` it shadows (drop-in compat, never hierarchical)
+        // `.prettierignore` it shadows (drop-in compat, never hierarchical). No
+        // listing for ancestors, so the read outcome stands in for presence: a
+        // present-but-unreadable `.formatignore` (`Unreadable`, warned) shadows
+        // `.prettierignore` just as in the listed case — only a genuinely `Absent`
+        // one falls through.
         let tsv_content = if in_repo && anchor.is_empty() {
-            read_first(ancestor, &TSV_ROOT_FILES)
+            match read_ignore_file(&ancestor.join(FORMATIGNORE_FILE), &mut out.warnings) {
+                IgnoreRead::Content(content) => Some(content),
+                IgnoreRead::Unreadable => None,
+                IgnoreRead::Absent => {
+                    read_ignore_file(&ancestor.join(PRETTIERIGNORE_FILE), &mut out.warnings)
+                        .content()
+                }
+            }
         } else {
-            read_optional(&ancestor.join(FORMATIGNORE_FILE))
+            read_ignore_file(&ancestor.join(FORMATIGNORE_FILE), &mut out.warnings).content()
         };
         if let Some(content) = tsv_content {
             stack.push_tsv(&anchor, &content);
         }
         // `.gitignore` layer: only inside a git repo
-        if in_repo && let Some(content) = read_optional(&ancestor.join(GITIGNORE_FILE)) {
+        if in_repo
+            && let IgnoreRead::Content(content) =
+                read_ignore_file(&ancestor.join(GITIGNORE_FILE), &mut out.warnings)
+        {
             stack.push_gitignore(&anchor, &content);
             heuristic_active = false;
         }
@@ -202,7 +227,15 @@ fn collect_root(root: &Path, cwd: &Path, out: &mut Discovered) {
         return;
     }
 
-    collect_recursive(root, &base_rel, in_repo, &mut stack, heuristic_active, out);
+    collect_recursive(
+        root,
+        &base_rel,
+        true,
+        in_repo,
+        &mut stack,
+        heuristic_active,
+        out,
+    );
 }
 
 fn collect_recursive(
@@ -210,6 +243,10 @@ fn collect_recursive(
     // `dir` relative to the format root, `/`-joined (`""` = the format root).
     // Child paths extend it without re-deriving from disk.
     dir_rel: &str,
+    // true only for the directory tsv was pointed at (the root of this walk),
+    // false for every descendant — gates the target-root-only
+    // `.prettierignore`-outside-a-repo warning.
+    is_target_root: bool,
     // whether the format root is a git repo — `.gitignore` is read only then.
     in_repo: bool,
     stack: &mut IgnoreStack,
@@ -246,43 +283,70 @@ fn collect_recursive(
         }
     }
 
-    // read THIS dir's own ignore files, opening only those the listing contains
-    let present = |name: &str| {
-        entries
-            .iter()
-            .any(|(_, n)| n.as_os_str() == OsStr::new(name))
-    };
-    // tsv layer: at the repo root only, `.formatignore` shadows `.prettierignore`;
-    // every other level (and outside a repo) uses `.formatignore`
-    let tsv_content = if in_repo && dir_rel.is_empty() {
-        TSV_ROOT_FILES
-            .iter()
-            .copied()
-            .filter(|name| present(name))
-            .find_map(|name| read_optional(&dir.join(name)))
-    } else if present(FORMATIGNORE_FILE) {
-        read_optional(&dir.join(FORMATIGNORE_FILE))
+    // Single pass over the listing for the ignore-file presence flags this dir
+    // needs, rather than a linear scan per name. `read_dir` order is arbitrary
+    // (not sorted), so there's nothing to short-circuit on; one pass bounds the
+    // cost on a large directory regardless of how many names we check. An ignore
+    // file's *content* is still opened only when present (below), so an
+    // ignore-file-free dir costs zero speculative opens.
+    let (mut has_formatignore, mut has_prettierignore, mut has_gitignore) = (false, false, false);
+    for (_, name) in &entries {
+        let n = name.as_os_str();
+        if n == OsStr::new(FORMATIGNORE_FILE) {
+            has_formatignore = true;
+        } else if n == OsStr::new(PRETTIERIGNORE_FILE) {
+            has_prettierignore = true;
+        } else if in_repo && n == OsStr::new(GITIGNORE_FILE) {
+            has_gitignore = true;
+        }
+    }
+    // tsv layer: `.formatignore` whenever present (every level, in or out of a
+    // repo); at the repo root only, a `.prettierignore` is the drop-in fallback,
+    // used solely when no `.formatignore` is *present*. Precedence is by presence
+    // (the listing), not readability — a present-but-unreadable `.formatignore`
+    // still shadows: `read_ignore_file` warns and yields no rules rather than
+    // silently falling through to `.prettierignore`.
+    let tsv_content = if has_formatignore {
+        read_ignore_file(&dir.join(FORMATIGNORE_FILE), &mut out.warnings).content()
+    } else if in_repo && dir_rel.is_empty() && has_prettierignore {
+        read_ignore_file(&dir.join(PRETTIERIGNORE_FILE), &mut out.warnings).content()
     } else {
         None
     };
-    let tsv_pushed = match tsv_content {
-        Some(content) => {
-            stack.push_tsv(dir_rel, &content);
-            true
-        }
-        None => false,
+    let tsv_pushed = if let Some(content) = tsv_content {
+        stack.push_tsv(dir_rel, &content);
+        true
+    } else {
+        false
     };
-    // `.gitignore` layer: only inside a repo; it turns the heuristic off for this
-    // dir's children
-    let git_pushed = in_repo
-        && present(GITIGNORE_FILE)
-        && match read_optional(&dir.join(GITIGNORE_FILE)) {
-            Some(content) => {
-                stack.push_gitignore(dir_rel, &content);
-                true
-            }
-            None => false,
-        };
+    // outside a git repo a target-root `.prettierignore` is silently skipped (tsv
+    // reads `.formatignore` there) — warn, from the listing already in hand (no
+    // extra stat), pointing at the rename / `git init` fixes. Bounded to the
+    // target root: a nested `.prettierignore` is unread by prettier too, and an
+    // ancestor of a subdir target has no boundary to anchor on outside a repo.
+    if is_target_root
+        && let Some(warning) = prettierignore_outside_repo_warning(
+            &dir.to_string_lossy(),
+            in_repo,
+            has_prettierignore,
+            has_formatignore,
+        )
+    {
+        out.warnings.push(warning);
+    }
+    // `.gitignore` layer: only inside a repo (`has_gitignore` implies `in_repo`);
+    // it turns the heuristic off for this dir's children. A present-but-unreadable
+    // `.gitignore` warns (inside `read_ignore_file`) and is *not* pushed — so the
+    // heuristic stays on for this subtree, which the warning makes visible.
+    let git_pushed = if has_gitignore
+        && let IgnoreRead::Content(content) =
+            read_ignore_file(&dir.join(GITIGNORE_FILE), &mut out.warnings)
+    {
+        stack.push_gitignore(dir_rel, &content);
+        true
+    } else {
+        false
+    };
     let child_heuristic = heuristic_active && !git_pushed;
 
     for (entry, name) in &entries {
@@ -321,6 +385,7 @@ fn collect_recursive(
             collect_recursive(
                 &entry.path(),
                 &child_rel,
+                false,
                 in_repo,
                 stack,
                 child_heuristic,
@@ -433,13 +498,48 @@ fn path_to_rel(path: &Path) -> String {
         .join("/")
 }
 
-/// Reads `dir/<name>` for the first readable `name`, or `None` if none exist —
-/// the `.formatignore`-shadows-`.prettierignore` resolution.
-fn read_first(dir: &Path, names: &[&str]) -> Option<String> {
-    names.iter().find_map(|name| read_optional(&dir.join(name)))
+/// The outcome of reading an ignore file the walk is about to consult.
+enum IgnoreRead {
+    /// Read succeeded.
+    Content(String),
+    /// Not there — nothing to apply, silently (genuinely absent, or deleted
+    /// between the directory listing and this read).
+    Absent,
+    /// Present but unreadable (invalid UTF-8, permissions, …). A non-fatal
+    /// warning was pushed and the rules are dropped. Distinct from `Absent` so a
+    /// precedence decision (`.formatignore` shadowing `.prettierignore`) doesn't
+    /// fall through to a lower-precedence file on a mere read error.
+    Unreadable,
 }
 
-/// Reads a file to a string, mapping any IO error (absent, unreadable) to `None`.
-fn read_optional(path: &Path) -> Option<String> {
-    fs::read_to_string(path).ok()
+impl IgnoreRead {
+    /// The content if the read succeeded, else `None` (any warning was already
+    /// pushed). For callers that don't distinguish `Absent` from `Unreadable`.
+    fn content(self) -> Option<String> {
+        match self {
+            IgnoreRead::Content(c) => Some(c),
+            IgnoreRead::Absent | IgnoreRead::Unreadable => None,
+        }
+    }
+}
+
+/// Read an ignore file, classifying the outcome so the walk can both surface a
+/// silently-dropped file and keep precedence by *presence*. A `NotFound` error is
+/// `Absent` (genuinely missing, or raced away after the listing — not the user's
+/// problem, no warning). Any other error (invalid UTF-8 — `read_to_string` is
+/// strict — permissions, …) pushes a non-fatal warning to `warnings` (the file is
+/// there but its rules won't apply, the exact silent footgun this surfaces) and
+/// yields `Unreadable`. Mirrors the JS `read_ignore_file`.
+fn read_ignore_file(path: &Path, warnings: &mut Vec<String>) -> IgnoreRead {
+    match fs::read_to_string(path) {
+        Ok(content) => IgnoreRead::Content(content),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => IgnoreRead::Absent,
+        Err(e) => {
+            warnings.push(format!(
+                "could not read {} ({e}); its ignore rules are not applied",
+                path.display()
+            ));
+            IgnoreRead::Unreadable
+        }
+    }
 }

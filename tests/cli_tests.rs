@@ -886,6 +886,194 @@ fn test_format_heuristic_shadow_silent_with_gitignore() {
 }
 
 #[test]
+fn test_format_prettierignore_outside_repo_warns() {
+    // issue #1 footgun: outside a git repo tsv reads `.formatignore` but not
+    // `.prettierignore`, so a prettier user's `.prettierignore` is silently
+    // skipped. Discovery is unchanged (the would-be-ignored file stays in scope),
+    // but we DO warn, pointing at the rename / `git init` fixes. Fires in `--list`.
+    let dir = temp_dir("prettierignore_outside_repo_warns");
+    fs::write(dir.join(".prettierignore"), "ignored.ts\n").unwrap();
+    fs::write(dir.join("ignored.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("keep.ts"), UNFORMATTED_TS).unwrap();
+
+    let output = tsv(&["format", "--list", dir.to_str().unwrap()]);
+    // warning is non-fatal: exit code stays 0, stdout (the --list set) is unchanged
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // `.prettierignore` is NOT honored outside a repo → both files stay in scope
+    assert!(stdout.contains("ignored.ts"), "not honored: {stdout}");
+    assert!(stdout.contains("keep.ts"), "stdout: {stdout}");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("warning:"), "stderr: {stderr}");
+    assert!(
+        stderr.contains(".prettierignore in") && stderr.contains("is not read outside a git repo"),
+        "stderr: {stderr}"
+    );
+    assert!(
+        stderr.contains("rename it to .formatignore"),
+        "stderr: {stderr}"
+    );
+}
+
+#[test]
+fn test_format_prettierignore_outside_repo_no_warn_with_formatignore() {
+    // a sibling `.formatignore` means the native file was adopted, so the
+    // `.prettierignore` is vestigial — no warning. And `.formatignore` IS honored.
+    let dir = temp_dir("prettierignore_outside_repo_formatignore");
+    fs::write(dir.join(".prettierignore"), "p.ts\n").unwrap();
+    fs::write(dir.join(".formatignore"), "f.ts\n").unwrap();
+    fs::write(dir.join("p.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("f.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("keep.ts"), UNFORMATTED_TS).unwrap();
+
+    let output = tsv(&["format", "--list", dir.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stderr.contains("warning:"), "suppressed: {stderr}");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // `.formatignore` honored (f.ts pruned); `.prettierignore` still unread (p.ts kept)
+    assert!(!stdout.contains("f.ts"), "formatignore honored: {stdout}");
+    assert!(stdout.contains("p.ts"), "prettierignore unread: {stdout}");
+    assert!(stdout.contains("keep.ts"), "stdout: {stdout}");
+}
+
+#[test]
+fn test_format_prettierignore_in_repo_no_warn() {
+    // inside a repo the repo-root `.prettierignore` IS read (drop-in compat) and
+    // honored, so there is nothing to warn about.
+    let dir = git_repo("prettierignore_in_repo_no_warn");
+    fs::write(dir.join(".prettierignore"), "ignored.ts\n").unwrap();
+    fs::write(dir.join("ignored.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("keep.ts"), UNFORMATTED_TS).unwrap();
+
+    let output = tsv(&["format", "--list", dir.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stderr.contains("warning:"), "in repo: {stderr}");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // honored: ignored.ts pruned, keep.ts in scope
+    assert!(!stdout.contains("ignored.ts"), "honored: {stdout}");
+    assert!(stdout.contains("keep.ts"), "stdout: {stdout}");
+}
+
+#[test]
+fn test_format_nested_prettierignore_outside_repo_does_not_warn() {
+    // the warning is bounded to the TARGET ROOT: a `.prettierignore` nested in a
+    // subdirectory is not read by prettier either, so it's no divergence — no
+    // warning (and tsv doesn't honor it).
+    let dir = temp_dir("nested_prettierignore_outside_repo");
+    fs::create_dir_all(dir.join("sub")).unwrap();
+    fs::write(dir.join("sub/.prettierignore"), "x.ts\n").unwrap();
+    fs::write(dir.join("sub/x.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("keep.ts"), UNFORMATTED_TS).unwrap();
+
+    let output = tsv(&["format", "--list", dir.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stderr.contains("warning:"), "nested: {stderr}");
+    // nested `.prettierignore` is not honored → sub/x.ts still in scope
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("x.ts"),
+        "stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
+
+#[test]
+fn test_format_unreadable_formatignore_warns_and_drops_rules() {
+    // a present `.formatignore` that can't be read (here invalid UTF-8 — the most
+    // likely real trigger) is no longer silently treated as absent: tsv warns and
+    // drops its rules (the file it would have ignored stays in scope), rather than
+    // silently formatting an excluded file.
+    let dir = temp_dir("unreadable_formatignore");
+    // a valid pattern line then invalid UTF-8 bytes → strict read_to_string fails
+    fs::write(dir.join(".formatignore"), b"ignored.ts\n\xff\xfe").unwrap();
+    fs::write(dir.join("ignored.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("keep.ts"), UNFORMATTED_TS).unwrap();
+
+    let output = tsv(&["format", "--list", dir.to_str().unwrap()]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("warning:"), "stderr: {stderr}");
+    assert!(
+        stderr.contains("could not read")
+            && stderr.contains(".formatignore")
+            && stderr.contains("ignore rules are not applied"),
+        "stderr: {stderr}"
+    );
+    // rules dropped → the would-be-ignored file is still in scope
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("ignored.ts"), "rules dropped: {stdout}");
+    assert!(stdout.contains("keep.ts"), "stdout: {stdout}");
+}
+
+#[test]
+fn test_format_unreadable_gitignore_warns_and_keeps_heuristic_on() {
+    // the consequential case: a present `.gitignore` normally turns the
+    // build-output heuristic OFF (so `build/` would be formatted). If it's
+    // unreadable, tsv warns and does NOT push it — the heuristic stays ON and
+    // `build/` is pruned. The warning makes that otherwise-silent swing visible.
+    let dir = git_repo("unreadable_gitignore");
+    fs::write(dir.join(".gitignore"), b"\xff\xfe\xfa").unwrap();
+    fs::create_dir_all(dir.join("build")).unwrap();
+    fs::write(dir.join("build/keep.ts"), UNFORMATTED_TS).unwrap();
+    fs::create_dir_all(dir.join("src")).unwrap();
+    fs::write(dir.join("src/app.ts"), UNFORMATTED_TS).unwrap();
+
+    let output = tsv(&["format", "--list", dir.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("could not read") && stderr.contains(".gitignore"),
+        "stderr: {stderr}"
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // heuristic stayed on (unreadable .gitignore not pushed) → build/ pruned
+    assert!(!stdout.contains("keep.ts"), "build pruned: {stdout}");
+    // normal source still discovered
+    assert!(stdout.contains("app.ts"), "stdout: {stdout}");
+}
+
+#[test]
+fn test_format_unreadable_formatignore_still_shadows_prettierignore() {
+    // Decision: precedence is by PRESENCE, not readability. At the repo root a
+    // present-but-unreadable `.formatignore` still shadows `.prettierignore` — tsv
+    // warns and applies *no* tsv rules, rather than silently falling back to
+    // prettier's file. So `.prettierignore`'s pattern must NOT take effect.
+    let dir = git_repo("unreadable_formatignore_shadows");
+    fs::write(dir.join(".formatignore"), b"\xff\xfe").unwrap(); // present, unreadable
+    fs::write(dir.join(".prettierignore"), "p_ignored.ts\n").unwrap(); // would prune, if read
+    fs::write(dir.join("p_ignored.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("keep.ts"), UNFORMATTED_TS).unwrap();
+
+    let output = tsv(&["format", "--list", dir.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("could not read") && stderr.contains(".formatignore"),
+        "stderr: {stderr}"
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // no fallback: `.prettierignore` was not read, so p_ignored.ts stays in scope
+    assert!(
+        stdout.contains("p_ignored.ts"),
+        "no fallback to prettierignore: {stdout}"
+    );
+    assert!(stdout.contains("keep.ts"), "stdout: {stdout}");
+}
+
+#[test]
 fn test_format_target_scope_is_cwd_independent() {
     // #4: a non-git project's own `.formatignore` is honored whether you cd
     // into it or name it by path from an unrelated cwd — the format root is the
