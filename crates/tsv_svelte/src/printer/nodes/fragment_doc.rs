@@ -536,7 +536,7 @@ impl<'a> Printer<'a> {
     ///
     /// Block children (div, p, etc.) and control flow blocks get their own lines.
     /// Text nodes with newlines split into separate lines, preserving source structure.
-    pub(super) fn build_nodes_doc_multiline(&self, nodes: &[FragmentNode]) -> DocId {
+    pub(crate) fn build_nodes_doc_multiline(&self, nodes: &[FragmentNode]) -> DocId {
         let d = self.d();
         if nodes.is_empty() {
             return d.empty();
