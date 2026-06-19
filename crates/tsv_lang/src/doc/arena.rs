@@ -88,8 +88,17 @@ pub enum DocNode {
         should_break: bool,
     },
 
-    /// Conditional rendering based on whether parent group breaks
-    IfBreak { break_doc: DocId, flat_doc: DocId },
+    /// Conditional rendering based on whether a group breaks.
+    ///
+    /// `group_id == None` keys on the immediately enclosing group (the common
+    /// case). `group_id == Some(id)` keys on a specific group's resolved mode
+    /// (like `IndentIfBreak`), so the conditional can react to a group it is not
+    /// nested inside — e.g. a block-tag head's `}` dangling after its head group.
+    IfBreak {
+        break_doc: DocId,
+        flat_doc: DocId,
+        group_id: Option<GroupId>,
+    },
 
     /// Conditionally indent based on whether a specific group broke
     IndentIfBreak {
@@ -452,6 +461,23 @@ impl DocArena {
         self.alloc(DocNode::IfBreak {
             break_doc,
             flat_doc,
+            group_id: None,
+        })
+    }
+
+    /// Conditional rendering based on whether a specific group broke.
+    ///
+    /// Unlike `if_break`, which keys on the immediately enclosing group, this
+    /// keys on `group_id`'s resolved mode — so it can sit outside the group it
+    /// reacts to (e.g. a block-tag head's `}` after its head group). During
+    /// `fits()` the keyed group is treated as unresolved (flat), so trailing
+    /// text after the conditional is still counted toward the group's own break
+    /// decision (the `}` stays in the head's width).
+    pub fn if_break_with_id(&self, break_doc: DocId, flat_doc: DocId, group_id: GroupId) -> DocId {
+        self.alloc(DocNode::IfBreak {
+            break_doc,
+            flat_doc,
+            group_id: Some(group_id),
         })
     }
 
@@ -822,6 +848,7 @@ impl DocArena {
             DocNode::IfBreak {
                 break_doc,
                 flat_doc,
+                ..
             } => self.can_break_inner(*break_doc, nodes) || self.can_break_inner(*flat_doc, nodes),
             DocNode::Concat(range) | DocNode::Fill(range) => {
                 let children = self.children.borrow();

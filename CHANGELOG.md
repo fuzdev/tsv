@@ -19,7 +19,8 @@ tsv has no config that changes its formatting behavior, and none will be added.
   (along with `format-ignore-start` and `format-ignore-end` for templates)
   ([#41](https://github.com/fuzdev/tsv/pull/41))
 - fix: various conformance fixes to the formatter and parser
-- fix: numerous new Prettier divergences including uniform indentation on continuations
+- fix: numerous new Prettier divergences including more readable block structure layouts
+  and uniform indentation on continuations
 - fix: expressions in Svelte block tags now consistently use TS printing paths,
   fixing oversights prettier-plugin-svelte
 - perf: reduce allocations using `SmallVec` and memoizations

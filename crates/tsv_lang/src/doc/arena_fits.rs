@@ -226,8 +226,13 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
             DocNode::IfBreak {
                 break_doc,
                 flat_doc,
+                group_id,
             } => {
-                let chosen = if current_mode == Mode::Break {
+                // A group-id if_break keys on a group that, during this
+                // hypothetical fits test, is still unresolved → treat as flat.
+                // This keeps trailing text (e.g. a block head's `}`) counted in
+                // the keyed group's own width so it breaks at the right boundary.
+                let chosen = if group_id.is_none() && current_mode == Mode::Break {
                     *break_doc
                 } else {
                     *flat_doc
@@ -368,8 +373,13 @@ pub(super) fn arena_fits_multi<R: TextResolver + ?Sized>(
             DocNode::IfBreak {
                 break_doc,
                 flat_doc,
+                group_id,
             } => {
-                let chosen = if current_mode == Mode::Break {
+                // A group-id if_break keys on a group that, during this
+                // hypothetical fits test, is still unresolved → treat as flat.
+                // This keeps trailing text (e.g. a block head's `}`) counted in
+                // the keyed group's own width so it breaks at the right boundary.
+                let chosen = if group_id.is_none() && current_mode == Mode::Break {
                     *break_doc
                 } else {
                     *flat_doc
