@@ -673,22 +673,31 @@ impl<'a> Printer<'a> {
                     // First pass: identify content-flow newlines and join those parts.
                     let parts: Vec<&str> = text.raw.split('\n').collect();
                     let mut merged_parts: Vec<String> = Vec::new();
+                    // Index in `merged_parts` of the last content-bearing part, if any.
+                    // Internal whitespace within a SINGLE text node — including blank
+                    // lines (`aaa\n\nbbb`) — collapses to one space: HTML text semantics,
+                    // and exactly what tsv already does for flowing text with no adjacent
+                    // block. So a content part merges into the last content part, dropping
+                    // any blank (whitespace-only) parts between them. Blank lines BETWEEN
+                    // sibling nodes are separate whitespace-only `Text` nodes (handled in
+                    // the `is_whitespace_only()` arm above) and stay preserved.
+                    let mut last_content_idx: Option<usize> = None;
 
                     for (idx, part) in parts.iter().enumerate() {
-                        if idx > 0 {
-                            let prev_has_content =
-                                parts[idx - 1].contains(|c: char| !c.is_whitespace());
-                            let curr_has_content = part.contains(|c: char| !c.is_whitespace());
-
-                            if prev_has_content && curr_has_content {
-                                // Content-flow: join with previous merged part
-                                if let Some(last) = merged_parts.last_mut() {
-                                    // Trim trailing ws from prev, add space, add curr trimmed
-                                    let prev_trimmed = last.trim_end().to_string();
-                                    *last = format!("{prev_trimmed} {}", part.trim_start());
-                                }
-                                continue;
-                            }
+                        let curr_has_content = part.contains(|c: char| !c.is_whitespace());
+                        if idx > 0
+                            && curr_has_content
+                            && let Some(lc) = last_content_idx
+                        {
+                            // Content-flow across any intervening blank parts: join into the
+                            // last content part and drop the collapsed blanks after it.
+                            let prev_trimmed = merged_parts[lc].trim_end().to_string();
+                            merged_parts[lc] = format!("{prev_trimmed} {}", part.trim_start());
+                            merged_parts.truncate(lc + 1);
+                            continue;
+                        }
+                        if curr_has_content {
+                            last_content_idx = Some(merged_parts.len());
                         }
                         merged_parts.push((*part).to_string());
                     }
