@@ -19,7 +19,6 @@ tsv has no config that changes its formatting style behavior, and none will be a
   `.prettierignore` (like Prettier, in the git root only),
   and the tsv-specific `.formatignore` (nestable like gitignore)
 - `tsv format --list` prints the in-scope files without formatting
-- support `format-ignore` as an alias to `prettier-ignore`
 - feat: support `format-ignore` as an alias to `prettier-ignore`
   (along with `format-ignore-start` and `format-ignore-end` for templates)
   ([#41](https://github.com/fuzdev/tsv/pull/41))

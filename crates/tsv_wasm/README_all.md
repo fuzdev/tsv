@@ -17,7 +17,7 @@ npx @fuzdev/tsv_wasm format --list .   # list the in-scope files, format nothing
 npx @fuzdev/tsv_wasm parse file.svelte # JSON AST to stdout (--pretty to indent)
 ```
 
-Installed (`npm i -D @fuzdev/tsv_wasm`), the bin is `tsv`. Directories recurse over `.ts`/`.svelte`/`.css` with gitignore-aware discovery, keyed on `.git`. **Inside a git repo** it honors `.gitignore` and `.formatignore` (both hierarchical, like git) plus a repo-root `.prettierignore`, scoped to the repo so results are reproducible. **Outside a repo** it reads neither `.gitignore` nor `.prettierignore` and honors `.formatignore` hierarchically (so a `~/.formatignore` is global config for loose files), with a built-in fallback that skips hidden directories and `dist`/`build`/`target`. `node_modules` and VCS dirs are always skipped, and an explicitly named file is always formatted.
+Installed (`npm i -D @fuzdev/tsv_wasm`), the bin is `tsv`. Directories recurse over `.ts`/`.svelte`/`.css` with gitignore-aware discovery. **Inside a git repo** it honors `.gitignore`, `.formatignore` (both hierarchical, like git), and a repo-root `.prettierignore`, scoped to the repo so results are reproducible. **Outside a repo** it honors only `.formatignore`, falling back to skipping hidden directories and `dist`/`build`/`target`. `node_modules` and VCS directories are always skipped; an explicitly named file is always formatted.
 
 `format --list` prints the discovered in-scope files without formatting — a read-only view of what `format` would touch. `--content <source>` / `--stdin` (with `--parser svelte|typescript|css`) format or parse strings to stdout. Exit codes — `format`: 0 clean, 1 would-change (`--check`), 2 errors; `parse`: 0 ok, 1 error.
 

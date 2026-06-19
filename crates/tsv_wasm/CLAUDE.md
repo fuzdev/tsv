@@ -66,8 +66,9 @@ then queries:
 The string-tag return for `classify_dir` (rather than a wasm-bindgen enum or a
 returned struct) needs no `patch_npm_package.ts` change and allocates no JS object
 on the common descend path. The earlier `is_reincluded` / `has_negation_under`
-primitives are now folded inside `classify_dir`, so they're no longer exported —
-callers consume the verdict instead of re-deriving the prune decision.
+primitives are now folded inside `classify_dir`, so they're no longer exported
+across the WASM boundary (they stay public on the Rust `tsv_ignore::IgnoreStack`) —
+JS callers consume the verdict instead of re-deriving the prune decision.
 
 Unlike the parse exports, the class is emitted as `export class` (not
 `export function`); `scripts/patch_npm_package.ts` detects `export class` and

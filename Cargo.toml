@@ -26,7 +26,6 @@ repository = "https://github.com/fuzdev/tsv"
 tsv_lang = { path = "crates/tsv_lang" }
 tsv_html = { path = "crates/tsv_html" }
 tsv_ignore = { path = "crates/tsv_ignore" }
-# Discovery policy (build-output heuristic + safety nets) over the tsv_ignore matcher
 tsv_discover = { path = "crates/tsv_discover" }
 
 # Language implementations
