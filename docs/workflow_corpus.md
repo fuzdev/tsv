@@ -578,9 +578,7 @@ cargo run -p tsv_debug line_width FILE --line N
 
 ### Red Flags
 
-| Symptom                                   | Likely Problem                   |
-| ----------------------------------------- | -------------------------------- |
-| "Let me just fix this one thing"          | Missing fixture first            |
-| `output_prettier.svelte` in many fixtures | Not matching Prettier (bugs)     |
-| Fixtures with domain-specific names       | Not following naming conventions |
-| Tests passing after fixture changes       | Modified fixture to hide bug     |
+- "Let me just fix this one thing" — Missing fixture first
+- `output_prettier.svelte` in many fixtures — Not matching Prettier (bugs)
+- Fixtures with domain-specific names — Not following naming conventions
+- Tests passing after fixture changes — Modified fixture to hide bug

@@ -20,13 +20,11 @@ Doc building and rendering are **interleaved** per-statement inside `format()` �
 
 **Key files:**
 
-| Component              | Crate      | Entry point                                                 |
-| ---------------------- | ---------- | ----------------------------------------------------------- |
-| Parse                  | `tsv_ts`   | `parser::parse_typescript()`                                |
-| Format (orchestration) | `tsv_ts`   | `printer::Printer::print_program()`                         |
-| Doc building           | `tsv_ts`   | `printer::Printer::build_statement_doc()` → `DocId`         |
-| Doc rendering          | `tsv_lang` | `doc::arena_render::arena_print_doc_with_indent_resolved()` |
-| Line-break decisions   | `tsv_lang` | `doc::arena_fits::arena_fits()`                             |
+- Parse — `tsv_ts` — `parser::parse_typescript()`
+- Format (orchestration) — `tsv_ts` — `printer::Printer::print_program()`
+- Doc building — `tsv_ts` — `printer::Printer::build_statement_doc()` → `DocId`
+- Doc rendering — `tsv_lang` — `doc::arena_render::arena_print_doc_with_indent_resolved()`
+- Line-break decisions — `tsv_lang` — `doc::arena_fits::arena_fits()`
 
 ## Tooling
 
