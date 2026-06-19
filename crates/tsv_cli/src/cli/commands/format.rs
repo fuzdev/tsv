@@ -155,9 +155,16 @@ impl FormatCommand {
         // empty result is a valid answer (exit 0), unlike the format action
         // below which treats "nothing found" as a usage error.
         if self.list {
+            // build the whole listing and emit it in one write: a per-path
+            // `println!` re-locks stdout and re-enters the formatter for each of
+            // (potentially thousands of) lines, which dominates `--list` on a large
+            // tree; one buffered write is dramatically cheaper.
+            use std::fmt::Write as _;
+            let mut listing = String::new();
             for path in &discovered.files {
-                println!("{}", path.display());
+                let _ = writeln!(listing, "{}", path.display());
             }
+            print!("{listing}");
             if !discovered.errors.is_empty() {
                 process::exit(2);
             }

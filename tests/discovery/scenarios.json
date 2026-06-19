@@ -74,6 +74,18 @@
 			"cases": [{"target": "", "expected": ["a.ts"]}]
 		},
 		{
+			"name": "nested_gitignore_disables_heuristic_in_subtree",
+			"note": "no root .gitignore keeps the heuristic on (root dist/ pruned), but a nested pkg/.gitignore — even empty — turns it off for pkg's subtree, so pkg/dist/ (which the heuristic would skip) is formatted. Pins the heuristic-active threading at depth (a nested .gitignore disabling the heuristic only for its own subtree)",
+			"tree": {
+				".git/": null,
+				"dist/a.ts": "x",
+				"pkg/.gitignore": "",
+				"pkg/dist/b.ts": "x",
+				"pkg/c.ts": "x"
+			},
+			"cases": [{"target": "", "expected": ["pkg/c.ts", "pkg/dist/b.ts"]}]
+		},
+		{
 			"name": "formatignore_reincludes_gitignored_file",
 			"note": "the tsv layer is applied after .gitignore, so a .formatignore `!` re-includes a file-level gitignore exclusion",
 			"tree": {

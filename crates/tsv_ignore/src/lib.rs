@@ -660,6 +660,20 @@ mod tests {
     }
 
     #[test]
+    fn multiple_double_stars_span_independently() {
+        // more than one `**` forces the matcher's general split-point search (the
+        // trailing-anchor fast path only fires when the tail after a `**` has no
+        // further `**`); each `**` independently matches zero or more segments.
+        let rules = ig("a/**/b/**/c.ts\n");
+        assert!(rules.is_ignored("a/b/c.ts", false)); // both `**` match zero
+        assert!(rules.is_ignored("a/x/b/y/c.ts", false)); // each matches one
+        assert!(rules.is_ignored("a/x/y/b/z/w/c.ts", false)); // each matches several
+        assert!(!rules.is_ignored("a/b/x.ts", false)); // trailing `c.ts` absent
+        assert!(!rules.is_ignored("a/x/c.ts", false)); // middle `b` absent
+        assert!(!rules.is_ignored("x/a/b/c.ts", false)); // anchored `a` not at root
+    }
+
+    #[test]
     fn negation_reincludes() {
         let rules = ig("*.ts\n!keep.ts\n");
         assert!(rules.is_ignored("drop.ts", false));
