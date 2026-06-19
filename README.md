@@ -61,7 +61,7 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
 
 ## Design
 
-- supports Svelte, TypeScript, CSS, JS, and HTML
+- supports Svelte, TypeScript/JS, CSS (and planned HTML/JSON)
 - formatting tracks Prettier and prettier-plugin-svelte for the common case, but intentionally
   diverges in some cases - see [docs/conformance_prettier.md](docs/conformance_prettier.md)
 - tsv can generate a public JSON AST that should exactly match
