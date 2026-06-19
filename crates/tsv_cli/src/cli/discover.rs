@@ -118,7 +118,7 @@ pub fn discover_files(paths: &[String]) -> Result<Discovered, Vec<String>> {
             collect_root(&path, &cwd, &mut out);
         }
     }
-    out.files.sort();
+    out.files.sort_by_cached_key(|p| path_sort_key(p));
     out.files.dedup();
     if paths.len() > 1 {
         let mut seen: HashSet<PathBuf> = HashSet::with_capacity(out.files.len());
@@ -355,6 +355,23 @@ fn rel_to(format_root: &Path, path: &Path) -> String {
     path.strip_prefix(format_root)
         .map(path_to_rel)
         .unwrap_or_default()
+}
+
+/// A byte key reproducing `Path`'s component-wise ordering as a plain byte
+/// string, so one pass of `sort_by_cached_key` replaces the O(n log n) re-parsing
+/// of `PathBuf` components that dominates discovery once the matcher is optimized.
+/// Each component is prefixed with a `\0` sentinel — which sorts before every real
+/// filename byte — so a shorter path at a component boundary sorts first
+/// (`a/y.ts` before `a-b/x.ts`), exactly like `Path::cmp` and the WASM CLI's
+/// `compare_paths`. A filename contains neither the path separator nor `\0`, so
+/// the sentinel is unambiguous.
+fn path_sort_key(path: &Path) -> Vec<u8> {
+    let mut key = Vec::new();
+    for component in path.components() {
+        key.push(0);
+        key.extend_from_slice(component.as_os_str().as_encoded_bytes());
+    }
+    key
 }
 
 /// A relative path's `Normal` components joined with `/` (the form ignore rules

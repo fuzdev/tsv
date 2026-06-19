@@ -138,6 +138,16 @@
 			]
 		},
 		{
+			"name": "sort_is_component_wise_at_separator_boundary",
+			"note": "output is ordered component-wise (the separator sorts before other bytes), so `a/`'s file precedes `a-b/`'s even though '-' < '/' in plain byte order. Native PathBuf order and cli.js compare_paths agree; the native sort key (path_sort_key) must preserve it",
+			"tree": {
+				".git/": null,
+				"a/z.ts": "x",
+				"a-b/y.ts": "x"
+			},
+			"cases": [{"target": "", "expected": ["a/z.ts", "a-b/y.ts"]}]
+		},
+		{
 			"name": "cwd_independent_decision",
 			"note": "a non-repo project's own .formatignore prunes gen/ (gen/ is not a heuristic dir, so the ignore file is the only thing that can skip it)",
 			"tree": {

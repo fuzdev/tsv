@@ -175,13 +175,27 @@ pub(crate) fn match_segments(pat: &[Seg], path: &[PathSeg<'_>]) -> bool {
     match pat.split_first() {
         None => path.is_empty(),
         Some((Seg::DoubleStar, rest)) => {
-            // `**` matches any number of leading path segments. A *trailing*
-            // `**` must consume at least one: git's `foo/**` matches everything
-            // *inside* foo, never foo itself (so a later `!foo/keep.ts` can
-            // re-include the file). An interior `**` still matches zero, so
-            // `a/**/b` keeps matching `a/b`.
-            let start = usize::from(rest.is_empty());
-            (start..=path.len()).any(|i| match_segments(rest, &path[i..]))
+            // `**` matches any number of leading path segments, then `rest` must
+            // match the remainder. When `rest` carries no further `**` it has a
+            // fixed segment count and can only align with the path's *tail*, so
+            // jump straight there instead of trying every split point — the
+            // floating `**/name` case (every plain pattern parses to a leading
+            // `**`) was O(depth) match attempts against a deep path.
+            if rest.iter().any(|s| matches!(s, Seg::DoubleStar)) {
+                // another `**` ahead: fall back to the general split-point search
+                // (`rest` is non-empty here, so `**` may still consume zero)
+                (0..=path.len()).any(|i| match_segments(rest, &path[i..]))
+            } else if rest.is_empty() {
+                // a *trailing* `**` matches everything inside the anchor (≥ 1
+                // segment), never the anchor dir itself — so a later `!foo/keep.ts`
+                // can re-include the file (git's rule).
+                !path.is_empty()
+            } else {
+                // fixed-length, `**`-free tail: it must match exactly the last
+                // `rest.len()` segments (an interior `**` still consumed zero here,
+                // so `a/**/b` keeps matching `a/b`).
+                rest.len() <= path.len() && match_segments(rest, &path[path.len() - rest.len()..])
+            }
         }
         Some((Seg::Glob(toks), rest)) => match path.split_first() {
             Some((head, tail)) if glob_seg_match(toks, &head.chars) => match_segments(rest, tail),
