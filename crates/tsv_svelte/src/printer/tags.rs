@@ -47,32 +47,66 @@ impl<'a> Printer<'a> {
     /// Format a const tag: {@const name = expr}
     pub(super) fn print_const_tag(&mut self, tag: &internal::ConstTag) {
         self.write("{@const ");
+        self.print_assignment_tag_body(&tag.id, &tag.init, tag.span.end);
+        self.write("}");
+    }
 
+    /// Format a declaration tag: {const name = expr} / {let name = expr} / {let name}
+    pub(super) fn print_declaration_tag(&mut self, tag: &internal::DeclarationTag) {
+        self.write("{");
+        self.write(tag.kind.keyword());
+        self.write(" ");
+
+        match &tag.init {
+            Some(init) => self.print_assignment_tag_body(&tag.id, init, tag.span.end),
+            None => {
+                // Binding-less `let` — id then a trailing `;` (prettier's form).
+                let embed = tsv_lang::EmbedContext {
+                    base_indent_offset: self.indent_level,
+                    ..tsv_lang::EmbedContext::default()
+                };
+                let formatted_id = tsv_ts::format_expression(&tag.id, &self.ts_inputs(), embed);
+                self.write(&formatted_id);
+                self.write(";");
+            }
+        }
+
+        self.write("}");
+    }
+
+    /// Write `<id> = <init>` plus the gap/trailing JS comments — the shared body
+    /// of the `{@const}` and with-init `{const}`/`{let}` buffer paths. The caller
+    /// writes the opening keyword and the closing `}`; `tag_end` is the tag span's
+    /// end (the `}`), bounding the trailing-comment scan.
+    fn print_assignment_tag_body(
+        &mut self,
+        id: &tsv_ts::Expression,
+        init: &tsv_ts::Expression,
+        tag_end: u32,
+    ) {
         let embed = tsv_lang::EmbedContext {
             base_indent_offset: self.indent_level,
             ..tsv_lang::EmbedContext::default()
         };
 
         // Format the id (pattern) with current indent level for multiline patterns
-        let formatted_id = tsv_ts::format_expression(&tag.id, &self.ts_inputs(), embed);
+        let formatted_id = tsv_ts::format_expression(id, &self.ts_inputs(), embed);
         self.write(&formatted_id);
         self.write(" = ");
 
         // Print any leading comments between "=" and the init expression
-        for comment in comments_in_range(self.comments, tag.id.span().end, tag.init.span().start) {
+        for comment in comments_in_range(self.comments, id.span().end, init.span().start) {
             self.write_leading_js_comment(comment);
         }
 
         // Format the init expression
-        let formatted_init = tsv_ts::format_expression(&tag.init, &self.ts_inputs(), embed);
+        let formatted_init = tsv_ts::format_expression(init, &self.ts_inputs(), embed);
         self.write(&formatted_init);
 
         // Print any trailing comments between the init expression and closing brace
-        for comment in comments_in_range(self.comments, tag.init.span().end, tag.span.end - 1) {
+        for comment in comments_in_range(self.comments, init.span().end, tag_end - 1) {
             self.write_trailing_js_comment(comment);
         }
-
-        self.write("}");
     }
 
     /// Format a debug tag: {@debug} or {@debug x, y, z}

@@ -995,6 +995,13 @@ impl<'a> Printer<'a> {
                     self.print_const_tag(tag);
                     state.after_block();
                 }
+                FragmentNode::DeclarationTag(tag) => {
+                    if state.has_output_content {
+                        self.write(state.pending_ws.resolve_for_block());
+                    }
+                    self.print_declaration_tag(tag);
+                    state.after_block();
+                }
                 FragmentNode::DebugTag(tag) => {
                     if state.has_output_content {
                         self.write(state.pending_ws.resolve_for_block());

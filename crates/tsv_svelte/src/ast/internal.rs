@@ -55,6 +55,7 @@ pub enum FragmentNode {
     SnippetBlock(SnippetBlock),
     HtmlTag(HtmlTag),
     ConstTag(ConstTag),
+    DeclarationTag(DeclarationTag),
     DebugTag(DebugTag),
     RenderTag(RenderTag),
 }
@@ -171,6 +172,41 @@ pub struct HtmlTag {
 pub struct ConstTag {
     pub id: Expression,   // Pattern (identifier or destructuring)
     pub init: Expression, // Initializer expression
+    pub span: Span,
+}
+
+/// The keyword of a `{const …}` / `{let …}` declaration tag.
+///
+/// Svelte's newer declaration tags carry a `const` or `let` kind on the inner
+/// `VariableDeclaration` (unlike `{@const}`, which is always `const`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeclarationKind {
+    Const,
+    Let,
+}
+
+impl DeclarationKind {
+    /// The kind keyword as it appears in the public AST and the emitted tag.
+    pub fn keyword(self) -> &'static str {
+        match self {
+            DeclarationKind::Const => "const",
+            DeclarationKind::Let => "let",
+        }
+    }
+}
+
+/// Svelte DeclarationTag - local `{const …}` / `{let …}` declaration
+///
+/// Represents the newer bare `{const name = expr}` / `{let name = expr}` tags
+/// (no `@`), parsed canonically as a `DeclarationTag` wrapping a
+/// `VariableDeclaration`. Unlike `{@const}` these accept either keyword and,
+/// for `let`, an omitted initializer (`{let name}`). The `id` is the pattern
+/// and `init` the optional value.
+#[derive(Debug, Clone)]
+pub struct DeclarationTag {
+    pub kind: DeclarationKind,
+    pub id: Expression,           // Pattern (identifier or destructuring)
+    pub init: Option<Expression>, // Initializer expression (None only for `let`)
     pub span: Span,
 }
 
@@ -599,6 +635,7 @@ impl FragmentNode {
             FragmentNode::SnippetBlock(block) => block.span,
             FragmentNode::HtmlTag(tag) => tag.span,
             FragmentNode::ConstTag(tag) => tag.span,
+            FragmentNode::DeclarationTag(tag) => tag.span,
             FragmentNode::DebugTag(tag) => tag.span,
             FragmentNode::RenderTag(tag) => tag.span,
         }

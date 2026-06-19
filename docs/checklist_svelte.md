@@ -187,6 +187,13 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Const with destructuring
 - Const in various contexts (if, each, await)
 
+### Declaration Tag
+
+- Basic declaration (`{const x = value}` / `{let x = value}`)
+- Binding-less `let` (`{let x}` → `{let x;}`)
+- Declaration with destructuring
+- Declaration in various contexts (root, if, each, snippet, element, component)
+
 ### Debug Tag
 
 - Empty debug (`{@debug}`)
