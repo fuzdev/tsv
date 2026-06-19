@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 475,
+	"end": 505,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 279,
-				"data": " A {#if} with an inline <span> sibling before it and a breakable <span> body: when content exceeds printWidth, tsv keeps the </span>{#if} boundary hugged and drops the body to its own line; prettier hugs the } and breaks the inner <span> internally (prettier_variant_hug) "
+				"end": 304,
+				"data": " A {#if} with an inline <span> sibling before it and a breakable <span> body: when content exceeds printWidth, tsv dangles the </span> closing > so the {#if} head starts fresh and drops the body to its own line; prettier hugs the } and breaks the inner <span> internally (prettier_variant_inline) "
 			},
 			{
 				"type": "Text",
-				"start": 279,
-				"end": 280,
+				"start": 304,
+				"end": 305,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 280,
-				"end": 474,
+				"start": 305,
+				"end": 504,
 				"name": "div",
 				"name_loc": {
 					"start": {
 						"line": 2,
 						"column": 1,
-						"character": 281
+						"character": 306
 					},
 					"end": {
 						"line": 2,
 						"column": 4,
-						"character": 284
+						"character": 309
 					}
 				},
 				"attributes": [],
@@ -43,26 +43,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 285,
-							"end": 287,
+							"start": 310,
+							"end": 312,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 287,
-							"end": 467,
+							"start": 312,
+							"end": 497,
 							"name": "div",
 							"name_loc": {
 								"start": {
 									"line": 3,
 									"column": 2,
-									"character": 288
+									"character": 313
 								},
 								"end": {
 									"line": 3,
 									"column": 5,
-									"character": 291
+									"character": 316
 								}
 							},
 							"attributes": [],
@@ -71,26 +71,26 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 292,
-										"end": 295,
+										"start": 317,
+										"end": 320,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "RegularElement",
-										"start": 295,
-										"end": 459,
+										"start": 320,
+										"end": 489,
 										"name": "div",
 										"name_loc": {
 											"start": {
 												"line": 4,
 												"column": 3,
-												"character": 296
+												"character": 321
 											},
 											"end": {
 												"line": 4,
 												"column": 6,
-												"character": 299
+												"character": 324
 											}
 										},
 										"attributes": [],
@@ -99,26 +99,26 @@
 											"nodes": [
 												{
 													"type": "Text",
-													"start": 300,
-													"end": 304,
+													"start": 325,
+													"end": 329,
 													"raw": "\n\t\t\t",
 													"data": "\n\t\t\t"
 												},
 												{
 													"type": "RegularElement",
-													"start": 304,
-													"end": 450,
+													"start": 329,
+													"end": 480,
 													"name": "small",
 													"name_loc": {
 														"start": {
 															"line": 5,
 															"column": 4,
-															"character": 305
+															"character": 330
 														},
 														"end": {
 															"line": 5,
 															"column": 9,
-															"character": 310
+															"character": 335
 														}
 													},
 													"attributes": [],
@@ -127,26 +127,26 @@
 														"nodes": [
 															{
 																"type": "Text",
-																"start": 311,
-																"end": 316,
+																"start": 336,
+																"end": 341,
 																"raw": "\n\t\t\t\t",
 																"data": "\n\t\t\t\t"
 															},
 															{
 																"type": "RegularElement",
-																"start": 316,
-																"end": 348,
+																"start": 341,
+																"end": 378,
 																"name": "span",
 																"name_loc": {
 																	"start": {
 																		"line": 6,
 																		"column": 5,
-																		"character": 317
+																		"character": 342
 																	},
 																	"end": {
 																		"line": 6,
 																		"column": 9,
-																		"character": 321
+																		"character": 346
 																	}
 																},
 																"attributes": [],
@@ -155,12 +155,12 @@
 																	"nodes": [
 																		{
 																			"type": "ExpressionTag",
-																			"start": 322,
-																			"end": 341,
+																			"start": 347,
+																			"end": 366,
 																			"expression": {
 																				"type": "MemberExpression",
-																				"start": 323,
-																				"end": 340,
+																				"start": 348,
+																				"end": 365,
 																				"loc": {
 																					"start": {
 																						"line": 6,
@@ -173,8 +173,8 @@
 																				},
 																				"object": {
 																					"type": "Identifier",
-																					"start": 323,
-																					"end": 326,
+																					"start": 348,
+																					"end": 351,
 																					"loc": {
 																						"start": {
 																							"line": 6,
@@ -189,8 +189,8 @@
 																				},
 																				"property": {
 																					"type": "Identifier",
-																					"start": 327,
-																					"end": 340,
+																					"start": 352,
+																					"end": 365,
 																					"loc": {
 																						"start": {
 																							"line": 6,
@@ -213,50 +213,50 @@
 															{
 																"type": "IfBlock",
 																"elseif": false,
-																"start": 348,
-																"end": 438,
+																"start": 378,
+																"end": 468,
 																"test": {
 																	"type": "MemberExpression",
-																	"start": 353,
-																	"end": 382,
+																	"start": 383,
+																	"end": 412,
 																	"loc": {
 																		"start": {
-																			"line": 6,
-																			"column": 41
+																			"line": 7,
+																			"column": 10
 																		},
 																		"end": {
-																			"line": 6,
-																			"column": 70
+																			"line": 7,
+																			"column": 39
 																		}
 																	},
 																	"object": {
 																		"type": "Identifier",
-																		"start": 353,
-																		"end": 356,
+																		"start": 383,
+																		"end": 386,
 																		"loc": {
 																			"start": {
-																				"line": 6,
-																				"column": 41
+																				"line": 7,
+																				"column": 10
 																			},
 																			"end": {
-																				"line": 6,
-																				"column": 44
+																				"line": 7,
+																				"column": 13
 																			}
 																		},
 																		"name": "obj"
 																	},
 																	"property": {
 																		"type": "Identifier",
-																		"start": 357,
-																		"end": 382,
+																		"start": 387,
+																		"end": 412,
 																		"loc": {
 																			"start": {
-																				"line": 6,
-																				"column": 45
+																				"line": 7,
+																				"column": 14
 																			},
 																			"end": {
-																				"line": 6,
-																				"column": 70
+																				"line": 7,
+																				"column": 39
 																			}
 																		},
 																		"name": "cond_prop_name_abcdefghij"
@@ -269,26 +269,26 @@
 																	"nodes": [
 																		{
 																			"type": "Text",
-																			"start": 383,
-																			"end": 389,
+																			"start": 413,
+																			"end": 419,
 																			"raw": "\n\t\t\t\t\t",
 																			"data": "\n\t\t\t\t\t"
 																		},
 																		{
 																			"type": "RegularElement",
-																			"start": 389,
-																			"end": 428,
+																			"start": 419,
+																			"end": 458,
 																			"name": "span",
 																			"name_loc": {
 																				"start": {
-																					"line": 7,
+																					"line": 8,
 																					"column": 6,
-																					"character": 390
+																					"character": 420
 																				},
 																				"end": {
-																					"line": 7,
+																					"line": 8,
 																					"column": 10,
-																					"character": 394
+																					"character": 424
 																				}
 																			},
 																			"attributes": [],
@@ -297,33 +297,33 @@
 																				"nodes": [
 																					{
 																						"type": "ExpressionTag",
-																						"start": 395,
-																						"end": 421,
+																						"start": 425,
+																						"end": 451,
 																						"expression": {
 																							"type": "MemberExpression",
-																							"start": 396,
-																							"end": 420,
+																							"start": 426,
+																							"end": 450,
 																							"loc": {
 																								"start": {
-																									"line": 7,
+																									"line": 8,
 																									"column": 12
 																								},
 																								"end": {
-																									"line": 7,
+																									"line": 8,
 																									"column": 36
 																								}
 																							},
 																							"object": {
 																								"type": "Identifier",
-																								"start": 396,
-																								"end": 399,
+																								"start": 426,
+																								"end": 429,
 																								"loc": {
 																									"start": {
-																										"line": 7,
+																										"line": 8,
 																										"column": 12
 																									},
 																									"end": {
-																										"line": 7,
+																										"line": 8,
 																										"column": 15
 																									}
 																								},
@@ -331,15 +331,15 @@
 																							},
 																							"property": {
 																								"type": "Identifier",
-																								"start": 400,
-																								"end": 420,
+																								"start": 430,
+																								"end": 450,
 																								"loc": {
 																									"start": {
-																										"line": 7,
+																										"line": 8,
 																										"column": 16
 																									},
 																									"end": {
-																										"line": 7,
+																										"line": 8,
 																										"column": 36
 																									}
 																								},
@@ -354,8 +354,8 @@
 																		},
 																		{
 																			"type": "Text",
-																			"start": 428,
-																			"end": 433,
+																			"start": 458,
+																			"end": 463,
 																			"raw": "\n\t\t\t\t",
 																			"data": "\n\t\t\t\t"
 																		}
@@ -365,8 +365,8 @@
 															},
 															{
 																"type": "Text",
-																"start": 438,
-																"end": 442,
+																"start": 468,
+																"end": 472,
 																"raw": "\n\t\t\t",
 																"data": "\n\t\t\t"
 															}
@@ -375,8 +375,8 @@
 												},
 												{
 													"type": "Text",
-													"start": 450,
-													"end": 453,
+													"start": 480,
+													"end": 483,
 													"raw": "\n\t\t",
 													"data": "\n\t\t"
 												}
@@ -385,8 +385,8 @@
 									},
 									{
 										"type": "Text",
-										"start": 459,
-										"end": 461,
+										"start": 489,
+										"end": 491,
 										"raw": "\n\t",
 										"data": "\n\t"
 									}
@@ -395,8 +395,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 467,
-							"end": 468,
+							"start": 497,
+							"end": 498,
 							"raw": "\n",
 							"data": "\n"
 						}
