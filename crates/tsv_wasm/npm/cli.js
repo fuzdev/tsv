@@ -9,20 +9,39 @@
  * `parse` — 0 ok, 1 error. Argument-parsing errors exit 1 (both commands).
  */
 
-import { readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	readdirSync,
+	readFileSync,
+	realpathSync,
+	statSync,
+	writeFileSync,
+} from 'node:fs';
+import { dirname, isAbsolute, join, relative as path_relative, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
 	format_css,
 	format_svelte,
 	format_typescript,
+	IgnoreStack,
 	parse_css_json,
 	parse_svelte_json,
 	parse_typescript_json,
 } from './index.js';
 
-/** Directory names skipped during recursive discovery, in addition to hidden
- * directories (leading `.`), which are skipped unconditionally. */
-const EXCLUDED_DIRS = new Set(['node_modules', 'dist', 'build', 'target']);
+/** tsv's native ignore file, discovered hierarchically (one per directory).
+ * Mirrors `FORMATIGNORE_FILE`. */
+const FORMATIGNORE_FILE = '.formatignore';
+
+/** The repo-root-only tsv files, in precedence order: a repo-root `.formatignore`
+ * (used alone when present, scoping tsv independently of prettier); else a
+ * repo-root `.prettierignore` for drop-in compat. Only consulted at the repo
+ * root, and never outside a repo. Mirrors `TSV_ROOT_FILES`. */
+const TSV_ROOT_FILES = ['.formatignore', '.prettierignore'];
+
+/** The git ignore file, discovered hierarchically (one per directory) and only
+ * inside a git repo, matching git. */
+const GITIGNORE_FILE = '.gitignore';
 
 const FORMATTERS = {
 	svelte: format_svelte,
@@ -53,12 +72,14 @@ Run \`tsv <command> --help\` for command flags.
 `;
 
 const FORMAT_HELP =
-	`Usage: tsv format [<paths...>] [--check] [--content <s> | --stdin] [--parser <p>]
+	`Usage: tsv format [<paths...>] [--check] [--list] [--content <s> | --stdin] [--parser <p>]
 
 Format source code in place (near-Prettier output).
 
 Paths are formatted in place (written only when the output differs) and
-changed paths print to stdout; directories recurse over .ts/.svelte/.css.
+changed paths print to stdout; directories recurse over .ts/.svelte/.css,
+honoring .gitignore (hierarchically, in a git tree) plus a repo-root
+.formatignore / .prettierignore. An explicitly named file is always formatted.
 --content/--stdin print formatted source to stdout.
 
 Options:
@@ -66,6 +87,7 @@ Options:
   --stdin           read from stdin, print to stdout (requires --parser)
   --parser <p>      parser type: svelte | typescript | css (--content/--stdin only)
   --check           check instead of writing/printing: exit 1 if any input would change
+  --list            list the discovered in-scope files (one per line) without formatting; path mode only
   --jobs <n>        accepted for native-CLI parity and ignored (single-threaded)
 
 Exit codes: 0 clean, 1 would change (--check), 2 errors.
@@ -170,6 +192,7 @@ function run_format(args) {
 			stdin: { type: 'boolean' },
 			parser: { type: 'string' },
 			check: { type: 'boolean' },
+			list: { type: 'boolean' },
 			jobs: { type: 'string' },
 			help: { type: 'boolean' },
 		},
@@ -201,6 +224,10 @@ function format_single(values, positionals, parser) {
 	}
 	if (values.jobs !== undefined) {
 		eprint('Error: --jobs applies to file paths; --content/--stdin format a single input\n');
+		process.exit(2);
+	}
+	if (values.list) {
+		eprint('Error: --list applies to file paths; --content/--stdin format a single input\n');
 		process.exit(2);
 	}
 	const flag = values.content !== undefined ? '--content' : '--stdin';
@@ -238,13 +265,36 @@ function format_paths(values, positionals) {
 		);
 		process.exit(2);
 	}
+	if (values.list && values.check) {
+		eprint('Error: --list and --check cannot be combined\n');
+		process.exit(2);
+	}
 
-	const { files, errors: traversal_errors } = discover_files(positionals);
+	const { files, errors: traversal_errors, warnings } = discover_files(positionals);
 	for (const msg of traversal_errors) {
 		eprint(`error: ${msg}\n`);
 	}
+	// discovery warnings (e.g. the heuristic-shadow no-op) go to stderr but are
+	// NOT errors — no effect on the exit code or stdout, so --list/--check output
+	// stays clean. Fires in every path mode.
+	for (const msg of warnings) {
+		eprint(`warning: ${msg}\n`);
+	}
+	// --list reports the in-scope set and stops — no formatting, and an empty
+	// result is a valid answer (exit 0), unlike the format action below which
+	// treats "nothing found" as a usage error.
+	if (values.list) {
+		for (const path of files) {
+			print(`${path}\n`);
+		}
+		if (traversal_errors.length > 0) process.exit(2);
+		return;
+	}
 	if (files.length === 0 && traversal_errors.length === 0) {
-		eprint('Error: No supported files found (.ts, .svelte, .css)\n');
+		// neutral wording: an empty result can mean "no .ts/.svelte/.css here" *or*
+		// "all of them are ignored" (e.g. a target under a gitignored dir), so don't
+		// imply a wrong-extension cause. `--list` reports the empty set and exits 0.
+		eprint('Error: No files to format — no unignored .ts/.svelte/.css files in scope\n');
 		process.exit(2);
 	}
 
@@ -386,22 +436,90 @@ function read_stdin(exit_code) {
 	}
 }
 
-/** Whether a file name has a formattable extension (compound forms like
- * `.svelte.ts` are covered by the `.ts` match). A leading dot is part of the
- * stem, not an extension — a file named exactly `.ts` doesn't match, same as
- * Rust's `Path::extension`. */
-function is_formattable(name) {
-	return /.\.(ts|svelte|css)$/.test(name);
+/** Reads a file to a string, mapping any IO error (absent, unreadable) to null. */
+function read_optional(path) {
+	try {
+		return readFileSync(path, 'utf-8');
+	} catch {
+		return null;
+	}
+}
+
+/** Reads `dir/<name>` for the first readable name, or null — the
+ * `.formatignore`-shadows-`.prettierignore` resolution. Mirrors `read_first`. */
+function read_first(dir, names) {
+	for (const name of names) {
+		const content = read_optional(join(dir, name));
+		if (content !== null) return content;
+	}
+	return null;
+}
+
+/** The nearest ancestor of `start` (inclusive) holding a `.git` entry (dir or
+ * file) — the repo root — or null if there is no git tree above `start`.
+ * Mirrors the native `find_repo_root`. */
+function find_repo_root(start) {
+	let dir = start;
+	for (;;) {
+		if (existsSync(join(dir, '.git'))) return dir;
+		const parent = dirname(dir);
+		if (parent === dir) return null; // filesystem root
+		dir = parent;
+	}
+}
+
+/** The filesystem root above `start` (`/` on posix). The format-root fallback
+ * outside a git repo, so the `.formatignore` walk spans the whole path and the
+ * cwd never enters. Mirrors the native `filesystem_root`. */
+function filesystem_root(start) {
+	let dir = start;
+	for (;;) {
+		const parent = dirname(dir);
+		if (parent === dir) return dir;
+		dir = parent;
+	}
+}
+
+/** `abs` relative to `format_root` as a `/`-joined string (empty for
+ * `format_root` itself). Returns null only in the degenerate case where `abs`
+ * is not under `format_root`, which the boundary resolution never produces (the
+ * format root is always an ancestor-or-self of the root). Mirrors the native
+ * `path_to_rel` over a `strip_prefix`. */
+function rel_under(format_root, abs) {
+	const rel = path_relative(format_root, abs);
+	if (rel === '') return '';
+	if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return null;
+	return rel
+		.split(/[/\\]/)
+		.filter((s) => s !== '' && s !== '.')
+		.join('/');
+}
+
+/** Directories from `format_root` (inclusive) down to `leaf` (inclusive),
+ * shallowest first. Mirrors the native `ancestor_chain`. */
+function ancestor_chain(format_root, leaf) {
+	const chain = [];
+	let dir = leaf;
+	for (;;) {
+		chain.push(dir);
+		if (dir === format_root) break;
+		const parent = dirname(dir);
+		if (parent === dir) break;
+		dir = parent;
+	}
+	chain.reverse();
+	return chain;
 }
 
 /**
  * Expand files and directories into a sorted, deduplicated list of files to
  * format, mirroring the native `discover_files`: root args are validated
  * upfront (any bad one fails the run with exit 2), explicit files are always
- * included regardless of extension, directories recurse with the extension
- * filter skipping hidden directories and `EXCLUDED_DIRS`, and symlinks inside
- * directories are not followed. Traversal errors below a valid root are
- * non-fatal and returned for reporting.
+ * included regardless of extension *and* regardless of the ignore files (the
+ * caller named them), and directories recurse with the extension filter.
+ * Symlinks inside directories are not followed. Traversal errors below a valid
+ * root are non-fatal and returned for reporting. See `collect_root` for the
+ * gitignore-aware ignore semantics.
  */
 function discover_files(paths) {
 	const stats = paths.map((path) => {
@@ -419,13 +537,22 @@ function discover_files(paths) {
 		process.exit(2);
 	}
 
+	// canonical cwd so it compares cleanly with canonicalized roots below
+	let cwd;
+	try {
+		cwd = realpathSync(process.cwd());
+	} catch {
+		cwd = process.cwd();
+	}
+
 	let files = [];
 	const errors = [];
+	const warnings = [];
 	for (let i = 0; i < paths.length; i++) {
 		if (stats[i].isFile()) {
-			files.push(paths[i]);
+			files.push(paths[i]); // explicit file bypasses the ignore files
 		} else {
-			collect_recursive(paths[i], files, errors);
+			collect_root(paths[i], cwd, files, errors, warnings);
 		}
 	}
 	files.sort(compare_paths);
@@ -445,7 +572,58 @@ function discover_files(paths) {
 		});
 	}
 	errors.sort();
-	return { files, errors };
+	// dedupe so a directory pruned via two overlapping roots warns at most once
+	warnings.sort();
+	const deduped_warnings = warnings.filter((w, i) => w !== warnings[i - 1]);
+	return { files, errors, warnings: deduped_warnings };
+}
+
+/**
+ * Set up the ignore evaluation for one directory `root`, then recurse. Inside a
+ * git repo the format root is the repo root (a hard stop — nothing above it is
+ * read, so `--check` is reproducible); outside one it's the filesystem root (so
+ * an ancestor `.formatignore` is honored). Preloads the `IgnoreStack` for the
+ * ancestor chain from there down: `.formatignore` at each level (with a repo-root
+ * `.prettierignore` shadow), and `.gitignore` at each level when in a repo.
+ * Mirrors the native `collect_root`.
+ */
+function collect_root(root, cwd, files, errors, warnings) {
+	let root_abs;
+	try {
+		root_abs = realpathSync(root);
+	} catch {
+		root_abs = isAbsolute(root) ? root : join(cwd, root);
+	}
+	const repo_root = find_repo_root(root_abs);
+	const in_repo = repo_root !== null;
+	const format_root = repo_root ?? filesystem_root(root_abs);
+
+	const stack = new IgnoreStack();
+	let heuristic_active = true;
+	// `root` relative to the format root (always an ancestor-or-self of it, so
+	// never null); '' means `root` *is* the format root
+	const base_rel = rel_under(format_root, root_abs) ?? '';
+
+	// preload the ancestor chain, format root → `root` (shallow→deep)
+	for (const ancestor of ancestor_chain(format_root, root_abs)) {
+		const anchor = rel_under(format_root, ancestor) ?? '';
+		// tsv layer: `.formatignore` everywhere; at the repo root only, a
+		// `.prettierignore` it shadows (drop-in compat, never hierarchical)
+		const tsv = in_repo && anchor === ''
+			? read_first(ancestor, TSV_ROOT_FILES)
+			: read_optional(join(ancestor, FORMATIGNORE_FILE));
+		if (tsv !== null) stack.push_tsv(anchor, tsv);
+		// `.gitignore` layer: only inside a git repo
+		if (in_repo) {
+			const gitignore = read_optional(join(ancestor, GITIGNORE_FILE));
+			if (gitignore !== null) {
+				stack.push_gitignore(anchor, gitignore);
+				heuristic_active = false;
+			}
+		}
+	}
+
+	collect_recursive(root, base_rel, in_repo, stack, heuristic_active, files, errors, warnings);
 }
 
 /** Component-wise path ordering matching Rust's `PathBuf` ordering — `/`
@@ -466,7 +644,7 @@ function compare_paths(a, b) {
 	return as.length - bs.length;
 }
 
-function collect_recursive(dir, files, errors) {
+function collect_recursive(dir, dir_rel, in_repo, stack, heuristic_active, files, errors, warnings) {
 	let entries;
 	try {
 		entries = readdirSync(dir, { withFileTypes: true });
@@ -479,10 +657,41 @@ function collect_recursive(dir, files, errors) {
 		// already end with one, so a trailing-slash root (`tsv format src/`)
 		// yields `src/a.ts`, not `src//a.ts`
 		const path = dir.endsWith('/') ? `${dir}${entry.name}` : `${dir}/${entry.name}`;
+		// `path` relative to the format root, for matching ('' = the format root)
+		const child_rel = dir_rel === '' ? entry.name : `${dir_rel}/${entry.name}`;
 		if (entry.isDirectory()) {
-			if (entry.name.startsWith('.') || EXCLUDED_DIRS.has(entry.name)) continue;
-			collect_recursive(path, files, errors);
-		} else if (entry.isFile() && is_formattable(entry.name)) {
+			// the per-directory prune/descend decision — safety nets, the
+			// build-output heuristic (+ its shadow warning), and the matcher —
+			// lives in `tsv_discover`, shared with the native CLI via the verdict.
+			// The FS walk + layer push/pop stay here.
+			const verdict = stack.classify_dir(entry.name, child_rel, heuristic_active);
+			if (verdict !== 'descend') {
+				// on `prune_warn` fetch the message from Rust (single source of
+				// truth — the JS CLI never templates it). One warning per pruned dir.
+				if (verdict === 'prune_warn') warnings.push(stack.heuristic_shadow_warning(child_rel));
+				continue;
+			}
+			// entering the dir: push its `.formatignore` (hierarchical) and, in a
+			// repo, its `.gitignore` (turns the heuristic off for its subtree);
+			// pop both on the way back out
+			let tsv_pushed = false;
+			const formatignore = read_optional(join(path, FORMATIGNORE_FILE));
+			if (formatignore !== null) {
+				stack.push_tsv(child_rel, formatignore);
+				tsv_pushed = true;
+			}
+			let git_pushed = false;
+			if (in_repo) {
+				const gitignore = read_optional(join(path, GITIGNORE_FILE));
+				if (gitignore !== null) {
+					stack.push_gitignore(child_rel, gitignore);
+					git_pushed = true;
+				}
+			}
+			collect_recursive(path, child_rel, in_repo, stack, heuristic_active && !git_pushed, files, errors, warnings);
+			if (git_pushed) stack.pop_gitignore();
+			if (tsv_pushed) stack.pop_tsv();
+		} else if (entry.isFile() && stack.should_format_file(entry.name, child_rel)) {
 			files.push(path);
 		}
 	}

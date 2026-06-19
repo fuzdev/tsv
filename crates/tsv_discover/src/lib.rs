@@ -1,0 +1,335 @@
+//! tsv's file-discovery **policy** — the per-directory and per-file decisions
+//! `tsv format` makes while walking a tree, as pure functions over a
+//! [`tsv_ignore::IgnoreStack`] (the matcher) plus the entry name and its
+//! format-root-relative path.
+//!
+//! This is the single home of the build-output heuristic, the always-pruned
+//! safety nets, the formattable-extension check, and the heuristic-shadow
+//! warning text. The three discovery surfaces — the native CLI (`tsv_cli`), the
+//! WASM CLI (`tsv_wasm`'s `npm/cli.js`), and the VS Code extension — call it
+//! instead of reimplementing the decision, so they agree **by construction**
+//! rather than by hand-mirrored constants and templates.
+//!
+//! Everything here is **pure**: no filesystem access. Locating directories,
+//! reading ignore files, resolving the format root, and walking the tree stay in
+//! each caller; only the *verdict* is shared. The matcher this builds on
+//! ([`tsv_ignore`]) stays a pure gitignore(5) matcher and deliberately does
+//! **not** absorb this policy (the `dist`/`build`/`target` list, the hidden-dir
+//! rule, the safety nets, the warning).
+//!
+//! tsv is non-configurable for *style*; file *scope* (which files get
+//! reformatted) is the one sanctioned carve-out. This crate is the policy half
+//! of that carve-out. It is **not** a language abstraction — no `Language`
+//! trait, registry, or dispatch — so it doesn't touch tsv's "Closed Scope, Open
+//! Convention" stance.
+//!
+//! ```
+//! use tsv_discover::{DirVerdict, classify_dir, should_format_file};
+//! use tsv_ignore::IgnoreStack;
+//!
+//! let mut stack = IgnoreStack::new();
+//! stack.push_gitignore("", "dist/\n"); // a .gitignore present → heuristic off
+//!
+//! // gitignored `dist` → pruned; clean `src` → descend
+//! assert_eq!(classify_dir("dist", "dist", false, &stack), DirVerdict::Prune);
+//! assert_eq!(classify_dir("src", "src", false, &stack), DirVerdict::Descend);
+//! // a non-ignored `.ts` file → format it
+//! assert!(should_format_file("app.ts", "src/app.ts", &stack));
+//! ```
+
+use std::path::Path;
+use tsv_ignore::IgnoreStack;
+
+/// Directory names skipped during discovery in **every** mode — VCS metadata and
+/// `node_modules`. Catastrophic or pointless to recurse, and not reliably listed
+/// in `.gitignore` (a committed `node_modules`, a jj-colocated `.jj`). `.git` is
+/// matched as a directory name here; its worktree/submodule *file* form is a file
+/// and is never recursed regardless.
+pub const SAFETY_NET_DIRS: [&str; 5] = ["node_modules", ".git", ".hg", ".svn", ".jj"];
+
+/// Heuristic-only directory skips — tsv's fallback guess at "generated /
+/// vendored / build output", applied **only** while no `.gitignore` governs the
+/// directory (`heuristic_active`). Hidden directories (a leading `.`) are skipped
+/// by the same heuristic. Once a `.gitignore` is in play the project's own rules
+/// decide, so these are recursed unless the project ignores them.
+pub const HEURISTIC_DIRS: [&str; 3] = ["dist", "build", "target"];
+
+/// The file extensions tsv formats — the discovery filter behind
+/// [`is_formattable`]. Compound forms like `.svelte.ts` are covered by the `ts`
+/// entry (`Path::extension` yields the final component).
+pub const FORMATTABLE_EXTENSIONS: [&str; 3] = ["ts", "svelte", "css"];
+
+/// The discovery verdict for one child **directory**: descend into it, prune it
+/// (skip its whole subtree), or prune it **and** surface a diagnostic.
+#[derive(Debug, PartialEq, Eq)]
+pub enum DirVerdict {
+    /// Recurse into the directory.
+    Descend,
+    /// Skip the directory and its subtree.
+    Prune,
+    /// Skip the directory and surface this non-fatal stderr warning: the
+    /// build-output heuristic pruned a directory that an *anchored* tsv-layer `!`
+    /// was trying to re-include *into* (a silent no-op). The string is the full
+    /// message (see [`heuristic_shadow_warning`]); the caller reports it without
+    /// re-deriving it.
+    PruneWithWarning(String),
+}
+
+/// Whether a file name has a [formattable extension](FORMATTABLE_EXTENSIONS)
+/// (`.ts`, `.svelte`, `.css` — compound forms like `.svelte.ts` are covered by the
+/// `.ts` match). Matches `Path::extension`, so a bare dotfile like `.ts` is a stem
+/// with no extension and is **not** formattable.
+pub fn is_formattable(name: &str) -> bool {
+    Path::new(name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|ext| FORMATTABLE_EXTENSIONS.contains(&ext))
+}
+
+/// Whether a directory `name` is an always-pruned [safety net](SAFETY_NET_DIRS)
+/// (`.git`/`node_modules`/`.hg`/`.svn`/`.jj`). A **complete, context-free**
+/// decision — safety nets prune in every mode, with no ignore-file or heuristic
+/// override — so a caller doing its own walk can short-circuit on it before
+/// building an [`IgnoreStack`]. (The build-output heuristic, by contrast, is
+/// contextual — it needs the stack and `heuristic_active` — so it has no
+/// standalone predicate; use [`classify_dir`].)
+pub fn is_safety_net(name: &str) -> bool {
+    SAFETY_NET_DIRS.contains(&name)
+}
+
+/// Classify a child **directory** during discovery. `name` is its final path
+/// segment; `child_rel` is its format-root-relative, `/`-separated path;
+/// `heuristic_active` is true while no `.gitignore` governs this level; `stack`
+/// is the matcher built from the ancestor chain. Pure — no filesystem access.
+///
+/// The order mirrors discovery: the [safety nets](SAFETY_NET_DIRS) prune
+/// unconditionally; then, only while the heuristic is active, a hidden or
+/// [build-output](HEURISTIC_DIRS) directory prunes unless an explicit tsv-layer
+/// `!` re-includes it — and if instead an *anchored* `!dir/<file>` was trying to
+/// reach inside it (a no-op under the prune, by git's parent-directory rule), the
+/// verdict carries the [shadow warning](DirVerdict::PruneWithWarning); finally the
+/// matcher prunes anything it ignores. Otherwise, descend.
+pub fn classify_dir(
+    name: &str,
+    child_rel: &str,
+    heuristic_active: bool,
+    stack: &IgnoreStack,
+) -> DirVerdict {
+    // safety nets prune unconditionally
+    if is_safety_net(name) {
+        return DirVerdict::Prune;
+    }
+    // the heuristic prunes hidden + build-output dirs only while no `.gitignore`
+    // governs this level — but an explicit tsv-layer `!` re-include overrides the
+    // guess (an explicit directive beats it). `heuristic_active` implies no
+    // `.gitignore` layer is pushed, so `is_reincluded` / `has_negation_under`
+    // consult only the tsv layer. That implication is load-bearing (a stray
+    // `.gitignore` negation would otherwise leak into the override), so the
+    // CLI/JS walkers' threading of `heuristic_active` is enforced here, not trusted.
+    debug_assert!(
+        !heuristic_active || !stack.has_gitignore_layers(),
+        "heuristic_active with a .gitignore layer pushed: is_reincluded would consult .gitignore negations in the heuristic override",
+    );
+    if heuristic_active
+        && (name.starts_with('.') || HEURISTIC_DIRS.contains(&name))
+        && !stack.is_reincluded(child_rel, true)
+    {
+        // a tsv-layer `!child_rel/<file>` re-include is a silent no-op under this
+        // prune (git's parent-dir rule); the warning points at the dir-level
+        // escape that works.
+        return if stack.has_negation_under(child_rel) {
+            DirVerdict::PruneWithWarning(heuristic_shadow_warning(child_rel))
+        } else {
+            DirVerdict::Prune
+        };
+    }
+    // a dir's own ignore files don't classify the dir itself, so this tests it
+    // against the stack-so-far (its ancestors)
+    //
+    // TODO: optimization — `is_ignored` re-walks every ancestor prefix of
+    // `child_rel`, but discovery only descends into non-ignored dirs, so the
+    // ancestors are already known clean. A leaf-only matcher query (just the last
+    // segment against every layer) would be equivalent for the discovery caller
+    // and drop the O(depth) re-walk; `should_format_file`'s `is_ignored` is the
+    // same. The matcher's standalone `is_ignored` must keep the full walk (its
+    // contract is arbitrary-path), so this is a new `tsv_ignore` method + a swap
+    // here, mirrored in `cli.js`. Followup if profiling flags it.
+    if stack.is_ignored(child_rel, true) {
+        return DirVerdict::Prune;
+    }
+    DirVerdict::Descend
+}
+
+/// Whether a child **file** should be formatted: it has a formattable extension
+/// and the matcher does not ignore it. `name` is its final path segment;
+/// `child_rel` is its format-root-relative, `/`-separated path. Pure — no
+/// filesystem access. (An explicitly named file *argument* bypasses this — the
+/// ignore files govern *discovery*, which is what this drives.)
+pub fn should_format_file(name: &str, child_rel: &str, stack: &IgnoreStack) -> bool {
+    is_formattable(name) && !stack.is_ignored(child_rel, false)
+}
+
+/// The stderr warning when the build-output heuristic prunes a directory that a
+/// tsv-layer `!` rule was trying to re-include *into*. The re-include is a silent
+/// no-op — git's parent-directory rule (matched in the `.gitignore` regime) bars
+/// re-including a descendant of an excluded directory — so the message points at
+/// the dir-level escape that does work. `d` is the pruned directory, format-root
+/// relative. Produced **once**, here: [`classify_dir`] carries it in
+/// [`DirVerdict::PruneWithWarning`], and the WASM binding fetches it directly, so
+/// no caller re-templates the text.
+pub fn heuristic_shadow_warning(d: &str) -> String {
+    format!(
+        "{d} is skipped by tsv's build-output heuristic, so a `!{d}/<file>` re-include under it does nothing; re-include the directory itself with `!{d}/` (then `{d}/*` + `!{d}/<file>` to select files within it)"
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tsv_stack(content: &str) -> IgnoreStack {
+        let mut stack = IgnoreStack::new();
+        stack.push_tsv("", content);
+        stack
+    }
+
+    #[test]
+    fn is_formattable_matches_supported_extensions() {
+        assert!(is_formattable("a.ts"));
+        assert!(is_formattable("a.svelte"));
+        assert!(is_formattable("a.css"));
+        assert!(is_formattable("a.svelte.ts")); // .ts wins
+        assert!(!is_formattable("a.txt"));
+        assert!(!is_formattable("a")); // no extension
+        assert!(!is_formattable(".ts")); // bare dotfile: a stem, no extension
+        assert!(!is_formattable("Makefile"));
+    }
+
+    #[test]
+    fn is_safety_net_matches_the_constant() {
+        for name in SAFETY_NET_DIRS {
+            assert!(is_safety_net(name), "{name}");
+        }
+        assert!(!is_safety_net("src"));
+        assert!(!is_safety_net("dist")); // a heuristic dir, not a safety net
+        assert!(!is_safety_net(".github")); // a hidden dir is not a safety net
+    }
+
+    #[test]
+    fn formattable_extensions_back_is_formattable() {
+        for ext in FORMATTABLE_EXTENSIONS {
+            assert!(is_formattable(&format!("file.{ext}")), "{ext}");
+        }
+    }
+
+    #[test]
+    fn safety_nets_always_prune() {
+        // even with the heuristic off and no ignore rules
+        let stack = IgnoreStack::new();
+        for name in SAFETY_NET_DIRS {
+            assert_eq!(
+                classify_dir(name, name, false, &stack),
+                DirVerdict::Prune,
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn heuristic_prunes_hidden_and_build_dirs_when_active() {
+        let stack = IgnoreStack::new();
+        assert_eq!(
+            classify_dir(".cache", ".cache", true, &stack),
+            DirVerdict::Prune
+        );
+        for name in HEURISTIC_DIRS {
+            assert_eq!(
+                classify_dir(name, name, true, &stack),
+                DirVerdict::Prune,
+                "{name}"
+            );
+        }
+        // a normal dir descends
+        assert_eq!(
+            classify_dir("src", "src", true, &stack),
+            DirVerdict::Descend
+        );
+    }
+
+    #[test]
+    fn heuristic_off_keeps_hidden_and_build_dirs() {
+        // with the heuristic inactive (a `.gitignore` governs), a hidden or
+        // build-output dir is not a heuristic prune — only the matcher can prune it
+        let stack = IgnoreStack::new();
+        assert_eq!(
+            classify_dir("build", "build", false, &stack),
+            DirVerdict::Descend
+        );
+        assert_eq!(
+            classify_dir(".cache", ".cache", false, &stack),
+            DirVerdict::Descend
+        );
+    }
+
+    #[test]
+    fn explicit_dir_reinclude_overrides_heuristic() {
+        let stack = tsv_stack("!build/\n");
+        assert_eq!(
+            classify_dir("build", "build", true, &stack),
+            DirVerdict::Descend
+        );
+    }
+
+    #[test]
+    fn anchored_negation_under_pruned_dir_warns() {
+        let stack = tsv_stack("!build/keep.ts\n");
+        assert_eq!(
+            classify_dir("build", "build", true, &stack),
+            DirVerdict::PruneWithWarning(heuristic_shadow_warning("build")),
+        );
+    }
+
+    #[test]
+    fn floating_negation_under_pruned_dir_does_not_warn() {
+        // a floating `!keep.ts` (parsed with a leading `**`) targets any depth,
+        // not `build/` specifically, so it is a plain prune (no warning)
+        let stack = tsv_stack("!keep.ts\n");
+        assert_eq!(
+            classify_dir("build", "build", true, &stack),
+            DirVerdict::Prune
+        );
+    }
+
+    #[test]
+    fn matcher_prunes_ignored_non_heuristic_dir() {
+        // `vendored/` is not a heuristic dir, so with the heuristic off the matcher
+        // is the only thing that can prune it
+        let stack = tsv_stack("vendored/\n");
+        assert_eq!(
+            classify_dir("vendored", "vendored", false, &stack),
+            DirVerdict::Prune
+        );
+        assert_eq!(
+            classify_dir("src", "src", false, &stack),
+            DirVerdict::Descend
+        );
+    }
+
+    #[test]
+    fn should_format_file_checks_extension_and_ignore() {
+        let stack = tsv_stack("gen.ts\n");
+        assert!(should_format_file("app.ts", "src/app.ts", &stack)); // formattable, not ignored
+        assert!(!should_format_file("notes.md", "notes.md", &stack)); // wrong extension
+        assert!(!should_format_file("gen.ts", "src/gen.ts", &stack)); // ignored by the matcher
+    }
+
+    #[test]
+    fn heuristic_shadow_warning_text_is_stable() {
+        // pinned verbatim — the native CLI carries it and the WASM binding fetches
+        // it, so both surfaces emit this exact string
+        assert_eq!(
+            heuristic_shadow_warning("dist"),
+            "dist is skipped by tsv's build-output heuristic, so a `!dist/<file>` re-include under it does nothing; re-include the directory itself with `!dist/` (then `dist/*` + `!dist/<file>` to select files within it)"
+        );
+    }
+}

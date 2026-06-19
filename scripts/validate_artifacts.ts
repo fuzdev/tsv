@@ -55,8 +55,9 @@ function file_size(path: URL): number | null {
 const VARIANTS = ['format', 'parse', 'all'] as const;
 const TARGETS = ['npm', 'deno'] as const;
 
-// Measured 2026-06-11 (shape v2 — parse slimmed to parse-only, all = both
-// features): format 2,196,623 B (npm); parse 1,699,885 B; all 2,889,210 B.
+// Measured 2026-06-18 (gitignore-aware discovery: the format-gated IgnoreStack
+// replaced the single-file IgnoreMatcher): format 2,213,589 B (npm); parse
+// 1,693,043 B; all 2,896,948 B.
 const BOUNDS = {
 	format: { min: 2_020_000, max: 2_370_000 },
 	parse: { min: 1_560_000, max: 1_840_000 },
@@ -184,8 +185,41 @@ for (const { label, entry, has_format, has_parse } of smoke_targets) {
 			'format_svelte',
 			() => mod.format_svelte('<div   >x</div   >') === '<div>x</div>\n',
 		);
+		check(label, 'IgnoreStack', () => {
+			const ctor = (mod as Record<string, unknown>).IgnoreStack as
+				| (new () => {
+						push_gitignore(anchor: string, content: string): void;
+						push_tsv(anchor: string, content: string): void;
+						is_ignored(path: string, is_dir: boolean): boolean;
+						classify_dir(name: string, child_rel: string, heuristic_active: boolean): string;
+						should_format_file(name: string, child_rel: string): boolean;
+				  })
+				| undefined;
+			if (!ctor) return false;
+			const stack = new ctor();
+			stack.push_gitignore('', 'build/\n');
+			stack.push_tsv('', '!build/keep.ts\n'); // tsv layer can't re-include under an excluded dir
+			return (
+				stack.is_ignored('build/x.ts', false) &&
+				stack.is_ignored('build/keep.ts', false) &&
+				!stack.is_ignored('src/x.ts', false) &&
+				// the tsv_discover verdict methods (the format-only package's primary
+				// discovery exports)
+				stack.classify_dir('node_modules', 'node_modules', true) === 'prune' && // safety net
+				stack.classify_dir('build', 'build', false) === 'prune' && // gitignored dir
+				stack.classify_dir('src', 'src', false) === 'descend' &&
+				stack.should_format_file('app.ts', 'src/app.ts') === true &&
+				stack.should_format_file('x.ts', 'build/x.ts') === false && // ignored
+				stack.should_format_file('notes.md', 'notes.md') === false // wrong extension
+			);
+		});
 	} else {
 		check(label, 'format_* absent (parse-only build)', () => mod.format_typescript === undefined);
+		check(
+			label,
+			'IgnoreStack absent (parse-only build)',
+			() => (mod as Record<string, unknown>).IgnoreStack === undefined,
+		);
 	}
 	if (has_parse) {
 		check(

@@ -1,0 +1,232 @@
+{
+	"_doc": "Shared discovery-parity scenarios, run against BOTH discovery walkers: the native `tsv_cli::cli::discover::discover_files` (tests/discovery_parity.rs) and the WASM `cli.js` (scripts/test_npm.ts). One source of truth so the two implementations can't drift. The matcher itself is checked against real `git check-ignore` by tsv_ignore's git_oracle; this table pins the WALK (repo-root detection, hierarchical layering, the build-output heuristic, explicit-arg bypass, the .git boundary). Each scenario materializes `tree` in a fresh tempdir (string value = file, null = empty directory; `.git`/`repo/.git` entries make a dir look like a repo root without a real git binary), then for every case runs `format --list <root>/<target>` and asserts the in-scope files, relative to the tempdir root, in exact sorted order. Names are ASCII so Rust's PathBuf order and cli.js's compare_paths agree (see cli.js compare_paths for the astral-plane/Windows caveat).",
+	"scenarios": [
+		{
+			"name": "respects_prettierignore",
+			"note": "repo-root .prettierignore (no .formatignore to shadow it) prunes a dir + a glob",
+			"tree": {
+				".git/": null,
+				".prettierignore": "generated/\n*.min.ts\n",
+				"src/keep.ts": "x",
+				"generated/skip.ts": "x",
+				"vendor.min.ts": "x"
+			},
+			"cases": [{"target": "", "expected": ["src/keep.ts"]}]
+		},
+		{
+			"name": "formatignore_shadows_prettierignore",
+			"note": "in a repo, a repo-root .formatignore is used ALONE — the repo-root .prettierignore is not read, so its pattern has no effect (p_only.ts stays in scope)",
+			"tree": {
+				".git/": null,
+				".prettierignore": "p_only.ts\n",
+				".formatignore": "f_only.ts\n",
+				"p_only.ts": "x",
+				"f_only.ts": "x",
+				"keep.ts": "x"
+			},
+			"cases": [{"target": "", "expected": ["keep.ts", "p_only.ts"]}]
+		},
+		{
+			"name": "gitignore_prunes_and_heuristic_off",
+			"note": "a .gitignore is authoritative: gitignored dist/ is pruned, but a non-gitignored build/ (which the old heuristic wrongly skipped) is in scope",
+			"tree": {
+				".git/": null,
+				".gitignore": "dist/\n",
+				"build/src.ts": "x",
+				"dist/out.ts": "x"
+			},
+			"cases": [{"target": "", "expected": ["build/src.ts"]}]
+		},
+		{
+			"name": "nested_gitignore_reinclude",
+			"note": "root ignores *.gen.ts; a deeper .gitignore re-includes one file (git's deeper-wins)",
+			"tree": {
+				".git/": null,
+				".gitignore": "*.gen.ts\n",
+				"sub/.gitignore": "!keep.gen.ts\n",
+				"a.gen.ts": "x",
+				"sub/keep.gen.ts": "x",
+				"sub/other.gen.ts": "x"
+			},
+			"cases": [{"target": "", "expected": ["sub/keep.gen.ts"]}]
+		},
+		{
+			"name": "subdir_target_finds_repo_root_ignores",
+			"note": "targeting a subdir still walks up to the repo-root .git and applies the repo-root .gitignore AND .formatignore",
+			"tree": {
+				".git/": null,
+				".gitignore": "vendored/\n",
+				".formatignore": "snap/\n",
+				"pkg/keep.ts": "x",
+				"pkg/vendored/v.ts": "x",
+				"pkg/snap/s.ts": "x"
+			},
+			"cases": [{"target": "pkg", "expected": ["pkg/keep.ts"]}]
+		},
+		{
+			"name": "git_repo_without_gitignore_keeps_heuristic",
+			"note": "a repo with no .gitignore keeps the heuristic on — dist/ stays skipped",
+			"tree": {
+				".git/": null,
+				"a.ts": "x",
+				"dist/out.ts": "x"
+			},
+			"cases": [{"target": "", "expected": ["a.ts"]}]
+		},
+		{
+			"name": "formatignore_reincludes_gitignored_file",
+			"note": "the tsv layer is applied after .gitignore, so a .formatignore `!` re-includes a file-level gitignore exclusion",
+			"tree": {
+				".git/": null,
+				".gitignore": "config.ts\n",
+				".formatignore": "!config.ts\n",
+				"config.ts": "x"
+			},
+			"cases": [{"target": "", "expected": ["config.ts"]}]
+		},
+		{
+			"name": "skips_other_vcs_dirs",
+			"note": ".hg/.svn/.jj are safety nets, pruned even in a git tree whose authoritative .gitignore (heuristic off) doesn't mention them",
+			"tree": {
+				".git/": null,
+				".gitignore": "*.log\n",
+				".hg/x.ts": "x",
+				".svn/x.ts": "x",
+				".jj/x.ts": "x",
+				"a.ts": "x"
+			},
+			"cases": [{"target": "", "expected": ["a.ts"]}]
+		},
+		{
+			"name": "explicit_file_bypasses_ignore",
+			"note": "discovery skips an ignored file, but naming it explicitly puts it in scope (the ignore files govern discovery, not explicit args)",
+			"tree": {
+				".git/": null,
+				".prettierignore": "skip.ts\n",
+				"skip.ts": "x",
+				"keep.ts": "x"
+			},
+			"cases": [
+				{"target": "", "expected": ["keep.ts"]},
+				{"target": "skip.ts", "expected": ["skip.ts"]}
+			]
+		},
+		{
+			"name": "list_in_scope_honors_ignores",
+			"note": "the in-scope set honors a dir prune (build/) and a glob (*.snap)",
+			"tree": {
+				".git/": null,
+				".gitignore": "build/\n*.snap\n",
+				"a.ts": "x",
+				"b.snap": "x",
+				"build/out.ts": "x"
+			},
+			"cases": [{"target": "", "expected": ["a.ts"]}]
+		},
+		{
+			"name": "fully_ignored_target_is_empty",
+			"note": "a target entirely under an ignored dir discovers nothing (an empty scope is a valid answer)",
+			"tree": {
+				".git/": null,
+				".gitignore": "build/\n",
+				"build/out.ts": "x"
+			},
+			"cases": [{"target": "build", "expected": []}]
+		},
+		{
+			"name": "cwd_independent_decision",
+			"note": "a non-repo project's own .formatignore prunes gen/ (gen/ is not a heuristic dir, so the ignore file is the only thing that can skip it)",
+			"tree": {
+				".formatignore": "gen/\n",
+				"src.ts": "x",
+				"gen/out.ts": "x"
+			},
+			"cases": [{"target": "", "expected": ["src.ts"]}]
+		},
+		{
+			"name": "subtree_consistent_direct_vs_via_root",
+			"note": "targeting a subdir directly vs via the repo root yields the same decisions for that subdir — the repo-root .gitignore applies either way",
+			"tree": {
+				".git/": null,
+				".gitignore": "vendored/\n",
+				"pkg/keep.ts": "x",
+				"pkg/vendored/v.ts": "x"
+			},
+			"cases": [
+				{"target": "pkg", "expected": ["pkg/keep.ts"]},
+				{"target": "", "expected": ["pkg/keep.ts"]}
+			]
+		},
+		{
+			"name": "reinclude_overrides_heuristic",
+			"note": "with no .gitignore the build/dist/target heuristic is on, but an explicit .formatignore `!build/` re-includes the dir over the guess",
+			"tree": {
+				".formatignore": "!build/\n",
+				"src.ts": "x",
+				"build/out.ts": "x"
+			},
+			"cases": [{"target": "", "expected": ["build/out.ts", "src.ts"]}]
+		},
+		{
+			"name": "formatignore_is_hierarchical",
+			"note": "a nested .formatignore governs its subtree; a deeper `!` re-includes",
+			"tree": {
+				".git/": null,
+				".formatignore": "*.gen.ts\n",
+				"src/.formatignore": "!keep.gen.ts\n",
+				"a.gen.ts": "x",
+				"src/keep.gen.ts": "x",
+				"src/drop.gen.ts": "x",
+				"src/main.ts": "x"
+			},
+			"cases": [{"target": "", "expected": ["src/keep.gen.ts", "src/main.ts"]}]
+		},
+		{
+			"name": "prettierignore_is_repo_root_only",
+			"note": "a repo-root .prettierignore is honored; a nested one is NOT (only .formatignore is hierarchical)",
+			"tree": {
+				".git/": null,
+				".prettierignore": "rootskip.ts\n",
+				"sub/.prettierignore": "subskip.ts\n",
+				"rootskip.ts": "x",
+				"sub/subskip.ts": "x",
+				"sub/keep.ts": "x"
+			},
+			"cases": [{"target": "", "expected": ["sub/keep.ts", "sub/subskip.ts"]}]
+		},
+		{
+			"name": "no_borrowed_ignores_outside_repo",
+			"note": "outside a repo, neither .prettierignore nor .gitignore is consulted; only the native .formatignore governs",
+			"tree": {
+				".prettierignore": "pp.ts\n",
+				".gitignore": "gg.ts\n",
+				".formatignore": "ff.ts\n",
+				"pp.ts": "x",
+				"gg.ts": "x",
+				"ff.ts": "x",
+				"keep.ts": "x"
+			},
+			"cases": [{"target": "", "expected": ["gg.ts", "keep.ts", "pp.ts"]}]
+		},
+		{
+			"name": "git_boundary_blocks_ancestor_formatignore",
+			"note": "the .git boundary is the hard stop: an ancestor .formatignore ABOVE the repo must not reach inside it",
+			"tree": {
+				".formatignore": "*.ts\n",
+				"repo/.git/": null,
+				"repo/a.ts": "x"
+			},
+			"cases": [{"target": "repo", "expected": ["repo/a.ts"]}]
+		},
+		{
+			"name": "ancestor_formatignore_applies_outside_repo",
+			"note": "outside any repo, an ancestor .formatignore governs descendants (filesystem-as-API / global config)",
+			"tree": {
+				".formatignore": "*.gen.ts\n",
+				"proj/a.gen.ts": "x",
+				"proj/main.ts": "x"
+			},
+			"cases": [{"target": "proj", "expected": ["proj/main.ts"]}]
+		}
+	]
+}

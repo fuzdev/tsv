@@ -1,0 +1,14 @@
+[package]
+name = "tsv_discover"
+version.workspace = true
+edition.workspace = true
+description = "tsv file-discovery policy: build-output heuristic + safety-net pruning over a tsv_ignore matcher"
+
+[dependencies]
+# Only the matcher. Zero external dependencies by design (like tsv_ignore),
+# keeping the format-only WASM artifact tiny and sidestepping the
+# dependency-approval gate. See CLAUDE.md.
+tsv_ignore = { workspace = true }
+
+[lints]
+workspace = true
