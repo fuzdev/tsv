@@ -1009,18 +1009,20 @@ impl<'a> Printer<'a> {
         block: &internal::AwaitBlock,
         in_multiline_context: bool,
     ) -> DocId {
-        self.build_await_block_doc_with_full_context(block, in_multiline_context, false)
+        self.build_await_block_doc_with_full_context(block, in_multiline_context, false, None)
     }
 
     /// Build await block doc with full context (multiline + preceding content).
     ///
-    /// Note: `{#await}` does not participate in the axis-3 sibling-`>` dangle (its body
-    /// doesn't drop cleanly after an inline sibling) — see `try_block_sibling_gt_dangle`.
+    /// `gt_prefix`: a preceding inline-element sibling's split-off closing `>` to fold into
+    /// the block's inline-vs-multiline decision (axis-3 sibling-`>` dangle). Only passed for
+    /// the expanding path (see `build_block_node_doc_with_gt`).
     pub(super) fn build_await_block_doc_with_full_context(
         &self,
         block: &internal::AwaitBlock,
         in_multiline_context: bool,
         has_preceding_breakable: bool,
+        gt_prefix: Option<DocId>,
     ) -> DocId {
         let d = self.d();
         // Build expression doc with context-dependent behavior
@@ -1054,6 +1056,13 @@ impl<'a> Printer<'a> {
             .iter()
             .filter_map(|f| f.as_ref())
             .all(|f| self.fragment_inline_authored(f, in_multiline_context));
+        // Uniform body-drop: when every present section is inline-authored, the body +
+        // `{:then}`/`{:catch}` keywords + `{/await}` drop to their own lines on overflow.
+        // Keyed on `can_wrap` — the same gate `{#if}`/`{#each}` use — so the body hugs in the
+        // inline-content/hug-both path (`can_wrap` false) but drops in the multiline-fragment
+        // path. A block-parent sibling routes await through the multiline path via
+        // `has_control_flow_after_sibling` (so `can_wrap` is true there); an inline parent
+        // keeps `can_wrap` false and hugs, matching `{#if}`/`{#each}`.
         if can_wrap && has_section && all_sections_inline {
             // Shorthand clause lives in the head: `then v` (value, no pending) or
             // `catch e` (error, no value/pending); the full form has none.
@@ -1076,7 +1085,12 @@ impl<'a> Printer<'a> {
             );
             let inline_tail = self.build_await_tail(block, false);
             let multiline_tail = self.build_await_tail(block, true);
-            return self.build_expanding_construct(head_doc, inline_tail, multiline_tail, None);
+            return self.build_expanding_construct(
+                head_doc,
+                inline_tail,
+                multiline_tail,
+                gt_prefix,
+            );
         }
 
         let mut parts: Vec<DocId> = Vec::new();
@@ -1417,16 +1431,28 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Build a doc for a snippet block
-    ///
-    /// Uses same inline/multiline pattern as if blocks.
-    /// Opening tag uses group() for parameter wrapping when they exceed print width.
-    ///
-    /// Note: `{#snippet}` does not participate in the axis-3 sibling-`>` dangle (its
-    /// `BlockHead` opening group decouples the body-drop from the `>` fold) — see
-    /// `try_block_sibling_gt_dangle`.
+    /// Build a doc for a snippet block (no preceding context / sibling `>`).
     pub(crate) fn build_snippet_block_doc(&self, block: &internal::SnippetBlock) -> DocId {
+        self.build_snippet_block_doc_with_full_context(block, false, false, None)
+    }
+
+    /// Build a doc for a snippet block with full context (multiline + preceding content +
+    /// optional sibling `>` fold).
+    ///
+    /// Uses same inline/multiline pattern as if blocks. Opening tag uses group() for
+    /// parameter wrapping when they exceed print width. The body-drop keys on `can_wrap`
+    /// (like `{#if}`/`{#each}`/`{#await}`): it hugs in the inline-content/hug-both path
+    /// (`can_wrap` false) and drops in the multiline-fragment path.
+    pub(crate) fn build_snippet_block_doc_with_full_context(
+        &self,
+        block: &internal::SnippetBlock,
+        in_multiline_context: bool,
+        has_preceding_breakable: bool,
+        gt_prefix: Option<DocId>,
+    ) -> DocId {
         let d = self.d();
+        let allow_wrapping = !has_preceding_breakable;
+        let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
         // Extract snippet name from the identifier expression
         let name = self.extract_source_range(
             block.expression.span().start_usize(),
@@ -1519,9 +1545,9 @@ impl<'a> Printer<'a> {
         // Inline-authored body: expand the body + `{/snippet}` onto their own lines
         // when the construct overflows (params wrap, or head + body exceeds width) —
         // uniformly, including paramless snippets. Keyed to the opening group above.
-        if is_inline && self.block_dangle_allowed() {
+        if is_inline && can_wrap {
             let close = d.text("{/snippet}");
-            return self.build_expanding_block(opening_doc, body_doc, close, None);
+            return self.build_expanding_block(opening_doc, body_doc, close, gt_prefix);
         }
 
         let mut parts = vec![opening_doc];

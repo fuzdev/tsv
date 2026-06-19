@@ -5,11 +5,15 @@ element's closing `>` onto its own line so the block head starts fresh
 (`</span⏎>{#if…}`). A short block that stays inline keeps the `>` hugged. Prettier keeps
 the `>` hugged in both.
 
-- **Dangle case** — `<span>text</span>` directly before a `{#if}` whose body overflows:
-  the `</span>` closing `>` drops to the block-head line. `{#each}` and `{#key}` dangle
-  identically (the rule is uniform across all three heads).
+- **Dangle case** — `<span>text</span>` directly before a block whose body overflows:
+  the `</span>` closing `>` drops to the block-head line. The rule is uniform across
+  **all five block heads** — `{#if}`, `{#each}`, `{#key}`, `{#await}`, and `{#snippet}`.
 - **Control** — the same `<span>` before a short `{#if cond}text{/if}` that stays
   inline: the `>` keeps hugging (no dangle), because the block never goes multiline.
+
+`{#await}` / `{#snippet}` don't force their parent multiline on their own (a lone block
+stays inline, matching prettier), but a preceding sibling routes them through the same
+multiline layout the others use, so the dangle resolves in one pass.
 
 The dangle moves the `>` only *inside* the closing tag (`</span⏎>`), injecting no
 whitespace between `</span>` and `{#if}`, so it parses to a byte-identical AST — it is

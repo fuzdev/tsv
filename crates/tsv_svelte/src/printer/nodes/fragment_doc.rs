@@ -128,13 +128,7 @@ impl<'a> Printer<'a> {
             }
 
             // For control flow blocks, check if there's preceding breakable content
-            let is_control_flow = matches!(
-                node,
-                FragmentNode::IfBlock(_)
-                    | FragmentNode::EachBlock(_)
-                    | FragmentNode::AwaitBlock(_)
-                    | FragmentNode::KeyBlock(_)
-            );
+            let is_control_flow = super::helpers::is_control_flow_block(node);
             let doc = if is_control_flow {
                 // "Breakable preceding content" is exactly the inline-content set — text never
                 // breaks before a control-flow block, so reuse the one predicate.
@@ -1025,30 +1019,16 @@ impl<'a> Printer<'a> {
             FragmentNode::SpecialElement(element) => Some(self.build_special_element_doc(element)),
             FragmentNode::ExpressionTag(tag) => Some(self.build_expression_tag_doc(tag)),
             FragmentNode::Comment(comment) => Some(self.build_html_comment_doc(comment)),
-            FragmentNode::IfBlock(block) => Some(self.build_if_block_doc_with_full_context(
-                block,
+            FragmentNode::IfBlock(_)
+            | FragmentNode::EachBlock(_)
+            | FragmentNode::AwaitBlock(_)
+            | FragmentNode::KeyBlock(_)
+            | FragmentNode::SnippetBlock(_) => self.build_control_flow_block_doc(
+                node,
                 in_multiline_context,
                 has_preceding_breakable,
                 None,
-            )),
-            FragmentNode::EachBlock(block) => Some(self.build_each_block_doc_with_full_context(
-                block,
-                in_multiline_context,
-                has_preceding_breakable,
-                None,
-            )),
-            FragmentNode::AwaitBlock(block) => Some(self.build_await_block_doc_with_full_context(
-                block,
-                in_multiline_context,
-                has_preceding_breakable,
-            )),
-            FragmentNode::KeyBlock(block) => Some(self.build_key_block_doc_with_full_context(
-                block,
-                in_multiline_context,
-                has_preceding_breakable,
-                None,
-            )),
-            FragmentNode::SnippetBlock(block) => Some(self.build_snippet_block_doc(block)),
+            ),
             FragmentNode::HtmlTag(tag) => Some(self.build_html_tag_doc(tag)),
             FragmentNode::ConstTag(tag) => Some(self.build_const_tag_doc(tag)),
             FragmentNode::DebugTag(tag) => Some(self.build_debug_tag_doc(tag)),
@@ -1071,12 +1051,12 @@ impl<'a> Printer<'a> {
     /// - a conditional block (an inline-authored body that may stay inline or expand on
     ///   width) folds the `>` into its own inline-vs-multiline `conditional_group`.
     ///
-    /// Limited to `{#if}` / `{#each}` / `{#key}` — the blocks whose body drops cleanly to
-    /// its own line after an inline sibling, keeping the dangle a one-pass fixed point.
-    /// `{#await}` and `{#snippet}` are deferred (see `conformance_prettier.md` §Svelte:
-    /// Blocks): await's body doesn't drop after a sibling (a pre-existing quirk — it
-    /// breaks the element's attributes instead), and snippet's `BlockHead` opening group
-    /// decouples the body-drop from the `>` fold; both would be 2-pass non-idempotent.
+    /// Applies to all five block heads (`{#if}` / `{#each}` / `{#key}` / `{#await}` /
+    /// `{#snippet}`). A control-flow block with any preceding sibling routes its block
+    /// parent through the multiline-fragment layout (`has_control_flow_after_sibling` →
+    /// `compute_needs_multiline`), so the block's body-drop keys on `can_wrap` (true here)
+    /// and the dangle is a one-pass fixed point — including for `{#await}` / `{#snippet}`,
+    /// whose body-drop is likewise gated on `can_wrap`.
     fn try_block_sibling_gt_dangle(
         &self,
         trimmed_nodes: &[FragmentNode],
@@ -1085,7 +1065,11 @@ impl<'a> Printer<'a> {
         let block = trimmed_nodes.get(i)?;
         if !matches!(
             block,
-            FragmentNode::IfBlock(_) | FragmentNode::EachBlock(_) | FragmentNode::KeyBlock(_)
+            FragmentNode::IfBlock(_)
+                | FragmentNode::EachBlock(_)
+                | FragmentNode::KeyBlock(_)
+                | FragmentNode::AwaitBlock(_)
+                | FragmentNode::SnippetBlock(_)
         ) {
             return None;
         }
@@ -1112,24 +1096,59 @@ impl<'a> Printer<'a> {
         Some((element_doc, block_doc))
     }
 
-    /// Dispatch a control-flow block (`{#if}` / `{#each}` / `{#key}`), threading a
-    /// preceding sibling's split-off closing `>` (`gt`) into its expanding layout. Mirrors
-    /// the block arms of `build_fragment_node_doc_impl` (in-multiline context, no preceding
-    /// breakable). `{#await}` / `{#snippet}` are not handled here — see the caller's gate.
+    /// Dispatch a control-flow block (`{#if}` / `{#each}` / `{#key}` / `{#await}` /
+    /// `{#snippet}`) to its `_with_full_context` builder with shared context: multiline
+    /// flag, preceding-breakable flag, and an optional preceding sibling's split-off closing
+    /// `>` (`gt_prefix`) to fold into the expanding layout. Returns `None` for any
+    /// non-control-flow node. The single wiring point for both the normal fragment dispatch
+    /// (`build_fragment_node_doc_impl`) and the sibling-`>` dangle (`build_block_node_doc_with_gt`).
+    fn build_control_flow_block_doc(
+        &self,
+        node: &FragmentNode,
+        in_multiline_context: bool,
+        has_preceding_breakable: bool,
+        gt_prefix: Option<DocId>,
+    ) -> Option<DocId> {
+        Some(match node {
+            FragmentNode::IfBlock(b) => self.build_if_block_doc_with_full_context(
+                b,
+                in_multiline_context,
+                has_preceding_breakable,
+                gt_prefix,
+            ),
+            FragmentNode::EachBlock(b) => self.build_each_block_doc_with_full_context(
+                b,
+                in_multiline_context,
+                has_preceding_breakable,
+                gt_prefix,
+            ),
+            FragmentNode::KeyBlock(b) => self.build_key_block_doc_with_full_context(
+                b,
+                in_multiline_context,
+                has_preceding_breakable,
+                gt_prefix,
+            ),
+            FragmentNode::AwaitBlock(b) => self.build_await_block_doc_with_full_context(
+                b,
+                in_multiline_context,
+                has_preceding_breakable,
+                gt_prefix,
+            ),
+            FragmentNode::SnippetBlock(b) => self.build_snippet_block_doc_with_full_context(
+                b,
+                in_multiline_context,
+                has_preceding_breakable,
+                gt_prefix,
+            ),
+            _ => return None,
+        })
+    }
+
+    /// Dispatch a control-flow block, threading a preceding sibling's split-off closing `>`
+    /// (`gt`) into its expanding layout (in-multiline context, no preceding breakable — the
+    /// dangle path forces both). See `build_control_flow_block_doc` and the caller's gate.
     fn build_block_node_doc_with_gt(&self, node: &FragmentNode, gt: DocId) -> Option<DocId> {
-        let gp = Some(gt);
-        match node {
-            FragmentNode::IfBlock(b) => {
-                Some(self.build_if_block_doc_with_full_context(b, true, false, gp))
-            }
-            FragmentNode::EachBlock(b) => {
-                Some(self.build_each_block_doc_with_full_context(b, true, false, gp))
-            }
-            FragmentNode::KeyBlock(b) => {
-                Some(self.build_key_block_doc_with_full_context(b, true, false, gp))
-            }
-            _ => None,
-        }
+        self.build_control_flow_block_doc(node, true, false, Some(gt))
     }
 
     //
