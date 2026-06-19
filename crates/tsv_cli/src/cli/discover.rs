@@ -294,7 +294,6 @@ fn collect_recursive(
                 continue;
             }
         };
-        let path = entry.path();
         let name = name.to_string_lossy();
         let child_rel = if dir_rel.is_empty() {
             name.to_string()
@@ -317,10 +316,18 @@ fn collect_recursive(
                 DirVerdict::Descend => {}
             }
             // the child reads its own ignore files (and pushes/pops its own layers)
-            // when we recurse into it
-            collect_recursive(&path, &child_rel, in_repo, stack, child_heuristic, out);
+            // when we recurse into it. `entry.path()` is built only here, so a
+            // pruned dir or a non-formatted file never pays for the allocation.
+            collect_recursive(
+                &entry.path(),
+                &child_rel,
+                in_repo,
+                stack,
+                child_heuristic,
+                out,
+            );
         } else if file_type.is_file() && should_format_file(&name, &child_rel, stack) {
-            out.files.push(path);
+            out.files.push(entry.path());
         }
     }
 
