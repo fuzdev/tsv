@@ -117,6 +117,31 @@ impl IgnoreStack {
         tsv_discover::heuristic_shadow_warning(dir)
     }
 
+    /// The `.prettierignore`-outside-a-repo warning text for the target root `dir`
+    /// (its display path), delegating to
+    /// `tsv_discover::prettierignore_outside_repo_warning`. Returns `undefined`
+    /// (the JS view of `None`) unless, outside a git repo, a target-root
+    /// `.prettierignore` is present and unshadowed by a sibling `.formatignore`.
+    /// A method (not a free function) so it rides the `IgnoreStack` class
+    /// re-export through the package facade; the receiver is unused. The JS CLI
+    /// calls this once at the target root and pushes any returned string into its
+    /// warnings channel — single source of truth with the native CLI, never
+    /// templated in JS.
+    pub fn prettierignore_outside_repo_warning(
+        &self,
+        dir: &str,
+        in_repo: bool,
+        has_prettierignore: bool,
+        has_formatignore: bool,
+    ) -> Option<String> {
+        tsv_discover::prettierignore_outside_repo_warning(
+            dir,
+            in_repo,
+            has_prettierignore,
+            has_formatignore,
+        )
+    }
+
     /// Whether no layer carries any rule — callers skip per-path matching.
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()

@@ -4,8 +4,9 @@
 //! format-root-relative path.
 //!
 //! This is the single home of the build-output heuristic, the always-pruned
-//! safety nets, the formattable-extension check, and the heuristic-shadow
-//! warning text. The three discovery surfaces — the native CLI (`tsv_cli`), the
+//! safety nets, the formattable-extension check, the heuristic-shadow warning
+//! text, and the `.prettierignore`-outside-a-repo warning. The three discovery
+//! surfaces — the native CLI (`tsv_cli`), the
 //! WASM CLI (`tsv_wasm`'s `npm/cli.js`), and the VS Code extension — call it
 //! instead of reimplementing the decision, so they agree **by construction**
 //! rather than by hand-mirrored constants and templates.
@@ -184,6 +185,42 @@ pub fn heuristic_shadow_warning(d: &str) -> String {
     )
 }
 
+/// The stderr warning when a `.prettierignore` sits in the **target root**
+/// directory but the run is **outside a git repo** — where tsv reads
+/// `.formatignore` (hierarchically) but never `.prettierignore`. Prettier would
+/// honor a cwd-level `.prettierignore`; tsv silently would not, so the message
+/// points at the two fixes (rename to `.formatignore`, or `git init`). `dir` is
+/// the target root's display path.
+///
+/// Returns `None` unless **all** hold: outside a repo (`!in_repo`), a
+/// `.prettierignore` is present (`has_prettierignore`), and no sibling
+/// `.formatignore` supersedes it (`!has_formatignore` — its presence means the
+/// native file was adopted, so the `.prettierignore` is vestigial and silence is
+/// correct).
+///
+/// The caller invokes this **once, at the target root**. An ancestor
+/// `.prettierignore` of a subdirectory target is deliberately *not* this case
+/// (outside a repo there is no boundary to bound an upward search), and a nested
+/// `.prettierignore` below the root is unread by prettier too (so not a
+/// divergence to flag). Presence-only — an empty or comments-only
+/// `.prettierignore` still warns (rare, and the message still points at the right
+/// fix); the caller learns presence from the directory listing it already holds,
+/// so this costs no extra filesystem access. Produced **once**, here, like
+/// `heuristic_shadow_warning`, so the native CLI and the WASM binding emit the
+/// identical text.
+pub fn prettierignore_outside_repo_warning(
+    dir: &str,
+    in_repo: bool,
+    has_prettierignore: bool,
+    has_formatignore: bool,
+) -> Option<String> {
+    (!in_repo && has_prettierignore && !has_formatignore).then(|| {
+        format!(
+            ".prettierignore in {dir} is not read outside a git repo (tsv reads .formatignore there); rename it to .formatignore, or run `git init`, for it to apply"
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331,6 +368,29 @@ mod tests {
         assert_eq!(
             heuristic_shadow_warning("dist"),
             "dist is skipped by tsv's build-output heuristic, so a `!dist/<file>` re-include under it does nothing; re-include the directory itself with `!dist/` (then `dist/*` + `!dist/<file>` to select files within it)"
+        );
+    }
+
+    #[test]
+    fn prettierignore_outside_repo_warns_only_when_unshadowed_outside_a_repo() {
+        // the footgun: outside a repo, a target-root `.prettierignore` with no
+        // `.formatignore` beside it is silently skipped → warn
+        assert!(prettierignore_outside_repo_warning("proj", false, true, false).is_some());
+        // inside a repo the repo-root `.prettierignore` IS read → no warning
+        assert!(prettierignore_outside_repo_warning("proj", true, true, false).is_none());
+        // a sibling `.formatignore` supersedes it (native file adopted) → no warning
+        assert!(prettierignore_outside_repo_warning("proj", false, true, true).is_none());
+        // no `.prettierignore` present → nothing to warn about
+        assert!(prettierignore_outside_repo_warning("proj", false, false, false).is_none());
+    }
+
+    #[test]
+    fn prettierignore_outside_repo_warning_text_is_stable() {
+        // pinned verbatim — the native CLI and the WASM binding emit this exact
+        // string, so both surfaces stay in lockstep
+        assert_eq!(
+            prettierignore_outside_repo_warning(".", false, true, false).unwrap(),
+            ".prettierignore in . is not read outside a git repo (tsv reads .formatignore there); rename it to .formatignore, or run `git init`, for it to apply"
         );
     }
 }
