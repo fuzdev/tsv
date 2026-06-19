@@ -85,9 +85,10 @@ jobs:
   # + wasm-opt), so the two can't drift.
   artifacts:
     runs-on: ubuntu-latest
-    # Gate behind `check` so a PR that fails basic checks doesn't burn the
-    # build; costs some latency on green PRs.
-    needs: check
+    # Runs in parallel with `check` (no `needs:`) so PR wall-clock is
+    # max(check, artifacts), not the sum. Tradeoff: a PR that fails `check`
+    # still burns the artifact build. Re-add `needs: check` to trade that
+    # latency back for not spending build minutes on red PRs.
     # Generous headroom over the cold wasm-only build (6 wasm-pack release builds
     # + wasm-opt; wasm-pack itself is now a prebuilt download, not a source
     # compile) — well short of the 6h default so a hang fails fast.
