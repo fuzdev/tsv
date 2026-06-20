@@ -74,6 +74,30 @@ impl<'a> Printer<'a> {
         None
     }
 
+    /// Find an angle-bracket type assertion's closing `>` in `[start, end)`,
+    /// skipping any `>` that sits inside a comment or string (`<T /* > */>x`).
+    ///
+    /// `start` is the type's end, `end` the asserted expression's start, so the
+    /// first bare `>` between them is the cast's close. Returns `end` as a safe
+    /// fallback if none is found (an impossible shape for a valid assertion) —
+    /// that routes any in-range comments to the before-`>` side rather than
+    /// dropping them.
+    pub(crate) fn find_assertion_close_angle(&self, start: u32, end: u32) -> u32 {
+        let source = self.source.as_bytes();
+        let end_usize = end as usize;
+        let mut i = start as usize;
+        while i < end_usize {
+            if source[i] == b'>' {
+                return i as u32;
+            }
+            if let Some(skip) = skip_string_or_comment(source, i, end_usize) {
+                i = skip;
+            }
+            i += 1;
+        }
+        end
+    }
+
     /// Find the position of the LAST comma in `[start, end)`, or `None`.
     ///
     /// Walks forward via `find_comma_after`, so it correctly skips commas
