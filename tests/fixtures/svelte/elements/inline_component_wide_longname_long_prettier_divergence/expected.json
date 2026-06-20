@@ -1,0 +1,124 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 466,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 224,
+				"data": " Long component name: a wide inline component drops to its own line and the\n     preceding word stays hugged on the text line (it is not stranded). Pins that\n     the boundary break is independent of tag-name length. "
+			},
+			{
+				"type": "Text",
+				"start": 224,
+				"end": 225,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 225,
+				"end": 465,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 226
+					},
+					"end": {
+						"line": 4,
+						"column": 2,
+						"character": 227
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 228,
+							"end": 325,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaaaaaaaaaaaa and\n\t",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaaaaaaaaaaaa and\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 325,
+							"end": 423,
+							"name": "VeryLongComponentName",
+							"name_loc": {
+								"start": {
+									"line": 6,
+									"column": 2,
+									"character": 326
+								},
+								"end": {
+									"line": 6,
+									"column": 23,
+									"character": 347
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 348,
+									"end": 391,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 6,
+											"column": 24,
+											"character": 348
+										},
+										"end": {
+											"line": 6,
+											"column": 28,
+											"character": 352
+										}
+									},
+									"value": [
+										{
+											"start": 354,
+											"end": 390,
+											"type": "Text",
+											"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+											"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 392,
+										"end": 399,
+										"raw": "content",
+										"data": "content"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 423,
+							"end": 461,
+							"raw": "\n\ttail1 tail2 tail3 tail4 tail5 tail6\n",
+							"data": "\n\ttail1 tail2 tail3 tail4 tail5 tail6\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
