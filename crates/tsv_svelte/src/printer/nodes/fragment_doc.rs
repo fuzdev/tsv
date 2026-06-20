@@ -643,16 +643,19 @@ impl<'a> Printer<'a> {
                 prev_text_has_trailing_space = false;
             } else if let FragmentNode::Text(text) = node {
                 // The fold below (breakable whitespace boundary) targets the closing tag of an
-                // immediately-preceding *inline* element — the only construct whose `>` would
-                // otherwise be split off on its own. Block elements flush the current line, and
-                // expression tags / other content have no closing `>` and keep prettier's own
-                // break behavior, so restrict the fold to inline elements explicitly.
-                let prev_is_inline_element = i > 0
-                    && matches!(
-                        &trimmed_nodes[i - 1],
-                        FragmentNode::Element(_) | FragmentNode::SpecialElement(_)
-                    )
-                    && !self.is_block_fragment_node(&trimmed_nodes[i - 1]);
+                // immediately-preceding *inline* element/component — the only construct whose `>`
+                // would otherwise be split off on its own. Block elements flush the current line,
+                // and expression tags / other content have no closing `>` and keep prettier's own
+                // break behavior, so restrict the fold to the flowing inline set explicitly.
+                let prev_is_inline_element =
+                    i > 0 && self.is_inline_el_or_comp(&trimmed_nodes[i - 1]);
+                // Whether the node *after* this text is also in that flowing set. When it is, the
+                // text's trailing boundary becomes a `fill` `line` (Fill idempotency) rather than a
+                // hard space, so the last word hugs and the over-wide child drops on its own line —
+                // independent of tag-name length.
+                let next_node_is_flow = trimmed_nodes
+                    .get(i + 1)
+                    .is_some_and(|n| self.is_inline_el_or_comp(n));
                 // Text - split on newlines to preserve source line structure
                 if text.raw.is_whitespace_only() {
                     let newline_count = text.raw.chars().filter(|&c| c == '\n').count();
@@ -752,11 +755,20 @@ impl<'a> Printer<'a> {
                                 }
                             }
                         }
+                        // Only the LAST merged part borders the next *node*; an earlier part's
+                        // trailing edge is internal to this text node (a collapsed newline), so
+                        // it never wants the flow-boundary `line`.
+                        let part_next_is_flow = next_node_is_flow && idx == merged_parts.len() - 1;
                         // Emit this part's words, folding into a preceding inline element when
                         // the boundary allows so the line can break after its closing `>`
                         // (keeping the `>` intact) instead of the element splitting it off. A
                         // collapsed newline becomes the source space.
-                        if self.emit_text_part(&mut current_line, part, prev_is_inline_element) {
+                        if self.emit_text_part(
+                            &mut current_line,
+                            part,
+                            prev_is_inline_element,
+                            part_next_is_flow,
+                        ) {
                             consecutive_blank_count = 0;
 
                             let remaining_parts_have_content =
@@ -765,9 +777,12 @@ impl<'a> Printer<'a> {
                             // ASCII whitespace only, matching the leading boundary in
                             // `emit_text_part`: a trailing non-breaking space (U+00A0 / U+202F)
                             // is welded to its word, not a collapsible boundary, so it must not
-                            // emit a separating space before the next node.
+                            // emit a separating space before the next node. When the boundary is
+                            // a flow `line` (`part_next_is_flow`), the fill already carries it —
+                            // don't also push a hard space.
                             if part.ends_with(|c: char| c.is_ascii_whitespace())
                                 && (remaining_parts_have_content || !is_last_node)
+                                && !part_next_is_flow
                             {
                                 current_line.push(d.text(" "));
                             }
@@ -784,12 +799,19 @@ impl<'a> Printer<'a> {
                     // ASCII whitespace only (see the newline branch above): a trailing
                     // non-breaking space stays glued to its word and emits no separating space.
                     let has_trailing = text.raw.ends_with(|c: char| c.is_ascii_whitespace());
-                    self.emit_text_part(&mut current_line, &text.raw, prev_is_inline_element);
+                    self.emit_text_part(
+                        &mut current_line,
+                        &text.raw,
+                        prev_is_inline_element,
+                        next_node_is_flow,
+                    );
 
                     // Add trailing space if source has it, but NOT for the last node
-                    // (boundary whitespace at end of fragment should be trimmed)
+                    // (boundary whitespace at end of fragment should be trimmed). When the next
+                    // node is a flowing inline element/component the fill carries the boundary as
+                    // a `line` (see `emit_text_part`), so don't also push a hard space.
                     let is_last = i == trimmed_nodes.len() - 1;
-                    if has_trailing && !is_last {
+                    if has_trailing && !is_last && !next_node_is_flow {
                         current_line.push(d.text(" "));
                     }
 
@@ -1031,6 +1053,20 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Whether a node is a flowing inline element or **component** — the set that participates
+    /// in a text↔element fill boundary on *either* side (the preceding-element fold trigger and
+    /// the following-element flow boundary). Any non-block `Element`/`SpecialElement`; block
+    /// elements and every non-element node are excluded. Unlike [`Self::next_is_inline_element`]
+    /// (a sibling-only predicate that *excludes* components, because a space-separated component
+    /// sibling breaks to its own line), this includes components: a wide `<Comp>` adjacent to
+    /// flowing text is the case the Fill-idempotency fix targets.
+    fn is_inline_el_or_comp(&self, node: &FragmentNode) -> bool {
+        matches!(
+            node,
+            FragmentNode::Element(_) | FragmentNode::SpecialElement(_)
+        ) && !self.is_block_fragment_node(node)
+    }
+
     /// Build a doc for a single fragment node with text trimming context
     ///
     /// Returns None for whitespace-only text nodes that should be skipped.
@@ -1229,15 +1265,26 @@ impl<'a> Printer<'a> {
     /// If the current line ends with an inline element, fold it together with `raw`'s words
     /// into one `fill` (`element line word line word …`) so the boundary after the element
     /// can break — keeping its closing `>` intact — while the words still pack greedily after
-    /// it. Returns `false` (no change) when the line is empty.
-    fn fold_text_after_inline_element(&self, line: &mut LineBuf, raw: &str) -> bool {
+    /// it. When `trailing_line` is set (the next sibling is itself a flowing inline
+    /// element/component), the fill ends with a `line` so the fold's last word hugs and the
+    /// boundary to that next element breaks per width (Fill idempotency — the word before a
+    /// wide inline child is never stranded). Returns `false` (no change) when the line is empty.
+    fn fold_text_after_inline_element(
+        &self,
+        line: &mut LineBuf,
+        raw: &str,
+        trailing_line: bool,
+    ) -> bool {
         let d = self.d();
         let Some(prev) = line.pop() else { return false };
         let words = self.word_fill_parts(raw);
-        let mut parts: Vec<DocId> = Vec::with_capacity(2 + words.len());
+        let mut parts: Vec<DocId> = Vec::with_capacity(3 + words.len());
         parts.push(prev);
         parts.push(d.line());
         parts.extend(words);
+        if trailing_line {
+            parts.push(d.line());
+        }
         line.push(d.fill(&parts));
         true
     }
@@ -1245,9 +1292,19 @@ impl<'a> Printer<'a> {
     /// Emit one text `part` into `line` for the multiline path: fold it into an
     /// immediately-preceding inline element when the boundary allows (keeping the element's
     /// closing `>` intact via [`Self::fold_text_after_inline_element`]), otherwise push the
-    /// optional leading space + word fill. Returns whether a fill was produced — `false` for an
+    /// optional leading space + word fill. `next_is_flow_element` requests a `line` at the
+    /// part's *trailing* edge (rather than a hard space pushed by the caller) when the next
+    /// sibling is a flowing inline element/component, so the part's last word hugs and the
+    /// boundary to that element breaks per width — see `build_text_fill_doc_trimmed`'s
+    /// `trailing_line`. Returns whether a fill was produced — `false` for an
     /// empty/whitespace-only `part`, so callers can skip blank-line and trailing-space bookkeeping.
-    fn emit_text_part(&self, line: &mut LineBuf, part: &str, prev_is_inline_element: bool) -> bool {
+    fn emit_text_part(
+        &self,
+        line: &mut LineBuf,
+        part: &str,
+        prev_is_inline_element: bool,
+        next_is_flow_element: bool,
+    ) -> bool {
         let d = self.d();
         // Gate on ASCII whitespace, matching the word split used everywhere else here
         // (`build_text_fill_doc_trimmed` / `word_fill_parts`): a leading non-breaking space
@@ -1261,17 +1318,26 @@ impl<'a> Printer<'a> {
             }
             return false;
         }
+        // A trailing `line` materializes only when the part actually ends with collapsible
+        // whitespace; a part welded to the next element by a non-breaking space is not a
+        // break point. (When set, the caller skips its hard separating space.)
+        let trailing_line =
+            next_is_flow_element && part.ends_with(|c: char| c.is_ascii_whitespace());
         // Fold into an immediately-preceding inline element when the boundary allows, keeping
         // its closing `>` intact (see `fold_text_after_inline_element`). Done before building
         // the fill so the fold path never allocates a discarded `build_text_fill_doc_trimmed`.
-        if has_leading && prev_is_inline_element && self.fold_text_after_inline_element(line, part)
+        if has_leading
+            && prev_is_inline_element
+            && self.fold_text_after_inline_element(line, part, trailing_line)
         {
             return true;
         }
         if has_leading {
             line.push(d.text(" "));
         }
-        if let Some(fill_doc) = self.build_text_fill_doc_trimmed(part, true, true, false, false) {
+        if let Some(fill_doc) =
+            self.build_text_fill_doc_trimmed(part, true, true, false, trailing_line)
+        {
             line.push(fill_doc);
         }
         true

@@ -1,0 +1,190 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 562,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 223,
+				"data": " Two wide inline components in one run: each drops to its own line and the\n     words around them stay hugged on their text lines (none stranded). Pins that\n     a run with repeated flow boundaries stays idempotent. "
+			},
+			{
+				"type": "Text",
+				"start": 223,
+				"end": 224,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 224,
+				"end": 561,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 225
+					},
+					"end": {
+						"line": 4,
+						"column": 2,
+						"character": 226
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 227,
+							"end": 324,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaaaaaaaaaaaa and\n\t",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaaaaaaaaaaaa and\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 324,
+							"end": 422,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 6,
+									"column": 2,
+									"character": 325
+								},
+								"end": {
+									"line": 6,
+									"column": 6,
+									"character": 329
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 330,
+									"end": 407,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 6,
+											"column": 7,
+											"character": 330
+										},
+										"end": {
+											"line": 6,
+											"column": 11,
+											"character": 334
+										}
+									},
+									"value": [
+										{
+											"start": 336,
+											"end": 406,
+											"type": "Text",
+											"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+											"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 408,
+										"end": 415,
+										"raw": "content",
+										"data": "content"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 422,
+							"end": 439,
+							"raw": "\n\tmid words and\n\t",
+							"data": "\n\tmid words and\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 439,
+							"end": 537,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 2,
+									"character": 440
+								},
+								"end": {
+									"line": 8,
+									"column": 6,
+									"character": 444
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 445,
+									"end": 522,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 8,
+											"column": 7,
+											"character": 445
+										},
+										"end": {
+											"line": 8,
+											"column": 11,
+											"character": 449
+										}
+									},
+									"value": [
+										{
+											"start": 451,
+											"end": 521,
+											"type": "Text",
+											"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+											"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 523,
+										"end": 530,
+										"raw": "content",
+										"data": "content"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 537,
+							"end": 557,
+							"raw": "\n\ttail1 tail2 tail3\n",
+							"data": "\n\ttail1 tail2 tail3\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,124 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 398,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 156,
+				"data": " Wide inline component (too wide to share a line) drops to its own line; the\n     preceding word stays hugged on the text line (it is not stranded). "
+			},
+			{
+				"type": "Text",
+				"start": 156,
+				"end": 157,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 157,
+				"end": 397,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 158
+					},
+					"end": {
+						"line": 3,
+						"column": 2,
+						"character": 159
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 160,
+							"end": 257,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaaaaaaaaaaaa and\n\t",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaaaaaaaaaaaa and\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 257,
+							"end": 355,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 2,
+									"character": 258
+								},
+								"end": {
+									"line": 5,
+									"column": 6,
+									"character": 262
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 263,
+									"end": 340,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 5,
+											"column": 7,
+											"character": 263
+										},
+										"end": {
+											"line": 5,
+											"column": 11,
+											"character": 267
+										}
+									},
+									"value": [
+										{
+											"start": 269,
+											"end": 339,
+											"type": "Text",
+											"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+											"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 341,
+										"end": 348,
+										"raw": "content",
+										"data": "content"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 355,
+							"end": 393,
+							"raw": "\n\ttail1 tail2 tail3 tail4 tail5 tail6\n",
+							"data": "\n\ttail1 tail2 tail3 tail4 tail5 tail6\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

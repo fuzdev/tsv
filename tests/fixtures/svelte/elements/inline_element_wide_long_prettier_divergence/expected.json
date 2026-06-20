@@ -1,0 +1,124 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 577,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 335,
+				"data": " Parity guard: a wide inline HTML element (`<a>`) at the same boundary as the\n     wide-component fixtures. It drops to its own line with the preceding word hugged,\n     identical in shape to `inline_component_wide_long`. Inline elements already do\n     this correctly; this pins that they keep doing so (and match components). "
+			},
+			{
+				"type": "Text",
+				"start": 335,
+				"end": 336,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 336,
+				"end": 576,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 337
+					},
+					"end": {
+						"line": 5,
+						"column": 2,
+						"character": 338
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 339,
+							"end": 436,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaaaaaaaaaaaa and\n\t",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaaaaaaaaaaaa and\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 436,
+							"end": 534,
+							"name": "a",
+							"name_loc": {
+								"start": {
+									"line": 7,
+									"column": 2,
+									"character": 437
+								},
+								"end": {
+									"line": 7,
+									"column": 3,
+									"character": 438
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 439,
+									"end": 522,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 7,
+											"column": 4,
+											"character": 439
+										},
+										"end": {
+											"line": 7,
+											"column": 8,
+											"character": 443
+										}
+									},
+									"value": [
+										{
+											"start": 445,
+											"end": 521,
+											"type": "Text",
+											"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+											"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 523,
+										"end": 530,
+										"raw": "content",
+										"data": "content"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 534,
+							"end": 572,
+							"raw": "\n\ttail1 tail2 tail3 tail4 tail5 tail6\n",
+							"data": "\n\ttail1 tail2 tail3 tail4 tail5 tail6\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
