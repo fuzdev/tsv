@@ -1,146 +1,13 @@
 // Helper utilities for node formatting
 //
-// Expression tag formatting, the pattern/expression doc builders shared by the
-// block and tag builders, and source position tracking used in inline run
-// grouping and multiline formatting decisions.
+// Fragment-node classification predicates plus the pattern/expression doc
+// builders shared by the block and tag builders, and source position tracking
+// used in inline run grouping and multiline formatting decisions.
 
 use crate::ast::internal::FragmentNode;
 use crate::printer::Printer;
 use tsv_lang::TAB_WIDTH;
 use tsv_lang::doc::arena::DocId;
-
-impl<'a> Printer<'a> {
-    /// Format an ExpressionTag
-    ///
-    /// Expression tags are Svelte-specific syntax for embedding TypeScript/JS
-    /// expressions in the template: `{expression}`
-    pub(crate) fn print_expression_tag(&mut self, tag: &crate::ast::internal::ExpressionTag) {
-        self.write("{");
-        // Assignment expressions need parens in expression tags: {(a = b)}
-        let needs_parens = matches!(tag.expression, tsv_ts::Expression::AssignmentExpression(_));
-        if needs_parens {
-            self.write("(");
-        }
-        // Format the expression - comments are looked up from Root.comments by span position
-        self.print_ts_expression_with_comments(&tag.expression, tag.span.start, tag.span.end);
-        if needs_parens {
-            self.write(")");
-        }
-        self.write("}");
-    }
-
-    /// Format a TypeScript expression
-    ///
-    /// Delegates to the TypeScript printer for correct parenthesization and formatting.
-    /// This ensures consistency with the TypeScript formatter's rules for:
-    /// - Operator precedence (clarifying parentheses)
-    /// - Nested ternary wrapping
-    /// - IIFE parenthesization
-    /// - Mixed logical operator grouping (&&, ||, ??)
-    pub(crate) fn print_ts_expression(&mut self, expr: &tsv_ts::Expression) {
-        let formatted = self.format_ts_expression(expr);
-        self.write(&formatted);
-    }
-
-    /// Write a JS comment as a leading comment (before content)
-    ///
-    /// Block comments: `/*content*/ ` (with trailing space)
-    /// Line comments: `// content\n` (with newline)
-    pub(crate) fn write_leading_js_comment(&mut self, comment: &tsv_lang::Comment) {
-        if comment.is_block {
-            self.write("/*");
-            self.write(&comment.content);
-            self.write("*/ ");
-        } else {
-            // Content already includes the space after // (e.g., " comment" from "// comment")
-            self.write("//");
-            self.write(&comment.content);
-            self.write("\n");
-        }
-    }
-
-    /// Write a JS comment as a trailing comment (after content), before a closing
-    /// `}` emitted by the caller.
-    ///
-    /// Block comments: ` /*content*/` (inline; the `}` follows on the same line).
-    /// Line comments: ` // content` + newline + indent — a `//` comment runs to end
-    /// of line, so the closing `}` MUST drop to the next line; otherwise it would be
-    /// swallowed into the comment and lost on reparse. This mirrors the doc-path
-    /// `build_trailing_js_comment_doc` (which appends a `hardline`); the buffer here
-    /// writes the newline + current indent directly. See `build_trailing_js_comment_doc`
-    /// for why `line_suffix`/inline is not an option in template context.
-    pub(crate) fn write_trailing_js_comment(&mut self, comment: &tsv_lang::Comment) {
-        if comment.is_block {
-            self.write(" /*");
-            self.write(&comment.content);
-            self.write("*/");
-        } else {
-            // Content already includes the space after // (e.g., " comment" from "// comment")
-            self.write(" //");
-            self.write(&comment.content);
-            self.write("\n");
-            self.write_indent();
-        }
-    }
-
-    /// Format a TypeScript expression with leading comments from the given span range.
-    ///
-    /// This looks up comments from Root.comments that fall within the span range
-    /// and prints them before the expression.
-    ///
-    /// For simple expression contexts (tags, simple blocks), suffix_width defaults to 1
-    /// for the closing `}`. For blocks with pattern/body suffixes, use
-    /// `print_ts_expression_with_suffix_width` instead.
-    pub(crate) fn print_ts_expression_with_comments(
-        &mut self,
-        expr: &tsv_ts::Expression,
-        span_start: u32,
-        span_end: u32,
-    ) {
-        // Default suffix_width of 1 for the closing `}`
-        self.print_ts_expression_with_suffix_width(expr, span_start, span_end, 1);
-    }
-
-    /// Format a TypeScript expression with explicit suffix width for width-aware wrapping.
-    ///
-    /// Use this for block expressions where the suffix (pattern, body, closing tag)
-    /// should be accounted for in line width calculations.
-    pub(crate) fn print_ts_expression_with_suffix_width(
-        &mut self,
-        expr: &tsv_ts::Expression,
-        span_start: u32,
-        span_end: u32,
-        suffix_width: usize,
-    ) {
-        // Print any leading comments between the opening brace and the expression
-        let expr_start = expr.span().start;
-        for comment in tsv_lang::comments_in_range(self.comments, span_start + 1, expr_start) {
-            self.write_leading_js_comment(comment);
-        }
-
-        // Calculate first_line_offset for width-aware wrapping
-        // This tells the TypeScript formatter where the expression starts on the line
-        let first_line_offset = self.buffer.current_column(TAB_WIDTH);
-        // Pass current indent level so wrapped lines get proper indentation
-        let base_indent_offset = self.indent_level;
-        let embed = tsv_lang::EmbedContext {
-            first_line_offset,
-            suffix_width,
-            base_indent_offset,
-            mode: tsv_lang::LayoutMode::Embedded,
-        };
-
-        // Format the expression with context-aware width calculations
-        let formatted = tsv_ts::format_expression(expr, &self.ts_inputs(), embed);
-        self.write(&formatted);
-
-        // Print any trailing comments between the expression and closing brace
-        let expr_end = expr.span().end;
-        for comment in tsv_lang::comments_in_range(self.comments, expr_end, span_end - 1) {
-            self.write_trailing_js_comment(comment);
-        }
-    }
-}
 
 /// Check if a fragment node is a control flow block (if/each/await/key/snippet).
 ///
@@ -470,16 +337,7 @@ impl<'a> Printer<'a> {
                 .map(|c| self.build_trailing_js_comment_doc(c))
                 .collect();
 
-        // Combine: leading + expr + trailing
-        if leading_docs.is_empty() && trailing_docs.is_empty() {
-            expr_doc
-        } else {
-            let mut parts = Vec::with_capacity(leading_docs.len() + 1 + trailing_docs.len());
-            parts.extend(leading_docs);
-            parts.push(expr_doc);
-            parts.extend(trailing_docs);
-            d.concat(&parts)
-        }
+        self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs)
     }
 
     /// Build expression doc for block expressions (if, each, await, key).
@@ -555,7 +413,19 @@ impl<'a> Printer<'a> {
                 .map(|c| self.build_trailing_js_comment_doc(c))
                 .collect();
 
-        // Combine: leading + expr + trailing
+        self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs)
+    }
+
+    /// Assemble `[leading…, expr, trailing…]` into one doc, returning `expr` unchanged
+    /// when there are no surrounding comments. Shared tail of the expression+comment
+    /// builders (`build_expression_with_comments_doc`, `build_expression_doc_for_block`,
+    /// `build_const_init_doc`).
+    pub(super) fn concat_with_surrounding_comments(
+        &self,
+        leading_docs: Vec<DocId>,
+        expr_doc: DocId,
+        trailing_docs: Vec<DocId>,
+    ) -> DocId {
         if leading_docs.is_empty() && trailing_docs.is_empty() {
             expr_doc
         } else {
@@ -563,7 +433,7 @@ impl<'a> Printer<'a> {
             parts.extend(leading_docs);
             parts.push(expr_doc);
             parts.extend(trailing_docs);
-            d.concat(&parts)
+            self.d().concat(&parts)
         }
     }
 }

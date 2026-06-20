@@ -430,31 +430,6 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Build a doc for an if block
-    ///
-    /// For inline blocks (no leading/trailing whitespace in body), hugs content directly:
-    ///   {#if cond}content{/if}
-    ///
-    /// For multiline blocks (has whitespace boundaries), uses hardlines:
-    ///   {#if cond}\n  content\n{/if}
-    ///
-    /// Note: Body is always wrapped in indent() so any internal breaks (like component
-    /// attr wrapping) get proper indentation relative to the if block.
-    pub(crate) fn build_if_block_doc(&self, block: &internal::IfBlock) -> DocId {
-        self.build_if_block_doc_with_context(block, false)
-    }
-
-    /// Build if block doc with multiline context awareness.
-    ///
-    /// When `in_multiline_context` is true, blocks with symmetric spaces expand.
-    pub(crate) fn build_if_block_doc_with_context(
-        &self,
-        block: &internal::IfBlock,
-        in_multiline_context: bool,
-    ) -> DocId {
-        self.build_if_block_doc_with_full_context(block, in_multiline_context, false, None)
-    }
-
     /// Build if block doc with full context (multiline + preceding content).
     ///
     /// `has_preceding_breakable`: If true, there's breakable content before this block,
@@ -763,22 +738,6 @@ impl<'a> Printer<'a> {
         }
         parts.push(d.text("{/each}"));
         d.concat(&parts)
-    }
-
-    /// Build a doc for an each block
-    ///
-    /// Uses same inline/multiline pattern as if blocks.
-    pub(crate) fn build_each_block_doc(&self, block: &internal::EachBlock) -> DocId {
-        self.build_each_block_doc_with_context(block, false)
-    }
-
-    /// Build each block doc with multiline context awareness.
-    pub(crate) fn build_each_block_doc_with_context(
-        &self,
-        block: &internal::EachBlock,
-        in_multiline_context: bool,
-    ) -> DocId {
-        self.build_each_block_doc_with_full_context(block, in_multiline_context, false, None)
     }
 
     /// Build each block doc with full context (multiline + preceding content).
@@ -1126,20 +1085,11 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Build a doc for an await block
+    /// Build a doc for an await block (no preceding context / sibling `>`).
     ///
     /// Uses same inline/multiline pattern as if blocks.
     pub(crate) fn build_await_block_doc(&self, block: &internal::AwaitBlock) -> DocId {
-        self.build_await_block_doc_with_context(block, false)
-    }
-
-    /// Build await block doc with multiline context awareness.
-    pub(crate) fn build_await_block_doc_with_context(
-        &self,
-        block: &internal::AwaitBlock,
-        in_multiline_context: bool,
-    ) -> DocId {
-        self.build_await_block_doc_with_full_context(block, in_multiline_context, false, None)
+        self.build_await_block_doc_with_full_context(block, false, false, None)
     }
 
     /// Build await block doc with full context (multiline + preceding content).
@@ -1247,20 +1197,11 @@ impl<'a> Printer<'a> {
         d.concat(&[head_doc, tail])
     }
 
-    /// Build a doc for a key block
+    /// Build a doc for a key block (no preceding context / sibling `>`).
     ///
     /// Uses same inline/multiline pattern as if blocks.
     pub(crate) fn build_key_block_doc(&self, block: &internal::KeyBlock) -> DocId {
-        self.build_key_block_doc_with_context(block, false)
-    }
-
-    /// Build key block doc with multiline context awareness.
-    pub(crate) fn build_key_block_doc_with_context(
-        &self,
-        block: &internal::KeyBlock,
-        in_multiline_context: bool,
-    ) -> DocId {
-        self.build_key_block_doc_with_full_context(block, in_multiline_context, false, None)
+        self.build_key_block_doc_with_full_context(block, false, false, None)
     }
 
     /// Build key block doc with full context (multiline + preceding content).
