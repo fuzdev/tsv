@@ -319,13 +319,15 @@ Same layout inside an inline element (head wraps + body expands, element hugs th
 
 ### Svelte: destructuring bracket spacing
 
-**Design choice.** `bracketSpacing: false` is one of tsv's four fixed identity settings; tsv hugs object braces everywhere, including object **destructuring patterns** in template binding positions. prettier-plugin-svelte ignores `bracketSpacing` for those binding patterns — `{#each … as PATTERN}`, `{#await … then PATTERN}`, `{:then PATTERN}`, `{:catch PATTERN}` — and hardcodes the spaced `{ … }` form, even though it honors the option for the same destructuring in `{@const}` (which routes through Prettier's JS printer, and which tsv already matched). tsv hugs uniformly so a destructuring pattern reads the same wherever it appears (`{#each items as {a, b}}` vs prettier's `{#each items as { a, b }}`), including object values nested inside defaults (`c = {x: 1}`). Array patterns (`[a, b]`) have no interior spacing in either formatter and are unaffected.
+**Design choice.** `bracketSpacing: false` is one of tsv's four fixed identity settings; tsv hugs object braces everywhere, including object **destructuring patterns** in template binding positions. prettier-plugin-svelte ignores `bracketSpacing` for those binding patterns — `{#each … as PATTERN}`, `{#await … then PATTERN}`, `{:then PATTERN}`, `{:catch PATTERN}` — and hardcodes the spaced `{ … }` form, even though it honors the option for the same destructuring in `{@const}` (which routes through Prettier's JS printer, and which tsv already matched). tsv hugs uniformly so a destructuring pattern reads the same wherever it appears (`{#each items as {a, b}}` vs prettier's `{#each items as { a, b }}`), including object values nested inside defaults (`c = {x: 1}`). Array patterns (`[a, b]`) have no interior spacing in either formatter and are unaffected. The brace spacing is the **only** difference for these patterns — the `[ ]` brackets around a **computed key** (`{[k]: v}`, including a template-literal key `` {[`k${i}`]: v} ``) are preserved identically by both formatters, so the key reads the same property; only tsv's surrounding braces hug.
 
 - `{#each as {…}}` basic — [destructure_object](../tests/fixtures/svelte/blocks/each/destructure_object_prettier_divergence/)
 - `{#each as {…}}` rest element — [destructure_object_rest](../tests/fixtures/svelte/blocks/each/destructure_object_rest_prettier_divergence/)
 - `{#each as {…}}` defaults + nested object value — [destructure_object_default](../tests/fixtures/svelte/blocks/each/destructure_object_default_prettier_divergence/)
 - `{#each as {…}, i (key)}` with index + key — [destructure_with_index_key](../tests/fixtures/svelte/blocks/each/destructure_with_index_key_prettier_divergence/)
+- `{#each as {[k]: …}}` computed key (brackets preserved) — [destructure_computed_key](../tests/fixtures/svelte/blocks/each/destructure_computed_key_prettier_divergence/)
 - `{#await then}` / `{:then}` / `{:catch}` — [destructure_default](../tests/fixtures/svelte/blocks/await/destructure_default_prettier_divergence/)
+- `{#await then}` / `{:then}` / `{:catch}` computed key — [destructure_computed_key](../tests/fixtures/svelte/blocks/await/destructure_computed_key_prettier_divergence/)
 
 ### Svelte: destructuring literal normalization
 
