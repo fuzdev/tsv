@@ -226,52 +226,49 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let expr_needs_parens =
             needs_parens(&type_assert.expression, ParenContext::AngleBracketAssertion);
-        // Comments between `<` and the type
-        let angle_end = type_assert.span.start + 1; // after `<`
+        // Cast boundary positions: `<` … type … `>` … expression. The `>` is found
+        // past any comment that itself contains a `>` (`<T /* > */>`).
+        let open_pos = type_assert.span.start; // the `<`
+        let angle_end = open_pos + 1; // after `<`
         let type_start = type_assert.type_annotation.span().start;
-        let comments_doc =
-            self.build_comments_between(angle_end, type_start, CommentSpacing::Trailing);
-        let type_doc = self.build_type_doc_with_wrapping_type_args(&type_assert.type_annotation);
-
-        // Block comments on either side of the closing `>` stay where the author
-        // wrote them: `<T /* c */>` (after the type, before `>`) trails the type
-        // inside the cast, `<T>/* c */ expr` (after `>`, before the expression)
-        // leads the expression. Split at the assertion's `>`, found past any
-        // comment. TODO: line comments in these positions are still dropped —
-        // prettier breaks the cast and relocates them onto the type line, which
-        // is a separate (relocation-vs-preserve) decision; block-only here avoids
-        // swallowing the following token onto the comment line.
         let type_end = type_assert.type_annotation.span().end;
         let expr_start = type_assert.expression.span().start;
         let close_angle = self.find_assertion_close_angle(type_end, expr_start);
-        let before_close_doc = self.build_comments_between_filtered(
-            type_end,
-            close_angle,
-            CommentSpacing::Leading,
-            CommentFilter::BlockOnly,
-        );
-        let after_close_doc = self.build_comments_between_filtered(
-            close_angle + 1,
-            expr_start,
-            CommentSpacing::Trailing,
-            CommentFilter::BlockOnly,
-        );
+        let type_doc = self.build_type_doc_with_wrapping_type_args(&type_assert.type_annotation);
 
-        // Mirror Prettier's `printTypeAssertion`: the cast `<Type>` is its own
-        // group, breaking after `<` with the type on an indented line and `>`
-        // back at the outer indent. Crucially, a union cast type prints *flat* on
-        // that line — Prettier's `shouldIndentUnionType` returns false for
-        // `TSTypeAssertion`, so it never gets the leading-`|` hanging indent that
-        // `as`/`satisfies` casts use (see `build_union_hanging_indent_doc`).
-        let cast_inner = d.group(d.concat(&[
-            d.text("<"),
-            d.indent(d.concat(&[d.softline(), comments_doc, type_doc, before_close_doc])),
-            d.softline(),
-            d.text(">"),
-        ]));
-        // A comment after `>` leads the expression in every layout branch below,
-        // so fold it onto the cast once rather than into each branch.
-        let cast_group = d.concat(&[cast_inner, after_close_doc]);
+        // Comments in the cast stay where the author wrote them. Block comments hug
+        // inline (`</* c */ T>`, `<T /* c */>`, `<T>/* c */ expr`); a `//` runs to
+        // end-of-line, so it forces the cast to break — and where prettier relocates
+        // it across the `<`/`>` boundary, tsv preserves position. See
+        // conformance_prettier.md §Comment relocation (Angle-bracket type assertion)
+        // and the `type_assertion_line_comment` /
+        // `type_assertion_close_own_line_comment` divergence fixtures.
+        let cast_doc = if self.has_line_comments_between(angle_end, type_start)
+            || self.has_line_comments_between(type_end, close_angle)
+        {
+            self.build_assertion_broken_cast(open_pos, type_start, type_end, close_angle, type_doc)
+        } else {
+            // Mirror Prettier's `printTypeAssertion`: the cast `<Type>` is its own
+            // group, breaking after `<` with the type on an indented line and `>`
+            // back at the outer indent. Crucially, a union cast type prints *flat* on
+            // that line — Prettier's `shouldIndentUnionType` returns false for
+            // `TSTypeAssertion`, so it never gets the leading-`|` hanging indent that
+            // `as`/`satisfies` casts use (see `build_union_hanging_indent_doc`).
+            let comments_doc =
+                self.build_comments_between(angle_end, type_start, CommentSpacing::Trailing);
+            let before_close_doc = self.build_comments_between_filtered(
+                type_end,
+                close_angle,
+                CommentSpacing::Leading,
+                CommentFilter::BlockOnly,
+            );
+            d.group(d.concat(&[
+                d.text("<"),
+                d.indent(d.concat(&[d.softline(), comments_doc, type_doc, before_close_doc])),
+                d.softline(),
+                d.text(">"),
+            ]))
+        };
 
         let inner_expr = self.build_expression_doc(&type_assert.expression);
         let expr_doc = if expr_needs_parens {
@@ -279,6 +276,43 @@ impl<'a> Printer<'a> {
         } else {
             inner_expr
         };
+
+        // A line comment after `>` drops the expression to a continuation line one
+        // indent in (prettier instead relocates it into the cast — a divergence).
+        // Each comment holds its position: a same-line `<T> // c` trails the `>`,
+        // an own-line comment keeps its own line leading the expression
+        // (`build_trailing_comments_multiline`). A block comment in the gap stays
+        // inline ahead of the expression.
+        //
+        // TODO: a binary-expression operand that *breaks across lines* misaligns — its
+        // first operand sits at this `indent` level but the chain's continuation `line`s
+        // snap back to the enclosing assignment-level indent (binary chains take their
+        // continuation indent from the parent context, not a nested `indent`), so
+        // `aaaa ||` lands one level deeper than `bbbb ||`. Idempotent and lossless, and
+        // only reachable via cast + after-`>` line comment + a wrapping binary operand
+        // (absent from any real corpus). A real fix means threading parent-indent context
+        // into the chain printer — out of scope here. No fixture guards it on purpose:
+        // `input.svelte` must be idempotent, so it could only bake the misaligned output
+        // in as canonical, sanctioning a known imperfection as a deliberate divergence —
+        // which the fixture rules forbid. The fix is to align it, after which an ordinary
+        // fixture follows.
+        if self.has_line_comments_between(close_angle + 1, expr_start) {
+            let trailing = self.build_trailing_comments_multiline(close_angle + 1, expr_start);
+            return d.concat(&[
+                cast_doc,
+                d.indent(d.concat(&[d.concat(&trailing), d.hardline(), expr_doc])),
+            ]);
+        }
+
+        // A block comment after `>` leads the expression in every layout branch
+        // below, so fold it onto the cast once rather than into each branch.
+        let after_close_doc = self.build_comments_between_filtered(
+            close_angle + 1,
+            expr_start,
+            CommentSpacing::Trailing,
+            CommentFilter::BlockOnly,
+        );
+        let cast_group = d.concat(&[cast_doc, after_close_doc]);
 
         // `shouldBreakAfterCast`: object/array-literal expressions hug the cast
         // (they expand themselves), everything else may break the expression into
@@ -303,6 +337,50 @@ impl<'a> Printer<'a> {
         } else {
             d.group(d.concat(&[cast_group, expr_doc]))
         }
+    }
+
+    /// Build a forced-break cast `<Type>` that preserves line comments in place.
+    ///
+    /// Used when a `//` sits between `<` and the type, or between the type and `>`
+    /// — it runs to end-of-line, so the cast can't stay inline. Each comment holds
+    /// the position the author gave it: a same-line `< // c` is pulled onto the `<`
+    /// line (`delimiter_line_comment_prefix`, the open-delimiter family — prettier
+    /// relocates it to its own line); own-line comments after `<` sit on their own
+    /// lines; a trailing-type `T // c` stays on the type line and an own-line
+    /// comment before `>` keeps its own line (`build_trailing_comments_multiline`).
+    /// See conformance_prettier.md §Comment relocation (Angle-bracket type assertion).
+    ///
+    /// Positions are the caller's already-computed cast boundaries, in source order:
+    /// `open_pos` is the `<`, `type_start`/`type_end` bound the type, `close_angle`
+    /// is the `>`. Taking them explicitly keeps this a pure doc assembler with no
+    /// `TSTypeAssertion` dependency or re-derivation.
+    fn build_assertion_broken_cast(
+        &self,
+        open_pos: u32,
+        type_start: u32,
+        type_end: u32,
+        close_angle: u32,
+        type_doc: DocId,
+    ) -> DocId {
+        let d = self.d();
+        let angle_end = open_pos + 1; // after `<`
+        let (angle_prefix, angle_pull_pos) =
+            self.delimiter_line_comment_prefix(open_pos, type_start);
+        let leading =
+            self.build_leading_comments_multiline_opt(angle_end, type_start, angle_pull_pos);
+        let trailing = self.build_trailing_comments_multiline(type_end, close_angle);
+        d.concat(&[
+            d.text("<"),
+            d.concat(&angle_prefix),
+            d.indent(d.concat(&[
+                d.hardline(),
+                d.concat(&leading),
+                type_doc,
+                d.concat(&trailing),
+            ])),
+            d.hardline(),
+            d.text(">"),
+        ])
     }
 
     /// Build a Doc for a TypeScript binary cast expression — `expr as Type` or
