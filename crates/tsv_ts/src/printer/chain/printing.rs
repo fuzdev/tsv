@@ -178,7 +178,7 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
                         )
                     }
                 };
-                d.concat(&[d.text("("), inner_group, d.text(")")])
+                d.parens(inner_group)
             } else {
                 printer.print_expression(expr)
             }

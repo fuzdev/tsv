@@ -184,7 +184,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let key_doc = self.build_ts_expression_doc_no_comments(key);
         if computed {
-            d.concat(&[d.text("["), key_doc, d.text("]")])
+            d.brackets(key_doc)
         } else {
             key_doc
         }

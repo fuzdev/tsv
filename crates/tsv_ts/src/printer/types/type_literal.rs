@@ -265,7 +265,7 @@ impl<'a> Printer<'a> {
             inner_parts.push(d.break_parent());
         }
         let inner = d.group(d.concat(&inner_parts));
-        d.concat(&[d.text("("), inner, d.text(")")])
+        d.parens(inner)
     }
 
     //

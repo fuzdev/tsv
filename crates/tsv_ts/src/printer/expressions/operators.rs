@@ -96,7 +96,7 @@ impl<'a> Printer<'a> {
             let inner = self.build_expression_doc(&unary.argument);
             let needs_paren_wrap = needs_parens(&unary.argument, ParenContext::UnaryArgument);
             let inner = if needs_paren_wrap {
-                d.concat(&[d.text("("), inner, d.text(")")])
+                d.parens(inner)
             } else {
                 inner
             };
@@ -869,7 +869,7 @@ impl<'a> Printer<'a> {
                 // Script context: include parens in group for proper line width calculation
                 let inner_parts =
                     self.build_binary_chain_parts_with_continuation_indent(inner_binary);
-                return d.group(d.concat(&[d.text("("), inner_parts, d.text(")")]));
+                return d.group(d.parens(inner_parts));
             }
             let operand_doc = self.build_chain_aware_operand_doc(operand);
             d.parens(operand_doc)
