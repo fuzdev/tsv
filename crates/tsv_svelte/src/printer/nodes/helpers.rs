@@ -171,6 +171,25 @@ impl<'a> Printer<'a> {
     /// (string quotes + numeric form), where prettier-plugin-svelte preserves the
     /// author's source token — both deliberate divergences (see
     /// conformance_prettier.md §Svelte: destructuring literal normalization).
+    /// Build a doc for a non-shorthand object-pattern property key.
+    ///
+    /// A **computed** key (`{[expr]: v}`) keeps its `[ ]` brackets so it reads the
+    /// same property — dropping them would change semantics (and a non-identifier
+    /// key like a template literal would become invalid syntax). Mirrors the
+    /// TypeScript pattern printer's computed-key handling
+    /// (`tsv_ts`'s `build_object_pattern_property_doc`); this path is comment-free,
+    /// so the bracket wrapping is plain text rather than the comment-aware
+    /// `build_computed_key_bracket_doc`.
+    fn build_pattern_property_key_doc(&self, computed: bool, key: &tsv_ts::Expression) -> DocId {
+        let d = self.d();
+        let key_doc = self.build_ts_expression_doc_no_comments(key);
+        if computed {
+            d.concat(&[d.text("["), key_doc, d.text("]")])
+        } else {
+            key_doc
+        }
+    }
+
     pub(super) fn build_pattern_doc(&self, expr: &tsv_ts::Expression) -> DocId {
         let d = self.d();
         match expr {
@@ -188,7 +207,7 @@ impl<'a> Printer<'a> {
                                 // AssignmentPattern (defaults) and preserve quotes
                                 parts.push(self.build_pattern_doc(&p.value));
                             } else {
-                                parts.push(self.build_ts_expression_doc_no_comments(&p.key));
+                                parts.push(self.build_pattern_property_key_doc(p.computed, &p.key));
                                 parts.push(d.text(": "));
                                 parts.push(self.build_pattern_doc(&p.value));
                             }
@@ -215,7 +234,7 @@ impl<'a> Printer<'a> {
                                 // Shorthand: `{ k }` or `{ k = 1 }`
                                 parts.push(self.build_pattern_doc(&p.value));
                             } else {
-                                parts.push(self.build_ts_expression_doc_no_comments(&p.key));
+                                parts.push(self.build_pattern_property_key_doc(p.computed, &p.key));
                                 parts.push(d.text(": "));
                                 parts.push(self.build_pattern_doc(&p.value));
                             }

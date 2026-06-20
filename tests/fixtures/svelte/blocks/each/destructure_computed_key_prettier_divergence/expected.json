@@ -1,0 +1,1047 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 706,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 112,
+				"data": " a computed key in an {#each} binding pattern keeps its [ ] brackets; braces hug (bracketSpacing: false) "
+			},
+			{
+				"type": "Text",
+				"start": 112,
+				"end": 113,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 113,
+				"end": 167,
+				"expression": {
+					"type": "Identifier",
+					"start": 120,
+					"end": 124,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 7
+						},
+						"end": {
+							"line": 2,
+							"column": 11
+						}
+					},
+					"name": "objs"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 142,
+							"end": 160,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 30,
+									"character": 143
+								},
+								"end": {
+									"line": 2,
+									"column": 33,
+									"character": 146
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 147,
+										"end": 154,
+										"expression": {
+											"type": "Identifier",
+											"start": 148,
+											"end": 153,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 35
+												},
+												"end": {
+													"line": 2,
+													"column": 40
+												}
+											},
+											"name": "value"
+										}
+									}
+								]
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "ObjectPattern",
+					"start": 128,
+					"end": 141,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 16
+						},
+						"end": {
+							"line": 2,
+							"column": 29
+						}
+					},
+					"properties": [
+						{
+							"type": "Property",
+							"start": 129,
+							"end": 140,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 17
+								},
+								"end": {
+									"line": 2,
+									"column": 28
+								}
+							},
+							"method": false,
+							"shorthand": false,
+							"computed": true,
+							"key": {
+								"type": "Identifier",
+								"start": 130,
+								"end": 132,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 18
+									},
+									"end": {
+										"line": 2,
+										"column": 20
+									}
+								},
+								"name": "id"
+							},
+							"value": {
+								"type": "Identifier",
+								"start": 135,
+								"end": 140,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 23
+									},
+									"end": {
+										"line": 2,
+										"column": 28
+									}
+								},
+								"name": "value"
+							},
+							"kind": "init"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 167,
+				"end": 169,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 169,
+				"end": 228,
+				"data": " a template-literal computed key keeps its brackets "
+			},
+			{
+				"type": "Text",
+				"start": 228,
+				"end": 229,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 229,
+				"end": 288,
+				"expression": {
+					"type": "Identifier",
+					"start": 236,
+					"end": 240,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 7
+						},
+						"end": {
+							"line": 5,
+							"column": 11
+						}
+					},
+					"name": "objs"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 263,
+							"end": 281,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 35,
+									"character": 264
+								},
+								"end": {
+									"line": 5,
+									"column": 38,
+									"character": 267
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 268,
+										"end": 275,
+										"expression": {
+											"type": "Identifier",
+											"start": 269,
+											"end": 274,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 40
+												},
+												"end": {
+													"line": 5,
+													"column": 45
+												}
+											},
+											"name": "value"
+										}
+									}
+								]
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "ObjectPattern",
+					"start": 244,
+					"end": 262,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 16
+						},
+						"end": {
+							"line": 5,
+							"column": 34
+						}
+					},
+					"properties": [
+						{
+							"type": "Property",
+							"start": 245,
+							"end": 261,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 17
+								},
+								"end": {
+									"line": 5,
+									"column": 33
+								}
+							},
+							"method": false,
+							"shorthand": false,
+							"computed": true,
+							"key": {
+								"type": "TemplateLiteral",
+								"start": 246,
+								"end": 253,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 18
+									},
+									"end": {
+										"line": 5,
+										"column": 25
+									}
+								},
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 250,
+										"end": 251,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 22
+											},
+											"end": {
+												"line": 5,
+												"column": 23
+											}
+										},
+										"name": "i"
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 247,
+										"end": 248,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 19
+											},
+											"end": {
+												"line": 5,
+												"column": 20
+											}
+										},
+										"value": {
+											"raw": "k",
+											"cooked": "k"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 252,
+										"end": 252,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 24
+											},
+											"end": {
+												"line": 5,
+												"column": 24
+											}
+										},
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": true
+									}
+								]
+							},
+							"value": {
+								"type": "Identifier",
+								"start": 256,
+								"end": 261,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 28
+									},
+									"end": {
+										"line": 5,
+										"column": 33
+									}
+								},
+								"name": "value"
+							},
+							"kind": "init"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 288,
+				"end": 290,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 290,
+				"end": 367,
+				"data": " a computed key after a shorthand prop (not first) keeps its brackets "
+			},
+			{
+				"type": "Text",
+				"start": 367,
+				"end": 368,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 368,
+				"end": 425,
+				"expression": {
+					"type": "Identifier",
+					"start": 375,
+					"end": 379,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 7
+						},
+						"end": {
+							"line": 8,
+							"column": 11
+						}
+					},
+					"name": "objs"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 400,
+							"end": 418,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 33,
+									"character": 401
+								},
+								"end": {
+									"line": 8,
+									"column": 36,
+									"character": 404
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 405,
+										"end": 412,
+										"expression": {
+											"type": "Identifier",
+											"start": 406,
+											"end": 411,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 38
+												},
+												"end": {
+													"line": 8,
+													"column": 43
+												}
+											},
+											"name": "value"
+										}
+									}
+								]
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "ObjectPattern",
+					"start": 383,
+					"end": 399,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 16
+						},
+						"end": {
+							"line": 8,
+							"column": 32
+						}
+					},
+					"properties": [
+						{
+							"type": "Property",
+							"start": 384,
+							"end": 385,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 17
+								},
+								"end": {
+									"line": 8,
+									"column": 18
+								}
+							},
+							"method": false,
+							"shorthand": true,
+							"computed": false,
+							"key": {
+								"type": "Identifier",
+								"start": 384,
+								"end": 385,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 17
+									},
+									"end": {
+										"line": 8,
+										"column": 18
+									}
+								},
+								"name": "a"
+							},
+							"value": {
+								"type": "Identifier",
+								"start": 384,
+								"end": 385,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 17
+									},
+									"end": {
+										"line": 8,
+										"column": 18
+									}
+								},
+								"name": "a"
+							},
+							"kind": "init"
+						},
+						{
+							"type": "Property",
+							"start": 387,
+							"end": 398,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 20
+								},
+								"end": {
+									"line": 8,
+									"column": 31
+								}
+							},
+							"method": false,
+							"shorthand": false,
+							"computed": true,
+							"key": {
+								"type": "Identifier",
+								"start": 388,
+								"end": 390,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 21
+									},
+									"end": {
+										"line": 8,
+										"column": 23
+									}
+								},
+								"name": "id"
+							},
+							"value": {
+								"type": "Identifier",
+								"start": 393,
+								"end": 398,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 26
+									},
+									"end": {
+										"line": 8,
+										"column": 31
+									}
+								},
+								"name": "value"
+							},
+							"kind": "init"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 425,
+				"end": 427,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 427,
+				"end": 502,
+				"data": " computed key with a nested object-pattern value and a rest sibling "
+			},
+			{
+				"type": "Text",
+				"start": 502,
+				"end": 503,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 503,
+				"end": 560,
+				"expression": {
+					"type": "Identifier",
+					"start": 510,
+					"end": 514,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 7
+						},
+						"end": {
+							"line": 11,
+							"column": 11
+						}
+					},
+					"name": "objs"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 539,
+							"end": 553,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 11,
+									"column": 37,
+									"character": 540
+								},
+								"end": {
+									"line": 11,
+									"column": 40,
+									"character": 543
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 544,
+										"end": 547,
+										"expression": {
+											"type": "Identifier",
+											"start": 545,
+											"end": 546,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 42
+												},
+												"end": {
+													"line": 11,
+													"column": 43
+												}
+											},
+											"name": "a"
+										}
+									}
+								]
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "ObjectPattern",
+					"start": 518,
+					"end": 538,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 16
+						},
+						"end": {
+							"line": 11,
+							"column": 36
+						}
+					},
+					"properties": [
+						{
+							"type": "Property",
+							"start": 519,
+							"end": 528,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 17
+								},
+								"end": {
+									"line": 11,
+									"column": 26
+								}
+							},
+							"method": false,
+							"shorthand": false,
+							"computed": true,
+							"key": {
+								"type": "Identifier",
+								"start": 520,
+								"end": 522,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 18
+									},
+									"end": {
+										"line": 11,
+										"column": 20
+									}
+								},
+								"name": "id"
+							},
+							"value": {
+								"type": "ObjectPattern",
+								"start": 525,
+								"end": 528,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 23
+									},
+									"end": {
+										"line": 11,
+										"column": 26
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 526,
+										"end": 527,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 24
+											},
+											"end": {
+												"line": 11,
+												"column": 25
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 526,
+											"end": 527,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 24
+												},
+												"end": {
+													"line": 11,
+													"column": 25
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 526,
+											"end": 527,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 24
+												},
+												"end": {
+													"line": 11,
+													"column": 25
+												}
+											},
+											"name": "a"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"kind": "init"
+						},
+						{
+							"type": "RestElement",
+							"start": 530,
+							"end": 537,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 28
+								},
+								"end": {
+									"line": 11,
+									"column": 35
+								}
+							},
+							"argument": {
+								"type": "Identifier",
+								"start": 533,
+								"end": 537,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 31
+									},
+									"end": {
+										"line": 11,
+										"column": 35
+									}
+								},
+								"name": "rest"
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 560,
+				"end": 562,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 562,
+				"end": 652,
+				"data": " a computed key nested inside a computed key's value keeps brackets at every depth "
+			},
+			{
+				"type": "Text",
+				"start": 652,
+				"end": 653,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 653,
+				"end": 705,
+				"expression": {
+					"type": "Identifier",
+					"start": 660,
+					"end": 664,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 7
+						},
+						"end": {
+							"line": 14,
+							"column": 11
+						}
+					},
+					"name": "objs"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 684,
+							"end": 698,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 14,
+									"column": 32,
+									"character": 685
+								},
+								"end": {
+									"line": 14,
+									"column": 35,
+									"character": 688
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 689,
+										"end": 692,
+										"expression": {
+											"type": "Identifier",
+											"start": 690,
+											"end": 691,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 37
+												},
+												"end": {
+													"line": 14,
+													"column": 38
+												}
+											},
+											"name": "c"
+										}
+									}
+								]
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "ObjectPattern",
+					"start": 668,
+					"end": 683,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 16
+						},
+						"end": {
+							"line": 14,
+							"column": 31
+						}
+					},
+					"properties": [
+						{
+							"type": "Property",
+							"start": 669,
+							"end": 682,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 17
+								},
+								"end": {
+									"line": 14,
+									"column": 30
+								}
+							},
+							"method": false,
+							"shorthand": false,
+							"computed": true,
+							"key": {
+								"type": "Identifier",
+								"start": 670,
+								"end": 671,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 18
+									},
+									"end": {
+										"line": 14,
+										"column": 19
+									}
+								},
+								"name": "a"
+							},
+							"value": {
+								"type": "ObjectPattern",
+								"start": 674,
+								"end": 682,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 22
+									},
+									"end": {
+										"line": 14,
+										"column": 30
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 675,
+										"end": 681,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 23
+											},
+											"end": {
+												"line": 14,
+												"column": 29
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": true,
+										"key": {
+											"type": "Identifier",
+											"start": 676,
+											"end": 677,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 24
+												},
+												"end": {
+													"line": 14,
+													"column": 25
+												}
+											},
+											"name": "b"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 680,
+											"end": 681,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 28
+												},
+												"end": {
+													"line": 14,
+													"column": 29
+												}
+											},
+											"name": "c"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"kind": "init"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
