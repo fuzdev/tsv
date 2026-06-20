@@ -484,7 +484,7 @@ impl<'a> Printer<'a> {
         };
         if super::needs_parens(expr, super::ParenContext::StatementTest) {
             let d = self.d();
-            d.concat(&[d.text("("), inner, d.text(")")])
+            d.parens(inner)
         } else {
             inner
         }

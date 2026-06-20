@@ -1035,7 +1035,7 @@ impl<'a> Printer<'a> {
 
         let rhs_doc = self.build_expression_doc(&pattern.right);
         let rhs_doc = if needs_parens(&pattern.right, ParenContext::DefaultValue) {
-            d.concat(&[d.text("("), rhs_doc, d.text(")")])
+            d.parens(rhs_doc)
         } else {
             rhs_doc
         };

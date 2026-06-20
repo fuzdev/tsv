@@ -561,7 +561,7 @@ impl<'a> Printer<'a> {
         let inner = if is_hugged || has_trailing_line_comment {
             // Hugged: the expression's internal doc handles wrapping
             let content = d.concat(&expr_content);
-            d.concat(&[d.text("{"), content, d.text("}")])
+            d.braces(content)
         } else {
             // Block structure for other expressions
             self.wrap_in_block_structure(expr_content)

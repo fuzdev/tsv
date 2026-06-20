@@ -121,7 +121,7 @@ impl<'a> Printer<'a> {
 
             // Empty block without any comments
             return if expand_empty {
-                d.concat(&[d.text("{"), d.hardline(), d.text("}")])
+                d.braces(d.hardline())
             } else {
                 d.text("{}")
             };

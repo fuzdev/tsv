@@ -26,7 +26,7 @@ impl<'a> Printer<'a> {
         if can_decorator_expression_unparenthesized(&decorator.expression) {
             expr_doc
         } else {
-            d.concat(&[d.text("("), expr_doc, d.text(")")])
+            d.parens(expr_doc)
         }
     }
 
