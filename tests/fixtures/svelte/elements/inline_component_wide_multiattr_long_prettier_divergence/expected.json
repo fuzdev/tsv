@@ -1,0 +1,284 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 531,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 326,
+				"data": " A wide self-closing inline component with several attributes drops to its own line where\n     all its attributes still fit on one line; the preceding word (`and`) stays hugged. Pins\n     that the flow boundary keys on the component being too wide for the text line, not on\n     whether its own attributes could break. "
+			},
+			{
+				"type": "Text",
+				"start": 326,
+				"end": 327,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 327,
+				"end": 530,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 328
+					},
+					"end": {
+						"line": 5,
+						"column": 2,
+						"character": 329
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 330,
+							"end": 427,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaaaaaaaaaaaa and\n\t",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaaaaaaaaaaaa and\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 427,
+							"end": 506,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 7,
+									"column": 2,
+									"character": 428
+								},
+								"end": {
+									"line": 7,
+									"column": 6,
+									"character": 432
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 433,
+									"end": 447,
+									"name": "prop1",
+									"name_loc": {
+										"start": {
+											"line": 7,
+											"column": 7,
+											"character": 433
+										},
+										"end": {
+											"line": 7,
+											"column": 12,
+											"character": 438
+										}
+									},
+									"value": {
+										"type": "ExpressionTag",
+										"start": 439,
+										"end": 447,
+										"expression": {
+											"type": "Identifier",
+											"start": 440,
+											"end": 446,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 14
+												},
+												"end": {
+													"line": 7,
+													"column": 20
+												}
+											},
+											"name": "value1"
+										}
+									}
+								},
+								{
+									"type": "Attribute",
+									"start": 448,
+									"end": 462,
+									"name": "prop2",
+									"name_loc": {
+										"start": {
+											"line": 7,
+											"column": 22,
+											"character": 448
+										},
+										"end": {
+											"line": 7,
+											"column": 27,
+											"character": 453
+										}
+									},
+									"value": {
+										"type": "ExpressionTag",
+										"start": 454,
+										"end": 462,
+										"expression": {
+											"type": "Identifier",
+											"start": 455,
+											"end": 461,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 29
+												},
+												"end": {
+													"line": 7,
+													"column": 35
+												}
+											},
+											"name": "value2"
+										}
+									}
+								},
+								{
+									"type": "Attribute",
+									"start": 463,
+									"end": 477,
+									"name": "prop3",
+									"name_loc": {
+										"start": {
+											"line": 7,
+											"column": 37,
+											"character": 463
+										},
+										"end": {
+											"line": 7,
+											"column": 42,
+											"character": 468
+										}
+									},
+									"value": {
+										"type": "ExpressionTag",
+										"start": 469,
+										"end": 477,
+										"expression": {
+											"type": "Identifier",
+											"start": 470,
+											"end": 476,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 44
+												},
+												"end": {
+													"line": 7,
+													"column": 50
+												}
+											},
+											"name": "value3"
+										}
+									}
+								},
+								{
+									"type": "Attribute",
+									"start": 478,
+									"end": 492,
+									"name": "prop4",
+									"name_loc": {
+										"start": {
+											"line": 7,
+											"column": 52,
+											"character": 478
+										},
+										"end": {
+											"line": 7,
+											"column": 57,
+											"character": 483
+										}
+									},
+									"value": {
+										"type": "ExpressionTag",
+										"start": 484,
+										"end": 492,
+										"expression": {
+											"type": "Identifier",
+											"start": 485,
+											"end": 491,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 59
+												},
+												"end": {
+													"line": 7,
+													"column": 65
+												}
+											},
+											"name": "value4"
+										}
+									}
+								},
+								{
+									"type": "Attribute",
+									"start": 493,
+									"end": 503,
+									"name": "prop5",
+									"name_loc": {
+										"start": {
+											"line": 7,
+											"column": 67,
+											"character": 493
+										},
+										"end": {
+											"line": 7,
+											"column": 72,
+											"character": 498
+										}
+									},
+									"value": {
+										"type": "ExpressionTag",
+										"start": 499,
+										"end": 503,
+										"expression": {
+											"type": "Identifier",
+											"start": 500,
+											"end": 502,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 74
+												},
+												"end": {
+													"line": 7,
+													"column": 76
+												}
+											},
+											"name": "v5"
+										}
+									}
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 506,
+							"end": 526,
+							"raw": "\n\ttail1 tail2 tail3\n",
+							"data": "\n\ttail1 tail2 tail3\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
