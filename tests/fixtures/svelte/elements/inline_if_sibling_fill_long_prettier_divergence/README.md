@@ -19,4 +19,4 @@ block heads and body shapes. See
 ## Related
 
 - [if/element_body_long](../../blocks/if/element_body_long_prettier_divergence/) — the same drop, standalone
-- [components/attrs_nested_long](../../components/attrs_nested_long_prettier_divergence/) — a `{#if}` body drop at deep nesting
+- [if/element_body_deep_nested](../../blocks/if/element_body_deep_nested_prettier_divergence/) — a `{#if}` body drop at deep nesting

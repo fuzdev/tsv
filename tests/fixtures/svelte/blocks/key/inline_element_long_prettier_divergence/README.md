@@ -19,4 +19,4 @@ diverges.
 ## Related
 
 - [key/long](../long_prettier_divergence/) — the same divergence standalone (block level)
-- [snippet/inline_in_element](../../snippet/inline_in_element_prettier_divergence/) — a `{#snippet}` inside an inline element
+- [snippet/inline_element_long](../../snippet/inline_element_long_prettier_divergence/) — a `{#snippet}` inside an inline element

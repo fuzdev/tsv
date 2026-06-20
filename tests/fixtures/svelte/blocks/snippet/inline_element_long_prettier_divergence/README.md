@@ -1,4 +1,4 @@
-# inline_in_element_prettier_divergence
+# inline_element_long_prettier_divergence
 
 A `{#snippet}` inside an inline element (`<A>…{#snippet n(a, b)}…{/snippet}…</A>`)
 whose construct exceeds printWidth.

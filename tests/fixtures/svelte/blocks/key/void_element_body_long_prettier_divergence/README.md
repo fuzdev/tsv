@@ -34,4 +34,4 @@ or children does have one and hugs the head instead. See
 ## Related
 
 - [key/long](../long_prettier_divergence/) — the standalone head-wrap + dangle + body-expand divergence
-- [snippet/inline_in_element](../../snippet/inline_in_element_prettier_divergence/) — another middle-zone (params inline + body expand) divergence
+- [snippet/inline_element_long](../../snippet/inline_element_long_prettier_divergence/) — another middle-zone (params inline + body expand) divergence

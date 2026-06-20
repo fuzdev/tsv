@@ -1,4 +1,4 @@
-# block_body_drop_in_context_prettier_divergence
+# block_body_drop_nested_siblings_prettier_divergence
 
 The uniform body-drop shown **embedded in realistic nested context with inline
 elements around it** — assurance that it reads correctly in real templates, not just
@@ -33,4 +33,4 @@ element is not the first body node. See
 
 - [if/element_body_long](../../blocks/if/element_body_long_prettier_divergence/) — the same drop, standalone
 - [elements/inline_component_else_body_long](../inline_component_else_body_long_prettier_divergence/) — breakable element in `{:else}`
-- [components/attrs_nested_long](../../components/attrs_nested_long_prettier_divergence/) — the same drop seven levels deep
+- [if/element_body_deep_nested](../../blocks/if/element_body_deep_nested_prettier_divergence/) — the same drop, deeply nested (dropped element re-wraps)

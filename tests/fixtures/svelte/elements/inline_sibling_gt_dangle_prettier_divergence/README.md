@@ -30,5 +30,5 @@ block actually rendering multiline (a short inline block keeps the `>` hugged). 
 
 ## Related
 
-- [elements/block_body_drop_in_context](../block_body_drop_in_context_prettier_divergence/) — the breadcrumb `</a>` dangle in realistic context
+- [elements/block_body_drop_nested_siblings](../block_body_drop_nested_siblings_prettier_divergence/) — the breadcrumb `</a>` dangle in realistic context
 - [elements/inline_if_sibling_fill_long](../inline_if_sibling_fill_long_prettier_divergence/) — the `</span>` dangle in a fill
