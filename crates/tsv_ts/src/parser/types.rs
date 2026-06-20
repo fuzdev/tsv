@@ -10,9 +10,25 @@ use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 
 use super::Parser;
-use super::scan::{is_identifier_start, skip_identifier, skip_whitespace_and_comments};
+use super::scan::{
+    is_identifier_continue, is_identifier_start, skip_identifier, skip_whitespace_and_comments,
+};
 
 impl<'a> Parser<'a> {
+    /// Parse a `: Type` annotation when the next token is a `:`, else `None` —
+    /// the optional-annotation guard shared by variable declarations, class
+    /// properties, and type members. Sites whose missing `:` is an error (e.g.
+    /// an index-signature parameter) keep their own inline `else`.
+    pub(in crate::parser) fn parse_optional_type_annotation(
+        &mut self,
+    ) -> Result<Option<TSTypeAnnotation>, ParseError> {
+        if self.check(&TokenKind::Colon) {
+            Ok(Some(self.parse_type_annotation()?))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub(in crate::parser) fn parse_type_annotation(
         &mut self,
     ) -> Result<TSTypeAnnotation, ParseError> {
@@ -444,17 +460,57 @@ impl<'a> Parser<'a> {
         pos < bytes.len() && bytes[pos] == b':'
     }
 
+    /// Check if the current position starts a mapped type: `[K in T]`, optionally
+    /// prefixed by `readonly` (`readonly [K in T]`). A mapped type is the sole
+    /// member of its type literal; the `in` keyword after the single
+    /// type-parameter name is what distinguishes it from an index signature
+    /// (`[k: T]`) or a computed-key member (`[expr]`), both of which fall through
+    /// to the general member loop. `+readonly` / `-readonly` mapped types are
+    /// detected earlier by their unambiguous `+`/`-` prefix, so this only handles
+    /// the bare and `readonly` forms.
+    ///
+    /// acorn-typescript reads `[Ident in …]` as a mapped type unconditionally
+    /// (even `[a in b]`), so a computed key that wants the `in` operator must
+    /// parenthesize (`[(a in b)]`) or use a non-identifier head (`[a.b in c]`) —
+    /// both fail the `[Ident in` shape here and parse as computed keys, matching
+    /// acorn.
+    fn is_mapped_type_start(&self) -> bool {
+        let bytes = self.source.as_bytes();
+        let mut pos = self.current_start;
+
+        // Optional leading `readonly` modifier (bare; `+readonly` / `-readonly`
+        // are handled by the caller's `+`/`-` check).
+        if matches!(self.current_kind, TokenKind::Identifier) && self.current_value() == "readonly"
+        {
+            pos = skip_whitespace_and_comments(bytes, skip_identifier(bytes, pos));
+        }
+
+        // Must be `[`
+        if pos >= bytes.len() || bytes[pos] != b'[' {
+            return false;
+        }
+        pos = skip_whitespace_and_comments(bytes, pos + 1);
+
+        // Followed by the type-parameter name (an identifier)
+        if pos >= bytes.len() || !is_identifier_start(bytes[pos]) {
+            return false;
+        }
+        pos = skip_whitespace_and_comments(bytes, skip_identifier(bytes, pos));
+
+        // Then the `in` keyword, at a word boundary so `[index]` and `[inK in K]`
+        // don't false-match on a leading `in`.
+        pos + 2 <= bytes.len()
+            && &bytes[pos..pos + 2] == b"in"
+            && (pos + 2 == bytes.len() || !is_identifier_continue(bytes[pos + 2]))
+    }
+
     /// Parse type reference: `Foo` or `Foo.Bar` or `Foo<T>`
     fn parse_type_reference(&mut self) -> Result<TSType, ParseError> {
         let start = self.current_pos().0;
         let type_name = self.parse_entity_name()?;
 
         // Check for type arguments: <T, U>
-        let type_arguments = if self.check(&TokenKind::LessThan) {
-            Some(self.parse_type_arguments()?)
-        } else {
-            None
-        };
+        let type_arguments = self.parse_optional_type_arguments()?;
 
         let end = type_arguments
             .as_ref()
@@ -515,11 +571,7 @@ impl<'a> Parser<'a> {
         };
 
         // Optional type arguments: <T, U>
-        let type_arguments = if self.check(&TokenKind::LessThan) {
-            Some(self.parse_type_arguments()?)
-        } else {
-            None
-        };
+        let type_arguments = self.parse_optional_type_arguments()?;
 
         let end = type_arguments
             .as_ref()
@@ -608,6 +660,21 @@ impl<'a> Parser<'a> {
         }
 
         Ok(result)
+    }
+
+    /// Parse a `<T, U>` type-argument list when the next token opens one (`<`),
+    /// else `None` — the optional-type-arguments guard shared by type references,
+    /// expression-with-type-arguments, and `extends`-clause heritage. Callers
+    /// that must additionally guard against ASI (no `<` after a line break) keep
+    /// their own inline check.
+    pub(in crate::parser) fn parse_optional_type_arguments(
+        &mut self,
+    ) -> Result<Option<TSTypeParameterInstantiation>, ParseError> {
+        if self.check(&TokenKind::LessThan) {
+            Ok(Some(self.parse_type_arguments()?))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Parse type arguments: `<T, U>` (trailing comma allowed, but cannot be empty)
@@ -807,11 +874,7 @@ impl<'a> Parser<'a> {
         self.expect(&TokenKind::Keyword(KeywordKind::New))?;
 
         // Parse optional type parameters: <T>
-        let type_parameters = if self.check(&TokenKind::LessThan) {
-            Some(self.parse_type_parameters()?)
-        } else {
-            None
-        };
+        let type_parameters = self.parse_optional_type_parameters()?;
 
         // Parse parameter list
         self.expect(&TokenKind::ParenOpen)?;
@@ -907,11 +970,7 @@ impl<'a> Parser<'a> {
         };
 
         // Check for type annotation: : T
-        let type_annotation = if self.check(&TokenKind::Colon) {
-            Some(self.parse_type_annotation()?)
-        } else {
-            None
-        };
+        let type_annotation = self.parse_optional_type_annotation()?;
 
         let end = type_annotation
             .as_ref()
@@ -937,33 +996,16 @@ impl<'a> Parser<'a> {
             return self.parse_mapped_type_body(start);
         }
 
-        // For `readonly [` or bare `[`, we need to look ahead to distinguish:
-        // - Mapped type: `{ readonly [K in keyof T]: V }` or `{ [K in keyof T]: V }`
-        // - Index signature: `{ readonly [key: string]: T }` or `{ [key: string]: T }`
-        // The distinction is `in` vs `:` after the identifier
-        if self.check(&TokenKind::BracketOpen) {
-            return self.parse_bracket_type_member_or_mapped(start, false, None);
+        // A mapped type (`{ [K in T]: V }`, optionally `readonly`) is the sole
+        // member and is parsed specially. Index signatures (`{ [k: T]: V }`) and
+        // computed-key members (`{ [expr]: V }`) both flow through the general
+        // member loop below, where `parse_type_element` handles the `readonly`
+        // modifier, index signatures, and arbitrary computed-key expressions.
+        if self.is_mapped_type_start() {
+            return self.parse_mapped_type_body(start);
         }
 
-        // Check for `readonly [` - needs disambiguation
-        if matches!(self.current_kind(), TokenKind::Identifier)
-            && self.current_value() == "readonly"
-            && matches!(self.peek_kind(), TokenKind::BracketOpen)
-        {
-            let readonly_start = self.current_pos().0;
-            self.advance()?; // consume 'readonly'
-            return self.parse_bracket_type_member_or_mapped(start, true, Some(readonly_start));
-        }
-
-        let mut members = Vec::new();
-        while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-            let mut element = self.parse_type_element()?;
-            // Consume separator (; or ,) if present, extending the element span to include it
-            if self.eat(TokenKind::Semicolon) || self.eat(TokenKind::Comma) {
-                element.extend_span_to(self.prev_token_end() as u32);
-            }
-            members.push(element);
-        }
+        let members = self.parse_type_members()?;
 
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
@@ -974,60 +1016,6 @@ impl<'a> Parser<'a> {
         }))
     }
 
-    /// Parse `[...]` that could be either a mapped type or index signature.
-    /// Consumes tokens to disambiguate, then continues with the appropriate parse.
-    /// `readonly` indicates whether we already consumed a `readonly` keyword.
-    fn parse_bracket_type_member_or_mapped(
-        &mut self,
-        start: usize,
-        readonly: bool,
-        readonly_start: Option<usize>,
-    ) -> Result<TSType, ParseError> {
-        // At this point: current is `[`
-        let bracket_start = self.current_pos().0;
-        self.expect(&TokenKind::BracketOpen)?;
-
-        // Parse the identifier (parameter name for mapped type, or key name for index sig)
-        let param_start = self.current_pos().0;
-        let param_name = self
-            .current_identifier_or_keyword_name()
-            .ok_or_else(|| self.error_expected_after("identifier", "["))?
-            .to_string();
-        let param_symbol = self.intern(&param_name);
-        let (id_start, _) = self.current_pos();
-        self.advance()?;
-
-        // NOW we can distinguish: `in` means mapped type, `:` means index signature
-        if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {
-            // Mapped type: [K in keyof T]: V
-            self.advance()?; // consume 'in'
-            let readonly = if readonly {
-                Some(TSMappedTypeModifier::True)
-            } else {
-                None
-            };
-            self.finish_mapped_type(start, param_start, param_name, readonly)
-        } else if self.check(&TokenKind::Colon) {
-            // Index signature: [key: string]: T
-            // Parse it as a type element, then continue with remaining members
-            self.parse_type_literal_starting_with_index_sig(
-                start,
-                readonly_start.unwrap_or(bracket_start),
-                param_symbol,
-                id_start,
-                readonly,
-            )
-        } else {
-            Err(self.error_msg(&format!(
-                "Expected 'in' or ':' after '[{}', found {}",
-                param_name,
-                self.current_kind()
-            )))
-        }
-    }
-
-    /// Parse type literal that starts with an index signature
-    /// Called after `[identifier` has been consumed and we saw `:`
     /// Parse the body of an index signature after `[identifier` has been consumed.
     /// Expects current token to be `:` (the colon after the parameter name).
     /// Returns the completed `TSTypeElement::IndexSignature`.
@@ -1070,42 +1058,6 @@ impl<'a> Parser<'a> {
             is_static: false,
             readonly,
             span: Span::new(sig_start as u32, member_end),
-        }))
-    }
-
-    fn parse_type_literal_starting_with_index_sig(
-        &mut self,
-        start: usize,
-        bracket_start: usize,
-        param_symbol: string_interner::DefaultSymbol,
-        id_start: usize,
-        readonly: bool,
-    ) -> Result<TSType, ParseError> {
-        let index_sig =
-            self.parse_index_signature_body(bracket_start, param_symbol, id_start, readonly)?;
-
-        // Now parse remaining members
-        let mut members = vec![index_sig];
-
-        // Consume separator (; or ,) if present, extending the element span to include it
-        if self.eat(TokenKind::Semicolon) || self.eat(TokenKind::Comma) {
-            members[0].extend_span_to(self.prev_token_end() as u32);
-        }
-
-        while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-            let mut element = self.parse_type_element()?;
-            if self.eat(TokenKind::Semicolon) || self.eat(TokenKind::Comma) {
-                element.extend_span_to(self.prev_token_end() as u32);
-            }
-            members.push(element);
-        }
-
-        let (_, end) = self.current_pos();
-        self.expect(&TokenKind::BraceClose)?;
-
-        Ok(TSType::TypeLiteral(TSTypeLiteral {
-            members,
-            span: Span::new(start as u32, end as u32),
         }))
     }
 
@@ -1512,6 +1464,24 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Parse a run of type members up to (but not consuming) the closing `}`.
+    /// Each member's span is extended over a trailing `;`/`,` separator when one
+    /// is present. Shared by type literals (`{ … }`) and interface bodies.
+    pub(in crate::parser) fn parse_type_members(
+        &mut self,
+    ) -> Result<Vec<TSTypeElement>, ParseError> {
+        let mut members = Vec::new();
+        while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
+            let mut element = self.parse_type_element()?;
+            // Consume separator (; or ,) if present, extending the element span to include it
+            if self.eat(TokenKind::Semicolon) || self.eat(TokenKind::Comma) {
+                element.extend_span_to(self.prev_token_end() as u32);
+            }
+            members.push(element);
+        }
+        Ok(members)
+    }
+
     /// Parse type element: property, method, call signature, construct signature, or index signature
     pub(in crate::parser) fn parse_type_element(&mut self) -> Result<TSTypeElement, ParseError> {
         let start = self.current_pos().0;
@@ -1544,11 +1514,7 @@ impl<'a> Parser<'a> {
         // Check for call signature: `(): T` or `<T>(): T`
         if self.check(&TokenKind::ParenOpen) || self.check(&TokenKind::LessThan) {
             // Parse optional type parameters: <T>
-            let type_parameters = if self.check(&TokenKind::LessThan) {
-                Some(self.parse_type_parameters()?)
-            } else {
-                None
-            };
+            let type_parameters = self.parse_optional_type_parameters()?;
             let params = self.parse_parameter_list()?;
             let (return_type, end) = self.parse_signature_return_type(true)?;
             return Ok(TSTypeElement::CallSignature(TSCallSignatureDeclaration {
@@ -1569,11 +1535,7 @@ impl<'a> Parser<'a> {
             if matches!(self.peek_kind(), TokenKind::ParenOpen | TokenKind::LessThan) {
                 self.advance()?;
                 // Parse optional type parameters: <T>
-                let type_parameters = if self.check(&TokenKind::LessThan) {
-                    Some(self.parse_type_parameters()?)
-                } else {
-                    None
-                };
+                let type_parameters = self.parse_optional_type_parameters()?;
                 let params = self.parse_parameter_list()?;
                 let (return_type, end) = self.parse_signature_return_type(false)?;
                 return Ok(TSTypeElement::ConstructSignature(
@@ -1683,11 +1645,7 @@ impl<'a> Parser<'a> {
             || self.check(&TokenKind::LessThan)
         {
             // Parse type parameters if present: `<T>` or `<T, U extends V>`
-            let type_parameters = if self.check(&TokenKind::LessThan) {
-                Some(self.parse_type_parameters()?)
-            } else {
-                None
-            };
+            let type_parameters = self.parse_optional_type_parameters()?;
 
             let params = self.parse_parameter_list()?;
             let (return_type, end) = self.parse_signature_return_type(true)?;
@@ -1705,11 +1663,7 @@ impl<'a> Parser<'a> {
         }
 
         // Property signature
-        let type_annotation = if self.check(&TokenKind::Colon) {
-            Some(self.parse_type_annotation()?)
-        } else {
-            None
-        };
+        let type_annotation = self.parse_optional_type_annotation()?;
 
         // Without a type annotation, prev_token_end() extends past the key when an
         // optional `?` was consumed (`interface I { a? }`), matching acorn's span.
@@ -1758,6 +1712,20 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse type parameters: `<T, U extends V = W>`
+    /// Parse a `<T, U>` type-parameter declaration list when the next token
+    /// opens one (`<`), else `None` — the optional-generics guard shared by every
+    /// declaration site (functions, classes, interfaces, type aliases, and call /
+    /// method / construct signatures).
+    pub(in crate::parser) fn parse_optional_type_parameters(
+        &mut self,
+    ) -> Result<Option<TSTypeParameterDeclaration>, ParseError> {
+        if self.check(&TokenKind::LessThan) {
+            Ok(Some(self.parse_type_parameters()?))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub(in crate::parser) fn parse_type_parameters(
         &mut self,
     ) -> Result<TSTypeParameterDeclaration, ParseError> {

@@ -209,11 +209,7 @@ impl<'a> Parser<'a> {
         // Check for definite assignment assertion: `let x!: Type`
         let definite = self.eat(TokenKind::Bang);
 
-        let type_annotation = if self.check(&TokenKind::Colon) {
-            Some(self.parse_type_annotation()?)
-        } else {
-            None
-        };
+        let type_annotation = self.parse_optional_type_annotation()?;
 
         let id_end = type_annotation
             .as_ref()

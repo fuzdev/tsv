@@ -79,11 +79,7 @@ impl<'a> Parser<'a> {
         let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
 
         // Parse type parameters (TypeScript generics): function foo<T>()
-        let type_parameters = if self.check(&TokenKind::LessThan) {
-            Some(self.parse_type_parameters()?)
-        } else {
-            None
-        };
+        let type_parameters = self.parse_optional_type_parameters()?;
 
         // Capture paren position before parsing params (for comment detection)
         let (params_start, _) = self.current_pos();
@@ -92,11 +88,7 @@ impl<'a> Parser<'a> {
         let params = self.parse_parameter_list()?;
 
         // Check for return type annotation
-        let return_type = if self.check(&TokenKind::Colon) {
-            Some(self.parse_return_type_annotation()?)
-        } else {
-            None
-        };
+        let return_type = self.parse_optional_return_type()?;
 
         // Check if this is an overload (ends with ; or no body) or implementation (has body)
         // Overload signatures don't have a body block - they end with ; or ASI
@@ -203,11 +195,7 @@ impl<'a> Parser<'a> {
         };
 
         // Parse type parameters
-        let type_parameters = if self.check(&TokenKind::LessThan) {
-            Some(self.parse_type_parameters()?)
-        } else {
-            None
-        };
+        let type_parameters = self.parse_optional_type_parameters()?;
 
         // Capture paren position before parsing params (for comment detection)
         let (params_start, _) = self.current_pos();
@@ -216,11 +204,7 @@ impl<'a> Parser<'a> {
         let params = self.parse_parameter_list()?;
 
         // Check for return type annotation
-        let return_type = if self.check(&TokenKind::Colon) {
-            Some(self.parse_return_type_annotation()?)
-        } else {
-            None
-        };
+        let return_type = self.parse_optional_return_type()?;
 
         // Check if this is an overload signature (no body) or implementation (has body)
         if !matches!(self.current_kind(), TokenKind::BraceOpen) {
@@ -316,11 +300,7 @@ impl<'a> Parser<'a> {
         };
 
         // Parse type parameters (TypeScript generics): function<T>()
-        let type_parameters = if self.check(&TokenKind::LessThan) {
-            Some(self.parse_type_parameters()?)
-        } else {
-            None
-        };
+        let type_parameters = self.parse_optional_type_parameters()?;
 
         // Capture paren position before parsing params (for comment detection)
         let (params_start, _) = self.current_pos();
@@ -329,11 +309,7 @@ impl<'a> Parser<'a> {
         let params = self.parse_parameter_list()?;
 
         // Check for return type annotation
-        let return_type = if self.check(&TokenKind::Colon) {
-            Some(self.parse_return_type_annotation()?)
-        } else {
-            None
-        };
+        let return_type = self.parse_optional_return_type()?;
 
         // Parse function body
         let body = self.parse_function_body()?;
