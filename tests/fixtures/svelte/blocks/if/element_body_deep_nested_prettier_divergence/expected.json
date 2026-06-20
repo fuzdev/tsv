@@ -1,0 +1,772 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 842,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 311,
+				"data": " A deeply-nested {#if} (5 levels) whose component body overflows the hugged head line, so the body drops; at this depth the dropped component meets the 100/101 boundary itself (100 stays one line, 101 wraps its attributes). Prettier hugs the } and breaks the component internally (prettier_variant_hug). "
+			},
+			{
+				"type": "Text",
+				"start": 311,
+				"end": 312,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 312,
+				"end": 841,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 313
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 316
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 317,
+							"end": 319,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 319,
+							"end": 834,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 320
+								},
+								"end": {
+									"line": 3,
+									"column": 5,
+									"character": 323
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 324,
+										"end": 327,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 327,
+										"end": 826,
+										"name": "div",
+										"name_loc": {
+											"start": {
+												"line": 4,
+												"column": 3,
+												"character": 328
+											},
+											"end": {
+												"line": 4,
+												"column": 6,
+												"character": 331
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 332,
+													"end": 336,
+													"raw": "\n\t\t\t",
+													"data": "\n\t\t\t"
+												},
+												{
+													"type": "RegularElement",
+													"start": 336,
+													"end": 817,
+													"name": "div",
+													"name_loc": {
+														"start": {
+															"line": 5,
+															"column": 4,
+															"character": 337
+														},
+														"end": {
+															"line": 5,
+															"column": 7,
+															"character": 340
+														}
+													},
+													"attributes": [],
+													"fragment": {
+														"type": "Fragment",
+														"nodes": [
+															{
+																"type": "Text",
+																"start": 341,
+																"end": 346,
+																"raw": "\n\t\t\t\t",
+																"data": "\n\t\t\t\t"
+															},
+															{
+																"type": "RegularElement",
+																"start": 346,
+																"end": 807,
+																"name": "div",
+																"name_loc": {
+																	"start": {
+																		"line": 6,
+																		"column": 5,
+																		"character": 347
+																	},
+																	"end": {
+																		"line": 6,
+																		"column": 8,
+																		"character": 350
+																	}
+																},
+																"attributes": [],
+																"fragment": {
+																	"type": "Fragment",
+																	"nodes": [
+																		{
+																			"type": "Text",
+																			"start": 351,
+																			"end": 357,
+																			"raw": "\n\t\t\t\t\t",
+																			"data": "\n\t\t\t\t\t"
+																		},
+																		{
+																			"type": "Comment",
+																			"start": 357,
+																			"end": 424,
+																			"data": " dropped component at body indent == 100: stays on one line "
+																		},
+																		{
+																			"type": "Text",
+																			"start": 424,
+																			"end": 430,
+																			"raw": "\n\t\t\t\t\t",
+																			"data": "\n\t\t\t\t\t"
+																		},
+																		{
+																			"type": "IfBlock",
+																			"elseif": false,
+																			"start": 430,
+																			"end": 546,
+																			"test": {
+																				"type": "Identifier",
+																				"start": 435,
+																				"end": 439,
+																				"loc": {
+																					"start": {
+																						"line": 8,
+																						"column": 10
+																					},
+																					"end": {
+																						"line": 8,
+																						"column": 14
+																					}
+																				},
+																				"name": "cond"
+																			},
+																			"consequent": {
+																				"type": "Fragment",
+																				"nodes": [
+																					{
+																						"type": "Text",
+																						"start": 440,
+																						"end": 447,
+																						"raw": "\n\t\t\t\t\t\t",
+																						"data": "\n\t\t\t\t\t\t"
+																					},
+																					{
+																						"type": "Component",
+																						"start": 447,
+																						"end": 535,
+																						"name": "Comp",
+																						"name_loc": {
+																							"start": {
+																								"line": 9,
+																								"column": 7,
+																								"character": 448
+																							},
+																							"end": {
+																								"line": 9,
+																								"column": 11,
+																								"character": 452
+																							}
+																						},
+																						"attributes": [
+																							{
+																								"type": "Attribute",
+																								"start": 453,
+																								"end": 467,
+																								"name": "prop1",
+																								"name_loc": {
+																									"start": {
+																										"line": 9,
+																										"column": 12,
+																										"character": 453
+																									},
+																									"end": {
+																										"line": 9,
+																										"column": 17,
+																										"character": 458
+																									}
+																								},
+																								"value": {
+																									"type": "ExpressionTag",
+																									"start": 459,
+																									"end": 467,
+																									"expression": {
+																										"type": "Identifier",
+																										"start": 460,
+																										"end": 466,
+																										"loc": {
+																											"start": {
+																												"line": 9,
+																												"column": 19
+																											},
+																											"end": {
+																												"line": 9,
+																												"column": 25
+																											}
+																										},
+																										"name": "value1"
+																									}
+																								}
+																							},
+																							{
+																								"type": "Attribute",
+																								"start": 468,
+																								"end": 482,
+																								"name": "prop2",
+																								"name_loc": {
+																									"start": {
+																										"line": 9,
+																										"column": 27,
+																										"character": 468
+																									},
+																									"end": {
+																										"line": 9,
+																										"column": 32,
+																										"character": 473
+																									}
+																								},
+																								"value": {
+																									"type": "ExpressionTag",
+																									"start": 474,
+																									"end": 482,
+																									"expression": {
+																										"type": "Identifier",
+																										"start": 475,
+																										"end": 481,
+																										"loc": {
+																											"start": {
+																												"line": 9,
+																												"column": 34
+																											},
+																											"end": {
+																												"line": 9,
+																												"column": 40
+																											}
+																										},
+																										"name": "value2"
+																									}
+																								}
+																							},
+																							{
+																								"type": "Attribute",
+																								"start": 483,
+																								"end": 497,
+																								"name": "prop3",
+																								"name_loc": {
+																									"start": {
+																										"line": 9,
+																										"column": 42,
+																										"character": 483
+																									},
+																									"end": {
+																										"line": 9,
+																										"column": 47,
+																										"character": 488
+																									}
+																								},
+																								"value": {
+																									"type": "ExpressionTag",
+																									"start": 489,
+																									"end": 497,
+																									"expression": {
+																										"type": "Identifier",
+																										"start": 490,
+																										"end": 496,
+																										"loc": {
+																											"start": {
+																												"line": 9,
+																												"column": 49
+																											},
+																											"end": {
+																												"line": 9,
+																												"column": 55
+																											}
+																										},
+																										"name": "value3"
+																									}
+																								}
+																							},
+																							{
+																								"type": "Attribute",
+																								"start": 498,
+																								"end": 512,
+																								"name": "prop4",
+																								"name_loc": {
+																									"start": {
+																										"line": 9,
+																										"column": 57,
+																										"character": 498
+																									},
+																									"end": {
+																										"line": 9,
+																										"column": 62,
+																										"character": 503
+																									}
+																								},
+																								"value": {
+																									"type": "ExpressionTag",
+																									"start": 504,
+																									"end": 512,
+																									"expression": {
+																										"type": "Identifier",
+																										"start": 505,
+																										"end": 511,
+																										"loc": {
+																											"start": {
+																												"line": 9,
+																												"column": 64
+																											},
+																											"end": {
+																												"line": 9,
+																												"column": 70
+																											}
+																										},
+																										"name": "value4"
+																									}
+																								}
+																							},
+																							{
+																								"type": "Attribute",
+																								"start": 513,
+																								"end": 532,
+																								"name": "prop5",
+																								"name_loc": {
+																									"start": {
+																										"line": 9,
+																										"column": 72,
+																										"character": 513
+																									},
+																									"end": {
+																										"line": 9,
+																										"column": 77,
+																										"character": 518
+																									}
+																								},
+																								"value": {
+																									"type": "ExpressionTag",
+																									"start": 519,
+																									"end": 532,
+																									"expression": {
+																										"type": "Identifier",
+																										"start": 520,
+																										"end": 531,
+																										"loc": {
+																											"start": {
+																												"line": 9,
+																												"column": 79
+																											},
+																											"end": {
+																												"line": 9,
+																												"column": 90
+																											}
+																										},
+																										"name": "value5abcde"
+																									}
+																								}
+																							}
+																						],
+																						"fragment": {
+																							"type": "Fragment",
+																							"nodes": []
+																						}
+																					},
+																					{
+																						"type": "Text",
+																						"start": 535,
+																						"end": 541,
+																						"raw": "\n\t\t\t\t\t",
+																						"data": "\n\t\t\t\t\t"
+																					}
+																				]
+																			},
+																			"alternate": null
+																		},
+																		{
+																			"type": "Text",
+																			"start": 546,
+																			"end": 553,
+																			"raw": "\n\n\t\t\t\t\t",
+																			"data": "\n\n\t\t\t\t\t"
+																		},
+																		{
+																			"type": "Comment",
+																			"start": 553,
+																			"end": 632,
+																			"data": " dropped component at body indent > 100 (101): wraps its own attributes "
+																		},
+																		{
+																			"type": "Text",
+																			"start": 632,
+																			"end": 638,
+																			"raw": "\n\t\t\t\t\t",
+																			"data": "\n\t\t\t\t\t"
+																		},
+																		{
+																			"type": "IfBlock",
+																			"elseif": false,
+																			"start": 638,
+																			"end": 796,
+																			"test": {
+																				"type": "Identifier",
+																				"start": 643,
+																				"end": 647,
+																				"loc": {
+																					"start": {
+																						"line": 13,
+																						"column": 10
+																					},
+																					"end": {
+																						"line": 13,
+																						"column": 14
+																					}
+																				},
+																				"name": "cond"
+																			},
+																			"consequent": {
+																				"type": "Fragment",
+																				"nodes": [
+																					{
+																						"type": "Text",
+																						"start": 648,
+																						"end": 655,
+																						"raw": "\n\t\t\t\t\t\t",
+																						"data": "\n\t\t\t\t\t\t"
+																					},
+																					{
+																						"type": "Component",
+																						"start": 655,
+																						"end": 785,
+																						"name": "Comp",
+																						"name_loc": {
+																							"start": {
+																								"line": 14,
+																								"column": 7,
+																								"character": 656
+																							},
+																							"end": {
+																								"line": 14,
+																								"column": 11,
+																								"character": 660
+																							}
+																						},
+																						"attributes": [
+																							{
+																								"type": "Attribute",
+																								"start": 668,
+																								"end": 682,
+																								"name": "prop1",
+																								"name_loc": {
+																									"start": {
+																										"line": 15,
+																										"column": 7,
+																										"character": 668
+																									},
+																									"end": {
+																										"line": 15,
+																										"column": 12,
+																										"character": 673
+																									}
+																								},
+																								"value": {
+																									"type": "ExpressionTag",
+																									"start": 674,
+																									"end": 682,
+																									"expression": {
+																										"type": "Identifier",
+																										"start": 675,
+																										"end": 681,
+																										"loc": {
+																											"start": {
+																												"line": 15,
+																												"column": 14
+																											},
+																											"end": {
+																												"line": 15,
+																												"column": 20
+																											}
+																										},
+																										"name": "value1"
+																									}
+																								}
+																							},
+																							{
+																								"type": "Attribute",
+																								"start": 690,
+																								"end": 704,
+																								"name": "prop2",
+																								"name_loc": {
+																									"start": {
+																										"line": 16,
+																										"column": 7,
+																										"character": 690
+																									},
+																									"end": {
+																										"line": 16,
+																										"column": 12,
+																										"character": 695
+																									}
+																								},
+																								"value": {
+																									"type": "ExpressionTag",
+																									"start": 696,
+																									"end": 704,
+																									"expression": {
+																										"type": "Identifier",
+																										"start": 697,
+																										"end": 703,
+																										"loc": {
+																											"start": {
+																												"line": 16,
+																												"column": 14
+																											},
+																											"end": {
+																												"line": 16,
+																												"column": 20
+																											}
+																										},
+																										"name": "value2"
+																									}
+																								}
+																							},
+																							{
+																								"type": "Attribute",
+																								"start": 712,
+																								"end": 726,
+																								"name": "prop3",
+																								"name_loc": {
+																									"start": {
+																										"line": 17,
+																										"column": 7,
+																										"character": 712
+																									},
+																									"end": {
+																										"line": 17,
+																										"column": 12,
+																										"character": 717
+																									}
+																								},
+																								"value": {
+																									"type": "ExpressionTag",
+																									"start": 718,
+																									"end": 726,
+																									"expression": {
+																										"type": "Identifier",
+																										"start": 719,
+																										"end": 725,
+																										"loc": {
+																											"start": {
+																												"line": 17,
+																												"column": 14
+																											},
+																											"end": {
+																												"line": 17,
+																												"column": 20
+																											}
+																										},
+																										"name": "value3"
+																									}
+																								}
+																							},
+																							{
+																								"type": "Attribute",
+																								"start": 734,
+																								"end": 748,
+																								"name": "prop4",
+																								"name_loc": {
+																									"start": {
+																										"line": 18,
+																										"column": 7,
+																										"character": 734
+																									},
+																									"end": {
+																										"line": 18,
+																										"column": 12,
+																										"character": 739
+																									}
+																								},
+																								"value": {
+																									"type": "ExpressionTag",
+																									"start": 740,
+																									"end": 748,
+																									"expression": {
+																										"type": "Identifier",
+																										"start": 741,
+																										"end": 747,
+																										"loc": {
+																											"start": {
+																												"line": 18,
+																												"column": 14
+																											},
+																											"end": {
+																												"line": 18,
+																												"column": 20
+																											}
+																										},
+																										"name": "value4"
+																									}
+																								}
+																							},
+																							{
+																								"type": "Attribute",
+																								"start": 756,
+																								"end": 776,
+																								"name": "prop5",
+																								"name_loc": {
+																									"start": {
+																										"line": 19,
+																										"column": 7,
+																										"character": 756
+																									},
+																									"end": {
+																										"line": 19,
+																										"column": 12,
+																										"character": 761
+																									}
+																								},
+																								"value": {
+																									"type": "ExpressionTag",
+																									"start": 762,
+																									"end": 776,
+																									"expression": {
+																										"type": "Identifier",
+																										"start": 763,
+																										"end": 775,
+																										"loc": {
+																											"start": {
+																												"line": 19,
+																												"column": 14
+																											},
+																											"end": {
+																												"line": 19,
+																												"column": 26
+																											}
+																										},
+																										"name": "value5abcdef"
+																									}
+																								}
+																							}
+																						],
+																						"fragment": {
+																							"type": "Fragment",
+																							"nodes": []
+																						}
+																					},
+																					{
+																						"type": "Text",
+																						"start": 785,
+																						"end": 791,
+																						"raw": "\n\t\t\t\t\t",
+																						"data": "\n\t\t\t\t\t"
+																					}
+																				]
+																			},
+																			"alternate": null
+																		},
+																		{
+																			"type": "Text",
+																			"start": 796,
+																			"end": 801,
+																			"raw": "\n\t\t\t\t",
+																			"data": "\n\t\t\t\t"
+																		}
+																	]
+																}
+															},
+															{
+																"type": "Text",
+																"start": 807,
+																"end": 811,
+																"raw": "\n\t\t\t",
+																"data": "\n\t\t\t"
+															}
+														]
+													}
+												},
+												{
+													"type": "Text",
+													"start": 817,
+													"end": 820,
+													"raw": "\n\t\t",
+													"data": "\n\t\t"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 826,
+										"end": 828,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 834,
+							"end": 835,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

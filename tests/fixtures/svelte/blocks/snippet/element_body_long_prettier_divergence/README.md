@@ -17,6 +17,6 @@ shapes — `{#snippet}` is not special-cased, so its body drops like every other
 
 ## Related
 
-- [snippet/inline_in_element](../inline_in_element_prettier_divergence/) — `{#snippet}` params-inline + body-expand inside an inline element
+- [snippet/inline_element_long](../inline_element_long_prettier_divergence/) — `{#snippet}` params-inline + body-expand inside an inline element
 - [if/element_body_long](../../if/element_body_long_prettier_divergence/) — the same drop at block level
 - [await/element_body_long](../../await/element_body_long_prettier_divergence/) — the same inside `<Container>` for `{#await}`

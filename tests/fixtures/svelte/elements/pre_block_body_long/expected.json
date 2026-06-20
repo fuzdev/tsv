@@ -1,0 +1,168 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 538,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 292,
+				"data": " A long block body inside <pre> does NOT drop to its own line: white-space is significant in <pre>, so the body stays on the pre line even past printWidth — the uniform body-drop is gated off. Both formatters agree. Outside <pre> the same body drops (see blocks/if/element_body_long). "
+			},
+			{
+				"type": "Text",
+				"start": 292,
+				"end": 293,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 293,
+				"end": 411,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 294
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 297
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 298,
+							"end": 405,
+							"test": {
+								"type": "Identifier",
+								"start": 303,
+								"end": 307,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 10
+									},
+									"end": {
+										"line": 2,
+										"column": 14
+									}
+								},
+								"name": "cond"
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 308,
+										"end": 400,
+										"raw": "this is a long run of plain text content that goes well beyond the hundred column limit here",
+										"data": "this is a long run of plain text content that goes well beyond the hundred column limit here"
+									}
+								]
+							},
+							"alternate": null
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 411,
+				"end": 413,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 413,
+				"end": 537,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 414
+					},
+					"end": {
+						"line": 4,
+						"column": 4,
+						"character": 417
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "EachBlock",
+							"start": 418,
+							"end": 531,
+							"expression": {
+								"type": "Identifier",
+								"start": 425,
+								"end": 430,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 12
+									},
+									"end": {
+										"line": 4,
+										"column": 17
+									}
+								},
+								"name": "items"
+							},
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 439,
+										"end": 524,
+										"raw": "another long run of plain text content well beyond the hundred column limit goes here",
+										"data": "another long run of plain text content well beyond the hundred column limit goes here"
+									}
+								]
+							},
+							"context": {
+								"type": "Identifier",
+								"name": "item",
+								"start": 434,
+								"end": 438,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 21,
+										"character": 434
+									},
+									"end": {
+										"line": 4,
+										"column": 25,
+										"character": 438
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
