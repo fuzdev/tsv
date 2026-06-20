@@ -1179,11 +1179,7 @@ impl<'a> Parser<'a> {
         let params = self.parse_parameter_list()?;
 
         // Check for return type annotation: <T>(): type => ... or type predicate
-        let return_type = if self.check(&TokenKind::Colon) {
-            Some(self.parse_return_type_annotation()?)
-        } else {
-            None
-        };
+        let return_type = self.parse_optional_return_type()?;
 
         self.expect(&TokenKind::Arrow)?; // consume '=>'
 
@@ -2278,11 +2274,7 @@ impl<'a> Parser<'a> {
         let params = self.parse_parameter_list()?;
 
         // Check for return type annotation: (): type => ... or type predicate
-        let return_type = if self.check(&TokenKind::Colon) {
-            Some(self.parse_return_type_annotation()?)
-        } else {
-            None
-        };
+        let return_type = self.parse_optional_return_type()?;
 
         self.expect(&TokenKind::Arrow)?; // consume '=>'
 
@@ -2341,11 +2333,7 @@ impl<'a> Parser<'a> {
         start: usize,
     ) -> Result<Expression, ParseError> {
         // Check for type parameters: `async <T>() => ...`
-        let type_parameters = if self.check(&TokenKind::LessThan) {
-            Some(self.parse_type_parameters()?)
-        } else {
-            None
-        };
+        let type_parameters = self.parse_optional_type_parameters()?;
 
         // Parse parameter list or single parameter
         // Note: with type parameters, must have parentheses
@@ -2371,11 +2359,7 @@ impl<'a> Parser<'a> {
         };
 
         // Check for return type annotation or type predicate
-        let return_type = if self.check(&TokenKind::Colon) {
-            Some(self.parse_return_type_annotation()?)
-        } else {
-            None
-        };
+        let return_type = self.parse_optional_return_type()?;
 
         self.expect(&TokenKind::Arrow)?; // consume '=>'
 
@@ -2405,22 +2389,14 @@ impl<'a> Parser<'a> {
         is_generator: bool,
     ) -> Result<FunctionExpression, ParseError> {
         // Parse optional type parameters: <T, U>
-        let type_parameters = if self.check(&TokenKind::LessThan) {
-            Some(self.parse_type_parameters()?)
-        } else {
-            None
-        };
+        let type_parameters = self.parse_optional_type_parameters()?;
 
         // Capture paren position before parsing params (for comment detection)
         let (params_start, _) = self.current_pos();
         let params = self.parse_parameter_list()?;
 
         // Check for return type annotation: (): type or type predicate
-        let return_type = if self.check(&TokenKind::Colon) {
-            Some(self.parse_return_type_annotation()?)
-        } else {
-            None
-        };
+        let return_type = self.parse_optional_return_type()?;
 
         let body = self.parse_function_body()?;
         let end = body.span.end;

@@ -178,11 +178,7 @@ impl<'a> Parser<'a> {
         };
 
         // Parse type parameters (TypeScript generics): class Foo<T>
-        let type_parameters = if self.check(&TokenKind::LessThan) {
-            Some(self.parse_type_parameters()?)
-        } else {
-            None
-        };
+        let type_parameters = self.parse_optional_type_parameters()?;
 
         // Parse optional `extends` clause
         let (super_class, super_type_parameters) = if matches!(
@@ -195,11 +191,7 @@ impl<'a> Parser<'a> {
             let expr = self.parse_heritage_expression()?;
 
             // Parse optional type arguments: `extends Base<T>`
-            let type_args = if self.check(&TokenKind::LessThan) {
-                Some(self.parse_type_arguments()?)
-            } else {
-                None
-            };
+            let type_args = self.parse_optional_type_arguments()?;
 
             (Some(Box::new(expr)), type_args)
         } else {
@@ -280,11 +272,7 @@ impl<'a> Parser<'a> {
         };
 
         // Parse type parameters (TypeScript generics): class Foo<T>()
-        let type_parameters = if self.check(&TokenKind::LessThan) {
-            Some(self.parse_type_parameters()?)
-        } else {
-            None
-        };
+        let type_parameters = self.parse_optional_type_parameters()?;
 
         // Parse optional `extends` clause
         let (super_class, super_type_parameters) = if matches!(
@@ -297,11 +285,7 @@ impl<'a> Parser<'a> {
             let expr = self.parse_heritage_expression()?;
 
             // Parse optional type arguments: `extends Base<T>`
-            let type_args = if self.check(&TokenKind::LessThan) {
-                Some(self.parse_type_arguments()?)
-            } else {
-                None
-            };
+            let type_args = self.parse_optional_type_arguments()?;
 
             (Some(Box::new(expr)), type_args)
         } else {
@@ -624,11 +608,7 @@ impl<'a> Parser<'a> {
         let modifier = self.parse_property_modifier();
 
         // Parse type parameters (TypeScript generics): method<T>()
-        let type_parameters = if self.check(&TokenKind::LessThan) {
-            Some(self.parse_type_parameters()?)
-        } else {
-            None
-        };
+        let type_parameters = self.parse_optional_type_parameters()?;
 
         // Detect if this is a method (has `(`) or property (has `=` or `;` or end of class)
         if matches!(self.current_kind(), TokenKind::ParenOpen) {
@@ -645,11 +625,7 @@ impl<'a> Parser<'a> {
             let params = self.parse_parameter_list()?;
 
             // Check for return type annotation: (): type or type predicate
-            let return_type = if self.check(&TokenKind::Colon) {
-                Some(self.parse_return_type_annotation()?)
-            } else {
-                None
-            };
+            let return_type = self.parse_optional_return_type()?;
 
             // Abstract methods and overload signatures have no body - just a semicolon
             // Method overloads: `parse(x: string): object;` followed by implementation
@@ -722,11 +698,7 @@ impl<'a> Parser<'a> {
             // The optional/definite marker was already parsed above (shared with methods).
 
             // Check for type annotation: `name: type`
-            let type_annotation = if self.check(&TokenKind::Colon) {
-                Some(self.parse_type_annotation()?)
-            } else {
-                None
-            };
+            let type_annotation = self.parse_optional_type_annotation()?;
 
             // Check for value: `= value`
             let value = if self.eat(TokenKind::Equals) {
