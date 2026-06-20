@@ -304,7 +304,7 @@ The constructs acorn re-parses (root `comments` duplication tsv corrects):
   - [computed_key_comment_svelte_divergence](../tests/fixtures/typescript/types/type_members/computed_key_comment_svelte_divergence/)
   - [computed_key_open_bracket_line_comment_svelte_prettier_divergence](../tests/fixtures/typescript/statements/class/computed_key_open_bracket_line_comment_svelte_prettier_divergence/)
 
-- **Angle-bracket type assertion `<T>x` — a comment inside `<…>`:**
+- **Angle-bracket type assertion `<T>x` — a block comment anywhere in the cast (inside `<…>`, after the type before `>`, or after `>` before the expression); a comment before `<` sits outside the reparse window and is not duplicated:**
   - [type_assertion_comment_svelte_divergence](../tests/fixtures/typescript/types/type_assertion_comment_svelte_divergence/)
 
 - **Arrow return type — a comment between the return type and `=>`:**

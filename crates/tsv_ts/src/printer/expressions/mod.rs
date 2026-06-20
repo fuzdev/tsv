@@ -28,7 +28,7 @@ mod patterns;
 mod template_literal;
 
 use crate::ast::internal::{BinaryExpression, BinaryOperator, Expression, TSType};
-use crate::printer::comments::CommentSpacing;
+use crate::printer::comments::{CommentFilter, CommentSpacing};
 use crate::printer::{ParenContext, PatternContext, Printer, chain, needs_parens};
 use tsv_lang::doc::arena::DocId;
 
@@ -233,18 +233,45 @@ impl<'a> Printer<'a> {
             self.build_comments_between(angle_end, type_start, CommentSpacing::Trailing);
         let type_doc = self.build_type_doc_with_wrapping_type_args(&type_assert.type_annotation);
 
+        // Block comments on either side of the closing `>` stay where the author
+        // wrote them: `<T /* c */>` (after the type, before `>`) trails the type
+        // inside the cast, `<T>/* c */ expr` (after `>`, before the expression)
+        // leads the expression. Split at the assertion's `>`, found past any
+        // comment. TODO: line comments in these positions are still dropped —
+        // prettier breaks the cast and relocates them onto the type line, which
+        // is a separate (relocation-vs-preserve) decision; block-only here avoids
+        // swallowing the following token onto the comment line.
+        let type_end = type_assert.type_annotation.span().end;
+        let expr_start = type_assert.expression.span().start;
+        let close_angle = self.find_assertion_close_angle(type_end, expr_start);
+        let before_close_doc = self.build_comments_between_filtered(
+            type_end,
+            close_angle,
+            CommentSpacing::Leading,
+            CommentFilter::BlockOnly,
+        );
+        let after_close_doc = self.build_comments_between_filtered(
+            close_angle + 1,
+            expr_start,
+            CommentSpacing::Trailing,
+            CommentFilter::BlockOnly,
+        );
+
         // Mirror Prettier's `printTypeAssertion`: the cast `<Type>` is its own
         // group, breaking after `<` with the type on an indented line and `>`
         // back at the outer indent. Crucially, a union cast type prints *flat* on
         // that line — Prettier's `shouldIndentUnionType` returns false for
         // `TSTypeAssertion`, so it never gets the leading-`|` hanging indent that
         // `as`/`satisfies` casts use (see `build_union_hanging_indent_doc`).
-        let cast_group = d.group(d.concat(&[
+        let cast_inner = d.group(d.concat(&[
             d.text("<"),
-            d.indent(d.concat(&[d.softline(), comments_doc, type_doc])),
+            d.indent(d.concat(&[d.softline(), comments_doc, type_doc, before_close_doc])),
             d.softline(),
             d.text(">"),
         ]));
+        // A comment after `>` leads the expression in every layout branch below,
+        // so fold it onto the cast once rather than into each branch.
+        let cast_group = d.concat(&[cast_inner, after_close_doc]);
 
         let inner_expr = self.build_expression_doc(&type_assert.expression);
         let expr_doc = if expr_needs_parens {
