@@ -1,0 +1,139 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 104,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 103,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 5,
+							"end": 97,
+							"test": {
+								"type": "Identifier",
+								"start": 10,
+								"end": 14,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 10
+									},
+									"end": {
+										"line": 1,
+										"column": 14
+									}
+								},
+								"name": "cond"
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "RegularElement",
+										"start": 15,
+										"end": 92,
+										"name": "span",
+										"name_loc": {
+											"start": {
+												"line": 1,
+												"column": 16,
+												"character": 16
+											},
+											"end": {
+												"line": 1,
+												"column": 20,
+												"character": 20
+											}
+										},
+										"attributes": [
+											{
+												"type": "Attribute",
+												"start": 21,
+												"end": 30,
+												"name": "class",
+												"name_loc": {
+													"start": {
+														"line": 1,
+														"column": 21,
+														"character": 21
+													},
+													"end": {
+														"line": 1,
+														"column": 26,
+														"character": 26
+													}
+												},
+												"value": [
+													{
+														"start": 28,
+														"end": 29,
+														"type": "Text",
+														"raw": "c",
+														"data": "c"
+													}
+												]
+											}
+										],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "ExpressionTag",
+													"start": 31,
+													"end": 83,
+													"expression": {
+														"type": "Identifier",
+														"start": 32,
+														"end": 82,
+														"loc": {
+															"start": {
+																"line": 1,
+																"column": 32
+															},
+															"end": {
+																"line": 1,
+																"column": 82
+															}
+														},
+														"name": "some_longer_content_expression_value_here_xyz_pads"
+													}
+												}
+											]
+										}
+									}
+								]
+							},
+							"alternate": null
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
