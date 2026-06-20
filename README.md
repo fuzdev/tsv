@@ -74,8 +74,10 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
   and there are no config files or CLI options for formatting style;
   tsv is opinionated like `gofmt` and Python's Black,
   see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
-- `tsv format` discovery is gitignore-aware, honoring `.gitignore`, `.formatignore`,
-  and a repo-root `.prettierignore`
+- `tsv format` discovery is gitignore-aware, honoring `.gitignore` and `.formatignore`
+  hierarchically (nested files like git, unlike Prettier)
+  plus a compatible `.prettierignore`
+  (but relative to repo root if available, not cwd like Prettier's default)
   ([gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format))
 - Rust-only implementation that never embeds or calls a JS runtime, for performance;
   JS reaches tsv through the WASM bindings, and native N-API bindings are

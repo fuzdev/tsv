@@ -1109,10 +1109,115 @@ impl<'a> SvelteParser<'a> {
 
         let decl_offset = tag_content_start + super::subslice_offset(tag_content, decl_str);
 
-        // Find the = sign (accounting for destructuring patterns with nested =)
-        // We need to find the top-level = that separates id from init
-        let eq_pos = self.find_const_equals(decl_str)?;
+        // Find the top-level `=` (not the nested `=` of a destructuring default)
+        // separating id from init, then parse both sides.
+        let eq_pos = self.find_top_level_equals(decl_str)?;
+        let (id, init) = self.parse_declarator(decl_str, decl_offset, eq_pos)?;
 
+        Ok(FragmentNode::ConstTag(ConstTag {
+            id,
+            init,
+            span: Span {
+                start: start as u32,
+                end: after_close as u32,
+            },
+        }))
+    }
+
+    /// When positioned at a `{` (`LeftBrace`), detect whether it opens a
+    /// `{const …}` / `{let …}` declaration tag rather than an ordinary `{expr}`
+    /// mustache. Leading whitespace after `{` is skipped to match Svelte's
+    /// `allow_whitespace`. Only the exact keywords `const`/`let` match (the
+    /// alphabetic-run read gives the `\b` word boundary for free, so identifiers
+    /// like `constant`/`letter` and expressions like `cond ? …` fall through).
+    pub(crate) fn declaration_tag_kind(&self) -> Option<DeclarationKind> {
+        let after_brace = self.current_end;
+        let rest = &self.source[after_brace..];
+        let kw_start = after_brace + (rest.len() - rest.trim_start().len());
+        match self.keyword_at(kw_start) {
+            "const" => Some(DeclarationKind::Const),
+            "let" => Some(DeclarationKind::Let),
+            _ => None,
+        }
+    }
+
+    /// At a `{` (`LeftBrace`), parse either a `{const}`/`{let}` declaration tag
+    /// or an ordinary `{expr}` mustache, whichever the lookahead indicates.
+    /// Shared by the root, element-children, and block-children fragment loops.
+    pub(crate) fn parse_brace_tag(&mut self) -> Result<FragmentNode, ParseError> {
+        if let Some(kind) = self.declaration_tag_kind() {
+            self.parse_declaration_tag(self.current_start, kind)
+        } else {
+            Ok(FragmentNode::ExpressionTag(self.parse_expression_tag()?))
+        }
+    }
+
+    /// Parse a declaration tag: `{const name = expr}` / `{let name = expr}` /
+    /// `{let name}`. Structurally a `{@const}` without the `@` (the content after
+    /// `{` is `const …` / `let …` either way), plus a `kind` and an optional
+    /// initializer — `let` may omit it, `const` may not.
+    pub(crate) fn parse_declaration_tag(
+        &mut self,
+        start: usize,
+        kind: DeclarationKind,
+    ) -> Result<FragmentNode, ParseError> {
+        let tag_content_start = self.current_end;
+        let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
+
+        // Skip leading whitespace after `{` (Svelte allows it) before the keyword.
+        let after_ws = tag_content.trim_start();
+        let keyword_start = tag_content_start + (tag_content.len() - after_ws.len());
+
+        // Strip the `const`/`let` keyword — Svelte requires whitespace + a value.
+        let keyword = kind.keyword();
+        let decl_str = self
+            .strip_block_keyword(after_ws, keyword, keyword_start)?
+            .trim();
+
+        let decl_offset = tag_content_start + super::subslice_offset(tag_content, decl_str);
+        let span = Span {
+            start: start as u32,
+            end: after_close as u32,
+        };
+
+        // Split id/init on the top-level `=`. No `=` means no initializer, which
+        // is valid only for `let` (`const` requires one).
+        match self.find_top_level_equals(decl_str).ok() {
+            Some(eq_pos) => {
+                let (id, init) = self.parse_declarator(decl_str, decl_offset, eq_pos)?;
+                Ok(FragmentNode::DeclarationTag(DeclarationTag {
+                    kind,
+                    id,
+                    init: Some(init),
+                    span,
+                }))
+            }
+            None => {
+                if kind == DeclarationKind::Const {
+                    return Err(self
+                        .error_msg_at("`const` declarations require an initializer", decl_offset));
+                }
+                let id = self.parse_ts_pattern(decl_str, decl_offset)?;
+                Ok(FragmentNode::DeclarationTag(DeclarationTag {
+                    kind,
+                    id,
+                    init: None,
+                    span,
+                }))
+            }
+        }
+    }
+
+    /// Split a declarator string on the top-level `=` at `eq_pos` into a parsed
+    /// (id pattern, init expression). `decl_offset` is the byte offset of
+    /// `decl_str` in the source, used to recover each side's span. Shared by the
+    /// `{@const}` and the with-init `{const}`/`{let}` paths.
+    fn parse_declarator(
+        &mut self,
+        decl_str: &'a str,
+        decl_offset: usize,
+        eq_pos: usize,
+    ) -> Result<(tsv_ts::Expression, tsv_ts::Expression), ParseError> {
         let id_str = decl_str[..eq_pos].trim();
         let init_str = decl_str[eq_pos + 1..].trim();
 
@@ -1120,31 +1225,20 @@ impl<'a> SvelteParser<'a> {
         let init_offset =
             decl_offset + eq_pos + 1 + (decl_str[eq_pos + 1..].len() - init_str.len());
 
-        // Parse id as a pattern (identifier or destructuring)
-        // Use parse_pattern to convert ObjectExpression/ArrayExpression to patterns
+        // id is a pattern (identifier or destructuring — `parse_ts_pattern`
+        // converts ObjectExpression/ArrayExpression to patterns), init an expression.
         let id = self.parse_ts_pattern(id_str, id_offset)?;
-
-        // Parse init as an expression
         let init = self.parse_ts_expression(init_str, init_offset)?;
-
-        let end = after_close;
-
-        Ok(FragmentNode::ConstTag(ConstTag {
-            id,
-            init,
-            span: Span {
-                start: start as u32,
-                end: end as u32,
-            },
-        }))
+        Ok((id, init))
     }
 
-    /// Find the top-level = in a const declaration (not inside brackets/braces)
+    /// Find the top-level `=` in a declaration string (not inside brackets/braces
+    /// or strings) — the one separating the binding from its initializer.
     ///
     /// NOTE: The escape handling is simplified - it doesn't correctly handle
     /// escaped backslashes (e.g., `"test\\"` would be parsed incorrectly).
-    /// This is unlikely to occur in real @const declarations.
-    fn find_const_equals(&self, s: &str) -> Result<usize, ParseError> {
+    /// This is unlikely to occur in real declarations.
+    fn find_top_level_equals(&self, s: &str) -> Result<usize, ParseError> {
         let mut depth = 0;
         let mut in_string = false;
         let mut string_char = '"';
@@ -1169,7 +1263,7 @@ impl<'a> SvelteParser<'a> {
         }
 
         Err(ParseError::InvalidSyntax {
-            message: "Expected '=' in const declaration".to_string(),
+            message: "Expected '=' in declaration".to_string(),
             position: 0,
             context: None,
         })
@@ -1391,9 +1485,9 @@ impl<'a> SvelteParser<'a> {
                     }
                 }
             } else if self.check(TokenKind::LeftBrace) {
-                let expr = self.parse_expression_tag()?;
-                last_end = expr.span.end_usize();
-                nodes.push(FragmentNode::ExpressionTag(expr));
+                let tag = self.parse_brace_tag()?;
+                last_end = tag.span().end_usize();
+                nodes.push(tag);
             } else if self.check(TokenKind::BlockOpen) {
                 let block = self.parse_block()?;
                 last_end = block.span().end_usize();

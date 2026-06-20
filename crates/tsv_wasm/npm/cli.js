@@ -33,11 +33,12 @@ import {
  * Mirrors `FORMATIGNORE_FILE`. */
 const FORMATIGNORE_FILE = '.formatignore';
 
-/** The repo-root-only tsv files, in precedence order: a repo-root `.formatignore`
- * (used alone when present, scoping tsv independently of prettier); else a
- * repo-root `.prettierignore` for drop-in compat. Only consulted at the repo
- * root, and never outside a repo. Mirrors `TSV_ROOT_FILES`. */
-const TSV_ROOT_FILES = ['.formatignore', '.prettierignore'];
+/** Prettier's ignore file — read only at the repo root for drop-in compat, and
+ * shadowed by *presence* of a repo-root `.formatignore` (used alone when present,
+ * even if present-but-unreadable). Never hierarchical, and never outside a repo —
+ * there a target-root `.prettierignore` triggers a heads-up warning instead.
+ * Mirrors `PRETTIERIGNORE_FILE`. */
+const PRETTIERIGNORE_FILE = '.prettierignore';
 
 /** The git ignore file, discovered hierarchically (one per directory) and only
  * inside a git repo, matching git. */
@@ -436,23 +437,32 @@ function read_stdin(exit_code) {
 	}
 }
 
-/** Reads a file to a string, mapping any IO error (absent, unreadable) to null. */
-function read_optional(path) {
+/** Read an ignore file, classifying the outcome so the walk can surface a
+ * silently-dropped file and keep precedence by presence. Returns `{kind:
+ * 'content', content}` on success, `{kind: 'absent'}` for ENOENT (missing, or
+ * raced away after the listing — silent), or `{kind: 'unreadable'}` for any other
+ * failure, pushing a non-fatal warning. **Strict UTF-8** (via `TextDecoder` with
+ * `fatal`) to match Rust's `read_to_string` — Node's `readFileSync(path, 'utf-8')`
+ * would lossily replace invalid bytes, silently applying a mangled ignore file the
+ * native CLI drops. `ignoreBOM: true` *keeps* a leading BOM (the option name is
+ * inverted) so a BOM-prefixed file decodes identically to Rust's `read_to_string`,
+ * which doesn't strip it either. Mirrors the native `read_ignore_file`. */
+function read_ignore_file(path, warnings) {
+	let buf;
 	try {
-		return readFileSync(path, 'utf-8');
+		buf = readFileSync(path);
+	} catch (error) {
+		if (error.code === 'ENOENT') return { kind: 'absent' };
+		warnings.push(`could not read ${path} (${error.message}); its ignore rules are not applied`);
+		return { kind: 'unreadable' };
+	}
+	try {
+		const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+		return { kind: 'content', content: decoder.decode(buf) };
 	} catch {
-		return null;
+		warnings.push(`could not read ${path} (invalid UTF-8); its ignore rules are not applied`);
+		return { kind: 'unreadable' };
 	}
-}
-
-/** Reads `dir/<name>` for the first readable name, or null — the
- * `.formatignore`-shadows-`.prettierignore` resolution. Mirrors `read_first`. */
-function read_first(dir, names) {
-	for (const name of names) {
-		const content = read_optional(join(dir, name));
-		if (content !== null) return content;
-	}
-	return null;
 }
 
 /** The nearest ancestor of `start` (inclusive) holding a `.git` entry (dir or
@@ -612,16 +622,29 @@ function collect_root(root, cwd, files, errors, warnings) {
 	for (const ancestor of ancestor_chain(format_root, root_abs).slice(0, -1)) {
 		const anchor = rel_under(format_root, ancestor) ?? '';
 		// tsv layer: `.formatignore` everywhere; at the repo root only, a
-		// `.prettierignore` it shadows (drop-in compat, never hierarchical)
-		const tsv = in_repo && anchor === ''
-			? read_first(ancestor, TSV_ROOT_FILES)
-			: read_optional(join(ancestor, FORMATIGNORE_FILE));
+		// `.prettierignore` it shadows. No listing for ancestors, so the read
+		// outcome stands in for presence: a present-but-unreadable `.formatignore`
+		// (`unreadable`, warned) shadows `.prettierignore` just as in the listed
+		// case — only a genuinely `absent` one falls through.
+		let tsv = null;
+		if (in_repo && anchor === '') {
+			const fr = read_ignore_file(join(ancestor, FORMATIGNORE_FILE), warnings);
+			if (fr.kind === 'content') {
+				tsv = fr.content;
+			} else if (fr.kind === 'absent') {
+				const pr = read_ignore_file(join(ancestor, PRETTIERIGNORE_FILE), warnings);
+				if (pr.kind === 'content') tsv = pr.content;
+			}
+		} else {
+			const fr = read_ignore_file(join(ancestor, FORMATIGNORE_FILE), warnings);
+			if (fr.kind === 'content') tsv = fr.content;
+		}
 		if (tsv !== null) stack.push_tsv(anchor, tsv);
 		// `.gitignore` layer: only inside a git repo
 		if (in_repo) {
-			const gitignore = read_optional(join(ancestor, GITIGNORE_FILE));
-			if (gitignore !== null) {
-				stack.push_gitignore(anchor, gitignore);
+			const gr = read_ignore_file(join(ancestor, GITIGNORE_FILE), warnings);
+			if (gr.kind === 'content') {
+				stack.push_gitignore(anchor, gr.content);
 				heuristic_active = false;
 			}
 		}
@@ -636,7 +659,7 @@ function collect_root(root, cwd, files, errors, warnings) {
 	// scope. Mirrors the native collect_root.
 	if (base_rel !== '' && stack.is_ignored(base_rel, true)) return;
 
-	collect_recursive(root, base_rel, in_repo, stack, heuristic_active, files, errors, warnings);
+	collect_recursive(root, base_rel, true, in_repo, stack, heuristic_active, files, errors, warnings);
 }
 
 /** Component-wise path ordering matching Rust's `PathBuf` ordering — `/`
@@ -657,7 +680,7 @@ function compare_paths(a, b) {
 	return as.length - bs.length;
 }
 
-function collect_recursive(dir, dir_rel, in_repo, stack, heuristic_active, files, errors, warnings) {
+function collect_recursive(dir, dir_rel, is_target_root, in_repo, stack, heuristic_active, files, errors, warnings) {
 	let entries;
 	try {
 		entries = readdirSync(dir, { withFileTypes: true });
@@ -665,34 +688,56 @@ function collect_recursive(dir, dir_rel, in_repo, stack, heuristic_active, files
 		errors.push(`${dir}: read_dir failed: ${error.message}`);
 		return;
 	}
-	// read THIS dir's own ignore files, opening only those the listing already
-	// contains (an ignore-file-free dir costs zero speculative opens). Mirrors the
-	// native collect_recursive.
-	const present = (name) => entries.some((e) => e.name === name);
-	// tsv layer: at the repo root only, `.formatignore` shadows `.prettierignore`;
-	// every other level (and outside a repo) uses `.formatignore`
+	// Single pass over the listing for the ignore-file presence flags this dir
+	// needs, rather than a scan per name; `readdir` order is arbitrary so there's
+	// nothing to short-circuit on. An ignore file's content is still opened only
+	// when present (below). Mirrors the native collect_recursive.
+	let has_formatignore = false;
+	let has_prettierignore = false;
+	let has_gitignore = false;
+	for (const e of entries) {
+		if (e.name === FORMATIGNORE_FILE) has_formatignore = true;
+		else if (e.name === PRETTIERIGNORE_FILE) has_prettierignore = true;
+		else if (in_repo && e.name === GITIGNORE_FILE) has_gitignore = true;
+	}
+	// tsv layer: `.formatignore` whenever present (every level, in or out of a
+	// repo); at the repo root only, a `.prettierignore` is the drop-in fallback,
+	// used solely when no `.formatignore` is present. Precedence is by presence
+	// (the listing), not readability — a present-but-unreadable `.formatignore`
+	// still shadows: read_ignore_file warns and yields no rules.
 	let tsv = null;
-	if (in_repo && dir_rel === '') {
-		for (const name of TSV_ROOT_FILES) {
-			if (present(name)) {
-				tsv = read_optional(join(dir, name));
-				if (tsv !== null) break;
-			}
-		}
-	} else if (present(FORMATIGNORE_FILE)) {
-		tsv = read_optional(join(dir, FORMATIGNORE_FILE));
+	if (has_formatignore) {
+		const r = read_ignore_file(join(dir, FORMATIGNORE_FILE), warnings);
+		if (r.kind === 'content') tsv = r.content;
+	} else if (in_repo && dir_rel === '' && has_prettierignore) {
+		const r = read_ignore_file(join(dir, PRETTIERIGNORE_FILE), warnings);
+		if (r.kind === 'content') tsv = r.content;
 	}
 	let tsv_pushed = false;
 	if (tsv !== null) {
 		stack.push_tsv(dir_rel, tsv);
 		tsv_pushed = true;
 	}
-	// `.gitignore` layer: only inside a repo; turns the heuristic off for children
+	// outside a git repo a target-root `.prettierignore` is silently skipped (tsv
+	// reads `.formatignore` there) — warn (decision + text from Rust, single source
+	// of truth with the native CLI), pointing at the rename / `git init` fixes.
+	if (is_target_root) {
+		const warning = stack.prettierignore_outside_repo_warning(
+			dir,
+			in_repo,
+			has_prettierignore,
+			has_formatignore,
+		);
+		if (warning != null) warnings.push(warning);
+	}
+	// `.gitignore` layer: only inside a repo (has_gitignore implies in_repo); turns
+	// the heuristic off for children. A present-but-unreadable `.gitignore` warns
+	// and is not pushed — so the heuristic stays on, which the warning makes visible.
 	let git_pushed = false;
-	if (in_repo && present(GITIGNORE_FILE)) {
-		const gitignore = read_optional(join(dir, GITIGNORE_FILE));
-		if (gitignore !== null) {
-			stack.push_gitignore(dir_rel, gitignore);
+	if (has_gitignore) {
+		const r = read_ignore_file(join(dir, GITIGNORE_FILE), warnings);
+		if (r.kind === 'content') {
+			stack.push_gitignore(dir_rel, r.content);
 			git_pushed = true;
 		}
 	}
@@ -718,7 +763,7 @@ function collect_recursive(dir, dir_rel, in_repo, stack, heuristic_active, files
 				continue;
 			}
 			// the child reads its own ignore files when we recurse into it
-			collect_recursive(path, child_rel, in_repo, stack, child_heuristic, files, errors, warnings);
+			collect_recursive(path, child_rel, false, in_repo, stack, child_heuristic, files, errors, warnings);
 		} else if (entry.isFile() && stack.should_format_file(entry.name, child_rel)) {
 			files.push(path);
 		}

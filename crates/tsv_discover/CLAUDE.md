@@ -5,7 +5,8 @@
 
 The single home of the decisions `tsv format`'s directory walk makes: the
 always-pruned safety nets, the build-output heuristic, the formattable-extension
-check, and the heuristic-shadow warning. The three discovery surfaces — the
+check, the heuristic-shadow warning, and the `.prettierignore`-outside-a-repo
+warning. The three discovery surfaces — the
 native CLI (`tsv_cli`), the WASM CLI (`crates/tsv_wasm/npm/cli.js`), and the VS
 Code extension — call into it instead of reimplementing the decision, so they
 agree **by construction** rather than by hand-mirrored constants and templates
@@ -76,17 +77,32 @@ crates (the open-convention stance):
   once here; `classify_dir` carries it in `PruneWithWarning`. Exposed `pub`
   because the WASM binding fetches it directly (the JS↔WASM boundary can't carry
   a tagged-union payload as one primitive — see below).
+- `prettierignore_outside_repo_warning(dir, in_repo, has_prettierignore,
+  has_formatignore) -> Option<String>` — the heads-up when, **outside a git
+  repo**, a `.prettierignore` sits in the **target root** with no sibling
+  `.formatignore` shadowing it. tsv reads `.formatignore` (not `.prettierignore`)
+  outside a repo, so prettier would have honored a file tsv silently skips; the
+  message points at the rename / `git init` fixes. Returns `None` otherwise. The
+  caller gates on *position* (only the target root — a nested or ancestor
+  `.prettierignore` is not this case) and passes the presence flags it already
+  read from the directory listing, so the check costs no extra filesystem access.
+  Both decision and text live here, so the native CLI and WASM binding stay in
+  lockstep.
 
 ## Consumers
 
 - **`tsv_cli`** (`cli/discover.rs`) — natively, in `collect_recursive`: matches
   `classify_dir`'s `DirVerdict` and pushes any `PruneWithWarning` text into the
-  `Discovered::warnings` channel; uses `should_format_file` for the file branch.
-  The FS walk, format-root resolution, and ignore-file reading stay there.
+  `Discovered::warnings` channel; uses `should_format_file` for the file branch;
+  and, at the target root only, pushes any `prettierignore_outside_repo_warning`
+  into the same channel. The FS walk, format-root resolution, and ignore-file
+  reading stay there.
 - **`tsv_wasm`** — the `format`-gated `IgnoreStack` wrapper exposes
   `classify_dir(name, child_rel, heuristic_active) -> string`
   (`"descend"|"prune"|"prune_warn"`), `should_format_file(name, child_rel) ->
-  bool`, and `heuristic_shadow_warning(dir) -> string`. The string-tag encoding
+  bool`, `heuristic_shadow_warning(dir) -> string`, and
+  `prettierignore_outside_repo_warning(dir, in_repo, has_prettierignore,
+  has_formatignore) -> string | undefined`. The string-tag encoding
   (rather than a wasm-bindgen enum or a returned struct) needs no
   `patch_npm_package.ts` change and allocates no JS class on the common
   descend path; the `prune_warn` arm fetches the text via the separate method.

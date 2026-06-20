@@ -15,6 +15,9 @@ const RENDER_TAG_OPEN: &str = "{@render ";
 // No trailing space — the space (when content follows) is emitted separately,
 // and the `.len()` derives the offset past the keyword for comment scanning.
 const DEBUG_TAG_OPEN: &str = "{@debug";
+const AT_CONST_TAG_OPEN: &str = "{@const ";
+const CONST_TAG_OPEN: &str = "{const ";
+const LET_TAG_OPEN: &str = "{let ";
 
 impl<'a> Printer<'a> {
     /// Build a doc for {@html expr}
@@ -39,26 +42,58 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc for {@const declaration}
-    ///
-    /// Prettier formats @const as an AssignmentExpression, using its assignment
-    /// layout to decide whether to break at `=`. Three layouts:
-    /// - will_break: `{@const id = init}` (init has hardlines, keep together)
-    /// - fluid: `{@const id = init}` or `{@const id =\n\tinit}` (marker group)
-    /// - break-after-operator: `{@const id =\n\tinit}` (group with line at `=`)
     pub(crate) fn build_const_tag_doc(&self, tag: &internal::ConstTag) -> DocId {
+        self.build_assignment_tag_doc(AT_CONST_TAG_OPEN, &tag.id, &tag.init, tag.span)
+    }
+
+    /// Build a doc for `{const id = init}` / `{let id = init}` / `{let id}`.
+    ///
+    /// The with-init form reuses the shared `{@const}` assignment layout (just a
+    /// different opening keyword). The binding-less `let` form (`{let id}`) has
+    /// no initializer — prettier renders it as a bare declaration with a trailing
+    /// `;`.
+    pub(crate) fn build_declaration_tag_doc(&self, tag: &internal::DeclarationTag) -> DocId {
+        let prefix = match tag.kind {
+            internal::DeclarationKind::Const => CONST_TAG_OPEN,
+            internal::DeclarationKind::Let => LET_TAG_OPEN,
+        };
+        match &tag.init {
+            Some(init) => self.build_assignment_tag_doc(prefix, &tag.id, init, tag.span),
+            None => {
+                let d = self.d();
+                let id_doc = self.build_ts_expression_doc_no_comments(&tag.id);
+                d.concat(&[d.text(prefix), id_doc, d.text(";}")])
+            }
+        }
+    }
+
+    /// Shared assignment-tag layout for `{@const}` and `{const}`/`{let}` (with init).
+    ///
+    /// Prettier formats these as an AssignmentExpression, using its assignment
+    /// layout to decide whether to break at `=`. Three layouts:
+    /// - will_break: `{… id = init}` (init has hardlines, keep together)
+    /// - fluid: `{… id = init}` or `{… id =\n\tinit}` (marker group)
+    /// - break-after-operator: `{… id =\n\tinit}` (group with line at `=`)
+    fn build_assignment_tag_doc(
+        &self,
+        prefix: &'static str,
+        id: &tsv_ts::Expression,
+        init: &tsv_ts::Expression,
+        span: tsv_lang::Span,
+    ) -> DocId {
         let d = self.d();
-        let id_doc = self.build_ts_expression_doc_no_comments(&tag.id);
+        let id_doc = self.build_ts_expression_doc_no_comments(id);
         // Build init with LayoutMode::Standalone so binary chains use Grouped style
         // (not ContinuationIndent). The assignment layout handles indentation —
         // ContinuationIndent would double-indent continuation lines.
         let init_doc = self.build_const_init_doc(
-            &tag.init,
-            tag.id.span().end, // scan from after the id so a comment between `=` and init survives
-            tag.span.end - 1,  // before "}"
+            init,
+            id.span().end, // scan from after the id so a comment between `=` and init survives
+            span.end - 1,  // before "}"
         );
 
         // Choose layout matching prettier's assignment layout selection.
-        if Self::const_should_break_after_op(&tag.init) {
+        if Self::const_should_break_after_op(init) {
             // Binary expressions, conditional with binary test, etc.
             // Break-after-operator: group with line at "=" so the doc printer
             // can break when the flat form exceeds print width. This takes
@@ -72,18 +107,12 @@ impl<'a> Printer<'a> {
             let rhs_indented = d.indent(rhs);
             let assignment = d.group(d.concat(&[d.text(" ="), rhs_indented, d.text("}")]));
 
-            d.concat(&[d.text("{@const "), id_doc, assignment])
+            d.concat(&[d.text(prefix), id_doc, assignment])
         } else if d.will_break(init_doc) {
             // Init has forced breaks (object/array/template, etc.) that aren't
             // break-after-operator — keep "= init" together, init's own breaks
             // handle formatting.
-            d.concat(&[
-                d.text("{@const "),
-                id_doc,
-                d.text(" = "),
-                init_doc,
-                d.text("}"),
-            ])
+            d.concat(&[d.text(prefix), id_doc, d.text(" = "), init_doc, d.text("}")])
         } else {
             // Fluid layout: break at `=` only when the full line exceeds
             // print width. Uses indentIfBreak so the RHS is evaluated
@@ -91,7 +120,7 @@ impl<'a> Printer<'a> {
             // on the same line as `=` while its branches break below.
             // Prettier ref: "fluid" layout (assignment.js:59-67)
             d.concat(&[
-                d.text("{@const "),
+                d.text(prefix),
                 id_doc,
                 d.text(" ="),
                 d.group_with_id(d.indent(d.line()), GroupId::Assignment),

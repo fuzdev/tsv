@@ -15,9 +15,17 @@ Formatting is now non-configurable by design -
 tsv has no config that changes its formatting style behavior, and none will be added.
 (this has no observable API changes because options had been deferred)
 
-- `tsv format` directory discovery now honors `.gitignore`,
-  `.prettierignore` (like Prettier, in the git root only),
-  and the tsv-specific `.formatignore` (nestable like gitignore)
+- `tsv format` directory discovery now honors `.gitignore` and the tsv-native
+  `.formatignore` hierarchically (one per directory, repo-rooted like git —
+  unlike Prettier, which reads only one `.gitignore` and one `.prettierignore`
+  relative to the cwd), plus a repo-root `.prettierignore` for drop-in compat
+  ([#50](https://github.com/fuzdev/tsv/pull/50))
+- `tsv format` warns (non-fatal, stderr) when a `.prettierignore` sits in the
+  target root outside a git repo — where prettier would read it but tsv does not —
+  pointing at the fix (rename to `.formatignore`, or `git init`)
+- `tsv format` warns instead of silently dropping a present-but-unreadable
+  `.gitignore`/`.formatignore`/`.prettierignore` (the WASM CLI now reads strict
+  UTF-8, matching native)
 - `tsv format --list` prints the in-scope files without formatting
 - feat: support `format-ignore` as an alias to `prettier-ignore`
   (along with `format-ignore-start` and `format-ignore-end` for templates)
