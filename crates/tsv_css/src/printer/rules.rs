@@ -60,14 +60,7 @@ impl<'a> Printer<'a> {
                         self.write("\n");
                     }
                     if format_ignore_next {
-                        // Emit raw source instead of formatting
-                        // Span doesn't include semicolon — add it like write_declaration_end
-                        self.write_indent();
-                        self.write(decl.span.extract(self.source));
-                        if decl.is_important() {
-                            self.write(" !important");
-                        }
-                        self.write(";\n");
+                        self.write_format_ignore_declaration(decl);
                         format_ignore_next = false;
                     } else {
                         self.print_css_declaration(decl);

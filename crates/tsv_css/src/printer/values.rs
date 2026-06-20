@@ -58,8 +58,10 @@ impl<'a> Printer<'a> {
             CssValue::Function { name, args, span } => {
                 self.build_value_function_doc(name, args, *span)
             }
-            CssValue::List { values, .. } => self.build_space_separated_doc(values),
-            CssValue::CommaSeparated { values, .. } => self.build_comma_separated_doc(values),
+            CssValue::List { values, .. } => self.build_separated_values_doc(values, " "),
+            CssValue::CommaSeparated { values, .. } => {
+                self.build_separated_values_doc(values, ", ")
+            }
         }
     }
 
@@ -300,15 +302,11 @@ impl<'a> Printer<'a> {
         d.group(d.indent(d.fill(&parts)))
     }
 
-    /// Build a doc for space-separated values
-    fn build_space_separated_doc(&self, values: &[CssValue]) -> DocId {
+    /// Build a doc for a value list joined by `sep` — `" "` for a space-separated
+    /// list (`CssValue::List`), `", "` for a comma-separated one
+    /// (`CssValue::CommaSeparated`).
+    fn build_separated_values_doc(&self, values: &[CssValue], sep: &'static str) -> DocId {
         self.d()
-            .join(values.iter().map(|v| self.build_css_value_doc(v)), " ")
-    }
-
-    /// Build a doc for comma-separated values
-    fn build_comma_separated_doc(&self, values: &[CssValue]) -> DocId {
-        self.d()
-            .join(values.iter().map(|v| self.build_css_value_doc(v)), ", ")
+            .join(values.iter().map(|v| self.build_css_value_doc(v)), sep)
     }
 }

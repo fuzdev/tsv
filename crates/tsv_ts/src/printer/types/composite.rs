@@ -909,18 +909,10 @@ impl<'a> Printer<'a> {
         expr_name: &internal::TSTypeQueryExprName,
     ) -> DocId {
         match expr_name {
-            internal::TSTypeQueryExprName::EntityName(entity) => {
-                self.build_type_entity_name_doc(entity)
-            }
+            internal::TSTypeQueryExprName::EntityName(entity) => self.build_entity_name_doc(entity),
             // `typeof import(...)` — identical to `TSType::Import`, including comment
             // preservation around the specifier, qualifier, and type arguments.
             internal::TSTypeQueryExprName::Import(i) => self.build_import_type_doc(i),
         }
-    }
-
-    /// Build doc for type entity name
-    pub(super) fn build_type_entity_name_doc(&self, name: &internal::TSEntityName) -> DocId {
-        // Delegate to standalone function - doesn't need printer state
-        super::super::build_entity_name_doc(self.d(), name)
     }
 }
