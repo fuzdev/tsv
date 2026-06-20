@@ -6,7 +6,7 @@
 //
 // - **mod.rs** (this file): Core Printer struct and root-level printing orchestration
 // - **nodes/**: Node-specific printing (elements, expressions, control flow, etc.)
-// - **text.rs**: Text content and whitespace normalization
+// - **text.rs**: Text-analysis predicates (leading/trailing whitespace, blank lines)
 // - **script_style.rs**: Script and style section printing
 // - **attributes.rs**: HTML attribute and directive printing
 // - **classification/**: HTML element classification adapters
@@ -19,99 +19,22 @@
 // 4. **Modularity**: Each module has single responsibility for future maintainability
 
 mod attributes;
-mod blocks;
 mod classification;
 mod helpers;
 mod nodes;
 mod script_style;
-mod tags;
 mod text;
 
 use self::text::TextAnalysis;
 use crate::ast::internal::{self, FragmentNode};
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::collections::HashSet;
 use std::rc::Rc;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{
     Comment, EmbedContext, INDENT, OutputBuffer, SharedInterner, SymbolResolver, TAB_WIDTH,
     is_format_ignore_directive, is_format_ignore_range_end, is_format_ignore_range_start,
 };
-
-/// Pending whitespace state - buffers whitespace decisions until next node is known
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-enum PendingWhitespace {
-    #[default]
-    /// No pending whitespace
-    None,
-    /// Whitespace already handled by previous node (e.g., text with trailing space)
-    /// Don't add any additional spacing
-    AlreadyHandled,
-    /// Space(s) detected in source (no newlines)
-    /// Will output as space before inline elements, newline before blocks
-    Space,
-    /// Single newline detected in source
-    /// Will output as newline before any element
-    Newline,
-    /// Blank line (2+ newlines) detected in source
-    /// Will output as double newline before any element
-    BlankLine,
-}
-
-impl PendingWhitespace {
-    /// Upgrade whitespace level (never downgrades)
-    fn upgrade(&mut self, other: PendingWhitespace) {
-        use PendingWhitespace::{BlankLine, Newline, Space};
-        *self = match (*self, other) {
-            (BlankLine, _) => BlankLine,
-            (_, BlankLine) => BlankLine,
-            (Newline, _) => Newline,
-            (_, Newline) => Newline,
-            (Space, _) => Space,
-            (_, Space) => Space,
-            _ => *self,
-        };
-    }
-
-    /// Resolve pending whitespace for block-like nodes (always newline or better)
-    fn resolve_for_block(self) -> &'static str {
-        match self {
-            PendingWhitespace::BlankLine => "\n\n",
-            PendingWhitespace::AlreadyHandled => "",
-            _ => "\n", // Newline, Space, None all become newline for blocks
-        }
-    }
-
-    /// Classify a root text node's **leading** whitespace into its pending-whitespace level
-    /// (`None` when it has none). Shared by the inline-run boundary and the content-text
-    /// node handler, which both `upgrade()` with the result.
-    fn leading_of(raw: &str) -> Self {
-        if raw.leading_whitespace().has_blank_line() {
-            Self::BlankLine
-        } else if raw.has_leading_newline() {
-            Self::Newline
-        } else if raw.has_leading_space_only() {
-            Self::Space
-        } else {
-            Self::None
-        }
-    }
-
-    /// Classify a root text node's **trailing** whitespace into its pending-whitespace level
-    /// (`None` when it has none). A trailing space-only run maps to `Space`; the content-text
-    /// handler, which writes that space inline, remaps it to `AlreadyHandled`, while the
-    /// inline-run path (whose doc trimmed the boundary) keeps `Space` to re-emit it.
-    fn trailing_of(raw: &str) -> Self {
-        if raw.has_trailing_blank_line() {
-            Self::BlankLine
-        } else if raw.has_trailing_newline() {
-            Self::Newline
-        } else if raw.has_trailing_space_only() {
-            Self::Space
-        } else {
-            Self::None
-        }
-    }
-}
 
 /// Which section a fragment comment should travel with during canonical reordering.
 /// Comments attach to the nearest section that follows them in source order.
@@ -122,55 +45,6 @@ enum CommentSection {
     InstanceScript,
     Template,
     Style,
-}
-
-/// What kind of node was previously printed at root level
-#[derive(Default, Clone, Copy, PartialEq, Eq)]
-enum PrevNodeKind {
-    #[default]
-    None,
-    Block,
-    Inline,
-    Text,
-    Comment,
-}
-
-/// State tracker for root-level fragment printing
-#[derive(Default)]
-struct RootPrintState {
-    prev_kind: PrevNodeKind,
-    has_output_content: bool,
-    pending_ws: PendingWhitespace,
-}
-
-impl RootPrintState {
-    /// Mark that a block-like node was just printed
-    fn after_block(&mut self) {
-        self.has_output_content = true;
-        self.prev_kind = PrevNodeKind::Block;
-        self.pending_ws = PendingWhitespace::None;
-    }
-
-    /// Mark that an inline node was just printed
-    fn after_inline(&mut self) {
-        self.has_output_content = true;
-        self.prev_kind = PrevNodeKind::Inline;
-        self.pending_ws = PendingWhitespace::None;
-    }
-
-    /// Mark that a text node was just printed
-    fn after_text(&mut self, trailing_ws: PendingWhitespace) {
-        self.has_output_content = true;
-        self.prev_kind = PrevNodeKind::Text;
-        self.pending_ws = trailing_ws;
-    }
-
-    /// Mark that a comment was just printed
-    fn after_comment(&mut self) {
-        self.has_output_content = true;
-        self.prev_kind = PrevNodeKind::Comment;
-        self.pending_ws = PendingWhitespace::None;
-    }
 }
 
 /// Printer state for building output
@@ -203,6 +77,16 @@ pub(crate) struct Printer<'a> {
     /// restores the previous value on the way out (so nested contexts reset
     /// correctly).
     block_dangle_allowed: Cell<bool>,
+    /// Span starts of control-flow blocks the root fragment marked as part of a **single-line
+    /// inline run** (`{x}{#if c}…{/if}` with no newline). The unified
+    /// [`Printer::build_nodes_doc_multiline`] builds these in inline context (long body
+    /// inner-breaks) rather than multiline context (body drops to its own line), reproducing
+    /// the root's pre-unification `build_nodes_doc_with_context` layout (the load-bearing
+    /// single-line-run discriminator). Span-keyed, so it scopes to **root-level** runs only —
+    /// element-nested blocks (different spans) keep the multiline body-drop divergence (e.g.
+    /// `blocks/await/preceding_sibling_body_long`). Populated once by
+    /// [`Printer::mark_root_inline_run_blocks`] before the root content is built.
+    root_inline_run_block_starts: RefCell<HashSet<u32>>,
 }
 
 impl<'a> Printer<'a> {
@@ -229,7 +113,17 @@ impl<'a> Printer<'a> {
             comments,
             line_breaks,
             block_dangle_allowed: Cell::new(true),
+            root_inline_run_block_starts: RefCell::new(HashSet::new()),
         }
+    }
+
+    /// Whether `node` is a control-flow block the root marked as part of a single-line inline
+    /// run — see [`Printer::root_inline_run_block_starts`]. Read by `build_nodes_doc_multiline`
+    /// to build the block in inline (inner-break) rather than multiline (body-drop) context.
+    pub(crate) fn is_root_inline_run_block(&self, node: &FragmentNode) -> bool {
+        self.root_inline_run_block_starts
+            .borrow()
+            .contains(&node.span().start)
     }
 
     /// Get a reference to the doc arena (convenience for `&self.arena`).
@@ -340,17 +234,6 @@ impl<'a> Printer<'a> {
             ..self.ts_inputs()
         };
         tsv_ts::build_expression_doc_with_comments(self.d(), expr, &inputs, &self.embed)
-    }
-
-    /// Format a TS expression to a string.
-    ///
-    /// Returns a simple formatted string with no indent context or comments.
-    pub(crate) fn format_ts_expression(&self, expr: &tsv_ts::Expression) -> String {
-        let inputs = tsv_ts::PrinterInputs {
-            comments: &[],
-            ..self.ts_inputs()
-        };
-        tsv_ts::format_expression(expr, &inputs, EmbedContext::default())
     }
 }
 
@@ -571,7 +454,7 @@ impl<'a> Printer<'a> {
             if has_previous_section {
                 self.write("\n"); // Blank line between sections
             }
-            self.print_root_fragment_filtered(&root.fragment, &printed_comment_indices);
+            self.print_root_fragment(&root.fragment, &printed_comment_indices);
             self.write("\n"); // Template needs explicit newline
             has_previous_section = true;
         }
@@ -617,408 +500,173 @@ impl<'a> Printer<'a> {
         self.write("\n");
     }
 
-    /// Format a Fragment with blank lines between root-level block elements
+    /// Render the whole template fragment through the same doc-based content path the
+    /// elements use — the root is **not special**.
     ///
-    /// Root-level formatting has special rules:
-    /// - Blank lines preserved from source (authorial intent for logical grouping)
-    /// - Multiple blank lines collapse to single blank line
-    /// - Whitespace between inline elements is preserved (INCLUDING newlines)
-    /// - Format preservation: inline stays inline, multiline stays multiline
-    /// - Leading/trailing whitespace-only nodes are removed
+    /// Prettier prints the root markup with the same `printChildren` as element children,
+    /// just inside a force-broken `group([…, hardline])`. [`Printer::build_nodes_doc_multiline`]
+    /// *is* that force-broken layout, so the root's sibling separation, blank-line handling,
+    /// block hugging, and the inline-element `>`-fold all come from the shared builder. Three
+    /// root-only concerns are handled around that call:
     ///
-    /// The `skip_indices` parameter allows skipping nodes that were already printed
-    /// (e.g., comments that appear before scripts are printed with the script section)
-    fn print_root_fragment_filtered(
-        &mut self,
-        fragment: &internal::Fragment,
-        skip_indices: &[usize],
-    ) {
-        let mut state = RootPrintState::default();
+    /// - **Boundary trim (B1):** the template content is the span of `fragment.nodes` from the
+    ///   first to the last node that isn't a section comment printed with its section
+    ///   (`skip_indices`) and isn't leading/trailing Unicode-whitespace-only text. Prettier trims
+    ///   the fragment boundary with a Unicode `trim()`, so a leading nbsp-only node (content
+    ///   mid-template) is dropped here. Section comments are *usually* boundary-contiguous, but a
+    ///   section sitting mid-template leaves one interior; those are dropped by the segmentation
+    ///   loop below (they are already printed with their hoisted section).
+    /// - **Single-line inline runs (B4):** a `{x}{#if c}…{/if}` run with no newline must
+    ///   *inner-break* a long body, not drop it — the load-bearing discriminator the element
+    ///   path does not apply. [`Self::mark_root_inline_run_blocks`] marks those blocks so the
+    ///   shared builder builds them in inline context (see `root_inline_run_block_starts`).
+    /// - **`format-ignore` ranges (B6):** `<!-- format-ignore-start -->` … `-end` is a
+    ///   *root-only* directive (it does not activate inside an element), so the content is
+    ///   split at top-level ranges: each range emits its source verbatim, the surrounding
+    ///   segments go through the shared builder. (Single-node `format-ignore` is handled by
+    ///   the shared builder itself.)
+    fn print_root_fragment(&mut self, fragment: &internal::Fragment, skip_indices: &[usize]) {
+        // Effective template range: drop section comments (`skip_indices`) and Unicode-ws-only
+        // boundary text. Both kinds only occur at the boundaries, so the kept content is a
+        // contiguous slice.
+        let skippable = |i: usize, n: &FragmentNode| {
+            skip_indices.contains(&i)
+                || matches!(n, FragmentNode::Text(t) if t.raw.trim().is_empty())
+        };
+        let Some(start) = fragment
+            .nodes
+            .iter()
+            .enumerate()
+            .position(|(i, n)| !skippable(i, n))
+        else {
+            return;
+        };
+        // `rposition` finds at least `start`, so the fallback never triggers (panic-free).
+        let end = fragment
+            .nodes
+            .iter()
+            .enumerate()
+            .rposition(|(i, n)| !skippable(i, n))
+            .unwrap_or(start);
+        let nodes = &fragment.nodes[start..=end];
 
-        // Find first non-whitespace node index (excluding skipped indices).
-        //
-        // This is the root-fragment leading boundary: prettier trims ALL leading
-        // whitespace here, non-breaking spaces included (the top-level output must
-        // not start with stray whitespace), mirroring the trailing line-rtrim. So
-        // a leading nbsp-only node is dropped here even though it counts as content
-        // mid-template — hence the Unicode `trim()` rather than the ASCII
-        // `is_whitespace_only` used for inter-element separators.
-        let first_non_ws_idx = fragment.nodes.iter().enumerate().position(|(i, node)| {
-            !skip_indices.contains(&i)
-                && !matches!(node, FragmentNode::Text(text) if text.raw.trim().is_empty())
-        });
+        // Mark single-line-run control-flow blocks so the shared builder inner-breaks them (B4).
+        self.mark_root_inline_run_blocks(nodes);
 
+        // Split at `format-ignore` ranges and at interior section comments (both rare); most
+        // templates are one segment.
+        let mut out: Vec<DocId> = Vec::new();
+        let mut seg_start = 0;
         let mut i = 0;
-        while i < fragment.nodes.len() {
-            let node = &fragment.nodes[i];
-            // Skip indices that were already printed (e.g., comments before script)
-            if skip_indices.contains(&i) {
+        while i < nodes.len() {
+            // A comment printed with its (hoisted) section — `skip_indices` indexes the full
+            // `fragment.nodes`, so offset by `start`. These are *usually* boundary-contiguous
+            // (trimmed away by `start`/`end`), but a `<script>`/`<style>`/`<svelte:options>`
+            // sitting **mid-template** (template content on both sides) leaves its comment
+            // interior to the slice. Drop it here so the shared builder doesn't re-emit it as
+            // template content (it is already printed with its section). The gap is re-bridged
+            // with the same boundary-aware separator the `format-ignore` range path uses.
+            if skip_indices.contains(&(start + i)) {
+                if nodes[seg_start..i]
+                    .iter()
+                    .any(|n| !n.is_whitespace_only_text())
+                {
+                    out.push(self.build_nodes_doc_multiline(&nodes[seg_start..i]));
+                    if let Some(sep) = self.range_trailing_separator(nodes, i) {
+                        out.push(sep);
+                    }
+                }
+                seg_start = i + 1;
                 i += 1;
                 continue;
             }
-
-            // Detect inline runs: a maximal span-adjacent (no whitespace gap) sequence
-            // mixing content text / inline nodes with a control-flow block. Route these
-            // through the doc-based element-content path so the block hugs its
-            // directly-adjacent neighbors (`text{#if}…{/if}text`) instead of getting a
-            // forced newline, while inter-line newlines, spaces, and `has_preceding_breakable`
-            // (fn-arg wrapping before block expansion) all resolve exactly as they do for
-            // element children.
-            if let Some(run_end) = self.detect_root_inline_run(&fragment.nodes, i) {
-                let run = &fragment.nodes[i..=run_end];
-                // A run that spans multiple source lines — a root-level text node carries
-                // a newline (`text{#if}…{/if}text⏎{#each}…`) — renders through the
-                // multiline element-content layout so the inter-line structure is kept and
-                // boundary whitespace is trimmed (carried as pending_ws). A single-line run
-                // (`{fn(…)}{#if …}…{/if}`, `a{#if}…{/if}c`) uses the inline path, where a
-                // long block keeps its body inline and breaks its inner content via
-                // `has_preceding_breakable` (matching prettier) rather than expanding.
-                let multiline = run
-                    .iter()
-                    .any(|n| matches!(n, FragmentNode::Text(t) if t.raw.contains('\n')));
-
-                // Leading boundary: the multiline path trims a content-text run-start's
-                // leading whitespace, so fold it into pending_ws here (the separator from
-                // any preceding root content). The inline path renders boundary whitespace
-                // verbatim, so it needs no upgrade.
-                if multiline && let FragmentNode::Text(text) = &fragment.nodes[i] {
-                    state
-                        .pending_ws
-                        .upgrade(PendingWhitespace::leading_of(&text.raw));
+            let is_range_start = matches!(
+                &nodes[i],
+                FragmentNode::Comment(c) if is_format_ignore_range_start(&c.content)
+            );
+            if is_range_start
+                && let Some(range_end) = (i + 1..nodes.len()).find(|&j| {
+                    matches!(&nodes[j],
+                        FragmentNode::Comment(c) if is_format_ignore_range_end(&c.content))
+                })
+            {
+                // Segment up to and including the start comment (it prints normally).
+                out.push(self.build_nodes_doc_multiline(&nodes[seg_start..=i]));
+                // Verbatim source from just after the start comment through the end comment.
+                let raw_start = nodes[i].span().end as usize;
+                let raw_end = nodes[range_end].span().end as usize;
+                out.push(
+                    self.d()
+                        .text_owned(self.source[raw_start..raw_end].to_string()),
+                );
+                // The whitespace after the end comment is trimmed by the next segment's
+                // boundary, so re-emit it as the separator before that segment.
+                if let Some(sep) = self.range_trailing_separator(nodes, range_end) {
+                    out.push(sep);
                 }
-
-                // Resolve pending whitespace before the run (same as ExpressionTag handling)
-                if state.has_output_content {
-                    match state.pending_ws {
-                        PendingWhitespace::None => {}
-                        PendingWhitespace::AlreadyHandled => {}
-                        PendingWhitespace::Space => {
-                            if state.prev_kind == PrevNodeKind::Comment {
-                                self.write("\n");
-                            } else {
-                                self.write(" ");
-                            }
-                        }
-                        PendingWhitespace::Newline => self.write("\n"),
-                        PendingWhitespace::BlankLine => self.write("\n\n"),
-                    }
-                }
-
-                // Build and render the run through the doc-based content path.
-                let doc = if multiline {
-                    self.build_nodes_doc_multiline(run)
-                } else {
-                    self.build_nodes_doc_with_context(run, false)
-                };
-                self.render_doc_immediate(doc);
-
-                state.has_output_content = true;
-                state.prev_kind = PrevNodeKind::Block; // control flow blocks are block-like
-                // Trailing boundary: the multiline path trimmed a content-text run-end's
-                // trailing whitespace — carry it as pending_ws so an inter-line newline /
-                // blank line / space is preserved. The inline path rendered it verbatim.
-                state.pending_ws = match &fragment.nodes[run_end] {
-                    FragmentNode::Text(text) if multiline && !text.raw.is_whitespace_only() => {
-                        PendingWhitespace::trailing_of(&text.raw)
-                    }
-                    _ => PendingWhitespace::None,
-                };
-                i = run_end + 1;
+                seg_start = range_end + 1;
+                i = range_end + 1;
                 continue;
-            }
-
-            match node {
-                FragmentNode::Text(text) => {
-                    // Skip leading whitespace-only text nodes at root level
-                    if Some(i) < first_non_ws_idx {
-                        i += 1;
-                        continue;
-                    }
-
-                    // Check if this is a whitespace-only node
-                    if text.raw.is_whitespace_only() {
-                        // Buffer whitespace type - use upgrade semantics (never downgrade)
-                        let ws_type = if text.raw.has_blank_line() {
-                            PendingWhitespace::BlankLine
-                        } else if text.raw.contains('\n') {
-                            PendingWhitespace::Newline
-                        } else {
-                            PendingWhitespace::Space
-                        };
-                        state.pending_ws.upgrade(ws_type);
-                        // Keep prev_kind as-is: block followed by inline always needs newline
-                        // (Prettier behavior: <div>block</div><span> becomes two lines)
-                        // continue to next iteration for whitespace-only nodes
-                    } else {
-                        // Text with content - upgrade pending whitespace from its leading ws.
-                        state
-                            .pending_ws
-                            .upgrade(PendingWhitespace::leading_of(&text.raw));
-
-                        // Resolve pending whitespace before outputting text
-                        if state.has_output_content {
-                            match state.pending_ws {
-                                PendingWhitespace::None => {
-                                    // No explicit whitespace, but add newline if previous was block
-                                    if state.prev_kind == PrevNodeKind::Block {
-                                        self.write("\n");
-                                    }
-                                }
-                                PendingWhitespace::AlreadyHandled => {}
-                                PendingWhitespace::Space => self.write(" "),
-                                PendingWhitespace::Newline => self.write("\n"),
-                                PendingWhitespace::BlankLine => self.write("\n\n"),
-                            }
-                        }
-
-                        // Check if text has trailing space (not newline) - those are semantic
-                        let has_trailing_space = text.raw.has_trailing_space_only();
-
-                        // Root-level text normalization: always trim leading, preserve internal spaces,
-                        // preserve trailing space only if it's not a newline
-                        let normalized = {
-                            let mut result = self.normalize_whitespace(&text.raw, true); // Trim completely first
-                            if has_trailing_space {
-                                result.push(' '); // Add back trailing space (semantic)
-                            }
-                            result
-                        };
-                        self.write(&normalized);
-
-                        // Set pending whitespace for next node based on trailing whitespace.
-                        // A trailing space was already written inline above (AlreadyHandled);
-                        // otherwise classify the trailing ws like the inline-run boundary.
-                        let trailing_ws = if has_trailing_space {
-                            PendingWhitespace::AlreadyHandled
-                        } else {
-                            PendingWhitespace::trailing_of(&text.raw)
-                        };
-                        state.after_text(trailing_ws);
-                    }
-                }
-                FragmentNode::Element(el) => {
-                    let is_block = self.is_block_element(el);
-                    let is_component = el.kind == internal::ElementKind::Component;
-                    let is_inline_html = !is_block && !is_component;
-
-                    // Resolve pending whitespace before element
-                    if state.has_output_content {
-                        match state.pending_ws {
-                            PendingWhitespace::None => {
-                                // No explicit whitespace
-                                // Blocks always need newlines
-                                // Inline elements need newlines if previous was block
-                                if is_block || state.prev_kind == PrevNodeKind::Block {
-                                    self.write("\n");
-                                }
-                            }
-                            PendingWhitespace::AlreadyHandled => {}
-                            PendingWhitespace::Space => {
-                                // Space before block → newline
-                                // Space after block before inline → newline (prettier always separates)
-                                // Space after comment before component → newline (prettier behavior)
-                                // Otherwise → preserve space
-                                if is_block
-                                    || state.prev_kind == PrevNodeKind::Block
-                                    || (state.prev_kind == PrevNodeKind::Comment && !is_inline_html)
-                                {
-                                    self.write("\n");
-                                } else {
-                                    self.write(" ");
-                                }
-                            }
-                            PendingWhitespace::Newline => self.write("\n"),
-                            PendingWhitespace::BlankLine => self.write("\n\n"),
-                        }
-                    }
-
-                    self.print_element(el);
-
-                    // Update state - elements need special handling for is_block
-                    state.has_output_content = true;
-                    state.prev_kind = if is_block {
-                        PrevNodeKind::Block
-                    } else {
-                        PrevNodeKind::Inline
-                    };
-                    state.pending_ws = PendingWhitespace::None;
-                }
-                FragmentNode::ExpressionTag(tag) => {
-                    // Resolve pending whitespace before expression (treat as inline)
-                    if state.has_output_content {
-                        match state.pending_ws {
-                            PendingWhitespace::None => {}
-                            PendingWhitespace::AlreadyHandled => {}
-                            PendingWhitespace::Space => {
-                                // Space after comment before expression → newline (prettier behavior)
-                                if state.prev_kind == PrevNodeKind::Comment {
-                                    self.write("\n");
-                                } else {
-                                    self.write(" ");
-                                }
-                            }
-                            PendingWhitespace::Newline => self.write("\n"),
-                            PendingWhitespace::BlankLine => self.write("\n\n"),
-                        }
-                    }
-
-                    self.print_expression_tag(tag);
-                    state.after_inline();
-                }
-                FragmentNode::Comment(comment) => {
-                    // Resolve pending whitespace before comment (treat as inline)
-                    if state.has_output_content {
-                        match state.pending_ws {
-                            PendingWhitespace::None => {
-                                // If previous was block, need newline before comment
-                                if state.prev_kind == PrevNodeKind::Block {
-                                    self.write("\n");
-                                }
-                            }
-                            PendingWhitespace::AlreadyHandled => {}
-                            PendingWhitespace::Space => {
-                                // Space before comment after non-text element → newline (prettier behavior)
-                                if state.prev_kind != PrevNodeKind::Text {
-                                    self.write("\n");
-                                } else {
-                                    self.write(" ");
-                                }
-                            }
-                            PendingWhitespace::Newline => self.write("\n"),
-                            PendingWhitespace::BlankLine => self.write("\n\n"),
-                        }
-                    }
-
-                    self.print_comment(comment);
-
-                    // format-ignore-start/end: preserve all nodes between as raw source
-                    // Only active at root level (nested ranges are treated as regular comments)
-                    if is_format_ignore_range_start(&comment.content) {
-                        // Find the matching range-end marker
-                        let mut end_idx = None;
-                        for j in (i + 1)..fragment.nodes.len() {
-                            if let FragmentNode::Comment(end_comment) = &fragment.nodes[j]
-                                && is_format_ignore_range_end(&end_comment.content)
-                            {
-                                end_idx = Some(j);
-                                break;
-                            }
-                        }
-                        if let Some(end_idx) = end_idx {
-                            // Emit raw source from after start comment through end comment
-                            let raw_start = comment.span.end as usize;
-                            let end_comment = &fragment.nodes[end_idx];
-                            let raw_end = end_comment.span().end as usize;
-                            self.write(&self.source[raw_start..raw_end]);
-                            state.has_output_content = true;
-                            state.prev_kind = PrevNodeKind::Block;
-                            state.pending_ws = PendingWhitespace::None;
-                            i = end_idx + 1;
-                            continue;
-                        }
-                    }
-
-                    // format-ignore: preserve next non-whitespace node as raw source
-                    if is_format_ignore_directive(&comment.content) {
-                        let mut next_idx = i + 1;
-                        while next_idx < fragment.nodes.len() {
-                            if let FragmentNode::Text(text) = &fragment.nodes[next_idx]
-                                && text.raw.is_whitespace_only()
-                            {
-                                next_idx += 1;
-                                continue;
-                            }
-                            break;
-                        }
-                        if next_idx < fragment.nodes.len() {
-                            self.write("\n");
-                            let raw = fragment.nodes[next_idx].span().extract(self.source);
-                            self.write(raw);
-                            state.has_output_content = true;
-                            state.prev_kind = PrevNodeKind::Block;
-                            state.pending_ws = PendingWhitespace::None;
-                            i = next_idx + 1;
-                            continue;
-                        }
-                    }
-
-                    state.after_comment();
-                }
-                // Block-like nodes: control blocks, tags, special elements
-                // All use the same pattern: newline/blank line before, treated as block after
-                FragmentNode::IfBlock(block) => {
-                    if state.has_output_content {
-                        self.write(state.pending_ws.resolve_for_block());
-                    }
-                    self.print_if_block(block);
-                    state.after_block();
-                }
-                FragmentNode::EachBlock(block) => {
-                    if state.has_output_content {
-                        self.write(state.pending_ws.resolve_for_block());
-                    }
-                    self.print_each_block(block);
-                    state.after_block();
-                }
-                FragmentNode::AwaitBlock(block) => {
-                    if state.has_output_content {
-                        self.write(state.pending_ws.resolve_for_block());
-                    }
-                    self.print_await_block(block);
-                    state.after_block();
-                }
-                FragmentNode::KeyBlock(block) => {
-                    if state.has_output_content {
-                        self.write(state.pending_ws.resolve_for_block());
-                    }
-                    self.print_key_block(block);
-                    state.after_block();
-                }
-                FragmentNode::SnippetBlock(block) => {
-                    if state.has_output_content {
-                        self.write(state.pending_ws.resolve_for_block());
-                    }
-                    self.print_snippet_block(block);
-                    state.after_block();
-                }
-                FragmentNode::HtmlTag(tag) => {
-                    if state.has_output_content {
-                        self.write(state.pending_ws.resolve_for_block());
-                    }
-                    self.print_html_tag(tag);
-                    state.after_block();
-                }
-                FragmentNode::ConstTag(tag) => {
-                    if state.has_output_content {
-                        self.write(state.pending_ws.resolve_for_block());
-                    }
-                    self.print_const_tag(tag);
-                    state.after_block();
-                }
-                FragmentNode::DebugTag(tag) => {
-                    if state.has_output_content {
-                        self.write(state.pending_ws.resolve_for_block());
-                    }
-                    self.print_debug_tag(tag);
-                    state.after_block();
-                }
-                FragmentNode::RenderTag(tag) => {
-                    if state.has_output_content {
-                        self.write(state.pending_ws.resolve_for_block());
-                    }
-                    self.print_render_tag(tag);
-                    state.after_block();
-                }
-                FragmentNode::SpecialElement(elem) => {
-                    if state.has_output_content {
-                        self.write(state.pending_ws.resolve_for_block());
-                    }
-                    self.print_special_element(elem);
-                    state.after_block();
-                }
             }
             i += 1;
         }
+        if seg_start < nodes.len() {
+            out.push(self.build_nodes_doc_multiline(&nodes[seg_start..]));
+        }
+
+        if !out.is_empty() {
+            let doc = self.d().concat(&out);
+            self.render_doc_immediate(doc);
+        }
+    }
+
+    /// Mark control-flow blocks in **single-line** root inline runs (`{x}{#if c}…{/if}` with no
+    /// newline) so [`Printer::build_nodes_doc_multiline`] builds them in inline context — see
+    /// [`Printer::root_inline_run_block_starts`]. A *multi-line* run (its content text spans
+    /// source lines) keeps the multiline layout, so its blocks are left unmarked. Span-keyed,
+    /// so only root-level run blocks are affected.
+    fn mark_root_inline_run_blocks(&self, nodes: &[FragmentNode]) {
+        let mut marks = self.root_inline_run_block_starts.borrow_mut();
+        marks.clear();
+        let mut i = 0;
+        while i < nodes.len() {
+            if let Some(run_end) = self.detect_root_inline_run(nodes, i) {
+                let run = &nodes[i..=run_end];
+                let multiline = run
+                    .iter()
+                    .any(|n| matches!(n, FragmentNode::Text(t) if t.raw.contains('\n')));
+                if !multiline {
+                    for n in run {
+                        if nodes::is_control_flow_block(n) {
+                            marks.insert(n.span().start);
+                        }
+                    }
+                }
+                i = run_end + 1;
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    /// The separator to emit after a `format-ignore` range, before the next segment: the
+    /// whitespace immediately following the end comment (which the next segment's boundary
+    /// trim would otherwise drop). A blank line → `literalline` (the un-indented blank) +
+    /// `hardline`; a single newline / adjacency → `hardline`. `None` when nothing follows.
+    fn range_trailing_separator(&self, nodes: &[FragmentNode], range_end: usize) -> Option<DocId> {
+        if range_end + 1 >= nodes.len() {
+            return None;
+        }
+        let d = self.d();
+        let blank = matches!(
+            &nodes[range_end + 1],
+            FragmentNode::Text(t) if t.raw.has_blank_line()
+        );
+        Some(if blank {
+            d.concat(&[d.literalline(), d.hardline()])
+        } else {
+            d.hardline()
+        })
     }
 
     /// Detect a "root inline run" starting at `start_idx` in the root fragment.

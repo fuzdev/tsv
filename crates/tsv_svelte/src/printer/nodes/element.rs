@@ -1,31 +1,11 @@
 // Element-specific formatting for Svelte templates
 //
-// Public entry points that delegate to doc builders in element_doc.rs and
-// special_doc.rs.
+// Hug-mode helpers shared by the element/special-element doc builders.
 
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
 
 impl<'a> Printer<'a> {
-    /// Format a Svelte element with context-aware formatting
-    ///
-    /// Doc-based path for all elements:
-    /// - style/script: handled by build_raw_content_element_doc()
-    /// - pre/textarea: handled by build_whitespace_sensitive_element_doc()
-    /// - all others: handled by build_element_doc()
-    pub(crate) fn print_element(&mut self, element: &internal::Element) {
-        let doc = self.build_element_doc(element);
-        self.render_doc_immediate(doc);
-    }
-
-    /// Format a Svelte special element
-    ///
-    /// Doc-based path for all special elements (svelte:*, slot, title).
-    pub(crate) fn print_special_element(&mut self, element: &internal::SpecialElement) {
-        let doc = self.build_special_element_doc(element);
-        self.render_doc_immediate(doc);
-    }
-
     //
     // Hug mode helpers (used by element_doc.rs and special_doc.rs)
     //

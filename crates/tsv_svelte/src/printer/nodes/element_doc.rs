@@ -1981,7 +1981,12 @@ impl<'a> Printer<'a> {
             return true;
         }
 
-        // Expression splitting
+        // Expression splitting forces an element multiline when authored with a leading break,
+        // a non-hugged trailing boundary, and 2+ spaced `{expr}` siblings — a multiline-*entry*
+        // trigger (distinct from sibling separation, which `build_nodes_doc_multiline` handles).
+        // Load-bearing for the component case (`components/multi_expressions_multiline`): without
+        // it such a `<Comp>` would stay inline. The only remaining use of
+        // `should_split_expressions_in_nodes` now that the sibling-break caller is retired.
         let should_split = self.should_split_expressions_in_nodes(&element.fragment.nodes);
         let has_trailing_ws = !hug_end;
         if source_has_leading_break && has_trailing_ws && should_split {
