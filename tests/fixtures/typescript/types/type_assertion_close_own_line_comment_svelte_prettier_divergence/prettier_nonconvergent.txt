@@ -1,0 +1,9 @@
+Prettier never reaches a fixed point on this input. An own-line comment in the
+type→`>` gap that follows a trailing-type comment cannot settle which side of the
+`>` it belongs on: it oscillates forever between `string // d⏎>// e⏎x` (the own-line
+comment pulled past `>` to lead the expression) and `string // d⏎// e⏎>x` (the
+comment back inside the cast on its own line), flipping on every pass. No
+prettier-anchored claim file (output_prettier.*, audit_signature.txt, variants) is
+expressible. The validator live-verifies this claim (rule F5). tsv keeps the comment
+where the author wrote it — on its own line before `>`, inside the cast. See
+README.md and docs/conformance_prettier.md §Comment relocation.
