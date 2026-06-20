@@ -4,8 +4,9 @@
 // that account for siblings. This matches Prettier's architecture where
 // the entire inline content is represented as a single doc tree.
 //
-// Used by `print_inline_children()` to format inline content with correct
-// attribute wrapping decisions that consider what comes after each element.
+// Entered through the `build_nodes_doc_*` family (and the element/block/root doc
+// builders that call them) to format fragment content with correct attribute
+// wrapping decisions that consider what comes after each element.
 
 // Allow Svelte block syntax like `{:else}`, `{:then}`, `{:catch}` which
 // look like Rust format args but are valid Svelte template syntax.
@@ -1123,14 +1124,7 @@ impl<'a> Printer<'a> {
         i: usize,
     ) -> Option<(DocId, DocId)> {
         let block = trimmed_nodes.get(i)?;
-        if !matches!(
-            block,
-            FragmentNode::IfBlock(_)
-                | FragmentNode::EachBlock(_)
-                | FragmentNode::KeyBlock(_)
-                | FragmentNode::AwaitBlock(_)
-                | FragmentNode::SnippetBlock(_)
-        ) {
+        if !super::helpers::is_control_flow_block(block) {
             return None;
         }
         let prev = trimmed_nodes.get(i.checked_sub(1)?)?;

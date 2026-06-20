@@ -682,9 +682,10 @@ impl<'a> Printer<'a> {
     ///
     /// The walk starts at content text, an inline node, or a control-flow block, and
     /// breaks on whitespace-only text, a non-adjacent node, or any other node (block
-    /// element, comment, `{@const}`/`{@debug}`). A content-text node bridges across the
-    /// boundary (its content hugs, its own internal/edge newlines become line breaks in
-    /// the multiline layout); the run's leading/trailing edge whitespace is carried as
+    /// element, comment, `{@const}`/`{@debug}`, `{const}`/`{let}`). A content-text node
+    /// bridges across the boundary (its content hugs, its own internal/edge newlines
+    /// become line breaks in the multiline layout); the run's leading/trailing edge
+    /// whitespace is carried as
     /// `pending_ws` by the caller. Lone blocks and pure-inline (no control-flow)
     /// sequences return `None`, keeping the per-node path's behavior for them.
     ///

@@ -337,16 +337,7 @@ impl<'a> Printer<'a> {
                 .map(|c| self.build_trailing_js_comment_doc(c))
                 .collect();
 
-        // Combine: leading + expr + trailing
-        if leading_docs.is_empty() && trailing_docs.is_empty() {
-            expr_doc
-        } else {
-            let mut parts = Vec::with_capacity(leading_docs.len() + 1 + trailing_docs.len());
-            parts.extend(leading_docs);
-            parts.push(expr_doc);
-            parts.extend(trailing_docs);
-            d.concat(&parts)
-        }
+        self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs)
     }
 
     /// Build expression doc for block expressions (if, each, await, key).
@@ -422,7 +413,19 @@ impl<'a> Printer<'a> {
                 .map(|c| self.build_trailing_js_comment_doc(c))
                 .collect();
 
-        // Combine: leading + expr + trailing
+        self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs)
+    }
+
+    /// Assemble `[leading…, expr, trailing…]` into one doc, returning `expr` unchanged
+    /// when there are no surrounding comments. Shared tail of the expression+comment
+    /// builders (`build_expression_with_comments_doc`, `build_expression_doc_for_block`,
+    /// `build_const_init_doc`).
+    pub(super) fn concat_with_surrounding_comments(
+        &self,
+        leading_docs: Vec<DocId>,
+        expr_doc: DocId,
+        trailing_docs: Vec<DocId>,
+    ) -> DocId {
         if leading_docs.is_empty() && trailing_docs.is_empty() {
             expr_doc
         } else {
@@ -430,7 +433,7 @@ impl<'a> Printer<'a> {
             parts.extend(leading_docs);
             parts.push(expr_doc);
             parts.extend(trailing_docs);
-            d.concat(&parts)
+            self.d().concat(&parts)
         }
     }
 }

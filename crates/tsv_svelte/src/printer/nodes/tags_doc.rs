@@ -189,15 +189,7 @@ impl<'a> Printer<'a> {
                 .map(|c| self.build_trailing_js_comment_doc(c))
                 .collect();
 
-        if leading_docs.is_empty() && trailing_docs.is_empty() {
-            expr_doc
-        } else {
-            let mut parts = Vec::with_capacity(leading_docs.len() + 1 + trailing_docs.len());
-            parts.extend(leading_docs);
-            parts.push(expr_doc);
-            parts.extend(trailing_docs);
-            d.concat(&parts)
-        }
+        self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs)
     }
 
     /// Build a doc for {@debug vars}
