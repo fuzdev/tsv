@@ -622,6 +622,21 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // For SequenceExpression, use the bare (no parens) version for getter/setter syntax
         if let tsv_ts::ast::internal::Expression::SequenceExpression(seq) = expr {
+            // The per-operand path below is comment-blind, so a leading or interior
+            // comment prettier preserves (`{// c\n get, set}`, `{get, /* c */ set}`)
+            // was silently dropped — real content loss. Route those through the
+            // comment-aware builder. Trailing comments after the last operand are NOT
+            // included in the range: prettier drops them, so tsv matches by dropping.
+            if let Some(span) = tag_span {
+                let last_end = seq.expressions[seq.expressions.len() - 1].span().end;
+                if tsv_lang::has_comments_in_range(self.comments, span.start + 1, last_end) {
+                    return vec![
+                        d.text("="),
+                        self.build_bind_sequence_with_comments_doc(seq, span),
+                    ];
+                }
+            }
+
             let len = seq.expressions.len();
 
             // Build items: each expression with trailing comma (except last)
@@ -644,15 +659,9 @@ impl<'a> Printer<'a> {
             let line = d.line();
             let items_doc = d.join_doc(items, line);
 
-            // Use group/indent structure that expands when content is multiline:
-            // Flat: ={getter, setter}
-            // Broken: ={\n\tgetter,\n\tsetter\n}
-            let indent_softline = d.indent_softline(items_doc);
-            let softline = d.softline();
-            let concat = d.concat(&[d.text("{"), indent_softline, softline, d.text("}")]);
-            let inner = d.group(concat);
-
-            return vec![d.text("="), inner];
+            // Bare block structure (shared with every other bind value): flat
+            // `={getter, setter}`, broken `={\n\tgetter,\n\tsetter\n}`.
+            return vec![d.text("="), self.wrap_in_block_structure(vec![items_doc])];
         }
 
         // For bind: directives, BinaryExpression should use block structure (not hugging).
@@ -663,6 +672,110 @@ impl<'a> Printer<'a> {
 
         // For other expressions, use the standard method
         self.build_expression_doc_parts_with_span(expr, tag_span)
+    }
+
+    /// Build the bare (no-parens) function-binding sequence value when it carries
+    /// a leading or interior comment, preserving each comment at the author's
+    /// position to match prettier. A line comment, or a multi-line block comment,
+    /// forces the broken `{\n …\n}` layout; a lone mid block comment stays inline.
+    ///
+    /// ```svelte
+    /// bind:value={
+    ///     // c
+    ///     () => a, (v) => (a = v)
+    /// }
+    /// bind:value={() => a, /* c */ (v) => (a = v)}
+    /// ```
+    ///
+    /// A single-line *leading* block comment (`{/* c */ a, b}`) stays inline and
+    /// bare: prettier parenthesizes it (`{/* c */ (a, b)}`) but that form is
+    /// non-idempotent — it drops the comment on the next pass — so tsv keeps the
+    /// comment bare and idempotent instead. Trailing comments after the last
+    /// operand are dropped (prettier drops them too); the caller's range excludes
+    /// them.
+    fn build_bind_sequence_with_comments_doc(
+        &self,
+        seq: &tsv_ts::ast::internal::SequenceExpression,
+        tag_span: tsv_lang::Span,
+    ) -> DocId {
+        let d = self.d();
+        let bytes = self.source.as_bytes();
+        let mut content: Vec<DocId> = Vec::new();
+
+        // Leading comments between `{` and the first operand. A line or multi-line
+        // block comment ends in a hardline, forcing the outer `{ }` to break — but
+        // the operands sit in their own group below, so they only break when *they*
+        // overflow or carry their own forced break (matching prettier, which keeps
+        // `() => a, (v) => (a = v)` on one line under a leading comment).
+        let first_start = seq.expressions[0].span().start;
+        for comment in tsv_lang::comments_in_range(self.comments, tag_span.start + 1, first_start) {
+            if comment.is_block && comment.content.contains('\n') {
+                // Multi-line block: own line(s), forcing the broken layout. Emitted
+                // without the inline trailing space so the line ends at `*/`.
+                content.push(d.text("/*"));
+                content.push(d.text_owned(comment.content.clone()));
+                content.push(d.text("*/"));
+                content.push(d.hardline());
+            } else {
+                // Single-line block: `/*…*/ ` inline. Line comment: `//…` + hardline.
+                content.push(self.build_leading_js_comment_doc(comment));
+            }
+        }
+
+        let mut items: Vec<DocId> = Vec::new();
+        for (i, sub_expr) in seq.expressions.iter().enumerate() {
+            if i > 0 {
+                let prev_end = seq.expressions[i - 1].span().end;
+                let cur_start = sub_expr.span().start;
+                // The separator comma, located in source so a comment on either side
+                // is attributed to the right operand (a comment's `,` can't fool it).
+                let comma_pos = tsv_lang::source_scan::find_char_skipping_comments(
+                    bytes,
+                    prev_end as usize,
+                    cur_start as usize,
+                    b',',
+                )
+                .map_or(prev_end, |c| c as u32);
+
+                // Comments before the comma trail the previous operand.
+                for comment in tsv_lang::comments_in_range(self.comments, prev_end, comma_pos) {
+                    items.push(self.build_trailing_js_comment_doc(comment));
+                }
+
+                items.push(d.text(","));
+
+                // Comments after the comma: an all-block run leads the next operand
+                // inline; a line comment trails the comma and forces the break.
+                let after: Vec<_> =
+                    tsv_lang::comments_in_range(self.comments, comma_pos + 1, cur_start).collect();
+                if after.is_empty() {
+                    items.push(d.line());
+                } else if after.iter().all(|c| c.is_block) {
+                    items.push(d.line());
+                    for comment in &after {
+                        items.push(self.build_leading_js_comment_doc(comment));
+                    }
+                } else {
+                    for comment in &after {
+                        items.push(self.build_trailing_js_comment_doc(comment));
+                    }
+                }
+            }
+
+            items.push(self.build_ts_expression_doc(sub_expr));
+        }
+
+        // The operands sit in their own group so a forced break in the *surrounding*
+        // `{ }` (a leading comment) doesn't break them — they break only when they
+        // overflow or carry an interior forced break (a mid line comment, a block-body
+        // arrow). Matches prettier.
+        let items_doc = d.concat(&items);
+        content.push(d.group(items_doc));
+
+        // Same bare block structure as the comment-free path: flat `{a, b}`, broken
+        // `{\n\ta,\n\tb\n}`. Comment hardlines force the break; a lone inline block
+        // comment leaves the operand group free to stay flat.
+        self.wrap_in_block_structure(content)
     }
 
     /// Build Doc parts using block structure: `={\n\texpr\n}`
