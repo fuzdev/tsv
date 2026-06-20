@@ -71,11 +71,7 @@ impl<'a> Parser<'a> {
         let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
 
         // Parse optional type parameters: <T, U>
-        let type_parameters = if self.check(&TokenKind::LessThan) {
-            Some(self.parse_type_parameters()?)
-        } else {
-            None
-        };
+        let type_parameters = self.parse_optional_type_parameters()?;
 
         // Expect '='
         self.expect(&TokenKind::Equals)?;
@@ -133,11 +129,7 @@ impl<'a> Parser<'a> {
         let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
 
         // Parse optional type parameters: <T, U>
-        let type_parameters = if self.check(&TokenKind::LessThan) {
-            Some(self.parse_type_parameters()?)
-        } else {
-            None
-        };
+        let type_parameters = self.parse_optional_type_parameters()?;
 
         // Parse optional extends clause
         let extends = if self.check(&TokenKind::Keyword(KeywordKind::Extends)) {
@@ -177,11 +169,7 @@ impl<'a> Parser<'a> {
             let expression = self.parse_entity_name()?;
 
             // Check for type arguments
-            let type_arguments = if self.check(&TokenKind::LessThan) {
-                Some(self.parse_type_arguments()?)
-            } else {
-                None
-            };
+            let type_arguments = self.parse_optional_type_arguments()?;
 
             let end = type_arguments
                 .as_ref()
@@ -206,15 +194,7 @@ impl<'a> Parser<'a> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::BraceOpen)?;
 
-        let mut body = Vec::new();
-        while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-            let mut element = self.parse_type_element()?;
-            // Consume separator (; or ,) if present, extending the element span to include it
-            if self.eat(TokenKind::Semicolon) || self.eat(TokenKind::Comma) {
-                element.extend_span_to(self.prev_token_end() as u32);
-            }
-            body.push(element);
-        }
+        let body = self.parse_type_members()?;
 
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
@@ -343,21 +323,13 @@ impl<'a> Parser<'a> {
         let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
 
         // Parse optional type parameters: <T, U>
-        let type_parameters = if self.check(&TokenKind::LessThan) {
-            Some(self.parse_type_parameters()?)
-        } else {
-            None
-        };
+        let type_parameters = self.parse_optional_type_parameters()?;
 
         // Parse parameters
         let params = self.parse_parameter_list()?;
 
         // Parse return type (may be a type predicate)
-        let return_type = if self.check(&TokenKind::Colon) {
-            Some(self.parse_return_type_annotation()?)
-        } else {
-            None
-        };
+        let return_type = self.parse_optional_return_type()?;
 
         let end = self.semicolon_end()?;
 
@@ -371,6 +343,19 @@ impl<'a> Parser<'a> {
             generator: false, // generators not allowed in declare context
             span: Span::new(start as u32, end),
         }))
+    }
+
+    /// Parse a `: ReturnType` annotation when the next token is a `:`, else
+    /// `None` — the optional-guard for function/method/signature return types
+    /// (type predicates included via `parse_return_type_annotation`).
+    pub(in crate::parser) fn parse_optional_return_type(
+        &mut self,
+    ) -> Result<Option<TSTypeAnnotation>, ParseError> {
+        if self.check(&TokenKind::Colon) {
+            Ok(Some(self.parse_return_type_annotation()?))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Parse return type annotation, handling type predicates (`x is T`, `asserts x is T`)
