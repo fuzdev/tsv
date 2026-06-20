@@ -142,6 +142,27 @@ struct MultilineInputs {
 }
 
 impl<'a> Printer<'a> {
+    /// `<name>` — a start tag with no attributes (HTML spec "start tag").
+    #[inline]
+    fn start_tag(&self, name: u32) -> DocId {
+        let d = self.d();
+        d.concat(&[d.text("<"), d.symbol(name), d.text(">")])
+    }
+
+    /// `</name>` — an end tag (HTML spec "end tag").
+    #[inline]
+    fn end_tag(&self, name: u32) -> DocId {
+        let d = self.d();
+        d.concat(&[d.text("</"), d.symbol(name), d.text(">")])
+    }
+
+    /// `<name />` — a self-closing start tag with no attributes.
+    #[inline]
+    fn self_closing_tag(&self, name: u32) -> DocId {
+        let d = self.d();
+        d.concat(&[d.text("<"), d.symbol(name), d.text(" />")])
+    }
+
     /// Build a doc for an element (regular HTML or component)
     ///
     /// Uses a three-phase approach:
@@ -287,9 +308,9 @@ impl<'a> Printer<'a> {
         // Declarations (<!DOCTYPE>) use > without self-closing slash
         if attr_docs.is_empty() {
             if is_declaration {
-                d.concat(&[d.text("<"), d.symbol(tag_sym), d.text(">")])
+                self.start_tag(tag_sym)
             } else {
-                d.concat(&[d.text("<"), d.symbol(tag_sym), d.text(" />")])
+                self.self_closing_tag(tag_sym)
             }
         } else if is_declaration {
             let attr_concat = d.concat(&attr_docs);
@@ -974,7 +995,7 @@ impl<'a> Printer<'a> {
         let tag_sym = element.name.to_u32();
         // Build opening tag
         let opening_tag = if attr_docs.is_empty() {
-            d.concat(&[d.text("<"), d.symbol(tag_sym), d.text(">")])
+            self.start_tag(tag_sym)
         } else {
             let sl = d.softline();
             let dedented = d.dedent(sl);
@@ -1120,7 +1141,7 @@ impl<'a> Printer<'a> {
             // When content doesn't end with \n, the closing </tag> has its `>` split
             // to a new line: `line2</span\n\t>` instead of `\n</span>`
             let closing = if last_text_ends_with_newline {
-                d.concat(&[d.text("</"), d.symbol(tag_sym), d.text(">")])
+                self.end_tag(tag_sym)
             } else {
                 // </tag\n\t> — closing > on new line with indent
                 d.concat(&[
@@ -1275,7 +1296,7 @@ impl<'a> Printer<'a> {
 
         // Build opening tag
         let opening_tag = if attr_docs.is_empty() {
-            d.concat(&[d.text("<"), d.symbol(tag_sym), d.text(">")])
+            self.start_tag(tag_sym)
         } else {
             // Block whitespace-sensitive elements (pre): hug `>` with the last attr when
             // attrs wrap (prettier tolerates the overflow rather than breaking `>`).

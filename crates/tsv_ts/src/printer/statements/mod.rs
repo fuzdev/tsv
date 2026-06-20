@@ -323,7 +323,7 @@ impl<'a> Printer<'a> {
         let raw_expr_doc = self.build_expression_doc(arg);
         // Assignment expressions need inner parens for clarity: return (\n  (a = b)\n);
         let expr_doc = if matches!(arg, Expression::AssignmentExpression(_)) {
-            d.concat(&[d.text("("), raw_expr_doc, d.text(")")])
+            d.parens(raw_expr_doc)
         } else {
             raw_expr_doc
         };

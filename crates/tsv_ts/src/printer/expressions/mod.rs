@@ -272,7 +272,7 @@ impl<'a> Printer<'a> {
 
         let inner_expr = self.build_expression_doc(&type_assert.expression);
         let expr_doc = if expr_needs_parens {
-            d.concat(&[d.text("("), inner_expr, d.text(")")])
+            d.parens(inner_expr)
         } else {
             inner_expr
         };

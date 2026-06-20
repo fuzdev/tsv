@@ -507,8 +507,7 @@ impl<'a> Printer<'a> {
                 // chooser takes the bare expression
                 let assignment_doc =
                     if super::needs_parens(value, super::ParenContext::DefaultValue) {
-                        let value_doc =
-                            d.concat(&[d.text("("), self.build_expression_doc(value), d.text(")")]);
+                        let value_doc = d.parens(self.build_expression_doc(value));
                         let value_doc = match rhs_comments {
                             Some(comments_doc) => d.concat(&[comments_doc, value_doc]),
                             None => value_doc,

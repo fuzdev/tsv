@@ -199,7 +199,7 @@ impl<'a> Printer<'a> {
                 if self.has_line_comments_between(keyword_end, operand_start) {
                     let operand_doc = self.build_type_doc(&o.type_annotation);
                     let value_doc = if needs_parens {
-                        d.concat(&[d.text("("), operand_doc, d.text(")")])
+                        d.parens(operand_doc)
                     } else {
                         operand_doc
                     };

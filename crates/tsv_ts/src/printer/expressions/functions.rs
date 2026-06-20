@@ -1203,7 +1203,7 @@ impl<'a> Printer<'a> {
                     if let Some(comment_doc) =
                         self.build_inline_comments_between_doc_no_leading_space_opt(open + 1, close)
                     {
-                        return d.concat(&[d.text("("), comment_doc, d.text(")")]);
+                        return d.parens(comment_doc);
                     }
                 }
             }
