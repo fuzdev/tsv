@@ -1,0 +1,80 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 111,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 102,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 39,
+							"end": 77,
+							"property": "color",
+							"value": "blue  !important"
+						},
+						{
+							"type": "Declaration",
+							"start": 81,
+							"end": 98,
+							"property": "background",
+							"value": "white"
+						}
+					]
+				},
+				"start": 9,
+				"end": 102
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 103,
+			"styles": "\n\ta {\n\t\t/* prettier-ignore */\n\t\tcolor: blue /* x */ !important /* y */;\n\t\tbackground: white;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 112,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

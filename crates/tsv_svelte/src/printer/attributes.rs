@@ -331,15 +331,37 @@ impl<'a> Printer<'a> {
     // Directive Doc builders
     //
 
-    /// Build a Doc for on:event directive
-    fn build_on_directive_doc(&self, dir: &internal::OnDirective) -> DocId {
+    /// Build a Doc for a directive with no shorthand suppression: `prefix` + name +
+    /// optional modifiers + optional `={expr}`. Backs the `on:` / `use:` / `animate:` /
+    /// transition (`transition:`/`in:`/`out:`) builders, which differ only in the prefix
+    /// and whether they carry modifiers (pass `&[]` for none). Directives with shorthand
+    /// suppression (`bind`/`class`/`let`) or non-expression values (`style`) keep their own.
+    fn build_simple_directive_doc(
+        &self,
+        prefix: DocId,
+        name: &str,
+        modifiers: &[String],
+        expression: Option<&tsv_ts::ast::internal::Expression>,
+        expression_tag_span: Option<tsv_lang::Span>,
+    ) -> DocId {
         let d = self.d();
-        let mut parts = vec![d.text("on:"), d.text_owned(dir.name.clone())];
-        parts.extend(self.build_modifiers_doc(&dir.modifiers));
-        if let Some(expr) = &dir.expression {
-            parts.extend(self.build_expression_doc_parts_with_span(expr, dir.expression_tag_span));
+        let mut parts = vec![prefix, d.text_owned(name.to_string())];
+        parts.extend(self.build_modifiers_doc(modifiers));
+        if let Some(expr) = expression {
+            parts.extend(self.build_expression_doc_parts_with_span(expr, expression_tag_span));
         }
         d.concat(&parts)
+    }
+
+    /// Build a Doc for on:event directive
+    fn build_on_directive_doc(&self, dir: &internal::OnDirective) -> DocId {
+        self.build_simple_directive_doc(
+            self.d().text("on:"),
+            &dir.name,
+            &dir.modifiers,
+            dir.expression.as_ref(),
+            dir.expression_tag_span,
+        )
     }
 
     /// Build a Doc for bind:prop directive
@@ -397,36 +419,35 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for use:action directive
     fn build_use_directive_doc(&self, dir: &internal::UseDirective) -> DocId {
-        let d = self.d();
-        let mut parts = vec![d.text("use:"), d.text_owned(dir.name.clone())];
-        if let Some(expr) = &dir.expression {
-            parts.extend(self.build_expression_doc_parts_with_span(expr, dir.expression_tag_span));
-        }
-        d.concat(&parts)
+        self.build_simple_directive_doc(
+            self.d().text("use:"),
+            &dir.name,
+            &[],
+            dir.expression.as_ref(),
+            dir.expression_tag_span,
+        )
     }
 
     /// Build a Doc for transition/in/out directive
     fn build_transition_directive_doc(&self, dir: &internal::TransitionDirective) -> DocId {
-        let d = self.d();
-        let mut parts = vec![
-            d.text(dir.direction.prefix_with_colon()),
-            d.text_owned(dir.name.clone()),
-        ];
-        parts.extend(self.build_modifiers_doc(&dir.modifiers));
-        if let Some(expr) = &dir.expression {
-            parts.extend(self.build_expression_doc_parts_with_span(expr, dir.expression_tag_span));
-        }
-        d.concat(&parts)
+        self.build_simple_directive_doc(
+            self.d().text(dir.direction.prefix_with_colon()),
+            &dir.name,
+            &dir.modifiers,
+            dir.expression.as_ref(),
+            dir.expression_tag_span,
+        )
     }
 
     /// Build a Doc for animate:name directive
     fn build_animate_directive_doc(&self, dir: &internal::AnimateDirective) -> DocId {
-        let d = self.d();
-        let mut parts = vec![d.text("animate:"), d.text_owned(dir.name.clone())];
-        if let Some(expr) = &dir.expression {
-            parts.extend(self.build_expression_doc_parts_with_span(expr, dir.expression_tag_span));
-        }
-        d.concat(&parts)
+        self.build_simple_directive_doc(
+            self.d().text("animate:"),
+            &dir.name,
+            &[],
+            dir.expression.as_ref(),
+            dir.expression_tag_span,
+        )
     }
 
     /// Build a Doc for let:name directive

@@ -110,14 +110,10 @@ impl<'a> Printer<'a> {
         for (i, node) in nodes.iter().enumerate() {
             // format-ignore: skip whitespace, emit raw source for ignored node
             if format_ignore_next {
-                if let FragmentNode::Text(text) = node
-                    && text.raw.is_whitespace_only()
-                {
-                    continue;
+                if let Some(raw_doc) = self.format_ignore_raw_doc(node) {
+                    docs.push(raw_doc);
+                    format_ignore_next = false;
                 }
-                let raw = node.span().extract(self.source);
-                docs.push(self.d().text_owned(raw.to_string()));
-                format_ignore_next = false;
                 continue;
             }
             if Self::is_format_ignore_comment(node) {
@@ -231,15 +227,11 @@ impl<'a> Printer<'a> {
 
             // format-ignore: skip whitespace, emit raw source for ignored node
             if format_ignore_next {
-                if let FragmentNode::Text(text) = node
-                    && text.raw.is_whitespace_only()
-                {
-                    continue;
+                if let Some(raw_doc) = self.format_ignore_raw_doc(node) {
+                    child_docs.push(raw_doc);
+                    handle_whitespace_of_prev_text = false;
+                    format_ignore_next = false;
                 }
-                let raw = node.span().extract(self.source);
-                child_docs.push(d.text_owned(raw.to_string()));
-                handle_whitespace_of_prev_text = false;
-                format_ignore_next = false;
                 continue;
             }
             if Self::is_format_ignore_comment(node) {
@@ -324,6 +316,20 @@ impl<'a> Printer<'a> {
     // truth for the directive set, shared across all three language printers.
     fn is_format_ignore_comment(node: &FragmentNode) -> bool {
         matches!(node, FragmentNode::Comment(c) if is_format_ignore_directive(&c.content))
+    }
+
+    /// Build the verbatim doc for a format-ignored node, or `None` when the node is
+    /// whitespace-only text to skip — the pin then carries to the next real node.
+    /// Shared leading step of the three `build_nodes_doc_*` accumulation loops; each
+    /// caller owns its sink and clears `format_ignore_next` only when this returns `Some`.
+    fn format_ignore_raw_doc(&self, node: &FragmentNode) -> Option<DocId> {
+        if let FragmentNode::Text(text) = node
+            && text.raw.is_whitespace_only()
+        {
+            return None;
+        }
+        let raw = node.span().extract(self.source);
+        Some(self.d().text_owned(raw.to_string()))
     }
 
     /// Handle a text child node - matches prettier-plugin-svelte's handleTextChild
@@ -546,20 +552,15 @@ impl<'a> Printer<'a> {
         for (i, node) in trimmed_nodes.iter().enumerate() {
             // format-ignore: skip whitespace, emit raw source for ignored node
             if format_ignore_next {
-                if let FragmentNode::Text(text) = node
-                    && text.raw.is_whitespace_only()
-                {
-                    continue;
+                if let Some(raw_doc) = self.format_ignore_raw_doc(node) {
+                    if !current_line.is_empty() {
+                        lines.push(std::mem::take(&mut current_line));
+                    }
+                    current_line.push(raw_doc);
+                    // Don't close the line — let subsequent inline content stay on same line
+                    prev_text_has_trailing_space = false;
+                    format_ignore_next = false;
                 }
-                let raw = node.span().extract(self.source);
-                let raw_doc = d.text_owned(raw.to_string());
-                if !current_line.is_empty() {
-                    lines.push(std::mem::take(&mut current_line));
-                }
-                current_line.push(raw_doc);
-                // Don't close the line — let subsequent inline content stay on same line
-                prev_text_has_trailing_space = false;
-                format_ignore_next = false;
                 continue;
             }
             if Self::is_format_ignore_comment(node) {

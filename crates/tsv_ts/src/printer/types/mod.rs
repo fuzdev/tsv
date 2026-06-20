@@ -75,7 +75,7 @@ impl<'a> Printer<'a> {
             TSType::Union(u) => self.build_union_type_doc(u, true),
             TSType::Intersection(i) => self.build_intersection_type_doc(i, true),
             TSType::TypeReference(r) => {
-                let mut parts = vec![self.build_type_entity_name_doc(&r.type_name)];
+                let mut parts = vec![self.build_entity_name_doc(&r.type_name)];
                 if let Some(type_args) = &r.type_arguments {
                     // Preserve comments before type args: `Map/* c */ <string, number>`
                     if let Some(doc) = self.build_name_to_type_params_comments_opt(
@@ -467,7 +467,7 @@ impl<'a> Printer<'a> {
                 qualifier_start,
                 CommentSpacing::Trailing,
             ));
-            parts.push(self.build_type_entity_name_doc(qualifier));
+            parts.push(self.build_entity_name_doc(qualifier));
         }
         if let Some(type_args) = &i.type_arguments {
             // Preserve comments before type args: `import("a").Foo/* c */ <string>`

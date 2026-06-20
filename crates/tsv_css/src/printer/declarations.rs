@@ -52,6 +52,17 @@ impl<'a> Printer<'a> {
         self.write(";\n");
     }
 
+    /// Emit a format-ignored declaration verbatim from source. The value span excludes
+    /// the trailing `!important` region (and any comments inside it) plus the `;`, so
+    /// `write_declaration_end` re-emits both — preserving a comment *after* the bang
+    /// (`blue !important /* y */;`) that a hand-rolled synthetic ` !important` would drop.
+    /// Shared by the rule and at-rule block loops.
+    pub(super) fn write_format_ignore_declaration(&mut self, decl: &internal::CssDeclaration) {
+        self.write_indent();
+        self.write(decl.span.extract(self.source));
+        self.write_declaration_end(decl);
+    }
+
     /// Check if any value in a list requires one-per-line formatting
     ///
     /// This matches Prettier's `shouldBreakList` which checks:

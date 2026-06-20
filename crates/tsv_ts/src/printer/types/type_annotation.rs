@@ -169,7 +169,7 @@ impl<'a> Printer<'a> {
             return d.concat(&[
                 d.text(": "),
                 comments_doc,
-                super::super::build_entity_name_doc(self.d(), &r.type_name),
+                self.build_entity_name_doc(&r.type_name),
                 name_ta_comments,
                 self.build_type_arguments_doc_wrapping(type_args),
             ]);
