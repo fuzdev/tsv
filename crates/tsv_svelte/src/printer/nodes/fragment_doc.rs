@@ -4,8 +4,9 @@
 // that account for siblings. This matches Prettier's architecture where
 // the entire inline content is represented as a single doc tree.
 //
-// Used by `print_inline_children()` to format inline content with correct
-// attribute wrapping decisions that consider what comes after each element.
+// Entered through the `build_nodes_doc_*` family (and the element/block/root doc
+// builders that call them) to format fragment content with correct attribute
+// wrapping decisions that consider what comes after each element.
 
 // Allow Svelte block syntax like `{:else}`, `{:then}`, `{:catch}` which
 // look like Rust format args but are valid Svelte template syntax.
@@ -533,11 +534,6 @@ impl<'a> Printer<'a> {
 
         let trimmed_nodes = &nodes[start_idx..end_idx];
 
-        // Check if we should split expressions to separate lines
-        // This matches Prettier: multiple expressions with whitespace between them
-        // get their own lines, but expressions with semantic text stay together
-        let should_split_expressions = self.should_split_expressions_in_nodes(trimmed_nodes);
-
         // Use separate current_line and completed lines vectors to avoid unwrap calls.
         // The pattern: build current line, then push to lines when starting a new line.
         let mut lines: Vec<LineBuf> = Vec::new();
@@ -602,8 +598,30 @@ impl<'a> Printer<'a> {
                     if !self.block_next_hugs_closing(trimmed_nodes, i, is_control_flow) {
                         lines.push(std::mem::take(&mut current_line));
                     }
-                } else if let Some(node_doc) = self.build_fragment_node_doc_in_multiline(node, true)
-                {
+                } else if let Some(node_doc) = {
+                    // A control-flow block that the root marked as part of a SINGLE-LINE inline run
+                    // (`{x}{#if c}…{/if}` with no newline) is built in INLINE context, so a long
+                    // body inner-breaks (its inner `{fn(…)}` args wrap) instead of dropping the body
+                    // to its own line — matching Prettier and the root's pre-unification
+                    // `build_nodes_doc_with_context` path. `has_preceding_breakable` mirrors that
+                    // path (true when the run has breakable content before the block, e.g. `{x}`).
+                    // The marks are span-keyed and populated only for *root* runs
+                    // (`detect_root_inline_run`), so element-nested blocks keep the multiline
+                    // (body-expanding) context — preserving the uniform body-drop divergence (e.g.
+                    // `blocks/await/preceding_sibling_body_long`). See `print_root_fragment`.
+                    if self.is_root_inline_run_block(node) {
+                        let has_preceding_breakable = trimmed_nodes[..i]
+                            .iter()
+                            .any(super::helpers::is_inline_content);
+                        self.build_fragment_node_doc_with_preceding_context(
+                            node,
+                            false,
+                            has_preceding_breakable,
+                        )
+                    } else {
+                        self.build_fragment_node_doc_in_multiline(node, true)
+                    }
+                } {
                     if keep_inline_with_prev {
                         // Add to current line (inline with preceding text)
                         current_line.push(node_doc);
@@ -648,20 +666,33 @@ impl<'a> Printer<'a> {
                             lines.push(SmallVec::new());
                         }
                         prev_text_has_trailing_space = false; // Newline resets trailing space
-                    } else if should_split_expressions {
-                        // When splitting expressions, whitespace between them becomes a line break
-                        // instead of a space (matches Prettier's multiline expression handling)
+                    } else if !current_line.is_empty()
+                        && self.next_is_inline_element(trimmed_nodes, i)
+                    {
+                        // A space-only separator before an inline element keeps a breakable
+                        // `line` (the visual line is grouped in `emit_lines`) so an over-width
+                        // inline-sibling pair breaks cleanly *between* the tags instead of
+                        // mangling the trailing element's closing `>`. This is the only sibling
+                        // boundary that stays on one line here, mirroring Prettier's
+                        // `group([line, child])` for an inline element in a force-broken fragment.
+                        current_line.push(d.line());
+                        // Whitespace-only text counts as trailing space for inline-before-block.
+                        prev_text_has_trailing_space = true;
+                    } else {
+                        // A space-only separator before any *other* sibling — component, `{expr}`,
+                        // comment, control-flow block, or block element — becomes a line break in
+                        // a multiline container: Prettier lays each such non-inline-element
+                        // sibling on its own line (the inter-sibling `line` in its force-broken
+                        // fragment group hardens to a newline; only an inline element's own
+                        // `group([line, …])` keeps it flat). A *directly adjacent* (no-whitespace)
+                        // control-flow block still hugs its neighbor via the `is_block` branch's
+                        // `block_keeps_inline_with_prev` / the sibling-`>` dangle; this arm only
+                        // fires on an explicit space, so resetting the trailing-space flag here is
+                        // what makes that block break instead of hug (the D2/D3 convergence fix).
                         if !current_line.is_empty() {
                             lines.push(std::mem::take(&mut current_line));
                         }
                         prev_text_has_trailing_space = false;
-                    } else {
-                        // Inline whitespace - add space if there's preceding content
-                        if !current_line.is_empty() {
-                            current_line.push(d.text(" "));
-                        }
-                        // Whitespace-only text counts as trailing space for inline-before-block
-                        prev_text_has_trailing_space = true;
                     }
                 } else if text.raw.contains('\n') {
                     // Text with newlines - split into lines at structural boundaries.
@@ -786,34 +817,42 @@ impl<'a> Printer<'a> {
     fn emit_lines(&self, lines: Vec<LineBuf>) -> DocId {
         let d = self.d();
         let mut docs = Vec::new();
-        let total_lines = lines.len();
         let mut found_first_content = false;
+        // A blank line renders only when content follows it: this drops leading/trailing blanks
+        // and collapses consecutive blank lines to one. Consecutive blank `LineBuf`s arise at
+        // the root from adjacent whitespace-only `Text` nodes left behind by extracted
+        // `<script>`/`<style>` sections (the parser never merges them), so without this the
+        // root would emit a doubled blank line where prettier keeps one.
+        let mut pending_blank = false;
 
-        for (i, line_docs) in lines.into_iter().enumerate() {
-            let is_empty = line_docs.is_empty();
-            let is_last = i == total_lines - 1;
-
-            // Skip leading empty lines (element structure adds hardline before content)
-            if is_empty && !found_first_content {
-                continue;
-            }
-
-            // Skip trailing empty lines (after last content)
-            if is_empty && is_last {
-                continue;
-            }
-
-            if is_empty {
-                // Internal blank line - use literalline (just \n, no indentation)
-                docs.push(d.literalline());
-            } else {
-                // Content line - use hardline before it (except first)
-                if !docs.is_empty() {
-                    docs.push(d.hardline());
+        for line_docs in lines {
+            if line_docs.is_empty() {
+                if found_first_content {
+                    pending_blank = true;
                 }
-                docs.push(d.concat(&line_docs));
-                found_first_content = true;
+                continue;
             }
+
+            if found_first_content {
+                // The blank's `literalline` (no indent) goes *before* the content's `hardline`
+                // (which re-indents), so the blank line carries no trailing indentation.
+                if pending_blank {
+                    docs.push(d.literalline());
+                }
+                docs.push(d.hardline());
+            }
+            pending_blank = false;
+            // A multi-item line is grouped so its breakable `line` separators (between
+            // inline siblings) break together on width — a clean sibling break, no tag
+            // mangle — while a fitting line stays flat. A single item passes through
+            // unwrapped. The `hardline` joins keep each line's `fits()` self-contained, so
+            // the group sees only its own line.
+            if line_docs.len() == 1 {
+                docs.push(line_docs[0]);
+            } else {
+                docs.push(d.group(d.concat(&line_docs)));
+            }
+            found_first_content = true;
         }
 
         if docs.is_empty() {
@@ -863,9 +902,12 @@ impl<'a> Printer<'a> {
     /// Whether the node after a control-flow block at `trimmed_nodes[i]` hugs its closing tag
     /// (no line break after the block).
     ///
-    /// Hugs when the next node is directly adjacent (no whitespace between), or is content text
-    /// on the same source line. Whitespace-only text between the two forces a break, and only
-    /// control-flow blocks hug at all — HTML block elements always break after.
+    /// Hugs when the next node is directly adjacent (no whitespace between), is content text on
+    /// the same source line, or is a **single space before an inline element** (`{/if} <span>` —
+    /// the block keeps its line open so the element hugs the closing tag with a breakable `line`,
+    /// the mirror of the whitespace-space arm's "inline only before an inline element" rule).
+    /// Any other whitespace-separated sibling (newline, component, `{expr}`, comment, block
+    /// element) forces a break, and only control-flow blocks hug at all.
     fn block_next_hugs_closing(
         &self,
         trimmed_nodes: &[FragmentNode],
@@ -877,10 +919,13 @@ impl<'a> Printer<'a> {
                 let curr_span = trimmed_nodes[i].span();
                 let next_span = next.span();
                 if let FragmentNode::Text(next_text) = next {
-                    // Whitespace-only text means no hugging; content text hugs when on the
-                    // same source line as the block.
+                    // Whitespace-only text: hug only when it's a space (no newline) before an
+                    // inline element, so `{/if} <span>` stays inline and breaks cleanly on width
+                    // (the space arm supplies the breakable `line`). Content text hugs when on
+                    // the same source line as the block.
                     if next_text.raw.trim().is_empty() {
-                        return false;
+                        return !next_text.raw.contains('\n')
+                            && self.next_is_inline_element(trimmed_nodes, i + 1);
                     }
                     return tsv_lang::printing::spans_on_same_line(
                         self.source,
@@ -919,7 +964,12 @@ impl<'a> Printer<'a> {
         non_ws_count > 1 && nodes.iter().any(|n| self.is_block_fragment_node(n))
     }
 
-    /// Check if expressions should be split to separate lines in multiline mode.
+    /// Whether the fragment has 2+ whitespace-separated `{expr}` siblings — a multiline-*entry*
+    /// signal consumed only by `compute_needs_multiline` (a `<Comp>` authored with a leading break
+    /// and a non-hugged trailing boundary goes multiline so its exprs break). Sibling *separation*
+    /// once multiline is decided is handled per-pair by the whitespace-space arm of
+    /// [`Self::build_nodes_doc_multiline`] (break before every non-inline-element sibling); this
+    /// predicate no longer drives layout directly.
     ///
     /// Returns true when:
     /// - There are 2+ expression tags
@@ -957,6 +1007,25 @@ impl<'a> Printer<'a> {
                     .iter()
                     .any(FragmentNode::is_whitespace_only_text)
             }
+            _ => false,
+        }
+    }
+
+    /// Whether the whitespace-only separator at `trimmed_nodes[i]` is immediately followed by an
+    /// **inline element** (`<span>`, `<a>`, an inline special element) — the one sibling boundary
+    /// that stays on one line in a multiline container. Their separator becomes a breakable `line`
+    /// (the enclosing visual line is grouped in [`Self::emit_lines`]) so an over-width
+    /// inline-sibling pair breaks cleanly *between* the tags — matching Prettier's
+    /// `group([line, child])` — instead of the trailing element splitting its own closing `>`
+    /// onto a line. Every *other* sibling kind after a space (component, `{expr}`, comment,
+    /// control-flow block, block element) breaks onto its own line — see the space arm in
+    /// `build_nodes_doc_multiline`.
+    fn next_is_inline_element(&self, trimmed_nodes: &[FragmentNode], i: usize) -> bool {
+        match trimmed_nodes.get(i + 1) {
+            Some(FragmentNode::Element(el)) => {
+                el.kind != internal::ElementKind::Component && !self.is_block_element(el)
+            }
+            Some(node @ FragmentNode::SpecialElement(_)) => !self.is_block_fragment_node(node),
             _ => false,
         }
     }
@@ -1055,14 +1124,7 @@ impl<'a> Printer<'a> {
         i: usize,
     ) -> Option<(DocId, DocId)> {
         let block = trimmed_nodes.get(i)?;
-        if !matches!(
-            block,
-            FragmentNode::IfBlock(_)
-                | FragmentNode::EachBlock(_)
-                | FragmentNode::KeyBlock(_)
-                | FragmentNode::AwaitBlock(_)
-                | FragmentNode::SnippetBlock(_)
-        ) {
+        if !super::helpers::is_control_flow_block(block) {
             return None;
         }
         let prev = trimmed_nodes.get(i.checked_sub(1)?)?;

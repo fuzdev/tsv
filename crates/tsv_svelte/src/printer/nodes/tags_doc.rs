@@ -12,6 +12,9 @@ use tsv_lang::doc::arena::DocId;
 // tag; sharing the literal keeps the emitted text and the scan offset in sync.
 const HTML_TAG_OPEN: &str = "{@html ";
 const RENDER_TAG_OPEN: &str = "{@render ";
+// No trailing space — the space (when content follows) is emitted separately,
+// and the `.len()` derives the offset past the keyword for comment scanning.
+const DEBUG_TAG_OPEN: &str = "{@debug";
 const AT_CONST_TAG_OPEN: &str = "{@const ";
 const CONST_TAG_OPEN: &str = "{const ";
 const LET_TAG_OPEN: &str = "{let ";
@@ -85,8 +88,8 @@ impl<'a> Printer<'a> {
         // ContinuationIndent would double-indent continuation lines.
         let init_doc = self.build_const_init_doc(
             init,
-            init.span().start,
-            span.end - 1, // before "}"
+            id.span().end, // scan from after the id so a comment between `=` and init survives
+            span.end - 1,  // before "}"
         );
 
         // Choose layout matching prettier's assignment layout selection.
@@ -186,35 +189,56 @@ impl<'a> Printer<'a> {
                 .map(|c| self.build_trailing_js_comment_doc(c))
                 .collect();
 
-        if leading_docs.is_empty() && trailing_docs.is_empty() {
-            expr_doc
-        } else {
-            let mut parts = Vec::with_capacity(leading_docs.len() + 1 + trailing_docs.len());
-            parts.extend(leading_docs);
-            parts.push(expr_doc);
-            parts.extend(trailing_docs);
-            d.concat(&parts)
-        }
+        self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs)
     }
 
     /// Build a doc for {@debug vars}
+    ///
+    /// Unlike Prettier (which strips them), tsv preserves embedded TS comments —
+    /// a cataloged divergence (`tags/debug/debug_comment_prettier_divergence`).
+    /// Comments are looked up from `Root.comments` by span and interleaved with
+    /// the identifiers, matching the (former) buffer printer's placement.
     pub(crate) fn build_debug_tag_doc(&self, tag: &internal::DebugTag) -> DocId {
         let d = self.d();
-        if tag.identifiers.is_empty() {
-            d.text("{@debug}")
-        } else {
-            let idents: Vec<DocId> = tag
-                .identifiers
-                .iter()
-                .map(|id| {
-                    let name =
-                        self.extract_source_range(id.span().start_usize(), id.span().end_usize());
-                    d.text_owned(name.to_string())
-                })
-                .collect();
 
-            d.concat(&[d.text("{@debug "), d.join(idents, ", "), d.text("}")])
+        // Comments within the tag's content (after "{@debug" and before "}").
+        let tag_comments: Vec<&tsv_lang::Comment> =
+            tsv_lang::comments_in_range(self.comments, tag.span.start, tag.span.end).collect();
+
+        if tag.identifiers.is_empty() && tag_comments.is_empty() {
+            return d.text("{@debug}");
         }
+
+        let mut parts: Vec<DocId> = vec![d.text("{@debug ")];
+        // Track position as we emit content, starting after the "{@debug" keyword.
+        let mut last_end = tag.span.start + DEBUG_TAG_OPEN.len() as u32;
+
+        for (i, id) in tag.identifiers.iter().enumerate() {
+            if i > 0 {
+                parts.push(d.text(", "));
+                last_end += 2; // ", "
+            }
+            // Comments appearing before this identifier.
+            for comment in &tag_comments {
+                if comment.span.start >= last_end && comment.span.end <= id.span().start {
+                    parts.push(self.build_leading_js_comment_doc(comment));
+                    last_end = comment.span.end;
+                }
+            }
+            let name = self.extract_source_range(id.span().start_usize(), id.span().end_usize());
+            parts.push(d.text_owned(name.to_string()));
+            last_end = id.span().end;
+        }
+
+        // Trailing comments (after the last identifier).
+        for comment in &tag_comments {
+            if comment.span.start >= last_end {
+                parts.push(self.build_trailing_js_comment_doc(comment));
+            }
+        }
+
+        parts.push(d.text("}"));
+        d.concat(&parts)
     }
 
     /// Build a doc for {@render snippet(args)}
