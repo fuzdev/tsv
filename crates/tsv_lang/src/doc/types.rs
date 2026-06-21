@@ -58,6 +58,33 @@ pub struct DocContext {
     /// word-wrap and CSS value lists pack greedily after a dropped item), so the flag never affects
     /// them.
     pub break_after_dropped_first: bool,
+
+    /// When set, the fill's trailing separator (its terminal `line`, the only one reaching the
+    /// "content + separator" render case) measures the *immediately following* node — the next
+    /// item on the render stack — as a WHOLE flat unit, instead of letting that node's own internal
+    /// break point short-circuit the fit check. A wide inline element that would not fit flat after
+    /// the separator then forces the separator to break, dropping the element to its own line whole
+    /// — rather than packing it onto the text line, where it would break its own tag in place.
+    ///
+    /// Scoped to the Svelte text→flow-element boundary fill (a text run whose next sibling is a
+    /// flowing inline element/component, ended with a trailing `line`). Off for every other fill, so
+    /// a small element after text still packs and CSS/value-list fills are unaffected. This is the
+    /// leading-boundary counterpart of [`Self::break_after_dropped_first`]: both re-couple the
+    /// width-driven drop decision to the boundary rule at render position so the space- and
+    /// newline-authored forms converge to one fixed point.
+    pub break_before_wide_flow: bool,
+
+    /// When set, the fill's FIRST item, if it sits mid-line (right after a small prefix such as a
+    /// parent inline element's `>`) and does not fit on its own line *either* (wider than printWidth
+    /// even at line start), is rendered **in place** — it breaks internally — rather than dropped to
+    /// the next line. Dropping a too-wide-anyway first item only strands a spurious break before it
+    /// (a `>⏎<child` dangle that the next pass collapses → non-idempotent); rendering in place keeps
+    /// the child hugging the prefix, matching the newline-authored form.
+    ///
+    /// Scoped to the Svelte after-element fold (`fill([element, line, words…])`), whose first item
+    /// is always a breakable inline element/component. Off for every other fill, so text word-wrap
+    /// and CSS value lists still drop a too-wide item onto its own line.
+    pub hug_wide_first: bool,
 }
 
 /// Trait for resolving symbol IDs to strings at print time

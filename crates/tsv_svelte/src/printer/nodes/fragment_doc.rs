@@ -771,6 +771,29 @@ impl<'a> Printer<'a> {
             leading_line,
             trailing_line,
         ) {
+            // Text immediately before a flowing inline element/component ends with a trailing
+            // `line`. Couple that boundary to the wide-element drop at render position: if the
+            // following element won't fit flat as a whole, the trailing `line` breaks so the
+            // element drops to its own line whole rather than packing onto the text line and
+            // breaking its own tag in place. The newline-authored boundary already does this (it
+            // emits a hardline); this makes the space-authored boundary converge to the same form.
+            //
+            // Scoped to `!is_first`, mirroring prettier-plugin-svelte's `handleTextChild`: only a
+            // MIDDLE text node trims its trailing whitespace and lets the following inline element be
+            // wrapped in a droppable `group([line, element])`. A FIRST-child text leaves the element
+            // bare, so it hugs and overflows (the sanctioned `inline_closing_text` shape). Matching
+            // that split keeps the first-child hug cases unchanged while the in-flow boundaries drop.
+            let fill_doc = if trailing_line && next_is_flow && !is_first {
+                d.with_context(
+                    fill_doc,
+                    tsv_lang::doc::DocContext {
+                        break_before_wide_flow: true,
+                        ..Default::default()
+                    },
+                )
+            } else {
+                fill_doc
+            };
             child_docs.push(fill_doc);
         }
         if add_trailing_space {
@@ -1229,17 +1252,20 @@ impl<'a> Printer<'a> {
             parts.push(d.line());
         }
         let fill = d.fill(&parts);
-        if sandwiched {
-            d.with_context(
-                fill,
-                tsv_lang::doc::DocContext {
-                    break_after_dropped_first: true,
-                    ..Default::default()
-                },
-            )
-        } else {
-            fill
-        }
+        // `hug_wide_first` is always set: the fold's first item is the inline element, and when it
+        // sits mid-line right after a parent element's `>` and is too wide for its own line, it must
+        // hug-and-break-internally rather than drop (which would strand a spurious `>⏎<child` break —
+        // the nested-`<span>` non-idempotency). `break_after_dropped_first` couples the *trailing*
+        // text to the drop, and only applies when the element is sandwiched (a preceding sibling can
+        // push it onto its own line); the two flags address opposite ends of the fold.
+        d.with_context(
+            fill,
+            tsv_lang::doc::DocContext {
+                hug_wide_first: true,
+                break_after_dropped_first: sandwiched,
+                ..Default::default()
+            },
+        )
     }
 
     /// Build a doc for a text node
