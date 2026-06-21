@@ -784,8 +784,34 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
             // width and lets the following node overshoot printWidth by a column. Re-measure with
             // the separator counted just before the look-ahead so the boundary breaks (next node
             // to its own line) exactly when it should.
-            let sep_fits = if is_final_segment && !rest_commands.is_empty() {
+            let sep_fits = if context.break_before_wide_flow
+                && is_final_segment
+                && rest_commands
+                    .last()
+                    .is_some_and(|c| arena.will_break(c.doc))
+            {
+                // Flow boundary, forced-break element: the following inline element is already
+                // multiline (multiline attributes, a block-body event handler, …). Prettier's
+                // `group([line, element])` breaks on that forced break and drops the element, so the
+                // separator must break here too — a flat-width measurement would short-circuit at the
+                // element's hardline and wrongly report a fit (hugging it onto the text line).
+                false
+            } else if is_final_segment && !rest_commands.is_empty() {
                 let mut rest_with_sep: Vec<ArenaCommand> = rest_commands.to_vec();
+                // Flow boundary (Svelte text→inline-element/component): measure the immediately
+                // following node — the top of the rest stack, the inline element — as a WHOLE flat
+                // unit (force Flat mode), so the separator breaks (dropping the element to its own
+                // line whole) exactly when prettier's `group([line, element])` would: when the
+                // element doesn't fit flat after the last word + the separator space. Without this,
+                // the element's inherited Break mode lets `arena_fits` short-circuit at its first
+                // internal line, so the element packs onto the text line and breaks its own tag in
+                // place. Scoped by the context flag to the in-flow (`!is_first`) text→element
+                // boundary; a first-child text leaves the element bare, which keeps hugging.
+                if context.break_before_wide_flow
+                    && let Some(next) = rest_with_sep.last_mut()
+                {
+                    next.mode = Mode::Flat;
+                }
                 rest_with_sep.push(ArenaCommand {
                     indent: indent_level,
                     mode: Mode::Flat,
@@ -890,6 +916,43 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                     embed,
                     resolver,
                 );
+
+                if context.hug_wide_first && !content_fits_at_start {
+                    // The first fill item is a breakable inline element (the after-element fold's
+                    // element) sitting mid-line right after a small prefix — the parent inline
+                    // element's `>`. It does not fit flat here, and it would not fit on its own line
+                    // either (it is wider than printWidth even at line start). Dropping it to the
+                    // next line therefore wouldn't help — it would only strand a spurious break
+                    // before it (`>⏎<child`, which the next pass collapses → non-idempotent).
+                    // Render it in place (it breaks its own attributes/content internally) and break
+                    // the separator so the trailing text takes its own line. This keeps the child
+                    // hugging the parent's `>`, the same shape the newline-authored boundary lands
+                    // on, so both authorings converge.
+                    render_single_doc(
+                        arena,
+                        content,
+                        output,
+                        pos,
+                        indent_level,
+                        Mode::Break,
+                        render,
+                        embed,
+                        resolver,
+                    );
+                    render_single_doc(
+                        arena,
+                        separator,
+                        output,
+                        pos,
+                        indent_level,
+                        Mode::Break,
+                        render,
+                        embed,
+                        resolver,
+                    );
+                    offset += 2;
+                    continue;
+                }
 
                 trim_trailing_whitespace(output);
                 output.push('\n');
