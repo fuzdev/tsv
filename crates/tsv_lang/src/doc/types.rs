@@ -47,6 +47,17 @@ pub struct DocContext {
     ///
     /// Example: CSS declarations add ";" after the value, so reserve 1 char.
     pub trailing_reserve: usize,
+
+    /// When set, the fill's FIRST item, if it renders at the start of its line (i.e. it was
+    /// pushed to its own line by a preceding break — it "dropped"), forces the separator after it
+    /// to break, so the next item takes its own line.
+    ///
+    /// Scoped to the Svelte after-element fold of a *sandwiched* inline element/component: a wide
+    /// inline child that drops to its own line owns that line — the trailing text after it wraps to
+    /// the next line rather than hugging the dropped child's `>`. Off for every other fill (text
+    /// word-wrap and CSS value lists pack greedily after a dropped item), so the flag never affects
+    /// them.
+    pub break_after_dropped_first: bool,
 }
 
 /// Trait for resolving symbol IDs to strings at print time

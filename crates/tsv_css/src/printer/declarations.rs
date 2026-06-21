@@ -563,6 +563,7 @@ impl<'a> Printer<'a> {
         // to exactly printWidth and then exceeding when ';' is added
         let context = DocContext {
             trailing_reserve: 1,
+            ..Default::default()
         };
         let fill = d.fill(&parts);
         d.with_context(fill, context)
@@ -614,7 +615,10 @@ impl<'a> Printer<'a> {
     fn build_space_fill_doc(&self, values: &[CssValue], trailing_reserve: usize) -> DocId {
         let d = self.d();
         let parts = self.build_space_fill_parts(values);
-        let context = DocContext { trailing_reserve };
+        let context = DocContext {
+            trailing_reserve,
+            ..Default::default()
+        };
         let fill = d.fill(&parts);
         d.with_context(fill, context)
     }

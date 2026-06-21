@@ -695,6 +695,47 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
             )
         };
 
+        // Dropped-first boundary (Svelte after-element fold of a sandwiched inline child): if the
+        // first fill item rendered at the start of its line, it was pushed there by a preceding
+        // break — it dropped to its own line — so break the separator after it and let the rest of
+        // the fill pack from there. A wide inline child that drops owns its line; trailing text
+        // wraps to the next line rather than hugging the child's `>`. Scoped by the context flag so
+        // greedy fills (text word-wrap, CSS value lists) are unaffected.
+        if offset == 0 && context.break_after_dropped_first && offset + 1 < parts.len() {
+            let line_start_pos = line_start_column(indent_level, render, embed);
+            if *pos == line_start_pos {
+                let content_mode = if content_fits {
+                    Mode::Flat
+                } else {
+                    Mode::Break
+                };
+                render_single_doc(
+                    arena,
+                    content,
+                    output,
+                    pos,
+                    indent_level,
+                    content_mode,
+                    render,
+                    embed,
+                    resolver,
+                );
+                render_single_doc(
+                    arena,
+                    parts[offset + 1],
+                    output,
+                    pos,
+                    indent_level,
+                    Mode::Break,
+                    render,
+                    embed,
+                    resolver,
+                );
+                offset += 2;
+                continue;
+            }
+        }
+
         // Case 1: Last item
         if offset + 1 >= parts.len() {
             if !content_fits {
@@ -735,11 +776,34 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 embed,
                 resolver,
             );
-            let sep_mode = if content_fits {
-                Mode::Flat
+            // The separator (the last fill item) is rendered between `content` and whatever
+            // follows the fill (`rest_commands`). The generic `content_fits` above measures
+            // `content` + `rest_commands` but NOT this separator, so a trailing-`line` fill
+            // (the `next_node_is_flow` / after-element-fold boundary — the only fills that reach
+            // Case 2, since they alone end in a separator) under-measures by the separator's
+            // width and lets the following node overshoot printWidth by a column. Re-measure with
+            // the separator counted just before the look-ahead so the boundary breaks (next node
+            // to its own line) exactly when it should.
+            let sep_fits = if is_final_segment && !rest_commands.is_empty() {
+                let mut rest_with_sep: Vec<ArenaCommand> = rest_commands.to_vec();
+                rest_with_sep.push(ArenaCommand {
+                    indent: indent_level,
+                    mode: Mode::Flat,
+                    doc: separator,
+                });
+                arena_fits_with_lookahead(
+                    arena,
+                    content,
+                    Mode::Flat,
+                    &rest_with_sep,
+                    remaining as isize,
+                    embed,
+                    resolver,
+                )
             } else {
-                Mode::Break
+                content_fits
             };
+            let sep_mode = if sep_fits { Mode::Flat } else { Mode::Break };
             render_single_doc(
                 arena,
                 separator,

@@ -213,7 +213,7 @@ impl<'a> Printer<'a> {
         let children_doc_tree = if needs_multiline {
             self.build_nodes_doc_multiline(&element.fragment.nodes)
         } else if is_simple_content {
-            self.build_nodes_doc_trimmed(&element.fragment.nodes, true)
+            self.build_nodes_doc_trimmed(&element.fragment.nodes, true, false, false)
         } else {
             self.build_fragment_doc(&element.fragment)
         };
