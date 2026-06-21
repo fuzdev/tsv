@@ -1,0 +1,200 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 717,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 448,
+				"data": " A wide inline element whose own content (not its attributes) overflows, followed by\n     trailing text. tsv wraps the content within printWidth and puts the trailing text on its\n     own line — it never hugs trailing text onto a wrapped element's last line. Prettier keeps\n     the content on one over-width line; its tail placement is authoring-dependent (hug vs\n     own-line — see prettier_variant_hug). See README. Covers <strong>/<a>. "
+			},
+			{
+				"type": "Text",
+				"start": 448,
+				"end": 449,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 449,
+				"end": 582,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 450
+					},
+					"end": {
+						"line": 6,
+						"column": 2,
+						"character": 451
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 452,
+							"end": 454,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 454,
+							"end": 571,
+							"name": "strong",
+							"name_loc": {
+								"start": {
+									"line": 7,
+									"column": 2,
+									"character": 455
+								},
+								"end": {
+									"line": 7,
+									"column": 8,
+									"character": 461
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 465,
+										"end": 560,
+										"raw": "alpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november\n\t\toscar",
+										"data": "alpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november\n\t\toscar"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 571,
+							"end": 578,
+							"raw": "\n\ttail\n",
+							"data": "\n\ttail\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 582,
+				"end": 584,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 584,
+				"end": 716,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 585
+					},
+					"end": {
+						"line": 14,
+						"column": 2,
+						"character": 586
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 587,
+							"end": 589,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 589,
+							"end": 705,
+							"name": "a",
+							"name_loc": {
+								"start": {
+									"line": 15,
+									"column": 2,
+									"character": 590
+								},
+								"end": {
+									"line": 15,
+									"column": 3,
+									"character": 591
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 592,
+									"end": 600,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 15,
+											"column": 4,
+											"character": 592
+										},
+										"end": {
+											"line": 15,
+											"column": 8,
+											"character": 596
+										}
+									},
+									"value": [
+										{
+											"start": 598,
+											"end": 599,
+											"type": "Text",
+											"raw": "#",
+											"data": "#"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 604,
+										"end": 699,
+										"raw": "november oscar papa quebec romeo sierra tango uniform victor whiskey xray yankee zulu\n\t\tabcdefg",
+										"data": "november oscar papa quebec romeo sierra tango uniform victor whiskey xray yankee zulu\n\t\tabcdefg"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 705,
+							"end": 712,
+							"raw": "\n\ttail\n",
+							"data": "\n\ttail\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
