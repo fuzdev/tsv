@@ -519,6 +519,7 @@ dependencies = [
  "tokio",
  "tsv_cli",
  "tsv_css",
+ "tsv_html",
  "tsv_lang",
  "tsv_svelte",
  "tsv_ts",

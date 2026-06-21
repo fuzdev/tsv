@@ -1,4 +1,5 @@
 pub mod ast_diff;
+pub mod authoring_audit;
 pub mod canonical_parse;
 pub mod check;
 pub mod compare;
