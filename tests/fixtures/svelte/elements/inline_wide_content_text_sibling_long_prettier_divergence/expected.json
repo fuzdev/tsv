@@ -1,0 +1,162 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 654,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 512,
+				"data": " A wide inline element whose content overflows, followed by text and then ANOTHER inline\n     element. tsv wraps the content within print width (the printWidth-hard-limit divergence);\n     the text between (`mid`) takes its OWN line after the dangled `>` — the same uniform\n     never-hug rule the terminal case uses (inline_wide_content_trailing_long). The following\n     element exercises the trailing-line boundary. prettier agrees on the `mid` line, so the\n     divergence is purely the content wrap. "
+			},
+			{
+				"type": "Text",
+				"start": 512,
+				"end": 513,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 513,
+				"end": 653,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 514
+					},
+					"end": {
+						"line": 7,
+						"column": 2,
+						"character": 515
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 516,
+							"end": 518,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 518,
+							"end": 634,
+							"name": "a",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 2,
+									"character": 519
+								},
+								"end": {
+									"line": 8,
+									"column": 3,
+									"character": 520
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 521,
+									"end": 529,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 8,
+											"column": 4,
+											"character": 521
+										},
+										"end": {
+											"line": 8,
+											"column": 8,
+											"character": 525
+										}
+									},
+									"value": [
+										{
+											"start": 527,
+											"end": 528,
+											"type": "Text",
+											"raw": "#",
+											"data": "#"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 533,
+										"end": 628,
+										"raw": "alpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november\n\t\toscar",
+										"data": "alpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november\n\t\toscar"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 634,
+							"end": 640,
+							"raw": "\n\tmid ",
+							"data": "\n\tmid "
+						},
+						{
+							"type": "RegularElement",
+							"start": 640,
+							"end": 648,
+							"name": "b",
+							"name_loc": {
+								"start": {
+									"line": 12,
+									"column": 6,
+									"character": 641
+								},
+								"end": {
+									"line": 12,
+									"column": 7,
+									"character": 642
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 643,
+										"end": 644,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 648,
+							"end": 649,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -445,8 +445,23 @@ impl<'a> Printer<'a> {
             } else if !prev_will_break {
                 trim_left = true;
                 add_leading_space = false; // line() handles the space
-                // Pop the last doc (the inline element) and wrap it with trailing line
+                // Pop the last doc (the inline element) and rejoin it with the trailing text.
                 if let Some(last_doc) = child_docs.pop() {
+                    if is_last {
+                        // Last child: fold the element and the trailing words into ONE fill
+                        // (like the multiline path) so a wide element wraps its own content
+                        // within printWidth. When the element fits, the words pack after it
+                        // inline; when it wraps, the trailing text takes its own line — the
+                        // uniform fill rule (break the separator after a wrapped item), never a
+                        // hug. Shared with the multiline path via `build_after_element_fold` so
+                        // both authorings converge.
+                        child_docs.push(self.build_after_element_fold(last_doc, raw, false));
+                        return;
+                    }
+                    // Non-last (text between two inline elements): keep the existing
+                    // group-wrapped boundary. The fold isn't needed here (a following element
+                    // supplies the next break point) and changing it has no failing fixture —
+                    // revisit fixtures-first if a mid-run wide element ever needs it.
                     let line = d.line();
                     let inner = d.concat(&[last_doc, line]);
                     child_docs.push(d.group(inner));
@@ -1262,21 +1277,34 @@ impl<'a> Printer<'a> {
         parts
     }
 
-    /// If the current line ends with an inline element, fold it together with `raw`'s words
-    /// into one `fill` (`element line word line word …`) so the boundary after the element
-    /// can break — keeping its closing `>` intact — while the words still pack greedily after
-    /// it. When `trailing_line` is set (the next sibling is itself a flowing inline
-    /// element/component), the fill ends with a `line` so the fold's last word hugs and the
-    /// boundary to that next element breaks per width (Fill idempotency — the word before a
-    /// wide inline child is never stranded). Returns `false` (no change) when the line is empty.
+    /// Pop the inline element off the end of the current line and replace it with the
+    /// after-element fold (see [`Self::build_after_element_fold`]) of it plus `raw`'s words.
+    /// Returns `false` (no change) when the line is empty. The `LineBuf` adapter for the
+    /// multiline path; the inline/trimmed path calls `build_after_element_fold` directly.
     fn fold_text_after_inline_element(
         &self,
         line: &mut LineBuf,
         raw: &str,
         trailing_line: bool,
     ) -> bool {
-        let d = self.d();
         let Some(prev) = line.pop() else { return false };
+        line.push(self.build_after_element_fold(prev, raw, trailing_line));
+        true
+    }
+
+    /// Build the after-element fold doc: one `fill([element, line, word …])` so the element's
+    /// closing `>` stays intact while the words pack greedily after it, plus (when
+    /// `trailing_line` — the next sibling is itself a flowing inline element/component) a
+    /// trailing `line` so the boundary to that next child can break. A wide element whose
+    /// content overflows wraps within print width and dangles its closing `>` on a low
+    /// column; the trailing text then takes its OWN line (`</tag⏎>⏎tail`) via the fill's
+    /// uniform "break the separator after a wrapped item" rule — the same rule CSS value
+    /// lists use (tsv does not hug trailing text onto a wrapped element's last line). Shared
+    /// by the multiline path ([`Self::fold_text_after_inline_element`]) and the inline/trimmed
+    /// path ([`Self::handle_text_child`]) so both lay a wide element + trailing text out
+    /// identically.
+    fn build_after_element_fold(&self, prev: DocId, raw: &str, trailing_line: bool) -> DocId {
+        let d = self.d();
         let words = self.word_fill_parts(raw);
         let mut parts: Vec<DocId> = Vec::with_capacity(3 + words.len());
         parts.push(prev);
@@ -1285,8 +1313,7 @@ impl<'a> Printer<'a> {
         if trailing_line {
             parts.push(d.line());
         }
-        line.push(d.fill(&parts));
-        true
+        d.fill(&parts)
     }
 
     /// Emit one text `part` into `line` for the multiline path: fold it into an
