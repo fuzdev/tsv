@@ -820,6 +820,7 @@ mod arena_tests {
             a.text("abcd"),
             DocContext {
                 trailing_reserve: 3,
+                ..Default::default()
             },
         );
         // 4 content + 3 reserved = 7

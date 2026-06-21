@@ -23,4 +23,4 @@ Sibling of [svelte_element_this_string](../svelte_element_this_string_prettier_d
 the other `<svelte:element>` printer regression from the same migration. Retires
 once a plugin fix releases and tsv's oracle is re-pinned.
 
-See [conformance_prettier.md §Svelte/HTML](../../../../../docs/conformance_prettier.md#sveltehtml).
+See [conformance_prettier.md §Svelte: Elements](../../../../../docs/conformance_prettier.md#svelte-elements).

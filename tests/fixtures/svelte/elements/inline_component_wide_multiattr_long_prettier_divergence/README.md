@@ -9,13 +9,19 @@ instead hugs `and <Comp` onto the text line (101) and breaks every attribute ont
 to `input.svelte`).
 
 tsv: word stays hugged, the whole component moves to its own line with attributes intact (each
-line ≤100)
+line ≤100), and the trailing text (`tail1 tail2 tail3`) wraps to its own line — a wide inline
+child that drops owns its line, so following text doesn't hug its `>`.
 Prettier: keeps `and <Comp` on the text line and breaks the component internally (one attribute
 per line)
 
 This complements `inline_component_wide_long` (a single long attribute): the flow boundary keys
 on the component being too wide for the *text* line, not on whether the component's own
 attributes can break.
+
+The trailing text takes its own line whether the boundary was authored as a space
+(`unformatted_ours_compact.svelte`) or a newline — both converge here, so there is no
+authoring-dependent dual-stable split (the after-element fold breaks the trailing separator when
+the dropped element renders at line start).
 
 ## Reason
 

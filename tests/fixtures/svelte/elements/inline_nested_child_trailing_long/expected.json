@@ -1,0 +1,311 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 566,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 151,
+				"data": " Fits: the nested inline child's line is exactly 100, so it stays inline; the\n     trailing text (authored on its own line) keeps its own line. "
+			},
+			{
+				"type": "Text",
+				"start": 151,
+				"end": 152,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 152,
+				"end": 271,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 153
+					},
+					"end": {
+						"line": 3,
+						"column": 5,
+						"character": 157
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 160,
+							"end": 257,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 3,
+									"character": 161
+								},
+								"end": {
+									"line": 4,
+									"column": 7,
+									"character": 165
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 166,
+									"end": 225,
+									"name": "class",
+									"name_loc": {
+										"start": {
+											"line": 4,
+											"column": 8,
+											"character": 166
+										},
+										"end": {
+											"line": 4,
+											"column": 13,
+											"character": 171
+										}
+									},
+									"value": [
+										{
+											"start": 173,
+											"end": 224,
+											"type": "Text",
+											"raw": "class1 class2 class3 class4 class5 class6 class7abc",
+											"data": "class1 class2 class3 class4 class5 class6 class7abc"
+										}
+									]
+								},
+								{
+									"start": 226,
+									"end": 243,
+									"type": "StyleDirective",
+									"name": "width",
+									"name_loc": {
+										"start": {
+											"line": 4,
+											"column": 68,
+											"character": 226
+										},
+										"end": {
+											"line": 4,
+											"column": 79,
+											"character": 237
+										}
+									},
+									"modifiers": [],
+									"value": [
+										{
+											"start": 239,
+											"end": 242,
+											"type": "Text",
+											"raw": "6ch",
+											"data": "6ch"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 244,
+										"end": 250,
+										"expression": {
+											"type": "Identifier",
+											"start": 245,
+											"end": 249,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 87
+												},
+												"end": {
+													"line": 4,
+													"column": 91
+												}
+											},
+											"name": "expr"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 257,
+							"end": 263,
+							"raw": "\n\ttext",
+							"data": "\n\ttext"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 271,
+				"end": 273,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 273,
+				"end": 442,
+				"data": " Breaks: one char longer (101), so the nested child wraps; the no-attr parent keeps its\n     open tag hugging the child and the trailing text keeps its own line. "
+			},
+			{
+				"type": "Text",
+				"start": 442,
+				"end": 443,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 443,
+				"end": 565,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 444
+					},
+					"end": {
+						"line": 10,
+						"column": 5,
+						"character": 448
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 451,
+							"end": 551,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 11,
+									"column": 3,
+									"character": 452
+								},
+								"end": {
+									"line": 11,
+									"column": 7,
+									"character": 456
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 457,
+									"end": 517,
+									"name": "class",
+									"name_loc": {
+										"start": {
+											"line": 11,
+											"column": 8,
+											"character": 457
+										},
+										"end": {
+											"line": 11,
+											"column": 13,
+											"character": 462
+										}
+									},
+									"value": [
+										{
+											"start": 464,
+											"end": 516,
+											"type": "Text",
+											"raw": "class1 class2 class3 class4 class5 class6 class7abcd",
+											"data": "class1 class2 class3 class4 class5 class6 class7abcd"
+										}
+									]
+								},
+								{
+									"start": 518,
+									"end": 535,
+									"type": "StyleDirective",
+									"name": "width",
+									"name_loc": {
+										"start": {
+											"line": 11,
+											"column": 69,
+											"character": 518
+										},
+										"end": {
+											"line": 11,
+											"column": 80,
+											"character": 529
+										}
+									},
+									"modifiers": [],
+									"value": [
+										{
+											"start": 531,
+											"end": 534,
+											"type": "Text",
+											"raw": "6ch",
+											"data": "6ch"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 536,
+										"end": 542,
+										"expression": {
+											"type": "Identifier",
+											"start": 537,
+											"end": 541,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 88
+												},
+												"end": {
+													"line": 11,
+													"column": 92
+												}
+											},
+											"name": "expr"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 551,
+							"end": 557,
+							"raw": "\n\ttext",
+							"data": "\n\ttext"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
