@@ -669,6 +669,32 @@ cargo run -p tsv_debug swallow_audit ~/dev/zzz/src   # audit a real codebase
 # `swallow:audit` task) over tests/fixtures.
 ```
 
+**Authoring-Independence Audit (Svelte boundary whitespace):**
+
+```bash
+# authoring_audit - probe whether the SAME logical document, authored with
+# different boundary whitespace, formats to ONE tsv fixed point. Stronger than
+# the corpus idempotency sweep (which only checks format(x) is stable): a
+# formatter can be idempotent yet authoring-DEPENDENT (two authorings settling
+# on two different stable outputs). Mutates only non-significant boundary
+# whitespace — an existing run between two siblings (a whitespace-only Text node
+# or a content Text node's boundary whitespace), space↔single-newline, never a
+# blank line, never inside <pre>/<textarea> (via tsv_html::preserves_whitespace).
+# Safe by construction (HTML whitespace collapse); the element expansion a toggle
+# may trigger is the property under test. Svelte (.svelte) only for now.
+cargo run -p tsv_debug authoring_audit                  # audit tests/fixtures (pure Rust)
+cargo run -p tsv_debug authoring_audit ~/dev/zzz/src    # audit a real codebase
+# Pure-Rust verdict per site: converge / diverge (dual-stable) / diverge
+# (NON-IDEMPOTENT). Exits 1 on any non-idempotency. With --prettier it adds the
+# triage via the sidecar: (a) tsv diverges where prettier converges (bug);
+# (b) tsv converges where prettier diverges (a _prettier_divergence to pin, the
+# space_after_block class); (c) both diverge (sanctioned, e.g. Tier-2 element
+# expansion). --dump-dir writes byte-exact repro artifacts (base/variant/ftry/
+# ftry2) for each hard finding — the basis for a fixtures-first fix.
+# Also: --json, --verbose, --limit N (sites/file), --examples N.
+cargo run -p tsv_debug authoring_audit ~/dev/zzz/src --prettier --dump-dir /tmp/audit
+```
+
 ## Architectural Notes
 
 ### Closed Scope, Open Convention
