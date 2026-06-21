@@ -393,13 +393,28 @@ impl<'a> Printer<'a> {
 
         // Build children doc
         let children_doc = if multiline_children {
-            self.build_nodes_doc_multiline(&element.fragment.nodes)
+            // Multiline content: the prettier-shaped trimmed builder in `multiline` mode.
+            let breakable_exprs = Self::nodes_have_breakable_expression(&element.fragment.nodes);
+            self.build_nodes_doc_trimmed(
+                &element.fragment.nodes,
+                ctx.trim_boundaries,
+                breakable_exprs,
+                true,
+            )
         } else if !(start_mode == BoundaryMode::Hug && end_mode == BoundaryMode::Hug) {
-            self.build_nodes_doc_trimmed(&element.fragment.nodes, ctx.trim_boundaries)
+            self.build_nodes_doc_trimmed(&element.fragment.nodes, ctx.trim_boundaries, false, false)
         } else {
-            // Hug both: determine if we should trim
-            let trim_text = !ctx.kind.is_inline() && ctx.only_text_content;
-            self.build_nodes_doc_with_context(&element.fragment.nodes, trim_text)
+            // Hug both: route through the prettier-shaped trimmed builder (the convergence
+            // base). When the fragment carries a break-capable expression tag, opt into the
+            // hard-width divergence so a long multi-expression run breaks the expression
+            // rather than overshooting printWidth (`fill_multiple_expr_long`).
+            let breakable_exprs = Self::nodes_have_breakable_expression(&element.fragment.nodes);
+            self.build_nodes_doc_trimmed(
+                &element.fragment.nodes,
+                ctx.trim_boundaries,
+                breakable_exprs,
+                false,
+            )
         };
 
         // Build opening tag
@@ -464,7 +479,7 @@ impl<'a> Printer<'a> {
                 // handles whitespace correctly and must not be replaced with trimmed.
                 let effective_children = if is_inline && !ctx.trim_boundaries && !multiline_children
                 {
-                    self.build_nodes_doc_trimmed(&element.fragment.nodes, true)
+                    self.build_nodes_doc_trimmed(&element.fragment.nodes, true, false, false)
                 } else {
                     children_doc
                 };
@@ -524,7 +539,7 @@ impl<'a> Printer<'a> {
                 // since line() now provides the boundary space that
                 // handle_text_child would otherwise duplicate.
                 let effective_children = if is_inline && !ctx.trim_boundaries {
-                    self.build_nodes_doc_trimmed(&element.fragment.nodes, true)
+                    self.build_nodes_doc_trimmed(&element.fragment.nodes, true, false, false)
                 } else {
                     children_doc
                 };
@@ -647,13 +662,8 @@ impl<'a> Printer<'a> {
                 // Check if any expression has internal break points (ternary, &&, ||, +, etc.)
                 // When breakable expressions exist, keep opening bracket hugging so expression
                 // breaks are preferred over bracket breaks (reduces indentation drift).
-                let has_breakable_expressions = element.fragment.nodes.iter().any(|n| {
-                    if let FragmentNode::ExpressionTag(tag) = n {
-                        Self::expression_has_break_points(&tag.expression)
-                    } else {
-                        false
-                    }
-                });
+                let has_breakable_expressions =
+                    Self::nodes_have_breakable_expression(&element.fragment.nodes);
 
                 if has_breakable_expressions {
                     // Breakable expressions: keep opening hugging, expressions break internally
@@ -1748,6 +1758,23 @@ impl<'a> Printer<'a> {
             | Expression::ImportExpression(_)
             | Expression::MetaProperty(_) => false,
         }
+    }
+
+    /// Whether any direct child expression tag (`{expr}`) can break internally
+    /// (ternary, binary, call, …). Mirrors the hug-both wrapper's hard-width
+    /// divergence: when true, the children builder must keep those expression
+    /// groups breakable, so boundary text adjacent to them is emitted as plain
+    /// spaces rather than `fill` `line`s — otherwise a `line` in fits()-Break
+    /// mode short-circuits the preceding expression group's width check, leaving
+    /// it flat and overshooting printWidth (the `fill_multiple_expr_long` case).
+    pub(super) fn nodes_have_breakable_expression(nodes: &[FragmentNode]) -> bool {
+        nodes.iter().any(|n| {
+            if let FragmentNode::ExpressionTag(tag) = n {
+                Self::expression_has_break_points(&tag.expression)
+            } else {
+                false
+            }
+        })
     }
 
     /// Check if a fragment node is an HTML block element (not component, not control flow)
