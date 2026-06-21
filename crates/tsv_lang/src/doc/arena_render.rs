@@ -880,6 +880,11 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                     );
                 }
             } else {
+                // Content didn't fit flat at line start; render it (it may break
+                // internally) and always break the separator so the next item takes its
+                // own line. Uniform across every fill — list-shaped (CSS value lists) and
+                // the inline after-element fold alike: a wrapped item never lets the
+                // following item hug onto its last line.
                 render_single_doc(
                     arena,
                     content,
@@ -1154,6 +1159,11 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
 
             DocNode::Fill(range) => {
                 let parts: Vec<DocId> = range.resolve(children_vec).to_vec();
+                // Pass the remaining commands as look-ahead (like the top-level
+                // `render_doc_iterative` Fill arm), so a fill's final-segment fits check
+                // sees the content that follows it within this sub-render — e.g. the
+                // `</tag` suffix after an inline element's content fill — and wraps the
+                // last word instead of over-shooting the print width.
                 render_fill_iterative(
                     arena,
                     &parts,
@@ -1163,7 +1173,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                     render,
                     embed,
                     &DocContext::default(),
-                    &[],
+                    &commands,
                     resolver,
                 );
             }
