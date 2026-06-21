@@ -1263,6 +1263,9 @@ impl<'a> Printer<'a> {
             tsv_lang::doc::DocContext {
                 hug_wide_first: true,
                 break_after_dropped_first: sandwiched,
+                // Terminal trailing text after a wide element hugs the dangled `>` (respecting the
+                // author's space boundary); non-terminal text (`trailing_line`) keeps its own line.
+                hug_terminal_after_break: !trailing_line,
                 ..Default::default()
             },
         )

@@ -679,30 +679,56 @@ impl<'a> Printer<'a> {
                         close_gt,
                     ]))
                 } else {
-                    // Text or simple expressions: inner group keeps content together,
-                    // outer group allows closing > to break independently.
-                    //
-                    // The inner group has a softline before ">content</tag" which is
-                    // critical for fits(): when trailing content (e.g., an IfBlock) is
-                    // on the rest-commands stack in Break mode, fits() hits this softline
-                    // early and returns true, keeping the element flat. When the element's
-                    // own group breaks, the inner group stays flat (content fits) while
-                    // the outer softline breaks the closing > to a new line.
-                    let inner_group = d.group(d.concat(&[
-                        d.softline(),
-                        d.text(">"),
-                        children_doc,
-                        d.text("</"),
-                        d.symbol(tag_sym),
-                    ]));
-                    let indent_inner = d.indent(inner_group);
-                    d.group(d.concat(&[
-                        d.text("<"),
-                        d.symbol(tag_sym),
-                        indent_inner,
-                        close_break_soft,
-                        close_gt,
-                    ]))
+                    // Text content flows like a paragraph: keep the opening tag intact and let
+                    // the text wrap after `>` at its internal spaces — text has break points
+                    // everywhere, so no opening-`>` dangle is needed. Only the closing `>` may
+                    // dangle. Element/expression first children keep the dangle (the `else` arm):
+                    // they are atomic, so the dangle avoids whitespace injection and communicates
+                    // nesting. This diverges from prettier, which pre-breaks the opening tag
+                    // uniformly — see conformance_prettier.md "Inline text content tags intact".
+                    // Attach only when the leading text has an *internal* break point (ASCII
+                    // whitespace): the fill can then wrap to keep every line within printWidth.
+                    // An unbreakable leading token (single word, or non-breaking-space-joined text)
+                    // has nowhere to wrap, so attaching `<tag>token</tag` could overshoot — keep the
+                    // dangle, which gives the token its own line and more room.
+                    let first_text_wraps = matches!(
+                        element.fragment.nodes.first(),
+                        Some(FragmentNode::Text(t))
+                            if t.raw.trim_ascii().contains(|c: char| c.is_ascii_whitespace())
+                    );
+                    if first_text_wraps {
+                        let body =
+                            d.indent(d.concat(&[children_doc, d.text("</"), d.symbol(tag_sym)]));
+                        d.group(d.concat(&[
+                            d.text("<"),
+                            d.symbol(tag_sym),
+                            d.text(">"),
+                            body,
+                            close_break_soft,
+                            close_gt,
+                        ]))
+                    } else {
+                        // Element/expression first child: the inner group keeps content together,
+                        // the outer group lets the closing > break independently. The softline
+                        // before ">content</tag" is also critical for fits(): when trailing content
+                        // (e.g., an IfBlock) is on the rest-commands stack in Break mode, fits()
+                        // hits it early and returns true, keeping the element flat.
+                        let inner_group = d.group(d.concat(&[
+                            d.softline(),
+                            d.text(">"),
+                            children_doc,
+                            d.text("</"),
+                            d.symbol(tag_sym),
+                        ]));
+                        let indent_inner = d.indent(inner_group);
+                        d.group(d.concat(&[
+                            d.text("<"),
+                            d.symbol(tag_sym),
+                            indent_inner,
+                            close_break_soft,
+                            close_gt,
+                        ]))
+                    }
                 }
             }
         } else {
@@ -828,6 +854,17 @@ impl<'a> Printer<'a> {
                     // 4. Both break: <tag\n\tattrs\n\t>content</tag\n>
                     //
                     // Note: body doesn't include trailing > since it's outside for hug mode
+                    // (Text-first opening-`>` attach is NOT applied to the with-attrs case. The
+                    // delimiter-dangle MECHANISM is shared with blocks — `group_with_id` on the
+                    // attrs + `if_break_with_id` on `>`, exactly like the block `}` keyed on its
+                    // head — but inline content FLOWS on the tag lines with no hardline barrier, so
+                    // the `>`-attach couples to content wrapping AND the closing-`>` dangle; that
+                    // coupling produced fresh non-idempotencies (long-href attr-wrap; closing-`>`
+                    // flip on mixed text+`{expr}`). Blocks avoid this because their body is
+                    // hardline-separated. Robustly attaching with attrs needs the content decoupled
+                    // first — the Svelte-5 block-style content direction — so it is deferred. The
+                    // no-attrs text attach in the `!has_attrs` branch above has no attr interaction
+                    // and is idempotent.
                     let html_body =
                         d.concat(&[d.text(">"), children_doc, d.text("</"), d.symbol(tag_sym)]);
                     let attr_group = d.group(d.concat(&hug_attr_docs));

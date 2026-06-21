@@ -1008,9 +1008,9 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 }
             } else {
                 // Content didn't fit flat at line start; render it (it may break
-                // internally) and always break the separator so the next item takes its
-                // own line. Uniform across every fill — list-shaped (CSS value lists) and
-                // the inline after-element fold alike: a wrapped item never lets the
+                // internally) and break the separator so the next item takes its own
+                // line. Default across every fill — list-shaped (CSS value lists) and the
+                // inline after-element fold alike: a wrapped item does not let the
                 // following item hug onto its last line.
                 render_single_doc(
                     arena,
@@ -1023,13 +1023,32 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                     embed,
                     resolver,
                 );
+                // Exception (Svelte after-element fold, terminal trailing text): choose the
+                // separator by the *actual resulting column* after the wrapped element. If the next
+                // item fits after the dangled `>` (separator rendered flat = one space), hug it
+                // there — respecting the author's space boundary — instead of forcing its own line.
+                let sep_mode = if context.hug_terminal_after_break
+                    && offset + 2 < parts.len()
+                    && arena_fits_with_lookahead(
+                        arena,
+                        next_content,
+                        Mode::Flat,
+                        &[],
+                        render.print_width.saturating_sub(*pos + 1) as isize,
+                        embed,
+                        resolver,
+                    ) {
+                    Mode::Flat
+                } else {
+                    Mode::Break
+                };
                 render_single_doc(
                     arena,
                     separator,
                     output,
                     pos,
                     indent_level,
-                    Mode::Break,
+                    sep_mode,
                     render,
                     embed,
                     resolver,
