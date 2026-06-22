@@ -465,14 +465,9 @@ impl<'a> Printer<'a> {
     /// preserved header line comment (which forces the outer group to break) from
     /// expanding a `{ a }` that would otherwise stay inline. Shared by named
     /// imports, named exports, and `with {…}`/`assert {…}` import attributes.
-    fn braced_softline_group(&self, inner: DocId) -> DocId {
+    fn braced_group(&self, inner: DocId) -> DocId {
         let d = self.d();
-        d.group(d.concat(&[
-            d.text("{"),
-            d.indent_line(inner),
-            d.bracket_spacing(),
-            d.text("}"),
-        ]))
+        d.group(d.concat(&[d.text("{"), d.indent_line(inner), d.line(), d.text("}")]))
     }
 
     /// Finish a module statement: emit any comments between the last content token
@@ -869,7 +864,7 @@ impl<'a> Printer<'a> {
                 // Own group so the braces fit independently of the outer statement —
                 // a preserved header line comment (source→`with` / `with`→`{`) forces
                 // the outer group to break but must not expand inline attributes.
-                self.braced_softline_group(attr_doc)
+                self.braced_group(attr_doc)
             }
         };
 
@@ -968,7 +963,7 @@ impl<'a> Printer<'a> {
                 &get_span,
                 &build_item,
             );
-            self.braced_softline_group(spec_doc)
+            self.braced_group(spec_doc)
         };
 
         // The keyword→`{` gap comment (`import /* c */ {a}`, `import type // c\n{a}`,
@@ -1269,9 +1264,10 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut inner_parts = Vec::new();
         let mut prev_end = brace_start + 1; // After opening `{`
-        // Block comment trailing the LAST item after the comma — preserved after
-        // the (synthetic) trailing comma rather than relocated before it (prettier
-        // relocates before; see conformance_prettier.md §Comment relocation).
+        // Block comment trailing the LAST item after its source comma — preserved past
+        // where the comma was (no trailing comma; trailingComma: 'none') rather than
+        // relocated before it (prettier relocates before; see conformance_prettier.md
+        // §Comment relocation).
         let mut last_after_comma = Vec::new();
 
         for (i, item) in items.iter().enumerate() {
@@ -1297,9 +1293,9 @@ impl<'a> Printer<'a> {
                 self.append_trailing_inline_block_comments(&mut item_parts, item_end, comma_pos);
                 prev_end = comma_pos + 1;
             } else {
-                // Split the last item's trailing block comments around a source
-                // trailing comma: before-comma stay with the item; after-comma are
-                // preserved after the comma (emitted below, after `trailing_comma`).
+                // Split the last item's trailing block comments around a source comma:
+                // before-comma stay with the item; after-comma are preserved below, past
+                // where the comma was (no trailing comma; trailingComma: 'none').
                 self.append_last_trailing_block_comments_split(
                     &mut item_parts,
                     &mut last_after_comma,
@@ -1317,8 +1313,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // trailingComma: 'none' — no trailing comma when the list breaks (matches
-        // join_trailing behavior)
+        // No trailing comma when the list breaks (trailingComma: 'none').
         // Preserved after-comma block comment(s) on the last item
         inner_parts.extend(last_after_comma);
 

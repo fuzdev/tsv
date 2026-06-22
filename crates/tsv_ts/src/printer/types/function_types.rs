@@ -560,16 +560,9 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Check if last param is rest element (no trailing comma)
-        let last_is_rest = params
-            .last()
-            .is_some_and(|p| matches!(p, internal::Expression::RestElement(_)));
-
         let mut parts = vec![d.text("(")];
         parts.push(d.indent(d.concat(&[d.softline(), d.concat(&param_parts)])));
-        if !last_is_rest {
-            parts.push(d.trailing_comma());
-        }
+        // No trailing comma on the last param (trailingComma: 'none').
         parts.push(d.softline());
         parts.push(d.text(")"));
 
@@ -729,9 +722,9 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(")"));
             } else {
                 let mut param_parts = Vec::new();
-                // Block comment trailing the last param after the comma — preserved
-                // after the synthetic trailing comma (prettier relocates before; see
-                // conformance_prettier.md §Comment relocation).
+                // Block comment trailing the last param after its source comma — preserved
+                // past where the comma was (no trailing comma; prettier relocates before;
+                // see conformance_prettier.md §Comment relocation).
                 let mut last_after_comma = Vec::new();
                 let mut prev_end = paren_pos.map_or(0, |p| p + 1); // After `(`
                 for (i, p) in params.iter().enumerate() {
@@ -774,13 +767,7 @@ impl<'a> Printer<'a> {
                 }
                 parts.push(d.text("("));
                 parts.push(d.indent(d.concat(&[d.softline(), d.concat(&param_parts)])));
-                // Trailing comma when breaking, UNLESS last param is a rest element
-                let last_is_rest = params
-                    .last()
-                    .is_some_and(|p| matches!(p, internal::Expression::RestElement(_)));
-                if !last_is_rest {
-                    parts.push(d.trailing_comma());
-                }
+                // No trailing comma on the last param (trailingComma: 'none').
                 // Preserved after-comma block comment(s) on the last param
                 parts.extend(last_after_comma);
                 parts.push(d.softline());

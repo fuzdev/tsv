@@ -240,11 +240,7 @@ impl<'a> Printer<'a> {
                                     d.hardline(),
                                     sig_doc,
                                     d.text(" =>"),
-                                    d.indent(d.concat(&[
-                                        d.hardline(),
-                                        body_doc,
-                                        d.trailing_comma(),
-                                    ])),
+                                    d.indent(d.concat(&[d.hardline(), body_doc])),
                                 ])),
                                 d.hardline(),
                                 d.text(")"),
@@ -486,7 +482,7 @@ impl<'a> Printer<'a> {
             );
 
             // Own-line block comments after the last arg (before closing paren).
-            // These appear as siblings after the trailing comma, forcing expansion.
+            // These appear as siblings after the last arg (no trailing comma), forcing expansion.
             let leading_block: Vec<_> = pc.leading.iter().filter(|c| c.is_block).collect();
             if !leading_block.is_empty()
                 && let Some(last_doc) = arg_docs.pop()
@@ -513,10 +509,10 @@ impl<'a> Printer<'a> {
             }
 
             if let Some(last_doc) = arg_docs.pop() {
-                // Split same-line blocks around the last arg's source trailing comma:
-                // before-comma blocks (and any block when the source has no trailing comma)
-                // hug the arg; an after-comma block is preserved past the synthetic trailing
-                // comma (`b, /* c */`, the tsv divergence prettier relocates to `b /* c */,`).
+                // Split same-line blocks around the last arg's source comma: before-comma
+                // blocks (and any block when the source has no comma) hug the arg; an
+                // after-comma block is preserved past where the comma was (`b /* c */`; no
+                // trailing comma, trailingComma: 'none').
                 // No line comments reach this block-only path.
                 let comma_pos = find_comma_pos(self.source, effective_arg_end, new_expr.span.end);
                 let mut last_with_comment = vec![last_doc];
@@ -532,8 +528,9 @@ impl<'a> Printer<'a> {
                 }
                 arg_docs.push(d.concat(&last_with_comment));
 
-                // The after-comma block (if any) is kept past the trailing comma via the
-                // wrap's `post_comma` suffix: `b /* c */` flat, `b, /* c */` broken.
+                // The after-comma block (if any) is kept past where the comma was via the
+                // wrap's `post_comma` suffix: `b /* c */` (no trailing comma in either
+                // mode; trailingComma: 'none').
                 let post_comma = d.concat(&after_comma);
 
                 // For function composition (multiple callbacks), use hardlines

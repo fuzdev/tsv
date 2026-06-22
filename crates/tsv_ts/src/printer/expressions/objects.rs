@@ -293,9 +293,8 @@ impl<'a> Printer<'a> {
                 // May stay inline - use group with bracketSpacing boundaries for
                 // width-based breaking: a space when flat (`{ foo }`), a newline when
                 // it breaks (brace_line_prefix is empty here — pulling implies must_break).
-                let inner = d.concat(&[d.bracket_spacing(), d.concat(&parts)]);
-                let (indented_content, closing_line) =
-                    self.wrap_with_decl_indent(inner, d.bracket_spacing());
+                let inner = d.concat(&[d.line(), d.concat(&parts)]);
+                let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.line());
 
                 self.wrap_object_braces(indented_content, closing_line, has_source_newline)
             }
@@ -336,17 +335,14 @@ impl<'a> Printer<'a> {
                     if !next_has_blank {
                         parts.push(d.line());
                     }
-                } else {
-                    // Last property: trailing comma only when broken
-                    parts.push(d.trailing_comma());
                 }
+                // No trailing comma on the last property (trailingComma: 'none').
             }
 
             // Width-based wrapping: bracketSpacing boundaries (space when flat
             // `{ foo }`, newline when broken).
-            let inner = d.concat(&[d.bracket_spacing(), d.concat(&parts)]);
-            let (indented_content, closing_line) =
-                self.wrap_with_decl_indent(inner, d.bracket_spacing());
+            let inner = d.concat(&[d.line(), d.concat(&parts)]);
+            let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.line());
 
             self.wrap_object_braces(indented_content, closing_line, has_source_newline)
         }

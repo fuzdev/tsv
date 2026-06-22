@@ -649,7 +649,7 @@ fn build_call_args_doc_for_chain_impl(
                 // when evaluated in Break mode during look-ahead.
                 let all_broken_state = d.group_break(d.concat(&[
                     d.text(prefix),
-                    d.indent(d.concat(&[d.line(), arrow_doc, d.trailing_comma()])),
+                    d.indent(d.concat(&[d.line(), arrow_doc])),
                     d.line(),
                     d.text(")"),
                 ]));
@@ -718,7 +718,7 @@ fn build_call_args_doc_for_chain_impl(
                         d.hardline(),
                         sig_doc,
                         d.text(" =>"),
-                        d.indent(d.concat(&[d.hardline(), body_doc, d.trailing_comma()])),
+                        d.indent(d.concat(&[d.hardline(), body_doc])),
                     ])),
                     d.hardline(),
                     d.text(")"),
@@ -768,7 +768,7 @@ fn build_call_args_doc_for_chain_impl(
                 // State 2: all args broken out — (\n  arrow_doc,\n)
                 let state_all_broken = d.group_break(d.concat(&[
                     d.text(prefix),
-                    d.indent(d.concat(&[d.line(), arrow_doc, d.trailing_comma()])),
+                    d.indent(d.concat(&[d.line(), arrow_doc])),
                     d.line(),
                     d.text(")"),
                 ]));
@@ -874,7 +874,7 @@ fn build_call_args_doc_for_chain_impl(
             {
                 let state_expand = d.concat(&[
                     d.text(prefix),
-                    d.indent(d.concat(&[d.hardline(), arg_with_comments, d.trailing_comma()])),
+                    d.indent(d.concat(&[d.hardline(), arg_with_comments])),
                     d.hardline(),
                     d.text(")"),
                 ]);
@@ -904,7 +904,8 @@ fn build_call_args_doc_for_chain_impl(
                 }
                 ChainArgKind::NeedsWrapper => {
                     // Huggable with internal break points (ternary, etc.)
-                    // Hugs opening paren but adds trailing comma when content breaks
+                    // Hugs opening paren; breaks the closing paren onto its own line
+                    // when content breaks (no trailing comma; trailingComma: 'none').
                     parts.push(wrap_huggable_arg(d, prefix, arg_with_comments));
                 }
                 ChainArgKind::HugsNaturally => {

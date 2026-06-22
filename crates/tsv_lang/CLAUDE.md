@@ -49,7 +49,7 @@ All methods take `&self` (interior mutability via `RefCell`):
 | Sequences    | `concat()`, `fill()`, `join()`, `join_doc()`                       |
 | Context      | `with_context()`                                                   |
 | Line suffix  | `line_suffix()`, `line_suffix_boundary()`, `break_parent()`        |
-| Convenience  | `wrap()`, `parens()`, `brackets()`, `braces()`, `trailing_comma()` |
+| Convenience  | `wrap()`, `parens()`, `brackets()`, `braces()`                     |
 | Inspection   | `will_break()`, `has_forced_break()`                               |
 | Diagnostics  | `line_comment_text_owned()` (tags `//` text for the swallow check) |
 

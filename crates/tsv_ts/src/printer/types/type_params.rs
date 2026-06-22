@@ -63,7 +63,7 @@ impl<'a> Printer<'a> {
         }
 
         let (param_docs, deferred_after) = self.build_type_parameter_docs_with_comments(decl);
-        let inner = d.concat(&[d.join_trailing(param_docs, d.comma_line()), deferred_after]);
+        let inner = d.concat(&[d.join_doc(param_docs, d.comma_line()), deferred_after]);
         d.concat(&[
             d.text("<"),
             d.indent_softline(inner),
@@ -160,9 +160,9 @@ impl<'a> Printer<'a> {
     /// Comments outside param spans (e.g., `</* c */ T /* c */>`) are captured here.
     /// Uses comma position to split: comments before comma = trailing, after = leading.
     /// Returns the per-param docs and a deferred doc for a block comment trailing
-    /// the last param after the comma — emitted by the caller after the (synthetic)
-    /// trailing comma so the comment is preserved after the comma rather than
-    /// relocated before it (prettier relocates; see conformance_prettier.md).
+    /// the last param after its source comma — emitted by the caller past where the
+    /// comma was (no trailing comma; trailingComma: 'none') so the comment is preserved
+    /// after it rather than relocated before (prettier relocates; see conformance_prettier.md).
     fn build_type_parameter_docs_with_comments(
         &self,
         decl: &TSTypeParameterDeclaration,
@@ -198,9 +198,9 @@ impl<'a> Printer<'a> {
                     ));
                     prev_end = comma_pos + 1; // After comma
                 } else {
-                    // Last param: split trailing block comments around a source
-                    // trailing comma. Before-comma stay with the param; after-comma
-                    // are deferred past the synthetic comma by the caller.
+                    // Last param: split trailing block comments around a source comma.
+                    // Before-comma stay with the param; after-comma are deferred past
+                    // where the comma was by the caller (no trailing comma).
                     let before_close = decl.span.end - 1;
                     match self
                         .find_comma_after(param.span.end)

@@ -249,10 +249,6 @@ impl<'a> Printer<'a> {
                 // Use group with line breaks for width-based expansion
                 // Include type annotation in the group so its width is considered
                 let mut parts = Vec::new();
-                let last_is_rest = matches!(
-                    obj.properties.last(),
-                    Some(ObjectPatternProperty::RestElement(_))
-                );
 
                 // Track previous end for comment detection (start after `{`)
                 let mut prev_end = obj.span.start + 1;
@@ -278,15 +274,9 @@ impl<'a> Printer<'a> {
                         .unwrap_or(obj.span.end);
                     let trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
 
-                    // Hard comma between properties; trailing comma (break-only) on
-                    // the last unless it is the rest element
-                    let comma = if !is_last {
-                        d.text(",")
-                    } else if !last_is_rest {
-                        d.trailing_comma()
-                    } else {
-                        d.empty()
-                    };
+                    // Separator comma between properties; no trailing comma on the last
+                    // property (trailingComma: 'none').
+                    let comma = if !is_last { d.text(",") } else { d.empty() };
                     self.push_element_comma_trailing(&mut parts, &trailing, comma);
 
                     // Add line break between properties
@@ -307,7 +297,7 @@ impl<'a> Printer<'a> {
                 let mut group_parts = vec![
                     d.text("{"),
                     d.indent_line(d.concat(&parts)),
-                    d.bracket_spacing(),
+                    d.line(),
                     d.text("}"),
                 ];
 
@@ -850,12 +840,11 @@ impl<'a> Printer<'a> {
                 // Block comments go before comma (line comments handled in expanded version)
                 parts.push(self.build_block_comments_doc(&trailing.block));
 
-                // Add comma
+                // Separator comma between elements; no trailing comma on the last
+                // (trailingComma: 'none').
                 if !is_last {
                     parts.push(d.text(","));
                     parts.push(d.line());
-                } else {
-                    parts.push(d.trailing_comma());
                 }
 
                 // Block comments after the comma (last element): preserve position

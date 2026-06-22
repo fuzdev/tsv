@@ -569,29 +569,6 @@ impl DocArena {
         }
     }
 
-    /// Join docs with separator.
-    ///
-    /// Under tsv's hardcoded `trailingComma: 'none'` this adds no trailing separator when the
-    /// list breaks — only the inter-item separators. It remains distinct from `join()` to mark
-    /// the break-path positions where prettier's `'all'` would append a trailing separator.
-    // TODO: under `'none'` this is now equivalent to `join()` — candidate for a follow-up
-    // collapse into `join()` once the trailing-comma machinery is ripped out.
-    pub fn join_trailing(&self, docs: impl IntoIterator<Item = DocId>, separator: DocId) -> DocId {
-        let iter = docs.into_iter();
-        let (lower, _) = iter.size_hint();
-        let mut parts = Vec::with_capacity(lower.saturating_mul(2));
-        for (i, doc) in iter.enumerate() {
-            if i > 0 {
-                parts.push(separator);
-            }
-            parts.push(doc);
-        }
-        if parts.is_empty() {
-            return self.empty();
-        }
-        self.concat(&parts)
-    }
-
     /// Wrap a doc with open and close delimiters.
     #[inline]
     pub fn wrap(&self, open: &'static str, inner: DocId, close: &'static str) -> DocId {
@@ -614,14 +591,6 @@ impl DocArena {
     #[inline]
     pub fn braces(&self, inner: DocId) -> DocId {
         self.wrap("{", inner, "}")
-    }
-
-    /// Inner padding for object-like braces under `bracketSpacing: true`:
-    /// a space when flat (`{ foo }`), a newline when the group breaks.
-    /// Mirrors prettier's `spacing = bracketSpacing ? line : softline`.
-    #[inline]
-    pub fn bracket_spacing(&self) -> DocId {
-        self.line()
     }
 
     /// Indent with leading line break.
@@ -648,20 +617,6 @@ impl DocArena {
     #[inline]
     pub fn comma_hardline(&self) -> DocId {
         self.concat(&[self.text(","), self.hardline()])
-    }
-
-    /// Trailing comma under `trailingComma: 'all'` — a no-op under tsv's hardcoded
-    /// `trailingComma: 'none'`.
-    ///
-    /// tsv fixes `trailingComma: 'none'` (matching Svelte's own prettier config), so no
-    /// trailing comma is ever emitted when a list breaks. This helper returns the empty doc
-    /// and now only marks the break-path positions where prettier's `'all'` would place a
-    /// trailing comma.
-    // TODO: this and its ~25 callsites are dead machinery under `'none'` — candidate for a
-    // follow-up rip-out (delete the helper and inline the empty at each callsite).
-    #[inline]
-    pub fn trailing_comma(&self) -> DocId {
-        self.empty()
     }
 
     //

@@ -343,7 +343,7 @@ impl<'a> Printer<'a> {
         // (`{ /* c */ a: 1 } | B`). Mirrors the width-aware branch of
         // `build_type_literal_doc_inner`.
         if !force_multiline {
-            member_parts.push(d.bracket_spacing());
+            member_parts.push(d.line());
             if let Some(first) = t.members.first() {
                 member_parts.extend(
                     self.build_type_literal_leading_comments_inline(
@@ -488,7 +488,7 @@ impl<'a> Printer<'a> {
         let line_doc = if force_multiline {
             d.hardline()
         } else {
-            d.bracket_spacing()
+            d.line()
         };
 
         d.group(d.concat(&[
@@ -665,7 +665,7 @@ impl<'a> Printer<'a> {
             // The opening bracketSpacing boundary leads (a space when flat `{ a }`,
             // a newline when broken), THEN any interior leading comments, so the
             // padding sits before the comment (`{ /* c */ a }`, not `{/* c */ a }`).
-            let mut member_parts = vec![d.bracket_spacing()];
+            let mut member_parts = vec![d.line()];
             if let Some(first) = t.members.first() {
                 member_parts.extend(
                     self.build_type_literal_leading_comments_inline(
@@ -713,7 +713,7 @@ impl<'a> Printer<'a> {
                 }
             }
             parts.push(d.indent(d.concat(&member_parts)));
-            parts.push(d.bracket_spacing());
+            parts.push(d.line());
         }
         parts.push(d.text("}"));
 

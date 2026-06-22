@@ -751,7 +751,7 @@ impl<'a> Printer<'a> {
         // every TS position, so the disambiguation is moot — see the
         // single_type_param_prettier_divergence fixture. The trailing comma added
         // here only appears when the group breaks across lines.
-        let inner_parts = d.join_trailing(param_docs, d.comma_line());
+        let inner_parts = d.join_doc(param_docs, d.comma_line());
 
         let brackets_doc = d.concat(&[
             d.text("<"),
