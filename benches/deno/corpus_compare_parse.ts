@@ -202,14 +202,62 @@ interface DocumentedMatcher {
 const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 	{
 		// Acorn-typescript's backtrack-reparse duplicates a comment inside any
-		// re-parsed construct — into trailingComments/leadingComments AND into
-		// the root `comments` array. tsv emits each comment once everywhere, so
-		// the divergence surfaces as extra entries on the acorn side of any
-		// `comments` array (root or attached).
-		name: 'comment_attachment',
+		// re-parsed construct, emitting it twice — into a node's
+		// leading/trailingComments AND into the root `comments` array (which
+		// shifts every later index). tsv emits each comment once, so the canonical
+		// side always has MORE entries. Two precise signatures (NOT "any path with
+		// a comment field" — that masked genuine attachment divergences):
+		// (1) a comment array that is strictly longer on the canonical side, and
+		// (2) a root `comments[i]` field drift, gated on canonical actually
+		// carrying a duplicated comment span (so a real per-comment value/offset
+		// bug, with no duplicate, still surfaces as undocumented).
+		name: 'comment_dedup',
+		conformance_section: 'Comment Attachment Differences',
+		matches: (entry, _canonical_parent, ctx) => {
+			if (
+				entry.kind === 'length_mismatch' &&
+				/(^|\.)(comments|leadingComments|trailingComments)$/.test(entry.path) &&
+				Number(entry.canonical) > Number(entry.ours)
+			) {
+				return true;
+			}
+			if (entry.kind === 'value_mismatch' && /^comments\[\d+\]\./.test(entry.path)) {
+				const root = ctx.canonical_root as { comments?: { start?: number }[] } | null;
+				const starts = root?.comments?.map((c) => c?.start);
+				return Array.isArray(starts) && new Set(starts).size !== starts.length;
+			}
+			return false;
+		},
+	},
+	{
+		// Svelte parses `<script module>` and the instance `<script>` against one
+		// shared root.comments queue (acorn.js get_comment_handlers/add_comments),
+		// so a module-region comment — a module-script comment, or a leading
+		// fragment HTML comment (`<!-- @component -->`) — is also attached to the
+		// instance script's Program or its first statement. tsv attaches each
+		// comment once, in its source region. The comment is never lost (it stays
+		// on its module/fragment home), so this is a pure cross-script duplication.
+		name: 'svelte_instance_comment_duplication',
 		conformance_section: 'Comment Attachment Differences',
 		matches: (entry) =>
-			/(^|\.)(trailingComments|leadingComments|comments)(\[|\.|$)/.test(entry.path),
+			entry.kind === 'missing_ours' &&
+			/^instance\.content(\.body\[0\])?\.(leadingComments|trailingComments)$/.test(entry.path),
+	},
+	{
+		// Svelte's parse_expression_at sets acorn `preserveParens: true`; a leading
+		// comment before a parenthesized subexpression attaches to the synthetic
+		// ParenthesizedExpression, which Svelte's remove_parens then strips —
+		// dropping the attachment (the comment survives only in root `comments`).
+		// tsv has no ParenthesizedExpression node, so it keeps the comment on the
+		// inner expression — a template-expression attachment Svelte lacks
+		// (`missing_canonical` under a `fragment.` path). Template-only; a plain
+		// `<script>` parse does not set preserveParens.
+		name: 'svelte_template_paren_comment',
+		conformance_section: 'Comment Attachment Differences',
+		matches: (entry) =>
+			entry.kind === 'missing_canonical' &&
+			/^fragment\./.test(entry.path) &&
+			/(^|\.)(leadingComments|trailingComments)$/.test(entry.path),
 	},
 	{
 		// acorn-typescript drops ALL params from async arrows with type params
