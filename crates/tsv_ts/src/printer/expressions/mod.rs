@@ -151,6 +151,74 @@ impl<'a> Printer<'a> {
             Expression::TSParameterProperty(param_prop) => {
                 self.build_ts_parameter_property_doc(param_prop)
             }
+            Expression::JsdocCast(cast) => self.build_jsdoc_cast_doc(cast),
+        }
+    }
+
+    /// Build a Doc for a JSDoc type cast: `/** @type {T} */ (inner)`.
+    ///
+    /// The leading `@type`/`@satisfies` comment for this cast level lives in the
+    /// gap before the `(` and is emitted by the *caller* (statement / RHS / arg
+    /// leading-comment path, keyed on `cast.span.start` = the `(`). This method
+    /// emits the parens plus any comments between this `(` and the inner — which
+    /// is how a **nested** cast's own `@type` comment lands (`/** @type {A} */
+    /// (/** @type {B} */ (expr))`). The inner is built bare: the cast's own
+    /// parens provide grouping, so `needs_parens` must not double-wrap it.
+    ///
+    /// Layout follows prettier-plugin-svelte's `ParenthesizedExpression`: an
+    /// object/array inner **hugs** the parens (`({…})` / `([…])`), every other
+    /// inner gets a breakable group (`(inner)` flat, `(⏎\tinner⏎)` when wide). A
+    /// line comment in the gap forces a hardline layout so it can't swallow the
+    /// inner and the closing `)`.
+    fn build_jsdoc_cast_doc(&self, cast: &crate::ast::internal::JsdocCast) -> DocId {
+        let d = self.d();
+        let open = cast.span.start; // the `(`
+        let inner_start = cast.inner.span().start;
+        let inner_doc = self.build_expression_doc(&cast.inner);
+
+        // A line comment in the gap before the inner must force a hardline layout —
+        // otherwise `(// c <inner>)` runs the inner and the `)` into the comment
+        // (silent content loss). Mirrors `build_expression_doc_keep_paren_comments`.
+        if self.has_line_comments_between(open + 1, inner_start) {
+            let mut parts = vec![d.hardline()];
+            for comment in tsv_lang::comments_in_range(self.comments, open + 1, inner_start) {
+                parts.push(self.build_comment_doc(comment));
+                // A line comment runs to end-of-line, so it must break; a block
+                // comment hugs the next token inline (`/** @type {B} */ (x)`).
+                parts.push(if comment.is_block {
+                    d.text(" ")
+                } else {
+                    d.hardline()
+                });
+            }
+            parts.push(inner_doc);
+            return d.concat(&[
+                d.text("("),
+                d.indent(d.concat(&parts)),
+                d.hardline(),
+                d.text(")"),
+            ]);
+        }
+
+        // Comments between this cast's `(` and the inner expression (a nested
+        // cast's own `@type` comment, when `inner` is itself a JsdocCast) — all
+        // block comments here, so they hug inline.
+        let interior = self.build_comments_between(open + 1, inner_start, CommentSpacing::Trailing);
+        let body = d.concat(&[interior, inner_doc]);
+
+        // Object/array literals hug the parens; the inner's own group breaks it.
+        if matches!(
+            &*cast.inner,
+            Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
+        ) {
+            d.concat(&[d.text("("), body, d.text(")")])
+        } else {
+            d.group(d.concat(&[
+                d.text("("),
+                d.indent(d.concat(&[d.softline(), body])),
+                d.softline(),
+                d.text(")"),
+            ]))
         }
     }
 

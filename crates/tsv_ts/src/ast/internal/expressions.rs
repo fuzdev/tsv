@@ -58,6 +58,8 @@ pub enum Expression {
     ImportExpression(ImportExpression),
     // Meta property: import.meta, new.target
     MetaProperty(MetaProperty),
+    // JSDoc type cast: `/** @type {T} */ (inner)` — internal-only, never serialized
+    JsdocCast(JsdocCast),
 }
 
 impl Expression {
@@ -100,6 +102,7 @@ impl Expression {
             Expression::TSParameterProperty(param_prop) => param_prop.span,
             Expression::ImportExpression(import) => import.span,
             Expression::MetaProperty(meta) => meta.span,
+            Expression::JsdocCast(cast) => cast.span,
         }
     }
 
@@ -135,6 +138,26 @@ impl Expression {
             _ => false,
         }
     }
+}
+
+/// JSDoc type cast: `/** @type {T} */ (inner)`.
+///
+/// Internal-only wrapper recording that the author wrote a parenthesized
+/// expression immediately preceded by a `@type`/`@satisfies` block comment — a
+/// TypeScript type **cast** whose parentheses are semantically required (without
+/// them the assertion is dropped). Ordinary grouping parens are discarded at
+/// parse time; cast parens are preserved here so the printer can re-emit them.
+///
+/// `span` covers the parentheses (`(`…`)`); `inner` keeps its own paren-free
+/// span. **Never serialized** — the convert layer unwraps to `inner`, so the
+/// public AST stays paren-free, matching acorn/Svelte (which carry no
+/// `ParenthesizedExpression`). Distinct from a bare grouping paren, the wrapper
+/// is opaque to layout heuristics (expand-last etc.), mirroring how acorn's
+/// `ParenthesizedExpression` hides the inner type in prettier-plugin-svelte.
+#[derive(Debug, Clone)]
+pub struct JsdocCast {
+    pub inner: Box<Expression>,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]

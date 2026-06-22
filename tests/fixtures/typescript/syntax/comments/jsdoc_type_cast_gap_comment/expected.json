@@ -1,0 +1,174 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 142,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A line comment between the cast ( and the inner stays on its own line.",
+			"start": 10,
+			"end": 83,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 95,
+			"end": 111,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 11
+				},
+				"end": {
+					"line": 3,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " note",
+			"start": 116,
+			"end": 123,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 141,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 132,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 85,
+					"end": 131,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 91,
+							"end": 130,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 91,
+								"end": 92,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 126,
+								"end": 127,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 3
+									}
+								},
+								"name": "x",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {A} ",
+										"start": 95,
+										"end": 111
+									},
+									{
+										"type": "Line",
+										"value": " note",
+										"start": 116,
+										"end": 123
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment between the cast ( and the inner stays on its own line.",
+							"start": 10,
+							"end": 83
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

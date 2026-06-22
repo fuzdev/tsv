@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 855,
+	"end": 401,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " simple nested cast in assignment",
-			"start": 20,
-			"end": 55,
+			"value": " two-level nested cast",
+			"start": 10,
+			"end": 34,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 36
+					"column": 25
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": "* @type {A} ",
-			"start": 67,
-			"end": 83,
+			"start": 46,
+			"end": 62,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -45,24 +45,24 @@
 		{
 			"type": "Block",
 			"value": "* @type {B} ",
-			"start": 84,
-			"end": 100,
+			"start": 64,
+			"end": 80,
 			"loc": {
 				"start": {
 					"line": 3,
-					"column": 28
+					"column": 29
 				},
 				"end": {
 					"line": 3,
-					"column": 44
+					"column": 45
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " nested cast with member access",
-			"start": 109,
-			"end": 142,
+			"value": " nested cast with member access inside",
+			"start": 92,
+			"end": 132,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -70,15 +70,15 @@
 				},
 				"end": {
 					"line": 5,
-					"column": 34
+					"column": 41
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": "* @type {A} ",
-			"start": 154,
-			"end": 170,
+			"start": 144,
+			"end": 160,
 			"loc": {
 				"start": {
 					"line": 6,
@@ -93,24 +93,24 @@
 		{
 			"type": "Block",
 			"value": "* @type {B} ",
-			"start": 171,
-			"end": 187,
+			"start": 162,
+			"end": 178,
 			"loc": {
 				"start": {
 					"line": 6,
-					"column": 28
+					"column": 29
 				},
 				"end": {
 					"line": 6,
-					"column": 44
+					"column": 45
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " nested cast as call argument",
-			"start": 201,
-			"end": 232,
+			"value": " three-level nested cast",
+			"start": 195,
+			"end": 221,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -118,47 +118,63 @@
 				},
 				"end": {
 					"line": 8,
-					"column": 32
+					"column": 27
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": "* @type {A} ",
-			"start": 247,
-			"end": 263,
+			"start": 233,
+			"end": 249,
 			"loc": {
 				"start": {
 					"line": 9,
-					"column": 14
+					"column": 11
 				},
 				"end": {
 					"line": 9,
-					"column": 30
+					"column": 27
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": "* @type {B} ",
-			"start": 264,
-			"end": 280,
+			"start": 251,
+			"end": 267,
 			"loc": {
 				"start": {
 					"line": 9,
-					"column": 31
+					"column": 29
 				},
 				"end": {
+					"line": 9,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {C} ",
+			"start": 269,
+			"end": 285,
+			"loc": {
+				"start": {
 					"line": 9,
 					"column": 47
+				},
+				"end": {
+					"line": 9,
+					"column": 63
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " nested cast as second call argument",
-			"start": 290,
-			"end": 328,
+			"value": " nested cast as a call argument",
+			"start": 298,
+			"end": 331,
 			"loc": {
 				"start": {
 					"line": 11,
@@ -166,7 +182,7 @@
 				},
 				"end": {
 					"line": 11,
-					"column": 39
+					"column": 34
 				}
 			}
 		},
@@ -178,283 +194,27 @@
 			"loc": {
 				"start": {
 					"line": 12,
-					"column": 17
+					"column": 14
 				},
 				"end": {
 					"line": 12,
-					"column": 33
+					"column": 30
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": "* @type {B} ",
-			"start": 363,
-			"end": 379,
+			"start": 364,
+			"end": 380,
 			"loc": {
 				"start": {
 					"line": 12,
-					"column": 34
-				},
-				"end": {
-					"line": 12,
-					"column": 50
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " nested cast in return",
-			"start": 389,
-			"end": 413,
-			"loc": {
-				"start": {
-					"line": 14,
-					"column": 1
-				},
-				"end": {
-					"line": 14,
-					"column": 25
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": "* @type {A} ",
-			"start": 441,
-			"end": 457,
-			"loc": {
-				"start": {
-					"line": 16,
-					"column": 9
-				},
-				"end": {
-					"line": 16,
-					"column": 25
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": "* @type {B} ",
-			"start": 458,
-			"end": 474,
-			"loc": {
-				"start": {
-					"line": 16,
-					"column": 26
-				},
-				"end": {
-					"line": 16,
-					"column": 42
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " nested cast in assignment rhs",
-			"start": 486,
-			"end": 518,
-			"loc": {
-				"start": {
-					"line": 19,
-					"column": 1
-				},
-				"end": {
-					"line": 19,
-					"column": 33
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": "* @type {A} ",
-			"start": 532,
-			"end": 548,
-			"loc": {
-				"start": {
-					"line": 21,
-					"column": 5
-				},
-				"end": {
-					"line": 21,
-					"column": 21
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": "* @type {B} ",
-			"start": 549,
-			"end": 565,
-			"loc": {
-				"start": {
-					"line": 21,
-					"column": 22
-				},
-				"end": {
-					"line": 21,
-					"column": 38
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " deeply nested (three levels)",
-			"start": 574,
-			"end": 605,
-			"loc": {
-				"start": {
-					"line": 23,
-					"column": 1
-				},
-				"end": {
-					"line": 23,
 					"column": 32
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": "* @type {A} ",
-			"start": 617,
-			"end": 633,
-			"loc": {
-				"start": {
-					"line": 24,
-					"column": 11
 				},
 				"end": {
-					"line": 24,
-					"column": 27
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": "* @type {B} ",
-			"start": 634,
-			"end": 650,
-			"loc": {
-				"start": {
-					"line": 24,
-					"column": 28
-				},
-				"end": {
-					"line": 24,
-					"column": 44
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": "* @type {C} ",
-			"start": 651,
-			"end": 667,
-			"loc": {
-				"start": {
-					"line": 24,
-					"column": 45
-				},
-				"end": {
-					"line": 24,
-					"column": 61
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " expression statement (standalone)",
-			"start": 676,
-			"end": 712,
-			"loc": {
-				"start": {
-					"line": 26,
-					"column": 1
-				},
-				"end": {
-					"line": 26,
-					"column": 37
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": "* @type {A} ",
-			"start": 714,
-			"end": 730,
-			"loc": {
-				"start": {
-					"line": 27,
-					"column": 1
-				},
-				"end": {
-					"line": 27,
-					"column": 17
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": "* @type {B} ",
-			"start": 731,
-			"end": 747,
-			"loc": {
-				"start": {
-					"line": 27,
-					"column": 18
-				},
-				"end": {
-					"line": 27,
-					"column": 34
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " expression statement with member access",
-			"start": 756,
-			"end": 798,
-			"loc": {
-				"start": {
-					"line": 29,
-					"column": 1
-				},
-				"end": {
-					"line": 29,
-					"column": 43
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": "* @type {A} ",
-			"start": 800,
-			"end": 816,
-			"loc": {
-				"start": {
-					"line": 30,
-					"column": 1
-				},
-				"end": {
-					"line": 30,
-					"column": 17
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": "* @type {B} ",
-			"start": 817,
-			"end": 833,
-			"loc": {
-				"start": {
-					"line": 30,
-					"column": 18
-				},
-				"end": {
-					"line": 30,
-					"column": 34
+					"line": 12,
+					"column": 48
 				}
 			}
 		}
@@ -462,27 +222,27 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 854,
+		"end": 400,
 		"context": "default",
 		"content": {
 			"type": "Program",
-			"start": 18,
-			"end": 845,
+			"start": 8,
+			"end": 391,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 31,
+					"line": 13,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
-					"start": 57,
-					"end": 106,
+					"start": 36,
+					"end": 89,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -490,14 +250,14 @@
 						},
 						"end": {
 							"line": 3,
-							"column": 50
+							"column": 54
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 63,
-							"end": 105,
+							"start": 42,
+							"end": 88,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -505,13 +265,13 @@
 								},
 								"end": {
 									"line": 3,
-									"column": 49
+									"column": 53
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 63,
-								"end": 64,
+								"start": 42,
+								"end": 43,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -526,16 +286,16 @@
 							},
 							"init": {
 								"type": "Identifier",
-								"start": 101,
-								"end": 105,
+								"start": 82,
+								"end": 86,
 								"loc": {
 									"start": {
 										"line": 3,
-										"column": 45
+										"column": 47
 									},
 									"end": {
 										"line": 3,
-										"column": 49
+										"column": 51
 									}
 								},
 								"name": "expr",
@@ -543,14 +303,14 @@
 									{
 										"type": "Block",
 										"value": "* @type {A} ",
-										"start": 67,
-										"end": 83
+										"start": 46,
+										"end": 62
 									},
 									{
 										"type": "Block",
 										"value": "* @type {B} ",
-										"start": 84,
-										"end": 100
+										"start": 64,
+										"end": 80
 									}
 								]
 							}
@@ -560,16 +320,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " simple nested cast in assignment",
-							"start": 20,
-							"end": 55
+							"value": " two-level nested cast",
+							"start": 10,
+							"end": 34
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 144,
-					"end": 198,
+					"start": 134,
+					"end": 192,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -577,14 +337,14 @@
 						},
 						"end": {
 							"line": 6,
-							"column": 55
+							"column": 59
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 150,
-							"end": 197,
+							"start": 140,
+							"end": 191,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -592,13 +352,13 @@
 								},
 								"end": {
 									"line": 6,
-									"column": 54
+									"column": 58
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 150,
-								"end": 151,
+								"start": 140,
+								"end": 141,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -613,46 +373,46 @@
 							},
 							"init": {
 								"type": "MemberExpression",
-								"start": 188,
-								"end": 197,
+								"start": 180,
+								"end": 189,
 								"loc": {
 									"start": {
 										"line": 6,
-										"column": 45
+										"column": 47
 									},
 									"end": {
 										"line": 6,
-										"column": 54
+										"column": 56
 									}
 								},
 								"object": {
 									"type": "Identifier",
-									"start": 188,
-									"end": 192,
+									"start": 180,
+									"end": 184,
 									"loc": {
 										"start": {
 											"line": 6,
-											"column": 45
+											"column": 47
 										},
 										"end": {
 											"line": 6,
-											"column": 49
+											"column": 51
 										}
 									},
 									"name": "expr"
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 193,
-									"end": 197,
+									"start": 185,
+									"end": 189,
 									"loc": {
 										"start": {
 											"line": 6,
-											"column": 50
+											"column": 52
 										},
 										"end": {
 											"line": 6,
-											"column": 54
+											"column": 56
 										}
 									},
 									"name": "prop"
@@ -663,14 +423,14 @@
 									{
 										"type": "Block",
 										"value": "* @type {A} ",
-										"start": 154,
-										"end": 170
+										"start": 144,
+										"end": 160
 									},
 									{
 										"type": "Block",
 										"value": "* @type {B} ",
-										"start": 171,
-										"end": 187
+										"start": 162,
+										"end": 178
 									}
 								]
 							}
@@ -680,16 +440,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " nested cast with member access",
-							"start": 109,
-							"end": 142
+							"value": " nested cast with member access inside",
+							"start": 92,
+							"end": 132
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 234,
-					"end": 287,
+					"start": 223,
+					"end": 295,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -697,14 +457,14 @@
 						},
 						"end": {
 							"line": 9,
-							"column": 54
+							"column": 73
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 240,
-							"end": 286,
+							"start": 229,
+							"end": 294,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -712,13 +472,13 @@
 								},
 								"end": {
 									"line": 9,
-									"column": 53
+									"column": 72
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 240,
-								"end": 241,
+								"start": 229,
+								"end": 230,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -732,68 +492,40 @@
 								"name": "c"
 							},
 							"init": {
-								"type": "CallExpression",
-								"start": 244,
-								"end": 286,
+								"type": "Identifier",
+								"start": 287,
+								"end": 291,
 								"loc": {
 									"start": {
 										"line": 9,
-										"column": 11
+										"column": 65
 									},
 									"end": {
 										"line": 9,
-										"column": 53
+										"column": 69
 									}
 								},
-								"callee": {
-									"type": "Identifier",
-									"start": 244,
-									"end": 246,
-									"loc": {
-										"start": {
-											"line": 9,
-											"column": 11
-										},
-										"end": {
-											"line": 9,
-											"column": 13
-										}
-									},
-									"name": "fn"
-								},
-								"arguments": [
+								"name": "expr",
+								"leadingComments": [
 									{
-										"type": "Identifier",
-										"start": 281,
-										"end": 285,
-										"loc": {
-											"start": {
-												"line": 9,
-												"column": 48
-											},
-											"end": {
-												"line": 9,
-												"column": 52
-											}
-										},
-										"name": "expr",
-										"leadingComments": [
-											{
-												"type": "Block",
-												"value": "* @type {A} ",
-												"start": 247,
-												"end": 263
-											},
-											{
-												"type": "Block",
-												"value": "* @type {B} ",
-												"start": 264,
-												"end": 280
-											}
-										]
+										"type": "Block",
+										"value": "* @type {A} ",
+										"start": 233,
+										"end": 249
+									},
+									{
+										"type": "Block",
+										"value": "* @type {B} ",
+										"start": 251,
+										"end": 267
+									},
+									{
+										"type": "Block",
+										"value": "* @type {C} ",
+										"start": 269,
+										"end": 285
 									}
-								],
-								"optional": false
+								]
 							}
 						}
 					],
@@ -801,16 +533,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " nested cast as call argument",
-							"start": 201,
-							"end": 232
+							"value": " three-level nested cast",
+							"start": 195,
+							"end": 221
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 330,
-					"end": 386,
+					"start": 333,
+					"end": 390,
 					"loc": {
 						"start": {
 							"line": 12,
@@ -818,14 +550,14 @@
 						},
 						"end": {
 							"line": 12,
-							"column": 57
+							"column": 58
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 336,
-							"end": 385,
+							"start": 339,
+							"end": 389,
 							"loc": {
 								"start": {
 									"line": 12,
@@ -833,13 +565,13 @@
 								},
 								"end": {
 									"line": 12,
-									"column": 56
+									"column": 57
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 336,
-								"end": 337,
+								"start": 339,
+								"end": 340,
 								"loc": {
 									"start": {
 										"line": 12,
@@ -854,8 +586,8 @@
 							},
 							"init": {
 								"type": "CallExpression",
-								"start": 340,
-								"end": 385,
+								"start": 343,
+								"end": 389,
 								"loc": {
 									"start": {
 										"line": 12,
@@ -863,13 +595,13 @@
 									},
 									"end": {
 										"line": 12,
-										"column": 56
+										"column": 57
 									}
 								},
 								"callee": {
 									"type": "Identifier",
-									"start": 340,
-									"end": 342,
+									"start": 343,
+									"end": 345,
 									"loc": {
 										"start": {
 											"line": 12,
@@ -885,49 +617,31 @@
 								"arguments": [
 									{
 										"type": "Identifier",
-										"start": 343,
-										"end": 344,
+										"start": 382,
+										"end": 386,
 										"loc": {
 											"start": {
 												"line": 12,
-												"column": 14
+												"column": 50
 											},
 											"end": {
 												"line": 12,
-												"column": 15
-											}
-										},
-										"name": "a",
-										"trailingComments": [
-											{
-												"type": "Block",
-												"value": "* @type {A} ",
-												"start": 346,
-												"end": 362
-											}
-										]
-									},
-									{
-										"type": "Identifier",
-										"start": 380,
-										"end": 384,
-										"loc": {
-											"start": {
-												"line": 12,
-												"column": 51
-											},
-											"end": {
-												"line": 12,
-												"column": 55
+												"column": 54
 											}
 										},
 										"name": "expr",
 										"leadingComments": [
 											{
 												"type": "Block",
+												"value": "* @type {A} ",
+												"start": 346,
+												"end": 362
+											},
+											{
+												"type": "Block",
 												"value": "* @type {B} ",
-												"start": 363,
-												"end": 379
+												"start": 364,
+												"end": 380
 											}
 										]
 									}
@@ -940,511 +654,15 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " nested cast as second call argument",
-							"start": 290,
-							"end": 328
-						}
-					]
-				},
-				{
-					"type": "FunctionDeclaration",
-					"start": 415,
-					"end": 483,
-					"loc": {
-						"start": {
-							"line": 15,
-							"column": 1
-						},
-						"end": {
-							"line": 17,
-							"column": 2
-						}
-					},
-					"id": {
-						"type": "Identifier",
-						"start": 424,
-						"end": 427,
-						"loc": {
-							"start": {
-								"line": 15,
-								"column": 10
-							},
-							"end": {
-								"line": 15,
-								"column": 13
-							}
-						},
-						"name": "fn1"
-					},
-					"expression": false,
-					"generator": false,
-					"async": false,
-					"params": [],
-					"body": {
-						"type": "BlockStatement",
-						"start": 430,
-						"end": 483,
-						"loc": {
-							"start": {
-								"line": 15,
-								"column": 16
-							},
-							"end": {
-								"line": 17,
-								"column": 2
-							}
-						},
-						"body": [
-							{
-								"type": "ReturnStatement",
-								"start": 434,
-								"end": 480,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 2
-									},
-									"end": {
-										"line": 16,
-										"column": 48
-									}
-								},
-								"argument": {
-									"type": "Identifier",
-									"start": 475,
-									"end": 479,
-									"loc": {
-										"start": {
-											"line": 16,
-											"column": 43
-										},
-										"end": {
-											"line": 16,
-											"column": 47
-										}
-									},
-									"name": "expr",
-									"leadingComments": [
-										{
-											"type": "Block",
-											"value": "* @type {A} ",
-											"start": 441,
-											"end": 457
-										},
-										{
-											"type": "Block",
-											"value": "* @type {B} ",
-											"start": 458,
-											"end": 474
-										}
-									]
-								}
-							}
-						]
-					},
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " nested cast in return",
-							"start": 389,
-							"end": 413
-						}
-					]
-				},
-				{
-					"type": "VariableDeclaration",
-					"start": 520,
-					"end": 526,
-					"loc": {
-						"start": {
-							"line": 20,
-							"column": 1
-						},
-						"end": {
-							"line": 20,
-							"column": 7
-						}
-					},
-					"declarations": [
-						{
-							"type": "VariableDeclarator",
-							"start": 524,
-							"end": 525,
-							"loc": {
-								"start": {
-									"line": 20,
-									"column": 5
-								},
-								"end": {
-									"line": 20,
-									"column": 6
-								}
-							},
-							"id": {
-								"type": "Identifier",
-								"start": 524,
-								"end": 525,
-								"loc": {
-									"start": {
-										"line": 20,
-										"column": 5
-									},
-									"end": {
-										"line": 20,
-										"column": 6
-									}
-								},
-								"name": "e"
-							},
-							"init": null
-						}
-					],
-					"kind": "let",
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " nested cast in assignment rhs",
-							"start": 486,
-							"end": 518
-						}
-					]
-				},
-				{
-					"type": "ExpressionStatement",
-					"start": 528,
-					"end": 571,
-					"loc": {
-						"start": {
-							"line": 21,
-							"column": 1
-						},
-						"end": {
-							"line": 21,
-							"column": 44
-						}
-					},
-					"expression": {
-						"type": "AssignmentExpression",
-						"start": 528,
-						"end": 570,
-						"loc": {
-							"start": {
-								"line": 21,
-								"column": 1
-							},
-							"end": {
-								"line": 21,
-								"column": 43
-							}
-						},
-						"operator": "=",
-						"left": {
-							"type": "Identifier",
-							"start": 528,
-							"end": 529,
-							"loc": {
-								"start": {
-									"line": 21,
-									"column": 1
-								},
-								"end": {
-									"line": 21,
-									"column": 2
-								}
-							},
-							"name": "e"
-						},
-						"right": {
-							"type": "Identifier",
-							"start": 566,
-							"end": 570,
-							"loc": {
-								"start": {
-									"line": 21,
-									"column": 39
-								},
-								"end": {
-									"line": 21,
-									"column": 43
-								}
-							},
-							"name": "expr",
-							"leadingComments": [
-								{
-									"type": "Block",
-									"value": "* @type {A} ",
-									"start": 532,
-									"end": 548
-								},
-								{
-									"type": "Block",
-									"value": "* @type {B} ",
-									"start": 549,
-									"end": 565
-								}
-							]
-						}
-					}
-				},
-				{
-					"type": "VariableDeclaration",
-					"start": 607,
-					"end": 673,
-					"loc": {
-						"start": {
-							"line": 24,
-							"column": 1
-						},
-						"end": {
-							"line": 24,
-							"column": 67
-						}
-					},
-					"declarations": [
-						{
-							"type": "VariableDeclarator",
-							"start": 613,
-							"end": 672,
-							"loc": {
-								"start": {
-									"line": 24,
-									"column": 7
-								},
-								"end": {
-									"line": 24,
-									"column": 66
-								}
-							},
-							"id": {
-								"type": "Identifier",
-								"start": 613,
-								"end": 614,
-								"loc": {
-									"start": {
-										"line": 24,
-										"column": 7
-									},
-									"end": {
-										"line": 24,
-										"column": 8
-									}
-								},
-								"name": "f"
-							},
-							"init": {
-								"type": "Identifier",
-								"start": 668,
-								"end": 672,
-								"loc": {
-									"start": {
-										"line": 24,
-										"column": 62
-									},
-									"end": {
-										"line": 24,
-										"column": 66
-									}
-								},
-								"name": "expr",
-								"leadingComments": [
-									{
-										"type": "Block",
-										"value": "* @type {A} ",
-										"start": 617,
-										"end": 633
-									},
-									{
-										"type": "Block",
-										"value": "* @type {B} ",
-										"start": 634,
-										"end": 650
-									},
-									{
-										"type": "Block",
-										"value": "* @type {C} ",
-										"start": 651,
-										"end": 667
-									}
-								]
-							}
-						}
-					],
-					"kind": "const",
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " deeply nested (three levels)",
-							"start": 574,
-							"end": 605
-						}
-					]
-				},
-				{
-					"type": "ExpressionStatement",
-					"start": 748,
-					"end": 753,
-					"loc": {
-						"start": {
-							"line": 27,
-							"column": 35
-						},
-						"end": {
-							"line": 27,
-							"column": 40
-						}
-					},
-					"expression": {
-						"type": "Identifier",
-						"start": 748,
-						"end": 752,
-						"loc": {
-							"start": {
-								"line": 27,
-								"column": 35
-							},
-							"end": {
-								"line": 27,
-								"column": 39
-							}
-						},
-						"name": "expr"
-					},
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " expression statement (standalone)",
-							"start": 676,
-							"end": 712
-						},
-						{
-							"type": "Block",
-							"value": "* @type {A} ",
-							"start": 714,
-							"end": 730
-						},
-						{
-							"type": "Block",
-							"value": "* @type {B} ",
-							"start": 731,
-							"end": 747
-						}
-					]
-				},
-				{
-					"type": "ExpressionStatement",
-					"start": 834,
-					"end": 844,
-					"loc": {
-						"start": {
-							"line": 30,
-							"column": 35
-						},
-						"end": {
-							"line": 30,
-							"column": 45
-						}
-					},
-					"expression": {
-						"type": "MemberExpression",
-						"start": 834,
-						"end": 843,
-						"loc": {
-							"start": {
-								"line": 30,
-								"column": 35
-							},
-							"end": {
-								"line": 30,
-								"column": 44
-							}
-						},
-						"object": {
-							"type": "Identifier",
-							"start": 834,
-							"end": 838,
-							"loc": {
-								"start": {
-									"line": 30,
-									"column": 35
-								},
-								"end": {
-									"line": 30,
-									"column": 39
-								}
-							},
-							"name": "expr"
-						},
-						"property": {
-							"type": "Identifier",
-							"start": 839,
-							"end": 843,
-							"loc": {
-								"start": {
-									"line": 30,
-									"column": 40
-								},
-								"end": {
-									"line": 30,
-									"column": 44
-								}
-							},
-							"name": "prop"
-						},
-						"computed": false,
-						"optional": false
-					},
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " expression statement with member access",
-							"start": 756,
-							"end": 798
-						},
-						{
-							"type": "Block",
-							"value": "* @type {A} ",
-							"start": 800,
-							"end": 816
-						},
-						{
-							"type": "Block",
-							"value": "* @type {B} ",
-							"start": 817,
-							"end": 833
+							"value": " nested cast as a call argument",
+							"start": 298,
+							"end": 331
 						}
 					]
 				}
 			],
 			"sourceType": "module"
 		},
-		"attributes": [
-			{
-				"type": "Attribute",
-				"start": 8,
-				"end": 17,
-				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
-				"value": [
-					{
-						"start": 14,
-						"end": 16,
-						"type": "Text",
-						"raw": "ts",
-						"data": "ts"
-					}
-				]
-			}
-		]
+		"attributes": []
 	}
 }

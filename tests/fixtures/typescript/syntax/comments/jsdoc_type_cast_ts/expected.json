@@ -1,0 +1,263 @@
+{
+	"type": "Program",
+	"start": 0,
+	"end": 331,
+	"loc": {
+		"start": {
+			"line": 1,
+			"column": 0
+		},
+		"end": {
+			"line": 11,
+			"column": 0
+		}
+	},
+	"body": [
+		{
+			"type": "VariableDeclaration",
+			"start": 59,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 0
+				},
+				"end": {
+					"line": 2,
+					"column": 32
+				}
+			},
+			"declarations": [
+				{
+					"type": "VariableDeclarator",
+					"start": 65,
+					"end": 90,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 6
+						},
+						"end": {
+							"line": 2,
+							"column": 31
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 65,
+						"end": 66,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 6
+							},
+							"end": {
+								"line": 2,
+								"column": 7
+							}
+						},
+						"name": "a"
+					},
+					"init": {
+						"type": "Identifier",
+						"start": 86,
+						"end": 90,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 27
+							},
+							"end": {
+								"line": 2,
+								"column": 31
+							}
+						},
+						"name": "expr"
+					}
+				}
+			],
+			"kind": "const"
+		},
+		{
+			"type": "VariableDeclaration",
+			"start": 165,
+			"end": 195,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 30
+				}
+			},
+			"declarations": [
+				{
+					"type": "VariableDeclarator",
+					"start": 171,
+					"end": 194,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 6
+						},
+						"end": {
+							"line": 5,
+							"column": 29
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 171,
+						"end": 172,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 6
+							},
+							"end": {
+								"line": 5,
+								"column": 7
+							}
+						},
+						"name": "b"
+					},
+					"init": {
+						"type": "Identifier",
+						"start": 190,
+						"end": 194,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 25
+							},
+							"end": {
+								"line": 5,
+								"column": 29
+							}
+						},
+						"name": "expr"
+					}
+				}
+			],
+			"kind": "const"
+		},
+		{
+			"type": "FunctionDeclaration",
+			"start": 280,
+			"end": 330,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 0
+				},
+				"end": {
+					"line": 10,
+					"column": 1
+				}
+			},
+			"id": {
+				"type": "Identifier",
+				"start": 289,
+				"end": 290,
+				"loc": {
+					"start": {
+						"line": 8,
+						"column": 9
+					},
+					"end": {
+						"line": 8,
+						"column": 10
+					}
+				},
+				"name": "f"
+			},
+			"expression": false,
+			"generator": false,
+			"async": false,
+			"params": [],
+			"body": {
+				"type": "BlockStatement",
+				"start": 293,
+				"end": 330,
+				"loc": {
+					"start": {
+						"line": 8,
+						"column": 13
+					},
+					"end": {
+						"line": 10,
+						"column": 1
+					}
+				},
+				"body": [
+					{
+						"type": "ReturnStatement",
+						"start": 296,
+						"end": 328,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 33
+							}
+						},
+						"argument": {
+							"type": "AssignmentExpression",
+							"start": 321,
+							"end": 326,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 26
+								},
+								"end": {
+									"line": 9,
+									"column": 31
+								}
+							},
+							"operator": "=",
+							"left": {
+								"type": "Identifier",
+								"start": 321,
+								"end": 322,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 26
+									},
+									"end": {
+										"line": 9,
+										"column": 27
+									}
+								},
+								"name": "x"
+							},
+							"right": {
+								"type": "Identifier",
+								"start": 325,
+								"end": 326,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 30
+									},
+									"end": {
+										"line": 9,
+										"column": 31
+									}
+								},
+								"name": "y"
+							}
+						}
+					}
+				]
+			}
+		}
+	],
+	"sourceType": "module"
+}

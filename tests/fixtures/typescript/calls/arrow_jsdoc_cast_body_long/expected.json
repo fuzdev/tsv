@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 262,
+	"end": 281,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -44,9 +44,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " Long: expand-last keeps params with call, body on next line",
-			"start": 83,
-			"end": 145,
+			"value": " Long: cast paren is opaque, so standard arg breaking (params on own line)",
+			"start": 85,
+			"end": 161,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -54,23 +54,23 @@
 				},
 				"end": {
 					"line": 5,
-					"column": 63
+					"column": 77
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": "* @type {AAAAAAAAAAAAAAAAAAAAAAAA} ",
-			"start": 202,
-			"end": 241,
+			"start": 219,
+			"end": 258,
 			"loc": {
 				"start": {
 					"line": 7,
-					"column": 2
+					"column": 9
 				},
 				"end": {
 					"line": 7,
-					"column": 41
+					"column": 48
 				}
 			}
 		}
@@ -78,12 +78,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 261,
+		"end": 280,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 252,
+			"end": 271,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -98,7 +98,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 33,
-					"end": 80,
+					"end": 82,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -106,14 +106,14 @@
 						},
 						"end": {
 							"line": 3,
-							"column": 48
+							"column": 50
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 39,
-							"end": 79,
+							"end": 81,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -121,7 +121,7 @@
 								},
 								"end": {
 									"line": 3,
-									"column": 47
+									"column": 49
 								}
 							},
 							"id": {
@@ -143,7 +143,7 @@
 							"init": {
 								"type": "CallExpression",
 								"start": 43,
-								"end": 79,
+								"end": 81,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -151,7 +151,7 @@
 									},
 									"end": {
 										"line": 3,
-										"column": 47
+										"column": 49
 									}
 								},
 								"callee": {
@@ -207,7 +207,7 @@
 									{
 										"type": "ArrowFunctionExpression",
 										"start": 49,
-										"end": 78,
+										"end": 80,
 										"loc": {
 											"start": {
 												"line": 3,
@@ -215,7 +215,7 @@
 											},
 											"end": {
 												"line": 3,
-												"column": 46
+												"column": 48
 											}
 										},
 										"id": null,
@@ -242,30 +242,30 @@
 										],
 										"body": {
 											"type": "CallExpression",
-											"start": 73,
-											"end": 78,
+											"start": 74,
+											"end": 79,
 											"loc": {
 												"start": {
 													"line": 3,
-													"column": 41
+													"column": 42
 												},
 												"end": {
 													"line": 3,
-													"column": 46
+													"column": 47
 												}
 											},
 											"callee": {
 												"type": "Identifier",
-												"start": 73,
-												"end": 75,
+												"start": 74,
+												"end": 76,
 												"loc": {
 													"start": {
 														"line": 3,
-														"column": 41
+														"column": 42
 													},
 													"end": {
 														"line": 3,
-														"column": 43
+														"column": 44
 													}
 												},
 												"name": "fn"
@@ -273,16 +273,16 @@
 											"arguments": [
 												{
 													"type": "Identifier",
-													"start": 76,
-													"end": 77,
+													"start": 77,
+													"end": 78,
 													"loc": {
 														"start": {
 															"line": 3,
-															"column": 44
+															"column": 45
 														},
 														"end": {
 															"line": 3,
-															"column": 45
+															"column": 46
 														}
 													},
 													"name": "x"
@@ -316,8 +316,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 147,
-					"end": 251,
+					"start": 163,
+					"end": 270,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -331,8 +331,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 153,
-							"end": 250,
+							"start": 169,
+							"end": 269,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -345,8 +345,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 153,
-								"end": 157,
+								"start": 169,
+								"end": 173,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -361,8 +361,8 @@
 							},
 							"init": {
 								"type": "CallExpression",
-								"start": 160,
-								"end": 250,
+								"start": 176,
+								"end": 269,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -375,8 +375,8 @@
 								},
 								"callee": {
 									"type": "MemberExpression",
-									"start": 160,
-									"end": 192,
+									"start": 176,
+									"end": 208,
 									"loc": {
 										"start": {
 											"line": 6,
@@ -389,8 +389,8 @@
 									},
 									"object": {
 										"type": "MemberExpression",
-										"start": 160,
-										"end": 188,
+										"start": 176,
+										"end": 204,
 										"loc": {
 											"start": {
 												"line": 6,
@@ -403,8 +403,8 @@
 										},
 										"object": {
 											"type": "Identifier",
-											"start": 160,
-											"end": 161,
+											"start": 176,
+											"end": 177,
 											"loc": {
 												"start": {
 													"line": 6,
@@ -419,8 +419,8 @@
 										},
 										"property": {
 											"type": "Identifier",
-											"start": 162,
-											"end": 188,
+											"start": 178,
+											"end": 204,
 											"loc": {
 												"start": {
 													"line": 6,
@@ -438,8 +438,8 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 189,
-										"end": 192,
+										"start": 205,
+										"end": 208,
 										"loc": {
 											"start": {
 												"line": 6,
@@ -458,16 +458,16 @@
 								"arguments": [
 									{
 										"type": "ArrowFunctionExpression",
-										"start": 193,
-										"end": 247,
+										"start": 212,
+										"end": 266,
 										"loc": {
 											"start": {
-												"line": 6,
-												"column": 47
+												"line": 7,
+												"column": 2
 											},
 											"end": {
 												"line": 7,
-												"column": 47
+												"column": 56
 											}
 										},
 										"id": null,
@@ -477,16 +477,16 @@
 										"params": [
 											{
 												"type": "Identifier",
-												"start": 194,
-												"end": 195,
+												"start": 213,
+												"end": 214,
 												"loc": {
 													"start": {
-														"line": 6,
-														"column": 48
+														"line": 7,
+														"column": 3
 													},
 													"end": {
-														"line": 6,
-														"column": 49
+														"line": 7,
+														"column": 4
 													}
 												},
 												"name": "x"
@@ -494,30 +494,30 @@
 										],
 										"body": {
 											"type": "CallExpression",
-											"start": 242,
-											"end": 247,
+											"start": 260,
+											"end": 265,
 											"loc": {
 												"start": {
 													"line": 7,
-													"column": 42
+													"column": 50
 												},
 												"end": {
 													"line": 7,
-													"column": 47
+													"column": 55
 												}
 											},
 											"callee": {
 												"type": "Identifier",
-												"start": 242,
-												"end": 244,
+												"start": 260,
+												"end": 262,
 												"loc": {
 													"start": {
 														"line": 7,
-														"column": 42
+														"column": 50
 													},
 													"end": {
 														"line": 7,
-														"column": 44
+														"column": 52
 													}
 												},
 												"name": "fn"
@@ -525,16 +525,16 @@
 											"arguments": [
 												{
 													"type": "Identifier",
-													"start": 245,
-													"end": 246,
+													"start": 263,
+													"end": 264,
 													"loc": {
 														"start": {
 															"line": 7,
-															"column": 45
+															"column": 53
 														},
 														"end": {
 															"line": 7,
-															"column": 46
+															"column": 54
 														}
 													},
 													"name": "x"
@@ -545,8 +545,8 @@
 												{
 													"type": "Block",
 													"value": "* @type {AAAAAAAAAAAAAAAAAAAAAAAA} ",
-													"start": 202,
-													"end": 241
+													"start": 219,
+													"end": 258
 												}
 											]
 										}
@@ -560,9 +560,9 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Long: expand-last keeps params with call, body on next line",
-							"start": 83,
-							"end": 145
+							"value": " Long: cast paren is opaque, so standard arg breaking (params on own line)",
+							"start": 85,
+							"end": 161
 						}
 					]
 				}

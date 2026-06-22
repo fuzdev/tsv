@@ -11,6 +11,11 @@ High-performance Rust parser as a drop-in replacement for Svelte's modern parser
 `git add` and `git commit` are denied by `.claude/settings.local.json` in
 this repo — make the edits and stop, the user commits.
 
+**Do not edit `CHANGELOG.md`.** Like release version bumps, the changelog is
+the user's responsibility — agents make the source/doc/fixture edits and leave
+`CHANGELOG.md` alone (including the `## Unreleased` section and its
+`<!-- bump: … -->` marker). The user stamps it at release time.
+
 ## Priorities
 
 1. **Correctness**: Match Svelte's parser exactly — it's a drop-in replacement. The formatter began with Prettier as its guide and tracks it for the common case, but tsv has its own identity and makes deliberate, cataloged choices to diverge where they're more defensible (spec, print width, comment position, its own taste). tsv also fixes numerous Prettier bugs. Fixtures are the source of truth for correct behavior — when tests fail, fix the code; when tsv diverges on purpose, the fixture records it.
@@ -229,7 +234,7 @@ Version source of truth: `Cargo.toml` `[workspace.package] version` (read direct
 
 Package shape: built from the wasm-pack `web` target, then `scripts/patch_npm_package.ts` adds a Node/Bun entry (`index.js`, sync auto-init), a browser entry (`browser.js`, guarded `await init()`), `index.d.ts`, conditional `exports`, npm metadata, and the variant README. The export list is extracted from the generated JS, so new `lang_bindings!` languages flow through automatically.
 
-`scripts/publish.ts` orchestrates the release end to end (preflight → bump → check → build (npm packages + deno bundles, so artifact validation never sees stale bundles) → verify → artifact validation: size bounds + Deno smoke + Node tests → idempotent npm publish → git commit + tag + push), printing a wasm size summary (raw + gzipped) at the end. It stamps CHANGELOG.md's `## Unreleased` section into the released version's section — that section must be non-empty and carry a `<!-- bump: <level> -->` marker that matches `--bump` (the bump is required in **both** places and they must agree; on stamp the marker is dropped and a fresh empty `## Unreleased` reset to `bump: patch` is seeded for the next cycle). Keep it updated as work lands. A failed wetrun is resumable: re-run `--wetrun` without `--bump`.
+`scripts/publish.ts` orchestrates the release end to end (preflight → bump → check → build (npm packages + deno bundles, so artifact validation never sees stale bundles) → verify → artifact validation: size bounds + Deno smoke + Node tests → idempotent npm publish → git commit + tag + push), printing a wasm size summary (raw + gzipped) at the end. It stamps CHANGELOG.md's `## Unreleased` section into the released version's section — that section must be non-empty and carry a `<!-- bump: <level> -->` marker that matches `--bump` (the bump is required in **both** places and they must agree; on stamp the marker is dropped and a fresh empty `## Unreleased` reset to `bump: patch` is seeded for the next cycle). The user keeps it updated as work lands — agents don't touch `CHANGELOG.md` (see [Committing](#committing)). A failed wetrun is resumable: re-run `--wetrun` without `--bump`.
 
 ```bash
 deno task publish                        # dry-run: validate everything, no mutation

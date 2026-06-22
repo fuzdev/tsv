@@ -332,7 +332,8 @@ Beyond acorn-typescript's per-parse duplication, **Svelte's own comment glue dup
   - [leading_html_comment_instance_duplication_svelte_divergence](../tests/fixtures/svelte/script/leading_html_comment_instance_duplication_svelte_divergence/)
 
 - **Template-expression comment before a parenthesized subexpression.** Svelte's `parse_expression_at` sets acorn's `preserveParens: true`, so a leading comment before a parenthesized subexpression attaches to the synthetic `ParenthesizedExpression`; Svelte's subsequent `remove_parens` discards that wrapper and its `leadingComments`, leaving the comment only in the root `comments` array. tsv (which has no `ParenthesizedExpression` node, matching Svelte's *final* shape) attaches it to the inner expression. This is template-only — a plain `<script>` parse does not set `preserveParens`, so the same comment attaches in both parsers there. The common real-world trigger is a JSDoc cast `/** @type {T} */ (expr)`.
-  - [template_expr_paren_comment_svelte_divergence](../tests/fixtures/svelte/syntax/comments/template_expr_paren_comment_svelte_divergence/)
+  - [template_expr_paren_comment_svelte_divergence](../tests/fixtures/svelte/syntax/comments/template_expr_paren_comment_svelte_divergence/) — precedence parens, isolating the parser difference
+  - [jsdoc_cast_template_svelte_prettier_divergence](../tests/fixtures/svelte/syntax/comments/jsdoc_cast_template_svelte_prettier_divergence/) — the JSDoc-cast trigger across template / attribute / directive positions; also a `_prettier_divergence` (prettier strips the cast there)
 
 
 ### Known Acorn-TypeScript Bugs (Not Corrections)

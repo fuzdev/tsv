@@ -384,6 +384,7 @@ pub fn contains_call_expression(expr: &Expression) -> bool {
         Expression::UnaryExpression(e) => contains_call_expression(&e.argument),
         Expression::UpdateExpression(e) => contains_call_expression(&e.argument),
         Expression::SpreadElement(e) => contains_call_expression(&e.argument),
+        Expression::JsdocCast(cast) => contains_call_expression(&cast.inner),
 
         // Binary expressions (includes logical operators in internal AST)
         Expression::BinaryExpression(e) => {

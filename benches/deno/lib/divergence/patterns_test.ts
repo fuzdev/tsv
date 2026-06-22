@@ -1143,13 +1143,15 @@ Deno.test('template_literal_width: negative - short prettier line (not width-mot
 
 // ─── jsdoc_type_cast_parens ────────────────────────────────────────────────
 
-Deno.test('jsdoc_type_cast_parens: negative - not svelte language', () => {
-	// Pattern only applies to svelte files (prettier-plugin-svelte context)
-	const prettier = '\tconst a = b.map((x) => /** @type {A} */ (fn(x)));';
-	const ours = '\tconst a = b.map((x) => /** @type {A} */ fn(x));';
+Deno.test('jsdoc_type_cast_parens: positive - typescript (ours keeps, prettier-TS strips)', () => {
+	// tsv preserves the cast parens (required for the assertion); prettier's
+	// oxc-ts backend strips them in TS contexts.
+	const prettier = '\tconst a = /** @type {A} */ document.activeElement;';
+	const ours = '\tconst a = /** @type {A} */ (document.activeElement);';
 	const ctx = make_context(ours, prettier, 'typescript');
 	const match = run_pattern('jsdoc_type_cast_parens', ctx);
-	assertEquals(match, null);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'jsdoc_type_cast_parens');
 });
 
 Deno.test('jsdoc_type_cast_parens: negative - @satisfies without paren difference', () => {
@@ -1157,6 +1159,16 @@ Deno.test('jsdoc_type_cast_parens: negative - @satisfies without paren differenc
 	const prettier = '\tconst a = /** @satisfies {A} */ (fn(x));';
 	const ours = '\tconst a = /** @satisfies {A} */ (fn(x));';
 	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('jsdoc_type_cast_parens', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('jsdoc_type_cast_parens: negative - reverse direction (ours strips) not claimed', () => {
+	// If OURS dropped the parens and prettier kept them, that would be a bug — the
+	// detector must NOT claim it (claiming an ours-side strip masks a real loss).
+	const prettier = '\tconst a = /** @type {A} */ (fn(x));';
+	const ours = '\tconst a = /** @type {A} */ fn(x);';
+	const ctx = make_context(ours, prettier, 'typescript');
 	const match = run_pattern('jsdoc_type_cast_parens', ctx);
 	assertEquals(match, null);
 });
@@ -1265,12 +1277,12 @@ Deno.test('fill_101_boundary: positive - multiline attr inline long text', () =>
 	assertEquals(match!.pattern, 'fill_101_boundary');
 });
 
-// ─── jsdoc_type_cast_parens covers arrow_jsdoc_cast_body_long ─────────────
+// ─── jsdoc_type_cast_parens in a svelte lang="ts" context ─────────────────
 
-Deno.test('jsdoc_type_cast_parens: positive - arrow callback body', () => {
-	// prettier-plugin-svelte preserves parens, we strip them
-	const prettier = '\tconst a = b.map((x) => /** @type {A} */ (fn(x)));';
-	const ours = '\tconst a = b.map((x) => /** @type {A} */ fn(x));';
+Deno.test('jsdoc_type_cast_parens: positive - svelte lang=ts (ours keeps, prettier strips)', () => {
+	// In `<script lang="ts">` prettier routes to oxc-ts and strips; tsv preserves.
+	const prettier = '\tconst a = b.map((x) => /** @type {A} */ fn(x));';
+	const ours = '\tconst a = b.map((x) => /** @type {A} */ (fn(x)));';
 	const ctx = make_context(ours, prettier, 'svelte');
 	const match = run_pattern('jsdoc_type_cast_parens', ctx);
 	assertNotEquals(match, null);

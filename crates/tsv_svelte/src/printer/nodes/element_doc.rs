@@ -1522,6 +1522,7 @@ impl<'a> Printer<'a> {
             // Assignment expressions have break points
             Expression::AssignmentExpression(_) => true,
             // Wrapping expressions: check inner
+            Expression::JsdocCast(cast) => Self::expression_has_break_points(&cast.inner),
             Expression::TSAsExpression(e) => Self::expression_has_break_points(&e.expression),
             Expression::TSSatisfiesExpression(e) => {
                 Self::expression_has_break_points(&e.expression)
