@@ -1,7 +1,9 @@
 <script lang="ts">
 	// Single-arg: void return + call body - sig hugged, body breaks after =>
 	const a = {
-		propAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA: fn((x: string): void => call(undefined))
+		propAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA: fn((x: string): void =>
+			call(undefined)
+		)
 	};
 
 	// Single-arg: string return + call body - same behavior

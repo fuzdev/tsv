@@ -4,11 +4,10 @@
 const short = <T>(): { a: T; b: T } => null as any;
 
 // Boundary: signature fits inline at exactly 100 chars - stays on one line
-const fitA = <T>(): { a: Aaaaaaaa<T>; bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: T } =>
-	null as any;
+const fitA = <T>(): { a: Aaaaaaaa<T>; bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: T } => null as any;
 
 // Boundary: signature at 101 chars - breaks, <T> stays inline
-const fitB = <T>(): { a: Aaaaaaaa<T>; bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: T } =>
+const fitB = <T>(): { a: Aaaaaaaa<T>; bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: T } =>
 	null as any;
 
 // Empty params + breaking object return: <T> stays inline, object expands (corpus: make_deferred)

@@ -3,7 +3,7 @@
 	type A = {
 		foo?: {
 			receive?: (
-				param_abc: GenericType<'arg1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', Arg2, 'arg3', 'arg4'>
+				param_abc: GenericType<'arg1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', Arg2, 'arg3', 'arg4'>
 			) => void;
 		};
 	};
@@ -12,7 +12,12 @@
 	type B = {
 		foo?: {
 			receive?: (
-				param_abcd: GenericType<'arg1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', Arg2, 'arg3', 'arg4'>
+				param_abcd: GenericType<
+					'arg1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+					Arg2,
+					'arg3',
+					'arg4'
+				>
 			) => void;
 		};
 	};

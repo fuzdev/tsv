@@ -9,12 +9,13 @@
 
 	/* 100 chars arg line - binary stays inline */
 	const c = fn(
-		aaaaaaaaaaaaaaaaaaaaaaaaaaa && bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdef
+		aaaaaaaaaaaaaaaaaaaaaaaaaaa && bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefg
 	);
 
 	/* 101 chars arg line - binary breaks, continuation gets extra indent */
 	const d = fn(
-		aaaaaaaaaaaaaaaaaaaaaaaaaaa && bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefg
+		aaaaaaaaaaaaaaaaaaaaaaaaaaa &&
+			bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefgh
 	);
 
 	/* Multi-operand chain - each continuation indented */

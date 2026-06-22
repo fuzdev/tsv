@@ -12,8 +12,8 @@
 	// Tests whether inner call args stay inline or break
 
 	// Inner line 100 chars - inner call stays inline
-	const c = this.fn().call(inner(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa, bb, cc));
+	const c = this.fn().call(inner(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa, bb, ccc));
 
 	// Inner line 101 chars - inner call args break
-	const d = this.fn().call(inner(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa, bb, ccc));
+	const d = this.fn().call(inner(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa, bb, cccc));
 </script>

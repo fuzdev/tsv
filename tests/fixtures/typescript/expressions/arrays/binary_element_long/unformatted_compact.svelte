@@ -6,10 +6,10 @@ const a=[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&&bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefgh
 const b=[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&&bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefghijklmnopqrstu];
 
 /* 100 chars element line - binary stays inline */
-const c=[aaaaaaaaaaaaaaaaaaaaaaaaaaa&&bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdef];
+const c=[aaaaaaaaaaaaaaaaaaaaaaaaaaa&&bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefg];
 
 /* 101 chars element line - binary breaks, continuation gets extra indent */
-const d=[aaaaaaaaaaaaaaaaaaaaaaaaaaa&&bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefg];
+const d=[aaaaaaaaaaaaaaaaaaaaaaaaaaa&&bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefgh];
 
 /* Multi-operand chain - each continuation indented */
 const e=[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&&bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&&cccccccccccccccccccccccccccccc];

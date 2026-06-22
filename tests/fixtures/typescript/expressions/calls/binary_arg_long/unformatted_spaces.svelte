@@ -17,7 +17,7 @@ const  c  =  fn(
 	aaaaaaaaaaaaaaaaaaaaaaaaaaa
 		&&
 
-			bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdef
+			bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefg
 )  ;
 
 /* 101 chars arg line - binary breaks, continuation gets extra indent */
@@ -27,7 +27,7 @@ const  d  =  fn(
 
 		&&
 
-			bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefg
+			bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefgh
 
 )  ;
 

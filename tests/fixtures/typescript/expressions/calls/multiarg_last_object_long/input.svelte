@@ -1,11 +1,9 @@
 <script lang="ts">
 	// 100 chars at 1-tab: all args stay inline
-	const a = fnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn(arg, items, {
-		x
-	});
+	const a = fnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn(arg, items, { x });
 
 	// 101 chars at 1-tab: trailing object expands
-	const b = fnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn(arg, items, {
+	const b = fnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn(arg, items, {
 		x
 	});
 

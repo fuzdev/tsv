@@ -7,7 +7,7 @@ set = a.b(c.d([e.f("g")], /** @type {T} */ (
 a.b(
 	[c],
 	/** @type {AAAA} */ (
-		d.eee(ffffffffffffffffffffffffffffffffffffffffffff, gggggggggggggggggggggggg)
+		d.eee(fffffffffffffffffffffffffffffffffffffffffffff, gggggggggggggggggggggggg)
 	),
 );
 
@@ -15,6 +15,6 @@ a.b(
 a.b(
 	[c],
 	/** @type {AAAA} */ (
-		d.eee(fffffffffffffffffffffffffffffffffffffffffffff, gggggggggggggggggggggggg)
+		d.eee(ffffffffffffffffffffffffffffffffffffffffffffff, gggggggggggggggggggggggg)
 	),
 );

@@ -8,8 +8,11 @@ Mirrors the each-block
 [destructure_literal_default](../../each/destructure_literal_default_prettier_divergence/)
 across all three await binding positions.
 
-tsv: `{:then { a = 0xff }}`, `{:catch { a = "a'b" }}` (normalized)
-Prettier: `{:then { a = 0xFF }}`, `{:catch { a = "a'b" }}` (source-preserved)
+tsv (normalized): `then { a = 'x' }`, `{:then { a = 0xff }}`
+Prettier (source-preserved): `then { a = "x" }`, `{:then { a = 0xFF }}`
+
+The `{:catch { a = "a'b" }}` literal is identical in both — escape-minimizing keeps
+double quotes around a string that contains `'` — so it is not a divergence.
 
 Both formatters space the braces; the divergence is solely the literal token —
 `prettier_variant_source.svelte` carries the raw author tokens (`"x"`, `0xFF`) that

@@ -35,7 +35,7 @@
 				? b.fn1('xxxxxxxxxx')
 					? b
 					: `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx${fn2(b, 'x')}`
-				: '')) + (c ? fn3(c, 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx') : '')
+				: '')) + (c ? fn3(c, 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx') : '')
 	);
 
 	// Nullish + nested ternary: 101 chars - binary breaks after +
@@ -45,6 +45,7 @@
 				? b.fn1('xxxxxxxxxx')
 					? b
 					: `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx${fn2(b, 'x')}`
-				: '')) + (c ? fn3(c, 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx') : '')
+				: '')) +
+			(c ? fn3(c, 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx') : '')
 	);
 </script>

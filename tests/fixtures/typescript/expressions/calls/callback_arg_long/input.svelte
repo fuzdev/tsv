@@ -17,12 +17,14 @@
 
 			// 100 chars inner line - breaks outer only
 			fn(
-				a.method((x) => typeof x === 'string' && x.includes('valuevaluevaluevaluevaluevaluevalue'))
+				a.method((x) => typeof x === 'string' && x.includes('valuevaluevaluevaluevaluevaluevaluev'))
 			);
 
 			// 101 chars inner line - breaks method call too
 			fn(
-				a.method((x) => typeof x === 'string' && x.includes('valuevaluevaluevaluevaluevaluevaluev'))
+				a.method(
+					(x) => typeof x === 'string' && x.includes('valuevaluevaluevaluevaluevaluevalueva')
+				)
 			);
 		}
 	}

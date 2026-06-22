@@ -1,12 +1,13 @@
 <script>
 	/* 100 chars arg line - stays inline */
 	const a = fn(
-		(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbb) * 100
+		(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbb) * 100
 	);
 
 	/* 101 chars arg line - only outer binary breaks */
 	const b = fn(
-		(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbb) * 100
+		(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbb) *
+			100
 	);
 
 	/* 106 chars arg line - breaks inside parens after + */

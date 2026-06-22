@@ -3,11 +3,10 @@
 	const short = <T, U>(): { a: T; b: U } => null as any;
 
 	// Boundary: signature fits inline at exactly 100 chars - stays on one line
-	const fitA = <T, U>(): { a: Aaaaaaaa<T>; bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: U } =>
-		null as any;
+	const fitA = <T, U>(): { a: Aaaaaaaa<T>; bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: U } => null as any;
 
 	// Boundary: signature at 101 chars - body breaks after `=>`, type params stay inline
-	const fitB = <T, U>(): { a: Aaaaaaaa<T>; bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: U } =>
+	const fitB = <T, U>(): { a: Aaaaaaaa<T>; bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: U } =>
 		null as any;
 
 	// Empty params + breaking object return: type params stay inline, object expands
