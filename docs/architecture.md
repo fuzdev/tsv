@@ -291,7 +291,7 @@ The `doc` module implements a declarative document builder inspired by prettier'
 
 ### Core Types (Arena-Based)
 
-Doc nodes are allocated in a contiguous `DocArena`. Each node is referenced by a `DocId` (a `u32` index), and child lists use `ChildRange` (start index + length). This eliminates per-node heap allocation and recursive `Drop` traversal.
+Doc nodes are allocated in a contiguous `DocArena`. Each node is referenced by a `DocId` (a `u32` index), and child lists use `ChildRange` (start index + length). This eliminates per-node heap allocation and recursive `Drop` traversal. This fits the doc tree specifically: it's built once, rendered once, and dropped wholesale, so `DocId` indices are the natural access pattern. The AST makes the opposite choice (nested `Box`/`Vec` ownership) because it's traversed constantly — see [Nested AST](#nested-ast-not-flatindexed).
 
 ```rust
 pub enum DocNode {
@@ -701,9 +701,9 @@ pub enum Statement {
 }
 ```
 
-**Rationale:** Flat/indexed layouts were benchmarked early in development (`arena` branch, similar to Zig's MultiArrayList). Traversal was significantly slower due to index lookups replacing direct pointer access. Memory savings don't justify the complexity for a formatter that traverses constantly.
+**Rationale:** Flat/indexed layouts were benchmarked early in development (`arena` branch, similar to Zig's MultiArrayList). Traversal was slower because index lookups replaced direct pointer access — the cost was the flat/indexed _structure_, not arena allocation itself (a separate axis; see below). Memory savings didn't justify the complexity for a formatter that traverses constantly.
 
-**Planned re-measurement:** That benchmark predates most of the current printer, the doc arena, and the measurement tooling, so the result shouldn't be trusted indefinitely. Two follow-ups are worth measuring against the current corpus benchmarks, as separate axes:
+**Planned re-measurement:** That benchmark predates most of the current printer, the doc arena, and the measurement tooling, so the result shouldn't be trusted indefinitely. The intent is to re-run it when performance optimization gets a dedicated pass — the internals are far more mature now, and the early prototype's numbers may not hold. Two follow-ups are worth measuring against the current corpus benchmarks, as separate axes:
 
 - **Flat/indexed structure, again** — re-run the layout comparison on the mature codebase rather than the early prototype.
 - **Bump allocation for the nested model** — keep the nested structure but allocate nodes in an arena. The `DocArena` is precedent that the pattern pays off here (it replaced `Box<Doc>` trees with a measured format-time win): faster allocation, wholesale deallocation, better locality, no change to traversal shape. Costs lifetime threading through every parser and printer API.

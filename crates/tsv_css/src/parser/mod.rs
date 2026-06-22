@@ -1,31 +1,4 @@
 // CSS parser - parse CSS content from <style> tags
-//
-// PERFORMANCE CONSIDERATIONS:
-//
-// TODO: Future optimization opportunities:
-//
-// 1. Pre-compile regex patterns (like Svelte does)
-//    - Currently we match character-by-character in lexer
-//    - Could use regex for faster identifier/number matching
-//    - Trade-off: regex overhead vs simpler code
-//
-// 2. String slicing over allocation
-//    - Currently allocating String for selectors, properties, values
-//    - Could use string slices (&str) with lifetime management
-//    - Trade-off: memory vs complexity
-//
-// 3. Single-pass parsing (inline tokenization like Svelte)
-//    - Currently two-pass: lex then parse
-//    - Could collapse into single pass
-//    - Trade-off: performance vs debuggability (see lexer.rs TODO)
-//
-// 4. Arena allocation for AST nodes
-//    - Currently using Vec and individual allocations
-//    - Could use typed-arena or bumpalo for better cache locality
-//    - Trade-off: speed vs memory control
-//
-// Recommendation: Implement features first, optimize when proven necessary.
-// Profile real-world CSS files (10k+ lines) before optimizing.
 
 mod atrules;
 mod attributes;

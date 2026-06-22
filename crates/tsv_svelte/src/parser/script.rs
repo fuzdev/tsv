@@ -38,7 +38,7 @@ impl<'a> SvelteParser<'a> {
         // - Nested <script> in string literals or comments: `const a = "</script>";`
         // - Template strings with </script>: `const a = \`</script>\`;`
         // For proper implementation, could use TypeScript lexer to tokenize and track
-        // string/comment contexts. For POC, simple pattern matching is acceptable.
+        // string/comment contexts.
         let closing_pattern = b"</script>";
         let source_bytes = self.source.as_bytes();
         let mut content_end = content_start;
