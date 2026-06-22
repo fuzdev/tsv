@@ -1912,25 +1912,29 @@ const block_comment_chain: DivergencePattern = {
 
 const jsdoc_type_cast_parens: DivergencePattern = {
 	id: 'jsdoc_type_cast_parens',
-	description: 'JSDoc type cast parens stripped',
-	languages: ['svelte'],
-	conformance_sections: ['TypeScript: Comments'],
-	fixtures: [
-		'typescript/syntax/comments/jsdoc_type_cast_prettier_divergence',
-		'typescript/calls/arrow_jsdoc_cast_body_long_prettier_divergence',
-	],
+	description: 'JSDoc type cast parens preserved (prettier-TS strips)',
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['JSDoc / paren semantics'],
+	fixtures: ['typescript/syntax/comments/jsdoc_type_cast_ts_prettier_divergence'],
 	detect(ctx) {
-		if (ctx.language !== 'svelte') return null;
+		// JSDoc type casts (`/** @type {T} */ (expr)`) are a TypeScript assertion
+		// whose parens are semantically required. tsv preserves them everywhere;
+		// prettier's oxc-ts backend strips them in TS contexts (`.ts`, `lang="ts"`).
+		// In plain-JS `<script>` prettier preserves too, so that's a match — only
+		// the TS-context direction (ours keeps / prettier drops) is a divergence.
+		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
 
-		// Prettier keeps parens: /** @type {T} */ (expr)
-		// We strip them: /** @type {T} */ expr
+		// We keep parens: /** @type {T} */ (expr)
+		// Prettier (oxc-ts) strips them: /** @type {T} */ expr
 		const jsdoc_cast_with_parens = /@(?:type|satisfies)\s*\{[^}]*\}\s*\*\/\s*\(/;
 		const jsdoc_cast_without_parens = /@(?:type|satisfies)\s*\{[^}]*\}\s*\*\/\s*[^(]/;
 
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
-			const prettier_has_parens = hunk.removed_lines.some((l) => jsdoc_cast_with_parens.test(l));
-			const ours_without_parens = hunk.added_lines.some((l) => jsdoc_cast_without_parens.test(l));
-			return prettier_has_parens && ours_without_parens;
+			const prettier_without_parens = hunk.removed_lines.some((l) =>
+				jsdoc_cast_without_parens.test(l)
+			);
+			const ours_with_parens = hunk.added_lines.some((l) => jsdoc_cast_with_parens.test(l));
+			return prettier_without_parens && ours_with_parens;
 		});
 
 		if (hunk_indices.length > 0) {
@@ -1938,7 +1942,7 @@ const jsdoc_type_cast_parens: DivergencePattern = {
 				pattern: 'jsdoc_type_cast_parens',
 				confidence: 'certain',
 				hunk_indices,
-				reason: 'JSDoc type cast parens stripped (semantically meaningless)',
+				reason: 'JSDoc type cast parens preserved (required for the cast; prettier-TS strips)',
 			};
 		}
 		return null;

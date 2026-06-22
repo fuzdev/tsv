@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 740,
+	"end": 686,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " Inline: JSDoc cast before call as arg - exactly 100 chars",
+			"value": " Inline: JSDoc cast wrapping a call arg, fits on one line",
 			"start": 10,
-			"end": 70,
+			"end": 69,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 61
+					"column": 60
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": "* @type {Expression} ",
-			"start": 75,
-			"end": 100,
+			"start": 74,
+			"end": 99,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -44,9 +44,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " Expanded: outer and inner call both break - inner line exceeds 100",
-			"start": 173,
-			"end": 242,
+			"value": " Long: the cast's inner call expands inside the preserved parens",
+			"start": 168,
+			"end": 234,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -54,15 +54,15 @@
 				},
 				"end": {
 					"line": 5,
-					"column": 70
+					"column": 67
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": "* @type {Expression} ",
-			"start": 250,
-			"end": 275,
+			"start": 242,
+			"end": 267,
 			"loc": {
 				"start": {
 					"line": 7,
@@ -76,64 +76,64 @@
 		},
 		{
 			"type": "Line",
-			"value": " Expanded: with preceding args - inner call line exceeds 100",
-			"start": 367,
-			"end": 429,
+			"value": " Long with a preceding arg",
+			"start": 355,
+			"end": 383,
 			"loc": {
 				"start": {
-					"line": 14,
+					"line": 12,
 					"column": 1
 				},
 				"end": {
-					"line": 14,
-					"column": 63
+					"line": 12,
+					"column": 29
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": "* @type {Expression} ",
-			"start": 445,
-			"end": 470,
+			"start": 399,
+			"end": 424,
 			"loc": {
 				"start": {
-					"line": 17,
+					"line": 15,
 					"column": 2
 				},
 				"end": {
-					"line": 17,
+					"line": 15,
 					"column": 27
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " Expanded: JSDoc cast before ternary as call arg",
-			"start": 559,
-			"end": 609,
+			"value": " Cast wrapping a ternary as a call arg",
+			"start": 512,
+			"end": 552,
 			"loc": {
 				"start": {
-					"line": 23,
+					"line": 20,
 					"column": 1
 				},
 				"end": {
-					"line": 23,
-					"column": 51
+					"line": 20,
+					"column": 41
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": "* @type {Expression} ",
-			"start": 622,
-			"end": 647,
+			"start": 565,
+			"end": 590,
 			"loc": {
 				"start": {
-					"line": 26,
+					"line": 23,
 					"column": 2
 				},
 				"end": {
-					"line": 26,
+					"line": 23,
 					"column": 27
 				}
 			}
@@ -142,27 +142,27 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 739,
+		"end": 685,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 730,
+			"end": 676,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 30,
+					"line": 27,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
-					"start": 72,
-					"end": 170,
+					"start": 71,
+					"end": 165,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -170,13 +170,13 @@
 						},
 						"end": {
 							"line": 3,
-							"column": 99
+							"column": 95
 						}
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 72,
-						"end": 169,
+						"start": 71,
+						"end": 164,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -184,13 +184,13 @@
 							},
 							"end": {
 								"line": 3,
-								"column": 98
+								"column": 94
 							}
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 72,
-							"end": 74,
+							"start": 71,
+							"end": 73,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -207,15 +207,15 @@
 							{
 								"type": "CallExpression",
 								"start": 101,
-								"end": 168,
+								"end": 162,
 								"loc": {
 									"start": {
 										"line": 3,
-										"column": 30
+										"column": 31
 									},
 									"end": {
 										"line": 3,
-										"column": 97
+										"column": 92
 									}
 								},
 								"callee": {
@@ -225,11 +225,11 @@
 									"loc": {
 										"start": {
 											"line": 3,
-											"column": 30
+											"column": 31
 										},
 										"end": {
 											"line": 3,
-											"column": 34
+											"column": 35
 										}
 									},
 									"name": "call"
@@ -238,50 +238,50 @@
 									{
 										"type": "Identifier",
 										"start": 106,
-										"end": 125,
+										"end": 123,
 										"loc": {
 											"start": {
 												"line": 3,
-												"column": 35
+												"column": 36
 											},
 											"end": {
 												"line": 3,
-												"column": 54
+												"column": 53
 											}
 										},
-										"name": "aaaaaaaaaaaaaaaaaaa"
+										"name": "aaaaaaaaaaaaaaaaa"
 									},
 									{
 										"type": "Identifier",
-										"start": 127,
-										"end": 146,
+										"start": 125,
+										"end": 142,
 										"loc": {
 											"start": {
 												"line": 3,
-												"column": 56
+												"column": 55
 											},
 											"end": {
 												"line": 3,
-												"column": 75
+												"column": 72
 											}
 										},
-										"name": "bbbbbbbbbbbbbbbbbbb"
+										"name": "bbbbbbbbbbbbbbbbb"
 									},
 									{
 										"type": "Identifier",
-										"start": 148,
-										"end": 167,
+										"start": 144,
+										"end": 161,
 										"loc": {
 											"start": {
 												"line": 3,
-												"column": 77
+												"column": 74
 											},
 											"end": {
 												"line": 3,
-												"column": 96
+												"column": 91
 											}
 										},
-										"name": "ccccccccccccccccccc"
+										"name": "ccccccccccccccccc"
 									}
 								],
 								"optional": false,
@@ -289,8 +289,8 @@
 									{
 										"type": "Block",
 										"value": "* @type {Expression} ",
-										"start": 75,
-										"end": 100
+										"start": 74,
+										"end": 99
 									}
 								]
 							}
@@ -300,44 +300,44 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Inline: JSDoc cast before call as arg - exactly 100 chars",
+							"value": " Inline: JSDoc cast wrapping a call arg, fits on one line",
 							"start": 10,
-							"end": 70
+							"end": 69
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 244,
-					"end": 364,
+					"start": 236,
+					"end": 352,
 					"loc": {
 						"start": {
 							"line": 6,
 							"column": 1
 						},
 						"end": {
-							"line": 12,
+							"line": 10,
 							"column": 3
 						}
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 244,
-						"end": 363,
+						"start": 236,
+						"end": 351,
 						"loc": {
 							"start": {
 								"line": 6,
 								"column": 1
 							},
 							"end": {
-								"line": 12,
+								"line": 10,
 								"column": 2
 							}
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 244,
-							"end": 246,
+							"start": 236,
+							"end": 238,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -353,30 +353,30 @@
 						"arguments": [
 							{
 								"type": "CallExpression",
-								"start": 276,
-								"end": 360,
+								"start": 273,
+								"end": 344,
 								"loc": {
 									"start": {
-										"line": 7,
-										"column": 28
+										"line": 8,
+										"column": 3
 									},
 									"end": {
-										"line": 11,
-										"column": 3
+										"line": 8,
+										"column": 74
 									}
 								},
 								"callee": {
 									"type": "Identifier",
-									"start": 276,
-									"end": 280,
+									"start": 273,
+									"end": 277,
 									"loc": {
 										"start": {
-											"line": 7,
-											"column": 28
+											"line": 8,
+											"column": 3
 										},
 										"end": {
-											"line": 7,
-											"column": 32
+											"line": 8,
+											"column": 7
 										}
 									},
 									"name": "call"
@@ -384,48 +384,48 @@
 								"arguments": [
 									{
 										"type": "Identifier",
-										"start": 285,
-										"end": 304,
+										"start": 278,
+										"end": 297,
 										"loc": {
 											"start": {
 												"line": 8,
-												"column": 3
+												"column": 8
 											},
 											"end": {
 												"line": 8,
-												"column": 22
+												"column": 27
 											}
 										},
 										"name": "aaaaaaaaaaaaaaaaaaa"
 									},
 									{
 										"type": "Identifier",
-										"start": 309,
-										"end": 331,
+										"start": 299,
+										"end": 321,
 										"loc": {
 											"start": {
-												"line": 9,
-												"column": 3
+												"line": 8,
+												"column": 29
 											},
 											"end": {
-												"line": 9,
-												"column": 25
+												"line": 8,
+												"column": 51
 											}
 										},
 										"name": "bbbbbbbbbbbbbbbbbbbbbb"
 									},
 									{
 										"type": "Identifier",
-										"start": 336,
-										"end": 356,
+										"start": 323,
+										"end": 343,
 										"loc": {
 											"start": {
-												"line": 10,
-												"column": 3
+												"line": 8,
+												"column": 53
 											},
 											"end": {
-												"line": 10,
-												"column": 23
+												"line": 8,
+												"column": 73
 											}
 										},
 										"name": "cccccccccccccccccccc"
@@ -436,8 +436,8 @@
 									{
 										"type": "Block",
 										"value": "* @type {Expression} ",
-										"start": 250,
-										"end": 275
+										"start": 242,
+										"end": 267
 									}
 								]
 							}
@@ -447,51 +447,51 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Expanded: outer and inner call both break - inner line exceeds 100",
-							"start": 173,
-							"end": 242
+							"value": " Long: the cast's inner call expands inside the preserved parens",
+							"start": 168,
+							"end": 234
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 431,
-					"end": 556,
+					"start": 385,
+					"end": 509,
 					"loc": {
 						"start": {
-							"line": 15,
+							"line": 13,
 							"column": 1
 						},
 						"end": {
-							"line": 21,
+							"line": 18,
 							"column": 3
 						}
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 431,
-						"end": 555,
+						"start": 385,
+						"end": 508,
 						"loc": {
 							"start": {
-								"line": 15,
+								"line": 13,
 								"column": 1
 							},
 							"end": {
-								"line": 21,
+								"line": 18,
 								"column": 2
 							}
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 431,
-							"end": 433,
+							"start": 385,
+							"end": 387,
 							"loc": {
 								"start": {
-									"line": 15,
+									"line": 13,
 									"column": 1
 								},
 								"end": {
-									"line": 15,
+									"line": 13,
 									"column": 3
 								}
 							},
@@ -500,15 +500,15 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 437,
-								"end": 441,
+								"start": 391,
+								"end": 395,
 								"loc": {
 									"start": {
-										"line": 16,
+										"line": 14,
 										"column": 2
 									},
 									"end": {
-										"line": 16,
+										"line": 14,
 										"column": 6
 									}
 								},
@@ -516,30 +516,30 @@
 							},
 							{
 								"type": "CallExpression",
-								"start": 471,
-								"end": 552,
+								"start": 430,
+								"end": 501,
 								"loc": {
 									"start": {
-										"line": 17,
-										"column": 28
+										"line": 16,
+										"column": 3
 									},
 									"end": {
-										"line": 20,
-										"column": 3
+										"line": 16,
+										"column": 74
 									}
 								},
 								"callee": {
 									"type": "Identifier",
-									"start": 471,
-									"end": 475,
+									"start": 430,
+									"end": 434,
 									"loc": {
 										"start": {
-											"line": 17,
-											"column": 28
+											"line": 16,
+											"column": 3
 										},
 										"end": {
-											"line": 17,
-											"column": 32
+											"line": 16,
+											"column": 7
 										}
 									},
 									"name": "call"
@@ -547,32 +547,32 @@
 								"arguments": [
 									{
 										"type": "Identifier",
-										"start": 480,
-										"end": 510,
+										"start": 435,
+										"end": 465,
 										"loc": {
 											"start": {
-												"line": 18,
-												"column": 3
+												"line": 16,
+												"column": 8
 											},
 											"end": {
-												"line": 18,
-												"column": 33
+												"line": 16,
+												"column": 38
 											}
 										},
 										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 									},
 									{
 										"type": "Identifier",
-										"start": 515,
-										"end": 548,
+										"start": 467,
+										"end": 500,
 										"loc": {
 											"start": {
-												"line": 19,
-												"column": 3
+												"line": 16,
+												"column": 40
 											},
 											"end": {
-												"line": 19,
-												"column": 36
+												"line": 16,
+												"column": 73
 											}
 										},
 										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -583,8 +583,8 @@
 									{
 										"type": "Block",
 										"value": "* @type {Expression} ",
-										"start": 445,
-										"end": 470
+										"start": 399,
+										"end": 424
 									}
 								]
 							}
@@ -594,51 +594,51 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Expanded: with preceding args - inner call line exceeds 100",
-							"start": 367,
-							"end": 429
+							"value": " Long with a preceding arg",
+							"start": 355,
+							"end": 383
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 611,
-					"end": 729,
+					"start": 554,
+					"end": 675,
 					"loc": {
 						"start": {
-							"line": 24,
+							"line": 21,
 							"column": 1
 						},
 						"end": {
-							"line": 29,
+							"line": 26,
 							"column": 3
 						}
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 611,
-						"end": 728,
+						"start": 554,
+						"end": 674,
 						"loc": {
 							"start": {
-								"line": 24,
+								"line": 21,
 								"column": 1
 							},
 							"end": {
-								"line": 29,
+								"line": 26,
 								"column": 2
 							}
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 611,
-							"end": 613,
+							"start": 554,
+							"end": 556,
 							"loc": {
 								"start": {
-									"line": 24,
+									"line": 21,
 									"column": 1
 								},
 								"end": {
-									"line": 24,
+									"line": 21,
 									"column": 3
 								}
 							},
@@ -647,15 +647,15 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 617,
-								"end": 618,
+								"start": 560,
+								"end": 561,
 								"loc": {
 									"start": {
-										"line": 25,
+										"line": 22,
 										"column": 2
 									},
 									"end": {
-										"line": 25,
+										"line": 22,
 										"column": 3
 									}
 								},
@@ -663,62 +663,62 @@
 							},
 							{
 								"type": "ConditionalExpression",
-								"start": 648,
-								"end": 725,
+								"start": 596,
+								"end": 667,
 								"loc": {
 									"start": {
-										"line": 26,
-										"column": 28
+										"line": 24,
+										"column": 3
 									},
 									"end": {
-										"line": 28,
-										"column": 34
+										"line": 24,
+										"column": 74
 									}
 								},
 								"test": {
 									"type": "Identifier",
-									"start": 648,
-									"end": 656,
+									"start": 596,
+									"end": 604,
 									"loc": {
 										"start": {
-											"line": 26,
-											"column": 28
+											"line": 24,
+											"column": 3
 										},
 										"end": {
-											"line": 26,
-											"column": 36
+											"line": 24,
+											"column": 11
 										}
 									},
 									"name": "conddddd"
 								},
 								"consequent": {
 									"type": "Identifier",
-									"start": 662,
-									"end": 690,
+									"start": 607,
+									"end": 635,
 									"loc": {
 										"start": {
-											"line": 27,
-											"column": 5
+											"line": 24,
+											"column": 14
 										},
 										"end": {
-											"line": 27,
-											"column": 33
+											"line": 24,
+											"column": 42
 										}
 									},
 									"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 								},
 								"alternate": {
 									"type": "Identifier",
-									"start": 696,
-									"end": 725,
+									"start": 638,
+									"end": 667,
 									"loc": {
 										"start": {
-											"line": 28,
-											"column": 5
+											"line": 24,
+											"column": 45
 										},
 										"end": {
-											"line": 28,
-											"column": 34
+											"line": 24,
+											"column": 74
 										}
 									},
 									"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -727,8 +727,8 @@
 									{
 										"type": "Block",
 										"value": "* @type {Expression} ",
-										"start": 622,
-										"end": 647
+										"start": 565,
+										"end": 590
 									}
 								]
 							}
@@ -738,9 +738,9 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Expanded: JSDoc cast before ternary as call arg",
-							"start": 559,
-							"end": 609
+							"value": " Cast wrapping a ternary as a call arg",
+							"start": 512,
+							"end": 552
 						}
 					]
 				}

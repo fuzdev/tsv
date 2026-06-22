@@ -1,30 +1,27 @@
 <script>
-	// Inline: JSDoc cast before call as arg - exactly 100 chars
-	fn(/** @type {Expression} */ call(aaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbbbb, ccccccccccccccccccc));
+	// Inline: JSDoc cast wrapping a call arg, fits on one line
+	fn(/** @type {Expression} */ (call(aaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbb, ccccccccccccccccc)));
 
-	// Expanded: outer and inner call both break - inner line exceeds 100
+	// Long: the cast's inner call expands inside the preserved parens
 	fn(
-		/** @type {Expression} */ call(
-			aaaaaaaaaaaaaaaaaaa,
-			bbbbbbbbbbbbbbbbbbbbbb,
-			cccccccccccccccccccc
+		/** @type {Expression} */ (
+			call(aaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbbbbbbb, cccccccccccccccccccc)
 		)
 	);
 
-	// Expanded: with preceding args - inner call line exceeds 100
+	// Long with a preceding arg
 	fn(
 		aaaa,
-		/** @type {Expression} */ call(
-			aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-			bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+		/** @type {Expression} */ (
+			call(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)
 		)
 	);
 
-	// Expanded: JSDoc cast before ternary as call arg
+	// Cast wrapping a ternary as a call arg
 	fn(
 		a,
-		/** @type {Expression} */ conddddd
-			? aaaaaaaaaaaaaaaaaaaaaaaaaaaa
-			: bbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+		/** @type {Expression} */ (
+			conddddd ? aaaaaaaaaaaaaaaaaaaaaaaaaaaa : bbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+		)
 	);
 </script>

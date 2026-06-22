@@ -4,13 +4,13 @@ use crate::ast::internal::{
     ArrayExpression, ArrayPattern, ArrowFunctionBody, ArrowFunctionExpression,
     AssignmentExpression, AssignmentOperator, AssignmentPattern, AwaitExpression, BinaryExpression,
     BinaryOperator, BlockStatement, CallExpression, ConditionalExpression, Expression,
-    FunctionExpression, Identifier, ImportExpression, Literal, LiteralValue, MemberExpression,
-    MetaProperty, NewExpression, ObjectExpression, ObjectPattern, ObjectPatternProperty,
-    ObjectProperty, Property, PropertyKind, RegexLiteral, RestElement, SequenceExpression,
-    SpreadElement, Super, TSAsExpression, TSInstantiationExpression, TSNonNullExpression,
-    TSSatisfiesExpression, TSTypeAssertion, TaggedTemplateExpression, TemplateElement,
-    TemplateLiteral, ThisExpression, UnaryExpression, UnaryOperator, UpdateExpression,
-    UpdateOperator, YieldExpression,
+    FunctionExpression, Identifier, ImportExpression, JsdocCast, Literal, LiteralValue,
+    MemberExpression, MetaProperty, NewExpression, ObjectExpression, ObjectPattern,
+    ObjectPatternProperty, ObjectProperty, Property, PropertyKind, RegexLiteral, RestElement,
+    SequenceExpression, SpreadElement, Super, TSAsExpression, TSInstantiationExpression,
+    TSNonNullExpression, TSSatisfiesExpression, TSTypeAssertion, TaggedTemplateExpression,
+    TemplateElement, TemplateLiteral, ThisExpression, UnaryExpression, UnaryOperator,
+    UpdateExpression, UpdateOperator, YieldExpression,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
@@ -119,6 +119,37 @@ impl ParsedExpr {
             actual_end,
         }
     }
+}
+
+/// Mirror of prettier's `isTypeCastComment` (`is-type-cast-comment.js`): the
+/// comment text (between `/*` and `*/`) starts with `*` — i.e. the `/**` form —
+/// and contains `@type` or `@satisfies` followed by a word boundary.
+fn is_jsdoc_type_cast_comment(value: &str) -> bool {
+    value.starts_with('*') && contains_type_or_satisfies_tag(value)
+}
+
+/// Whether `value` contains `@type` or `@satisfies` with a trailing word
+/// boundary (so `@types` / `@typedef` don't match), matching prettier's
+/// `/@(?:type|satisfies)\b/`. The boundary is **ASCII** (`[A-Za-z0-9_]`) to
+/// mirror that regex exactly — JS `\b` has no `u` flag here, so `@typeñ` ends
+/// the tag at the non-ASCII `ñ` and counts as a cast.
+fn contains_type_or_satisfies_tag(value: &str) -> bool {
+    for tag in ["@type", "@satisfies"] {
+        let mut from = 0;
+        while let Some(rel) = value[from..].find(tag) {
+            let abs = from + rel;
+            let after = abs + tag.len();
+            let boundary = value[after..]
+                .chars()
+                .next()
+                .is_none_or(|c| !(c.is_ascii_alphanumeric() || c == '_'));
+            if boundary {
+                return true;
+            }
+            from = abs + 1;
+        }
+    }
+    false
 }
 
 /// Infix operator info: binding powers and the corresponding binary operator.
@@ -1109,10 +1140,14 @@ impl<'a> Parser<'a> {
         // when this expression is used as a callee: (a ? b : c)() should have
         // CallExpression span starting at '(', not at 'a'
         //
-        // Note: JSDoc type cast parens (/** @type {T} */ (expr)) are handled identically
-        // to regular parens — the parser consumes them and returns the inner expression.
-        // Comments are preserved via position-based lookup in the flat Vec<Comment>.
+        // JSDoc type cast parens (`/** @type {T} */ (expr)`) are special: the parens
+        // are semantically required (without them the cast is dropped), so when a
+        // `@type`/`@satisfies` block comment immediately precedes the `(` we wrap the
+        // inner expression in a `JsdocCast` node to preserve them, instead of
+        // discarding them like ordinary grouping parens. Comments themselves are
+        // still located positionally in the flat `Vec<Comment>` at print time.
         let (paren_start, _) = self.current_pos();
+        let is_jsdoc_cast = self.paren_preceded_by_jsdoc_cast_comment(paren_start);
         self.expect(&TokenKind::ParenOpen)?; // consume '('
 
         self.grouping_depth += 1;
@@ -1124,8 +1159,47 @@ impl<'a> Parser<'a> {
         self.grouping_depth -= 1;
 
         // Return expression with its original span (excluding parens), but with
-        // actual_start before '(' and actual_end after ')' for containing expressions
+        // actual_start before '(' and actual_end after ')' for containing expressions.
+        // A JSDoc cast keeps the same actual bounds (so containing expressions still
+        // get the paren-inclusive span) but carries the explicit wrapper node.
+        if is_jsdoc_cast {
+            let cast = Expression::JsdocCast(JsdocCast {
+                inner: Box::new(parsed.expr),
+                span: Span::new(paren_start as u32, paren_end as u32),
+            });
+            return Ok(ParsedExpr::with_bounds(cast, paren_start, paren_end));
+        }
         Ok(ParsedExpr::with_bounds(parsed.expr, paren_start, paren_end))
+    }
+
+    /// Whether a `(` at `paren_start` is immediately preceded by a JSDoc type-cast
+    /// block comment (`/** @type {T} */` / `/** @satisfies {T} */`), making the
+    /// parens a TypeScript cast that must be preserved.
+    ///
+    /// Mirrors prettier's predicate (`is-type-cast-comment.js` +
+    /// `postprocess/index.js`): a **block** comment whose text starts with `*`
+    /// (the `/**` form) and contains `@type`/`@satisfies` (word boundary), with
+    /// only whitespace between the comment's `*/` and the `(`.
+    fn paren_preceded_by_jsdoc_cast_comment(&self, paren_start: usize) -> bool {
+        let bytes = self.source.as_bytes();
+        // `paren_start` is a full-file offset (`current_pos` adds `base_offset`);
+        // `self.source` is the local slice, so translate back to a local index.
+        let mut i = paren_start - self.base_offset;
+        // Walk back over whitespace immediately before '('.
+        while i > 0 && bytes[i - 1].is_ascii_whitespace() {
+            i -= 1;
+        }
+        // The preceding token must be a block comment ending exactly at `i`.
+        if i < 4 || &bytes[i - 2..i] != b"*/" {
+            return false;
+        }
+        // Find the start of that block comment (block comments don't nest in JS,
+        // so the last `/*` before `*/` opens it).
+        let Some(open) = self.source[..i - 2].rfind("/*") else {
+            return false;
+        };
+        let value = &self.source[open + 2..i - 2]; // text between `/*` and `*/`
+        is_jsdoc_type_cast_comment(value)
     }
 
     /// Check if current position starts an arrow function

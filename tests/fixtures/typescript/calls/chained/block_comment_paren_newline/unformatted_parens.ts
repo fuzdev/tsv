@@ -8,7 +8,7 @@ a.b(
 // JSDoc comment on own line, parens on next line
 a.b(
   [c],
-  /** @type {T} */
+  /** doc */
   (d.eee(fff, ggg)),
 );
 

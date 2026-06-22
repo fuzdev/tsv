@@ -26,7 +26,7 @@
 **Use `input.ts` only when a feature genuinely can't be tested in `.svelte`** — two cases:
 
 - **Byte-0 file-level features** — hashbang (`#!/usr/bin/env node`), BOM — must be the first byte, before any `<script>` tag
-- **Context-dependent formatting** — constructs tsv/prettier format _differently_ standalone vs. embedded. Two known cases: JSDoc cast paren stripping (stripped in TS, kept in Svelte), and arrow/standalone type parameters (`<T>` in TS, `<T,>` in Svelte — the trailing comma disambiguates from JSX/template syntax). Test the pure-TS form in `.ts`.
+- **Context-dependent formatting** — constructs prettier formats _differently_ standalone vs. embedded (tsv itself is context-free). Known case: arrow/standalone type parameters (`<T>` in TS, `<T,>` in Svelte — the trailing comma disambiguates from JSX/template syntax). Test the pure-TS form in `.ts`. JSDoc casts are **not** a member: they format identically in `.ts` and `<script lang="ts">` (tsv preserves; prettier's oxc-ts strips), so a cast fixture is kept `.ts` *intentionally* (see the `INTENTIONAL_TS` note below), not out of necessity.
 
 > **TS-only _syntax_ is NOT one of these.** `import x = require(...)`, `export = value`, type
 > annotations, decorators, `declare`, etc. parse and format **identically** inside `<script lang="ts">`
@@ -37,16 +37,16 @@
 > `cargo run -p tsv_debug ts_fixture_audit [pattern]`) embeds **every** `.ts` file in a fixture (input
 > _and_ variants) in `<script lang="ts">` and reports whether it's _necessary_ as `.ts` (byte-0
 > feature, Svelte-parse failure, or formats-differently — checked against both tsv and prettier) or
-> _convertible_. Variants matter: the JSDoc-cast paren-stripping divergence often lives in an
+> _convertible_. Variants matter: a paren divergence can live in an
 > `unformatted_*_parens.ts`, not `input.ts`, so an input-only check gives false "convertible"s.
 > Caveat: _convertible_ means only that **formatting** is identical in both contexts — it doesn't know
 > whether the fixture is `.ts` on purpose to cover the standalone `tsv_ts`/acorn path (whose
 > `expected.json` pins a different AST than Svelte's). It's a screen, not a mandate. Fixtures that
 > are `.ts` deliberately are listed in the audit's `INTENTIONAL_TS` allowlist and reported as
 > _intentional_ rather than _convertible_, so the convertible list stays limited to fixtures that are
-> genuinely free to move (e.g. `syntax/comments/jsdoc_type_cast` is the standalone-TS proof that the
-> JSDoc-cast paren divergence is Svelte-only). Add an entry there when a fixture's `.ts`-ness is
-> load-bearing.
+> genuinely free to move (e.g. `syntax/comments/jsdoc_type_cast_ts_prettier_divergence` is the
+> standalone-TS proof that the JSDoc-cast paren divergence holds in TS contexts). Add an entry there
+> when a fixture's `.ts`-ness is load-bearing.
 
 **Use `input.css` only for file-level CSS features** that require byte position 0:
 

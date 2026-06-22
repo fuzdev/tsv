@@ -37,6 +37,13 @@ pub(in crate::ast::convert) fn convert_expression_inner(
     in_chain: bool,
 ) -> public::Expression {
     match expr {
+        // A JSDoc cast is internal-only: unwrap to the inner expression so the
+        // public AST stays paren-free (matching acorn/Svelte, which carry no
+        // `ParenthesizedExpression`). `in_chain = false` because the cast's parens
+        // seal any optional chain — the inner is a fresh chain root.
+        internal::Expression::JsdocCast(cast) => {
+            convert_expression_inner(&cast.inner, source, loc, interner, offset, false)
+        }
         internal::Expression::Literal(lit) => convert_literal_expression(lit, source, loc, offset),
         internal::Expression::Identifier(id) => {
             public::Expression::Identifier(public::Identifier {
