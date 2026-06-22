@@ -1,0 +1,286 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 116,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 81,
+				"end": 83,
+				"raw": "\n\n",
+				"data": "\n\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " shared note",
+			"start": 17,
+			"end": 31,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " trailing in module ",
+			"start": 47,
+			"end": 71,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 25
+				}
+			}
+		}
+	],
+	"module": {
+		"type": "Script",
+		"start": 0,
+		"end": 81,
+		"context": "module",
+		"content": {
+			"type": "Program",
+			"start": 15,
+			"end": 72,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 33,
+					"end": 45,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 39,
+							"end": 44,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 39,
+								"end": 40,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 43,
+								"end": 44,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " shared note",
+							"start": 17,
+							"end": 31
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " trailing in module ",
+							"start": 47,
+							"end": 71
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 14,
+				"name": "module",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 14,
+						"character": 14
+					}
+				},
+				"value": true
+			}
+		]
+	},
+	"instance": {
+		"type": "Script",
+		"start": 83,
+		"end": 115,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 91,
+			"end": 106,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 93,
+					"end": 105,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 99,
+							"end": 104,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 99,
+								"end": 100,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 103,
+								"end": 104,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 11
+									},
+									"end": {
+										"line": 8,
+										"column": 12
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " shared note",
+							"start": 17,
+							"end": 31
+						},
+						{
+							"type": "Block",
+							"value": " trailing in module ",
+							"start": 47,
+							"end": 71
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

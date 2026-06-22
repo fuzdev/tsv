@@ -12,6 +12,44 @@ use tsv_lang::{ParseError, Span};
 use super::expression_tag::scan_to_matching_brace;
 use super::parser_impl::SvelteParser;
 
+/// Iterate the `(byte_offset, char)` of the chars in a declaration string that sit
+/// at bracket depth 0 and outside string literals — the structurally "top-level"
+/// positions where a declarator `,` separator or a binding/init `=` appears.
+/// Brackets (`()`/`[]`/`{}`) with their contents, and string literals, are skipped.
+///
+/// NOTE: escape handling is simplified — a `\` before a closing quote isn't treated
+/// as an escaped backslash (`"a\\"` would misparse). Unlikely in real declarations.
+fn top_level_chars(s: &str) -> impl Iterator<Item = (usize, char)> + '_ {
+    let mut depth: i32 = 0;
+    let mut in_string = false;
+    let mut string_char = '"';
+    s.char_indices().filter(move |&(i, c)| {
+        if in_string {
+            if c == string_char && !s[..i].ends_with('\\') {
+                in_string = false;
+            }
+            false
+        } else {
+            match c {
+                '"' | '\'' | '`' => {
+                    in_string = true;
+                    string_char = c;
+                    false
+                }
+                '(' | '[' | '{' => {
+                    depth += 1;
+                    false
+                }
+                ')' | ']' | '}' => {
+                    depth -= 1;
+                    false
+                }
+                _ => depth == 0,
+            }
+        }
+    })
+}
+
 /// Find the position of the LAST top-level ` as ` keyword in a string.
 ///
 /// "Top-level" means not inside `()`, `[]`, `{}`, or `<>` brackets, and not inside string
@@ -1109,6 +1147,15 @@ impl<'a> SvelteParser<'a> {
 
         let decl_offset = tag_content_start + super::subslice_offset(tag_content, decl_str);
 
+        // `{@const}` must be a single declarator (unlike the bare `{const}`/`{let}`
+        // tags) — Svelte rejects `{@const a = 1, b = 2}`.
+        if top_level_chars(decl_str).any(|(_, c)| c == ',') {
+            return Err(self.error_msg_at(
+                "{@const ...} must consist of a single variable declaration",
+                decl_offset,
+            ));
+        }
+
         // Find the top-level `=` (not the nested `=` of a destructuring default)
         // separating id from init, then parse both sides.
         let eq_pos = self.find_top_level_equals(decl_str)?;
@@ -1130,82 +1177,76 @@ impl<'a> SvelteParser<'a> {
     /// `allow_whitespace`. Only the exact keywords `const`/`let` match (the
     /// alphabetic-run read gives the `\b` word boundary for free, so identifiers
     /// like `constant`/`letter` and expressions like `cond ? …` fall through).
-    pub(crate) fn declaration_tag_kind(&self) -> Option<DeclarationKind> {
+    pub(crate) fn opens_declaration_tag(&self) -> bool {
         let after_brace = self.current_end;
         let rest = &self.source[after_brace..];
         let kw_start = after_brace + (rest.len() - rest.trim_start().len());
-        match self.keyword_at(kw_start) {
-            "const" => Some(DeclarationKind::Const),
-            "let" => Some(DeclarationKind::Let),
-            _ => None,
-        }
+        matches!(self.keyword_at(kw_start), "const" | "let")
     }
 
     /// At a `{` (`LeftBrace`), parse either a `{const}`/`{let}` declaration tag
     /// or an ordinary `{expr}` mustache, whichever the lookahead indicates.
     /// Shared by the root, element-children, and block-children fragment loops.
     pub(crate) fn parse_brace_tag(&mut self) -> Result<FragmentNode, ParseError> {
-        if let Some(kind) = self.declaration_tag_kind() {
-            self.parse_declaration_tag(self.current_start, kind)
+        if self.opens_declaration_tag() {
+            self.parse_declaration_tag(self.current_start)
         } else {
             Ok(FragmentNode::ExpressionTag(self.parse_expression_tag()?))
         }
     }
 
-    /// Parse a declaration tag: `{const name = expr}` / `{let name = expr}` /
-    /// `{let name}`. Structurally a `{@const}` without the `@` (the content after
-    /// `{` is `const …` / `let …` either way), plus a `kind` and an optional
-    /// initializer — `let` may omit it, `const` may not.
+    /// Parse a declaration tag: `{const …}` / `{let …}`. The body is a TS variable
+    /// declaration — `tsv_ts` parses it natively (declarators, comments, brackets,
+    /// strings), so this delegates and rejects only a comment trailing the
+    /// declaration before `}`, which Svelte does not allow. `{@const}` keeps its
+    /// own `parse_const_tag`.
     pub(crate) fn parse_declaration_tag(
         &mut self,
         start: usize,
-        kind: DeclarationKind,
     ) -> Result<FragmentNode, ParseError> {
         let tag_content_start = self.current_end;
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
-        // Skip leading whitespace after `{` (Svelte allows it) before the keyword.
-        let after_ws = tag_content.trim_start();
-        let keyword_start = tag_content_start + (tag_content.len() - after_ws.len());
-
-        // Strip the `const`/`let` keyword — Svelte requires whitespace + a value.
-        let keyword = kind.keyword();
-        let decl_str = self
-            .strip_block_keyword(after_ws, keyword, keyword_start)?
-            .trim();
-
-        let decl_offset = tag_content_start + super::subslice_offset(tag_content, decl_str);
-        let span = Span {
-            start: start as u32,
-            end: after_close as u32,
+        let tsv_ts::Statement::VariableDeclaration(declaration) =
+            self.parse_ts_statement(tag_content, tag_content_start)?
+        else {
+            return Err(
+                self.error_msg_at("expected a `const` or `let` declaration", tag_content_start)
+            );
         };
 
-        // Split id/init on the top-level `=`. No `=` means no initializer, which
-        // is valid only for `let` (`const` requires one).
-        match self.find_top_level_equals(decl_str).ok() {
-            Some(eq_pos) => {
-                let (id, init) = self.parse_declarator(decl_str, decl_offset, eq_pos)?;
-                Ok(FragmentNode::DeclarationTag(DeclarationTag {
-                    kind,
-                    id,
-                    init: Some(init),
-                    span,
-                }))
-            }
-            None => {
-                if kind == DeclarationKind::Const {
-                    return Err(self
-                        .error_msg_at("`const` declarations require an initializer", decl_offset));
-                }
-                let id = self.parse_ts_pattern(decl_str, decl_offset)?;
-                Ok(FragmentNode::DeclarationTag(DeclarationTag {
-                    kind,
-                    id,
-                    init: None,
-                    span,
-                }))
-            }
+        // Svelte (like acorn) rejects a `const` declarator with no initializer;
+        // tsv_ts's parser is more permissive, so enforce it here.
+        if declaration.kind.as_str() == "const"
+            && declaration
+                .declarations
+                .iter()
+                .any(|decl| decl.init.is_none())
+        {
+            return Err(self.error_msg_at(
+                "`const` declarations require an initializer",
+                tag_content_start,
+            ));
         }
+
+        // Svelte rejects a comment trailing the declaration before `}`
+        // (`{const x = v /* c */}`); only whitespace and an optional `;` may follow.
+        let decl_end = declaration.span.end as usize;
+        let close_brace = after_close - 1;
+        if !self.source[decl_end..close_brace]
+            .trim_matches(|c: char| c.is_whitespace() || c == ';')
+            .is_empty()
+        {
+            return Err(self.error_msg_at("unexpected content after declaration", decl_end));
+        }
+
+        Ok(FragmentNode::DeclarationTag(DeclarationTag {
+            declaration,
+            span: Span {
+                start: start as u32,
+                end: after_close as u32,
+            },
+        }))
     }
 
     /// Split a declarator string on the top-level `=` at `eq_pos` into a parsed
@@ -1234,39 +1275,15 @@ impl<'a> SvelteParser<'a> {
 
     /// Find the top-level `=` in a declaration string (not inside brackets/braces
     /// or strings) — the one separating the binding from its initializer.
-    ///
-    /// NOTE: The escape handling is simplified - it doesn't correctly handle
-    /// escaped backslashes (e.g., `"test\\"` would be parsed incorrectly).
-    /// This is unlikely to occur in real declarations.
     fn find_top_level_equals(&self, s: &str) -> Result<usize, ParseError> {
-        let mut depth = 0;
-        let mut in_string = false;
-        let mut string_char = '"';
-
-        for (i, c) in s.char_indices() {
-            if in_string {
-                if c == string_char && !s[..i].ends_with('\\') {
-                    in_string = false;
-                }
-            } else {
-                match c {
-                    '"' | '\'' | '`' => {
-                        in_string = true;
-                        string_char = c;
-                    }
-                    '{' | '[' | '(' => depth += 1,
-                    '}' | ']' | ')' => depth -= 1,
-                    '=' if depth == 0 => return Ok(i),
-                    _ => {}
-                }
-            }
-        }
-
-        Err(ParseError::InvalidSyntax {
-            message: "Expected '=' in declaration".to_string(),
-            position: 0,
-            context: None,
-        })
+        top_level_chars(s)
+            .find(|&(_, c)| c == '=')
+            .map(|(i, _)| i)
+            .ok_or_else(|| ParseError::InvalidSyntax {
+                message: "Expected '=' in declaration".to_string(),
+                position: 0,
+                context: None,
+            })
     }
 
     /// Parse a debug tag: {@debug} or {@debug x, y, z}

@@ -105,9 +105,13 @@ impl<'a> Printer<'a> {
     ///
     /// Handles declare, definite assignment (!), type annotations, and multiple declarators.
     /// Follows prettier's rule: if any declarator has an initializer, break to multiple lines.
-    pub(in crate::printer) fn build_variable_declaration_doc(
+    /// `emit_semicolon` is `false` only for embedders that supply their own
+    /// terminator — Svelte's `{const …}`/`{let …}` tags close with `}` and drop
+    /// the `;` (a bare `{let a}` is the lone exception, which passes `true`).
+    pub(crate) fn build_variable_declaration_doc(
         &self,
         decl: &internal::VariableDeclaration,
+        emit_semicolon: bool,
     ) -> DocId {
         let d = self.d();
         let mut prefix = Vec::new();
@@ -161,6 +165,16 @@ impl<'a> Printer<'a> {
                 // Check for comments between declarators
                 let has_line_comment = self.has_line_comments_between(prev_end, curr_start);
                 let has_block_comment = self.has_comments_between(prev_end, curr_start);
+                // The declarator-separating comma. A block comment keeps the author's
+                // side of it: before → trails the previous init; after → leads the next
+                // declarator. (Only consulted when `has_block_comment`.)
+                let comma_pos = tsv_lang::source_scan::find_char_skipping_comments(
+                    self.source.as_bytes(),
+                    prev_end as usize,
+                    curr_start as usize,
+                    b',',
+                )
+                .map_or(curr_start, |p| p as u32);
 
                 if should_break {
                     if has_line_comment {
@@ -199,36 +213,46 @@ impl<'a> Printer<'a> {
                             needs_hardline = !comment.is_block;
                         }
                     } else {
+                        // Block comment(s) before the comma trail the previous init
+                        // (`a = 1 /* c */,`); after-comma comments lead the next
+                        // declarator (below the break). Prettier preserves the side.
+                        if has_block_comment {
+                            for comment in comments_in_range(self.comments, prev_end, comma_pos) {
+                                parts.push(d.text(" "));
+                                parts.push(self.build_comment_doc(comment));
+                            }
+                        }
                         parts.push(d.text(","));
                     }
                     // Break to new line with indentation for next declarator
                     parts.push(d.hardline());
                     parts.push(d.text(INDENT));
                     if has_block_comment && !has_line_comment {
-                        // Block comment: print on new line before declarator
-                        parts.push(self.build_inline_comments_between_doc_no_leading_space(
-                            prev_end, curr_start,
-                        ));
-                        parts.push(d.text(" "));
+                        for comment in comments_in_range(self.comments, comma_pos, curr_start) {
+                            parts.push(self.build_comment_doc(comment));
+                            parts.push(d.text(" "));
+                        }
                     }
                 } else {
-                    // For non-break case: first continuation gets comma in parts,
-                    // subsequent continuations get comma in rest_parts
-                    if i == 1 {
-                        // First continuation: comma goes to parts (after first declarator)
-                        parts.push(d.text(","));
-                    } else {
-                        // Subsequent: comma goes to rest_parts (after previous continuation)
-                        rest_parts.push(d.text(","));
+                    // Non-break case: block comments keep their side of the comma
+                    // (preserve position). The first continuation's comma sits in
+                    // `parts` (after declarator 0), later commas in `rest_parts`;
+                    // after-comma comments lead the next declarator.
+                    let comma_target = if i == 1 { &mut parts } else { &mut rest_parts };
+                    if has_block_comment {
+                        for comment in comments_in_range(self.comments, prev_end, comma_pos) {
+                            comma_target.push(d.text(" "));
+                            comma_target.push(self.build_comment_doc(comment));
+                        }
                     }
-
+                    comma_target.push(d.text(","));
                     // Soft break for declarations without initializers
                     rest_parts.push(d.line());
                     if has_block_comment {
-                        rest_parts.push(self.build_inline_comments_between_doc_no_leading_space(
-                            prev_end, curr_start,
-                        ));
-                        rest_parts.push(d.text(" "));
+                        for comment in comments_in_range(self.comments, comma_pos, curr_start) {
+                            rest_parts.push(self.build_comment_doc(comment));
+                            rest_parts.push(d.text(" "));
+                        }
                     }
                 }
             }
@@ -748,16 +772,18 @@ impl<'a> Printer<'a> {
         // Preserve comments between last declarator and semicolon in place:
         // `const x = 1 /* comment */;` stays before `;`
         // Prettier moves these after: `const x = 1; /* comment */`
-        if let Some(last) = decl.declarations.last() {
-            let semicolon_pos = decl.span.end.saturating_sub(1);
-            if let Some(comments_doc) =
-                self.build_inline_comments_between_doc_opt(last.span.end, semicolon_pos)
-            {
-                parts.push(comments_doc);
+        if emit_semicolon {
+            if let Some(last) = decl.declarations.last() {
+                let semicolon_pos = decl.span.end.saturating_sub(1);
+                if let Some(comments_doc) =
+                    self.build_inline_comments_between_doc_opt(last.span.end, semicolon_pos)
+                {
+                    parts.push(comments_doc);
+                }
             }
-        }
 
-        parts.push(d.text(";"));
+            parts.push(d.text(";"));
+        }
 
         // Restore context flags
         self.declaration_indent_depth.set(old_indent_depth);

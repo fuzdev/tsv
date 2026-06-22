@@ -325,6 +325,40 @@ pub fn parse_expression_partial_with_comments(
     Ok((expr, end_pos, comments))
 }
 
+/// Parse a single statement and return it with any collected comments.
+///
+/// Used by embedders whose host syntax wraps a statement — e.g. Svelte's
+/// `{const …}` / `{let …}` tags, which are a `VariableDeclaration` (no trailing
+/// `;`). The statement's `span().end` is the byte offset just past it.
+pub fn parse_statement_with_comments(
+    source: &str,
+    base_offset: usize,
+    interner: SharedInterner,
+) -> Result<(Statement, Vec<ast::Comment>)> {
+    let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
+    let stmt = parser
+        .parse_statement()
+        .map_err(|e| e.with_context(source))?;
+    let comments = parser.take_comments();
+    Ok((stmt, comments))
+}
+
+/// Build a DocId for a variable declaration in the caller's arena.
+///
+/// `emit_semicolon` is `false` for embedders that supply their own terminator
+/// (Svelte declaration tags close with `}`). Set `inputs.comments` to `&[]` when
+/// no comments need to be preserved.
+pub fn build_variable_declaration_doc_with_comments(
+    arena: &DocArena,
+    decl: &VariableDeclaration,
+    inputs: &PrinterInputs<'_>,
+    embed: &EmbedContext,
+    emit_semicolon: bool,
+) -> DocId {
+    let printer = make_printer(arena, inputs, *embed);
+    printer.build_variable_declaration_doc(decl, emit_semicolon)
+}
+
 /// Build a DocId for a TypeScript expression with comments in the caller's arena.
 ///
 /// Set `inputs.comments` to `&[]` when no comments need to be preserved.
@@ -370,4 +404,5 @@ pub use printer::{conditional_should_break_after_op, should_inline_logical_expre
 // types remain accessible through the full `tsv_ts::ast::internal::Foo` path.
 pub use ast::internal::{
     Expression, ObjectPatternProperty, ObjectProperty, Program, Statement, TSTypeAnnotation,
+    VariableDeclaration,
 };

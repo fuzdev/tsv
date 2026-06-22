@@ -11,8 +11,15 @@ In `.svelte` files, prettier-plugin-svelte preserves parens because acorn's
 parser produces `ParenthesizedExpression` AST nodes, and the plugin keeps
 them when preceded by a `@type`/`@satisfies` comment.
 
-The parens are semantically meaningless — stripping is the stronger
-normalization and matches prettier's standalone TS/JS behavior.
+**Caveat — these parens are NOT semantically meaningless (re-examination).**
+In checkJs / JSDoc-typed code `/** @type {T} */ (expr)` is a type **cast** and
+the parens are required for the cast to apply — `/** @type {T} */ expr` is not a
+cast. Stripping them silently drops the assertion. tsv strips to match
+prettier's standalone TS/JS behavior, but in `.svelte` the canonical formatter
+(prettier-plugin-svelte) deliberately *preserves* them, so here tsv both
+diverges from the Svelte oracle and changes the meaning of typed components.
+Whether tsv should preserve cast parens in `.svelte` (matching the plugin) is an
+open question; this fixture pins the current strip behavior pending that call.
 
 ## Contexts tested
 

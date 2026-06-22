@@ -89,7 +89,8 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
   (e.g. duplicate params, reserved-word bindings) still parse for now, with
   enforcement deferred to a future diagnostics layer; Svelte and TypeScript
   are inherently strict, so this only matters for standalone JS scripts
-- pushes complexity and mess to the printer, out of the parser and AST,
+- pushes complexity and mess to the printer and JSON conversion,
+  out of the parser and internal AST,
   keeping the model clean for the other planned tools
 
 Each language is a self-contained Rust crate exposing the same
