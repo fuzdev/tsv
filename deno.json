@@ -7,9 +7,11 @@
 		"build:ffi": "cargo build -p tsv_ffi --release",
 		"build:ffi:format": "cargo build -p tsv_ffi --release --no-default-features --features format --target-dir target/ffi-format",
 		"build:ffi:parse": "cargo build -p tsv_ffi --release --no-default-features --features parse --target-dir target/ffi-parse",
+		"build:ffi:all": "deno task build:ffi && deno task build:ffi:format && deno task build:ffi:parse",
 		"build:wasm:deno": "wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/format/deno -- --no-default-features --features format",
 		"build:wasm:parse:deno": "wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/parse/deno -- --no-default-features --features parse",
 		"build:wasm:all:deno": "wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/all/deno",
+		"build:bench": "deno task build:ffi:all && deno task build:wasm:deno && deno task build:wasm:parse:deno && deno task build:wasm:all:deno",
 		"build:npm:format": "wasm-pack build crates/tsv_wasm --target web --release --out-dir pkg/format/npm -- --no-default-features --features format && deno run --allow-read --allow-write=crates/tsv_wasm/pkg --allow-run=gzip scripts/patch_npm_package.ts format",
 		"build:npm:parse": "wasm-pack build crates/tsv_wasm --target web --release --out-dir pkg/parse/npm -- --no-default-features --features parse && deno run --allow-read --allow-write=crates/tsv_wasm/pkg --allow-run=gzip scripts/patch_npm_package.ts parse",
 		"build:npm:all": "wasm-pack build crates/tsv_wasm --target web --release --out-dir pkg/all/npm && deno run --allow-read --allow-write=crates/tsv_wasm/pkg --allow-run=gzip scripts/patch_npm_package.ts all",
@@ -22,7 +24,7 @@
 		"check": "deno task typecheck && deno task test && deno task test:deno && deno task conformance:audit && deno task swallow:audit && cargo fmt --check && deno task check:ast-types && deno task lint",
 		"check:ast-types": "deno run --allow-read --allow-write=scripts --allow-run=cargo,deno scripts/check_ast_types.ts",
 
-		"fixture:init": "cargo run -p tsv_debug --quiet fixture_init",
+		"fixtures:init": "cargo run -p tsv_debug --quiet fixture_init",
 		"fixtures:list": "cargo run -p tsv_debug --quiet fixtures_update_parsed --list",
 		"fixtures:validate": "cargo run -p tsv_debug --quiet fixtures_validate",
 		"fixtures:update": "cargo run -p tsv_debug --quiet fixtures_update",
@@ -34,7 +36,7 @@
 		"swallow:audit": "cargo run -p tsv_debug --quiet swallow_audit",
 		"metrics": "cargo run -p tsv_debug --quiet metrics",
 
-		"bench": "deno task build:ffi && deno task build:ffi:format && deno task build:ffi:parse && deno task build:wasm:deno && deno task build:wasm:parse:deno && deno task build:wasm:all:deno && deno task bench:run",
+		"bench": "deno task build:bench && deno task bench:run",
 		"bench:run": "deno run --v8-flags=--expose-gc --allow-ffi --allow-read --allow-write=benches/deno/results --allow-run=git,gzip --allow-env --allow-net --allow-sys benches/deno/bench.ts",
 		"bench:clean": "rm -f benches/deno/results/baseline.json benches/deno/results/[0-9]*.json benches/deno/results/[0-9]*.md",
 		"smoke": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/smoke.ts",
@@ -46,9 +48,12 @@
 		"divergence:audit": "deno run --allow-read benches/deno/divergence_audit.ts",
 		"test:deno": "deno test --config benches/deno/deno.json --allow-read --allow-env --allow-net --allow-sys benches/deno/lib/",
 
-		"test:npm": "PKG_DIR=crates/tsv_wasm/pkg/format/npm node --test scripts/test_npm.ts",
-		"test:npm:parse": "PKG_DIR=crates/tsv_wasm/pkg/parse/npm node --test scripts/test_npm.ts",
-		"test:npm:all": "PKG_DIR=crates/tsv_wasm/pkg/all/npm node --test scripts/test_npm.ts",
+		"test:npm": "deno task build:npm:format && deno task test:npm:run",
+		"test:npm:run": "PKG_DIR=crates/tsv_wasm/pkg/format/npm node --test scripts/test_npm.ts",
+		"test:npm:parse": "deno task build:npm:parse && deno task test:npm:parse:run",
+		"test:npm:parse:run": "PKG_DIR=crates/tsv_wasm/pkg/parse/npm node --test scripts/test_npm.ts",
+		"test:npm:all": "deno task build:npm:all && deno task test:npm:all:run",
+		"test:npm:all:run": "PKG_DIR=crates/tsv_wasm/pkg/all/npm node --test scripts/test_npm.ts",
 		"validate:artifacts": "deno run --allow-read scripts/validate_artifacts.ts",
 
 		"publish": "deno run --allow-read --allow-write --allow-run --allow-env --allow-net scripts/publish.ts"

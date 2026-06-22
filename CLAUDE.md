@@ -108,7 +108,8 @@ deno task build            # workspace dev build
 deno task build:release    # workspace optimized build
 deno task build:all        # release + ffi + build:packages (everything)
 deno task build:packages   # the 6 publishable WASM bundles (npm + deno) — single source of truth shared by CI + publish.ts
-deno task build:ffi        # C FFI library
+deno task build:bench      # the artifact set `bench`/`smoke` measure (ffi×3 + the 3 wasm:deno variants)
+deno task build:ffi        # C FFI library (:format / :parse size-only variants; :all builds all three)
 deno task build:wasm:deno  # deno-target WASM bundle (requires wasm-pack; :parse:deno / :all:deno for the other variants)
 deno task clean            # clean build artifacts
 deno task dev              # watch mode: check + test on changes (requires cargo-watch)
@@ -235,8 +236,8 @@ deno task publish                        # dry-run: validate everything, no muta
 deno task publish --wetrun --bump patch  # release: bump + publish + git finalize (--bump required, must match CHANGELOG marker)
 deno task publish --wetrun               # resume a failed wetrun (sentinel retry only)
 # Flags: --bump patch|minor|major, --no-check, --no-git
-deno task test:npm[:parse|:all]          # Node tests against a built pkg/{format,parse,all}/npm/ (:all includes CLI tests)
-deno task validate:artifacts             # tight wasm size bounds + Deno smoke of all built bundles
+deno task test:npm[:parse|:all]          # builds the npm package, then runs Node tests against it (:all includes CLI tests; `:run` suffix skips the rebuild)
+deno task validate:artifacts             # tight wasm size bounds + Deno smoke of all built bundles (fails if nothing is built)
 ```
 
 `scripts/validate_artifacts.ts` holds deliberately tight (~±8%) size bounds — a legitimate binary size change fails the publish until the constants are updated, keeping size moves visible and intentional.
@@ -271,7 +272,7 @@ Divergence detection identifies known differences documented in `conformance_pre
 # Smoke test (fast sanity check that every formatter+parser produces output)
 deno task smoke
 
-# Run benchmarks (builds ffi + wasm:deno automatically)
+# Run benchmarks (builds the bench artifact set — `build:bench` — automatically)
 deno task bench
 
 # Run without rebuilding (if already built). Aborts if the FFI/WASM artifacts

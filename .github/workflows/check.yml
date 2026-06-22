@@ -146,9 +146,11 @@ jobs:
         run: deno task validate:artifacts
 
       # All three published shapes differ (format excludes convert, parse
-      # bundles the .d.ts, all ships the tsv bin), so test each.
+      # bundles the .d.ts, all ships the tsv bin), so test each. The `:run`
+      # variants skip the per-package rebuild the bare `test:npm*` wrappers do —
+      # `build:packages` above already built all six bundles.
       - name: Node package tests
         run: |
-          deno task test:npm
-          deno task test:npm:parse
-          deno task test:npm:all
+          deno task test:npm:run
+          deno task test:npm:parse:run
+          deno task test:npm:all:run
