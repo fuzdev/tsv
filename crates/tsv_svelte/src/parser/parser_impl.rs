@@ -453,4 +453,17 @@ impl<'a> SvelteParser<'a> {
         self.expression_comments.extend(comments);
         Ok(pattern)
     }
+
+    /// Parse a TypeScript statement (the body of a `{const}`/`{let}` tag is a
+    /// `VariableDeclaration`) and collect any comments.
+    pub(crate) fn parse_ts_statement(
+        &mut self,
+        source: &str,
+        base_offset: usize,
+    ) -> Result<tsv_ts::Statement, ParseError> {
+        let (stmt, comments) =
+            tsv_ts::parse_statement_with_comments(source, base_offset, Rc::clone(&self.interner))?;
+        self.expression_comments.extend(comments);
+        Ok(stmt)
+    }
 }

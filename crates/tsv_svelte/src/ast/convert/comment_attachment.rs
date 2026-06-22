@@ -504,7 +504,7 @@ fn walk_and_attach_expressions(
                     if let (Some(c_start), Some(c_end)) = (container_start, container_end)
                         && let Some(expr) = map.get_mut("expression")
                     {
-                        try_attach_comments_to_expression(
+                        try_attach_comments_to_node(
                             expr,
                             template_comments,
                             source,
@@ -522,7 +522,7 @@ fn walk_and_attach_expressions(
                             .or(container_end)
                             .unwrap_or(0);
                         if let Some(test) = map.get_mut("test") {
-                            try_attach_comments_to_expression(
+                            try_attach_comments_to_node(
                                 test,
                                 template_comments,
                                 source,
@@ -540,7 +540,7 @@ fn walk_and_attach_expressions(
                             .or(container_end)
                             .unwrap_or(0);
                         if let Some(expr) = map.get_mut("expression") {
-                            try_attach_comments_to_expression(
+                            try_attach_comments_to_node(
                                 expr,
                                 template_comments,
                                 source,
@@ -562,7 +562,7 @@ fn walk_and_attach_expressions(
                             .or(container_end)
                             .unwrap_or(0);
                         if let Some(expr) = map.get_mut("expression") {
-                            try_attach_comments_to_expression(
+                            try_attach_comments_to_node(
                                 expr,
                                 template_comments,
                                 source,
@@ -572,7 +572,7 @@ fn walk_and_attach_expressions(
                         }
                         // context: skip (patterns don't collect comments)
                         if let Some(key) = map.get_mut("key") {
-                            try_attach_comments_to_expression(
+                            try_attach_comments_to_node(
                                 key,
                                 template_comments,
                                 source,
@@ -593,7 +593,7 @@ fn walk_and_attach_expressions(
                             .or(container_end)
                             .unwrap_or(0);
                         if let Some(expr) = map.get_mut("expression") {
-                            try_attach_comments_to_expression(
+                            try_attach_comments_to_node(
                                 expr,
                                 template_comments,
                                 source,
@@ -612,7 +612,7 @@ fn walk_and_attach_expressions(
                             .or(container_end)
                             .unwrap_or(0);
                         if let Some(expr) = map.get_mut("expression") {
-                            try_attach_comments_to_expression(
+                            try_attach_comments_to_node(
                                 expr,
                                 template_comments,
                                 source,
@@ -622,7 +622,7 @@ fn walk_and_attach_expressions(
                         }
                         if let Some(serde_json::Value::Array(params)) = map.get_mut("parameters") {
                             for param in params.iter_mut() {
-                                try_attach_comments_to_expression(
+                                try_attach_comments_to_node(
                                     param,
                                     template_comments,
                                     source,
@@ -634,29 +634,26 @@ fn walk_and_attach_expressions(
                     }
                 }
 
-                // ConstTag: {@const id = init}; DeclarationTag: {const id = init} / {let id = init}
-                // Svelte runs `add_comments(init)` on the init expression directly,
-                // THEN constructs the VariableDeclaration wrapper. So we need to attach
-                // comments to the init expression, not the whole declaration.
-                // Also update VariableDeclaration.end to match Svelte's (container_end - 1).
-                "ConstTag" | "DeclarationTag" => {
+                // `{@const id = init}` — Svelte hand-builds the VariableDeclaration and
+                // runs `add_comments(init)` on the **init expression directly**, so
+                // comments attach to the init's subtree, not the whole declaration.
+                // (Also update VariableDeclaration.end to Svelte's `parser.index - 1`.)
+                "ConstTag" => {
                     if let (Some(c_start), Some(c_end)) = (container_start, container_end)
                         && let Some(decl) = map.get_mut("declaration")
                     {
-                        // Update declaration.end to match Svelte (parser.index - 1 = closing `}`)
                         if let Some(obj) = decl.as_object_mut() {
                             obj.insert(
                                 "end".to_string(),
                                 serde_json::Value::Number((c_end - 1).into()),
                             );
                         }
-                        // Attach comments to init expression inside first declarator
                         if let Some(declarations) =
                             decl.get_mut("declarations").and_then(|d| d.as_array_mut())
                             && let Some(declarator) = declarations.first_mut()
                             && let Some(init) = declarator.get_mut("init")
                         {
-                            try_attach_comments_to_expression(
+                            try_attach_comments_to_node(
                                 init,
                                 template_comments,
                                 source,
@@ -666,6 +663,30 @@ fn walk_and_attach_expressions(
                         }
                     }
                 }
+                // `{const id = init}` / `{let …}` are acorn-parsed, so comments attach
+                // across the **whole VariableDeclaration tree** (every declarator and
+                // its id/init) per acorn's recursive attachment — attaching only to the
+                // first init left a comment leading a later declarator
+                // (`{let a = 1, /* c */ b}`) unattached.
+                "DeclarationTag" => {
+                    if let (Some(c_start), Some(c_end)) = (container_start, container_end)
+                        && let Some(decl) = map.get_mut("declaration")
+                    {
+                        if let Some(obj) = decl.as_object_mut() {
+                            obj.insert(
+                                "end".to_string(),
+                                serde_json::Value::Number((c_end - 1).into()),
+                            );
+                        }
+                        try_attach_comments_to_node(
+                            decl,
+                            template_comments,
+                            source,
+                            c_start,
+                            c_end,
+                        );
+                    }
+                }
 
                 // DebugTag: {@debug identifiers}
                 "DebugTag" => {
@@ -673,7 +694,7 @@ fn walk_and_attach_expressions(
                         && let Some(serde_json::Value::Array(ids)) = map.get_mut("identifiers")
                     {
                         for id in ids.iter_mut() {
-                            try_attach_comments_to_expression(
+                            try_attach_comments_to_node(
                                 id,
                                 template_comments,
                                 source,
@@ -694,7 +715,7 @@ fn walk_and_attach_expressions(
                         && let Some(expr) = map.get_mut("expression")
                         && !expr.is_null()
                     {
-                        try_attach_comments_to_expression(
+                        try_attach_comments_to_node(
                             expr,
                             template_comments,
                             source,
@@ -710,7 +731,7 @@ fn walk_and_attach_expressions(
                         && let Some(expr) = map.get_mut("expression")
                         && expr.is_object()
                     {
-                        try_attach_comments_to_expression(
+                        try_attach_comments_to_node(
                             expr,
                             template_comments,
                             source,
@@ -733,13 +754,7 @@ fn walk_and_attach_expressions(
                     if let (Some(c_start), Some(c_end)) = (container_start, container_end)
                         && let Some(tag) = map.get_mut("tag")
                     {
-                        try_attach_comments_to_expression(
-                            tag,
-                            template_comments,
-                            source,
-                            c_start,
-                            c_end,
-                        );
+                        try_attach_comments_to_node(tag, template_comments, source, c_start, c_end);
                     }
                 }
 
@@ -747,7 +762,7 @@ fn walk_and_attach_expressions(
                     if let (Some(c_start), Some(c_end)) = (container_start, container_end)
                         && let Some(expr) = map.get_mut("expression")
                     {
-                        try_attach_comments_to_expression(
+                        try_attach_comments_to_node(
                             expr,
                             template_comments,
                             source,
@@ -834,14 +849,14 @@ fn first_child_start(
 ///
 /// The `container_start` is the Svelte node's start (e.g., ExpressionTag start).
 /// The `container_end` bounds the maximum extent for trailing comment scanning.
-fn try_attach_comments_to_expression(
-    expr_json: &mut serde_json::Value,
+fn try_attach_comments_to_node(
+    node_json: &mut serde_json::Value,
     template_comments: &[&Comment],
     source: &str,
     container_start: u32,
     container_end: u32,
 ) {
-    let Some(expr_end) = node_end(expr_json) else {
+    let Some(expr_end) = node_end(node_json) else {
         return;
     };
 
@@ -868,7 +883,7 @@ fn try_attach_comments_to_expression(
         source,
     };
 
-    attach_comments_recursively(expr_json, &mut ctx);
+    attach_comments_recursively(node_json, &mut ctx);
 }
 
 /// Scan source after an expression's end to find the effective end of comment collection

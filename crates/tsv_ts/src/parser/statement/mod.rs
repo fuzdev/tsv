@@ -16,7 +16,7 @@ mod type_declarations;
 mod variable;
 
 impl<'a> Parser<'a> {
-    pub(super) fn parse_statement(&mut self) -> Result<Statement, ParseError> {
+    pub(crate) fn parse_statement(&mut self) -> Result<Statement, ParseError> {
         // Check if this is a variable declaration
         match self.current_kind() {
             TokenKind::Keyword(kw) => match kw {

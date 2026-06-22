@@ -3,7 +3,9 @@
 In `.svelte` files, prettier-plugin-svelte preserves JSDoc type cast parens
 (`/** @type {T} */ (fn(x))`), while tsv strips them (the parser consumes the
 parens and returns the inner expression directly). This is the same paren
-divergence documented in `jsdoc_type_cast_prettier_divergence`.
+divergence documented in `jsdoc_type_cast_prettier_divergence` — and, as noted
+there, the strip is **semantic** (it drops the cast in checkJs code), not
+cosmetic.
 
 When the arrow body line exceeds print width, a secondary line-breaking
 difference appears: without parens, prettier (in `.ts` mode) and tsv both

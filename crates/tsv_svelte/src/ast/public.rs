@@ -483,7 +483,7 @@ pub struct ConstTag {
 /// Svelte DeclarationTag - local `{const …}` / `{let …}` declaration
 ///
 /// The declaration is a VariableDeclaration-like structure (`kind` is `const`
-/// or `let`) with a single declarator.
+/// or `let`) with one or more comma-separated declarators.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeclarationTag {
     #[serde(rename = "type")]

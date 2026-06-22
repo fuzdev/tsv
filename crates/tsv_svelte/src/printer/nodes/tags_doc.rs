@@ -16,8 +16,6 @@ const RENDER_TAG_OPEN: &str = "{@render ";
 // and the `.len()` derives the offset past the keyword for comment scanning.
 const DEBUG_TAG_OPEN: &str = "{@debug";
 const AT_CONST_TAG_OPEN: &str = "{@const ";
-const CONST_TAG_OPEN: &str = "{const ";
-const LET_TAG_OPEN: &str = "{let ";
 
 impl<'a> Printer<'a> {
     /// Build a doc for {@html expr}
@@ -46,25 +44,23 @@ impl<'a> Printer<'a> {
         self.build_assignment_tag_doc(AT_CONST_TAG_OPEN, &tag.id, &tag.init, tag.span)
     }
 
-    /// Build a doc for `{const id = init}` / `{let id = init}` / `{let id}`.
-    ///
-    /// The with-init form reuses the shared `{@const}` assignment layout (just a
-    /// different opening keyword). The binding-less `let` form (`{let id}`) has
-    /// no initializer — prettier renders it as a bare declaration with a trailing
-    /// `;`.
+    /// Build a doc for `{const …}` / `{let …}` — the body is a TS variable
+    /// declaration, so the layout (declarator breaking, long-init break-after-`=`,
+    /// comments) is delegated to `tsv_ts`. The `}` terminates the tag, so the
+    /// trailing `;` is dropped — except for a bare single declarator (`{let a}` →
+    /// `{let a;}`), which prettier keeps.
     pub(crate) fn build_declaration_tag_doc(&self, tag: &internal::DeclarationTag) -> DocId {
-        let prefix = match tag.kind {
-            internal::DeclarationKind::Const => CONST_TAG_OPEN,
-            internal::DeclarationKind::Let => LET_TAG_OPEN,
-        };
-        match &tag.init {
-            Some(init) => self.build_assignment_tag_doc(prefix, &tag.id, init, tag.span),
-            None => {
-                let d = self.d();
-                let id_doc = self.build_ts_expression_doc_no_comments(&tag.id);
-                d.concat(&[d.text(prefix), id_doc, d.text(";}")])
-            }
-        }
+        let d = self.d();
+        let decl = &tag.declaration;
+        let emit_semicolon = decl.declarations.len() == 1 && decl.declarations[0].init.is_none();
+        let inner = tsv_ts::build_variable_declaration_doc_with_comments(
+            d,
+            decl,
+            &self.ts_inputs(),
+            &self.embed,
+            emit_semicolon,
+        );
+        d.concat(&[d.text("{"), inner, d.text("}")])
     }
 
     /// Shared assignment-tag layout for `{@const}` and `{const}`/`{let}` (with init).

@@ -18,11 +18,11 @@ discovered tests (46,545 graded after skips).
 
 | Tests                    | Passed | Failed |
 | ------------------------ | ------ | ------ |
-| Positive (should parse)  | 41,226 | 888    |
+| Positive (should parse)  | 41,827 | 287    |
 | Negative (should reject) | 1,354  | 3,077  |
 
-- **Overall**: 42,580/46,545 (91.5%)
-- **Positive pass rate**: 97.9% — valid syntax tsv accepts
+- **Overall**: 43,181/46,545 (92.8%)
+- **Positive pass rate**: 99.3% — valid syntax tsv accepts
 - **Skipped**: 2,591 (sloppy mode: 2,519, runtime: 38, resolution: 34)
 
 Most negative failures are over-acceptance of _early errors_ — programs that

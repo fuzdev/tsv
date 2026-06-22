@@ -478,7 +478,7 @@ pub(in crate::ast) fn convert_block_statement(
     }
 }
 
-pub(in crate::ast) fn convert_variable_declaration(
+pub fn convert_variable_declaration(
     var_decl: &internal::VariableDeclaration,
     source: &str,
     loc: &LocationTracker,

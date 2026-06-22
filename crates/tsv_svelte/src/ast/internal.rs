@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use string_interner::DefaultSymbol;
 use tsv_css::ast::internal::CssStyleSheet;
 pub use tsv_lang::{Comment, SharedInterner, Span};
-use tsv_ts::ast::internal::{Expression, Program};
+use tsv_ts::ast::internal::{Expression, Program, VariableDeclaration};
 
 /// Svelte Root - top-level AST node
 ///
@@ -175,38 +175,15 @@ pub struct ConstTag {
     pub span: Span,
 }
 
-/// The keyword of a `{const …}` / `{let …}` declaration tag.
-///
-/// Svelte's newer declaration tags carry a `const` or `let` kind on the inner
-/// `VariableDeclaration` (unlike `{@const}`, which is always `const`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DeclarationKind {
-    Const,
-    Let,
-}
-
-impl DeclarationKind {
-    /// The kind keyword as it appears in the public AST and the emitted tag.
-    pub fn keyword(self) -> &'static str {
-        match self {
-            DeclarationKind::Const => "const",
-            DeclarationKind::Let => "let",
-        }
-    }
-}
-
 /// Svelte DeclarationTag - local `{const …}` / `{let …}` declaration
 ///
-/// Represents the newer bare `{const name = expr}` / `{let name = expr}` tags
-/// (no `@`), parsed canonically as a `DeclarationTag` wrapping a
-/// `VariableDeclaration`. Unlike `{@const}` these accept either keyword and,
-/// for `let`, an omitted initializer (`{let name}`). The `id` is the pattern
-/// and `init` the optional value.
+/// The bare `{const name = expr}` / `{let name = expr}` tags (no `@`). The body is
+/// a TS `VariableDeclaration` parsed, printed, and converted by `tsv_ts`, so
+/// multiple declarators, comments, and every bracket/string case are handled
+/// natively. (`{@const}` is a separate `ConstTag` on its own path.)
 #[derive(Debug, Clone)]
 pub struct DeclarationTag {
-    pub kind: DeclarationKind,
-    pub id: Expression,           // Pattern (identifier or destructuring)
-    pub init: Option<Expression>, // Initializer expression (None only for `let`)
+    pub declaration: VariableDeclaration,
     pub span: Span,
 }
 
