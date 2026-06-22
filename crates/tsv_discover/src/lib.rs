@@ -116,21 +116,47 @@ pub fn classify_dir(
     heuristic_active: bool,
     stack: &IgnoreStack,
 ) -> DirVerdict {
+    // `heuristic_active` implies no `.gitignore` layer is pushed, so the
+    // `is_reincluded` / `has_negation_under` consulted below see only the tsv
+    // layer. That implication is load-bearing (a stray `.gitignore` negation would
+    // otherwise leak into the heuristic override), so the CLI/JS walkers' threading
+    // of `heuristic_active` is enforced here, not trusted. The per-file
+    // `is_path_pruned` replay assembles the full ancestor stack up front rather
+    // than pushing incrementally, so it can't satisfy this whole-stack invariant
+    // and calls `classify_dir_inner` directly — sound for a different reason (see
+    // there), with `heuristic_active` reconstructed per level.
+    debug_assert!(
+        !heuristic_active || !stack.has_gitignore_layers(),
+        "heuristic_active with a .gitignore layer pushed: is_reincluded would consult .gitignore negations in the heuristic override",
+    );
+    classify_dir_inner(name, child_rel, heuristic_active, stack)
+}
+
+/// The [`classify_dir`] decision without its `heuristic_active ⟹ no .gitignore
+/// layer` whole-stack debug-assert. A top-down traversal ([`classify_dir`]) pushes
+/// layers incrementally, so when it classifies a level no deeper `.gitignore` is
+/// present and the assert holds. The per-file [`is_path_pruned`] replay instead
+/// assembles the file's *full* ancestor stack once and reconstructs each level's
+/// `heuristic_active` itself — so a deeper `.gitignore` may sit in the stack while
+/// a shallower level's heuristic is active. That is still faithful: the matcher's
+/// `last_match_at` only consults layers whose anchor is a prefix of the queried
+/// path (a deeper layer fails to `relativize`), so the leaf / re-include queries
+/// see exactly the ancestors they would mid-walk; and the one place a deeper layer
+/// *is* consulted — `has_negation_under`, picking `Prune` vs `PruneWithWarning` —
+/// only affects the warning, which a boolean prune query collapses away.
+fn classify_dir_inner(
+    name: &str,
+    child_rel: &str,
+    heuristic_active: bool,
+    stack: &IgnoreStack,
+) -> DirVerdict {
     // safety nets prune unconditionally
     if is_safety_net(name) {
         return DirVerdict::Prune;
     }
     // the heuristic prunes hidden + build-output dirs only while no `.gitignore`
     // governs this level — but an explicit tsv-layer `!` re-include overrides the
-    // guess (an explicit directive beats it). `heuristic_active` implies no
-    // `.gitignore` layer is pushed, so `is_reincluded` / `has_negation_under`
-    // consult only the tsv layer. That implication is load-bearing (a stray
-    // `.gitignore` negation would otherwise leak into the override), so the
-    // CLI/JS walkers' threading of `heuristic_active` is enforced here, not trusted.
-    debug_assert!(
-        !heuristic_active || !stack.has_gitignore_layers(),
-        "heuristic_active with a .gitignore layer pushed: is_reincluded would consult .gitignore negations in the heuristic override",
-    );
+    // guess (an explicit directive beats it).
     if heuristic_active
         && (name.starts_with('.') || HEURISTIC_DIRS.contains(&name))
         && !stack.is_reincluded(child_rel, true)
@@ -155,6 +181,74 @@ pub fn classify_dir(
         return DirVerdict::Prune;
     }
     DirVerdict::Descend
+}
+
+/// Whether `rel` — a format-root-relative, `/`-separated **file** path — is
+/// skipped because some ancestor directory would be pruned by the traversal (a
+/// [safety net](SAFETY_NET_DIRS), the build-output heuristic, or the matcher)
+/// before the walk reaches the file. The per-file companion to [`classify_dir`]
+/// for a consumer that has **no top-down traversal**: the VS Code extension
+/// formats one open document at a time, so it can't thread `heuristic_active`
+/// down a walk.
+///
+/// `stack` is the matcher assembled from the file's full ancestor chain (every
+/// `.gitignore` / tsv layer from the root down — the same stack a file-level
+/// [`is_ignored`](tsv_ignore::IgnoreStack::is_ignored) check uses). This walks the
+/// ancestor directories shallow→deep, reconstructing each level's
+/// `heuristic_active` from the stack's own pushed `.gitignore` anchors
+/// ([`gitignore_anchors`](tsv_ignore::IgnoreStack::gitignore_anchors)) — off at a
+/// level once a `.gitignore` anchored *above* it is present — and returns `true`
+/// at the first ancestor [`classify_dir`] would not `Descend` into. It does the
+/// **directory** half of discovery only; pair it with
+/// [`is_ignored(rel, false)`](tsv_ignore::IgnoreStack::is_ignored) for the
+/// file-level match (a file no directory prunes may still be ignored by a rule).
+///
+/// Equivalent to running [`classify_dir`] down a real single-path walk — it calls
+/// [`classify_dir_inner`] so the full-stack assembly skips the incremental-walk
+/// assert; see that fn for why the assembled stack stays faithful.
+pub fn is_path_pruned(rel: &str, stack: &IgnoreStack) -> bool {
+    let segments: Vec<&str> = rel
+        .split('/')
+        .filter(|s| !s.is_empty() && *s != ".")
+        .collect();
+    // a root-level file (or empty path) has no ancestor directories to prune
+    if segments.len() < 2 {
+        return false;
+    }
+    let git_anchors = stack.gitignore_anchors();
+    let mut child_rel = String::new();
+    for &name in &segments[..segments.len() - 1] {
+        if child_rel.is_empty() {
+            child_rel.push_str(name);
+        } else {
+            child_rel.push('/');
+            child_rel.push_str(name);
+        }
+        let heuristic_active = !gitignore_above(&git_anchors, &child_rel);
+        if !matches!(
+            classify_dir_inner(name, &child_rel, heuristic_active, stack),
+            DirVerdict::Descend
+        ) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Whether any `.gitignore` anchor in `anchors` sits at a **strict ancestor**
+/// directory of `dir`. The root anchor `""` is an ancestor of every non-root
+/// directory; an anchor *equal* to `dir` is the directory's own `.gitignore`
+/// (pushed only when descending *into* it during a real walk, so it doesn't
+/// classify the directory itself) and does **not** count. This reconstructs how
+/// the traversal turns `heuristic_active` off for a directory once a `.gitignore`
+/// governs a level at or above it.
+fn gitignore_above(anchors: &[String], dir: &str) -> bool {
+    anchors.iter().any(|anchor| {
+        anchor.is_empty()
+            || (dir.len() > anchor.len()
+                && dir.starts_with(anchor.as_str())
+                && dir.as_bytes()[anchor.len()] == b'/')
+    })
 }
 
 /// Whether a child **file** should be formatted: it has a formattable extension
@@ -392,5 +486,94 @@ mod tests {
             prettierignore_outside_repo_warning(".", false, true, false).unwrap(),
             ".prettierignore in . is not read outside a git repo (tsv reads .formatignore there); rename it to .formatignore, or run `git init`, for it to apply"
         );
+    }
+
+    /// Assemble a stack the way a per-file consumer (the VS Code extension) does:
+    /// every `.gitignore` layer shallow→deep, then every tsv layer shallow→deep.
+    fn stack_from(gitignores: &[(&str, &str)], tsvs: &[(&str, &str)]) -> IgnoreStack {
+        let mut stack = IgnoreStack::new();
+        for (anchor, content) in gitignores {
+            stack.push_gitignore(anchor, content);
+        }
+        for (anchor, content) in tsvs {
+            stack.push_tsv(anchor, content);
+        }
+        stack
+    }
+
+    #[test]
+    fn path_pruned_under_gitignored_dir() {
+        // a file under a gitignored `dist/` is pruned; a sibling under `src/` is not
+        let stack = stack_from(&[("", "dist/\n")], &[]);
+        assert!(is_path_pruned("dist/out.ts", &stack));
+        assert!(!is_path_pruned("src/app.ts", &stack));
+    }
+
+    #[test]
+    fn path_pruned_safety_net_with_no_ignore_files() {
+        // safety nets prune unconditionally — even an empty stack prunes node_modules
+        let stack = IgnoreStack::new();
+        assert!(is_path_pruned("node_modules/pkg/index.ts", &stack));
+        assert!(!is_path_pruned("src/app.ts", &stack));
+    }
+
+    #[test]
+    fn root_level_file_is_never_path_pruned() {
+        // no ancestor directories to prune (and an empty path is a no-op)
+        let stack = stack_from(&[("", "dist/\n")], &[]);
+        assert!(!is_path_pruned("app.ts", &stack));
+        assert!(!is_path_pruned("", &stack));
+    }
+
+    #[test]
+    fn loose_regime_heuristic_prunes_build_output_and_hidden() {
+        // no `.gitignore` pushed (loose): the heuristic is on, so build/dist/target
+        // and hidden dirs prune; a normal `src/` does not
+        let stack = stack_from(&[], &[]);
+        assert!(is_path_pruned("build/b.ts", &stack));
+        assert!(is_path_pruned("dist/d.ts", &stack));
+        assert!(is_path_pruned("target/t.ts", &stack));
+        assert!(is_path_pruned(".hidden/h.ts", &stack));
+        assert!(!is_path_pruned("src/app.ts", &stack));
+    }
+
+    #[test]
+    fn repo_with_root_gitignore_turns_heuristic_off_for_build() {
+        // mirrors the extension scenario: a repo with a root `.gitignore` ignoring
+        // `dist/` — `dist/` prunes via the matcher, but `build/` is NOT a heuristic
+        // prune (a `.gitignore` governs the level, so the heuristic is off)
+        let stack = stack_from(&[("", "dist/\n")], &[]);
+        assert!(is_path_pruned("dist/out.ts", &stack));
+        assert!(!is_path_pruned("build/src.ts", &stack));
+    }
+
+    #[test]
+    fn loose_tsv_reinclude_overrides_heuristic() {
+        // a `.formatignore` `!build/` re-includes over the build-output heuristic;
+        // a non-re-included `dist/` still prunes
+        let stack = stack_from(&[], &[("", "!build/\n")]);
+        assert!(!is_path_pruned("build/out.ts", &stack));
+        assert!(is_path_pruned("dist/d.ts", &stack));
+    }
+
+    #[test]
+    fn heuristic_active_reconstructed_per_level_from_deeper_gitignore() {
+        // the case that proves the per-level reconstruction (and that the full-stack
+        // assembly is sound where the incremental-walk assert would forbid it): a
+        // `.gitignore` only at `sub/` turns the heuristic off for `sub`'s subtree but
+        // not above it — top-level `build/` is still a heuristic prune, `sub/build/`
+        // is not. (Calling the assert-bearing `classify_dir` with this full stack
+        // would panic in debug; `is_path_pruned` uses `classify_dir_inner`.)
+        let stack = stack_from(&[("sub", "# nothing\n")], &[]);
+        assert!(is_path_pruned("build/x.ts", &stack)); // heuristic on above `sub`
+        assert!(!is_path_pruned("sub/build/x.ts", &stack)); // heuristic off under `sub`'s .gitignore
+    }
+
+    #[test]
+    fn nested_directory_under_gitignored_ancestor_is_pruned() {
+        // git's parent-directory prune reaches an arbitrarily deep descendant
+        let stack = stack_from(&[("", "vendored/\n")], &[]);
+        assert!(is_path_pruned("vendored/deep/nested/v.svelte", &stack));
+        assert!(!is_path_pruned("src/deep/nested/app.svelte", &stack));
     }
 }

@@ -23,6 +23,12 @@ tsv has no config that changes its formatting style behavior, and none will be a
   relative to the cwd), plus a repo-root `.prettierignore` for drop-in compat
   ([#50](https://github.com/fuzdev/tsv/pull/50))
 - feat: `tsv format --list` prints the in-scope files without formatting
+- feat: `IgnoreStack.is_path_pruned(rel)` on the WASM binding
+  (`@fuzdev/tsv_format_wasm` / `@fuzdev/tsv_wasm`) — a per-file directory-prune
+  query (safety nets + build-output heuristic + matcher) for discovery consumers
+  with no top-down traversal; it reconstructs each ancestor's `heuristic_active`
+  from the stack's own `.gitignore` anchors, so the VS Code extension uses it
+  instead of rebuilding that walk in TypeScript
 - feat: support `format-ignore` as an alias to `prettier-ignore`
   (along with `format-ignore-start` and `format-ignore-end` for templates)
   ([#41](https://github.com/fuzdev/tsv/pull/41))
