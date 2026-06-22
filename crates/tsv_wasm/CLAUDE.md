@@ -57,6 +57,13 @@ then queries:
   the message via `heuristic_shadow_warning(dir)`.
 - `should_format_file(name, child_rel) -> bool` — the per-file verdict (a
   formattable extension and not ignored).
+- `is_path_pruned(rel) -> bool` — the per-file form of the directory-prune verdict
+  for a consumer with **no top-down traversal** (the VS Code extension formats one
+  open document at a time). It walks `rel`'s ancestor directories itself and
+  reconstructs each level's `heuristic_active` from the stack's own pushed
+  `.gitignore` anchors, so it takes no extra arguments; pair it with
+  `is_ignored(rel, false)` for the file-level match. (`classify_dir` stays the
+  primitive for `npm/cli.js`, which threads `heuristic_active` down a real walk.)
 - `heuristic_shadow_warning(dir) -> string` — the one warning template (a method,
   not a free function, so it rides the class re-export; single source of truth
   with the native CLI, never re-templated in JS).

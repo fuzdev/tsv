@@ -108,6 +108,18 @@ impl IgnoreStack {
         tsv_discover::should_format_file(name, child_rel, &self.inner)
     }
 
+    /// Whether `rel` (a format-root-relative file path) is skipped because some
+    /// ancestor directory would be pruned by discovery — the safety nets, the
+    /// build-output heuristic, or the matcher — delegating to
+    /// `tsv_discover::is_path_pruned`. A per-file companion to `classify_dir` for a
+    /// consumer with no top-down traversal: it reconstructs each ancestor's
+    /// `heuristic_active` from this stack's own pushed `.gitignore` anchors, so it
+    /// takes no extra arguments. Pair with `is_ignored(rel, false)` for the
+    /// file-level match.
+    pub fn is_path_pruned(&self, rel: &str) -> bool {
+        tsv_discover::is_path_pruned(rel, &self.inner)
+    }
+
     /// The heuristic-shadow warning text for a pruned directory `dir`
     /// (format-root relative), delegating to `tsv_discover::heuristic_shadow_warning`.
     /// A method (not a free function) so it rides the `IgnoreStack` class

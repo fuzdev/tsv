@@ -36,7 +36,7 @@ this path." tsv's discovery *policy* — the build-output heuristic, the
 always-pruned safety nets, the formattable-extension check, the heuristic-shadow
 warning — lives one layer up in [`tsv_discover`](../tsv_discover/CLAUDE.md), which
 builds on `IgnoreStack` (consuming `is_ignored_leaf` / `is_reincluded` /
-`has_negation_under` / `has_gitignore_layers`; the ancestor-walking `is_ignored`
+`has_negation_under` / `has_gitignore_layers` / `gitignore_anchors`; the ancestor-walking `is_ignored`
 is the caller's, for gating the root). Keeping that policy out of here is deliberate: `IgnoreStack`
 stays a pure gitignore(5) matcher, reusable beyond tsv's own discovery rules, and
 the three surfaces share the prune *decision* through `tsv_discover` rather than
@@ -82,6 +82,11 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
   (true even for an empty one — mere presence turns a caller's heuristic off, as in
   git). `tsv_discover` uses it to assert its `heuristic_active ⟹ no .gitignore layer`
   invariant.
+- `IgnoreStack::gitignore_anchors()` — the format-root-relative directory anchors
+  (`/`-joined; `""` = root) of the pushed `.gitignore` layers. Lets a per-file
+  discovery replay with **no** top-down walk (the VS Code extension, via
+  `tsv_discover::is_path_pruned`) reconstruct each ancestor's `heuristic_active` —
+  the heuristic is off at a level once a `.gitignore` anchored above it is present.
 - `IgnoreStack::is_empty()` — callers skip per-path matching when true.
 
 **Which** files feed the stack is the caller's choice. tsv reads `.formatignore`
