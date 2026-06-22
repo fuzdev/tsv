@@ -1,0 +1,274 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 634,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 62,
+				"data": " 100 chars: exactly at limit, no break needed (83 x's) "
+			},
+			{
+				"type": "Text",
+				"start": 62,
+				"end": 63,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 63,
+				"end": 175,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 64
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 67
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 68,
+							"end": 70,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 70,
+							"end": 168,
+							"name": "small",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 71
+								},
+								"end": {
+									"line": 3,
+									"column": 7,
+									"character": 76
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 77,
+										"end": 160,
+										"raw": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+										"data": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 168,
+							"end": 169,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 175,
+				"end": 177,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 177,
+				"end": 309,
+				"data": " 101 chars: overflows; tsv lays out block-style (unbreakable 84-x word on its own line), prettier dangles only the closing > "
+			},
+			{
+				"type": "Text",
+				"start": 309,
+				"end": 310,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 310,
+				"end": 428,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 311
+					},
+					"end": {
+						"line": 7,
+						"column": 4,
+						"character": 314
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 315,
+							"end": 317,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 317,
+							"end": 421,
+							"name": "small",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 2,
+									"character": 318
+								},
+								"end": {
+									"line": 8,
+									"column": 7,
+									"character": 323
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 324,
+										"end": 413,
+										"raw": "\n\t\txxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\t",
+										"data": "\n\t\txxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 421,
+							"end": 422,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 428,
+				"end": 430,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 430,
+				"end": 513,
+				"data": " 102 chars: same tsv block-style shape (85 x's); prettier dangles both tags "
+			},
+			{
+				"type": "Text",
+				"start": 513,
+				"end": 514,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 514,
+				"end": 633,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 515
+					},
+					"end": {
+						"line": 14,
+						"column": 4,
+						"character": 518
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 519,
+							"end": 521,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 521,
+							"end": 626,
+							"name": "small",
+							"name_loc": {
+								"start": {
+									"line": 15,
+									"column": 2,
+									"character": 522
+								},
+								"end": {
+									"line": 15,
+									"column": 7,
+									"character": 527
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 528,
+										"end": 618,
+										"raw": "\n\t\txxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\t",
+										"data": "\n\t\txxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 626,
+							"end": 627,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

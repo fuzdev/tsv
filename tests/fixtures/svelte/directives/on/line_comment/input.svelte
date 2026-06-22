@@ -2,7 +2,9 @@
 	on:click={// comment
 	() => {
 		fn();
-	}}>text</button
+	}}
 >
+	text
+</button>
 
 <button on:click={/* block comment */ fn}>text</button>

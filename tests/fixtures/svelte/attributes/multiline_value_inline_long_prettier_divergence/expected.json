@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 158,
+	"end": 163,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,7 +10,7 @@
 			{
 				"type": "RegularElement",
 				"start": 0,
-				"end": 157,
+				"end": 162,
 				"name": "p",
 				"name_loc": {
 					"start": {
@@ -38,7 +38,7 @@
 						{
 							"type": "RegularElement",
 							"start": 10,
-							"end": 52,
+							"end": 57,
 							"name": "span",
 							"name_loc": {
 								"start": {
@@ -86,20 +86,20 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 37,
-										"end": 43,
-										"raw": "inline",
-										"data": "inline"
+										"start": 39,
+										"end": 50,
+										"raw": "\n\t\tinline\n\t",
+										"data": "\n\t\tinline\n\t"
 									}
 								]
 							}
 						},
 						{
 							"type": "Text",
-							"start": 52,
-							"end": 153,
-							"raw": " text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14 text15_\n\tx\n",
-							"data": " text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14 text15_\n\tx\n"
+							"start": 57,
+							"end": 158,
+							"raw": " text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14\n\ttext15_ x\n",
+							"data": " text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14\n\ttext15_ x\n"
 						}
 					]
 				}

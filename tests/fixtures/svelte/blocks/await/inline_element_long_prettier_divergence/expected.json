@@ -42,6 +42,13 @@
 					"type": "Fragment",
 					"nodes": [
 						{
+							"type": "Text",
+							"start": 310,
+							"end": 312,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
 							"type": "AwaitBlock",
 							"start": 312,
 							"end": 450,
@@ -52,7 +59,7 @@
 								"loc": {
 									"start": {
 										"line": 3,
-										"column": 10
+										"column": 9
 									},
 									"end": {
 										"line": 9,
@@ -66,11 +73,11 @@
 									"loc": {
 										"start": {
 											"line": 3,
-											"column": 10
+											"column": 9
 										},
 										"end": {
 											"line": 3,
-											"column": 17
+											"column": 16
 										}
 									},
 									"name": "getData"
@@ -220,6 +227,13 @@
 								]
 							},
 							"catch": null
+						},
+						{
+							"type": "Text",
+							"start": 450,
+							"end": 451,
+							"raw": "\n",
+							"data": "\n"
 						}
 					]
 				}

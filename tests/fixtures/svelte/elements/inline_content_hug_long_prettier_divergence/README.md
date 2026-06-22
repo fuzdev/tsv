@@ -1,17 +1,26 @@
 # inline_content_hug_long_prettier_divergence
 
-When inline element content with expressions exceeds printWidth, there are two strategies:
+An inline element (`<small>`) whose **expression content** overflows print width lays out
+**block-style**: both tags stay intact and the content moves to its own indented line, exactly like
+a block element (and like the text case `inline_content_text_wrap`). Content that fits stays inline
+(at 100 chars); only overflow breaks to block-style.
 
-1. Break opening bracket: `<small\n\t>content</small\n>` (Prettier)
-2. Break expression internally: `<small>{expr\n\t? x\n\t: y}</small\n>` (tsv)
+Giving the content its own indented line is usually enough room to keep the expression **whole** —
+ternaries, logical (`&&`) chains, and binary (`+`) chains all sit unbroken on that line. Prettier
+instead **dangles** the tag delimiters (`<small⏎\t>…</small⏎>`) and, at the tighter dangled indent,
+breaks the expression operator-by-operator (one `&&`/`+`/ternary per line — see
+`prettier_variant_compact`).
 
-tsv: breaks expressions (ternaries at `?`, logical chains at `&&`, binaries at `+`)
-Prettier: breaks the opening bracket
+When the content is unbreakable identifiers, both formatters reach the same width regardless; the
+companion `inline_content_unbreakable` covers that case.
 
-Applies to ternaries, logical chains, and binary expression chains. At 100 chars both formatters keep inline. At 101 chars both break only the closing `>`. At 102+ chars with breakable expressions, tsv breaks the expression while Prettier breaks the bracket.
-
-When expressions are unbreakable identifiers, both formatters break at the bracket identically.
+The `unformatted_ours_compact` (single-line authoring) and `prettier_variant_compact` (prettier's
+dangle) both normalize to `input.svelte` under tsv in one pass.
 
 ## Reason
 
-Breaking expressions saves 1 tab indent level per nesting depth, keeps `<tag>{content}` visually connected, and follows operator precedence for break points. In real-world cases (e.g., ThreadListitem.svelte), tsv produces max 84-char lines vs Prettier's 108 chars (exceeding by 8).
+tsv treats printWidth as a hard limit and prefers block-style content over a dangled, operator-broken
+expression: it keeps `<tag>` and `</tag>` intact and the expression visually whole on one indented
+line. In real-world cases this keeps lines well within printWidth where prettier's dangle pushes them
+over. See
+[conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).

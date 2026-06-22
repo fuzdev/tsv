@@ -667,6 +667,13 @@
 								"type": "Fragment",
 								"nodes": [
 									{
+										"type": "Text",
+										"start": 516,
+										"end": 519,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
 										"type": "IfBlock",
 										"elseif": false,
 										"start": 519,
@@ -678,11 +685,11 @@
 											"loc": {
 												"start": {
 													"line": 12,
-													"column": 8
+													"column": 7
 												},
 												"end": {
 													"line": 12,
-													"column": 15
+													"column": 14
 												}
 											},
 											"name": "loading"
@@ -912,6 +919,13 @@
 												}
 											]
 										}
+									},
+									{
+										"type": "Text",
+										"start": 660,
+										"end": 662,
+										"raw": "\n\t",
+										"data": "\n\t"
 									}
 								]
 							}

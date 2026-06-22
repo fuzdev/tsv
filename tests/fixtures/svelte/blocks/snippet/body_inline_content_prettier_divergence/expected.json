@@ -1,0 +1,155 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 181,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "SnippetBlock",
+				"start": 0,
+				"end": 44,
+				"expression": {
+					"type": "Identifier",
+					"name": "badge",
+					"start": 10,
+					"end": 15,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 10,
+							"character": 10
+						},
+						"end": {
+							"line": 1,
+							"column": 15,
+							"character": 15
+						}
+					}
+				},
+				"parameters": [],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 18,
+							"end": 34,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 1,
+									"column": 19,
+									"character": 19
+								},
+								"end": {
+									"line": 1,
+									"column": 23,
+									"character": 23
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 24,
+										"end": 27,
+										"raw": "New",
+										"data": "New"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 44,
+				"end": 46,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 46,
+				"end": 180,
+				"expression": {
+					"type": "Identifier",
+					"name": "row",
+					"start": 56,
+					"end": 59,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 10,
+							"character": 56
+						},
+						"end": {
+							"line": 3,
+							"column": 13,
+							"character": 59
+						}
+					}
+				},
+				"parameters": [],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 62,
+							"end": 64,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 64,
+							"end": 169,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 2,
+									"character": 65
+								},
+								"end": {
+									"line": 4,
+									"column": 6,
+									"character": 69
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 70,
+										"end": 162,
+										"raw": "\n\t\tsome long inline text content that runs well beyond the hundred column print width mark\n\t",
+										"data": "\n\t\tsome long inline text content that runs well beyond the hundred column print width mark\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 169,
+							"end": 170,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

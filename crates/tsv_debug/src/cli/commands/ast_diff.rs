@@ -2,6 +2,7 @@ use crate::deno;
 use crate::diff::{DiffOptions, diff_to_string};
 use crate::error;
 use crate::fixtures;
+use crate::render_normalize::render_normalize;
 use argh::FromArgs;
 use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::{Input, InputArgs, ParserType};
@@ -21,6 +22,11 @@ pub struct AstDiffCommand {
     /// parser type: svelte | typescript | css
     #[argh(option)]
     parser: Option<ParserType>,
+
+    /// normalize both ASTs per Svelte 5 render-time whitespace rules before
+    /// comparing (confirms render-equivalence, e.g. for block-style content)
+    #[argh(switch)]
+    render: bool,
 
     /// file path(s) — one for round-trip, two for direct compare
     #[argh(positional)]
@@ -91,10 +97,15 @@ impl AstDiffCommand {
         let rt = super::create_runtime();
         let result = if let Some(ref input2) = input2 {
             // Two input mode: compare both directly
-            rt.block_on(compare_two_inputs(&input1, input2, parser_type))
+            rt.block_on(compare_two_inputs(
+                &input1,
+                input2,
+                parser_type,
+                self.render,
+            ))
         } else {
             // Single input mode: parse → format → parse → compare
-            rt.block_on(compare_round_trip(&input1, parser_type))
+            rt.block_on(compare_round_trip(&input1, parser_type, self.render))
         };
 
         match result {
@@ -118,6 +129,7 @@ async fn compare_two_inputs(
     input1: &Input,
     input2: &Input,
     parser_type: ParserType,
+    render: bool,
 ) -> error::Result<bool> {
     let content1 = input1.content();
     let content2 = input2.content();
@@ -125,11 +137,15 @@ async fn compare_two_inputs(
     let ast1 = parse_to_value(content1, parser_type).await?;
     let ast2 = parse_to_value(content2, parser_type).await?;
 
-    compare_asts(ast1, ast2)
+    compare_asts(ast1, ast2, render)
 }
 
 /// Compare round-trip: parse → format → parse → compare
-async fn compare_round_trip(input: &Input, parser_type: ParserType) -> error::Result<bool> {
+async fn compare_round_trip(
+    input: &Input,
+    parser_type: ParserType,
+    render: bool,
+) -> error::Result<bool> {
     let content = input.content();
 
     // Parse original
@@ -141,7 +157,7 @@ async fn compare_round_trip(input: &Input, parser_type: ParserType) -> error::Re
     // Parse formatted
     let ast2 = parse_to_value(&formatted, parser_type).await?;
 
-    compare_asts(ast1, ast2)
+    compare_asts(ast1, ast2, render)
 }
 
 /// Parse content to AST Value
@@ -157,8 +173,23 @@ fn format_content(content: &str, parser_type: ParserType) -> error::Result<Strin
     format_source(content, parser_type).map_err(error::DebugError::Command)
 }
 
-/// Compare two ASTs (ignoring spans/locations)
-fn compare_asts(ast1: serde_json::Value, ast2: serde_json::Value) -> error::Result<bool> {
+/// Compare two ASTs (ignoring spans/locations).
+///
+/// With `render`, both ASTs are first normalized per Svelte 5 render-time
+/// whitespace rules ([`render_normalize`]) so render-equivalent forms — e.g.
+/// `<small>text</small>` vs block-style `<small>⏎\ttext⏎</small>` — compare
+/// equal even though the parser keeps the boundary whitespace verbatim.
+fn compare_asts(
+    ast1: serde_json::Value,
+    ast2: serde_json::Value,
+    render: bool,
+) -> error::Result<bool> {
+    let (ast1, ast2) = if render {
+        (render_normalize(ast1), render_normalize(ast2))
+    } else {
+        (ast1, ast2)
+    };
+
     // Remove locations from both
     let ast1_clean = fixtures::remove_locations(ast1);
     let ast2_clean = fixtures::remove_locations(ast2);
