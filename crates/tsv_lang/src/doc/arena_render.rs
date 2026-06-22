@@ -1027,8 +1027,9 @@ fn render_fill_iterative<R: TextResolver + ?Sized>(
                 // separator by the *actual resulting column* after the wrapped element. If the next
                 // item fits after the dangled `>` (separator rendered flat = one space), hug it
                 // there — respecting the author's space boundary — instead of forcing its own line.
+                // `next_content` (= `parts[offset + 2]`) is in bounds here: this is the at-line-start
+                // arm of Case 3, which Case 2 (`offset + 2 >= parts.len()`) has already excluded.
                 let sep_mode = if context.hug_terminal_after_break
-                    && offset + 2 < parts.len()
                     && arena_fits_with_lookahead(
                         arena,
                         next_content,

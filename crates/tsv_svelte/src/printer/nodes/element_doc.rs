@@ -106,8 +106,10 @@ struct ElementContext {
     hug_end: bool,
     /// Whether children need multiline formatting
     needs_multiline: bool,
-    /// Whether element has block flow children (if, each, etc.)
-    has_block_flow_children: bool,
+    /// Whether block-flow children (if/each/etc.) force this element to multiline layout. Cached
+    /// `has_block_flow_children && block_flow_forces_multiline` — the only combination the three
+    /// readers (`force` layout, `will_go_multiline`, `compute_needs_multiline`) ever need.
+    block_flow_multiline: bool,
     /// Whether to trim boundary whitespace from children
     trim_boundaries: bool,
     /// Whether any attribute source contains embedded newlines (forces attr group break)
@@ -135,8 +137,9 @@ struct MultilineInputs {
     source_has_leading_break: bool,
     /// Whether source has newline at closing boundary
     source_has_trailing_break: bool,
-    /// Whether element has block flow children (if, each, etc.)
-    has_block_flow_children: bool,
+    /// Whether block-flow children force this element multiline (cached, mirrors
+    /// [`ElementContext::block_flow_multiline`])
+    block_flow_multiline: bool,
     /// Whether all content children are text nodes
     only_text_content: bool,
 }
@@ -288,7 +291,7 @@ impl<'a> Printer<'a> {
                 let trim_text = !ctx.kind.is_inline() && ctx.only_text_content;
                 let children_doc =
                     self.build_nodes_doc_with_context(&element.fragment.nodes, trim_text);
-                Some(self.build_hug_both_doc(element, &ctx, children_doc, true))
+                Some(self.build_hug_both_doc(element, &ctx, &attr_docs, children_doc, true))
             }
             _ => None,
         }
@@ -417,6 +420,12 @@ impl<'a> Printer<'a> {
             )
         };
 
+        // Hug-both builds its own opening (the `>` is content-keyed, not attr-keyed), so handle it
+        // before building `opening_tag` — every remaining arm uses `opening_tag`, this one doesn't.
+        if start_mode == BoundaryMode::Hug && end_mode == BoundaryMode::Hug {
+            return self.build_hug_both_doc(element, ctx, attr_docs, children_doc, false);
+        }
+
         // Build opening tag
         let opening_tag = self.build_opening_tag(
             tag_sym,
@@ -428,9 +437,6 @@ impl<'a> Printer<'a> {
 
         // Build doc structure based on boundary modes
         match (start_mode, end_mode) {
-            (BoundaryMode::Hug, BoundaryMode::Hug) => {
-                self.build_hug_both_doc(element, ctx, children_doc, false)
-            }
             (BoundaryMode::Hug, _) => {
                 // Hug start: > hugs content
                 let has_multiline_attrs = element.attributes.len() > 1;
@@ -569,157 +575,63 @@ impl<'a> Printer<'a> {
         &self,
         element: &internal::Element,
         ctx: &ElementContext,
+        attr_docs: &[DocId],
         children_doc: DocId,
         external_close: bool,
     ) -> DocId {
-        let d = self.d();
         let tag_sym = element.name.to_u32();
-        let has_attrs = !element.attributes.is_empty();
-        let is_html = element.kind == internal::ElementKind::Html;
-        // When closing externally, drop the trailing `>` and its preceding boundary break
-        // at every arm's final closing position.
-        let close_gt = if external_close {
-            d.empty()
-        } else {
-            d.text(">")
-        };
-        let close_break_soft = if external_close {
-            d.empty()
-        } else {
-            d.softline()
-        };
-        let close_break_hard = if external_close {
-            d.empty()
-        } else {
-            d.hardline()
-        };
 
-        // Block-style content (shared by the no-attrs and with-attrs paths via
-        // `build_inline_block_style`): both tags intact, content on its own indented line(s),
-        // collapsing to `<tag…>content</tag>` when it fits. `force` makes the content
-        // always-multiline (hardline boundaries) when an expanding control-flow block (if/each/key,
-        // or nested in await), a non-inline snippet body, or another multiline trigger is present;
-        // otherwise the softline boundaries collapse-when-fits. Computed once for both paths.
-        // (A control-flow-bearing *child* element already carries a hardline that propagates
-        // `will_break`, so it needs no separate force term; `source_has_leading_break` is impossible
-        // on the Hug/Hug path — there is no leading boundary break — so it is dropped too.)
+        // `force` makes the content always-multiline (hardline boundaries) when an expanding
+        // control-flow block (if/each/key, or nested in await), a non-inline snippet body, or
+        // another multiline trigger is present; otherwise the softline boundaries
+        // collapse-when-fits. (A control-flow-bearing *child* element already carries a hardline
+        // that propagates `will_break`, so it needs no separate force term;
+        // `source_has_leading_break` is impossible on the Hug/Hug path — there is no leading
+        // boundary break — so it is dropped too.)
         let force = super::helpers::has_any_expanding_blocks(&element.fragment.nodes)
-            || (ctx.has_block_flow_children && self.block_flow_forces_multiline(element))
+            || ctx.block_flow_multiline
             || ctx.needs_multiline;
 
-        if !has_attrs {
-            // Opening is just `<tag`. Content-boundary whitespace is render-free under Svelte 5,
-            // so the softline boundaries are injected freely — replacing the former opening-attach /
-            // closing-`>` dangle pyramid. See conformance_prettier.md + the inline-layout lore.
-            let opening = d.concat(&[d.text("<"), d.symbol(tag_sym)]);
-            self.build_inline_block_style(
-                opening,
-                tag_sym,
-                children_doc,
-                force,
-                close_break_soft,
-                close_break_hard,
-                close_gt,
-            )
-        } else {
-            // Rebuild attr_docs since we're in a different branch.
-            let hug_attr_docs = self.build_element_attrs_doc(
-                &element.attributes,
-                self.d().line(),
-                element.name_span.end,
-                element.open_tag_end,
-                is_html,
-            );
-            // Empty inline/component elements keep the hug-mode conditional group (nothing to lay
-            // out block-style). Likely unreachable — `is_empty` routes to `ElementLayout::Empty`
-            // before `build_content_element_doc`/`build_hug_both_doc` — but kept defensively.
-            let is_inline_elem = ctx.kind.is_inline() || ctx.kind.is_component();
-            if is_inline_elem && ctx.is_empty {
-                // Empty: conditional group — 1: all inline `<tag attrs></tag>`, 2: attrs inline
-                // with `>` on its own line, 3: attrs each on their own line.
-                let closing = d.concat(&[d.text("></"), d.symbol(tag_sym), close_gt]);
+        // Opening is `<tag` (empty `attr_docs`) or the attr-keyed `build_opening_tag(hug_start=false)`,
+        // whose `>` hugs the last attr when attrs fit and dedents to its own line when they wrap. The
+        // attr group and the content group stay SEPARATE, so attr-wrapping and content-wrapping
+        // decouple — the decoupling that makes the with-attrs case idempotent now that content no
+        // longer flows on the tag lines. See conformance_prettier.md + the inline-layout lore.
+        let opening =
+            self.build_opening_tag(tag_sym, attr_docs, false, false, ctx.has_multiline_attr);
 
-                let attr_concat1 = d.concat(&hug_attr_docs);
-                let attr_indent1 = d.indent(attr_concat1);
-                let inline_state =
-                    d.concat(&[d.text("<"), d.symbol(tag_sym), attr_indent1, closing]);
-
-                let hug_space_attrs = self.build_element_attrs_doc(
-                    &element.attributes,
-                    self.d().text(" "),
-                    element.name_span.end,
-                    element.open_tag_end,
-                    is_html,
-                );
-                let hug_state = d.concat(&[
-                    d.text("<"),
-                    d.symbol(tag_sym),
-                    d.concat(&hug_space_attrs),
-                    d.hardline(),
-                    closing,
-                ]);
-
-                let attr_concat3 = d.concat(&hug_attr_docs);
-                let attr_indent3 = d.indent(attr_concat3);
-                let multiline_state = d.concat(&[
-                    d.text("<"),
-                    d.symbol(tag_sym),
-                    attr_indent3,
-                    d.hardline(),
-                    closing,
-                ]);
-
-                d.conditional_group(&[inline_state, hug_state, multiline_state])
-            } else {
-                // `build_opening_tag(hug_start=false)` makes the `>` attr-keyed: it hugs the last
-                // attr when attrs fit and dedents to its own line when they wrap. The attr group and
-                // the content group are SEPARATE, so attr-wrapping and content-wrapping decouple —
-                // the decoupling that makes the with-attrs case idempotent now that content no
-                // longer flows on the tag lines. See conformance_prettier.md + the inline-layout lore.
-                let opening = self.build_opening_tag(
-                    tag_sym,
-                    &hug_attr_docs,
-                    false,
-                    false,
-                    ctx.has_multiline_attr,
-                );
-                self.build_inline_block_style(
-                    opening,
-                    tag_sym,
-                    children_doc,
-                    force,
-                    close_break_soft,
-                    close_break_hard,
-                    close_gt,
-                )
-            }
-        }
+        self.build_inline_block_style(opening, tag_sym, children_doc, force, external_close)
     }
 
-    /// Block-style inline content, shared by the no-attrs and with-attrs paths of
-    /// [`Self::build_hug_both_doc`]. `opening` is everything before the content's `>` (`<tag` for
-    /// no-attrs, the attr-keyed `build_opening_tag(…)` for attrs); this appends `>`, puts the
-    /// content on its own indented line(s) — collapsing to `<…>content</tag>` when it fits — and
-    /// closes with `</tag>`. `force` ⇒ always multiline (hardline boundaries); otherwise softline
-    /// collapses-when-fits. The `close_*` args carry the external-close state (all empty when the
-    /// trailing `>` is emitted elsewhere — the sibling-`>` dangle).
-    #[allow(clippy::too_many_arguments)]
+    /// Block-style inline content for [`Self::build_hug_both_doc`]. `opening` is everything before
+    /// the content's `>` (`<tag` when there are no attrs, the attr-keyed `build_opening_tag(…)`
+    /// otherwise); this appends `>`, puts the content on its own indented line(s) — collapsing to
+    /// `<…>content</tag>` when it fits — and closes with `</tag>`. `force` ⇒ always multiline
+    /// (hardline boundaries); otherwise softline collapses-when-fits. `external_close` drops the
+    /// trailing `>` and its boundary break — the sibling-`>` dangle emits the `>` elsewhere.
     fn build_inline_block_style(
         &self,
         opening: DocId,
         tag_sym: u32,
         children_doc: DocId,
         force: bool,
-        close_break_soft: DocId,
-        close_break_hard: DocId,
-        close_gt: DocId,
+        external_close: bool,
     ) -> DocId {
         let d = self.d();
         let leading = if force { d.hardline() } else { d.softline() };
-        let trailing = if force {
-            close_break_hard
+        // External close: the trailing `>` and its preceding boundary break are emitted elsewhere,
+        // so both collapse to nothing here.
+        let trailing = if external_close {
+            d.empty()
+        } else if force {
+            d.hardline()
         } else {
-            close_break_soft
+            d.softline()
+        };
+        let close_gt = if external_close {
+            d.empty()
+        } else {
+            d.text(">")
         };
         let body = d.indent(d.concat(&[leading, children_doc]));
         d.group(d.concat(&[
@@ -1819,12 +1731,16 @@ impl<'a> Printer<'a> {
         let hug_start = self.should_hug_start(element, kind.is_block());
         let hug_end = self.should_hug_end(element, kind.is_block());
 
-        // Block flow children
+        // Block flow children → whether they force multiline. Computed once here (a non-trivial
+        // traversal) and cached, since `will_go_multiline`, `compute_needs_multiline`, and the
+        // hug-both `force` all read exactly this combination.
         let has_block_flow_children = element
             .fragment
             .nodes
             .iter()
             .any(super::helpers::is_control_flow_block);
+        let block_flow_multiline =
+            has_block_flow_children && self.block_flow_forces_multiline(element);
 
         // Any attribute doc that will_break (forces attr group break + trim_boundaries)
         let has_multiline_attr = attr_docs.iter().any(|&doc| self.d().will_break(doc));
@@ -1846,14 +1762,14 @@ impl<'a> Printer<'a> {
                 hug_end,
                 source_has_leading_break,
                 source_has_trailing_break,
-                has_block_flow_children,
+                block_flow_multiline,
                 only_text_content,
             },
         );
 
         // Compute trim_boundaries
         let will_go_multiline = element.attributes.len() > 1
-            || (has_block_flow_children && self.block_flow_forces_multiline(element))
+            || block_flow_multiline
             || super::helpers::has_nested_block_flow(&element.fragment.nodes)
             || has_multiline_attr;
         let trim_boundaries = !kind.is_inline() || will_go_multiline;
@@ -1868,7 +1784,7 @@ impl<'a> Printer<'a> {
             hug_start,
             hug_end,
             needs_multiline,
-            has_block_flow_children,
+            block_flow_multiline,
             trim_boundaries,
             has_multiline_attr,
             only_text_content,
@@ -1887,7 +1803,7 @@ impl<'a> Printer<'a> {
             hug_end,
             source_has_leading_break,
             source_has_trailing_break,
-            has_block_flow_children,
+            block_flow_multiline,
             only_text_content,
         } = inputs;
 
@@ -1972,7 +1888,7 @@ impl<'a> Printer<'a> {
         }
 
         // Block flow forces multiline
-        if has_block_flow_children && self.block_flow_forces_multiline(element) {
+        if block_flow_multiline {
             return true;
         }
 
