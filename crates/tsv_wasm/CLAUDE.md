@@ -146,8 +146,10 @@ export); the subset deno builds are size-tracked by `binary_sizes.ts`. The
 patched by `scripts/patch_npm_package.ts` into the multi-entry package shape
 (Node auto-init entry, guarded browser entry, conditional `exports`,
 metadata, README — plus `cli.js` and the `tsv` bin for the `all` variant).
-`deno task test:npm[:parse|:all]` runs Node tests against it (the `all`
-variant adds CLI subprocess tests), and `deno task validate:artifacts`
+`deno task test:npm[:parse|:all]` builds the package and then runs Node tests
+against it (the `all` variant adds CLI subprocess tests; the `:run` suffix —
+e.g. `test:npm:run` — skips the rebuild when the bundle is already fresh, as in
+the publish/CI pipelines), and `deno task validate:artifacts`
 checks tight wasm size bounds plus a Deno runtime smoke of every built
 bundle (both run in the publish pipeline). The npm package itself covers
 Node/browser/bundler consumers, so there are no standalone `web`/`nodejs`

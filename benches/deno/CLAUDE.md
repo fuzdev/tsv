@@ -244,7 +244,7 @@ map records silenced third-party stderr crashes as `{pattern: count}`.
 `suppressed_noise` are JSON-only.
 
 ```bash
-# Run benchmarks (builds ffi + wasm:deno automatically)
+# Run benchmarks (builds the bench artifact set — `build:bench` — automatically)
 deno task bench
 
 # Run without rebuilding (if already built) — guarded against stale artifacts,
@@ -279,15 +279,16 @@ BENCH_STALE_OK=1 deno task bench:run        # Override the freshness guard (see 
 
 ## Artifact Freshness Guard
 
-The `:run` variants (`bench:run`, `corpus:compare:format:run`) skip the rebuild so you
-can iterate on the harness without paying the wasm-pack cost — at the risk of
-silently measuring a binary older than current source (a CSS run once reported
-`146/183` against a stale `.so` that should have been `155/183`).
-`lib/check_artifact_freshness.ts` guards against this: before a `:run` touches
-the executed artifacts (the profile-aware FFI library + the `pkg/all/deno` WASM
-bundle), it compares their mtimes against the crate sources feeding them and
-**aborts (exit 1)** if any is stale, or missing. The build-first tasks (`bench`,
-`corpus:compare:format`) rebuild first, so they pass the guard for free.
+The rebuild-skipping tasks (`bench:run`, `corpus:compare:format:run`, and
+`smoke`) skip the rebuild so you can iterate on the harness without paying the
+wasm-pack cost — at the risk of silently measuring a binary older than current
+source (a CSS run once reported `146/183` against a stale `.so` that should have
+been `155/183`). `lib/check_artifact_freshness.ts` guards against this: before a
+run touches the executed artifacts (the profile-aware FFI library + the
+`pkg/all/deno` WASM bundle), it compares their mtimes against the crate sources
+feeding them and **aborts (exit 1)** if any is stale, or missing. The build-first
+tasks (`bench`, `corpus:compare:format`) rebuild first, so they pass the guard
+for free.
 
 **Escape hatch:** `BENCH_STALE_OK=1` downgrades a _stale_ artifact to a `⚠`
 warning and proceeds (a _missing_ one stays fatal). See the module doc for the
@@ -306,6 +307,11 @@ BENCH_STALE_OK=1 deno task bench:run    # deliberately measure the current (stal
 (trivial fixed inputs, non-throwing + non-empty + idempotent). Exits non-zero
 on any failure. Use it to catch "implementation totally broken" before
 running the full bench. `corpus_compare_format` is still the real correctness gate.
+
+Like the bench/corpus `:run` tasks, `smoke` skips the rebuild for speed and is
+guarded by the freshness check above — it aborts on a stale or missing FFI/WASM
+artifact (rebuild with `deno task build:bench`, or `BENCH_STALE_OK=1` to
+override). It is **not** a build-first task.
 
 ## Fairness Caveats
 

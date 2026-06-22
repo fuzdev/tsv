@@ -10,6 +10,8 @@
  * Exit codes: 0 = all pass, 1 = any failure.
  */
 
+import { check_artifact_freshness, wasm_artifact_path } from './lib/check_artifact_freshness.ts';
+import { get_library_path } from './lib/ffi.ts';
 import {
 	get_benchmark_tasks,
 	get_formatters,
@@ -49,6 +51,24 @@ function record_pass(): void {
 function record_fail(f: Failure): void {
 	failures.push(f);
 }
+
+// Refuse to smoke stale binaries (smoke skips the rebuild for speed, same as
+// the bench/corpus :run tasks). See lib/check_artifact_freshness.ts; override
+// with BENCH_STALE_OK=1.
+await check_artifact_freshness([
+	{
+		label: 'FFI (release)',
+		path: get_library_path(),
+		binding_crates: ['tsv_ffi'],
+		rebuild: 'deno task build:ffi',
+	},
+	{
+		label: 'WASM (all/deno)',
+		path: wasm_artifact_path('all'),
+		binding_crates: ['tsv_wasm'],
+		rebuild: 'deno task build:wasm:all:deno',
+	},
+]);
 
 const impls = await init_implementations({ logger: () => {} });
 

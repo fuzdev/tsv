@@ -1,12 +1,13 @@
 /**
- * Artifact freshness guard for the `*:run` bench/corpus tasks.
+ * Artifact freshness guard for the rebuild-skipping bench/corpus/smoke tasks.
  *
  * `deno task bench` and `deno task corpus:compare:format` build the Rust + WASM
  * artifacts before running, so what they measure is fresh by construction. The
  * `:run` variants (`bench:run`, `corpus:compare:format:run`) deliberately SKIP that
  * build — that's the path for iterating on the measurement/reporting harness
  * (this directory's `.ts`) without paying the cargo + wasm-pack cost on every
- * tweak.
+ * tweak. `deno task smoke` likewise skips the build (it's the fast pre-bench
+ * sanity check) and relies on this guard rather than rebuilding.
  *
  * The hazard the split creates: edit a crate's source, run a `:run` task, and
  * you silently measure the *previously* built binary. That is exactly the trap
@@ -184,7 +185,10 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
 	if (fatal) {
 		lines.push('');
 		lines.push(
-			'  Rebuild everything first with `deno task bench` / `deno task corpus:compare:format`,',
+			'  Rebuild everything first with a build-first task (`deno task bench` /',
+		);
+		lines.push(
+			'  `deno task corpus:compare:format`), or `deno task build:bench` then re-run `deno task smoke`,',
 		);
 		lines.push('  run the specific rebuild command(s) above, or set BENCH_STALE_OK=1 to override');
 		lines.push('  (the override applies to stale artifacts only — a missing one is always fatal).');
