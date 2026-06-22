@@ -7,11 +7,11 @@
 
 <!-- if/else with breakable branches, nested two inline <span> wrappers deep — both branch bodies drop -->
 <p>
-	<span class="label">Status</span><span class="value"
-		>{#if loading}
+	<span class="label">Status</span><span class="value">
+		{#if loading}
 			<Spinner size={spinner_size} variant={spinner_variant} />
 		{:else}
 			<Badge tone={badge_tone}>{badge_text}</Badge>
-		{/if}</span
-	>
+		{/if}
+	</span>
 </p>

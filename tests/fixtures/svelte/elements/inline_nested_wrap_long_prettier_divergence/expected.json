@@ -1,0 +1,83 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 140,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 139,
+				"name": "strong",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 7,
+						"character": 7
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 8,
+							"end": 10,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 10,
+							"end": 129,
+							"name": "em",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 11
+								},
+								"end": {
+									"line": 2,
+									"column": 4,
+									"character": 13
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 14,
+										"end": 124,
+										"raw": "\n\t\tsome long inline text content that runs well beyond the hundred column print width mark today\n\t\tplus more\n\t",
+										"data": "\n\t\tsome long inline text content that runs well beyond the hundred column print width mark today\n\t\tplus more\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 129,
+							"end": 130,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

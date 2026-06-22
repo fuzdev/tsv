@@ -38,6 +38,11 @@ pub enum GroupId {
 /// This allows fills to make better packing decisions by knowing about
 /// punctuation that will be added by the parent (e.g., semicolons in CSS,
 /// commas in object properties).
+///
+/// These flags are deliberate per-fill render policies set by the language
+/// printers (Svelte boundary rules, CSS trailing punctuation); a flag bag is
+/// the intended shape, so the `excessive_bools` lint is allowed here.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Default)]
 pub struct DocContext {
     /// Reserve N chars when checking if content fits.
@@ -85,6 +90,19 @@ pub struct DocContext {
     /// is always a breakable inline element/component. Off for every other fill, so text word-wrap
     /// and CSS value lists still drop a too-wide item onto its own line.
     pub hug_wide_first: bool,
+
+    /// When set, a fill item that wraps at line start (the after-element fold's wide element) lets
+    /// the *terminal* trailing text hug the dangled closing `>` (`</tag⏎> tail`) if it fits there,
+    /// instead of forcing it onto its own line. The separator after the wrapped element is chosen
+    /// by the actual resulting column — flat (hug) when the next item still fits, else break.
+    ///
+    /// Scoped to the Svelte after-element fold whose trailing text is *terminal* (`!trailing_line`
+    /// — no following flowing element). This is how tsv respects an author's *space* boundary after
+    /// a wide inline element, mirroring how short inline elements already keep `<el>x</el> tail`
+    /// inline; a *newline*-authored boundary still takes its own line (the text node carries the
+    /// newline, so it never reaches this fold). Off for every other fill — CSS value lists and
+    /// non-terminal text (`trailing_line`, the non-convergent cascade) keep their own-line break.
+    pub hug_terminal_after_break: bool,
 }
 
 /// Trait for resolving symbol IDs to strings at print time

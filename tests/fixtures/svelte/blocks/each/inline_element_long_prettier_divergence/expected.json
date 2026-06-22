@@ -42,6 +42,13 @@
 					"type": "Fragment",
 					"nodes": [
 						{
+							"type": "Text",
+							"start": 267,
+							"end": 269,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
 							"type": "EachBlock",
 							"start": 269,
 							"end": 410,
@@ -52,7 +59,7 @@
 								"loc": {
 									"start": {
 										"line": 3,
-										"column": 9
+										"column": 8
 									},
 									"end": {
 										"line": 9,
@@ -66,11 +73,11 @@
 									"loc": {
 										"start": {
 											"line": 3,
-											"column": 9
+											"column": 8
 										},
 										"end": {
 											"line": 3,
-											"column": 17
+											"column": 16
 										}
 									},
 									"name": "getItems"
@@ -217,6 +224,13 @@
 									}
 								}
 							}
+						},
+						{
+							"type": "Text",
+							"start": 410,
+							"end": 411,
+							"raw": "\n",
+							"data": "\n"
 						}
 					]
 				}

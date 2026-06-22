@@ -557,6 +557,12 @@ cargo run -p tsv_debug compare file.svelte
 # ast_diff - verify semantic equivalence
 cargo run -p tsv_debug ast_diff input.svelte                         # round-trip: parse → format → parse → compare
 cargo run -p tsv_debug ast_diff input.svelte output_prettier.svelte  # compare two files' ASTs
+cargo run -p tsv_debug ast_diff --render input.svelte               # render-aware: normalize both ASTs per Svelte 5
+# --render normalizes template whitespace per Svelte 5 (collapse inter-node runs to one space, trim
+# start/end-of-content whitespace, honor <pre>/<textarea>) BEFORE comparing — so render-equivalent
+# forms like block-style inline content (<small>⏎\ttext⏎</small> vs <small>text</small>) match even
+# though the parser keeps boundary whitespace verbatim. Sound: real content / <pre> / presence-of-space
+# changes still differ. Use to confirm block-style render-equivalence at corpus scale.
 
 # canonical_parse - parse using external parsers (Svelte, acorn+typescript, or our CSS)
 cargo run -p tsv_debug canonical_parse file.svelte

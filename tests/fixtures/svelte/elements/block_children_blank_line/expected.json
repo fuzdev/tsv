@@ -42,6 +42,13 @@
 					"type": "Fragment",
 					"nodes": [
 						{
+							"type": "Text",
+							"start": 94,
+							"end": 96,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
 							"type": "RegularElement",
 							"start": 96,
 							"end": 113,
@@ -49,12 +56,12 @@
 							"name_loc": {
 								"start": {
 									"line": 3,
-									"column": 3,
+									"column": 2,
 									"character": 97
 								},
 								"end": {
 									"line": 3,
-									"column": 6,
+									"column": 5,
 									"character": 100
 								}
 							},
@@ -109,6 +116,13 @@
 									}
 								]
 							}
+						},
+						{
+							"type": "Text",
+							"start": 133,
+							"end": 134,
+							"raw": "\n",
+							"data": "\n"
 						}
 					]
 				}
@@ -155,6 +169,13 @@
 					"type": "Fragment",
 					"nodes": [
 						{
+							"type": "Text",
+							"start": 209,
+							"end": 211,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
 							"type": "RegularElement",
 							"start": 211,
 							"end": 224,
@@ -162,12 +183,12 @@
 							"name_loc": {
 								"start": {
 									"line": 10,
-									"column": 3,
+									"column": 2,
 									"character": 212
 								},
 								"end": {
 									"line": 10,
-									"column": 4,
+									"column": 3,
 									"character": 213
 								}
 							},
@@ -260,6 +281,13 @@
 									}
 								]
 							}
+						},
+						{
+							"type": "Text",
+							"start": 255,
+							"end": 256,
+							"raw": "\n",
+							"data": "\n"
 						}
 					]
 				}

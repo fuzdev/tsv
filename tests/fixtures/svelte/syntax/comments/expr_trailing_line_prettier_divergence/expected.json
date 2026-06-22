@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 613,
+	"end": 616,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -1084,7 +1084,7 @@
 			{
 				"type": "RegularElement",
 				"start": 492,
-				"end": 536,
+				"end": 539,
 				"name": "button",
 				"name_loc": {
 					"start": {
@@ -1148,67 +1148,67 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 522,
-							"end": 526,
-							"raw": "text",
-							"data": "text"
+							"start": 523,
+							"end": 530,
+							"raw": "\n\ttext\n",
+							"data": "\n\ttext\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 536,
-				"end": 537,
+				"start": 539,
+				"end": 540,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 537,
-				"end": 577,
+				"start": 540,
+				"end": 580,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 51,
+						"line": 53,
 						"column": 1,
-						"character": 538
+						"character": 541
 					},
 					"end": {
-						"line": 51,
+						"line": 53,
 						"column": 4,
-						"character": 541
+						"character": 544
 					}
 				},
 				"attributes": [
 					{
-						"start": 543,
-						"end": 569,
+						"start": 546,
+						"end": 572,
 						"type": "ClassDirective",
 						"name": "class1",
 						"name_loc": {
 							"start": {
-								"line": 52,
+								"line": 54,
 								"column": 1,
-								"character": 543
+								"character": 546
 							},
 							"end": {
-								"line": 52,
+								"line": 54,
 								"column": 13,
-								"character": 555
+								"character": 558
 							}
 						},
 						"expression": {
 							"type": "Identifier",
-							"start": 557,
-							"end": 561,
+							"start": 560,
+							"end": 564,
 							"loc": {
 								"start": {
-									"line": 52,
+									"line": 54,
 									"column": 15
 								},
 								"end": {
-									"line": 52,
+									"line": 54,
 									"column": 19
 								}
 							},
@@ -1217,8 +1217,8 @@
 								{
 									"type": "Line",
 									"value": " c",
-									"start": 562,
-									"end": 566
+									"start": 565,
+									"end": 569
 								}
 							]
 						},
@@ -1232,57 +1232,57 @@
 			},
 			{
 				"type": "Text",
-				"start": 577,
-				"end": 578,
+				"start": 580,
+				"end": 581,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 578,
-				"end": 612,
+				"start": 581,
+				"end": 615,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 55,
+						"line": 57,
 						"column": 1,
-						"character": 579
+						"character": 582
 					},
 					"end": {
-						"line": 55,
+						"line": 57,
 						"column": 4,
-						"character": 582
+						"character": 585
 					}
 				},
 				"attributes": [
 					{
-						"start": 584,
-						"end": 604,
+						"start": 587,
+						"end": 607,
 						"type": "UseDirective",
 						"name": "fn",
 						"name_loc": {
 							"start": {
-								"line": 56,
+								"line": 58,
 								"column": 1,
-								"character": 584
+								"character": 587
 							},
 							"end": {
-								"line": 56,
+								"line": 58,
 								"column": 7,
-								"character": 590
+								"character": 593
 							}
 						},
 						"expression": {
 							"type": "Identifier",
-							"start": 592,
-							"end": 596,
+							"start": 595,
+							"end": 599,
 							"loc": {
 								"start": {
-									"line": 56,
+									"line": 58,
 									"column": 9
 								},
 								"end": {
-									"line": 56,
+									"line": 58,
 									"column": 13
 								}
 							},
@@ -1291,8 +1291,8 @@
 								{
 									"type": "Line",
 									"value": " c",
-									"start": 597,
-									"end": 601
+									"start": 600,
+									"end": 604
 								}
 							]
 						},
@@ -1567,15 +1567,15 @@
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 562,
-			"end": 566,
+			"start": 565,
+			"end": 569,
 			"loc": {
 				"start": {
-					"line": 52,
+					"line": 54,
 					"column": 20
 				},
 				"end": {
-					"line": 52,
+					"line": 54,
 					"column": 24
 				}
 			}
@@ -1583,15 +1583,15 @@
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 597,
-			"end": 601,
+			"start": 600,
+			"end": 604,
 			"loc": {
 				"start": {
-					"line": 56,
+					"line": 58,
 					"column": 14
 				},
 				"end": {
-					"line": 56,
+					"line": 58,
 					"column": 18
 				}
 			}

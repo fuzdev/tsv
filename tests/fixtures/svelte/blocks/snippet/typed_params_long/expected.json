@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 403,
+	"end": 401,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -15,97 +15,110 @@
 				"data": "\n\n"
 			},
 			{
-				"type": "SnippetBlock",
+				"type": "Comment",
 				"start": 48,
-				"end": 211,
+				"end": 81,
+				"data": " 100 chars - stays inline "
+			},
+			{
+				"type": "Text",
+				"start": 81,
+				"end": 82,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 82,
+				"end": 210,
 				"expression": {
 					"type": "Identifier",
 					"name": "fn",
-					"start": 58,
-					"end": 60,
+					"start": 92,
+					"end": 94,
 					"loc": {
 						"start": {
-							"line": 5,
+							"line": 6,
 							"column": 10,
-							"character": 58
+							"character": 92
 						},
 						"end": {
-							"line": 5,
+							"line": 6,
 							"column": 12,
-							"character": 60
+							"character": 94
 						}
 					}
 				},
 				"parameters": [
 					{
 						"type": "Identifier",
-						"start": 61,
-						"end": 132,
+						"start": 95,
+						"end": 166,
 						"loc": {
 							"start": {
-								"line": 5,
+								"line": 6,
 								"column": 13
 							},
 							"end": {
-								"line": 5,
+								"line": 6,
 								"column": 84
 							}
 						},
 						"name": "a",
 						"typeAnnotation": {
 							"type": "TSTypeAnnotation",
-							"start": 62,
-							"end": 132,
+							"start": 96,
+							"end": 166,
 							"loc": {
 								"start": {
-									"line": 5,
+									"line": 6,
 									"column": 14
 								},
 								"end": {
-									"line": 5,
+									"line": 6,
 									"column": 84
 								}
 							},
 							"typeAnnotation": {
 								"type": "TSUnionType",
-								"start": 64,
-								"end": 132,
+								"start": 98,
+								"end": 166,
 								"loc": {
 									"start": {
-										"line": 5,
+										"line": 6,
 										"column": 16
 									},
 									"end": {
-										"line": 5,
+										"line": 6,
 										"column": 84
 									}
 								},
 								"types": [
 									{
 										"type": "TSTypeReference",
-										"start": 64,
-										"end": 65,
+										"start": 98,
+										"end": 99,
 										"loc": {
 											"start": {
-												"line": 5,
+												"line": 6,
 												"column": 16
 											},
 											"end": {
-												"line": 5,
+												"line": 6,
 												"column": 17
 											}
 										},
 										"typeName": {
 											"type": "Identifier",
-											"start": 64,
-											"end": 65,
+											"start": 98,
+											"end": 99,
 											"loc": {
 												"start": {
-													"line": 5,
+													"line": 6,
 													"column": 16
 												},
 												"end": {
-													"line": 5,
+													"line": 6,
 													"column": 17
 												}
 											},
@@ -114,29 +127,29 @@
 									},
 									{
 										"type": "TSLiteralType",
-										"start": 68,
-										"end": 75,
+										"start": 102,
+										"end": 109,
 										"loc": {
 											"start": {
-												"line": 5,
+												"line": 6,
 												"column": 20
 											},
 											"end": {
-												"line": 5,
+												"line": 6,
 												"column": 27
 											}
 										},
 										"literal": {
 											"type": "Literal",
-											"start": 68,
-											"end": 75,
+											"start": 102,
+											"end": 109,
 											"loc": {
 												"start": {
-													"line": 5,
+													"line": 6,
 													"column": 20
 												},
 												"end": {
-													"line": 5,
+													"line": 6,
 													"column": 27
 												}
 											},
@@ -146,29 +159,29 @@
 									},
 									{
 										"type": "TSLiteralType",
-										"start": 78,
-										"end": 85,
+										"start": 112,
+										"end": 119,
 										"loc": {
 											"start": {
-												"line": 5,
+												"line": 6,
 												"column": 30
 											},
 											"end": {
-												"line": 5,
+												"line": 6,
 												"column": 37
 											}
 										},
 										"literal": {
 											"type": "Literal",
-											"start": 78,
-											"end": 85,
+											"start": 112,
+											"end": 119,
 											"loc": {
 												"start": {
-													"line": 5,
+													"line": 6,
 													"column": 30
 												},
 												"end": {
-													"line": 5,
+													"line": 6,
 													"column": 37
 												}
 											},
@@ -178,29 +191,29 @@
 									},
 									{
 										"type": "TSLiteralType",
-										"start": 88,
-										"end": 95,
+										"start": 122,
+										"end": 129,
 										"loc": {
 											"start": {
-												"line": 5,
+												"line": 6,
 												"column": 40
 											},
 											"end": {
-												"line": 5,
+												"line": 6,
 												"column": 47
 											}
 										},
 										"literal": {
 											"type": "Literal",
-											"start": 88,
-											"end": 95,
+											"start": 122,
+											"end": 129,
 											"loc": {
 												"start": {
-													"line": 5,
+													"line": 6,
 													"column": 40
 												},
 												"end": {
-													"line": 5,
+													"line": 6,
 													"column": 47
 												}
 											},
@@ -210,29 +223,29 @@
 									},
 									{
 										"type": "TSLiteralType",
-										"start": 98,
-										"end": 105,
+										"start": 132,
+										"end": 139,
 										"loc": {
 											"start": {
-												"line": 5,
+												"line": 6,
 												"column": 50
 											},
 											"end": {
-												"line": 5,
+												"line": 6,
 												"column": 57
 											}
 										},
 										"literal": {
 											"type": "Literal",
-											"start": 98,
-											"end": 105,
+											"start": 132,
+											"end": 139,
 											"loc": {
 												"start": {
-													"line": 5,
+													"line": 6,
 													"column": 50
 												},
 												"end": {
-													"line": 5,
+													"line": 6,
 													"column": 57
 												}
 											},
@@ -242,29 +255,29 @@
 									},
 									{
 										"type": "TSLiteralType",
-										"start": 108,
-										"end": 115,
+										"start": 142,
+										"end": 149,
 										"loc": {
 											"start": {
-												"line": 5,
+												"line": 6,
 												"column": 60
 											},
 											"end": {
-												"line": 5,
+												"line": 6,
 												"column": 67
 											}
 										},
 										"literal": {
 											"type": "Literal",
-											"start": 108,
-											"end": 115,
+											"start": 142,
+											"end": 149,
 											"loc": {
 												"start": {
-													"line": 5,
+													"line": 6,
 													"column": 60
 												},
 												"end": {
-													"line": 5,
+													"line": 6,
 													"column": 67
 												}
 											},
@@ -274,29 +287,29 @@
 									},
 									{
 										"type": "TSLiteralType",
-										"start": 118,
-										"end": 125,
+										"start": 152,
+										"end": 159,
 										"loc": {
 											"start": {
-												"line": 5,
+												"line": 6,
 												"column": 70
 											},
 											"end": {
-												"line": 5,
+												"line": 6,
 												"column": 77
 											}
 										},
 										"literal": {
 											"type": "Literal",
-											"start": 118,
-											"end": 125,
+											"start": 152,
+											"end": 159,
 											"loc": {
 												"start": {
-													"line": 5,
+													"line": 6,
 													"column": 70
 												},
 												"end": {
-													"line": 5,
+													"line": 6,
 													"column": 77
 												}
 											},
@@ -306,15 +319,15 @@
 									},
 									{
 										"type": "TSNullKeyword",
-										"start": 128,
-										"end": 132,
+										"start": 162,
+										"end": 166,
 										"loc": {
 											"start": {
-												"line": 5,
+												"line": 6,
 												"column": 80
 											},
 											"end": {
-												"line": 5,
+												"line": 6,
 												"column": 84
 											}
 										}
@@ -325,72 +338,72 @@
 					},
 					{
 						"type": "AssignmentPattern",
-						"start": 134,
-						"end": 146,
+						"start": 168,
+						"end": 180,
 						"loc": {
 							"start": {
-								"line": 5,
+								"line": 6,
 								"column": 86
 							},
 							"end": {
-								"line": 5,
+								"line": 6,
 								"column": 98
 							}
 						},
 						"left": {
 							"type": "Identifier",
-							"start": 134,
-							"end": 138,
+							"start": 168,
+							"end": 172,
 							"loc": {
 								"start": {
-									"line": 5,
+									"line": 6,
 									"column": 86
 								},
 								"end": {
-									"line": 5,
+									"line": 6,
 									"column": 90
 								}
 							},
 							"name": "b",
 							"typeAnnotation": {
 								"type": "TSTypeAnnotation",
-								"start": 135,
-								"end": 138,
+								"start": 169,
+								"end": 172,
 								"loc": {
 									"start": {
-										"line": 5,
+										"line": 6,
 										"column": 87
 									},
 									"end": {
-										"line": 5,
+										"line": 6,
 										"column": 90
 									}
 								},
 								"typeAnnotation": {
 									"type": "TSTypeReference",
-									"start": 137,
-									"end": 138,
+									"start": 171,
+									"end": 172,
 									"loc": {
 										"start": {
-											"line": 5,
+											"line": 6,
 											"column": 89
 										},
 										"end": {
-											"line": 5,
+											"line": 6,
 											"column": 90
 										}
 									},
 									"typeName": {
 										"type": "Identifier",
-										"start": 137,
-										"end": 138,
+										"start": 171,
+										"end": 172,
 										"loc": {
 											"start": {
-												"line": 5,
+												"line": 6,
 												"column": 89
 											},
 											"end": {
-												"line": 5,
+												"line": 6,
 												"column": 90
 											}
 										},
@@ -401,15 +414,15 @@
 						},
 						"right": {
 							"type": "Literal",
-							"start": 141,
-							"end": 146,
+							"start": 175,
+							"end": 180,
 							"loc": {
 								"start": {
-									"line": 5,
+									"line": 6,
 									"column": 93
 								},
 								"end": {
-									"line": 5,
+									"line": 6,
 									"column": 98
 								}
 							},
@@ -423,39 +436,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 148,
-							"end": 150,
-							"raw": "\n\t",
-							"data": "\n\t"
-						},
-						{
-							"type": "Comment",
-							"start": 150,
-							"end": 183,
-							"data": " 100 chars - stays inline "
-						},
-						{
-							"type": "Text",
-							"start": 183,
-							"end": 185,
+							"start": 182,
+							"end": 184,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 185,
-							"end": 200,
+							"start": 184,
+							"end": 199,
 							"name": "div",
 							"name_loc": {
 								"start": {
 									"line": 7,
 									"column": 2,
-									"character": 186
+									"character": 185
 								},
 								"end": {
 									"line": 7,
 									"column": 5,
-									"character": 189
+									"character": 188
 								}
 							},
 							"attributes": [],
@@ -464,8 +464,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 190,
-										"end": 194,
+										"start": 189,
+										"end": 193,
 										"raw": "text",
 										"data": "text"
 									}
@@ -474,8 +474,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 200,
-							"end": 201,
+							"start": 199,
+							"end": 200,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -484,103 +484,116 @@
 			},
 			{
 				"type": "Text",
-				"start": 211,
-				"end": 213,
+				"start": 210,
+				"end": 212,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
+				"type": "Comment",
+				"start": 212,
+				"end": 265,
+				"data": " 101 chars - each param wraps to its own line "
+			},
+			{
+				"type": "Text",
+				"start": 265,
+				"end": 266,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
 				"type": "SnippetBlock",
-				"start": 213,
-				"end": 402,
+				"start": 266,
+				"end": 400,
 				"expression": {
 					"type": "Identifier",
 					"name": "fn",
-					"start": 223,
-					"end": 225,
+					"start": 276,
+					"end": 278,
 					"loc": {
 						"start": {
-							"line": 10,
+							"line": 11,
 							"column": 10,
-							"character": 223
+							"character": 276
 						},
 						"end": {
-							"line": 10,
+							"line": 11,
 							"column": 12,
-							"character": 225
+							"character": 278
 						}
 					}
 				},
 				"parameters": [
 					{
 						"type": "Identifier",
-						"start": 228,
-						"end": 299,
+						"start": 281,
+						"end": 352,
 						"loc": {
 							"start": {
-								"line": 11,
+								"line": 12,
 								"column": 1
 							},
 							"end": {
-								"line": 11,
+								"line": 12,
 								"column": 72
 							}
 						},
 						"name": "a",
 						"typeAnnotation": {
 							"type": "TSTypeAnnotation",
-							"start": 229,
-							"end": 299,
+							"start": 282,
+							"end": 352,
 							"loc": {
 								"start": {
-									"line": 11,
+									"line": 12,
 									"column": 2
 								},
 								"end": {
-									"line": 11,
+									"line": 12,
 									"column": 72
 								}
 							},
 							"typeAnnotation": {
 								"type": "TSUnionType",
-								"start": 231,
-								"end": 299,
+								"start": 284,
+								"end": 352,
 								"loc": {
 									"start": {
-										"line": 11,
+										"line": 12,
 										"column": 4
 									},
 									"end": {
-										"line": 11,
+										"line": 12,
 										"column": 72
 									}
 								},
 								"types": [
 									{
 										"type": "TSTypeReference",
-										"start": 231,
-										"end": 232,
+										"start": 284,
+										"end": 285,
 										"loc": {
 											"start": {
-												"line": 11,
+												"line": 12,
 												"column": 4
 											},
 											"end": {
-												"line": 11,
+												"line": 12,
 												"column": 5
 											}
 										},
 										"typeName": {
 											"type": "Identifier",
-											"start": 231,
-											"end": 232,
+											"start": 284,
+											"end": 285,
 											"loc": {
 												"start": {
-													"line": 11,
+													"line": 12,
 													"column": 4
 												},
 												"end": {
-													"line": 11,
+													"line": 12,
 													"column": 5
 												}
 											},
@@ -589,29 +602,29 @@
 									},
 									{
 										"type": "TSLiteralType",
-										"start": 235,
-										"end": 242,
+										"start": 288,
+										"end": 295,
 										"loc": {
 											"start": {
-												"line": 11,
+												"line": 12,
 												"column": 8
 											},
 											"end": {
-												"line": 11,
+												"line": 12,
 												"column": 15
 											}
 										},
 										"literal": {
 											"type": "Literal",
-											"start": 235,
-											"end": 242,
+											"start": 288,
+											"end": 295,
 											"loc": {
 												"start": {
-													"line": 11,
+													"line": 12,
 													"column": 8
 												},
 												"end": {
-													"line": 11,
+													"line": 12,
 													"column": 15
 												}
 											},
@@ -621,29 +634,29 @@
 									},
 									{
 										"type": "TSLiteralType",
-										"start": 245,
-										"end": 252,
+										"start": 298,
+										"end": 305,
 										"loc": {
 											"start": {
-												"line": 11,
+												"line": 12,
 												"column": 18
 											},
 											"end": {
-												"line": 11,
+												"line": 12,
 												"column": 25
 											}
 										},
 										"literal": {
 											"type": "Literal",
-											"start": 245,
-											"end": 252,
+											"start": 298,
+											"end": 305,
 											"loc": {
 												"start": {
-													"line": 11,
+													"line": 12,
 													"column": 18
 												},
 												"end": {
-													"line": 11,
+													"line": 12,
 													"column": 25
 												}
 											},
@@ -653,29 +666,29 @@
 									},
 									{
 										"type": "TSLiteralType",
-										"start": 255,
-										"end": 262,
+										"start": 308,
+										"end": 315,
 										"loc": {
 											"start": {
-												"line": 11,
+												"line": 12,
 												"column": 28
 											},
 											"end": {
-												"line": 11,
+												"line": 12,
 												"column": 35
 											}
 										},
 										"literal": {
 											"type": "Literal",
-											"start": 255,
-											"end": 262,
+											"start": 308,
+											"end": 315,
 											"loc": {
 												"start": {
-													"line": 11,
+													"line": 12,
 													"column": 28
 												},
 												"end": {
-													"line": 11,
+													"line": 12,
 													"column": 35
 												}
 											},
@@ -685,29 +698,29 @@
 									},
 									{
 										"type": "TSLiteralType",
-										"start": 265,
-										"end": 272,
+										"start": 318,
+										"end": 325,
 										"loc": {
 											"start": {
-												"line": 11,
+												"line": 12,
 												"column": 38
 											},
 											"end": {
-												"line": 11,
+												"line": 12,
 												"column": 45
 											}
 										},
 										"literal": {
 											"type": "Literal",
-											"start": 265,
-											"end": 272,
+											"start": 318,
+											"end": 325,
 											"loc": {
 												"start": {
-													"line": 11,
+													"line": 12,
 													"column": 38
 												},
 												"end": {
-													"line": 11,
+													"line": 12,
 													"column": 45
 												}
 											},
@@ -717,29 +730,29 @@
 									},
 									{
 										"type": "TSLiteralType",
-										"start": 275,
-										"end": 282,
+										"start": 328,
+										"end": 335,
 										"loc": {
 											"start": {
-												"line": 11,
+												"line": 12,
 												"column": 48
 											},
 											"end": {
-												"line": 11,
+												"line": 12,
 												"column": 55
 											}
 										},
 										"literal": {
 											"type": "Literal",
-											"start": 275,
-											"end": 282,
+											"start": 328,
+											"end": 335,
 											"loc": {
 												"start": {
-													"line": 11,
+													"line": 12,
 													"column": 48
 												},
 												"end": {
-													"line": 11,
+													"line": 12,
 													"column": 55
 												}
 											},
@@ -749,29 +762,29 @@
 									},
 									{
 										"type": "TSLiteralType",
-										"start": 285,
-										"end": 292,
+										"start": 338,
+										"end": 345,
 										"loc": {
 											"start": {
-												"line": 11,
+												"line": 12,
 												"column": 58
 											},
 											"end": {
-												"line": 11,
+												"line": 12,
 												"column": 65
 											}
 										},
 										"literal": {
 											"type": "Literal",
-											"start": 285,
-											"end": 292,
+											"start": 338,
+											"end": 345,
 											"loc": {
 												"start": {
-													"line": 11,
+													"line": 12,
 													"column": 58
 												},
 												"end": {
-													"line": 11,
+													"line": 12,
 													"column": 65
 												}
 											},
@@ -781,15 +794,15 @@
 									},
 									{
 										"type": "TSNullKeyword",
-										"start": 295,
-										"end": 299,
+										"start": 348,
+										"end": 352,
 										"loc": {
 											"start": {
-												"line": 11,
+												"line": 12,
 												"column": 68
 											},
 											"end": {
-												"line": 11,
+												"line": 12,
 												"column": 72
 											}
 										}
@@ -800,72 +813,72 @@
 					},
 					{
 						"type": "AssignmentPattern",
-						"start": 302,
-						"end": 315,
+						"start": 355,
+						"end": 368,
 						"loc": {
 							"start": {
-								"line": 12,
+								"line": 13,
 								"column": 1
 							},
 							"end": {
-								"line": 12,
+								"line": 13,
 								"column": 14
 							}
 						},
 						"left": {
 							"type": "Identifier",
-							"start": 302,
-							"end": 306,
+							"start": 355,
+							"end": 359,
 							"loc": {
 								"start": {
-									"line": 12,
+									"line": 13,
 									"column": 1
 								},
 								"end": {
-									"line": 12,
+									"line": 13,
 									"column": 5
 								}
 							},
 							"name": "b",
 							"typeAnnotation": {
 								"type": "TSTypeAnnotation",
-								"start": 303,
-								"end": 306,
+								"start": 356,
+								"end": 359,
 								"loc": {
 									"start": {
-										"line": 12,
+										"line": 13,
 										"column": 2
 									},
 									"end": {
-										"line": 12,
+										"line": 13,
 										"column": 5
 									}
 								},
 								"typeAnnotation": {
 									"type": "TSTypeReference",
-									"start": 305,
-									"end": 306,
+									"start": 358,
+									"end": 359,
 									"loc": {
 										"start": {
-											"line": 12,
+											"line": 13,
 											"column": 4
 										},
 										"end": {
-											"line": 12,
+											"line": 13,
 											"column": 5
 										}
 									},
 									"typeName": {
 										"type": "Identifier",
-										"start": 305,
-										"end": 306,
+										"start": 358,
+										"end": 359,
 										"loc": {
 											"start": {
-												"line": 12,
+												"line": 13,
 												"column": 4
 											},
 											"end": {
-												"line": 12,
+												"line": 13,
 												"column": 5
 											}
 										},
@@ -876,15 +889,15 @@
 						},
 						"right": {
 							"type": "Literal",
-							"start": 309,
-							"end": 315,
+							"start": 362,
+							"end": 368,
 							"loc": {
 								"start": {
-									"line": 12,
+									"line": 13,
 									"column": 8
 								},
 								"end": {
-									"line": 12,
+									"line": 13,
 									"column": 14
 								}
 							},
@@ -898,39 +911,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 319,
-							"end": 321,
-							"raw": "\n\t",
-							"data": "\n\t"
-						},
-						{
-							"type": "Comment",
-							"start": 321,
+							"start": 372,
 							"end": 374,
-							"data": " 101 chars - each param wraps to its own line "
-						},
-						{
-							"type": "Text",
-							"start": 374,
-							"end": 376,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 376,
-							"end": 391,
+							"start": 374,
+							"end": 389,
 							"name": "div",
 							"name_loc": {
 								"start": {
 									"line": 15,
 									"column": 2,
-									"character": 377
+									"character": 375
 								},
 								"end": {
 									"line": 15,
 									"column": 5,
-									"character": 380
+									"character": 378
 								}
 							},
 							"attributes": [],
@@ -939,8 +939,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 381,
-										"end": 385,
+										"start": 379,
+										"end": 383,
 										"raw": "text",
 										"data": "text"
 									}
@@ -949,8 +949,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 391,
-							"end": 392,
+							"start": 389,
+							"end": 390,
 							"raw": "\n",
 							"data": "\n"
 						}

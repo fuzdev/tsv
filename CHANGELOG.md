@@ -15,6 +15,8 @@ Formatting is now non-configurable by design -
 tsv has no config that changes its formatting style behavior, and none will be added.
 (this has no observable API changes because options had been deferred)
 
+- feat: rework to block style wrapping using Svelte 5 whitespace changes
+  [#76](https://github.com/fuzdev/tsv/pull/76)
 - feat: `tsv format` directory discovery now honors `.gitignore` and the tsv-native
   `.formatignore` hierarchically (one per directory, repo-rooted like git —
   unlike Prettier, which reads only one `.gitignore` and one `.prettierignore`

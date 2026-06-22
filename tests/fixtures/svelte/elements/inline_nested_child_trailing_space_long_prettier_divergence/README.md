@@ -1,28 +1,28 @@
 # inline_nested_child_trailing_space_long_prettier_divergence
 
-The space-authored companion of `inline_nested_child_trailing_long`. An inline `<span>` wraps a
-wide inline child `<span>` (its open tag overflows print width) plus trailing text. tsv drops the
-child below the parent's open tag and puts the trailing text on its **own line** — it never hugs
-trailing text onto a wrapped child's closing tag. Both the newline-authored boundary (the `input`
-shape) and the space-authored boundary (`unformatted_ours_compact`) converge to this one form, so
-the space form is no longer authoring-dependent.
+An inline `<span>` wraps a wide inline child `<span>` (its open tag overflows print width) plus
+trailing text. Under block-style both tags stay intact and the content goes on its own indented
+lines (no dangle). The trailing-text boundary is currently **authoring-dependent**:
 
-Prettier keeps the child on its own line too, but **hugs the trailing text** after the child's
-closing tag (`</span> text`) — see `prettier_variant_hug.svelte` (prettier's stable form, which tsv
-normalizes back to `input.svelte`).
+- **`input.svelte`** (space boundary) — the trailing text **hugs** the child's closing tag
+  (`</span> text`). This is the fixture's canonical form, matching the `_trailing_space` name and
+  the terminal sibling `inline_wide_content_trailing_long`.
+- **`variant_ownline.svelte`** (newline boundary) — the trailing text keeps its **own line**.
 
-tsv: child drops below the parent open tag, trailing text on its own line
-Prettier: child drops below the parent open tag, trailing text hugs the child's closing `>`
+Both forms are **dual-stable** — tsv and prettier each keep their respective form idempotent.
 
-This pins the **authoring-independence** of the boundary: feeding the space-authored form must reach
-the same fixed point as the newline-authored form. Before the fix the space form was
-non-idempotent — the parent `<span>`'s `>` dangled on its own line on the first pass and collapsed on
-the second, settling on a second fixed point.
+The prettier divergence is pinned on the **compact authoring**: `unformatted_ours_compact` (the
+content on one line) normalizes to `input.svelte` under tsv, while prettier dangles the tag
+delimiters into the pyramid captured by `prettier_variant_compact` (which tsv likewise converges to
+`input.svelte`). So tsv lays the nested child + trailing text out block-style where prettier dangles
+— the same divergence as the other inline-content fixtures, here with the trailing-space hug.
 
 ## Reason
 
-tsv treats printWidth as a hard limit and a wide inline child that does not fit drops to its own
-line whole; trailing text after such a dropped child takes its own line rather than hugging the
-child's closing `>`, uniformly regardless of whether the boundary was authored as a space or a
-newline. See
-[conformance_prettier.md §Wide inline content + trailing text](../../../../../docs/conformance_prettier.md#svelte-elements).
+Converging the two authorings (always hugging the trailing text, reflowing the newline boundary as
+render-free under Svelte 5) is a deliberate **pending follow-up** — the between/terminal-text
+hug-convergence. The terminal case (`inline_wide_content_trailing_long`) already hugs a space-
+authored tail; this nested-child case goes through a different render branch (the wide child is
+itself multiline) and is not yet converged, so the newline authoring (`variant_ownline`) settles on
+its own distinct stable form. See
+[conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).

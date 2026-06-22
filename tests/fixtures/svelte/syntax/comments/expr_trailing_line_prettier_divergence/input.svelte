@@ -46,8 +46,10 @@ then val}
 ></div>
 <button
 	on:click={fn // c
-	}>text</button
+	}
 >
+	text
+</button>
 <div
 	class:class1={cond // c
 	}

@@ -1,0 +1,401 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1247,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 479,
+				"data": " An inline element (`<small>`) whose text content overflows print width lays out block-style:\n     both tags stay intact and the content moves to its own indented line, exactly like a block\n     element. Content that fits stays inline (`<small>short text</small>`). Content-boundary\n     whitespace is render-free under Svelte 5, so tsv places it freely. Prettier instead pre-breaks\n     the opening tag and dangles the closing `>`; see prettier_variant_compact + README. "
+			},
+			{
+				"type": "Text",
+				"start": 479,
+				"end": 480,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 480,
+				"end": 635,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 481
+					},
+					"end": {
+						"line": 6,
+						"column": 4,
+						"character": 484
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 485,
+							"end": 487,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 487,
+							"end": 512,
+							"name": "small",
+							"name_loc": {
+								"start": {
+									"line": 7,
+									"column": 2,
+									"character": 488
+								},
+								"end": {
+									"line": 7,
+									"column": 7,
+									"character": 493
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 494,
+										"end": 504,
+										"raw": "short text",
+										"data": "short text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 512,
+							"end": 514,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 514,
+							"end": 628,
+							"name": "small",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 2,
+									"character": 515
+								},
+								"end": {
+									"line": 8,
+									"column": 7,
+									"character": 520
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 521,
+										"end": 620,
+										"raw": "\n\t\tword word word word word word word word word word word word word word word word word word word\n\t",
+										"data": "\n\t\tword word word word word word word word word word word word word word word word word word word\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 628,
+							"end": 629,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 635,
+				"end": 637,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 637,
+				"end": 701,
+				"data": " Exact 100/101 boundary: a 100-char <small> stays inline "
+			},
+			{
+				"type": "Text",
+				"start": 701,
+				"end": 702,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 702,
+				"end": 814,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 703
+					},
+					"end": {
+						"line": 14,
+						"column": 4,
+						"character": 706
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 707,
+							"end": 709,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 709,
+							"end": 807,
+							"name": "small",
+							"name_loc": {
+								"start": {
+									"line": 15,
+									"column": 2,
+									"character": 710
+								},
+								"end": {
+									"line": 15,
+									"column": 7,
+									"character": 715
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 716,
+										"end": 799,
+										"raw": "word word word word word word word word word word word word word word word wordabcd",
+										"data": "word word word word word word word word word word word word word word word wordabcd"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 807,
+							"end": 808,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 814,
+				"end": 816,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 816,
+				"end": 891,
+				"data": " Exact 100/101 boundary: one char longer (101) flips to block-style "
+			},
+			{
+				"type": "Text",
+				"start": 891,
+				"end": 892,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 892,
+				"end": 1010,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 19,
+						"column": 1,
+						"character": 893
+					},
+					"end": {
+						"line": 19,
+						"column": 4,
+						"character": 896
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 897,
+							"end": 899,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 899,
+							"end": 1003,
+							"name": "small",
+							"name_loc": {
+								"start": {
+									"line": 20,
+									"column": 2,
+									"character": 900
+								},
+								"end": {
+									"line": 20,
+									"column": 7,
+									"character": 905
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 906,
+										"end": 995,
+										"raw": "\n\t\tword word word word word word word word word word word word word word word wordabcde\n\t",
+										"data": "\n\t\tword word word word word word word word word word word word word word word wordabcde\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1003,
+							"end": 1004,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1010,
+				"end": 1012,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1012,
+				"end": 1085,
+				"data": " Wider content fill-wraps within the block-style body (no dangle) "
+			},
+			{
+				"type": "Text",
+				"start": 1085,
+				"end": 1086,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1086,
+				"end": 1246,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 26,
+						"column": 1,
+						"character": 1087
+					},
+					"end": {
+						"line": 26,
+						"column": 4,
+						"character": 1090
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1091,
+							"end": 1093,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1093,
+							"end": 1239,
+							"name": "small",
+							"name_loc": {
+								"start": {
+									"line": 27,
+									"column": 2,
+									"character": 1094
+								},
+								"end": {
+									"line": 27,
+									"column": 7,
+									"character": 1099
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1100,
+										"end": 1231,
+										"raw": "\n\t\tword word word word word word word word word word word word word word word word word word word\n\t\tword word word word word word\n\t",
+										"data": "\n\t\tword word word word word word word word word word word word word word word word word word word\n\t\tword word word word word word\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1239,
+							"end": 1240,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

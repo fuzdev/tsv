@@ -3,6 +3,7 @@ mod deno;
 mod diff;
 mod error;
 mod fixtures;
+mod render_normalize;
 mod test262;
 
 fn main() {
