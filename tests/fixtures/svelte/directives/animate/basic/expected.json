@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 151,
+	"end": 153,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -168,7 +168,7 @@
 			{
 				"type": "EachBlock",
 				"start": 67,
-				"end": 150,
+				"end": 152,
 				"expression": {
 					"type": "Identifier",
 					"start": 74,
@@ -198,7 +198,7 @@
 						{
 							"type": "RegularElement",
 							"start": 100,
-							"end": 142,
+							"end": 144,
 							"name": "div",
 							"name_loc": {
 								"start": {
@@ -215,7 +215,7 @@
 							"attributes": [
 								{
 									"start": 105,
-									"end": 135,
+									"end": 137,
 									"type": "AnimateDirective",
 									"name": "flip",
 									"name_loc": {
@@ -233,7 +233,7 @@
 									"expression": {
 										"type": "ObjectExpression",
 										"start": 119,
-										"end": 134,
+										"end": 136,
 										"loc": {
 											"start": {
 												"line": 6,
@@ -241,22 +241,22 @@
 											},
 											"end": {
 												"line": 6,
-												"column": 35
+												"column": 37
 											}
 										},
 										"properties": [
 											{
 												"type": "Property",
-												"start": 120,
-												"end": 133,
+												"start": 121,
+												"end": 134,
 												"loc": {
 													"start": {
 														"line": 6,
-														"column": 21
+														"column": 22
 													},
 													"end": {
 														"line": 6,
-														"column": 34
+														"column": 35
 													}
 												},
 												"method": false,
@@ -264,32 +264,32 @@
 												"computed": false,
 												"key": {
 													"type": "Identifier",
-													"start": 120,
-													"end": 128,
+													"start": 121,
+													"end": 129,
 													"loc": {
 														"start": {
 															"line": 6,
-															"column": 21
+															"column": 22
 														},
 														"end": {
 															"line": 6,
-															"column": 29
+															"column": 30
 														}
 													},
 													"name": "duration"
 												},
 												"value": {
 													"type": "Literal",
-													"start": 130,
-													"end": 133,
+													"start": 131,
+													"end": 134,
 													"loc": {
 														"start": {
 															"line": 6,
-															"column": 31
+															"column": 32
 														},
 														"end": {
 															"line": 6,
-															"column": 34
+															"column": 35
 														}
 													},
 													"value": 200,
@@ -309,8 +309,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 142,
-							"end": 143,
+							"start": 144,
+							"end": 145,
 							"raw": "\n",
 							"data": "\n"
 						}

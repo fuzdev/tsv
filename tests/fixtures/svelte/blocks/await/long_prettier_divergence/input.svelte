@@ -7,15 +7,14 @@
 		aaaaaaaaaaaaaaaaaaa,
 		bbbbbbbbbbbbbbbbbbb,
 		ccccccccccccccccccc,
-		ddddddddddddddddddd,
+		ddddddddddddddddddd
 	) then r}
 		{r}
 	{/await}
 
 	<!-- member-call (.filter) with arrow body: call breaks open, ) dedents, } dangles (divergence) -->
 	{#await a.filter(
-		(item) =>
-			item.a && item.b && item.c && item.d && item.e && item.f && item.g && item.h && item.i,
+		(item) => item.a && item.b && item.c && item.d && item.e && item.f && item.g && item.h && item.i
 	) then item}
 		{item}
 	{/await}

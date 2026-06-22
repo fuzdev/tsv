@@ -16,6 +16,6 @@
 
 	// fn(...) as Record< is 101, break call, trailing 18 chars fits
 	const c = fn(
-		eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee,
+		eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
 	) as Record<E, F>;
 </script>

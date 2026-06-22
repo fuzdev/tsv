@@ -18,7 +18,7 @@
 
 <div>{[a, b, c]}</div>
 
-<div>{{a, b, c}}</div>
+<div>{{ a, b, c }}</div>
 
 <div>{`template ${a} literal ${b}`}</div>
 
@@ -30,7 +30,7 @@
 
 <div>{[...a, ...b]}</div>
 
-<div>{{...a, ...b}}</div>
+<div>{{ ...a, ...b }}</div>
 
 <div>{(() => a + b)()}</div>
 

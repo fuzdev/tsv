@@ -11,7 +11,7 @@
 
 	// In async function
 	async function load() {
-		const {default: fn} = await import('./fn');
+		const { default: fn } = await import('./fn');
 		return fn;
 	}
 

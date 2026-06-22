@@ -15,6 +15,10 @@ Formatting is now non-configurable by design -
 tsv has no config that changes its formatting style behavior, and none will be added.
 (this has no observable API changes because options had been deferred)
 
+- feat: adopt `bracketSpacing: true` — object, destructuring, and import/export
+  braces are now spaced (`{ a }`), matching Prettier's default
+- feat: adopt `trailingComma: 'none'` — no trailing comma on multiline lists,
+  matching the Svelte project's own Prettier config
 - feat: rework to block style wrapping using Svelte 5 whitespace changes
   [#76](https://github.com/fuzdev/tsv/pull/76)
 - feat: `tsv format` directory discovery now honors `.gitignore` and the tsv-native

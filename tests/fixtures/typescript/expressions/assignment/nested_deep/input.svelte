@@ -9,8 +9,8 @@
 	const n = o.map((p) =>
 		p.q.map((r) => {
 			const s = r.t.filter((u) => u.v).map((u) => u.w);
-			return {x: r.y, z: s};
-		}),
+			return { x: r.y, z: s };
+		})
 	);
 
 	// Assignment inside try block inside callback

@@ -3,21 +3,21 @@
 	new Cls(
 		() => a,
 		() => b,
-		() => c,
+		() => c
 	);
 
 	// With type args
 	new Cls<T>(
 		() => a,
 		() => b,
-		() => c,
+		() => c
 	);
 
 	// Mixed with simple args
 	new Cls(
 		x,
 		() => a,
-		() => b,
+		() => b
 	);
 
 	// Multiple function expressions
@@ -27,7 +27,7 @@
 		},
 		function () {
 			return b;
-		},
+		}
 	);
 
 	// Mixed arrow + function
@@ -35,6 +35,6 @@
 		() => a,
 		function () {
 			return b;
-		},
+		}
 	);
 </script>

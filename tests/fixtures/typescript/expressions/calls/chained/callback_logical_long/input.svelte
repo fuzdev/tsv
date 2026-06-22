@@ -2,7 +2,7 @@
 	// 100 chars on line (at boundary)
 	const a = items
 		.filter(
-			aa && bb && cc && dd && ee && ff && gg && hh && ii && jj && kk && ll && mm && nn && oo && ppp,
+			aa && bb && cc && dd && ee && ff && gg && hh && ii && jj && kk && ll && mm && nn && oo && pppp
 		)
 		.join();
 
@@ -24,7 +24,7 @@
 				mm &&
 				nn &&
 				oo &&
-				pppp,
+				ppppp
 		)
 		.join();
 </script>

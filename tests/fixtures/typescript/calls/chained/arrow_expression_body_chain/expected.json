@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 161,
+	"end": 160,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,12 +13,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 160,
+		"end": 159,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 151,
+			"end": 150,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -33,7 +33,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 10,
-					"end": 150,
+					"end": 149,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -47,7 +47,7 @@
 					"expression": {
 						"type": "BinaryExpression",
 						"start": 10,
-						"end": 149,
+						"end": 148,
 						"loc": {
 							"start": {
 								"line": 2,
@@ -61,7 +61,7 @@
 						"left": {
 							"type": "MemberExpression",
 							"start": 10,
-							"end": 145,
+							"end": 144,
 							"loc": {
 								"start": {
 									"line": 2,
@@ -75,7 +75,7 @@
 							"object": {
 								"type": "CallExpression",
 								"start": 10,
-								"end": 138,
+								"end": 137,
 								"loc": {
 									"start": {
 										"line": 2,
@@ -670,8 +670,8 @@
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 139,
-								"end": 145,
+								"start": 138,
+								"end": 144,
 								"loc": {
 									"start": {
 										"line": 5,
@@ -690,8 +690,8 @@
 						"operator": ">",
 						"right": {
 							"type": "Literal",
-							"start": 148,
-							"end": 149,
+							"start": 147,
+							"end": 148,
 							"loc": {
 								"start": {
 									"line": 5,

@@ -17,28 +17,28 @@
 	// Line comment after element
 	const f = [
 		A, // comment
-		B,
+		B
 	];
 
 	// Line comment before element
 	const g = [
 		A,
 		// comment
-		B,
+		B
 	];
 
 	// Block and line mixed
 	const h = [
 		A /* block */,
 		B, // line
-		C,
+		C
 	];
 
 	// Line comment then block comment
 	const i = [
 		/* block */ A,
 		B, // line
-		C,
+		C
 	];
 
 	// Elision with comments

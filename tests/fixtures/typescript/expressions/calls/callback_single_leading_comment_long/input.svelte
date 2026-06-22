@@ -7,6 +7,6 @@
 
 	// Long at 101 - leading comment blocks expand-last-arg, breaks at open paren
 	a.b.c.map(
-		/* comment */ (source) => get_relative_aaaaaaaaaaaaaaaaaaaaaaaaa(source_aaaaaa, source),
+		/* comment */ (source) => get_relative_aaaaaaaaaaaaaaaaaaaaaaaaa(source_aaaaaa, source)
 	);
 </script>

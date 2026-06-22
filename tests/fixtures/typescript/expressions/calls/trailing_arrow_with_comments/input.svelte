@@ -4,7 +4,7 @@
 		// comment before arrow
 		(x) => {
 			return y;
-		},
+		}
 	);
 
 	fn(
@@ -12,6 +12,6 @@
 		/* block comment */
 		(x) => {
 			return y;
-		},
+		}
 	);
 </script>

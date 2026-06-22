@@ -15,6 +15,6 @@
 		},
 		*typed(): Generator<number> {
 			yield 1;
-		},
+		}
 	};
 </script>

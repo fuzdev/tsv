@@ -7,15 +7,14 @@
 		aaaaaaaaaaaaaaaaaaa,
 		bbbbbbbbbbbbbbbbbbb,
 		ccccccccccccccccccc,
-		ddddddddddddddddddd,
+		ddddddddddddddddddd
 	) as item}
 		{item}
 	{/each}
 
 	<!-- member-call (.filter) with arrow body: call breaks open, ) dedents, } dangles (divergence) -->
 	{#each a.filter(
-		(item) =>
-			item.a && item.b && item.c && item.d && item.e && item.f && item.g && item.h && item.i,
+		(item) => item.a && item.b && item.c && item.d && item.e && item.f && item.g && item.h && item.i
 	) as item}
 		{item}
 	{/each}

@@ -7,7 +7,7 @@
 	// Very long - type params break, heritage on separate line
 	interface VeryLong<
 		T extends VeryLongTypeName | AnotherLongTypeName,
-		U extends ExtraLongConstraintType | MoreTypes,
+		U extends ExtraLongConstraintType | MoreTypes
 	>
 		extends Base1<T>, Base2<T>, Base3<U> {
 		prop: string;

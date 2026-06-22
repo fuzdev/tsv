@@ -4,25 +4,25 @@
 
 	// Long constraint - type params wrap
 	const longConstraint = async <
-		T extends VeryLongConstraintTypeName | AnotherLongConstraintTypeName,
+		T extends VeryLongConstraintTypeName | AnotherLongConstraintTypeName
 	>() => {};
 
 	// Multiple long type params - each on own line
 	const multipleLong = async <
 		T extends LongConstraintOne | LongConstraintTwo,
-		U extends LongConstraintThree | LongConstraintFour,
+		U extends LongConstraintThree | LongConstraintFour
 	>() => {};
 
 	// Long with constraint and default - wraps
 	const longWithDefault = async <
-		T extends VeryLongConstraintTypeName = VeryLongDefaultTypeName,
+		T extends VeryLongConstraintTypeName = VeryLongDefaultTypeName
 	>() => {};
 
 	// Long with parameters and return type
 	const longWithParams = async <
-		T extends VeryLongConstraintTypeName | AnotherLongConstraintTypeName,
+		T extends VeryLongConstraintTypeName | AnotherLongConstraintTypeName
 	>(
-		param: T,
+		param: T
 	): Promise<T> => param;
 
 	// Long object type constraint - wraps
@@ -30,15 +30,15 @@
 		T extends {
 			longPropertyName: VeryLongTypeName;
 			anotherLongProperty: AnotherLongTypeName;
-		},
+		}
 	>() => {};
 
 	// Long function type constraint - wraps
 	const longFnConstraint = async <
 		T extends (
 			longParam: VeryLongParamType,
-			anotherParam: AnotherLongParamType,
-		) => Promise<VeryLongReturnType>,
+			anotherParam: AnotherLongParamType
+		) => Promise<VeryLongReturnType>
 	>() => {};
 
 	// Long with rest parameter - stays inline (just under 100 chars)
@@ -49,6 +49,6 @@
 	// Long conditional type in default - wraps
 	const longConditionalDefault = async <
 		T,
-		U extends T = T extends VeryLongConditionType ? VeryLongTrueType : never,
+		U extends T = T extends VeryLongConditionType ? VeryLongTrueType : never
 	>() => {};
 </script>

@@ -1,10 +1,10 @@
 <script>
 	// Arrow operator `=>` inside expression after `,` in comparison RHS
 	// scan_for_closing_angle_bracket must not treat `>` in `=>` as closing `>`
-	const a = {'<': (a, b) => a < b, '<=': (a, b) => a <= b};
+	const a = { '<': (a, b) => a < b, '<=': (a, b) => a <= b };
 
 	// Object with operators as string keys
-	const b = {'>=': (a, b) => a >= b, '>': (a, b) => a > b};
+	const b = { '>=': (a, b) => a >= b, '>': (a, b) => a > b };
 
 	// Arrow in array element after comparison
 	const c = [a < b, (x) => x];
@@ -18,7 +18,7 @@
 		'<': (a, b) => a < b,
 		'<=': (a, b) => a <= b,
 		'>': (a, b) => a > b,
-		'>=': (a, b) => a >= b,
+		'>=': (a, b) => a >= b
 	};
 
 	// Comparison operators in multiple arrow bodies
@@ -26,7 +26,7 @@
 		lt: (a, b) => a < b,
 		lte: (a, b) => a <= b,
 		gt: (a, b) => a > b,
-		gte: (a, b) => a >= b,
+		gte: (a, b) => a >= b
 	};
 
 	// Complex expression inside brackets on comparison RHS

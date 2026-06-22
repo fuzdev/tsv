@@ -1084,6 +1084,7 @@ impl<'a> Printer<'a> {
             for (i, member) in decl.members.iter().enumerate() {
                 let member_start = member.span.start;
                 let is_first = i == 0;
+                let is_last = i == decl.members.len() - 1;
 
                 // Check for comments between previous position and this member.
                 // First member: drop comments pulled onto the `{` line (emitted
@@ -1155,8 +1156,11 @@ impl<'a> Printer<'a> {
                     // statement-list / class-member paths.
                     member_parts.extend(self.build_trailing_same_line_comment_docs(member_end, cp));
 
-                    // Comma
-                    member_parts.push(d.text(","));
+                    // Separator comma between members; no trailing comma on the last
+                    // member under `trailingComma: 'none'`.
+                    if !is_last {
+                        member_parts.push(d.text(","));
+                    }
 
                     // Same-line trailing comments after comma (line comments)
                     member_parts
@@ -1166,7 +1170,9 @@ impl<'a> Printer<'a> {
                     prev_end = self.find_end_with_trailing_comments(cp + 1);
                 } else {
                     // Fallback: no comma found (shouldn't happen in valid enum)
-                    member_parts.push(d.text(","));
+                    if !is_last {
+                        member_parts.push(d.text(","));
+                    }
                     member_parts.extend(
                         self.build_trailing_same_line_comment_docs(member_end, upper_bound),
                     );

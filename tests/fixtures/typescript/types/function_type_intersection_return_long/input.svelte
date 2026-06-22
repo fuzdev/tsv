@@ -6,7 +6,7 @@
 	type T100 = {
 		a?: {
 			b?: (
-				c: D,
+				c: D
 			) => Eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee['f'] & Promise<Eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee['f']>;
 		};
 	};
@@ -15,7 +15,7 @@
 	type T101 = {
 		a?: {
 			b?: (
-				c: D,
+				c: D
 			) => Eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee['f'] &
 				Promise<Eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee['f']>;
 		};

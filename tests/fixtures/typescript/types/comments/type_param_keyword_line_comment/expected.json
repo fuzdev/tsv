@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 619,
+	"end": 616,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -61,8 +61,8 @@
 		{
 			"type": "Line",
 			"value": " Two line comments after `=` stay on separate lines (inline + own-line), not merged.",
-			"start": 300,
-			"end": 386,
+			"start": 299,
+			"end": 385,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " inline comment",
-			"start": 406,
-			"end": 423,
+			"start": 405,
+			"end": 422,
 			"loc": {
 				"start": {
 					"line": 12,
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " own-line comment",
-			"start": 427,
-			"end": 446,
+			"start": 426,
+			"end": 445,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " Two line comments after `extends` stay on separate lines.",
-			"start": 463,
-			"end": 523,
+			"start": 461,
+			"end": 521,
 			"loc": {
 				"start": {
 					"line": 17,
@@ -125,8 +125,8 @@
 		{
 			"type": "Line",
 			"value": " inline comment",
-			"start": 554,
-			"end": 571,
+			"start": 552,
+			"end": 569,
 			"loc": {
 				"start": {
 					"line": 19,
@@ -141,8 +141,8 @@
 		{
 			"type": "Line",
 			"value": " own-line comment",
-			"start": 575,
-			"end": 594,
+			"start": 573,
+			"end": 592,
 			"loc": {
 				"start": {
 					"line": 20,
@@ -158,12 +158,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 618,
+		"end": 615,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 609,
+			"end": 606,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -178,7 +178,7 @@
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 101,
-					"end": 297,
+					"end": 296,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -208,7 +208,7 @@
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
 						"start": 113,
-						"end": 292,
+						"end": 291,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -454,15 +454,12 @@
 									]
 								}
 							}
-						],
-						"extra": {
-							"trailingComma": 288
-						}
+						]
 					},
 					"typeAnnotation": {
 						"type": "TSTypeReference",
-						"start": 295,
-						"end": 296,
+						"start": 294,
+						"end": 295,
 						"loc": {
 							"start": {
 								"line": 8,
@@ -475,8 +472,8 @@
 						},
 						"typeName": {
 							"type": "Identifier",
-							"start": 295,
-							"end": 296,
+							"start": 294,
+							"end": 295,
 							"loc": {
 								"start": {
 									"line": 8,
@@ -501,8 +498,8 @@
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 388,
-					"end": 460,
+					"start": 387,
+					"end": 458,
 					"loc": {
 						"start": {
 							"line": 11,
@@ -515,8 +512,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 393,
-						"end": 398,
+						"start": 392,
+						"end": 397,
 						"loc": {
 							"start": {
 								"line": 11,
@@ -531,8 +528,8 @@
 					},
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
-						"start": 398,
-						"end": 455,
+						"start": 397,
+						"end": 453,
 						"loc": {
 							"start": {
 								"line": 11,
@@ -546,8 +543,8 @@
 						"params": [
 							{
 								"type": "TSTypeParameter",
-								"start": 402,
-								"end": 451,
+								"start": 401,
+								"end": 450,
 								"loc": {
 									"start": {
 										"line": 12,
@@ -561,8 +558,8 @@
 								"name": "U",
 								"default": {
 									"type": "TSTypeReference",
-									"start": 450,
-									"end": 451,
+									"start": 449,
+									"end": 450,
 									"loc": {
 										"start": {
 											"line": 14,
@@ -575,8 +572,8 @@
 									},
 									"typeName": {
 										"type": "Identifier",
-										"start": 450,
-										"end": 451,
+										"start": 449,
+										"end": 450,
 										"loc": {
 											"start": {
 												"line": 14,
@@ -593,27 +590,24 @@
 										{
 											"type": "Line",
 											"value": " inline comment",
-											"start": 406,
-											"end": 423
+											"start": 405,
+											"end": 422
 										},
 										{
 											"type": "Line",
 											"value": " own-line comment",
-											"start": 427,
-											"end": 446
+											"start": 426,
+											"end": 445
 										}
 									]
 								}
 							}
-						],
-						"extra": {
-							"trailingComma": 451
-						}
+						]
 					},
 					"typeAnnotation": {
 						"type": "TSTypeReference",
-						"start": 458,
-						"end": 459,
+						"start": 456,
+						"end": 457,
 						"loc": {
 							"start": {
 								"line": 15,
@@ -626,8 +620,8 @@
 						},
 						"typeName": {
 							"type": "Identifier",
-							"start": 458,
-							"end": 459,
+							"start": 456,
+							"end": 457,
 							"loc": {
 								"start": {
 									"line": 15,
@@ -645,15 +639,15 @@
 						{
 							"type": "Line",
 							"value": " Two line comments after `=` stay on separate lines (inline + own-line), not merged.",
-							"start": 300,
-							"end": 386
+							"start": 299,
+							"end": 385
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 525,
-					"end": 608,
+					"start": 523,
+					"end": 605,
 					"loc": {
 						"start": {
 							"line": 18,
@@ -666,8 +660,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 530,
-						"end": 540,
+						"start": 528,
+						"end": 538,
 						"loc": {
 							"start": {
 								"line": 18,
@@ -682,8 +676,8 @@
 					},
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
-						"start": 540,
-						"end": 603,
+						"start": 538,
+						"end": 600,
 						"loc": {
 							"start": {
 								"line": 18,
@@ -697,8 +691,8 @@
 						"params": [
 							{
 								"type": "TSTypeParameter",
-								"start": 544,
-								"end": 599,
+								"start": 542,
+								"end": 597,
 								"loc": {
 									"start": {
 										"line": 19,
@@ -712,8 +706,8 @@
 								"name": "T",
 								"constraint": {
 									"type": "TSTypeReference",
-									"start": 598,
-									"end": 599,
+									"start": 596,
+									"end": 597,
 									"loc": {
 										"start": {
 											"line": 21,
@@ -726,8 +720,8 @@
 									},
 									"typeName": {
 										"type": "Identifier",
-										"start": 598,
-										"end": 599,
+										"start": 596,
+										"end": 597,
 										"loc": {
 											"start": {
 												"line": 21,
@@ -744,27 +738,24 @@
 										{
 											"type": "Line",
 											"value": " inline comment",
-											"start": 554,
-											"end": 571
+											"start": 552,
+											"end": 569
 										},
 										{
 											"type": "Line",
 											"value": " own-line comment",
-											"start": 575,
-											"end": 594
+											"start": 573,
+											"end": 592
 										}
 									]
 								}
 							}
-						],
-						"extra": {
-							"trailingComma": 599
-						}
+						]
 					},
 					"typeAnnotation": {
 						"type": "TSTypeReference",
-						"start": 606,
-						"end": 607,
+						"start": 603,
+						"end": 604,
 						"loc": {
 							"start": {
 								"line": 22,
@@ -777,8 +768,8 @@
 						},
 						"typeName": {
 							"type": "Identifier",
-							"start": 606,
-							"end": 607,
+							"start": 603,
+							"end": 604,
 							"loc": {
 								"start": {
 									"line": 22,
@@ -796,8 +787,8 @@
 						{
 							"type": "Line",
 							"value": " Two line comments after `extends` stay on separate lines.",
-							"start": 463,
-							"end": 523
+							"start": 461,
+							"end": 521
 						}
 					]
 				}

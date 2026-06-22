@@ -11,7 +11,7 @@ comma.
 foo                             foo
 	.bar(                           .bar(
 		a, /* c1 */ // c2               a /* c1 */, // c2
-		b,                              b,
+		b                               b
 	)                               )
 	.baz();                         .baz();
 ```

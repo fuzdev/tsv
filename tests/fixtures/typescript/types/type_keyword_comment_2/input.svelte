@@ -1,9 +1,9 @@
 <script lang="ts">
 	// Mapped type in keyword
-	type A = {[K in /* c */ keyof T]: string};
+	type A = { [K in /* c */ keyof T]: string };
 
 	// Mapped type as keyword
-	type B = {[K in keyof T as /* c */ string]: string};
+	type B = { [K in keyof T as /* c */ string]: string };
 
 	// Named tuple member label-to-type
 	type C = [label: /* c */ string];

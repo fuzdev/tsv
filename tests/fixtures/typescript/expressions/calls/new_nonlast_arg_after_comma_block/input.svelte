@@ -1,26 +1,26 @@
 <script lang="ts">
 	new A(
 		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-		/* c */ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+		/* c */ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 	);
 
 	new A(
 		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 		/* c */ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
-		cccccccccccccccccccccccccccccccccc,
+		cccccccccccccccccccccccccccccccccc
 	);
 
 	new A(
 		a,
 		/* c */ {
-			key: valuevaluevalue,
-		},
+			key: valuevaluevalue
+		}
 	);
 
 	new A(
 		a,
 		/* c */ b,
 
-		d,
+		d
 	);
 </script>

@@ -63,11 +63,11 @@
 		get with() {
 			return 1;
 		},
-		set with(v) {},
+		set with(v) {}
 	};
 
 	// Destructuring with reserved word keys
-	const {if: a, else: b, class: c, default: d} = obj;
+	const { if: a, else: b, class: c, default: d } = obj;
 
 	// Member access with reserved words
 	const e = obj.if;

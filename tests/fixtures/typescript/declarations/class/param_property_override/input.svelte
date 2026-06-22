@@ -8,7 +8,7 @@
 	class B extends Base {
 		constructor(
 			public override b: string,
-			protected override readonly c: boolean,
+			protected override readonly c: boolean
 		) {
 			super();
 		}
@@ -19,7 +19,7 @@
 	class C extends Base {
 		constructor(
 			private override d = 1,
-			public override readonly e: string = 'x',
+			public override readonly e: string = 'x'
 		) {
 			super();
 		}

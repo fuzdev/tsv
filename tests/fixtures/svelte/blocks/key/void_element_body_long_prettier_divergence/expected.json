@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 982,
+	"end": 981,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,7 +10,7 @@
 			{
 				"type": "RegularElement",
 				"start": 0,
-				"end": 981,
+				"end": 980,
 				"name": "div",
 				"name_loc": {
 					"start": {
@@ -271,11 +271,11 @@
 						{
 							"type": "KeyBlock",
 							"start": 530,
-							"end": 664,
+							"end": 663,
 							"expression": {
 								"type": "CallExpression",
 								"start": 536,
-								"end": 641,
+								"end": 640,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -327,26 +327,26 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 642,
-										"end": 645,
+										"start": 641,
+										"end": 644,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "Component",
-										"start": 645,
-										"end": 656,
+										"start": 644,
+										"end": 655,
 										"name": "Spinner",
 										"name_loc": {
 											"start": {
 												"line": 14,
 												"column": 3,
-												"character": 646
+												"character": 645
 											},
 											"end": {
 												"line": 14,
 												"column": 10,
-												"character": 653
+												"character": 652
 											}
 										},
 										"attributes": [],
@@ -357,8 +357,8 @@
 									},
 									{
 										"type": "Text",
-										"start": 656,
-										"end": 658,
+										"start": 655,
+										"end": 657,
 										"raw": "\n\t",
 										"data": "\n\t"
 									}
@@ -367,32 +367,32 @@
 						},
 						{
 							"type": "Text",
-							"start": 664,
-							"end": 667,
+							"start": 663,
+							"end": 666,
 							"raw": "\n\n\t",
 							"data": "\n\n\t"
 						},
 						{
 							"type": "Comment",
-							"start": 667,
-							"end": 838,
+							"start": 666,
+							"end": 837,
 							"data": " an attributed element body drops the same way — no breakable-hug special case (uniform body-expand); prettier instead hugs the } and breaks the element internally "
 						},
 						{
 							"type": "Text",
-							"start": 838,
-							"end": 840,
+							"start": 837,
+							"end": 839,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "KeyBlock",
-							"start": 840,
-							"end": 974,
+							"start": 839,
+							"end": 973,
 							"expression": {
 								"type": "CallExpression",
-								"start": 846,
-								"end": 921,
+								"start": 845,
+								"end": 920,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -405,8 +405,8 @@
 								},
 								"callee": {
 									"type": "Identifier",
-									"start": 846,
-									"end": 853,
+									"start": 845,
+									"end": 852,
 									"loc": {
 										"start": {
 											"line": 18,
@@ -422,8 +422,8 @@
 								"arguments": [
 									{
 										"type": "Identifier",
-										"start": 854,
-										"end": 920,
+										"start": 853,
+										"end": 919,
 										"loc": {
 											"start": {
 												"line": 18,
@@ -444,50 +444,50 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 922,
-										"end": 925,
+										"start": 921,
+										"end": 924,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "Component",
-										"start": 925,
-										"end": 966,
+										"start": 924,
+										"end": 965,
 										"name": "Spinner",
 										"name_loc": {
 											"start": {
 												"line": 19,
 												"column": 3,
-												"character": 926
+												"character": 925
 											},
 											"end": {
 												"line": 19,
 												"column": 10,
-												"character": 933
+												"character": 932
 											}
 										},
 										"attributes": [
 											{
 												"type": "Attribute",
-												"start": 934,
-												"end": 963,
+												"start": 933,
+												"end": 962,
 												"name": "class",
 												"name_loc": {
 													"start": {
 														"line": 19,
 														"column": 11,
-														"character": 934
+														"character": 933
 													},
 													"end": {
 														"line": 19,
 														"column": 16,
-														"character": 939
+														"character": 938
 													}
 												},
 												"value": [
 													{
-														"start": 941,
-														"end": 962,
+														"start": 940,
+														"end": 961,
 														"type": "Text",
 														"raw": "loading-spinner-class",
 														"data": "loading-spinner-class"
@@ -502,8 +502,8 @@
 									},
 									{
 										"type": "Text",
-										"start": 966,
-										"end": 968,
+										"start": 965,
+										"end": 967,
 										"raw": "\n\t",
 										"data": "\n\t"
 									}
@@ -512,8 +512,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 974,
-							"end": 975,
+							"start": 973,
+							"end": 974,
 							"raw": "\n",
 							"data": "\n"
 						}

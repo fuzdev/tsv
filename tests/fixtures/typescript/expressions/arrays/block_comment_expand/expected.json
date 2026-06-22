@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 397,
+	"end": 395,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " Multi-line block comment in middle also forces expansion",
-			"start": 153,
-			"end": 212,
+			"start": 152,
+			"end": 211,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -61,8 +61,8 @@
 		{
 			"type": "Block",
 			"value": " comment line 1\ncomment line 2 ",
-			"start": 233,
-			"end": 268,
+			"start": 232,
+			"end": 267,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " Single-line block comment does NOT force expansion (short array)",
-			"start": 283,
-			"end": 350,
+			"start": 281,
+			"end": 348,
 			"loc": {
 				"start": {
 					"line": 18,
@@ -93,8 +93,8 @@
 		{
 			"type": "Block",
 			"value": " comment ",
-			"start": 363,
-			"end": 376,
+			"start": 361,
+			"end": 374,
 			"loc": {
 				"start": {
 					"line": 19,
@@ -110,12 +110,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 396,
+		"end": 394,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 387,
+			"end": 385,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -130,7 +130,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 84,
-					"end": 150,
+					"end": 149,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -145,7 +145,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 90,
-							"end": 149,
+							"end": 148,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -175,7 +175,7 @@
 							"init": {
 								"type": "ArrayExpression",
 								"start": 94,
-								"end": 149,
+								"end": 148,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -259,8 +259,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 214,
-					"end": 280,
+					"start": 213,
+					"end": 278,
 					"loc": {
 						"start": {
 							"line": 11,
@@ -274,8 +274,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 220,
-							"end": 279,
+							"start": 219,
+							"end": 277,
 							"loc": {
 								"start": {
 									"line": 11,
@@ -288,8 +288,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 220,
-								"end": 221,
+								"start": 219,
+								"end": 220,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -304,8 +304,8 @@
 							},
 							"init": {
 								"type": "ArrayExpression",
-								"start": 224,
-								"end": 279,
+								"start": 223,
+								"end": 277,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -319,8 +319,8 @@
 								"elements": [
 									{
 										"type": "Identifier",
-										"start": 228,
-										"end": 229,
+										"start": 227,
+										"end": 228,
 										"loc": {
 											"start": {
 												"line": 12,
@@ -335,8 +335,8 @@
 									},
 									{
 										"type": "Identifier",
-										"start": 269,
-										"end": 270,
+										"start": 268,
+										"end": 269,
 										"loc": {
 											"start": {
 												"line": 14,
@@ -352,15 +352,15 @@
 											{
 												"type": "Block",
 												"value": " comment line 1\ncomment line 2 ",
-												"start": 233,
-												"end": 268
+												"start": 232,
+												"end": 267
 											}
 										]
 									},
 									{
 										"type": "Identifier",
-										"start": 274,
-										"end": 275,
+										"start": 273,
+										"end": 274,
 										"loc": {
 											"start": {
 												"line": 15,
@@ -382,15 +382,15 @@
 						{
 							"type": "Line",
 							"value": " Multi-line block comment in middle also forces expansion",
-							"start": 153,
-							"end": 212
+							"start": 152,
+							"end": 211
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 352,
-					"end": 386,
+					"start": 350,
+					"end": 384,
 					"loc": {
 						"start": {
 							"line": 19,
@@ -404,8 +404,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 358,
-							"end": 385,
+							"start": 356,
+							"end": 383,
 							"loc": {
 								"start": {
 									"line": 19,
@@ -418,8 +418,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 358,
-								"end": 359,
+								"start": 356,
+								"end": 357,
 								"loc": {
 									"start": {
 										"line": 19,
@@ -434,8 +434,8 @@
 							},
 							"init": {
 								"type": "ArrayExpression",
-								"start": 362,
-								"end": 385,
+								"start": 360,
+								"end": 383,
 								"loc": {
 									"start": {
 										"line": 19,
@@ -449,8 +449,8 @@
 								"elements": [
 									{
 										"type": "Identifier",
-										"start": 377,
-										"end": 378,
+										"start": 375,
+										"end": 376,
 										"loc": {
 											"start": {
 												"line": 19,
@@ -466,15 +466,15 @@
 											{
 												"type": "Block",
 												"value": " comment ",
-												"start": 363,
-												"end": 376
+												"start": 361,
+												"end": 374
 											}
 										]
 									},
 									{
 										"type": "Identifier",
-										"start": 380,
-										"end": 381,
+										"start": 378,
+										"end": 379,
 										"loc": {
 											"start": {
 												"line": 19,
@@ -489,8 +489,8 @@
 									},
 									{
 										"type": "Identifier",
-										"start": 383,
-										"end": 384,
+										"start": 381,
+										"end": 382,
 										"loc": {
 											"start": {
 												"line": 19,
@@ -512,8 +512,8 @@
 						{
 							"type": "Line",
 							"value": " Single-line block comment does NOT force expansion (short array)",
-							"start": 283,
-							"end": 350
+							"start": 281,
+							"end": 348
 						}
 					]
 				}

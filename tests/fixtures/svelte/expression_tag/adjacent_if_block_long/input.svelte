@@ -7,11 +7,11 @@
 
 <!-- 101 chars - inner fn() args break (exceeds print_width) -->
 {fn(aaaaaa || bbbbbbbb)}{#if aaaaaa && bbbbbbbb && aaaaaa !== bbbbbbbb}, updated {fn(
-		bbbbbbbbb,
+		bbbbbbbbb
 	)}{/if}
 
 <!-- 176 chars - first fn() args break, text content also breaks -->
 {fn(
-	aaaaaaaaaaaaaaaaaa || bbbbbbbbbbbbbbbbbb,
+	aaaaaaaaaaaaaaaaaa || bbbbbbbbbbbbbbbbbb
 )}{#if aaaaaaaaaaaaaaaaaa && bbbbbbbbbbbbbbbbbb && aaaaaaaaaaaaaaaaaa !== bbbbbbbbbbbbbbbbbb},
 	updated {fn(bbbbbbbbbbbbbbbbbb)}{/if}

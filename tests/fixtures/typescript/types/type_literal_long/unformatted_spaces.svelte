@@ -1,7 +1,7 @@
 <script lang="ts">
-	type   Inline   =   {  prop  :   GenericType<  A  ,  B  ,  C  ,  DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD  >  }  ;
+	type   Inline   =   {  prop  :   GenericType<  A  ,  B  ,  C  ,  DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD  >  }  ;
 	type   Expanded   =   {
-		prop  :  GenericType<  A  ,  B  ,  C  ,  DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD  >  ;
+		prop  :  GenericType<  A  ,  B  ,  C  ,  DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD  >  ;
 	}  ;
 	type   PropertyInline   =   {
 		prop  :  GenericType<  TypeArgument1  ,  TypeArgument2  ,  TypeArgument3  ,  TypeArgument4AAAAAAAAAAAAAAAAAA  >  ;

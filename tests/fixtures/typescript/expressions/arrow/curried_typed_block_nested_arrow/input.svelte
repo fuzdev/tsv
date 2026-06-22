@@ -5,6 +5,6 @@
 	const fn =
 		(a: A): B =>
 		() => {
-			return {x: () => inner(value), y: obj.prop};
+			return { x: () => inner(value), y: obj.prop };
 		};
 </script>

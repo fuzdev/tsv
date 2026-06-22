@@ -1,13 +1,13 @@
 <script lang="ts">
 	fn(
 		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-		/* c */ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+		/* c */ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 	);
 
 	fn(
 		a,
 		/* c */ b,
 
-		d,
+		d
 	);
 </script>

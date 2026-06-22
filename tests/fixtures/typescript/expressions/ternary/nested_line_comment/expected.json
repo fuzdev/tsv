@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 832,
+	"end": 830,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " Object property without comment - stays inline",
-			"start": 356,
-			"end": 405,
+			"start": 355,
+			"end": 404,
 			"loc": {
 				"start": {
 					"line": 23,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " Trailing comment on nested consequent",
-			"start": 465,
-			"end": 505,
+			"start": 463,
+			"end": 503,
 			"loc": {
 				"start": {
 					"line": 28,
@@ -125,8 +125,8 @@
 		{
 			"type": "Line",
 			"value": " trailing",
-			"start": 547,
-			"end": 558,
+			"start": 545,
+			"end": 556,
 			"loc": {
 				"start": {
 					"line": 32,
@@ -141,8 +141,8 @@
 		{
 			"type": "Line",
 			"value": " Line comment before alternate only - inner consequent still breaks",
-			"start": 568,
-			"end": 637,
+			"start": 566,
+			"end": 635,
 			"loc": {
 				"start": {
 					"line": 35,
@@ -157,8 +157,8 @@
 		{
 			"type": "Line",
 			"value": " comment",
-			"start": 683,
-			"end": 693,
+			"start": 681,
+			"end": 691,
 			"loc": {
 				"start": {
 					"line": 40,
@@ -173,8 +173,8 @@
 		{
 			"type": "Line",
 			"value": " Multiline template literal in test - inner consequent breaks",
-			"start": 702,
-			"end": 765,
+			"start": 700,
+			"end": 763,
 			"loc": {
 				"start": {
 					"line": 43,
@@ -190,12 +190,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 831,
+		"end": 829,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 822,
+			"end": 820,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -552,7 +552,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 272,
-					"end": 353,
+					"end": 352,
 					"loc": {
 						"start": {
 							"line": 14,
@@ -567,7 +567,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 278,
-							"end": 352,
+							"end": 351,
 							"loc": {
 								"start": {
 									"line": 14,
@@ -597,7 +597,7 @@
 							"init": {
 								"type": "ObjectExpression",
 								"start": 284,
-								"end": 352,
+								"end": 351,
 								"loc": {
 									"start": {
 										"line": 14,
@@ -778,8 +778,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 407,
-					"end": 462,
+					"start": 406,
+					"end": 460,
 					"loc": {
 						"start": {
 							"line": 24,
@@ -793,8 +793,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 413,
-							"end": 461,
+							"start": 412,
+							"end": 459,
 							"loc": {
 								"start": {
 									"line": 24,
@@ -807,8 +807,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 413,
-								"end": 417,
+								"start": 412,
+								"end": 416,
 								"loc": {
 									"start": {
 										"line": 24,
@@ -823,8 +823,8 @@
 							},
 							"init": {
 								"type": "ObjectExpression",
-								"start": 420,
-								"end": 461,
+								"start": 419,
+								"end": 459,
 								"loc": {
 									"start": {
 										"line": 24,
@@ -838,8 +838,8 @@
 								"properties": [
 									{
 										"type": "Property",
-										"start": 424,
-										"end": 457,
+										"start": 423,
+										"end": 456,
 										"loc": {
 											"start": {
 												"line": 25,
@@ -855,8 +855,8 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 424,
-											"end": 428,
+											"start": 423,
+											"end": 427,
 											"loc": {
 												"start": {
 													"line": 25,
@@ -871,8 +871,8 @@
 										},
 										"value": {
 											"type": "ConditionalExpression",
-											"start": 430,
-											"end": 457,
+											"start": 429,
+											"end": 456,
 											"loc": {
 												"start": {
 													"line": 25,
@@ -885,8 +885,8 @@
 											},
 											"test": {
 												"type": "Identifier",
-												"start": 430,
-												"end": 435,
+												"start": 429,
+												"end": 434,
 												"loc": {
 													"start": {
 														"line": 25,
@@ -901,8 +901,8 @@
 											},
 											"consequent": {
 												"type": "ConditionalExpression",
-												"start": 439,
-												"end": 452,
+												"start": 438,
+												"end": 451,
 												"loc": {
 													"start": {
 														"line": 25,
@@ -915,8 +915,8 @@
 												},
 												"test": {
 													"type": "Identifier",
-													"start": 439,
-													"end": 444,
+													"start": 438,
+													"end": 443,
 													"loc": {
 														"start": {
 															"line": 25,
@@ -931,8 +931,8 @@
 												},
 												"consequent": {
 													"type": "Identifier",
-													"start": 447,
-													"end": 448,
+													"start": 446,
+													"end": 447,
 													"loc": {
 														"start": {
 															"line": 25,
@@ -947,8 +947,8 @@
 												},
 												"alternate": {
 													"type": "Identifier",
-													"start": 451,
-													"end": 452,
+													"start": 450,
+													"end": 451,
 													"loc": {
 														"start": {
 															"line": 25,
@@ -964,8 +964,8 @@
 											},
 											"alternate": {
 												"type": "Identifier",
-												"start": 456,
-												"end": 457,
+												"start": 455,
+												"end": 456,
 												"loc": {
 													"start": {
 														"line": 25,
@@ -990,15 +990,15 @@
 						{
 							"type": "Line",
 							"value": " Object property without comment - stays inline",
-							"start": 356,
-							"end": 405
+							"start": 355,
+							"end": 404
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 507,
-					"end": 565,
+					"start": 505,
+					"end": 563,
 					"loc": {
 						"start": {
 							"line": 29,
@@ -1012,8 +1012,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 513,
-							"end": 564,
+							"start": 511,
+							"end": 562,
 							"loc": {
 								"start": {
 									"line": 29,
@@ -1026,8 +1026,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 513,
-								"end": 514,
+								"start": 511,
+								"end": 512,
 								"loc": {
 									"start": {
 										"line": 29,
@@ -1042,8 +1042,8 @@
 							},
 							"init": {
 								"type": "ConditionalExpression",
-								"start": 517,
-								"end": 564,
+								"start": 515,
+								"end": 562,
 								"loc": {
 									"start": {
 										"line": 29,
@@ -1056,8 +1056,8 @@
 								},
 								"test": {
 									"type": "Identifier",
-									"start": 517,
-									"end": 522,
+									"start": 515,
+									"end": 520,
 									"loc": {
 										"start": {
 											"line": 29,
@@ -1072,8 +1072,8 @@
 								},
 								"consequent": {
 									"type": "ConditionalExpression",
-									"start": 527,
-									"end": 546,
+									"start": 525,
+									"end": 544,
 									"loc": {
 										"start": {
 											"line": 30,
@@ -1086,8 +1086,8 @@
 									},
 									"test": {
 										"type": "Identifier",
-										"start": 527,
-										"end": 532,
+										"start": 525,
+										"end": 530,
 										"loc": {
 											"start": {
 												"line": 30,
@@ -1102,8 +1102,8 @@
 									},
 									"consequent": {
 										"type": "Identifier",
-										"start": 538,
-										"end": 539,
+										"start": 536,
+										"end": 537,
 										"loc": {
 											"start": {
 												"line": 31,
@@ -1118,8 +1118,8 @@
 									},
 									"alternate": {
 										"type": "Identifier",
-										"start": 545,
-										"end": 546,
+										"start": 543,
+										"end": 544,
 										"loc": {
 											"start": {
 												"line": 32,
@@ -1136,15 +1136,15 @@
 										{
 											"type": "Line",
 											"value": " trailing",
-											"start": 547,
-											"end": 558
+											"start": 545,
+											"end": 556
 										}
 									]
 								},
 								"alternate": {
 									"type": "Identifier",
-									"start": 563,
-									"end": 564,
+									"start": 561,
+									"end": 562,
 									"loc": {
 										"start": {
 											"line": 33,
@@ -1165,15 +1165,15 @@
 						{
 							"type": "Line",
 							"value": " Trailing comment on nested consequent",
-							"start": 465,
-							"end": 505
+							"start": 463,
+							"end": 503
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 639,
-					"end": 699,
+					"start": 637,
+					"end": 697,
 					"loc": {
 						"start": {
 							"line": 36,
@@ -1187,8 +1187,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 645,
-							"end": 698,
+							"start": 643,
+							"end": 696,
 							"loc": {
 								"start": {
 									"line": 36,
@@ -1201,8 +1201,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 645,
-								"end": 646,
+								"start": 643,
+								"end": 644,
 								"loc": {
 									"start": {
 										"line": 36,
@@ -1217,8 +1217,8 @@
 							},
 							"init": {
 								"type": "ConditionalExpression",
-								"start": 649,
-								"end": 698,
+								"start": 647,
+								"end": 696,
 								"loc": {
 									"start": {
 										"line": 36,
@@ -1231,8 +1231,8 @@
 								},
 								"test": {
 									"type": "Identifier",
-									"start": 649,
-									"end": 654,
+									"start": 647,
+									"end": 652,
 									"loc": {
 										"start": {
 											"line": 36,
@@ -1247,8 +1247,8 @@
 								},
 								"consequent": {
 									"type": "ConditionalExpression",
-									"start": 659,
-									"end": 678,
+									"start": 657,
+									"end": 676,
 									"loc": {
 										"start": {
 											"line": 37,
@@ -1261,8 +1261,8 @@
 									},
 									"test": {
 										"type": "Identifier",
-										"start": 659,
-										"end": 664,
+										"start": 657,
+										"end": 662,
 										"loc": {
 											"start": {
 												"line": 37,
@@ -1277,8 +1277,8 @@
 									},
 									"consequent": {
 										"type": "Identifier",
-										"start": 670,
-										"end": 671,
+										"start": 668,
+										"end": 669,
 										"loc": {
 											"start": {
 												"line": 38,
@@ -1293,8 +1293,8 @@
 									},
 									"alternate": {
 										"type": "Identifier",
-										"start": 677,
-										"end": 678,
+										"start": 675,
+										"end": 676,
 										"loc": {
 											"start": {
 												"line": 39,
@@ -1310,8 +1310,8 @@
 								},
 								"alternate": {
 									"type": "Identifier",
-									"start": 697,
-									"end": 698,
+									"start": 695,
+									"end": 696,
 									"loc": {
 										"start": {
 											"line": 41,
@@ -1327,8 +1327,8 @@
 										{
 											"type": "Line",
 											"value": " comment",
-											"start": 683,
-											"end": 693
+											"start": 681,
+											"end": 691
 										}
 									]
 								}
@@ -1340,15 +1340,15 @@
 						{
 							"type": "Line",
 							"value": " Line comment before alternate only - inner consequent still breaks",
-							"start": 568,
-							"end": 637
+							"start": 566,
+							"end": 635
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 767,
-					"end": 821,
+					"start": 765,
+					"end": 819,
 					"loc": {
 						"start": {
 							"line": 44,
@@ -1362,8 +1362,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 773,
-							"end": 820,
+							"start": 771,
+							"end": 818,
 							"loc": {
 								"start": {
 									"line": 44,
@@ -1376,8 +1376,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 773,
-								"end": 774,
+								"start": 771,
+								"end": 772,
 								"loc": {
 									"start": {
 										"line": 44,
@@ -1392,8 +1392,8 @@
 							},
 							"init": {
 								"type": "ConditionalExpression",
-								"start": 777,
-								"end": 820,
+								"start": 775,
+								"end": 818,
 								"loc": {
 									"start": {
 										"line": 44,
@@ -1406,8 +1406,8 @@
 								},
 								"test": {
 									"type": "TemplateLiteral",
-									"start": 777,
-									"end": 790,
+									"start": 775,
+									"end": 788,
 									"loc": {
 										"start": {
 											"line": 44,
@@ -1422,8 +1422,8 @@
 									"quasis": [
 										{
 											"type": "TemplateElement",
-											"start": 778,
-											"end": 789,
+											"start": 776,
+											"end": 787,
 											"loc": {
 												"start": {
 													"line": 44,
@@ -1444,8 +1444,8 @@
 								},
 								"consequent": {
 									"type": "ConditionalExpression",
-									"start": 795,
-									"end": 814,
+									"start": 793,
+									"end": 812,
 									"loc": {
 										"start": {
 											"line": 46,
@@ -1458,8 +1458,8 @@
 									},
 									"test": {
 										"type": "Identifier",
-										"start": 795,
-										"end": 800,
+										"start": 793,
+										"end": 798,
 										"loc": {
 											"start": {
 												"line": 46,
@@ -1474,8 +1474,8 @@
 									},
 									"consequent": {
 										"type": "Identifier",
-										"start": 806,
-										"end": 807,
+										"start": 804,
+										"end": 805,
 										"loc": {
 											"start": {
 												"line": 47,
@@ -1490,8 +1490,8 @@
 									},
 									"alternate": {
 										"type": "Identifier",
-										"start": 813,
-										"end": 814,
+										"start": 811,
+										"end": 812,
 										"loc": {
 											"start": {
 												"line": 48,
@@ -1507,8 +1507,8 @@
 								},
 								"alternate": {
 									"type": "Identifier",
-									"start": 819,
-									"end": 820,
+									"start": 817,
+									"end": 818,
 									"loc": {
 										"start": {
 											"line": 49,
@@ -1529,8 +1529,8 @@
 						{
 							"type": "Line",
 							"value": " Multiline template literal in test - inner consequent breaks",
-							"start": 702,
-							"end": 765
+							"start": 700,
+							"end": 763
 						}
 					]
 				}

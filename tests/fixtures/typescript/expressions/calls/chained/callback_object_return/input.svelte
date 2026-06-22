@@ -1,20 +1,20 @@
 <script lang="ts">
 	// short object - stays inline
-	const a = items.map((x) => ({a: 1, b: 2})).filter(Boolean);
+	const a = items.map((x) => ({ a: 1, b: 2 })).filter(Boolean);
 
 	// multiline object in chain
 	const b = items
 		.map((x) => ({
 			a: x.a,
-			b: x.b,
+			b: x.b
 		}))
 		.filter(Boolean);
 
 	// destructuring params
 	const c = items
-		.map(({a, b}) => ({
+		.map(({ a, b }) => ({
 			a: a === 'x' ? a : 'y',
-			b: [{c: b}],
+			b: [{ c: b }]
 		}))
 		.concat(d);
 
@@ -22,7 +22,7 @@
 	const e = items
 		.map((x) => ({
 			a: x.a,
-			b: x.b,
+			b: x.b
 		}))
 		.filter(Boolean)
 		.sort();
@@ -32,16 +32,16 @@
 		.map((x) => ({
 			a: {
 				b: x.b,
-				c: x.c,
-			},
+				c: x.c
+			}
 		}))
 		.filter(Boolean);
 
 	// callback with type annotation
 	const g = items
-		.map((x): {a: string; b: number} => ({
+		.map((x): { a: string; b: number } => ({
 			a: x.a,
-			b: x.b,
+			b: x.b
 		}))
 		.filter(Boolean);
 
@@ -51,7 +51,7 @@
 	// block body (contrast)
 	const i = items
 		.map((x) => {
-			return {a: x.a};
+			return { a: x.a };
 		})
 		.filter(Boolean);
 
@@ -59,7 +59,7 @@
 	const j = items
 		.map((x) => (y) => ({
 			a: x,
-			b: y,
+			b: y
 		}))
 		.filter(Boolean);
 
@@ -67,7 +67,7 @@
 	const k = items
 		.map(async (x) => ({
 			a: await x.a,
-			b: x.b,
+			b: x.b
 		}))
 		.filter(Boolean);
 
@@ -76,7 +76,7 @@
 		.map((x) => (y) => (z) => ({
 			a: x,
 			b: y,
-			c: z,
+			c: z
 		}))
 		.filter(Boolean);
 
@@ -84,7 +84,7 @@
 	const m = items
 		.map((x) => ({
 			...x,
-			a: 1,
+			a: 1
 		}))
 		.filter(Boolean);
 
@@ -93,14 +93,14 @@
 		.map((x) => [
 			x.aaaaaaaaaaaaaaaaaaaaaaaaaa,
 			x.bbbbbbbbbbbbbbbbbbbbbbbbbb,
-			x.cccccccccccccccccccccccccc,
+			x.cccccccccccccccccccccccccc
 		])
 		.filter(Boolean);
 
 	// long string return - soft wraps (contrast)
 	const o = items
 		.map(
-			(x) => 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+			(x) => 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 		)
 		.filter(Boolean);
 </script>

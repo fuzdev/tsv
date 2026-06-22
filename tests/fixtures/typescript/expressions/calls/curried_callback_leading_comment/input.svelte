@@ -4,6 +4,6 @@
 		'name',
 		/* comment */ () => {
 			fn();
-		},
+		}
 	);
 </script>

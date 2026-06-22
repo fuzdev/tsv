@@ -5,14 +5,14 @@
 
 		property2,
 
-		property3,
+		property3
 	} = obj1;
 
 	// Multiple blank lines collapse to one
 	const {
 		property4,
 
-		property5,
+		property5
 	} = obj2;
 
 	// Blank line only between some properties
@@ -20,13 +20,13 @@
 		property6,
 
 		property7,
-		property8,
+		property8
 	} = obj3;
 
 	// Short properties - wraps but preserves blank lines
 	const {
 		a,
 
-		b,
+		b
 	} = obj4;
 </script>

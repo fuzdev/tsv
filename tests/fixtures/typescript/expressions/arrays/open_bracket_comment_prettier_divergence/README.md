@@ -10,8 +10,8 @@ Prettier: moves the comment down to its own line
 ```
 // tsv                          // prettier
 const a = [ // c1               const a = [
-	x,                                 // c1
-];                                 x,
+	x                                  // c1
+];                                 x
                                  ];
 ```
 

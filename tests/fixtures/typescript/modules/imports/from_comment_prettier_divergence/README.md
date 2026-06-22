@@ -13,9 +13,9 @@ import Foo /* c1 */ from './a';
 import Bar from './b'; // c2
 import * as ns1 /* c3 */ from './c';
 import * as ns2 from './d'; // c4
-import {a /* c5 */} from './e';
+import { a /* c5 */ } from './e';
 import {
-	b, // c6
+	b // c6
 } from './f';
 ```
 
@@ -28,8 +28,8 @@ import Bar // c2
 import * as ns1 /* c3 */ from './c';
 import * as ns2 // c4
 	from './d';
-import {a} /* c5 */ from './e';
-import {b} // c6
+import { a } /* c5 */ from './e';
+import { b } // c6
 	from './f';
 ```
 

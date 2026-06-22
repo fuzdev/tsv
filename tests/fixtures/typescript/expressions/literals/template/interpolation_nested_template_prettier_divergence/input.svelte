@@ -36,14 +36,14 @@
 														`${ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd}`
 													}',
 													e: '${[
-														`${eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee}`,
+														`${eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee}`
 													]}',
 													f: '${ssss.processFFFFFFFFFFFFFFFFF(
-														`${fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff}`,
+														`${fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff}`
 													)}',
 													g: '${ssss.itemsGGGGGGGGGGGGGGGGGG.map(
 														(x) =>
-															`${ggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg}`,
+															`${ggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg}`
 													)}',
 												}`;
 										})

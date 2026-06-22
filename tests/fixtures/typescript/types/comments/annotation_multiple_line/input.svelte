@@ -2,7 +2,7 @@
 	// Union annotation: first comment trails `:`, remaining comments and the type indent one level
 	let {
 		a,
-		b,
+		b
 	}: // union one
 		// union two
 		A | B = init1;
@@ -10,7 +10,7 @@
 	// Three line comments: each breaks onto its own line (none merge)
 	let {
 		c,
-		d,
+		d
 	}: // union three a
 		// union three b
 		// union three c
@@ -19,7 +19,7 @@
 	// Block comment stays inline after `:`; the line comment ends its line
 	let {
 		e,
-		f,
+		f
 	}: /* lead */ // trail
 		A | B = init3;
 </script>

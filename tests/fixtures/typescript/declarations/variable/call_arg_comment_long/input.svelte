@@ -6,7 +6,7 @@
 
 			// 101 chars - call args expand (short arg with comment exceeds boundary)
 			const aaaaaaaaa2 = bbbbbbbbbbbbbbb.cccccccccc.ddddddddddd.eeeeeeeeee.fffffffff.ggg(
-				/* x */ hh,
+				/* x */ hh
 			);
 
 			// 101 chars - break after = (short arg without comment, poorly breakable)

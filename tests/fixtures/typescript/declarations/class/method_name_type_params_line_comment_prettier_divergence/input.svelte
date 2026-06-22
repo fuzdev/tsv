@@ -8,7 +8,7 @@
 	// Object method
 	const b = {
 		fn1 // c2
-		<T>() {},
+		<T>() {}
 	};
 
 	// Interface method

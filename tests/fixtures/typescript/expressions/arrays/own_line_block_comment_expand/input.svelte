@@ -3,14 +3,14 @@
 	const a = [
 		x,
 		/* c */
-		y,
+		y
 	];
 
 	// Own-line block comment before first element forces expansion
 	const b = [
 		/* c */
 		x,
-		y,
+		y
 	];
 
 	// Multiple own-line block comments between elements
@@ -18,7 +18,7 @@
 		x,
 		/* c1 */
 		/* c2 */
-		y,
+		y
 	];
 
 	// Same-line block comment does NOT force expansion (short array)

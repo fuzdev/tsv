@@ -2,7 +2,7 @@
 	// Comment inside require() on separate line (#18037)
 	require(
 		// comment
-		'a',
+		'a'
 	);
 
 	// Inline comment

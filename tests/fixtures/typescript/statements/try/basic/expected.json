@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 251,
+	"end": 253,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,12 +13,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 250,
+		"end": 252,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 241,
+			"end": 243,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -606,7 +606,7 @@
 				{
 					"type": "TryStatement",
 					"start": 193,
-					"end": 240,
+					"end": 242,
 					"loc": {
 						"start": {
 							"line": 28,
@@ -668,7 +668,7 @@
 					"handler": {
 						"type": "CatchClause",
 						"start": 210,
-						"end": 240,
+						"end": 242,
 						"loc": {
 							"start": {
 								"line": 30,
@@ -682,7 +682,7 @@
 						"param": {
 							"type": "ObjectPattern",
 							"start": 217,
-							"end": 226,
+							"end": 228,
 							"loc": {
 								"start": {
 									"line": 30,
@@ -690,22 +690,22 @@
 								},
 								"end": {
 									"line": 30,
-									"column": 19
+									"column": 21
 								}
 							},
 							"properties": [
 								{
 									"type": "Property",
-									"start": 218,
-									"end": 225,
+									"start": 219,
+									"end": 226,
 									"loc": {
 										"start": {
 											"line": 30,
-											"column": 11
+											"column": 12
 										},
 										"end": {
 											"line": 30,
-											"column": 18
+											"column": 19
 										}
 									},
 									"method": false,
@@ -713,32 +713,32 @@
 									"computed": false,
 									"key": {
 										"type": "Identifier",
-										"start": 218,
-										"end": 225,
+										"start": 219,
+										"end": 226,
 										"loc": {
 											"start": {
 												"line": 30,
-												"column": 11
+												"column": 12
 											},
 											"end": {
 												"line": 30,
-												"column": 18
+												"column": 19
 											}
 										},
 										"name": "message"
 									},
 									"value": {
 										"type": "Identifier",
-										"start": 218,
-										"end": 225,
+										"start": 219,
+										"end": 226,
 										"loc": {
 											"start": {
 												"line": 30,
-												"column": 11
+												"column": 12
 											},
 											"end": {
 												"line": 30,
-												"column": 18
+												"column": 19
 											}
 										},
 										"name": "message"
@@ -749,12 +749,12 @@
 						},
 						"body": {
 							"type": "BlockStatement",
-							"start": 228,
-							"end": 240,
+							"start": 230,
+							"end": 242,
 							"loc": {
 								"start": {
 									"line": 30,
-									"column": 21
+									"column": 23
 								},
 								"end": {
 									"line": 32,
@@ -764,8 +764,8 @@
 							"body": [
 								{
 									"type": "ExpressionStatement",
-									"start": 232,
-									"end": 237,
+									"start": 234,
+									"end": 239,
 									"loc": {
 										"start": {
 											"line": 31,
@@ -778,8 +778,8 @@
 									},
 									"expression": {
 										"type": "Identifier",
-										"start": 232,
-										"end": 236,
+										"start": 234,
+										"end": 238,
 										"loc": {
 											"start": {
 												"line": 31,

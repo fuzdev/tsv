@@ -6,7 +6,7 @@
 	// Anonymous function - with params
 	const b = function (
 		// c2
-		x,
+		x
 	) {
 		return x;
 	};

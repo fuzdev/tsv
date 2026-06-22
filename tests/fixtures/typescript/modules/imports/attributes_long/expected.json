@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 169,
+	"end": 168,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,12 +13,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 168,
+		"end": 167,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 159,
+			"end": 158,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -33,7 +33,7 @@
 				{
 					"type": "ImportDeclaration",
 					"start": 10,
-					"end": 158,
+					"end": 157,
 					"loc": {
 						"start": {
 							"line": 2,

@@ -7,5 +7,5 @@
 	paramF,
 	paramG,
 	paramH,
-	paramIIIIIIIIIIIIIIII,
+	paramIIIIIIIIIIIIIIII
 )}<div>text</div>{/snippet}

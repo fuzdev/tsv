@@ -2,7 +2,7 @@
 	// Member expression call with multiple args, last is arrow returning call
 	// Prettier hugs head args and breaks after =>
 	something.method(firstArg, (x) =>
-		anotherFunction(x, veryLongArgumentName, anotherVeryLongArgumentName, yetAnotherLongArg),
+		anotherFunction(x, veryLongArgumentName, anotherVeryLongArgumentName, yetAnotherLongArg)
 	);
 
 	// Shorter case that fits on one line
@@ -13,6 +13,6 @@
 
 	// Inner call breaks
 	a.b(c, (x) =>
-		fn(x, {veryLongPropertyName: someValue, anotherVeryLongProperty: anotherValue, third: t}),
+		fn(x, { veryLongPropertyName: someValue, anotherVeryLongProperty: anotherValue, third: t })
 	);
 </script>

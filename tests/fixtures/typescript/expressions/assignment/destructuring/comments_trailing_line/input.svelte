@@ -8,19 +8,19 @@
 	} = $props();
 
 	// trailing after last property
-	const {d, e} = x; // trailing on whole statement
+	const { d, e } = x; // trailing on whole statement
 
 	// line comment after specific property
 	const {
 		f, // comment after f
 		g, // comment after g
-		h,
+		h
 	} = y;
 
 	// mixed block and line
 	const {
 		i = 1 /* block */, // line
-		j,
+		j
 	} = z;
 
 	// array destructuring with trailing line comments
@@ -33,25 +33,25 @@
 	// nested destructuring
 	const {
 		outer: {
-			inner, // comment on inner
-		}, // comment on outer
+			inner // comment on inner
+		} // comment on outer
 	} = nested;
 
 	// renamed with line comment
 	const {
 		oldName: newName, // renaming comment
-		xx,
+		xx
 	} = obj;
 
 	// line comment on last property before closing brace
 	const {
 		first,
-		last, // this is the last one
+		last // this is the last one
 	} = obj2;
 
 	// function params with destructuring
 	function fn({
 		param1, // first param
-		param2, // second param
+		param2 // second param
 	}: Props) {}
 </script>

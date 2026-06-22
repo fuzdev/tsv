@@ -9,7 +9,7 @@
 				if (true) {
 					// 100 chars total: fits on one line, only args break internally
 					const aaaa_bbbbbbbbbbbbbbbbbbbbbbbbbbbb = cccccc.ddddddddddddddddd.eeeeeeeeeeeeeee.filter(
-						(x) => x.s === 'a',
+						(x) => x.s === 'a'
 					);
 					// 101 chars total: we expand call args, prettier breaks after =
 					const aaaa_bbbbbbbbbbbbbbbbbbbbbbbbbbbbb =

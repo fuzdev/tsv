@@ -25,7 +25,7 @@
 		argument5,
 		argument6,
 		argument7,
-		argument8abcdefg,
+		argument8abcdefg
 	)}
 </p>
 

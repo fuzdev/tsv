@@ -3,25 +3,25 @@
 	const a =
 		(b) =>
 		<T>(fn) =>
-			b.c((tx) => fn(new C({a: tx, b: d})));
+			b.c((tx) => fn(new C({ a: tx, b: d })));
 
-	// Body line at exactly 100 chars
+	// Body line is exactly 100 chars - callback stays inline
 	const b =
 		(c) =>
 		<T>(fn) =>
-			c.d((tx) => fn(new E({a: tx, b: ddddddddddddddddddddddddddddddddddddddddddddddddddddddddd})));
+			c.d((tx) => fn(new E({ a: tx, b: ddddddddddddddddddddddddddddddddddddddddddddddddddddddd })));
 
-	// Body line at 101 chars - callback wraps
+	// Body line is 101 chars - callback wraps
 	const c =
 		(d) =>
 		<T>(fn) =>
 			d.e((tx) =>
-				fn(new F({a: tx, b: dddddddddddddddddddddddddddddddddddddddddddddddddddddddddd})),
+				fn(new F({ a: tx, b: dddddddddddddddddddddddddddddddddddddddddddddddddddddddd }))
 			);
 
 	// With return type and async
 	const e =
 		(b: A) =>
 		async <T>(fn: (c: B) => Promise<T>): Promise<T> =>
-			b.c(async (tx) => fn(new C({a: tx, b: d})));
+			b.c(async (tx) => fn(new C({ a: tx, b: d })));
 </script>

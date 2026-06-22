@@ -4,13 +4,13 @@
 		'a1' +
 			// c
 			'a2' +
-			'a3',
+			'a3'
 	);
 
 	// leading comment on the first operand alone does not break the chain
 	const b = fn(
 		// c
-		'b1' + 'b2' + 'b3',
+		'b1' + 'b2' + 'b3'
 	);
 
 	// leading comment on the first operand plus a continuation comment:
@@ -20,7 +20,7 @@
 		'c1' +
 			// c2
 			'c2' +
-			'c3',
+			'c3'
 	);
 
 	// inline block comment leads the first operand; the chain breaks on width and
@@ -28,6 +28,6 @@
 	const d = fn(
 		/* c */ 'dddddddddddddddddddddddddddddddddddddddddddd' +
 			'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' +
-			'fffffffffffffffffffffffffffffffffffffffffff',
+			'fffffffffffffffffffffffffffffffffffffffffff'
 	);
 </script>

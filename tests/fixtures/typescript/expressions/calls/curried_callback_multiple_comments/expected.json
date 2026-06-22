@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 336,
+	"end": 334,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " Both comments - expands (comment after comma)",
-			"start": 214,
-			"end": 262,
+			"start": 213,
+			"end": 261,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -93,8 +93,8 @@
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 279,
-			"end": 287,
+			"start": 278,
+			"end": 286,
 			"loc": {
 				"start": {
 					"line": 17,
@@ -109,8 +109,8 @@
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 291,
-			"end": 299,
+			"start": 290,
+			"end": 298,
 			"loc": {
 				"start": {
 					"line": 18,
@@ -126,12 +126,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 335,
+		"end": 333,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 326,
+			"end": 324,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -330,7 +330,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 159,
-					"end": 211,
+					"end": 210,
 					"loc": {
 						"start": {
 							"line": 8,
@@ -344,7 +344,7 @@
 					"expression": {
 						"type": "CallExpression",
 						"start": 159,
-						"end": 210,
+						"end": 209,
 						"loc": {
 							"start": {
 								"line": 8,
@@ -513,8 +513,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 264,
-					"end": 325,
+					"start": 263,
+					"end": 323,
 					"loc": {
 						"start": {
 							"line": 16,
@@ -527,8 +527,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 264,
-						"end": 324,
+						"start": 263,
+						"end": 322,
 						"loc": {
 							"start": {
 								"line": 16,
@@ -541,8 +541,8 @@
 						},
 						"callee": {
 							"type": "CallExpression",
-							"start": 264,
-							"end": 268,
+							"start": 263,
+							"end": 267,
 							"loc": {
 								"start": {
 									"line": 16,
@@ -555,8 +555,8 @@
 							},
 							"callee": {
 								"type": "Identifier",
-								"start": 264,
-								"end": 266,
+								"start": 263,
+								"end": 265,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -575,8 +575,8 @@
 						"arguments": [
 							{
 								"type": "Literal",
-								"start": 272,
-								"end": 278,
+								"start": 271,
+								"end": 277,
 								"loc": {
 									"start": {
 										"line": 17,
@@ -593,15 +593,15 @@
 									{
 										"type": "Block",
 										"value": " c1 ",
-										"start": 279,
-										"end": 287
+										"start": 278,
+										"end": 286
 									}
 								]
 							},
 							{
 								"type": "ArrowFunctionExpression",
-								"start": 300,
-								"end": 320,
+								"start": 299,
+								"end": 319,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -619,8 +619,8 @@
 								"params": [],
 								"body": {
 									"type": "BlockStatement",
-									"start": 306,
-									"end": 320,
+									"start": 305,
+									"end": 319,
 									"loc": {
 										"start": {
 											"line": 18,
@@ -634,8 +634,8 @@
 									"body": [
 										{
 											"type": "ExpressionStatement",
-											"start": 311,
-											"end": 316,
+											"start": 310,
+											"end": 315,
 											"loc": {
 												"start": {
 													"line": 19,
@@ -648,8 +648,8 @@
 											},
 											"expression": {
 												"type": "CallExpression",
-												"start": 311,
-												"end": 315,
+												"start": 310,
+												"end": 314,
 												"loc": {
 													"start": {
 														"line": 19,
@@ -662,8 +662,8 @@
 												},
 												"callee": {
 													"type": "Identifier",
-													"start": 311,
-													"end": 313,
+													"start": 310,
+													"end": 312,
 													"loc": {
 														"start": {
 															"line": 19,
@@ -686,8 +686,8 @@
 									{
 										"type": "Block",
 										"value": " c2 ",
-										"start": 291,
-										"end": 299
+										"start": 290,
+										"end": 298
 									}
 								]
 							}
@@ -698,8 +698,8 @@
 						{
 							"type": "Line",
 							"value": " Both comments - expands (comment after comma)",
-							"start": 214,
-							"end": 262
+							"start": 213,
+							"end": 261
 						}
 					]
 				}

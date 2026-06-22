@@ -2,7 +2,7 @@
 	const obj = {
 		nested: [
 			'multi \
-line',
-		],
+line'
+		]
 	};
 </script>

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 362,
+	"end": 361,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -61,8 +61,8 @@
 		{
 			"type": "Line",
 			"value": " Multiple spreads before callback",
-			"start": 274,
-			"end": 309,
+			"start": 273,
+			"end": 308,
 			"loc": {
 				"start": {
 					"line": 20,
@@ -78,12 +78,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 361,
+		"end": 360,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 352,
+			"end": 351,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -477,7 +477,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 224,
-					"end": 271,
+					"end": 270,
 					"loc": {
 						"start": {
 							"line": 13,
@@ -491,7 +491,7 @@
 					"expression": {
 						"type": "CallExpression",
 						"start": 224,
-						"end": 270,
+						"end": 269,
 						"loc": {
 							"start": {
 								"line": 13,
@@ -649,8 +649,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 311,
-					"end": 351,
+					"start": 310,
+					"end": 350,
 					"loc": {
 						"start": {
 							"line": 21,
@@ -663,8 +663,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 311,
-						"end": 350,
+						"start": 310,
+						"end": 349,
 						"loc": {
 							"start": {
 								"line": 21,
@@ -677,8 +677,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 311,
-							"end": 313,
+							"start": 310,
+							"end": 312,
 							"loc": {
 								"start": {
 									"line": 21,
@@ -694,8 +694,8 @@
 						"arguments": [
 							{
 								"type": "SpreadElement",
-								"start": 314,
-								"end": 318,
+								"start": 313,
+								"end": 317,
 								"loc": {
 									"start": {
 										"line": 21,
@@ -708,8 +708,8 @@
 								},
 								"argument": {
 									"type": "Identifier",
-									"start": 317,
-									"end": 318,
+									"start": 316,
+									"end": 317,
 									"loc": {
 										"start": {
 											"line": 21,
@@ -725,8 +725,8 @@
 							},
 							{
 								"type": "SpreadElement",
-								"start": 320,
-								"end": 324,
+								"start": 319,
+								"end": 323,
 								"loc": {
 									"start": {
 										"line": 21,
@@ -739,8 +739,8 @@
 								},
 								"argument": {
 									"type": "Identifier",
-									"start": 323,
-									"end": 324,
+									"start": 322,
+									"end": 323,
 									"loc": {
 										"start": {
 											"line": 21,
@@ -756,8 +756,8 @@
 							},
 							{
 								"type": "ArrowFunctionExpression",
-								"start": 326,
-								"end": 349,
+								"start": 325,
+								"end": 348,
 								"loc": {
 									"start": {
 										"line": 21,
@@ -775,8 +775,8 @@
 								"params": [
 									{
 										"type": "Identifier",
-										"start": 327,
-										"end": 328,
+										"start": 326,
+										"end": 327,
 										"loc": {
 											"start": {
 												"line": 21,
@@ -792,8 +792,8 @@
 								],
 								"body": {
 									"type": "BlockStatement",
-									"start": 333,
-									"end": 349,
+									"start": 332,
+									"end": 348,
 									"loc": {
 										"start": {
 											"line": 21,
@@ -807,8 +807,8 @@
 									"body": [
 										{
 											"type": "ReturnStatement",
-											"start": 337,
-											"end": 346,
+											"start": 336,
+											"end": 345,
 											"loc": {
 												"start": {
 													"line": 22,
@@ -821,8 +821,8 @@
 											},
 											"argument": {
 												"type": "Identifier",
-												"start": 344,
-												"end": 345,
+												"start": 343,
+												"end": 344,
 												"loc": {
 													"start": {
 														"line": 22,
@@ -846,8 +846,8 @@
 						{
 							"type": "Line",
 							"value": " Multiple spreads before callback",
-							"start": 274,
-							"end": 309
+							"start": 273,
+							"end": 308
 						}
 					]
 				}

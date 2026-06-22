@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 454,
+	"end": 456,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -141,8 +141,8 @@
 		{
 			"type": "Line",
 			"value": " block comment before array literal",
-			"start": 312,
-			"end": 349,
+			"start": 314,
+			"end": 351,
 			"loc": {
 				"start": {
 					"line": 16,
@@ -157,8 +157,8 @@
 		{
 			"type": "Block",
 			"value": " comment ",
-			"start": 355,
-			"end": 368,
+			"start": 357,
+			"end": 370,
 			"loc": {
 				"start": {
 					"line": 17,
@@ -173,8 +173,8 @@
 		{
 			"type": "Line",
 			"value": " block comment before call expression",
-			"start": 379,
-			"end": 418,
+			"start": 381,
+			"end": 420,
 			"loc": {
 				"start": {
 					"line": 19,
@@ -189,8 +189,8 @@
 		{
 			"type": "Block",
 			"value": " comment ",
-			"start": 424,
-			"end": 437,
+			"start": 426,
+			"end": 439,
 			"loc": {
 				"start": {
 					"line": 20,
@@ -206,12 +206,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 453,
+		"end": 455,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 444,
+			"end": 446,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -550,7 +550,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 284,
-					"end": 309,
+					"end": 311,
 					"loc": {
 						"start": {
 							"line": 14,
@@ -558,13 +558,13 @@
 						},
 						"end": {
 							"line": 14,
-							"column": 26
+							"column": 28
 						}
 					},
 					"expression": {
 						"type": "AssignmentExpression",
 						"start": 284,
-						"end": 308,
+						"end": 310,
 						"loc": {
 							"start": {
 								"line": 14,
@@ -572,7 +572,7 @@
 							},
 							"end": {
 								"line": 14,
-								"column": 25
+								"column": 27
 							}
 						},
 						"operator": "=",
@@ -595,7 +595,7 @@
 						"right": {
 							"type": "ObjectExpression",
 							"start": 302,
-							"end": 308,
+							"end": 310,
 							"loc": {
 								"start": {
 									"line": 14,
@@ -603,22 +603,22 @@
 								},
 								"end": {
 									"line": 14,
-									"column": 25
+									"column": 27
 								}
 							},
 							"properties": [
 								{
 									"type": "Property",
-									"start": 303,
-									"end": 307,
+									"start": 304,
+									"end": 308,
 									"loc": {
 										"start": {
 											"line": 14,
-											"column": 20
+											"column": 21
 										},
 										"end": {
 											"line": 14,
-											"column": 24
+											"column": 25
 										}
 									},
 									"method": false,
@@ -626,32 +626,32 @@
 									"computed": false,
 									"key": {
 										"type": "Identifier",
-										"start": 303,
-										"end": 304,
+										"start": 304,
+										"end": 305,
 										"loc": {
 											"start": {
 												"line": 14,
-												"column": 20
+												"column": 21
 											},
 											"end": {
 												"line": 14,
-												"column": 21
+												"column": 22
 											}
 										},
 										"name": "b"
 									},
 									"value": {
 										"type": "Literal",
-										"start": 306,
-										"end": 307,
+										"start": 307,
+										"end": 308,
 										"loc": {
 											"start": {
 												"line": 14,
-												"column": 23
+												"column": 24
 											},
 											"end": {
 												"line": 14,
-												"column": 24
+												"column": 25
 											}
 										},
 										"value": 1,
@@ -681,8 +681,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 351,
-					"end": 376,
+					"start": 353,
+					"end": 378,
 					"loc": {
 						"start": {
 							"line": 17,
@@ -695,8 +695,8 @@
 					},
 					"expression": {
 						"type": "AssignmentExpression",
-						"start": 351,
-						"end": 375,
+						"start": 353,
+						"end": 377,
 						"loc": {
 							"start": {
 								"line": 17,
@@ -710,8 +710,8 @@
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
-							"start": 351,
-							"end": 352,
+							"start": 353,
+							"end": 354,
 							"loc": {
 								"start": {
 									"line": 17,
@@ -726,8 +726,8 @@
 						},
 						"right": {
 							"type": "ArrayExpression",
-							"start": 369,
-							"end": 375,
+							"start": 371,
+							"end": 377,
 							"loc": {
 								"start": {
 									"line": 17,
@@ -741,8 +741,8 @@
 							"elements": [
 								{
 									"type": "Literal",
-									"start": 370,
-									"end": 371,
+									"start": 372,
+									"end": 373,
 									"loc": {
 										"start": {
 											"line": 17,
@@ -758,8 +758,8 @@
 								},
 								{
 									"type": "Literal",
-									"start": 373,
-									"end": 374,
+									"start": 375,
+									"end": 376,
 									"loc": {
 										"start": {
 											"line": 17,
@@ -778,8 +778,8 @@
 								{
 									"type": "Block",
 									"value": " comment ",
-									"start": 355,
-									"end": 368
+									"start": 357,
+									"end": 370
 								}
 							]
 						}
@@ -788,15 +788,15 @@
 						{
 							"type": "Line",
 							"value": " block comment before array literal",
-							"start": 312,
-							"end": 349
+							"start": 314,
+							"end": 351
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 420,
-					"end": 443,
+					"start": 422,
+					"end": 445,
 					"loc": {
 						"start": {
 							"line": 20,
@@ -809,8 +809,8 @@
 					},
 					"expression": {
 						"type": "AssignmentExpression",
-						"start": 420,
-						"end": 442,
+						"start": 422,
+						"end": 444,
 						"loc": {
 							"start": {
 								"line": 20,
@@ -824,8 +824,8 @@
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
-							"start": 420,
-							"end": 421,
+							"start": 422,
+							"end": 423,
 							"loc": {
 								"start": {
 									"line": 20,
@@ -840,8 +840,8 @@
 						},
 						"right": {
 							"type": "CallExpression",
-							"start": 438,
-							"end": 442,
+							"start": 440,
+							"end": 444,
 							"loc": {
 								"start": {
 									"line": 20,
@@ -854,8 +854,8 @@
 							},
 							"callee": {
 								"type": "Identifier",
-								"start": 438,
-								"end": 440,
+								"start": 440,
+								"end": 442,
 								"loc": {
 									"start": {
 										"line": 20,
@@ -874,8 +874,8 @@
 								{
 									"type": "Block",
 									"value": " comment ",
-									"start": 424,
-									"end": 437
+									"start": 426,
+									"end": 439
 								}
 							]
 						}
@@ -884,8 +884,8 @@
 						{
 							"type": "Line",
 							"value": " block comment before call expression",
-							"start": 379,
-							"end": 418
+							"start": 381,
+							"end": 420
 						}
 					]
 				}

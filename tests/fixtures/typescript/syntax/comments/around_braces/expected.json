@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 132,
+	"end": 131,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -61,8 +61,8 @@
 		{
 			"type": "Block",
 			"value": " comment4 ",
-			"start": 88,
-			"end": 102,
+			"start": 87,
+			"end": 101,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -77,8 +77,8 @@
 		{
 			"type": "Block",
 			"value": " comment5 ",
-			"start": 107,
-			"end": 121,
+			"start": 106,
+			"end": 120,
 			"loc": {
 				"start": {
 					"line": 6,
@@ -94,12 +94,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 131,
+		"end": 130,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 122,
+			"end": 121,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -114,7 +114,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 10,
-					"end": 106,
+					"end": 105,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -129,7 +129,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 16,
-							"end": 105,
+							"end": 104,
 							"loc": {
 								"start": {
 									"line": 2,
@@ -159,7 +159,7 @@
 							"init": {
 								"type": "ObjectExpression",
 								"start": 40,
-								"end": 105,
+								"end": 104,
 								"loc": {
 									"start": {
 										"line": 2,
@@ -240,8 +240,8 @@
 											{
 												"type": "Block",
 												"value": " comment4 ",
-												"start": 88,
-												"end": 102
+												"start": 87,
+												"end": 101
 											}
 										]
 									}
@@ -262,8 +262,8 @@
 						{
 							"type": "Block",
 							"value": " comment5 ",
-							"start": 107,
-							"end": 121
+							"start": 106,
+							"end": 120
 						}
 					]
 				}

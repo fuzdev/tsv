@@ -1,11 +1,11 @@
 <script lang="ts">
 	new A(
-		a,
+		a
 		// comment
 	);
 
 	new A(
-		b,
+		b
 		/* block */
 		// line
 	);

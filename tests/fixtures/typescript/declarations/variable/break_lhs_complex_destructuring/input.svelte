@@ -4,19 +4,19 @@
 		propOne,
 		propTwo = 1,
 		propThree = 2,
-		propFour,
+		propFour
 	} = getSomeLongObjectNameThatExceedsThePrintWidth();
 
 	// Complex destructuring - >2 properties with non-shorthand
 	const {
 		a: propertyA,
 		b: propertyB,
-		c: propertyC,
+		c: propertyC
 	} = getAnotherLongObjectNameThatExceedsPrintWidth();
 
 	// Not complex - only 2 properties
-	const {x = 1, y = 2} = getShortObject();
+	const { x = 1, y = 2 } = getShortObject();
 
 	// Not complex - 3 properties but all shorthand without defaults
-	const {foo, bar, baz} = getObject();
+	const { foo, bar, baz } = getObject();
 </script>

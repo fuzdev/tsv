@@ -10,6 +10,6 @@
 
 	// Leading block comment with expanded trailing comment
 	obj.method1().method2(
-		/* leading */ value, // trailing
+		/* leading */ value // trailing
 	);
 </script>

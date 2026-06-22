@@ -12,13 +12,13 @@
 
 	// Destructuring
 	{
-		const {symbol} = obj;
+		const { symbol } = obj;
 	}
 	{
 		const [symbol] = arr;
 	}
 	{
-		const {symbol: s} = obj;
+		const { symbol: s } = obj;
 	}
 
 	// Assignment (Bug #5 - fails without declaration keyword)
@@ -38,17 +38,17 @@
 	// Object property shorthand
 	{
 		const symbol = 'a';
-		const obj2 = {symbol};
+		const obj2 = { symbol };
 	}
 
 	// Object property key
-	const obj3 = {symbol: 'value'};
+	const obj3 = { symbol: 'value' };
 
 	// Method name
 	const obj4 = {
 		symbol() {
 			return 'a';
-		},
+		}
 	};
 
 	// Class property

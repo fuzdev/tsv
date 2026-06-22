@@ -6,6 +6,6 @@
 		},
 		withParams(a, b) {
 			return a + b;
-		},
+		}
 	};
 </script>

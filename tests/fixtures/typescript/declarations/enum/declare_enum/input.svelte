@@ -1,11 +1,11 @@
 <script lang="ts">
 	declare enum A {
 		X,
-		Y,
+		Y
 	}
 
 	declare const enum B {
 		X = 'x',
-		Y = 'y',
+		Y = 'y'
 	}
 </script>

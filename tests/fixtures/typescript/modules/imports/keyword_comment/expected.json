@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 803,
+	"end": 805,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -269,16 +269,16 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 780,
-			"end": 787,
+			"start": 782,
+			"end": 789,
 			"loc": {
 				"start": {
 					"line": 24,
-					"column": 17
+					"column": 19
 				},
 				"end": {
 					"line": 24,
-					"column": 24
+					"column": 26
 				}
 			}
 		}
@@ -286,12 +286,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 802,
+		"end": 804,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 793,
+			"end": 795,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -662,7 +662,7 @@
 				{
 					"type": "ImportDeclaration",
 					"start": 764,
-					"end": 792,
+					"end": 794,
 					"loc": {
 						"start": {
 							"line": 24,
@@ -670,53 +670,53 @@
 						},
 						"end": {
 							"line": 24,
-							"column": 29
+							"column": 31
 						}
 					},
 					"importKind": "value",
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
-							"start": 772,
-							"end": 773,
+							"start": 773,
+							"end": 774,
 							"loc": {
 								"start": {
 									"line": 24,
-									"column": 9
+									"column": 10
 								},
 								"end": {
 									"line": 24,
-									"column": 10
+									"column": 11
 								}
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 772,
-								"end": 773,
+								"start": 773,
+								"end": 774,
 								"loc": {
 									"start": {
 										"line": 24,
-										"column": 9
+										"column": 10
 									},
 									"end": {
 										"line": 24,
-										"column": 10
+										"column": 11
 									}
 								},
 								"name": "a"
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 772,
-								"end": 773,
+								"start": 773,
+								"end": 774,
 								"loc": {
 									"start": {
 										"line": 24,
-										"column": 9
+										"column": 10
 									},
 									"end": {
 										"line": 24,
-										"column": 10
+										"column": 11
 									}
 								},
 								"name": "a"
@@ -726,16 +726,16 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 788,
-						"end": 791,
+						"start": 790,
+						"end": 793,
 						"loc": {
 							"start": {
 								"line": 24,
-								"column": 25
+								"column": 27
 							},
 							"end": {
 								"line": 24,
-								"column": 28
+								"column": 30
 							}
 						},
 						"value": "i",
@@ -744,8 +744,8 @@
 							{
 								"type": "Block",
 								"value": " c ",
-								"start": 780,
-								"end": 787
+								"start": 782,
+								"end": 789
 							}
 						]
 					},

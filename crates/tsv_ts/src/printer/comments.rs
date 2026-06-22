@@ -2261,10 +2261,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Split the last list-member's trailing inline block comments around a source
-    /// trailing comma (in `elem_end..end_boundary`): comments before the comma go
-    /// to `before`, comments after it to `after`. Callers emit `after` past the
-    /// synthetic trailing comma so the comment is preserved after the comma rather
-    /// than relocated before it (see conformance_prettier.md §Comment relocation).
+    /// comma (in `elem_end..end_boundary`): comments before the comma go to `before`,
+    /// comments after it to `after`. Callers emit `after` past where the comma was
+    /// (no trailing comma; trailingComma: 'none') so the comment is preserved after it
+    /// rather than relocated before (see conformance_prettier.md §Comment relocation).
     pub(crate) fn append_last_trailing_block_comments_split(
         &self,
         before: &mut Vec<DocId>,

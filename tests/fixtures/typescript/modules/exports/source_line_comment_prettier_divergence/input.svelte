@@ -8,6 +8,6 @@
 		'./b';
 
 	// named specifiers: line comment between from and source
-	export {a} from // c
+	export { a } from // c
 		'./c';
 </script>

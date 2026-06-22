@@ -7,15 +7,15 @@
 		x,
 		/** @type {T} */ (y) => {
 			z;
-		},
+		}
 	);
 
 	// Object boundary 100: fits inline
-	a.b(x, /** @type {T} */ {aaaa: 1, bbbb: 2, cccc: 3, dddd: 4, eeee: 5, ffff: 6, gggg: 7, hhhh: 8});
+	a.b(x, /** @type {T} */ { aaaa: 1, bbbb: 2, cccc: 3, dddd: 4, eeee: 5, ffff: 6, gggg: 7, hh: 8 });
 
 	// Object boundary 101: expands, leading comment prevents expand-last
 	a.b(
 		x,
-		/** @type {T} */ {aaaa: 1, bbbb: 2, cccc: 3, dddd: 4, eeee: 5, ffff: 6, gggg: 7, hhhh: 88},
+		/** @type {T} */ { aaaa: 1, bbbb: 2, cccc: 3, dddd: 4, eeee: 5, ffff: 6, gggg: 7, hh: 88 }
 	);
 </script>

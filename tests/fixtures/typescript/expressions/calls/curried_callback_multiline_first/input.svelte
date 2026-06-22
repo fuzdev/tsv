@@ -4,7 +4,7 @@
 		'aaaaaaaaaaaaaaaaaaaaa',
 		'bbbbbbbbbbbbbbbbbbbbb',
 		'ccccccccccccccccccccc',
-		'ddddddddddddddddddddd',
+		'ddddddddddddddddddddd'
 	])('a', (b) => {
 		fn(b);
 	});
@@ -14,7 +14,7 @@
 		'aaaaaaaaaaaaaaaaaaaaa',
 		'bbbbbbbbbbbbbbbbbbbbb',
 		'ccccccccccccccccccccc',
-		'ddddddddddddddddddddd',
+		'ddddddddddddddddddddd'
 	])('a', (b) => {
 		fn(b);
 	});
@@ -24,7 +24,7 @@
 		a: 'aaaaaaaaaa',
 		b: 'bbbbbbbbbb',
 		c: 'cccccccccc',
-		d: 'dddddddddd',
+		d: 'dddddddddd'
 	})('a', (b) => {
 		fn(b);
 	});

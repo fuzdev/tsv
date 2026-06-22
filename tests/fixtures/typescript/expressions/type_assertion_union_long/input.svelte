@@ -17,6 +17,6 @@
 
 	// object-literal expr stays hugged after `>` even when the cast type breaks
 	const e = <Map<string, number, boolean, object, null, undefined, never, symbol> | undefined>{
-		prop: a,
+		prop: a
 	};
 </script>

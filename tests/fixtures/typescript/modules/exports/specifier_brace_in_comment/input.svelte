@@ -1,4 +1,4 @@
 <script>
-	export {/* { */ a, b} from './a';
-	export {c, d /* } */} from './b';
+	export { /* { */ a, b } from './a';
+	export { c, d /* } */ } from './b';
 </script>

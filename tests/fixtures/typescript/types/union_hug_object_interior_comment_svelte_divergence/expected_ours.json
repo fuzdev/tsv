@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 414,
+	"end": 422,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -29,24 +29,24 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 116,
-			"end": 123,
+			"start": 117,
+			"end": 124,
 			"loc": {
 				"start": {
 					"line": 3,
-					"column": 11
+					"column": 12
 				},
 				"end": {
 					"line": 3,
-					"column": 18
+					"column": 19
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " Multiple properties: still hugs",
-			"start": 140,
-			"end": 174,
+			"start": 142,
+			"end": 176,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -61,24 +61,24 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 186,
-			"end": 193,
+			"start": 189,
+			"end": 196,
 			"loc": {
 				"start": {
 					"line": 6,
-					"column": 11
+					"column": 12
 				},
 				"end": {
 					"line": 6,
-					"column": 18
+					"column": 19
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " Three union members: hugs, non-object members appended",
-			"start": 216,
-			"end": 273,
+			"start": 220,
+			"end": 277,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -93,24 +93,24 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 285,
-			"end": 292,
+			"start": 290,
+			"end": 297,
 			"loc": {
 				"start": {
 					"line": 9,
-					"column": 11
+					"column": 12
 				},
 				"end": {
 					"line": 9,
-					"column": 18
+					"column": 19
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " Intersection sibling already hugs (consistency target)",
-			"start": 316,
-			"end": 373,
+			"start": 322,
+			"end": 379,
 			"loc": {
 				"start": {
 					"line": 11,
@@ -125,16 +125,16 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 385,
-			"end": 392,
+			"start": 392,
+			"end": 399,
 			"loc": {
 				"start": {
 					"line": 12,
-					"column": 11
+					"column": 12
 				},
 				"end": {
 					"line": 12,
-					"column": 18
+					"column": 19
 				}
 			}
 		}
@@ -142,12 +142,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 413,
+		"end": 421,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 404,
+			"end": 412,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -162,7 +162,7 @@
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 106,
-					"end": 137,
+					"end": 139,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -170,7 +170,7 @@
 						},
 						"end": {
 							"line": 3,
-							"column": 32
+							"column": 34
 						}
 					},
 					"id": {
@@ -192,7 +192,7 @@
 					"typeAnnotation": {
 						"type": "TSUnionType",
 						"start": 115,
-						"end": 136,
+						"end": 138,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -200,14 +200,14 @@
 							},
 							"end": {
 								"line": 3,
-								"column": 31
+								"column": 33
 							}
 						},
 						"types": [
 							{
 								"type": "TSTypeLiteral",
 								"start": 115,
-								"end": 129,
+								"end": 131,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -215,81 +215,81 @@
 									},
 									"end": {
 										"line": 3,
-										"column": 24
+										"column": 26
 									}
 								},
 								"members": [
 									{
 										"type": "TSPropertySignature",
-										"start": 124,
-										"end": 128,
+										"start": 125,
+										"end": 129,
 										"loc": {
 											"start": {
 												"line": 3,
-												"column": 19
+												"column": 20
 											},
 											"end": {
 												"line": 3,
-												"column": 23
+												"column": 24
 											}
 										},
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 124,
-											"end": 125,
+											"start": 125,
+											"end": 126,
 											"loc": {
 												"start": {
 													"line": 3,
-													"column": 19
+													"column": 20
 												},
 												"end": {
 													"line": 3,
-													"column": 20
+													"column": 21
 												}
 											},
 											"name": "a"
 										},
 										"typeAnnotation": {
 											"type": "TSTypeAnnotation",
-											"start": 125,
-											"end": 128,
+											"start": 126,
+											"end": 129,
 											"loc": {
 												"start": {
 													"line": 3,
-													"column": 20
+													"column": 21
 												},
 												"end": {
 													"line": 3,
-													"column": 23
+													"column": 24
 												}
 											},
 											"typeAnnotation": {
 												"type": "TSLiteralType",
-												"start": 127,
-												"end": 128,
+												"start": 128,
+												"end": 129,
 												"loc": {
 													"start": {
 														"line": 3,
-														"column": 22
+														"column": 23
 													},
 													"end": {
 														"line": 3,
-														"column": 23
+														"column": 24
 													}
 												},
 												"literal": {
 													"type": "Literal",
-													"start": 127,
-													"end": 128,
+													"start": 128,
+													"end": 129,
 													"loc": {
 														"start": {
 															"line": 3,
-															"column": 22
+															"column": 23
 														},
 														"end": {
 															"line": 3,
-															"column": 23
+															"column": 24
 														}
 													},
 													"value": 1,
@@ -301,8 +301,8 @@
 											{
 												"type": "Block",
 												"value": " c ",
-												"start": 116,
-												"end": 123
+												"start": 117,
+												"end": 124
 											}
 										]
 									}
@@ -310,16 +310,16 @@
 							},
 							{
 								"type": "TSVoidKeyword",
-								"start": 132,
-								"end": 136,
+								"start": 134,
+								"end": 138,
 								"loc": {
 									"start": {
 										"line": 3,
-										"column": 27
+										"column": 29
 									},
 									"end": {
 										"line": 3,
-										"column": 31
+										"column": 33
 									}
 								}
 							}
@@ -336,8 +336,8 @@
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 176,
-					"end": 213,
+					"start": 178,
+					"end": 217,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -345,13 +345,13 @@
 						},
 						"end": {
 							"line": 6,
-							"column": 38
+							"column": 40
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 181,
-						"end": 182,
+						"start": 183,
+						"end": 184,
 						"loc": {
 							"start": {
 								"line": 6,
@@ -366,8 +366,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
-						"start": 185,
-						"end": 212,
+						"start": 187,
+						"end": 216,
 						"loc": {
 							"start": {
 								"line": 6,
@@ -375,14 +375,14 @@
 							},
 							"end": {
 								"line": 6,
-								"column": 37
+								"column": 39
 							}
 						},
 						"types": [
 							{
 								"type": "TSTypeLiteral",
-								"start": 185,
-								"end": 205,
+								"start": 187,
+								"end": 209,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -390,44 +390,28 @@
 									},
 									"end": {
 										"line": 6,
-										"column": 30
+										"column": 32
 									}
 								},
 								"members": [
 									{
 										"type": "TSPropertySignature",
-										"start": 194,
-										"end": 199,
+										"start": 197,
+										"end": 202,
 										"loc": {
 											"start": {
 												"line": 6,
-												"column": 19
+												"column": 20
 											},
 											"end": {
 												"line": 6,
-												"column": 24
+												"column": 25
 											}
 										},
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 194,
-											"end": 195,
-											"loc": {
-												"start": {
-													"line": 6,
-													"column": 19
-												},
-												"end": {
-													"line": 6,
-													"column": 20
-												}
-											},
-											"name": "a"
-										},
-										"typeAnnotation": {
-											"type": "TSTypeAnnotation",
-											"start": 195,
+											"start": 197,
 											"end": 198,
 											"loc": {
 												"start": {
@@ -436,35 +420,51 @@
 												},
 												"end": {
 													"line": 6,
-													"column": 23
+													"column": 21
+												}
+											},
+											"name": "a"
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 198,
+											"end": 201,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 21
+												},
+												"end": {
+													"line": 6,
+													"column": 24
 												}
 											},
 											"typeAnnotation": {
 												"type": "TSLiteralType",
-												"start": 197,
-												"end": 198,
+												"start": 200,
+												"end": 201,
 												"loc": {
 													"start": {
 														"line": 6,
-														"column": 22
+														"column": 23
 													},
 													"end": {
 														"line": 6,
-														"column": 23
+														"column": 24
 													}
 												},
 												"literal": {
 													"type": "Literal",
-													"start": 197,
-													"end": 198,
+													"start": 200,
+													"end": 201,
 													"loc": {
 														"start": {
 															"line": 6,
-															"column": 22
+															"column": 23
 														},
 														"end": {
 															"line": 6,
-															"column": 23
+															"column": 24
 														}
 													},
 													"value": 1,
@@ -476,45 +476,29 @@
 											{
 												"type": "Block",
 												"value": " c ",
-												"start": 186,
-												"end": 193
+												"start": 189,
+												"end": 196
 											}
 										]
 									},
 									{
 										"type": "TSPropertySignature",
-										"start": 200,
-										"end": 204,
+										"start": 203,
+										"end": 207,
 										"loc": {
 											"start": {
 												"line": 6,
-												"column": 25
+												"column": 26
 											},
 											"end": {
 												"line": 6,
-												"column": 29
+												"column": 30
 											}
 										},
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 200,
-											"end": 201,
-											"loc": {
-												"start": {
-													"line": 6,
-													"column": 25
-												},
-												"end": {
-													"line": 6,
-													"column": 26
-												}
-											},
-											"name": "b"
-										},
-										"typeAnnotation": {
-											"type": "TSTypeAnnotation",
-											"start": 201,
+											"start": 203,
 											"end": 204,
 											"loc": {
 												"start": {
@@ -523,35 +507,51 @@
 												},
 												"end": {
 													"line": 6,
-													"column": 29
+													"column": 27
+												}
+											},
+											"name": "b"
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 204,
+											"end": 207,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 27
+												},
+												"end": {
+													"line": 6,
+													"column": 30
 												}
 											},
 											"typeAnnotation": {
 												"type": "TSLiteralType",
-												"start": 203,
-												"end": 204,
+												"start": 206,
+												"end": 207,
 												"loc": {
 													"start": {
 														"line": 6,
-														"column": 28
+														"column": 29
 													},
 													"end": {
 														"line": 6,
-														"column": 29
+														"column": 30
 													}
 												},
 												"literal": {
 													"type": "Literal",
-													"start": 203,
-													"end": 204,
+													"start": 206,
+													"end": 207,
 													"loc": {
 														"start": {
 															"line": 6,
-															"column": 28
+															"column": 29
 														},
 														"end": {
 															"line": 6,
-															"column": 29
+															"column": 30
 														}
 													},
 													"value": 2,
@@ -564,16 +564,16 @@
 							},
 							{
 								"type": "TSNullKeyword",
-								"start": 208,
-								"end": 212,
+								"start": 212,
+								"end": 216,
 								"loc": {
 									"start": {
 										"line": 6,
-										"column": 33
+										"column": 35
 									},
 									"end": {
 										"line": 6,
-										"column": 37
+										"column": 39
 									}
 								}
 							}
@@ -583,15 +583,15 @@
 						{
 							"type": "Line",
 							"value": " Multiple properties: still hugs",
-							"start": 140,
-							"end": 174
+							"start": 142,
+							"end": 176
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 275,
-					"end": 313,
+					"start": 279,
+					"end": 319,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -599,13 +599,13 @@
 						},
 						"end": {
 							"line": 9,
-							"column": 39
+							"column": 41
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 280,
-						"end": 281,
+						"start": 284,
+						"end": 285,
 						"loc": {
 							"start": {
 								"line": 9,
@@ -620,8 +620,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
-						"start": 284,
-						"end": 312,
+						"start": 288,
+						"end": 318,
 						"loc": {
 							"start": {
 								"line": 9,
@@ -629,14 +629,14 @@
 							},
 							"end": {
 								"line": 9,
-								"column": 38
+								"column": 40
 							}
 						},
 						"types": [
 							{
 								"type": "TSTypeLiteral",
-								"start": 284,
-								"end": 298,
+								"start": 288,
+								"end": 304,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -644,81 +644,81 @@
 									},
 									"end": {
 										"line": 9,
-										"column": 24
+										"column": 26
 									}
 								},
 								"members": [
 									{
 										"type": "TSPropertySignature",
-										"start": 293,
-										"end": 297,
+										"start": 298,
+										"end": 302,
 										"loc": {
 											"start": {
 												"line": 9,
-												"column": 19
+												"column": 20
 											},
 											"end": {
 												"line": 9,
-												"column": 23
+												"column": 24
 											}
 										},
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 293,
-											"end": 294,
+											"start": 298,
+											"end": 299,
 											"loc": {
 												"start": {
 													"line": 9,
-													"column": 19
+													"column": 20
 												},
 												"end": {
 													"line": 9,
-													"column": 20
+													"column": 21
 												}
 											},
 											"name": "a"
 										},
 										"typeAnnotation": {
 											"type": "TSTypeAnnotation",
-											"start": 294,
-											"end": 297,
+											"start": 299,
+											"end": 302,
 											"loc": {
 												"start": {
 													"line": 9,
-													"column": 20
+													"column": 21
 												},
 												"end": {
 													"line": 9,
-													"column": 23
+													"column": 24
 												}
 											},
 											"typeAnnotation": {
 												"type": "TSLiteralType",
-												"start": 296,
-												"end": 297,
+												"start": 301,
+												"end": 302,
 												"loc": {
 													"start": {
 														"line": 9,
-														"column": 22
+														"column": 23
 													},
 													"end": {
 														"line": 9,
-														"column": 23
+														"column": 24
 													}
 												},
 												"literal": {
 													"type": "Literal",
-													"start": 296,
-													"end": 297,
+													"start": 301,
+													"end": 302,
 													"loc": {
 														"start": {
 															"line": 9,
-															"column": 22
+															"column": 23
 														},
 														"end": {
 															"line": 9,
-															"column": 23
+															"column": 24
 														}
 													},
 													"value": 1,
@@ -730,8 +730,8 @@
 											{
 												"type": "Block",
 												"value": " c ",
-												"start": 285,
-												"end": 292
+												"start": 290,
+												"end": 297
 											}
 										]
 									}
@@ -739,31 +739,31 @@
 							},
 							{
 								"type": "TSNullKeyword",
-								"start": 301,
-								"end": 305,
+								"start": 307,
+								"end": 311,
 								"loc": {
 									"start": {
 										"line": 9,
-										"column": 27
+										"column": 29
 									},
 									"end": {
 										"line": 9,
-										"column": 31
+										"column": 33
 									}
 								}
 							},
 							{
 								"type": "TSVoidKeyword",
-								"start": 308,
-								"end": 312,
+								"start": 314,
+								"end": 318,
 								"loc": {
 									"start": {
 										"line": 9,
-										"column": 34
+										"column": 36
 									},
 									"end": {
 										"line": 9,
-										"column": 38
+										"column": 40
 									}
 								}
 							}
@@ -773,15 +773,15 @@
 						{
 							"type": "Line",
 							"value": " Three union members: hugs, non-object members appended",
-							"start": 216,
-							"end": 273
+							"start": 220,
+							"end": 277
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 375,
-					"end": 403,
+					"start": 381,
+					"end": 411,
 					"loc": {
 						"start": {
 							"line": 12,
@@ -789,13 +789,13 @@
 						},
 						"end": {
 							"line": 12,
-							"column": 29
+							"column": 31
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 380,
-						"end": 381,
+						"start": 386,
+						"end": 387,
 						"loc": {
 							"start": {
 								"line": 12,
@@ -810,8 +810,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSIntersectionType",
-						"start": 384,
-						"end": 402,
+						"start": 390,
+						"end": 410,
 						"loc": {
 							"start": {
 								"line": 12,
@@ -819,14 +819,14 @@
 							},
 							"end": {
 								"line": 12,
-								"column": 28
+								"column": 30
 							}
 						},
 						"types": [
 							{
 								"type": "TSTypeLiteral",
-								"start": 384,
-								"end": 398,
+								"start": 390,
+								"end": 406,
 								"loc": {
 									"start": {
 										"line": 12,
@@ -834,81 +834,81 @@
 									},
 									"end": {
 										"line": 12,
-										"column": 24
+										"column": 26
 									}
 								},
 								"members": [
 									{
 										"type": "TSPropertySignature",
-										"start": 393,
-										"end": 397,
+										"start": 400,
+										"end": 404,
 										"loc": {
 											"start": {
 												"line": 12,
-												"column": 19
+												"column": 20
 											},
 											"end": {
 												"line": 12,
-												"column": 23
+												"column": 24
 											}
 										},
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 393,
-											"end": 394,
+											"start": 400,
+											"end": 401,
 											"loc": {
 												"start": {
 													"line": 12,
-													"column": 19
+													"column": 20
 												},
 												"end": {
 													"line": 12,
-													"column": 20
+													"column": 21
 												}
 											},
 											"name": "a"
 										},
 										"typeAnnotation": {
 											"type": "TSTypeAnnotation",
-											"start": 394,
-											"end": 397,
+											"start": 401,
+											"end": 404,
 											"loc": {
 												"start": {
 													"line": 12,
-													"column": 20
+													"column": 21
 												},
 												"end": {
 													"line": 12,
-													"column": 23
+													"column": 24
 												}
 											},
 											"typeAnnotation": {
 												"type": "TSLiteralType",
-												"start": 396,
-												"end": 397,
+												"start": 403,
+												"end": 404,
 												"loc": {
 													"start": {
 														"line": 12,
-														"column": 22
+														"column": 23
 													},
 													"end": {
 														"line": 12,
-														"column": 23
+														"column": 24
 													}
 												},
 												"literal": {
 													"type": "Literal",
-													"start": 396,
-													"end": 397,
+													"start": 403,
+													"end": 404,
 													"loc": {
 														"start": {
 															"line": 12,
-															"column": 22
+															"column": 23
 														},
 														"end": {
 															"line": 12,
-															"column": 23
+															"column": 24
 														}
 													},
 													"value": 1,
@@ -920,8 +920,8 @@
 											{
 												"type": "Block",
 												"value": " c ",
-												"start": 385,
-												"end": 392
+												"start": 392,
+												"end": 399
 											}
 										]
 									}
@@ -929,30 +929,30 @@
 							},
 							{
 								"type": "TSTypeReference",
-								"start": 401,
-								"end": 402,
+								"start": 409,
+								"end": 410,
 								"loc": {
 									"start": {
 										"line": 12,
-										"column": 27
+										"column": 29
 									},
 									"end": {
 										"line": 12,
-										"column": 28
+										"column": 30
 									}
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 401,
-									"end": 402,
+									"start": 409,
+									"end": 410,
 									"loc": {
 										"start": {
 											"line": 12,
-											"column": 27
+											"column": 29
 										},
 										"end": {
 											"line": 12,
-											"column": 28
+											"column": 30
 										}
 									},
 									"name": "B"
@@ -964,8 +964,8 @@
 						{
 							"type": "Line",
 							"value": " Intersection sibling already hugs (consistency target)",
-							"start": 316,
-							"end": 373
+							"start": 322,
+							"end": 379
 						}
 					]
 				}

@@ -19,7 +19,7 @@
 	enum C {
 		// comment
 		A,
-		B,
+		B
 	}
 
 	// Namespace - line comment absorbed into block

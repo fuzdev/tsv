@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 359,
+	"end": 355,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -29,8 +29,8 @@
 		{
 			"type": "Line",
 			"value": " Both args are TSSatisfiesExpression - expand-last disabled",
-			"start": 212,
-			"end": 273,
+			"start": 210,
+			"end": 271,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -46,12 +46,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 358,
+		"end": 354,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 349,
+			"end": 345,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -66,7 +66,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 94,
-					"end": 209,
+					"end": 207,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -81,7 +81,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 100,
-							"end": 208,
+							"end": 206,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -111,7 +111,7 @@
 							"init": {
 								"type": "CallExpression",
 								"start": 104,
-								"end": 208,
+								"end": 206,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -234,7 +234,7 @@
 									{
 										"type": "TSAsExpression",
 										"start": 131,
-										"end": 204,
+										"end": 203,
 										"loc": {
 											"start": {
 												"line": 5,
@@ -248,7 +248,7 @@
 										"expression": {
 											"type": "ObjectExpression",
 											"start": 131,
-											"end": 197,
+											"end": 196,
 											"loc": {
 												"start": {
 													"line": 5,
@@ -483,8 +483,8 @@
 										},
 										"typeAnnotation": {
 											"type": "TSAnyKeyword",
-											"start": 201,
-											"end": 204,
+											"start": 200,
+											"end": 203,
 											"loc": {
 												"start": {
 													"line": 7,
@@ -514,8 +514,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 275,
-					"end": 348,
+					"start": 273,
+					"end": 344,
 					"loc": {
 						"start": {
 							"line": 11,
@@ -529,8 +529,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 281,
-							"end": 347,
+							"start": 279,
+							"end": 343,
 							"loc": {
 								"start": {
 									"line": 11,
@@ -543,8 +543,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 281,
-								"end": 282,
+								"start": 279,
+								"end": 280,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -559,8 +559,8 @@
 							},
 							"init": {
 								"type": "CallExpression",
-								"start": 285,
-								"end": 347,
+								"start": 283,
+								"end": 343,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -573,8 +573,8 @@
 								},
 								"callee": {
 									"type": "Identifier",
-									"start": 285,
-									"end": 287,
+									"start": 283,
+									"end": 285,
 									"loc": {
 										"start": {
 											"line": 11,
@@ -590,8 +590,8 @@
 								"arguments": [
 									{
 										"type": "TSSatisfiesExpression",
-										"start": 291,
-										"end": 304,
+										"start": 289,
+										"end": 302,
 										"loc": {
 											"start": {
 												"line": 12,
@@ -604,8 +604,8 @@
 										},
 										"expression": {
 											"type": "Identifier",
-											"start": 291,
-											"end": 292,
+											"start": 289,
+											"end": 290,
 											"loc": {
 												"start": {
 													"line": 12,
@@ -620,8 +620,8 @@
 										},
 										"typeAnnotation": {
 											"type": "TSTypeReference",
-											"start": 303,
-											"end": 304,
+											"start": 301,
+											"end": 302,
 											"loc": {
 												"start": {
 													"line": 12,
@@ -634,8 +634,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 303,
-												"end": 304,
+												"start": 301,
+												"end": 302,
 												"loc": {
 													"start": {
 														"line": 12,
@@ -652,8 +652,8 @@
 									},
 									{
 										"type": "TSSatisfiesExpression",
-										"start": 308,
-										"end": 343,
+										"start": 306,
+										"end": 340,
 										"loc": {
 											"start": {
 												"line": 13,
@@ -666,8 +666,8 @@
 										},
 										"expression": {
 											"type": "ObjectExpression",
-											"start": 308,
-											"end": 331,
+											"start": 306,
+											"end": 328,
 											"loc": {
 												"start": {
 													"line": 13,
@@ -681,8 +681,8 @@
 											"properties": [
 												{
 													"type": "Property",
-													"start": 313,
-													"end": 317,
+													"start": 311,
+													"end": 315,
 													"loc": {
 														"start": {
 															"line": 14,
@@ -698,8 +698,8 @@
 													"computed": false,
 													"key": {
 														"type": "Identifier",
-														"start": 313,
-														"end": 314,
+														"start": 311,
+														"end": 312,
 														"loc": {
 															"start": {
 																"line": 14,
@@ -714,8 +714,8 @@
 													},
 													"value": {
 														"type": "Literal",
-														"start": 316,
-														"end": 317,
+														"start": 314,
+														"end": 315,
 														"loc": {
 															"start": {
 																"line": 14,
@@ -733,8 +733,8 @@
 												},
 												{
 													"type": "Property",
-													"start": 322,
-													"end": 326,
+													"start": 320,
+													"end": 324,
 													"loc": {
 														"start": {
 															"line": 15,
@@ -750,8 +750,8 @@
 													"computed": false,
 													"key": {
 														"type": "Identifier",
-														"start": 322,
-														"end": 323,
+														"start": 320,
+														"end": 321,
 														"loc": {
 															"start": {
 																"line": 15,
@@ -766,8 +766,8 @@
 													},
 													"value": {
 														"type": "Literal",
-														"start": 325,
-														"end": 326,
+														"start": 323,
+														"end": 324,
 														"loc": {
 															"start": {
 																"line": 15,
@@ -787,8 +787,8 @@
 										},
 										"typeAnnotation": {
 											"type": "TSTypeReference",
-											"start": 342,
-											"end": 343,
+											"start": 339,
+											"end": 340,
 											"loc": {
 												"start": {
 													"line": 16,
@@ -801,8 +801,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 342,
-												"end": 343,
+												"start": 339,
+												"end": 340,
 												"loc": {
 													"start": {
 														"line": 16,
@@ -827,8 +827,8 @@
 						{
 							"type": "Line",
 							"value": " Both args are TSSatisfiesExpression - expand-last disabled",
-							"start": 212,
-							"end": 273
+							"start": 210,
+							"end": 271
 						}
 					]
 				}

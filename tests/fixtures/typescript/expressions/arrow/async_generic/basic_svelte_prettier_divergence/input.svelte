@@ -28,7 +28,7 @@
 	//
 
 	// Object type constraint
-	const objectConstraint = async <T extends {foo: string}>() => {};
+	const objectConstraint = async <T extends { foo: string }>() => {};
 
 	// Function type constraint
 	const fnConstraint = async <T extends () => Promise<void>>() => {};

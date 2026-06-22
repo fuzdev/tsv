@@ -3,7 +3,7 @@
 	enum Short {
 		X,
 		Y,
-		Z,
+		Z
 	}
 
 	/* long member names - still multi-line */
@@ -14,12 +14,12 @@
 		DDDDDDDDDD,
 		EEEEEEEEEE,
 		FFFFFFFFFF,
-		GGGGGGGGGG,
+		GGGGGGGGGG
 	}
 
 	/* long string value - exceeds 100 chars, stays inline */
 	enum LongString {
-		X = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+		X = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 	}
 
 	/* long computed values - expressions wrap (exceeds 100 chars) */
@@ -44,6 +44,6 @@
 			18 +
 			19 +
 			20 +
-			21,
+			21
 	}
 </script>

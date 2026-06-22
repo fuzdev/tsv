@@ -7,6 +7,6 @@
 
 	// 101 chars - exceeds (call stays with =, arrow params wrap)
 	aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = bbbbbbbbbbbbbbbb.map(
-		(x) => x * 2222222222222222222222222222,
+		(x) => x * 2222222222222222222222222222
 	);
 </script>

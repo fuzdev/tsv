@@ -17,12 +17,12 @@
 	[, , a, , b] = arr;
 
 	// Object destructuring
-	({a, b} = obj);
-	({a: x, b: y} = obj);
-	({a = 1, b = 2} = obj);
-	({a, ...rest5} = obj);
+	({ a, b } = obj);
+	({ a: x, b: y } = obj);
+	({ a = 1, b = 2 } = obj);
+	({ a, ...rest5 } = obj);
 	({
-		outer: {inner},
+		outer: { inner }
 	} = obj);
 
 	// Empty patterns
@@ -30,38 +30,38 @@
 	[] = arr;
 
 	// Rest-only
-	({...rest6} = obj);
+	({ ...rest6 } = obj);
 	[...rest7] = arr;
 
 	// Computed keys
-	({[key]: x} = obj);
-	({[0]: first, [1]: second} = obj);
+	({ [key]: x } = obj);
+	({ [0]: first, [1]: second } = obj);
 
 	// Numeric/string keys
-	({0: first, 1: second} = obj);
-	({key: value} = obj);
+	({ 0: first, 1: second } = obj);
+	({ key: value } = obj);
 
 	// Deep nesting
 	[[a1, b1], [c1, d1]] = arr;
 	({
 		a: {
-			b: {c: x},
-		},
+			b: { c: x }
+		}
 	} = obj);
 
 	// Nested with defaults
 	[[a = 1]] = arr;
 	({
-		a: {b = 1},
+		a: { b = 1 }
 	} = obj);
 
 	// Trailing commas
 	[a, b] = arr;
-	({a, b} = obj);
+	({ a, b } = obj);
 
 	// Mixed nesting
 	({
-		arr: [first, second],
+		arr: [first, second]
 	} = obj);
-	[{a}, {b}] = arr;
+	[{ a }, { b }] = arr;
 </script>

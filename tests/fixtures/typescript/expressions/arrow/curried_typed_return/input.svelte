@@ -63,7 +63,7 @@
 
 	// Destructuring param - ALWAYS breaks
 	const k =
-		({a, b}) =>
+		({ a, b }) =>
 		(y) =>
 			a + b + y;
 

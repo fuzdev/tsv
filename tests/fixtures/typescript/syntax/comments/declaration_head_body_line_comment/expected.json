@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 472,
+	"end": 471,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -141,8 +141,8 @@
 		{
 			"type": "Line",
 			"value": " Namespace - line comment absorbed into block",
-			"start": 361,
-			"end": 408,
+			"start": 360,
+			"end": 407,
 			"loc": {
 				"start": {
 					"line": 25,
@@ -157,8 +157,8 @@
 		{
 			"type": "Line",
 			"value": " comment",
-			"start": 426,
-			"end": 436,
+			"start": 425,
+			"end": 435,
 			"loc": {
 				"start": {
 					"line": 27,
@@ -174,12 +174,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 471,
+		"end": 470,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 462,
+			"end": 461,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -447,7 +447,7 @@
 				{
 					"type": "TSEnumDeclaration",
 					"start": 324,
-					"end": 358,
+					"end": 357,
 					"loc": {
 						"start": {
 							"line": 19,
@@ -557,8 +557,8 @@
 				},
 				{
 					"type": "TSModuleDeclaration",
-					"start": 410,
-					"end": 461,
+					"start": 409,
+					"end": 460,
 					"loc": {
 						"start": {
 							"line": 26,
@@ -571,8 +571,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 420,
-						"end": 421,
+						"start": 419,
+						"end": 420,
 						"loc": {
 							"start": {
 								"line": 26,
@@ -587,8 +587,8 @@
 					},
 					"body": {
 						"type": "TSModuleBlock",
-						"start": 422,
-						"end": 461,
+						"start": 421,
+						"end": 460,
 						"loc": {
 							"start": {
 								"line": 26,
@@ -602,8 +602,8 @@
 						"body": [
 							{
 								"type": "ExportNamedDeclaration",
-								"start": 439,
-								"end": 458,
+								"start": 438,
+								"end": 457,
 								"loc": {
 									"start": {
 										"line": 28,
@@ -617,8 +617,8 @@
 								"exportKind": "value",
 								"declaration": {
 									"type": "VariableDeclaration",
-									"start": 446,
-									"end": 458,
+									"start": 445,
+									"end": 457,
 									"loc": {
 										"start": {
 											"line": 28,
@@ -632,8 +632,8 @@
 									"declarations": [
 										{
 											"type": "VariableDeclarator",
-											"start": 452,
-											"end": 457,
+											"start": 451,
+											"end": 456,
 											"loc": {
 												"start": {
 													"line": 28,
@@ -646,8 +646,8 @@
 											},
 											"id": {
 												"type": "Identifier",
-												"start": 452,
-												"end": 453,
+												"start": 451,
+												"end": 452,
 												"loc": {
 													"start": {
 														"line": 28,
@@ -662,8 +662,8 @@
 											},
 											"init": {
 												"type": "Literal",
-												"start": 456,
-												"end": 457,
+												"start": 455,
+												"end": 456,
 												"loc": {
 													"start": {
 														"line": 28,
@@ -687,8 +687,8 @@
 									{
 										"type": "Line",
 										"value": " comment",
-										"start": 426,
-										"end": 436
+										"start": 425,
+										"end": 435
 									}
 								]
 							}
@@ -698,8 +698,8 @@
 						{
 							"type": "Line",
 							"value": " Namespace - line comment absorbed into block",
-							"start": 361,
-							"end": 408
+							"start": 360,
+							"end": 407
 						}
 					]
 				}

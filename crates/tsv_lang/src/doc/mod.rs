@@ -378,26 +378,6 @@ mod arena_tests {
     }
 
     #[test]
-    fn test_arena_join_trailing_flat() {
-        let a = DocArena::new();
-        let sep = a.concat(&[a.text(","), a.line()]);
-        let docs = vec![a.text("a"), a.text("b"), a.text("c")];
-        let trailing = a.join_trailing(docs, sep);
-        let doc = a.group(trailing);
-        assert_eq!(render_pw_spaces(&a, doc, 20), "a, b, c");
-    }
-
-    #[test]
-    fn test_arena_join_trailing_break() {
-        let a = DocArena::new();
-        let sep = a.concat(&[a.text(","), a.line()]);
-        let docs = vec![a.text("a"), a.text("b"), a.text("c")];
-        let trailing = a.join_trailing(docs, sep);
-        let doc = a.group(trailing);
-        assert_eq!(render_pw_spaces(&a, doc, 3), "a,\nb,\nc,");
-    }
-
-    #[test]
     fn test_arena_indent_line() {
         let a = DocArena::new();
         let doc = a.group(a.concat(&[a.text("prefix"), a.indent_line(a.text("indented"))]));
@@ -515,33 +495,16 @@ mod arena_tests {
         assert_eq!(render_pw(&a2, doc2, 10), "item1,\nitem2,\nitem3");
     }
 
+    // Regression guard for tsv's hardcoded `trailingComma: 'none'`: a bracketed
+    // `join_doc` list gets inter-item commas but no trailing comma when it breaks.
     #[test]
-    fn test_arena_join_trailing_empty() {
-        let a = DocArena::new();
-        let sep = a.concat(&[a.text(","), a.line()]);
-        let docs: Vec<DocId> = vec![];
-        let doc = a.join_trailing(docs, sep);
-        assert_eq!(render_default(&a, doc), "");
-    }
-
-    #[test]
-    fn test_arena_join_trailing_single() {
-        let a = DocArena::new();
-        let sep = a.concat(&[a.text(","), a.line()]);
-        let docs = vec![a.text("a")];
-        let trailing = a.join_trailing(docs, sep);
-        let doc = a.group(trailing);
-        assert_eq!(render_pw(&a, doc, 20), "a");
-    }
-
-    #[test]
-    fn test_arena_join_trailing_in_brackets() {
+    fn test_arena_join_doc_no_trailing_comma_in_brackets() {
         let a = DocArena::new();
         let sep = a.concat(&[a.text(","), a.line()]);
         let docs = vec![a.text("item1"), a.text("item2"), a.text("item3")];
-        let trailing = a.join_trailing(docs, sep);
+        let joined = a.join_doc(docs, sep);
         let sl1 = a.softline();
-        let inner = a.concat(&[sl1, trailing]);
+        let inner = a.concat(&[sl1, joined]);
         let indented = a.indent(inner);
         let sl2 = a.softline();
         let doc = a.group(a.concat(&[a.text("["), indented, sl2, a.text("]")]));
@@ -551,16 +514,17 @@ mod arena_tests {
         let a2 = DocArena::new();
         let sep2 = a2.concat(&[a2.text(","), a2.line()]);
         let docs2 = vec![a2.text("item1"), a2.text("item2"), a2.text("item3")];
-        let trailing2 = a2.join_trailing(docs2, sep2);
+        let joined2 = a2.join_doc(docs2, sep2);
         let sl1_2 = a2.softline();
-        let inner2 = a2.concat(&[sl1_2, trailing2]);
+        let inner2 = a2.concat(&[sl1_2, joined2]);
         let indented2 = a2.indent(inner2);
         let sl2_2 = a2.softline();
         let doc2 = a2.group(a2.concat(&[a2.text("["), indented2, sl2_2, a2.text("]")]));
 
+        // trailingComma: 'none' — no trailing comma when the list breaks
         assert_eq!(
             render_pw_spaces(&a2, doc2, 15),
-            "[\n  item1,\n  item2,\n  item3,\n]"
+            "[\n  item1,\n  item2,\n  item3\n]"
         );
     }
 

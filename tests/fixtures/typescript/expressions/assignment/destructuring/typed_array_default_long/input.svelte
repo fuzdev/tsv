@@ -10,7 +10,7 @@
 		string,
 		string,
 		string,
-		stringABCDEFGHIJKLM,
+		stringABCDEFGHIJKLM
 	] = []) {}
 
 	// Without default: 101 chars - tuple type expands, pattern stays inline (same behavior)
@@ -23,7 +23,7 @@
 		string,
 		string,
 		string,
-		stringABCDE,
+		stringABCDE
 	]) {}
 
 	// Arrow function variant with default
@@ -34,6 +34,6 @@
 		string,
 		string,
 		string,
-		stringABCDEFGHIJKLM,
+		stringABCDEFGHIJKLM
 	] = []) => {};
 </script>

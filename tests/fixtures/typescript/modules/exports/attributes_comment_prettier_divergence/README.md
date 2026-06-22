@@ -11,21 +11,21 @@ place, relocates a `with`→`{` comment to before `with`, and pulls an after-`}`
 comment *inside* the braces (trailing the last attribute):
 
 ```
-export {a} from 'a' /* c1 */ with {type: 'json'};
-export {b} from 'b' /* c2 */ with {type: 'json'};
-export {c} from 'c' with {type: 'json' /* c3 */};
-export * from 'd' /* c4 */ with {type: 'json'};
-export * from 'e' with {type: 'json' /* c5 */};
+export { a } from 'a' /* c1 */ with { type: 'json' };
+export { b } from 'b' /* c2 */ with { type: 'json' };
+export { c } from 'c' with { type: 'json' /* c3 */ };
+export * from 'd' /* c4 */ with { type: 'json' };
+export * from 'e' with { type: 'json' /* c5 */ };
 ```
 
 **tsv**: preserves each comment where the user wrote it:
 
 ```
-export {a} from 'a' /* c1 */ with {type: 'json'};
-export {b} from 'b' with /* c2 */ {type: 'json'};
-export {c} from 'c' with {type: 'json'} /* c3 */;
-export * from 'd' with /* c4 */ {type: 'json'};
-export * from 'e' with {type: 'json'} /* c5 */;
+export { a } from 'a' /* c1 */ with { type: 'json' };
+export { b } from 'b' with /* c2 */ { type: 'json' };
+export { c } from 'c' with { type: 'json' } /* c3 */;
+export * from 'd' with /* c4 */ { type: 'json' };
+export * from 'e' with { type: 'json' } /* c5 */;
 ```
 
 The source→`with` block comment (c1) is dual-stable. The `with`→`{` (c2, c4) and

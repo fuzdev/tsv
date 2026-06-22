@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 80,
+	"end": 78,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,8 +13,8 @@
 		{
 			"type": "Block",
 			"value": " trailing ",
-			"start": 50,
-			"end": 64,
+			"start": 49,
+			"end": 63,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -30,12 +30,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 79,
+		"end": 77,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 70,
+			"end": 68,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -50,7 +50,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 20,
-					"end": 69,
+					"end": 67,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -64,7 +64,7 @@
 					"expression": {
 						"type": "CallExpression",
 						"start": 20,
-						"end": 68,
+						"end": 66,
 						"loc": {
 							"start": {
 								"line": 2,
@@ -95,7 +95,7 @@
 							{
 								"type": "ObjectExpression",
 								"start": 26,
-								"end": 49,
+								"end": 48,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -164,8 +164,8 @@
 									{
 										"type": "Block",
 										"value": " trailing ",
-										"start": 50,
-										"end": 64
+										"start": 49,
+										"end": 63
 									}
 								]
 							}

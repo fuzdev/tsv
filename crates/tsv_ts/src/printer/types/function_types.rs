@@ -496,7 +496,6 @@ impl<'a> Printer<'a> {
                 let param_start = p.span().start;
                 let param_end = p.span().end;
                 let is_last = i == params.len() - 1;
-                let is_rest = matches!(p, internal::Expression::RestElement(_));
 
                 let skip_delim = if i == 0 { paren_pull_pos } else { None };
                 inner_parts.extend(self.build_leading_comments_multiline_opt(
@@ -515,9 +514,7 @@ impl<'a> Printer<'a> {
                     );
                 } else {
                     let close = close_paren_pos.unwrap_or(param_end);
-                    if !is_rest {
-                        inner_parts.push(d.text(","));
-                    }
+                    // No trailing comma after the last param (trailingComma: 'none').
                     inner_parts.extend(self.build_trailing_comments_multiline(param_end, close));
                 }
             }
@@ -563,16 +560,9 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Check if last param is rest element (no trailing comma)
-        let last_is_rest = params
-            .last()
-            .is_some_and(|p| matches!(p, internal::Expression::RestElement(_)));
-
         let mut parts = vec![d.text("(")];
         parts.push(d.indent(d.concat(&[d.softline(), d.concat(&param_parts)])));
-        if !last_is_rest {
-            parts.push(d.trailing_comma());
-        }
+        // No trailing comma on the last param (trailingComma: 'none').
         parts.push(d.softline());
         parts.push(d.text(")"));
 
@@ -732,9 +722,9 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(")"));
             } else {
                 let mut param_parts = Vec::new();
-                // Block comment trailing the last param after the comma — preserved
-                // after the synthetic trailing comma (prettier relocates before; see
-                // conformance_prettier.md §Comment relocation).
+                // Block comment trailing the last param after its source comma — preserved
+                // past where the comma was (no trailing comma; prettier relocates before;
+                // see conformance_prettier.md §Comment relocation).
                 let mut last_after_comma = Vec::new();
                 let mut prev_end = paren_pos.map_or(0, |p| p + 1); // After `(`
                 for (i, p) in params.iter().enumerate() {
@@ -777,13 +767,7 @@ impl<'a> Printer<'a> {
                 }
                 parts.push(d.text("("));
                 parts.push(d.indent(d.concat(&[d.softline(), d.concat(&param_parts)])));
-                // Trailing comma when breaking, UNLESS last param is a rest element
-                let last_is_rest = params
-                    .last()
-                    .is_some_and(|p| matches!(p, internal::Expression::RestElement(_)));
-                if !last_is_rest {
-                    parts.push(d.trailing_comma());
-                }
+                // No trailing comma on the last param (trailingComma: 'none').
                 // Preserved after-comma block comment(s) on the last param
                 parts.extend(last_after_comma);
                 parts.push(d.softline());
@@ -832,8 +816,6 @@ impl<'a> Printer<'a> {
 
             inner_parts.push(self.build_function_type_param_expression_doc(p));
 
-            let is_rest = matches!(p, internal::Expression::RestElement(_));
-
             if !is_last {
                 let next_start = params[i + 1].span().start;
                 prev_end = self.emit_multiline_comma_with_comments(
@@ -842,13 +824,10 @@ impl<'a> Printer<'a> {
                     next_start,
                 );
             } else {
-                // Last param: trailing comma (unless rest) + comments before `)`
+                // Last param: no trailing comma (trailingComma: 'none') + comments before `)`
                 let close_paren = paren_pos
                     .and_then(|p| self.matching_close_paren(p))
                     .unwrap_or(param_end);
-                if !is_rest {
-                    inner_parts.push(d.text(","));
-                }
                 inner_parts.extend(self.build_trailing_comments_multiline(param_end, close_paren));
                 prev_end = close_paren;
             }

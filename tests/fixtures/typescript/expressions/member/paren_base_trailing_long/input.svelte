@@ -5,15 +5,20 @@
 			await call(
 				applicationObjectLong,
 				specificationObjectLong,
-				{aaa: parentNodeId, bbb: childNodeId},
-				handlerObjectLong,
+				{ aaa: parentNodeId, bbb: childNodeId },
+				handlerObjectLong
 			)
-		).ok,
+		).ok
 	);
 
 	// Parenthesized cast base hangs across lines; single trailing member hugs the `)`
 	const flag = (
-		call(applicationObject, specificationObject, {a: parentNodeId, b: childNodeId}, handler) as Foo
+		call(
+			applicationObject,
+			specificationObject,
+			{ a: parentNodeId, b: childNodeId },
+			handler
+		) as Foo
 	).ok;
 
 	// Boundary: single-line base, total exactly 100 - member stays inline on the same line

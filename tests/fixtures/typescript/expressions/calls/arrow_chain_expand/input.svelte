@@ -7,7 +7,7 @@
 	// Multi-arg: arrow returning arrow with object body - expands last arg
 	fn(a, () => () => ({
 		x: 1,
-		y: 2,
+		y: 2
 	}));
 
 	// Multi-arg: arrow returning arrow returning arrow with block body (triple chain)
@@ -29,7 +29,7 @@
 	// Single arg: arrow returning arrow with object body
 	fn(() => () => ({
 		x: 1,
-		y: 2,
+		y: 2
 	}));
 
 	// Multi-arg: three args with arrow chain last

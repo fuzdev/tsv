@@ -4,11 +4,11 @@
 
 	// 101 chars - breaks after =>
 	const b = new Xy((x) =>
-		x ? aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa : bbbbbbbbbbbbbbbbbbbbbbb,
+		x ? aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa : bbbbbbbbbbbbbbbbbbbbbbb
 	);
 
 	// with await - 101 chars
 	const c = await new Xy((x) =>
-		x ? aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa : bbbbbbbbbbbbbbbbbbbb,
+		x ? aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa : bbbbbbbbbbbbbbbbbbbb
 	);
 </script>

@@ -4,24 +4,24 @@
 
 	/* 101 chars total - array wraps, binary stays inline */
 	const b = [
-		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa && bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefghijklmnopqrstu,
+		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa && bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefghijklmnopqrstu
 	];
 
 	/* 100 chars element line - binary stays inline */
 	const c = [
-		aaaaaaaaaaaaaaaaaaaaaaaaaaa && bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdef,
+		aaaaaaaaaaaaaaaaaaaaaaaaaaa && bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefg
 	];
 
 	/* 101 chars element line - binary breaks, continuation gets extra indent */
 	const d = [
 		aaaaaaaaaaaaaaaaaaaaaaaaaaa &&
-			bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefg,
+			bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefgh
 	];
 
 	/* Multi-operand chain - each continuation indented */
 	const e = [
 		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa &&
 			bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb &&
-			cccccccccccccccccccccccccccccc,
+			cccccccccccccccccccccccccccccc
 	];
 </script>

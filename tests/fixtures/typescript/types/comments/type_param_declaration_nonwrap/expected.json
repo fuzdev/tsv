@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 326,
+	"end": 324,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -29,24 +29,24 @@
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 108,
-			"end": 112,
+			"start": 107,
+			"end": 111,
 			"loc": {
 				"start": {
 					"line": 5,
-					"column": 6
+					"column": 5
 				},
 				"end": {
 					"line": 5,
-					"column": 10
+					"column": 9
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " Block comment in call signature type params",
-			"start": 132,
-			"end": 178,
+			"start": 131,
+			"end": 177,
 			"loc": {
 				"start": {
 					"line": 9,
@@ -61,8 +61,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 196,
-			"end": 203,
+			"start": 195,
+			"end": 202,
 			"loc": {
 				"start": {
 					"line": 11,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " Line comment in construct signature type params",
-			"start": 220,
-			"end": 270,
+			"start": 219,
+			"end": 269,
 			"loc": {
 				"start": {
 					"line": 14,
@@ -93,16 +93,16 @@
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 297,
-			"end": 301,
+			"start": 295,
+			"end": 299,
 			"loc": {
 				"start": {
 					"line": 17,
-					"column": 6
+					"column": 5
 				},
 				"end": {
 					"line": 17,
-					"column": 10
+					"column": 9
 				}
 			}
 		}
@@ -110,12 +110,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 325,
+		"end": 323,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 316,
+			"end": 314,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -130,7 +130,7 @@
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 87,
-					"end": 129,
+					"end": 128,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -160,7 +160,7 @@
 					"typeAnnotation": {
 						"type": "TSTypeLiteral",
 						"start": 96,
-						"end": 128,
+						"end": 127,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -175,7 +175,7 @@
 							{
 								"type": "TSCallSignatureDeclaration",
 								"start": 100,
-								"end": 125,
+								"end": 124,
 								"loc": {
 									"start": {
 										"line": 4,
@@ -189,7 +189,7 @@
 								"typeParameters": {
 									"type": "TSTypeParameterDeclaration",
 									"start": 100,
-									"end": 116,
+									"end": 115,
 									"loc": {
 										"start": {
 											"line": 4,
@@ -220,21 +220,18 @@
 												{
 													"type": "Line",
 													"value": " c",
-													"start": 108,
-													"end": 112
+													"start": 107,
+													"end": 111
 												}
 											]
 										}
-									],
-									"extra": {
-										"trailingComma": 106
-									}
+									]
 								},
 								"parameters": [],
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 118,
-									"end": 124,
+									"start": 117,
+									"end": 123,
 									"loc": {
 										"start": {
 											"line": 6,
@@ -247,8 +244,8 @@
 									},
 									"typeAnnotation": {
 										"type": "TSVoidKeyword",
-										"start": 120,
-										"end": 124,
+										"start": 119,
+										"end": 123,
 										"loc": {
 											"start": {
 												"line": 6,
@@ -275,8 +272,8 @@
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 180,
-					"end": 217,
+					"start": 179,
+					"end": 216,
 					"loc": {
 						"start": {
 							"line": 10,
@@ -289,8 +286,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 185,
-						"end": 186,
+						"start": 184,
+						"end": 185,
 						"loc": {
 							"start": {
 								"line": 10,
@@ -305,8 +302,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSTypeLiteral",
-						"start": 189,
-						"end": 216,
+						"start": 188,
+						"end": 215,
 						"loc": {
 							"start": {
 								"line": 10,
@@ -320,8 +317,8 @@
 						"members": [
 							{
 								"type": "TSCallSignatureDeclaration",
-								"start": 193,
-								"end": 213,
+								"start": 192,
+								"end": 212,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -334,8 +331,8 @@
 								},
 								"typeParameters": {
 									"type": "TSTypeParameterDeclaration",
-									"start": 193,
-									"end": 204,
+									"start": 192,
+									"end": 203,
 									"loc": {
 										"start": {
 											"line": 11,
@@ -349,8 +346,8 @@
 									"params": [
 										{
 											"type": "TSTypeParameter",
-											"start": 194,
-											"end": 195,
+											"start": 193,
+											"end": 194,
 											"loc": {
 												"start": {
 													"line": 11,
@@ -366,8 +363,8 @@
 												{
 													"type": "Block",
 													"value": " c ",
-													"start": 196,
-													"end": 203
+													"start": 195,
+													"end": 202
 												}
 											]
 										}
@@ -376,8 +373,8 @@
 								"parameters": [],
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 206,
-									"end": 212,
+									"start": 205,
+									"end": 211,
 									"loc": {
 										"start": {
 											"line": 11,
@@ -390,8 +387,8 @@
 									},
 									"typeAnnotation": {
 										"type": "TSVoidKeyword",
-										"start": 208,
-										"end": 212,
+										"start": 207,
+										"end": 211,
 										"loc": {
 											"start": {
 												"line": 11,
@@ -411,15 +408,15 @@
 						{
 							"type": "Line",
 							"value": " Block comment in call signature type params",
-							"start": 132,
-							"end": 178
+							"start": 131,
+							"end": 177
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 272,
-					"end": 315,
+					"start": 271,
+					"end": 313,
 					"loc": {
 						"start": {
 							"line": 15,
@@ -432,8 +429,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 277,
-						"end": 278,
+						"start": 276,
+						"end": 277,
 						"loc": {
 							"start": {
 								"line": 15,
@@ -448,8 +445,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSTypeLiteral",
-						"start": 281,
-						"end": 314,
+						"start": 280,
+						"end": 312,
 						"loc": {
 							"start": {
 								"line": 15,
@@ -463,8 +460,8 @@
 						"members": [
 							{
 								"type": "TSConstructSignatureDeclaration",
-								"start": 285,
-								"end": 311,
+								"start": 284,
+								"end": 309,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -477,8 +474,8 @@
 								},
 								"typeParameters": {
 									"type": "TSTypeParameterDeclaration",
-									"start": 289,
-									"end": 305,
+									"start": 288,
+									"end": 303,
 									"loc": {
 										"start": {
 											"line": 16,
@@ -492,8 +489,8 @@
 									"params": [
 										{
 											"type": "TSTypeParameter",
-											"start": 294,
-											"end": 295,
+											"start": 293,
+											"end": 294,
 											"loc": {
 												"start": {
 													"line": 17,
@@ -509,21 +506,18 @@
 												{
 													"type": "Line",
 													"value": " c",
-													"start": 297,
-													"end": 301
+													"start": 295,
+													"end": 299
 												}
 											]
 										}
-									],
-									"extra": {
-										"trailingComma": 295
-									}
+									]
 								},
 								"parameters": [],
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 307,
-									"end": 310,
+									"start": 305,
+									"end": 308,
 									"loc": {
 										"start": {
 											"line": 18,
@@ -536,8 +530,8 @@
 									},
 									"typeAnnotation": {
 										"type": "TSTypeReference",
-										"start": 309,
-										"end": 310,
+										"start": 307,
+										"end": 308,
 										"loc": {
 											"start": {
 												"line": 18,
@@ -550,8 +544,8 @@
 										},
 										"typeName": {
 											"type": "Identifier",
-											"start": 309,
-											"end": 310,
+											"start": 307,
+											"end": 308,
 											"loc": {
 												"start": {
 													"line": 18,
@@ -573,8 +567,8 @@
 						{
 							"type": "Line",
 							"value": " Line comment in construct signature type params",
-							"start": 220,
-							"end": 270
+							"start": 219,
+							"end": 269
 						}
 					]
 				}

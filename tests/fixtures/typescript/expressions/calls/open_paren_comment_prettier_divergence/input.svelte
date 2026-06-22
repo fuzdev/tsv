@@ -1,18 +1,18 @@
 <script>
 	// line comment trailing `(` — single arg
 	fn( // c1
-		a,
+		a
 	);
 
 	// line comment trailing `(` — multiple args
 	fn( // c2
 		a,
-		b,
+		b
 	);
 
 	// block comment trailing `(`, then own-line leading comment
 	fn( /* paren */
 		// lead
-		a,
+		a
 	);
 </script>

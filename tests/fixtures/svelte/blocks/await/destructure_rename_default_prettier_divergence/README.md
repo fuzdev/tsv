@@ -6,7 +6,7 @@ across `{#await … then}`, `{:then}`, and `{:catch}` bindings: a non-shorthand
 property with a default (`{a: b = 1}`, read property `a`) prints as `{ b = 1 }`
 (read property `b`) — a semantic change. tsv preserves the key in every branch.
 
-tsv: `{:then {a: b = 1}}`, `{:catch {a: b = 1}}` (key preserved)
+tsv: `{:then { a: b = 1 }}`, `{:catch { a: b = 1 }}` (key preserved)
 Prettier: `{:then { b = 1 }}`, `{:catch { b = 1 }}` (key dropped — wrong property)
 
 ## Reason

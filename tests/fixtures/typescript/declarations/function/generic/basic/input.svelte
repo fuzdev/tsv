@@ -14,7 +14,7 @@
 	}
 
 	// With constraint
-	function withConstraint<T extends {length: number}>(a: T, b: T): T {
+	function withConstraint<T extends { length: number }>(a: T, b: T): T {
 		return a.length >= b.length ? a : b;
 	}
 

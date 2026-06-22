@@ -18,7 +18,7 @@
 	const h = fn<T | [A, B]>();
 
 	// Intersection with object type
-	const i = fn<T & {a: number}>();
+	const i = fn<T & { a: number }>();
 
 	// Multiple type args
 	const j = fn<T, U, V>();

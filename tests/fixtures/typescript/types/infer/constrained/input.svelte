@@ -15,5 +15,7 @@
 	type Wide<T> = T extends infer U extends string | number ? U : never;
 
 	// Multiple constrained infers in an object type
-	type Both<T> = T extends {a: infer A extends string; b: infer B extends number} ? [A, B] : never;
+	type Both<T> = T extends { a: infer A extends string; b: infer B extends number }
+		? [A, B]
+		: never;
 </script>

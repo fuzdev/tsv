@@ -4,6 +4,6 @@
 			? firstResult?.propertyName === expectedValue
 			: conditionVariable === 'other_value'
 				? secondResult === otherExpected
-				: defaultFallbackValue,
+				: defaultFallbackValue
 	);
 </script>

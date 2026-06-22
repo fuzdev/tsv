@@ -1,7 +1,7 @@
 <script lang="ts">
 	fn(
 		(
-			a: string, // comment
-		) => {},
+			a: string // comment
+		) => {}
 	);
 </script>

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 674,
+	"end": 673,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -61,8 +61,8 @@
 		{
 			"type": "Block",
 			"value": " Inside !!() - wraps arguments ",
-			"start": 479,
-			"end": 514,
+			"start": 478,
+			"end": 513,
 			"loc": {
 				"start": {
 					"line": 16,
@@ -78,12 +78,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 673,
+		"end": 672,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 664,
+			"end": 663,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -372,7 +372,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 323,
-					"end": 476,
+					"end": 475,
 					"loc": {
 						"start": {
 							"line": 10,
@@ -387,7 +387,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 329,
-							"end": 475,
+							"end": 474,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -417,7 +417,7 @@
 							"init": {
 								"type": "CallExpression",
 								"start": 335,
-								"end": 475,
+								"end": 474,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -542,8 +542,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 516,
-					"end": 663,
+					"start": 515,
+					"end": 662,
 					"loc": {
 						"start": {
 							"line": 17,
@@ -557,8 +557,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 522,
-							"end": 662,
+							"start": 521,
+							"end": 661,
 							"loc": {
 								"start": {
 									"line": 17,
@@ -571,8 +571,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 522,
-								"end": 525,
+								"start": 521,
+								"end": 524,
 								"loc": {
 									"start": {
 										"line": 17,
@@ -587,8 +587,8 @@
 							},
 							"init": {
 								"type": "UnaryExpression",
-								"start": 528,
-								"end": 662,
+								"start": 527,
+								"end": 661,
 								"loc": {
 									"start": {
 										"line": 17,
@@ -603,8 +603,8 @@
 								"prefix": true,
 								"argument": {
 									"type": "UnaryExpression",
-									"start": 529,
-									"end": 662,
+									"start": 528,
+									"end": 661,
 									"loc": {
 										"start": {
 											"line": 17,
@@ -619,8 +619,8 @@
 									"prefix": true,
 									"argument": {
 										"type": "LogicalExpression",
-										"start": 534,
-										"end": 659,
+										"start": 533,
+										"end": 658,
 										"loc": {
 											"start": {
 												"line": 18,
@@ -633,8 +633,8 @@
 										},
 										"left": {
 											"type": "LogicalExpression",
-											"start": 534,
-											"end": 614,
+											"start": 533,
+											"end": 613,
 											"loc": {
 												"start": {
 													"line": 18,
@@ -647,8 +647,8 @@
 											},
 											"left": {
 												"type": "Identifier",
-												"start": 534,
-												"end": 569,
+												"start": 533,
+												"end": 568,
 												"loc": {
 													"start": {
 														"line": 18,
@@ -664,8 +664,8 @@
 											"operator": "||",
 											"right": {
 												"type": "Identifier",
-												"start": 575,
-												"end": 614,
+												"start": 574,
+												"end": 613,
 												"loc": {
 													"start": {
 														"line": 19,
@@ -682,8 +682,8 @@
 										"operator": "||",
 										"right": {
 											"type": "Identifier",
-											"start": 620,
-											"end": 659,
+											"start": 619,
+											"end": 658,
 											"loc": {
 												"start": {
 													"line": 20,
@@ -706,8 +706,8 @@
 						{
 							"type": "Block",
 							"value": " Inside !!() - wraps arguments ",
-							"start": 479,
-							"end": 514
+							"start": 478,
+							"end": 513
 						}
 					]
 				}

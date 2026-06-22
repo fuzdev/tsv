@@ -160,7 +160,7 @@ impl<'a> Printer<'a> {
                         return d.concat(&[
                             callee_with_types,
                             d.text("("),
-                            d.indent(d.concat(&[d.softline(), arrow_doc, d.text(",")])),
+                            d.indent(d.concat(&[d.softline(), arrow_doc])),
                             d.softline(),
                             d.text(")"),
                         ]);
@@ -173,7 +173,7 @@ impl<'a> Printer<'a> {
                         d.concat(&[
                             callee_with_types,
                             d.text("("),
-                            d.indent(d.concat(&[d.softline(), arrow_doc, d.text(",")])),
+                            d.indent(d.concat(&[d.softline(), arrow_doc])),
                             d.softline(),
                             d.text(")"),
                         ]),
@@ -215,7 +215,7 @@ impl<'a> Printer<'a> {
                                 d.text("("),
                                 sig_doc,
                                 d.text(" =>"),
-                                d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
+                                d.indent(d.concat(&[d.hardline(), body_doc])),
                                 d.hardline(),
                                 d.text(")"),
                             ]);
@@ -240,11 +240,7 @@ impl<'a> Printer<'a> {
                                     d.hardline(),
                                     sig_doc,
                                     d.text(" =>"),
-                                    d.indent(d.concat(&[
-                                        d.hardline(),
-                                        body_doc,
-                                        d.trailing_comma(),
-                                    ])),
+                                    d.indent(d.concat(&[d.hardline(), body_doc])),
                                 ])),
                                 d.hardline(),
                                 d.text(")"),
@@ -379,7 +375,6 @@ impl<'a> Printer<'a> {
         // e.g., new Class(arg1, // comment\n  arg2)
         if has_trailing_line_comments_slice(&new_expr.arguments, new_expr.span.end, self) {
             let mut arg_parts = Vec::new();
-            let mut has_trailing_comma_on_last = false;
 
             for (i, arg) in new_expr.arguments.iter().enumerate() {
                 // Leading comments before the first argument (e.g. `new Foo(/* c */ a, // t)`).
@@ -419,32 +414,21 @@ impl<'a> Printer<'a> {
                         paren_close,
                     );
 
-                    // Same-line trailing comments split around the (synthetic) trailing
-                    // comma (after-comma blocks stay past it, `b, /* c */` — the tsv
-                    // divergence — and a line comment follows via `line_suffix`), then
-                    // own-line dangling comments. Matches the call/member-chain last-arg
-                    // paths instead of relocating every block before the comma.
-                    pc.emit_last_arg_comments(
-                        &mut arg_parts,
-                        self,
-                        arg_end,
-                        paren_close,
-                        &mut has_trailing_comma_on_last,
-                    );
+                    // Same-line trailing comments split around the source comma position
+                    // (after-comma blocks stay past it, `b /* c */` — the tsv divergence —
+                    // and a line comment follows via `line_suffix`), then own-line dangling
+                    // comments. No trailing comma (trailingComma: 'none'). Matches the
+                    // call/member-chain last-arg paths.
+                    pc.emit_last_arg_comments(&mut arg_parts, self, arg_end, paren_close);
                 }
             }
 
             let arg_doc = d.concat(&arg_parts);
-            let trailing = if has_trailing_comma_on_last {
-                d.empty()
-            } else {
-                d.text(",")
-            };
 
             return d.concat(&[
                 callee_with_types,
                 d.text("("),
-                d.indent(d.concat(&[d.hardline(), arg_doc, trailing])),
+                d.indent(d.concat(&[d.hardline(), arg_doc])),
                 d.hardline(),
                 d.text(")"),
             ]);
@@ -498,12 +482,12 @@ impl<'a> Printer<'a> {
             );
 
             // Own-line block comments after the last arg (before closing paren).
-            // These appear as siblings after the trailing comma, forcing expansion.
+            // These appear as siblings after the last arg (no trailing comma), forcing expansion.
             let leading_block: Vec<_> = pc.leading.iter().filter(|c| c.is_block).collect();
             if !leading_block.is_empty()
                 && let Some(last_doc) = arg_docs.pop()
             {
-                let mut last_parts = vec![last_doc, d.text(",")];
+                let mut last_parts = vec![last_doc];
                 for comment in &leading_block {
                     last_parts.push(d.hardline());
                     last_parts.push(self.build_comment_doc(comment));
@@ -525,10 +509,10 @@ impl<'a> Printer<'a> {
             }
 
             if let Some(last_doc) = arg_docs.pop() {
-                // Split same-line blocks around the last arg's source trailing comma:
-                // before-comma blocks (and any block when the source has no trailing comma)
-                // hug the arg; an after-comma block is preserved past the synthetic trailing
-                // comma (`b, /* c */`, the tsv divergence prettier relocates to `b /* c */,`).
+                // Split same-line blocks around the last arg's source comma: before-comma
+                // blocks (and any block when the source has no comma) hug the arg; an
+                // after-comma block is preserved past where the comma was (`b /* c */`; no
+                // trailing comma, trailingComma: 'none').
                 // No line comments reach this block-only path.
                 let comma_pos = find_comma_pos(self.source, effective_arg_end, new_expr.span.end);
                 let mut last_with_comment = vec![last_doc];
@@ -544,8 +528,9 @@ impl<'a> Printer<'a> {
                 }
                 arg_docs.push(d.concat(&last_with_comment));
 
-                // The after-comma block (if any) is kept past the trailing comma via the
-                // wrap's `post_comma` suffix: `b /* c */` flat, `b, /* c */` broken.
+                // The after-comma block (if any) is kept past where the comma was via the
+                // wrap's `post_comma` suffix: `b /* c */` (no trailing comma in either
+                // mode; trailingComma: 'none').
                 let post_comma = d.concat(&after_comma);
 
                 // For function composition (multiple callbacks), use hardlines
@@ -740,7 +725,7 @@ impl<'a> Printer<'a> {
                     callee_with_types,
                     d.text("("),
                     d.concat(&paren_line_prefix),
-                    d.indent(d.concat(&[d.hardline(), d.concat(&inner), d.text(",")])),
+                    d.indent(d.concat(&[d.hardline(), d.concat(&inner)])),
                     d.hardline(),
                     d.text(")"),
                 ]);

@@ -1,6 +1,6 @@
 <script>
 	// format-ignore
-	const a = {b: 1, c: 2};
+	const a = { b: 1, c: 2 };
 
 	/* format-ignore */
 	const d = [1, 2, 3];
@@ -8,7 +8,7 @@
 	// prettier-ignore
 	const   h  =   {   i:   5,   j:   6   };
 
-	const e = {f: 1, g: 2};
+	const e = { f: 1, g: 2 };
 </script>
 
 <style>

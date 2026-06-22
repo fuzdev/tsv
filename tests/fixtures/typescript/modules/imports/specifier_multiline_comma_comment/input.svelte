@@ -2,18 +2,18 @@
 	import {
 		a, // trailing line
 		b /* c */,
-		c,
+		c
 	} from './a';
 
 	export {
 		d, // trailing line
 		e /* c */,
-		f,
+		f
 	};
 
 	export {
 		g, // trailing line
 		h /* c */,
-		i,
+		i
 	} from './b';
 </script>

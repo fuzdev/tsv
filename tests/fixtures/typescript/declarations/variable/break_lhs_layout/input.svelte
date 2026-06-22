@@ -20,6 +20,6 @@
 	// Type alias with constrained type params
 	type MyVeryLongTypeName<
 		T extends string,
-		U = number,
+		U = number
 	> = SomeVeryLongTypeNameThatDefinitelyExceedsPrintWidthLimit;
 </script>

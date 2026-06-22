@@ -94,7 +94,7 @@ async function dispatch(
 				useTabs: true,
 				printWidth: 100,
 				singleQuote: true,
-				bracketSpacing: false,
+				trailingComma: 'none',
 				parser: options?.parser as string | undefined,
 				filepath: filepath as string | undefined,
 			});

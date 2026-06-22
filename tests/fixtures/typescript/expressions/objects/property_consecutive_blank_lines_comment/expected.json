@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 218,
+	"end": 217,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -94,12 +94,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 217,
+		"end": 216,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 208,
+			"end": 207,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -114,7 +114,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 89,
-					"end": 207,
+					"end": 206,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -129,7 +129,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 95,
-							"end": 206,
+							"end": 205,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -159,7 +159,7 @@
 							"init": {
 								"type": "ObjectExpression",
 								"start": 101,
-								"end": 206,
+								"end": 205,
 								"loc": {
 									"start": {
 										"line": 3,

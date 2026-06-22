@@ -7,8 +7,8 @@
 	const chainAaaa = obj.fn1(scope, 'pathValueSegmentLiteralAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa').fn2(
 		new Ctor(serialize(input), {
 			status: 200,
-			headers: defaultHeaders,
-		}),
+			headers: defaultHeaders
+		})
 	);
 
 	// 101 — the flat chain prefix is one char longer, so it overflows and the chain
@@ -18,7 +18,7 @@
 		.fn2(
 			new Ctor(serialize(input), {
 				status: 200,
-				headers: defaultHeaders,
-			}),
+				headers: defaultHeaders
+			})
 		);
 </script>

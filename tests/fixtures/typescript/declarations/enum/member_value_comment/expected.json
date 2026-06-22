@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 129,
+	"end": 128,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -62,12 +62,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 128,
+		"end": 127,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 119,
+			"end": 118,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -82,7 +82,7 @@
 				{
 					"type": "TSEnumDeclaration",
 					"start": 75,
-					"end": 118,
+					"end": 117,
 					"loc": {
 						"start": {
 							"line": 3,

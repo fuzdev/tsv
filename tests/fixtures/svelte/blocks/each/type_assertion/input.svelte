@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type {A} from './a';
+	import type { A } from './a';
 	let a: A;
 </script>
 

@@ -9,7 +9,7 @@ Prettier diverges by shape (tsv preserves each in place + indented):
 - **empty re-export** (`export {} from // c⏎'x'`) and **export-all**
   (`export * from // c⏎'x'`): prettier keeps the comment in place but flat
   (indent-only divergence).
-- **named specifiers** (`export {a} from // c⏎'x'`): prettier relocates the
+- **named specifiers** (`export { a } from // c⏎'x'`): prettier relocates the
   comment into the braces as the last specifier's trailing comment, expanding them.
 
 The matching block-comment cases stay flat in both formatters and live in the

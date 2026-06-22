@@ -26,13 +26,13 @@
 	};
 
 	// Index signature in variable type annotation
-	const a: {[k: string]: number} = {};
+	const a: { [k: string]: number } = {};
 
 	// Index signature in function parameter
-	function fn(obj: {[key: string]: unknown}): void {}
+	function fn(obj: { [key: string]: unknown }): void {}
 
 	// Index signature in return type
-	function getDict(): {[key: string]: string} {
+	function getDict(): { [key: string]: string } {
 		return {};
 	}
 </script>

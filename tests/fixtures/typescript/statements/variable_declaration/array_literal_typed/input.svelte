@@ -3,7 +3,7 @@
 	const items: Array<T> = [
 		{
 			a: 'value_with_longer_text_here',
-			b: 'another_value_with_longer_text_here',
-		},
+			b: 'another_value_with_longer_text_here'
+		}
 	];
 </script>

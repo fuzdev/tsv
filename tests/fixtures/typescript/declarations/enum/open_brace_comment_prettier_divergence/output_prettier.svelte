@@ -2,13 +2,13 @@
 	// line comment trailing an enum body `{`
 	enum E {
 		// c1
-		A,
+		A
 	}
 
 	// block comment trailing the body `{`, then own-line leading comment
 	enum F {
 		/* brace */
 		// lead
-		B,
+		B
 	}
 </script>

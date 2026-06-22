@@ -2,18 +2,18 @@
 	import {
 		a,
 		/* c */
-		b,
+		b
 	} from './a';
 
 	export {
 		c,
 		/* c */
-		d,
+		d
 	};
 
 	export {
 		e,
 		/* c */
-		f,
+		f
 	} from './b';
 </script>

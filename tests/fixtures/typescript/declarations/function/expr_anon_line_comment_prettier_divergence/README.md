@@ -6,7 +6,7 @@ keyword and opening `(` in anonymous function expressions. Not idempotent — ta
 
 Pass 1 (from our input):
 - No params: `function // c\n()` → `function () // c\n{}`
-- With params: `function // c\n(x)` → `function (\n\t// c\n\tx,\n)`
+- With params: `function // c\n(x)` → `function (\n\t// c\n\tx\n)`
 - Generator/async/export default: same as no-params
 
 Pass 2 (stable form):

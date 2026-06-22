@@ -1,6 +1,6 @@
 <script>
 	const arr = [
 		'multi \
-line',
+line'
 	];
 </script>

@@ -3,7 +3,7 @@
 	fn(() => (x) => x);
 
 	// Curried arrow with destructuring param as call arg - hugs body
-	fn(() => ({a}) => {
+	fn(() => ({ a }) => {
 		return a;
 	});
 

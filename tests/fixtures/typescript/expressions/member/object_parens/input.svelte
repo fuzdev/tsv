@@ -14,5 +14,5 @@
 	// brace-delimited bodies are unambiguous — these strip
 	const k = function () {}.p;
 	const l = class {}.p;
-	const m = {a: 1}.p;
+	const m = { a: 1 }.p;
 </script>

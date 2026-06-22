@@ -2,19 +2,19 @@
 	// Line comment trailing first element
 	type T = [
 		A, // trailing
-		B,
+		B
 	];
 
 	// Line comment trailing multiple elements
 	type U = [
 		A, // trailing A
 		B, // trailing B
-		C,
+		C
 	];
 
 	// Trailing on last element
 	type V = [
 		A,
-		B, // trailing
+		B // trailing
 	];
 </script>

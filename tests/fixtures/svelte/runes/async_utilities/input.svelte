@@ -1,5 +1,5 @@
 <script>
-	import {fork, settled, tick} from 'svelte';
+	import { fork, settled, tick } from 'svelte';
 
 	let open = $state(false);
 	let pending = null;

@@ -11,8 +11,8 @@ Prettier: moves the comment down to its own line
 ```
 // tsv                          // prettier
 obj.method( // c1              obj.method(
-	a,                                // c1
-);                                a,
+	a                                  // c1
+);                                a
                                 );
 ```
 

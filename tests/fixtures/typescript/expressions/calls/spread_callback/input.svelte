@@ -14,7 +14,7 @@
 		(x) => {
 			return x;
 		},
-		...args,
+		...args
 	);
 
 	// Multiple spreads before callback

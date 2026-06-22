@@ -3,6 +3,6 @@
 	const x = arr.map((item) =>
 		aaaaaaa(item, (bbbbbb) => {
 			console.log(bbbbbb);
-		}),
+		})
 	);
 </script>

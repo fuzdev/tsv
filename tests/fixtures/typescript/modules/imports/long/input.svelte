@@ -1,6 +1,6 @@
 <script lang="ts">
 	/* short named import - stays inline (under 100 chars) */
-	import {aaaa, bbbb, cccc, dddd, eeee, ffff, gggg, hhhh} from 'short';
+	import { aaaa, bbbb, cccc, dddd, eeee, ffff, gggg, hhhh } from 'short';
 
 	/* long named import - wraps (exceeds 100 chars) */
 	import {
@@ -10,7 +10,7 @@
 		llllllllll,
 		mmmmmmmmmm,
 		nnnnnnnnnn,
-		oooooooooo,
+		oooooooooo
 	} from 'module';
 
 	/* long import with renaming - wraps */
@@ -22,7 +22,7 @@
 		ttt as t1,
 		uuu as u1,
 		vvv as v1,
-		www as w1,
+		www as w1
 	} from 'rn';
 
 	/* combined import (default + named) - wraps when long */
@@ -32,11 +32,18 @@
 		zzzzzzzzzz,
 		aaaaaaaaab,
 		bbbbbbbbbc,
-		cccccccccd,
+		cccccccccd
 	} from 'combined';
 
 	/* short type import - stays inline (exactly 100 chars) */
-	import type {AAAAAAAAAA, BBBBBBBBBB, CCCCCCCCCC, DDDDDDDDDD, EEEEEEEEEE, FFFFFFFFFF} from 'types';
+	import type {
+		AAAAAAAAAA,
+		BBBBBBBBBB,
+		CCCCCCCCCC,
+		DDDDDDDDDD,
+		EEEEEEEEEE,
+		FFFFFFFFFF
+	} from 'types';
 
 	/* long type import - wraps (exceeds 100 chars) */
 	import type {
@@ -46,11 +53,11 @@
 		JJJJJJJJJJ,
 		KKKKKKKKKK,
 		LLLLLLLLLL,
-		MMMMMMMMMM,
+		MMMMMMMMMM
 	} from 'longtypes';
 
 	/* short mixed type/value import - stays inline */
-	import {type NNNNNNNNNN, type OOOOOOOOOO, pppppppppp, qqqqqqqqqq, rrrrrrrrrr} from 'mixed';
+	import { type NNNNNNNNNN, type OOOOOOOOOO, pppppppppp, qqqqqqqqqq, rrrrrrrrrr } from 'mixed';
 
 	/* long mixed type/value import - wraps */
 	import {
@@ -59,6 +66,6 @@
 		type RRRRRRRRRR,
 		type SSSSSSSSSS,
 		tttttttttt,
-		uuuuuuuuuu,
+		uuuuuuuuuu
 	} from 'longmixed';
 </script>

@@ -4,13 +4,13 @@
 		() => {
 			tick();
 		},
-		100, // trailing comment
+		100 // trailing comment
 	);
 
 	// Multiple function args with trailing comment
 	fn(
 		(a) => a,
-		(b) => b, // trailing comment
+		(b) => b // trailing comment
 	);
 
 	// Test call with trailing comment - comment moves outside (prettier quirk)

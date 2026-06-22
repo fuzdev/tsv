@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 719,
+	"end": 717,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " Leading comment before first arg - forces expansion",
-			"start": 591,
-			"end": 645,
+			"start": 590,
+			"end": 644,
 			"loc": {
 				"start": {
 					"line": 37,
@@ -125,8 +125,8 @@
 		{
 			"type": "Line",
 			"value": " leading comment",
-			"start": 655,
-			"end": 673,
+			"start": 654,
+			"end": 672,
 			"loc": {
 				"start": {
 					"line": 39,
@@ -142,12 +142,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 718,
+		"end": 716,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 709,
+			"end": 707,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -1145,7 +1145,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 540,
-					"end": 588,
+					"end": 587,
 					"loc": {
 						"start": {
 							"line": 28,
@@ -1159,7 +1159,7 @@
 					"expression": {
 						"type": "CallExpression",
 						"start": 540,
-						"end": 587,
+						"end": 586,
 						"loc": {
 							"start": {
 								"line": 28,
@@ -1337,8 +1337,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 647,
-					"end": 708,
+					"start": 646,
+					"end": 706,
 					"loc": {
 						"start": {
 							"line": 38,
@@ -1351,8 +1351,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 647,
-						"end": 707,
+						"start": 646,
+						"end": 705,
 						"loc": {
 							"start": {
 								"line": 38,
@@ -1365,8 +1365,8 @@
 						},
 						"callee": {
 							"type": "CallExpression",
-							"start": 647,
-							"end": 651,
+							"start": 646,
+							"end": 650,
 							"loc": {
 								"start": {
 									"line": 38,
@@ -1379,8 +1379,8 @@
 							},
 							"callee": {
 								"type": "Identifier",
-								"start": 647,
-								"end": 649,
+								"start": 646,
+								"end": 648,
 								"loc": {
 									"start": {
 										"line": 38,
@@ -1399,8 +1399,8 @@
 						"arguments": [
 							{
 								"type": "Literal",
-								"start": 676,
-								"end": 679,
+								"start": 675,
+								"end": 678,
 								"loc": {
 									"start": {
 										"line": 40,
@@ -1417,15 +1417,15 @@
 									{
 										"type": "Line",
 										"value": " leading comment",
-										"start": 655,
-										"end": 673
+										"start": 654,
+										"end": 672
 									}
 								]
 							},
 							{
 								"type": "ArrowFunctionExpression",
-								"start": 683,
-								"end": 703,
+								"start": 682,
+								"end": 702,
 								"loc": {
 									"start": {
 										"line": 41,
@@ -1443,8 +1443,8 @@
 								"params": [],
 								"body": {
 									"type": "BlockStatement",
-									"start": 689,
-									"end": 703,
+									"start": 688,
+									"end": 702,
 									"loc": {
 										"start": {
 											"line": 41,
@@ -1458,8 +1458,8 @@
 									"body": [
 										{
 											"type": "ExpressionStatement",
-											"start": 694,
-											"end": 699,
+											"start": 693,
+											"end": 698,
 											"loc": {
 												"start": {
 													"line": 42,
@@ -1472,8 +1472,8 @@
 											},
 											"expression": {
 												"type": "CallExpression",
-												"start": 694,
-												"end": 698,
+												"start": 693,
+												"end": 697,
 												"loc": {
 													"start": {
 														"line": 42,
@@ -1486,8 +1486,8 @@
 												},
 												"callee": {
 													"type": "Identifier",
-													"start": 694,
-													"end": 696,
+													"start": 693,
+													"end": 695,
 													"loc": {
 														"start": {
 															"line": 42,
@@ -1514,8 +1514,8 @@
 						{
 							"type": "Line",
 							"value": " Leading comment before first arg - forces expansion",
-							"start": 591,
-							"end": 645
+							"start": 590,
+							"end": 644
 						}
 					]
 				}

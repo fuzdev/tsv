@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1310,
+	"end": 1309,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -141,8 +141,8 @@
 		{
 			"type": "Line",
 			"value": " Function return type, simple type: continuation indents one level",
-			"start": 446,
-			"end": 514,
+			"start": 445,
+			"end": 513,
 			"loc": {
 				"start": {
 					"line": 22,
@@ -157,8 +157,8 @@
 		{
 			"type": "Line",
 			"value": " c5",
-			"start": 531,
-			"end": 536,
+			"start": 530,
+			"end": 535,
 			"loc": {
 				"start": {
 					"line": 23,
@@ -173,8 +173,8 @@
 		{
 			"type": "Line",
 			"value": " Interface property, intersection type: continuation indents one level.",
-			"start": 570,
-			"end": 643,
+			"start": 569,
+			"end": 642,
 			"loc": {
 				"start": {
 					"line": 28,
@@ -189,8 +189,8 @@
 		{
 			"type": "Line",
 			"value": " Prettier keeps it flush here (unlike a simple property-signature type, which",
-			"start": 645,
-			"end": 724,
+			"start": 644,
+			"end": 723,
 			"loc": {
 				"start": {
 					"line": 29,
@@ -205,8 +205,8 @@
 		{
 			"type": "Line",
 			"value": " it relocates to end-of-line — see annotation_simple), so this is the",
-			"start": 726,
-			"end": 797,
+			"start": 725,
+			"end": 796,
 			"loc": {
 				"start": {
 					"line": 30,
@@ -221,8 +221,8 @@
 		{
 			"type": "Line",
 			"value": " type-element face of the \"intersection in any position\" divergence.",
-			"start": 799,
-			"end": 869,
+			"start": 798,
+			"end": 868,
 			"loc": {
 				"start": {
 					"line": 31,
@@ -237,8 +237,8 @@
 		{
 			"type": "Line",
 			"value": " c6",
-			"start": 890,
-			"end": 895,
+			"start": 889,
+			"end": 894,
 			"loc": {
 				"start": {
 					"line": 33,
@@ -253,8 +253,8 @@
 		{
 			"type": "Line",
 			"value": " Arrow-function return type, simple type: continuation indents one level",
-			"start": 911,
-			"end": 985,
+			"start": 910,
+			"end": 984,
 			"loc": {
 				"start": {
 					"line": 37,
@@ -269,8 +269,8 @@
 		{
 			"type": "Line",
 			"value": " (same shared path as the function-declaration return above).",
-			"start": 987,
-			"end": 1050,
+			"start": 986,
+			"end": 1049,
 			"loc": {
 				"start": {
 					"line": 38,
@@ -285,8 +285,8 @@
 		{
 			"type": "Line",
 			"value": " c7",
-			"start": 1066,
-			"end": 1071,
+			"start": 1065,
+			"end": 1070,
 			"loc": {
 				"start": {
 					"line": 39,
@@ -301,8 +301,8 @@
 		{
 			"type": "Line",
 			"value": " Variable annotation, intersection type, two line comments: each ends its own",
-			"start": 1094,
-			"end": 1173,
+			"start": 1093,
+			"end": 1172,
 			"loc": {
 				"start": {
 					"line": 42,
@@ -317,8 +317,8 @@
 		{
 			"type": "Line",
 			"value": " line and the whole continuation indents one level (none merge or swallow).",
-			"start": 1175,
-			"end": 1252,
+			"start": 1174,
+			"end": 1251,
 			"loc": {
 				"start": {
 					"line": 43,
@@ -333,8 +333,8 @@
 		{
 			"type": "Line",
 			"value": " c8",
-			"start": 1263,
-			"end": 1268,
+			"start": 1262,
+			"end": 1267,
 			"loc": {
 				"start": {
 					"line": 44,
@@ -349,8 +349,8 @@
 		{
 			"type": "Line",
 			"value": " c9",
-			"start": 1271,
-			"end": 1276,
+			"start": 1270,
+			"end": 1275,
 			"loc": {
 				"start": {
 					"line": 45,
@@ -366,12 +366,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 1309,
+		"end": 1308,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 1300,
+			"end": 1299,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -911,7 +911,7 @@
 				{
 					"type": "FunctionDeclaration",
 					"start": 408,
-					"end": 443,
+					"end": 442,
 					"loc": {
 						"start": {
 							"line": 17,
@@ -1015,8 +1015,8 @@
 					],
 					"body": {
 						"type": "BlockStatement",
-						"start": 441,
-						"end": 443,
+						"start": 440,
+						"end": 442,
 						"loc": {
 							"start": {
 								"line": 20,
@@ -1040,8 +1040,8 @@
 				},
 				{
 					"type": "FunctionDeclaration",
-					"start": 516,
-					"end": 567,
+					"start": 515,
+					"end": 566,
 					"loc": {
 						"start": {
 							"line": 23,
@@ -1054,8 +1054,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 525,
-						"end": 527,
+						"start": 524,
+						"end": 526,
 						"loc": {
 							"start": {
 								"line": 23,
@@ -1074,8 +1074,8 @@
 					"params": [],
 					"returnType": {
 						"type": "TSTypeAnnotation",
-						"start": 529,
-						"end": 540,
+						"start": 528,
+						"end": 539,
 						"loc": {
 							"start": {
 								"line": 23,
@@ -1088,8 +1088,8 @@
 						},
 						"typeAnnotation": {
 							"type": "TSTypeReference",
-							"start": 539,
-							"end": 540,
+							"start": 538,
+							"end": 539,
 							"loc": {
 								"start": {
 									"line": 24,
@@ -1102,8 +1102,8 @@
 							},
 							"typeName": {
 								"type": "Identifier",
-								"start": 539,
-								"end": 540,
+								"start": 538,
+								"end": 539,
 								"loc": {
 									"start": {
 										"line": 24,
@@ -1120,16 +1120,16 @@
 								{
 									"type": "Line",
 									"value": " c5",
-									"start": 531,
-									"end": 536
+									"start": 530,
+									"end": 535
 								}
 							]
 						}
 					},
 					"body": {
 						"type": "BlockStatement",
-						"start": 541,
-						"end": 567,
+						"start": 540,
+						"end": 566,
 						"loc": {
 							"start": {
 								"line": 24,
@@ -1143,8 +1143,8 @@
 						"body": [
 							{
 								"type": "ReturnStatement",
-								"start": 545,
-								"end": 564,
+								"start": 544,
+								"end": 563,
 								"loc": {
 									"start": {
 										"line": 25,
@@ -1157,8 +1157,8 @@
 								},
 								"argument": {
 									"type": "TSAsExpression",
-									"start": 552,
-									"end": 563,
+									"start": 551,
+									"end": 562,
 									"loc": {
 										"start": {
 											"line": 25,
@@ -1171,8 +1171,8 @@
 									},
 									"expression": {
 										"type": "Literal",
-										"start": 552,
-										"end": 556,
+										"start": 551,
+										"end": 555,
 										"loc": {
 											"start": {
 												"line": 25,
@@ -1188,8 +1188,8 @@
 									},
 									"typeAnnotation": {
 										"type": "TSAnyKeyword",
-										"start": 560,
-										"end": 563,
+										"start": 559,
+										"end": 562,
 										"loc": {
 											"start": {
 												"line": 25,
@@ -1209,15 +1209,15 @@
 						{
 							"type": "Line",
 							"value": " Function return type, simple type: continuation indents one level",
-							"start": 446,
-							"end": 514
+							"start": 445,
+							"end": 513
 						}
 					]
 				},
 				{
 					"type": "TSInterfaceDeclaration",
-					"start": 871,
-					"end": 908,
+					"start": 870,
+					"end": 907,
 					"loc": {
 						"start": {
 							"line": 32,
@@ -1230,8 +1230,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 881,
-						"end": 882,
+						"start": 880,
+						"end": 881,
 						"loc": {
 							"start": {
 								"line": 32,
@@ -1246,8 +1246,8 @@
 					},
 					"body": {
 						"type": "TSInterfaceBody",
-						"start": 883,
-						"end": 908,
+						"start": 882,
+						"end": 907,
 						"loc": {
 							"start": {
 								"line": 32,
@@ -1261,8 +1261,8 @@
 						"body": [
 							{
 								"type": "TSPropertySignature",
-								"start": 887,
-								"end": 905,
+								"start": 886,
+								"end": 904,
 								"loc": {
 									"start": {
 										"line": 33,
@@ -1276,8 +1276,8 @@
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 887,
-									"end": 888,
+									"start": 886,
+									"end": 887,
 									"loc": {
 										"start": {
 											"line": 33,
@@ -1292,8 +1292,8 @@
 								},
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 888,
-									"end": 904,
+									"start": 887,
+									"end": 903,
 									"loc": {
 										"start": {
 											"line": 33,
@@ -1306,8 +1306,8 @@
 									},
 									"typeAnnotation": {
 										"type": "TSIntersectionType",
-										"start": 899,
-										"end": 904,
+										"start": 898,
+										"end": 903,
 										"loc": {
 											"start": {
 												"line": 34,
@@ -1321,8 +1321,8 @@
 										"types": [
 											{
 												"type": "TSTypeReference",
-												"start": 899,
-												"end": 900,
+												"start": 898,
+												"end": 899,
 												"loc": {
 													"start": {
 														"line": 34,
@@ -1335,8 +1335,8 @@
 												},
 												"typeName": {
 													"type": "Identifier",
-													"start": 899,
-													"end": 900,
+													"start": 898,
+													"end": 899,
 													"loc": {
 														"start": {
 															"line": 34,
@@ -1352,8 +1352,8 @@
 											},
 											{
 												"type": "TSTypeReference",
-												"start": 903,
-												"end": 904,
+												"start": 902,
+												"end": 903,
 												"loc": {
 													"start": {
 														"line": 34,
@@ -1366,8 +1366,8 @@
 												},
 												"typeName": {
 													"type": "Identifier",
-													"start": 903,
-													"end": 904,
+													"start": 902,
+													"end": 903,
 													"loc": {
 														"start": {
 															"line": 34,
@@ -1386,8 +1386,8 @@
 											{
 												"type": "Line",
 												"value": " c6",
-												"start": 890,
-												"end": 895
+												"start": 889,
+												"end": 894
 											}
 										]
 									}
@@ -1399,33 +1399,33 @@
 						{
 							"type": "Line",
 							"value": " Interface property, intersection type: continuation indents one level.",
-							"start": 570,
-							"end": 643
+							"start": 569,
+							"end": 642
 						},
 						{
 							"type": "Line",
 							"value": " Prettier keeps it flush here (unlike a simple property-signature type, which",
-							"start": 645,
-							"end": 724
+							"start": 644,
+							"end": 723
 						},
 						{
 							"type": "Line",
 							"value": " it relocates to end-of-line — see annotation_simple), so this is the",
-							"start": 726,
-							"end": 797
+							"start": 725,
+							"end": 796
 						},
 						{
 							"type": "Line",
 							"value": " type-element face of the \"intersection in any position\" divergence.",
-							"start": 799,
-							"end": 869
+							"start": 798,
+							"end": 868
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 1052,
-					"end": 1091,
+					"start": 1051,
+					"end": 1090,
 					"loc": {
 						"start": {
 							"line": 39,
@@ -1439,8 +1439,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 1058,
-							"end": 1090,
+							"start": 1057,
+							"end": 1089,
 							"loc": {
 								"start": {
 									"line": 39,
@@ -1453,8 +1453,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 1058,
-								"end": 1059,
+								"start": 1057,
+								"end": 1058,
 								"loc": {
 									"start": {
 										"line": 39,
@@ -1469,8 +1469,8 @@
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
-								"start": 1062,
-								"end": 1090,
+								"start": 1061,
+								"end": 1089,
 								"loc": {
 									"start": {
 										"line": 39,
@@ -1483,8 +1483,8 @@
 								},
 								"returnType": {
 									"type": "TSTypeAnnotation",
-									"start": 1064,
-									"end": 1075,
+									"start": 1063,
+									"end": 1074,
 									"loc": {
 										"start": {
 											"line": 39,
@@ -1497,8 +1497,8 @@
 									},
 									"typeAnnotation": {
 										"type": "TSTypeReference",
-										"start": 1074,
-										"end": 1075,
+										"start": 1073,
+										"end": 1074,
 										"loc": {
 											"start": {
 												"line": 40,
@@ -1511,8 +1511,8 @@
 										},
 										"typeName": {
 											"type": "Identifier",
-											"start": 1074,
-											"end": 1075,
+											"start": 1073,
+											"end": 1074,
 											"loc": {
 												"start": {
 													"line": 40,
@@ -1529,8 +1529,8 @@
 											{
 												"type": "Line",
 												"value": " c7",
-												"start": 1066,
-												"end": 1071
+												"start": 1065,
+												"end": 1070
 											}
 										]
 									}
@@ -1542,8 +1542,8 @@
 								"params": [],
 								"body": {
 									"type": "TSAsExpression",
-									"start": 1079,
-									"end": 1090,
+									"start": 1078,
+									"end": 1089,
 									"loc": {
 										"start": {
 											"line": 40,
@@ -1556,8 +1556,8 @@
 									},
 									"expression": {
 										"type": "Literal",
-										"start": 1079,
-										"end": 1083,
+										"start": 1078,
+										"end": 1082,
 										"loc": {
 											"start": {
 												"line": 40,
@@ -1573,8 +1573,8 @@
 									},
 									"typeAnnotation": {
 										"type": "TSAnyKeyword",
-										"start": 1087,
-										"end": 1090,
+										"start": 1086,
+										"end": 1089,
 										"loc": {
 											"start": {
 												"line": 40,
@@ -1595,21 +1595,21 @@
 						{
 							"type": "Line",
 							"value": " Arrow-function return type, simple type: continuation indents one level",
-							"start": 911,
-							"end": 985
+							"start": 910,
+							"end": 984
 						},
 						{
 							"type": "Line",
 							"value": " (same shared path as the function-declaration return above).",
-							"start": 987,
-							"end": 1050
+							"start": 986,
+							"end": 1049
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 1254,
-					"end": 1299,
+					"start": 1253,
+					"end": 1298,
 					"loc": {
 						"start": {
 							"line": 44,
@@ -1623,8 +1623,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 1260,
-							"end": 1298,
+							"start": 1259,
+							"end": 1297,
 							"loc": {
 								"start": {
 									"line": 44,
@@ -1637,8 +1637,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 1260,
-								"end": 1284,
+								"start": 1259,
+								"end": 1283,
 								"loc": {
 									"start": {
 										"line": 44,
@@ -1652,8 +1652,8 @@
 								"name": "j",
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 1261,
-									"end": 1284,
+									"start": 1260,
+									"end": 1283,
 									"loc": {
 										"start": {
 											"line": 44,
@@ -1666,8 +1666,8 @@
 									},
 									"typeAnnotation": {
 										"type": "TSIntersectionType",
-										"start": 1279,
-										"end": 1284,
+										"start": 1278,
+										"end": 1283,
 										"loc": {
 											"start": {
 												"line": 46,
@@ -1681,8 +1681,8 @@
 										"types": [
 											{
 												"type": "TSTypeReference",
-												"start": 1279,
-												"end": 1280,
+												"start": 1278,
+												"end": 1279,
 												"loc": {
 													"start": {
 														"line": 46,
@@ -1695,8 +1695,8 @@
 												},
 												"typeName": {
 													"type": "Identifier",
-													"start": 1279,
-													"end": 1280,
+													"start": 1278,
+													"end": 1279,
 													"loc": {
 														"start": {
 															"line": 46,
@@ -1712,8 +1712,8 @@
 											},
 											{
 												"type": "TSTypeReference",
-												"start": 1283,
-												"end": 1284,
+												"start": 1282,
+												"end": 1283,
 												"loc": {
 													"start": {
 														"line": 46,
@@ -1726,8 +1726,8 @@
 												},
 												"typeName": {
 													"type": "Identifier",
-													"start": 1283,
-													"end": 1284,
+													"start": 1282,
+													"end": 1283,
 													"loc": {
 														"start": {
 															"line": 46,
@@ -1746,14 +1746,14 @@
 											{
 												"type": "Line",
 												"value": " c8",
-												"start": 1263,
-												"end": 1268
+												"start": 1262,
+												"end": 1267
 											},
 											{
 												"type": "Line",
 												"value": " c9",
-												"start": 1271,
-												"end": 1276
+												"start": 1270,
+												"end": 1275
 											}
 										]
 									}
@@ -1761,8 +1761,8 @@
 							},
 							"init": {
 								"type": "TSAsExpression",
-								"start": 1287,
-								"end": 1298,
+								"start": 1286,
+								"end": 1297,
 								"loc": {
 									"start": {
 										"line": 46,
@@ -1775,8 +1775,8 @@
 								},
 								"expression": {
 									"type": "Literal",
-									"start": 1287,
-									"end": 1291,
+									"start": 1286,
+									"end": 1290,
 									"loc": {
 										"start": {
 											"line": 46,
@@ -1792,8 +1792,8 @@
 								},
 								"typeAnnotation": {
 									"type": "TSAnyKeyword",
-									"start": 1295,
-									"end": 1298,
+									"start": 1294,
+									"end": 1297,
 									"loc": {
 										"start": {
 											"line": 46,
@@ -1813,14 +1813,14 @@
 						{
 							"type": "Line",
 							"value": " Variable annotation, intersection type, two line comments: each ends its own",
-							"start": 1094,
-							"end": 1173
+							"start": 1093,
+							"end": 1172
 						},
 						{
 							"type": "Line",
 							"value": " line and the whole continuation indents one level (none merge or swallow).",
-							"start": 1175,
-							"end": 1252
+							"start": 1174,
+							"end": 1251
 						}
 					]
 				}

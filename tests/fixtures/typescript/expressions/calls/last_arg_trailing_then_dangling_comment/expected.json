@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 697,
+	"end": 692,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,24 +45,24 @@
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 185,
-			"end": 190,
+			"start": 184,
+			"end": 189,
 			"loc": {
 				"start": {
 					"line": 6,
-					"column": 5
+					"column": 4
 				},
 				"end": {
 					"line": 6,
-					"column": 10
+					"column": 9
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 193,
-			"end": 198,
+			"start": 192,
+			"end": 197,
 			"loc": {
 				"start": {
 					"line": 7,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " Same, with three: only the first trails; the rest each get their own line.",
-			"start": 205,
-			"end": 282,
+			"start": 204,
+			"end": 281,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -93,24 +93,24 @@
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 298,
-			"end": 303,
+			"start": 296,
+			"end": 301,
 			"loc": {
 				"start": {
 					"line": 13,
-					"column": 5
+					"column": 4
 				},
 				"end": {
 					"line": 13,
-					"column": 10
+					"column": 9
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 306,
-			"end": 311,
+			"start": 304,
+			"end": 309,
 			"loc": {
 				"start": {
 					"line": 14,
@@ -125,8 +125,8 @@
 		{
 			"type": "Line",
 			"value": " c3",
-			"start": 314,
-			"end": 319,
+			"start": 312,
+			"end": 317,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -141,8 +141,8 @@
 		{
 			"type": "Line",
 			"value": " Block comment then line comment, both on the last arg's line: the block",
-			"start": 326,
-			"end": 400,
+			"start": 324,
+			"end": 398,
 			"loc": {
 				"start": {
 					"line": 18,
@@ -157,8 +157,8 @@
 		{
 			"type": "Line",
 			"value": " trails before the comma, the line trails after it (neither is dropped).",
-			"start": 402,
-			"end": 476,
+			"start": 400,
+			"end": 474,
 			"loc": {
 				"start": {
 					"line": 19,
@@ -173,8 +173,8 @@
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 491,
-			"end": 499,
+			"start": 489,
+			"end": 497,
 			"loc": {
 				"start": {
 					"line": 22,
@@ -189,24 +189,24 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 501,
-			"end": 506,
+			"start": 498,
+			"end": 503,
 			"loc": {
 				"start": {
 					"line": 22,
-					"column": 14
+					"column": 13
 				},
 				"end": {
 					"line": 22,
-					"column": 19
+					"column": 18
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " Single arg: block + line on the arg's line.",
-			"start": 513,
-			"end": 559,
+			"start": 510,
+			"end": 556,
 			"loc": {
 				"start": {
 					"line": 25,
@@ -221,8 +221,8 @@
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 569,
-			"end": 577,
+			"start": 566,
+			"end": 574,
 			"loc": {
 				"start": {
 					"line": 27,
@@ -237,24 +237,24 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 579,
-			"end": 584,
+			"start": 575,
+			"end": 580,
 			"loc": {
 				"start": {
 					"line": 27,
-					"column": 14
+					"column": 13
 				},
 				"end": {
 					"line": 27,
-					"column": 19
+					"column": 18
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " Block trailing the arg, then a block on its own line.",
-			"start": 591,
-			"end": 647,
+			"start": 587,
+			"end": 643,
 			"loc": {
 				"start": {
 					"line": 30,
@@ -269,8 +269,8 @@
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 662,
-			"end": 670,
+			"start": 658,
+			"end": 666,
 			"loc": {
 				"start": {
 					"line": 33,
@@ -285,8 +285,8 @@
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 674,
-			"end": 682,
+			"start": 669,
+			"end": 677,
 			"loc": {
 				"start": {
 					"line": 34,
@@ -302,12 +302,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 696,
+		"end": 691,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 687,
+			"end": 682,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -322,7 +322,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 171,
-					"end": 202,
+					"end": 201,
 					"loc": {
 						"start": {
 							"line": 4,
@@ -336,7 +336,7 @@
 					"expression": {
 						"type": "CallExpression",
 						"start": 171,
-						"end": 201,
+						"end": 200,
 						"loc": {
 							"start": {
 								"line": 4,
@@ -399,8 +399,8 @@
 									{
 										"type": "Line",
 										"value": " c1",
-										"start": 185,
-										"end": 190
+										"start": 184,
+										"end": 189
 									}
 								]
 							}
@@ -424,8 +424,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 284,
-					"end": 323,
+					"start": 283,
+					"end": 321,
 					"loc": {
 						"start": {
 							"line": 11,
@@ -438,8 +438,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 284,
-						"end": 322,
+						"start": 283,
+						"end": 320,
 						"loc": {
 							"start": {
 								"line": 11,
@@ -452,8 +452,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 284,
-							"end": 286,
+							"start": 283,
+							"end": 285,
 							"loc": {
 								"start": {
 									"line": 11,
@@ -469,8 +469,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 290,
-								"end": 291,
+								"start": 289,
+								"end": 290,
 								"loc": {
 									"start": {
 										"line": 12,
@@ -485,8 +485,8 @@
 							},
 							{
 								"type": "Identifier",
-								"start": 295,
-								"end": 296,
+								"start": 294,
+								"end": 295,
 								"loc": {
 									"start": {
 										"line": 13,
@@ -502,8 +502,8 @@
 									{
 										"type": "Line",
 										"value": " c1",
-										"start": 298,
-										"end": 303
+										"start": 296,
+										"end": 301
 									}
 								]
 							}
@@ -514,21 +514,21 @@
 						{
 							"type": "Line",
 							"value": " c2",
-							"start": 193,
-							"end": 198
+							"start": 192,
+							"end": 197
 						},
 						{
 							"type": "Line",
 							"value": " Same, with three: only the first trails; the rest each get their own line.",
-							"start": 205,
-							"end": 282
+							"start": 204,
+							"end": 281
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 478,
-					"end": 510,
+					"start": 476,
+					"end": 507,
 					"loc": {
 						"start": {
 							"line": 20,
@@ -541,8 +541,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 478,
-						"end": 509,
+						"start": 476,
+						"end": 506,
 						"loc": {
 							"start": {
 								"line": 20,
@@ -555,8 +555,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 478,
-							"end": 480,
+							"start": 476,
+							"end": 478,
 							"loc": {
 								"start": {
 									"line": 20,
@@ -572,8 +572,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 484,
-								"end": 485,
+								"start": 482,
+								"end": 483,
 								"loc": {
 									"start": {
 										"line": 21,
@@ -588,8 +588,8 @@
 							},
 							{
 								"type": "Identifier",
-								"start": 489,
-								"end": 490,
+								"start": 487,
+								"end": 488,
 								"loc": {
 									"start": {
 										"line": 22,
@@ -605,8 +605,8 @@
 									{
 										"type": "Block",
 										"value": " c1 ",
-										"start": 491,
-										"end": 499
+										"start": 489,
+										"end": 497
 									}
 								]
 							}
@@ -617,33 +617,33 @@
 						{
 							"type": "Line",
 							"value": " c2",
-							"start": 306,
-							"end": 311
+							"start": 304,
+							"end": 309
 						},
 						{
 							"type": "Line",
 							"value": " c3",
-							"start": 314,
-							"end": 319
+							"start": 312,
+							"end": 317
 						},
 						{
 							"type": "Line",
 							"value": " Block comment then line comment, both on the last arg's line: the block",
-							"start": 326,
-							"end": 400
+							"start": 324,
+							"end": 398
 						},
 						{
 							"type": "Line",
 							"value": " trails before the comma, the line trails after it (neither is dropped).",
-							"start": 402,
-							"end": 476
+							"start": 400,
+							"end": 474
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 561,
-					"end": 588,
+					"start": 558,
+					"end": 584,
 					"loc": {
 						"start": {
 							"line": 26,
@@ -656,8 +656,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 561,
-						"end": 587,
+						"start": 558,
+						"end": 583,
 						"loc": {
 							"start": {
 								"line": 26,
@@ -670,8 +670,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 561,
-							"end": 563,
+							"start": 558,
+							"end": 560,
 							"loc": {
 								"start": {
 									"line": 26,
@@ -687,8 +687,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 567,
-								"end": 568,
+								"start": 564,
+								"end": 565,
 								"loc": {
 									"start": {
 										"line": 27,
@@ -704,8 +704,8 @@
 									{
 										"type": "Block",
 										"value": " c1 ",
-										"start": 569,
-										"end": 577
+										"start": 566,
+										"end": 574
 									}
 								]
 							}
@@ -716,21 +716,21 @@
 						{
 							"type": "Line",
 							"value": " c2",
-							"start": 501,
-							"end": 506
+							"start": 498,
+							"end": 503
 						},
 						{
 							"type": "Line",
 							"value": " Single arg: block + line on the arg's line.",
-							"start": 513,
-							"end": 559
+							"start": 510,
+							"end": 556
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 649,
-					"end": 686,
+					"start": 645,
+					"end": 681,
 					"loc": {
 						"start": {
 							"line": 31,
@@ -743,8 +743,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 649,
-						"end": 685,
+						"start": 645,
+						"end": 680,
 						"loc": {
 							"start": {
 								"line": 31,
@@ -757,8 +757,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 649,
-							"end": 651,
+							"start": 645,
+							"end": 647,
 							"loc": {
 								"start": {
 									"line": 31,
@@ -774,8 +774,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 655,
-								"end": 656,
+								"start": 651,
+								"end": 652,
 								"loc": {
 									"start": {
 										"line": 32,
@@ -790,8 +790,8 @@
 							},
 							{
 								"type": "Identifier",
-								"start": 660,
-								"end": 661,
+								"start": 656,
+								"end": 657,
 								"loc": {
 									"start": {
 										"line": 33,
@@ -807,8 +807,8 @@
 									{
 										"type": "Block",
 										"value": " c1 ",
-										"start": 662,
-										"end": 670
+										"start": 658,
+										"end": 666
 									}
 								]
 							}
@@ -819,22 +819,22 @@
 						{
 							"type": "Line",
 							"value": " c2",
-							"start": 579,
-							"end": 584
+							"start": 575,
+							"end": 580
 						},
 						{
 							"type": "Line",
 							"value": " Block trailing the arg, then a block on its own line.",
-							"start": 591,
-							"end": 647
+							"start": 587,
+							"end": 643
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Block",
 							"value": " c2 ",
-							"start": 674,
-							"end": 682
+							"start": 669,
+							"end": 677
 						}
 					]
 				}

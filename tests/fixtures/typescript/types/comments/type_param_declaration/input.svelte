@@ -16,19 +16,19 @@
 
 	// Line comment after type param name (forces multiline)
 	function fn5<
-		T, // c
+		T // c
 	>() {}
 
 	// Line comment after extends
 	function fn6<
 		T extends // c
-			A,
+			A
 	>() {}
 
 	// Line comment after default =
 	function fn7<
 		T = // c
-			A,
+			A
 	>() {}
 
 	// Multiple type params with comments

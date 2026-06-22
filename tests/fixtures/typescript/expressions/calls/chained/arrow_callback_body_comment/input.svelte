@@ -3,8 +3,8 @@
 	const a = a.b().fn1(() =>
 		fn2(
 			a,
-			b, // comment
-		),
+			b // comment
+		)
 	);
 
 	// Chain with own-line block comment
@@ -12,8 +12,8 @@
 		fn2(
 			a,
 			/* comment */
-			b,
-		),
+			b
+		)
 	);
 
 	// Chain with leading line comment between args
@@ -21,15 +21,15 @@
 		fn2(
 			a,
 			// comment
-			b,
-		),
+			b
+		)
 	);
 
 	// Short control - single member chain, no bug
 	const e = obj.fn1(() =>
 		fn2(
 			a,
-			b, // comment
-		),
+			b // comment
+		)
 	);
 </script>

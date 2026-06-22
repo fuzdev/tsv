@@ -1,7 +1,7 @@
 <script>
 	const a = [
 		`line
-continuation`,
+continuation`
 		/* block */
 	];
 </script>

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 248,
+	"end": 250,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -16,54 +16,54 @@
 			},
 			{
 				"type": "Text",
-				"start": 188,
-				"end": 190,
+				"start": 190,
+				"end": 192,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 190,
-				"end": 247,
+				"start": 192,
+				"end": 249,
 				"name": "button",
 				"name_loc": {
 					"start": {
 						"line": 9,
 						"column": 1,
-						"character": 191
+						"character": 193
 					},
 					"end": {
 						"line": 9,
 						"column": 7,
-						"character": 197
+						"character": 199
 					}
 				},
 				"attributes": [
 					{
 						"type": "Attribute",
-						"start": 198,
-						"end": 228,
+						"start": 200,
+						"end": 230,
 						"name": "onclick",
 						"name_loc": {
 							"start": {
 								"line": 9,
 								"column": 8,
-								"character": 198
+								"character": 200
 							},
 							"end": {
 								"line": 9,
 								"column": 15,
-								"character": 205
+								"character": 207
 							}
 						},
 						"value": {
 							"type": "ExpressionTag",
-							"start": 206,
-							"end": 228,
+							"start": 208,
+							"end": 230,
 							"expression": {
 								"type": "ArrowFunctionExpression",
-								"start": 207,
-								"end": 227,
+								"start": 209,
+								"end": 229,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -81,8 +81,8 @@
 								"params": [],
 								"body": {
 									"type": "CallExpression",
-									"start": 213,
-									"end": 227,
+									"start": 215,
+									"end": 229,
 									"loc": {
 										"start": {
 											"line": 9,
@@ -95,8 +95,8 @@
 									},
 									"callee": {
 										"type": "Identifier",
-										"start": 213,
-										"end": 218,
+										"start": 215,
+										"end": 220,
 										"loc": {
 											"start": {
 												"line": 9,
@@ -112,8 +112,8 @@
 									"arguments": [
 										{
 											"type": "Literal",
-											"start": 219,
-											"end": 226,
+											"start": 221,
+											"end": 228,
 											"loc": {
 												"start": {
 													"line": 9,
@@ -139,8 +139,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 229,
-							"end": 238,
+							"start": 231,
+							"end": 240,
 							"raw": "say hello",
 							"data": "say hello"
 						}
@@ -189,12 +189,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 47,
-		"end": 188,
+		"end": 190,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 65,
-			"end": 179,
+			"end": 181,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -209,7 +209,7 @@
 				{
 					"type": "FunctionDeclaration",
 					"start": 67,
-					"end": 178,
+					"end": 180,
 					"loc": {
 						"start": {
 							"line": 4,
@@ -290,7 +290,7 @@
 					"body": {
 						"type": "BlockStatement",
 						"start": 100,
-						"end": 178,
+						"end": 180,
 						"loc": {
 							"start": {
 								"line": 4,
@@ -305,7 +305,7 @@
 							{
 								"type": "ExpressionStatement",
 								"start": 104,
-								"end": 175,
+								"end": 177,
 								"loc": {
 									"start": {
 										"line": 5,
@@ -313,13 +313,13 @@
 									},
 									"end": {
 										"line": 5,
-										"column": 73
+										"column": 75
 									}
 								},
 								"expression": {
 									"type": "CallExpression",
 									"start": 104,
-									"end": 174,
+									"end": 176,
 									"loc": {
 										"start": {
 											"line": 5,
@@ -327,7 +327,7 @@
 										},
 										"end": {
 											"line": 5,
-											"column": 72
+											"column": 74
 										}
 									},
 									"callee": {
@@ -400,7 +400,7 @@
 										{
 											"type": "NewExpression",
 											"start": 126,
-											"end": 173,
+											"end": 175,
 											"loc": {
 												"start": {
 													"line": 5,
@@ -408,7 +408,7 @@
 												},
 												"end": {
 													"line": 5,
-													"column": 71
+													"column": 73
 												}
 											},
 											"callee": {
@@ -448,7 +448,7 @@
 												{
 													"type": "ObjectExpression",
 													"start": 154,
-													"end": 172,
+													"end": 174,
 													"loc": {
 														"start": {
 															"line": 5,
@@ -456,22 +456,22 @@
 														},
 														"end": {
 															"line": 5,
-															"column": 70
+															"column": 72
 														}
 													},
 													"properties": [
 														{
 															"type": "Property",
-															"start": 155,
-															"end": 171,
+															"start": 156,
+															"end": 172,
 															"loc": {
 																"start": {
 																	"line": 5,
-																	"column": 53
+																	"column": 54
 																},
 																"end": {
 																	"line": 5,
-																	"column": 69
+																	"column": 70
 																}
 															},
 															"method": false,
@@ -479,32 +479,32 @@
 															"computed": false,
 															"key": {
 																"type": "Identifier",
-																"start": 155,
-																"end": 161,
+																"start": 156,
+																"end": 162,
 																"loc": {
 																	"start": {
 																		"line": 5,
-																		"column": 53
+																		"column": 54
 																	},
 																	"end": {
 																		"line": 5,
-																		"column": 59
+																		"column": 60
 																	}
 																},
 																"name": "detail"
 															},
 															"value": {
 																"type": "Identifier",
-																"start": 163,
-																"end": 171,
+																"start": 164,
+																"end": 172,
 																"loc": {
 																	"start": {
 																		"line": 5,
-																		"column": 61
+																		"column": 62
 																	},
 																	"end": {
 																		"line": 5,
-																		"column": 69
+																		"column": 70
 																	}
 																},
 																"name": "greeting"

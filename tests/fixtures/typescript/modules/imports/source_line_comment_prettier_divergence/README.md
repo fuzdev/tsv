@@ -11,7 +11,7 @@ diverges differently per case (all preserved in place + indented by tsv):
 
 - **bare** (`import // c⏎'x'`) and **empty braces** (`import {} from // c⏎'x'`):
   prettier keeps the comment in place but flat (indent-only divergence).
-- **named specifiers** (`import {a} from // c⏎'x'`): prettier relocates the
+- **named specifiers** (`import { a } from // c⏎'x'`): prettier relocates the
   comment into the braces as the last specifier's trailing comment, expanding them.
 - **default binding** (`import Foo from // c⏎'x'`): prettier floats the comment
   past the `;` (the before-semicolon/float-out rule).

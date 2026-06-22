@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 490,
+	"end": 487,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " Two block comments before the comma, then a line comment after it: all kept.",
-			"start": 240,
-			"end": 319,
+			"start": 239,
+			"end": 318,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -109,8 +109,8 @@
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 329,
-			"end": 337,
+			"start": 328,
+			"end": 336,
 			"loc": {
 				"start": {
 					"line": 12,
@@ -125,8 +125,8 @@
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 338,
-			"end": 346,
+			"start": 337,
+			"end": 345,
 			"loc": {
 				"start": {
 					"line": 12,
@@ -141,8 +141,8 @@
 		{
 			"type": "Line",
 			"value": " c3",
-			"start": 348,
-			"end": 353,
+			"start": 347,
+			"end": 352,
 			"loc": {
 				"start": {
 					"line": 12,
@@ -157,8 +157,8 @@
 		{
 			"type": "Line",
 			"value": " The block+line argument in the middle of three args (not just the last).",
-			"start": 365,
-			"end": 440,
+			"start": 363,
+			"end": 438,
 			"loc": {
 				"start": {
 					"line": 16,
@@ -173,8 +173,8 @@
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 450,
-			"end": 458,
+			"start": 448,
+			"end": 456,
 			"loc": {
 				"start": {
 					"line": 18,
@@ -189,8 +189,8 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 460,
-			"end": 465,
+			"start": 458,
+			"end": 463,
 			"loc": {
 				"start": {
 					"line": 18,
@@ -206,12 +206,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 489,
+		"end": 486,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 480,
+			"end": 477,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -226,7 +226,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 205,
-					"end": 237,
+					"end": 236,
 					"loc": {
 						"start": {
 							"line": 5,
@@ -240,7 +240,7 @@
 					"expression": {
 						"type": "CallExpression",
 						"start": 205,
-						"end": 236,
+						"end": 235,
 						"loc": {
 							"start": {
 								"line": 5,
@@ -342,8 +342,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 321,
-					"end": 362,
+					"start": 320,
+					"end": 360,
 					"loc": {
 						"start": {
 							"line": 11,
@@ -356,8 +356,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 321,
-						"end": 361,
+						"start": 320,
+						"end": 359,
 						"loc": {
 							"start": {
 								"line": 11,
@@ -370,8 +370,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 321,
-							"end": 323,
+							"start": 320,
+							"end": 322,
 							"loc": {
 								"start": {
 									"line": 11,
@@ -387,8 +387,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 327,
-								"end": 328,
+								"start": 326,
+								"end": 327,
 								"loc": {
 									"start": {
 										"line": 12,
@@ -404,15 +404,15 @@
 									{
 										"type": "Block",
 										"value": " c1 ",
-										"start": 329,
-										"end": 337
+										"start": 328,
+										"end": 336
 									}
 								]
 							},
 							{
 								"type": "Identifier",
-								"start": 356,
-								"end": 357,
+								"start": 355,
+								"end": 356,
 								"loc": {
 									"start": {
 										"line": 13,
@@ -428,14 +428,14 @@
 									{
 										"type": "Block",
 										"value": " c2 ",
-										"start": 338,
-										"end": 346
+										"start": 337,
+										"end": 345
 									},
 									{
 										"type": "Line",
 										"value": " c3",
-										"start": 348,
-										"end": 353
+										"start": 347,
+										"end": 352
 									}
 								]
 							}
@@ -446,15 +446,15 @@
 						{
 							"type": "Line",
 							"value": " Two block comments before the comma, then a line comment after it: all kept.",
-							"start": 240,
-							"end": 319
+							"start": 239,
+							"end": 318
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 442,
-					"end": 479,
+					"start": 440,
+					"end": 476,
 					"loc": {
 						"start": {
 							"line": 17,
@@ -467,8 +467,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 442,
-						"end": 478,
+						"start": 440,
+						"end": 475,
 						"loc": {
 							"start": {
 								"line": 17,
@@ -481,8 +481,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 442,
-							"end": 444,
+							"start": 440,
+							"end": 442,
 							"loc": {
 								"start": {
 									"line": 17,
@@ -498,8 +498,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 448,
-								"end": 449,
+								"start": 446,
+								"end": 447,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -515,15 +515,15 @@
 									{
 										"type": "Block",
 										"value": " c1 ",
-										"start": 450,
-										"end": 458
+										"start": 448,
+										"end": 456
 									}
 								]
 							},
 							{
 								"type": "Identifier",
-								"start": 468,
-								"end": 469,
+								"start": 466,
+								"end": 467,
 								"loc": {
 									"start": {
 										"line": 19,
@@ -539,15 +539,15 @@
 									{
 										"type": "Line",
 										"value": " c2",
-										"start": 460,
-										"end": 465
+										"start": 458,
+										"end": 463
 									}
 								]
 							},
 							{
 								"type": "Identifier",
-								"start": 473,
-								"end": 474,
+								"start": 471,
+								"end": 472,
 								"loc": {
 									"start": {
 										"line": 20,
@@ -567,8 +567,8 @@
 						{
 							"type": "Line",
 							"value": " The block+line argument in the middle of three args (not just the last).",
-							"start": 365,
-							"end": 440
+							"start": 363,
+							"end": 438
 						}
 					]
 				}

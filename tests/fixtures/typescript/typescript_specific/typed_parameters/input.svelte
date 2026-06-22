@@ -16,6 +16,6 @@
 	const obj = {
 		method(a: number) {
 			return a;
-		},
+		}
 	};
 </script>

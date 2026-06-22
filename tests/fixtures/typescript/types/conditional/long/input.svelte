@@ -9,7 +9,7 @@
 			: never;
 
 	// Mapped type in extends clause - stays inline, ternary wraps
-	type LongMappedCheck<T> = T extends {[K in keyof LongObjectTypeName]: LongValueTypeName}
+	type LongMappedCheck<T> = T extends { [K in keyof LongObjectTypeName]: LongValueTypeName }
 		? LongValueTypeName
 		: never;
 

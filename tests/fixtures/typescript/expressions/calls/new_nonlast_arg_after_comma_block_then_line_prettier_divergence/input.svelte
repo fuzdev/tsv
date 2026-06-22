@@ -4,7 +4,7 @@
 	// the comma.
 	new A(
 		a, /* c1 */ // c2
-		b,
+		b
 	);
 
 	// A blank line after the commented arg routes through the blank-line args path;
@@ -12,6 +12,6 @@
 	new A(
 		a, /* c1 */ // c2
 
-		b,
+		b
 	);
 </script>

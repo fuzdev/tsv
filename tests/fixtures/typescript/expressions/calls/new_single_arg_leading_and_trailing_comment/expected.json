@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 146,
+	"end": 143,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -29,8 +29,8 @@
 		{
 			"type": "Line",
 			"value": " trail",
-			"start": 36,
-			"end": 44,
+			"start": 35,
+			"end": 43,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -45,8 +45,8 @@
 		{
 			"type": "Block",
 			"value": " lead ",
-			"start": 62,
-			"end": 72,
+			"start": 61,
+			"end": 71,
 			"loc": {
 				"start": {
 					"line": 9,
@@ -61,8 +61,8 @@
 		{
 			"type": "Line",
 			"value": " trail",
-			"start": 78,
-			"end": 86,
+			"start": 76,
+			"end": 84,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -77,8 +77,8 @@
 		{
 			"type": "Block",
 			"value": " lead ",
-			"start": 104,
-			"end": 114,
+			"start": 102,
+			"end": 112,
 			"loc": {
 				"start": {
 					"line": 14,
@@ -93,8 +93,8 @@
 		{
 			"type": "Block",
 			"value": " trail ",
-			"start": 120,
-			"end": 131,
+			"start": 117,
+			"end": 128,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -110,12 +110,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 145,
+		"end": 142,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 136,
+			"end": 133,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -130,7 +130,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 10,
-					"end": 48,
+					"end": 47,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -144,7 +144,7 @@
 					"expression": {
 						"type": "NewExpression",
 						"start": 10,
-						"end": 47,
+						"end": 46,
 						"loc": {
 							"start": {
 								"line": 2,
@@ -201,8 +201,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 51,
-					"end": 90,
+					"start": 50,
+					"end": 88,
 					"loc": {
 						"start": {
 							"line": 8,
@@ -215,8 +215,8 @@
 					},
 					"expression": {
 						"type": "NewExpression",
-						"start": 51,
-						"end": 89,
+						"start": 50,
+						"end": 87,
 						"loc": {
 							"start": {
 								"line": 8,
@@ -229,8 +229,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 55,
-							"end": 58,
+							"start": 54,
+							"end": 57,
 							"loc": {
 								"start": {
 									"line": 8,
@@ -246,8 +246,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 73,
-								"end": 74,
+								"start": 72,
+								"end": 73,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -263,8 +263,8 @@
 									{
 										"type": "Block",
 										"value": " lead ",
-										"start": 62,
-										"end": 72
+										"start": 61,
+										"end": 71
 									}
 								]
 							}
@@ -274,15 +274,15 @@
 						{
 							"type": "Line",
 							"value": " trail",
-							"start": 36,
-							"end": 44
+							"start": 35,
+							"end": 43
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 93,
-					"end": 135,
+					"start": 91,
+					"end": 132,
 					"loc": {
 						"start": {
 							"line": 13,
@@ -295,8 +295,8 @@
 					},
 					"expression": {
 						"type": "NewExpression",
-						"start": 93,
-						"end": 134,
+						"start": 91,
+						"end": 131,
 						"loc": {
 							"start": {
 								"line": 13,
@@ -309,8 +309,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 97,
-							"end": 100,
+							"start": 95,
+							"end": 98,
 							"loc": {
 								"start": {
 									"line": 13,
@@ -326,8 +326,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 115,
-								"end": 116,
+								"start": 113,
+								"end": 114,
 								"loc": {
 									"start": {
 										"line": 14,
@@ -343,8 +343,8 @@
 									{
 										"type": "Block",
 										"value": " lead ",
-										"start": 104,
-										"end": 114
+										"start": 102,
+										"end": 112
 									}
 								]
 							}
@@ -354,16 +354,16 @@
 						{
 							"type": "Line",
 							"value": " trail",
-							"start": 78,
-							"end": 86
+							"start": 76,
+							"end": 84
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Block",
 							"value": " trail ",
-							"start": 120,
-							"end": 131
+							"start": 117,
+							"end": 128
 						}
 					]
 				}

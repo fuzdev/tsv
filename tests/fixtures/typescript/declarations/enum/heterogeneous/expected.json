@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 127,
+	"end": 126,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,12 +13,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 126,
+		"end": 125,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 117,
+			"end": 116,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -33,7 +33,7 @@
 				{
 					"type": "TSEnumDeclaration",
 					"start": 20,
-					"end": 75,
+					"end": 74,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -257,8 +257,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 78,
-					"end": 96,
+					"start": 77,
+					"end": 95,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -272,8 +272,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 84,
-							"end": 95,
+							"start": 83,
+							"end": 94,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -286,8 +286,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 84,
-								"end": 85,
+								"start": 83,
+								"end": 84,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -302,8 +302,8 @@
 							},
 							"init": {
 								"type": "MemberExpression",
-								"start": 88,
-								"end": 95,
+								"start": 87,
+								"end": 94,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -316,8 +316,8 @@
 								},
 								"object": {
 									"type": "Identifier",
-									"start": 88,
-									"end": 93,
+									"start": 87,
+									"end": 92,
 									"loc": {
 										"start": {
 											"line": 9,
@@ -332,8 +332,8 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 94,
-									"end": 95,
+									"start": 93,
+									"end": 94,
 									"loc": {
 										"start": {
 											"line": 9,
@@ -355,8 +355,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 98,
-					"end": 116,
+					"start": 97,
+					"end": 115,
 					"loc": {
 						"start": {
 							"line": 10,
@@ -370,8 +370,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 104,
-							"end": 115,
+							"start": 103,
+							"end": 114,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -384,8 +384,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 104,
-								"end": 105,
+								"start": 103,
+								"end": 104,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -400,8 +400,8 @@
 							},
 							"init": {
 								"type": "MemberExpression",
-								"start": 108,
-								"end": 115,
+								"start": 107,
+								"end": 114,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -414,8 +414,8 @@
 								},
 								"object": {
 									"type": "Identifier",
-									"start": 108,
-									"end": 113,
+									"start": 107,
+									"end": 112,
 									"loc": {
 										"start": {
 											"line": 10,
@@ -430,8 +430,8 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 114,
-									"end": 115,
+									"start": 113,
+									"end": 114,
 									"loc": {
 										"start": {
 											"line": 10,

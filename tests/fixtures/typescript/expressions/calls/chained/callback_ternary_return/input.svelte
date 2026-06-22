@@ -7,7 +7,7 @@
 		.map((x) =>
 			x.condition
 				? aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-				: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+				: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 		)
 		.filter(Boolean);
 
@@ -18,10 +18,12 @@
 				? aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 				: x.b
 					? bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-					: ccccccccccccccccccccccccccccccccccccccccccccc,
+					: ccccccccccccccccccccccccccccccccccccccccccccc
 		)
 		.filter(Boolean);
 
 	// ternary with object branches - stays inline
-	const d = items.map((x) => (x.condition ? {a: x.a, b: x.b} : {a: x.c, b: x.d})).filter(Boolean);
+	const d = items
+		.map((x) => (x.condition ? { a: x.a, b: x.b } : { a: x.c, b: x.d }))
+		.filter(Boolean);
 </script>

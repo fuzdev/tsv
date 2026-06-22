@@ -2,7 +2,7 @@
 
 <script lang="ts">
 	function greet(greeting: string) {
-		$host().dispatchEvent(new CustomEvent('greeting', {detail: greeting}));
+		$host().dispatchEvent(new CustomEvent('greeting', { detail: greeting }));
 	}
 </script>
 

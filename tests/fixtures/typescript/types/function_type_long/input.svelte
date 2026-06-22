@@ -10,7 +10,7 @@
 		arg2: number,
 		arg3: boolean,
 		arg4: object,
-		arg5: nullllllllllll,
+		arg5: nullllllllllll
 	) => string;
 
 	// Constructor types
@@ -24,6 +24,6 @@
 		arg2: number,
 		arg3: boolean,
 		arg4: object,
-		arg5: nulllllllllllll,
+		arg5: nulllllllllllll
 	) => A;
 </script>

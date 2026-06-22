@@ -3,7 +3,7 @@
 		A = 1,
 		B = 'b',
 		C = 2,
-		D = 'd',
+		D = 'd'
 	}
 
 	const a = Mixed.A;

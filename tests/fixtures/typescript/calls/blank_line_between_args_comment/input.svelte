@@ -8,7 +8,7 @@
 		b,
 
 		// comment 3
-		c,
+		c
 	);
 
 	// Blank lines between args with trailing line comments
@@ -17,7 +17,7 @@
 
 		b, // trailing 2
 
-		c,
+		c
 	);
 
 	// Blank lines with block comments between args
@@ -26,7 +26,7 @@
 		a,
 
 		/* comment 2 */
-		b,
+		b
 	);
 
 	// Mixed: some blank lines, some not
@@ -37,6 +37,6 @@
 		b,
 
 		// comment 3 (blank line before)
-		c,
+		c
 	);
 </script>

@@ -23,7 +23,7 @@
 	};
 
 	// Index signature in generic constraint
-	function lookup<T extends {[key: string]: unknown}>(obj: T, key: string): unknown {
+	function lookup<T extends { [key: string]: unknown }>(obj: T, key: string): unknown {
 		return obj[key];
 	}
 

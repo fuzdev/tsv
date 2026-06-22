@@ -3,6 +3,6 @@
 	aaaaaa?.get(xxxxxxxx)?.push({
 		prop_ab,
 		ab: yyyyyy.stats.prop_aaaaaa,
-		prop_cd: yyyyyy.stats.prop_b,
+		prop_cd: yyyyyy.stats.prop_b
 	});
 </script>

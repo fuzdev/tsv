@@ -1,18 +1,18 @@
 <script>
 	// line comment trailing `(` — single arg
 	new Foo( // c1
-		a,
+		a
 	);
 
 	// line comment trailing `(` — multiple args
 	new Foo( // c2
 		a,
-		b,
+		b
 	);
 
 	// block comment trailing `(`, then own-line leading comment
 	new Foo( /* paren */
 		// lead
-		a,
+		a
 	);
 </script>

@@ -3,7 +3,7 @@
 	type T = [
 		A,
 		// comment before B
-		B,
+		B
 	];
 
 	// Line comment between multiple tuple elements
@@ -12,7 +12,7 @@
 		// comment before B
 		B,
 		// comment before C
-		C,
+		C
 	];
 
 	// Multiple consecutive line comments
@@ -20,6 +20,6 @@
 		A,
 		// comment line 1
 		// comment line 2
-		B,
+		B
 	];
 </script>

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 655,
+	"end": 654,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -78,12 +78,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 654,
+		"end": 653,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 645,
+			"end": 644,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -637,7 +637,7 @@
 				{
 					"type": "FunctionDeclaration",
 					"start": 489,
-					"end": 644,
+					"end": 643,
 					"loc": {
 						"start": {
 							"line": 17,
@@ -671,7 +671,7 @@
 					"body": {
 						"type": "BlockStatement",
 						"start": 504,
-						"end": 644,
+						"end": 643,
 						"loc": {
 							"start": {
 								"line": 17,
@@ -686,7 +686,7 @@
 							{
 								"type": "FunctionDeclaration",
 								"start": 508,
-								"end": 641,
+								"end": 640,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -720,7 +720,7 @@
 								"body": {
 									"type": "BlockStatement",
 									"start": 526,
-									"end": 641,
+									"end": 640,
 									"loc": {
 										"start": {
 											"line": 18,
@@ -735,7 +735,7 @@
 										{
 											"type": "VariableDeclaration",
 											"start": 531,
-											"end": 637,
+											"end": 636,
 											"loc": {
 												"start": {
 													"line": 19,
@@ -750,7 +750,7 @@
 												{
 													"type": "VariableDeclarator",
 													"start": 537,
-													"end": 636,
+													"end": 635,
 													"loc": {
 														"start": {
 															"line": 19,
@@ -780,7 +780,7 @@
 													"init": {
 														"type": "CallExpression",
 														"start": 541,
-														"end": 636,
+														"end": 635,
 														"loc": {
 															"start": {
 																"line": 19,

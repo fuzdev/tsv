@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 419,
+	"end": 418,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -23,7 +23,7 @@
 			{
 				"type": "RegularElement",
 				"start": 261,
-				"end": 418,
+				"end": 417,
 				"name": "span",
 				"name_loc": {
 					"start": {
@@ -51,11 +51,11 @@
 						{
 							"type": "EachBlock",
 							"start": 269,
-							"end": 410,
+							"end": 409,
 							"expression": {
 								"type": "CallExpression",
 								"start": 276,
-								"end": 383,
+								"end": 382,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -171,19 +171,19 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 392,
-										"end": 395,
+										"start": 391,
+										"end": 394,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "ExpressionTag",
-										"start": 395,
-										"end": 401,
+										"start": 394,
+										"end": 400,
 										"expression": {
 											"type": "Identifier",
-											"start": 396,
-											"end": 400,
+											"start": 395,
+											"end": 399,
 											"loc": {
 												"start": {
 													"line": 10,
@@ -199,8 +199,8 @@
 									},
 									{
 										"type": "Text",
-										"start": 401,
-										"end": 403,
+										"start": 400,
+										"end": 402,
 										"raw": "\n\t",
 										"data": "\n\t"
 									}
@@ -209,26 +209,26 @@
 							"context": {
 								"type": "Identifier",
 								"name": "item",
-								"start": 387,
-								"end": 391,
+								"start": 386,
+								"end": 390,
 								"loc": {
 									"start": {
 										"line": 9,
 										"column": 6,
-										"character": 387
+										"character": 386
 									},
 									"end": {
 										"line": 9,
 										"column": 10,
-										"character": 391
+										"character": 390
 									}
 								}
 							}
 						},
 						{
 							"type": "Text",
-							"start": 410,
-							"end": 411,
+							"start": 409,
+							"end": 410,
 							"raw": "\n",
 							"data": "\n"
 						}

@@ -19,6 +19,6 @@
 		},
 		async *typedGen(): AsyncGenerator<number> {
 			yield 1;
-		},
+		}
 	};
 </script>

@@ -2,7 +2,7 @@
 	// Long type params - params break
 	declare function longParams<
 		T extends LongConstraintOne | LongConstraintTwo,
-		ES extends LongConstraintThree | LongConstraintFour,
+		ES extends LongConstraintThree | LongConstraintFour
 	>(base: T, signals: ES): Config<T, ES>;
 
 	// Short - stays on one line (97 chars, contrast case)
@@ -11,6 +11,6 @@
 	// Very long constraints
 	declare function veryLong<
 		T extends VeryLongTypeName | AnotherLongTypeName,
-		U extends ExtraLongConstraintType | MoreTypes,
+		U extends ExtraLongConstraintType | MoreTypes
 	>(a: T, b: U): [T, U];
 </script>

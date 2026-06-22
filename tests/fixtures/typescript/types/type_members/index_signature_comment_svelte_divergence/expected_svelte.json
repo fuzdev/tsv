@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 177,
+	"end": 179,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -61,16 +61,16 @@
 		{
 			"type": "Block",
 			"value": " ] ",
-			"start": 148,
-			"end": 155,
+			"start": 149,
+			"end": 156,
 			"loc": {
 				"start": {
 					"line": 10,
-					"column": 24
+					"column": 25
 				},
 				"end": {
 					"line": 10,
-					"column": 31
+					"column": 32
 				}
 			}
 		}
@@ -78,12 +78,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 176,
+		"end": 178,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 167,
+			"end": 169,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -402,7 +402,7 @@
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 125,
-					"end": 166,
+					"end": 168,
 					"loc": {
 						"start": {
 							"line": 10,
@@ -410,7 +410,7 @@
 						},
 						"end": {
 							"line": 10,
-							"column": 42
+							"column": 44
 						}
 					},
 					"id": {
@@ -432,7 +432,7 @@
 					"typeAnnotation": {
 						"type": "TSTypeLiteral",
 						"start": 134,
-						"end": 165,
+						"end": 167,
 						"loc": {
 							"start": {
 								"line": 10,
@@ -440,66 +440,66 @@
 							},
 							"end": {
 								"line": 10,
-								"column": 41
+								"column": 43
 							}
 						},
 						"members": [
 							{
 								"type": "TSIndexSignature",
-								"start": 135,
-								"end": 164,
+								"start": 136,
+								"end": 165,
 								"loc": {
 									"start": {
 										"line": 10,
-										"column": 11
+										"column": 12
 									},
 									"end": {
 										"line": 10,
-										"column": 40
+										"column": 41
 									}
 								},
 								"parameters": [
 									{
 										"type": "Identifier",
-										"start": 136,
-										"end": 147,
+										"start": 137,
+										"end": 148,
 										"loc": {
 											"start": {
 												"line": 10,
-												"column": 12
+												"column": 13
 											},
 											"end": {
 												"line": 10,
-												"column": 23
+												"column": 24
 											}
 										},
 										"name": "key",
 										"typeAnnotation": {
 											"type": "TSTypeAnnotation",
-											"start": 139,
-											"end": 147,
+											"start": 140,
+											"end": 148,
 											"loc": {
 												"start": {
 													"line": 10,
-													"column": 15
+													"column": 16
 												},
 												"end": {
 													"line": 10,
-													"column": 23
+													"column": 24
 												}
 											},
 											"typeAnnotation": {
 												"type": "TSStringKeyword",
-												"start": 141,
-												"end": 147,
+												"start": 142,
+												"end": 148,
 												"loc": {
 													"start": {
 														"line": 10,
-														"column": 17
+														"column": 18
 													},
 													"end": {
 														"line": 10,
-														"column": 23
+														"column": 24
 													}
 												}
 											}
@@ -508,38 +508,38 @@
 											{
 												"type": "Block",
 												"value": " ] ",
-												"start": 148,
-												"end": 155
+												"start": 149,
+												"end": 156
 											}
 										]
 									}
 								],
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 156,
-									"end": 164,
+									"start": 157,
+									"end": 165,
 									"loc": {
 										"start": {
 											"line": 10,
-											"column": 32
+											"column": 33
 										},
 										"end": {
 											"line": 10,
-											"column": 40
+											"column": 41
 										}
 									},
 									"typeAnnotation": {
 										"type": "TSNumberKeyword",
-										"start": 158,
-										"end": 164,
+										"start": 159,
+										"end": 165,
 										"loc": {
 											"start": {
 												"line": 10,
-												"column": 34
+												"column": 35
 											},
 											"end": {
 												"line": 10,
-												"column": 40
+												"column": 41
 											}
 										}
 									}

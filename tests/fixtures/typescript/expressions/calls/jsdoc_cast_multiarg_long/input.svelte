@@ -8,25 +8,25 @@
 	// Boundary at 101: args break - each cast stays with its expression
 	fn(
 		/** @type {AAAAAAAAA} */ aaaaaaaaaaaa,
-		/** @type {BBBBBBBBB} */ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+		/** @type {BBBBBBBBB} */ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 	);
 
 	// Expanded: three args with JSDoc casts
 	fn(
 		/** @type {AAAAAAAAAAAA} */ aaaaaaaaaaaaa,
 		/** @type {BBBBBBBBBBBB} */ bbbbbbbbbbbbb,
-		cccccccccccc,
+		cccccccccccc
 	);
 
 	// Expanded: cast before a call expression arg
 	fn(
 		/** @type {AAAAAAAAAA} */ call(aaaaaa, bbbbbb),
-		/** @type {BBBBBBBBBB} */ call(cccccc, dddddd),
+		/** @type {BBBBBBBBBB} */ call(cccccc, dddddd)
 	);
 
 	// Expanded: JSDoc cast before non-first arg only
 	fn(
 		aaaaaaaaaaaaaaaaaaaaaaaa,
-		/** @type {BBBBBBBBBBBBBBBBBBBBBBBBBBB} */ bbbbbbbbbbbbbbbbbbbbbbbbb,
+		/** @type {BBBBBBBBBBBBBBBBBBBBBBBBBBB} */ bbbbbbbbbbbbbbbbbbbbbbbbb
 	);
 </script>

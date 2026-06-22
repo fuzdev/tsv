@@ -11,7 +11,7 @@ export function fn() {
 		},
 		inc() {
 			a++;
-		},
+		}
 	};
 }
 
@@ -28,6 +28,6 @@ export function fn2<T>(init: T) {
 		},
 		set(v: T) {
 			value = v;
-		},
+		}
 	};
 }

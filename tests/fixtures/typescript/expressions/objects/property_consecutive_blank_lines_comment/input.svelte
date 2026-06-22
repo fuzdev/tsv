@@ -13,6 +13,6 @@
 		/**
 		 * JSDoc section
 		 */
-		c: 3,
+		c: 3
 	};
 </script>

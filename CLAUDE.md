@@ -4,7 +4,7 @@
 
 High-performance Rust parser as a drop-in replacement for Svelte's modern parser (acorn + acorn-typescript), paired with a formatter that took Prettier as its initial guide and still tracks it for the common case — while making deliberate, cataloged choices to diverge where tsv's own judgment is more defensible.
 
-**Non-configurable by design**: formatting options are fixed at Prettier's defaults except printWidth=100, useTabs=true, singleQuote=true, and bracketSpacing=false — no config files, CLI flags, or runtime options, ever (opinionated like `gofmt` and Black). The one carve-out is file *scope*, not style: `tsv format` honors `.gitignore` (hierarchically, in a git tree) plus a repo-root `.formatignore` / `.prettierignore`. See [Configuration](#configuration).
+**Non-configurable by design**: formatting options are fixed at Prettier's defaults except printWidth=100, useTabs=true, singleQuote=true, and trailingComma='none' — no config files, CLI flags, or runtime options, ever (opinionated like `gofmt` and Black). The one carve-out is file *scope*, not style: `tsv format` honors `.gitignore` (hierarchically, in a git tree) plus a repo-root `.formatignore` / `.prettierignore`. See [Configuration](#configuration).
 
 ## Committing
 
@@ -334,14 +334,14 @@ When a `.gitignore` is in scope it is authoritative and the built-in **heuristic
 
 The table lists the settings that diverge from Prettier's defaults; everything else (e.g. tabWidth=2) matches Prettier.
 
-| Setting          | Value | Notes                                       |
-| ---------------- | ----- | ------------------------------------------- |
-| `printWidth`     | 100   | Wider than Prettier's default of 80         |
-| `useTabs`        | true  | Tabs, not spaces (Prettier defaults to off) |
-| `singleQuote`    | true  | Single quotes, not double (Prettier off)    |
-| `bracketSpacing` | false | No spaces inside `{ }`                      |
+| Setting         | Value  | Notes                                                                  |
+| --------------- | ------ | ---------------------------------------------------------------------- |
+| `printWidth`    | 100    | Wider than Prettier's default of 80                                    |
+| `useTabs`       | true   | Tabs, not spaces (Prettier defaults to off)                            |
+| `singleQuote`   | true   | Single quotes, not double (Prettier off)                               |
+| `trailingComma` | 'none' | No trailing comma on multiline lists; differs from Prettier's `'all'` |
 
-`bracketSpacing: false`: tight object and destructuring braces (`{foo}`) stay visually distinct from the `{` that opens a function body or block.
+`trailingComma: 'none'`: no trailing comma is emitted even when a list breaks across lines. With `useTabs` and `singleQuote`, this matches the Svelte project's own Prettier config (`.prettierrc`).
 
 **Measuring line widths**: Use `cargo run -p tsv_debug line_width <file>` to measure visual width of lines (accounts for tabWidth=2). Never use `wc -c` — it counts bytes, not visual characters (tabs are 1 byte but 2 visual chars). The `compare` command also shows line widths on changed lines.
 

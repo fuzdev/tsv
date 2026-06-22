@@ -4,7 +4,7 @@
 	fn(
 		'arg1',
 		/* block comment */
-		'arg2',
+		'arg2'
 	);
 
 	// Multiple args with multiple comments
@@ -15,6 +15,6 @@
 		/* leading comment */
 		'arg1',
 		/* inter-arg comment */
-		'arg2',
+		'arg2'
 	);
 </script>

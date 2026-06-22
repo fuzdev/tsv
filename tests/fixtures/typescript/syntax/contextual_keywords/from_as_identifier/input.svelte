@@ -14,7 +14,7 @@
 	}
 
 	{
-		const {from, to} = obj;
+		const { from, to } = obj;
 	}
 
 	function fn1(from: number, to: number) {}

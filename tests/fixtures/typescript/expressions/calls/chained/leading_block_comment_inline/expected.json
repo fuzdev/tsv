@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 424,
+	"end": 423,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -141,16 +141,16 @@
 		{
 			"type": "Line",
 			"value": " trailing",
-			"start": 398,
-			"end": 409,
+			"start": 397,
+			"end": 408,
 			"loc": {
 				"start": {
 					"line": 13,
-					"column": 23
+					"column": 22
 				},
 				"end": {
 					"line": 13,
-					"column": 34
+					"column": 33
 				}
 			}
 		}
@@ -158,12 +158,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 423,
+		"end": 422,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 414,
+			"end": 413,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -701,7 +701,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 352,
-					"end": 413,
+					"end": 412,
 					"loc": {
 						"start": {
 							"line": 12,
@@ -715,7 +715,7 @@
 					"expression": {
 						"type": "CallExpression",
 						"start": 352,
-						"end": 412,
+						"end": 411,
 						"loc": {
 							"start": {
 								"line": 12,
@@ -853,8 +853,8 @@
 									{
 										"type": "Line",
 										"value": " trailing",
-										"start": 398,
-										"end": 409
+										"start": 397,
+										"end": 408
 									}
 								]
 							}

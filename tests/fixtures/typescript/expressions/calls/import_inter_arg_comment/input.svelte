@@ -21,16 +21,16 @@
 	// long source forces a break; the hugging block leads the (flat) options object
 	const h = import(
 		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-		/* c */ {with: {type: 'json'}}
+		/* c */ { with: { type: 'json' } }
 	);
 
 	// a long options object expands; the hugging block leads it
 	const k = import(
 		'./a',
 		/* c */ {
-			with: {type: 'json'},
+			with: { type: 'json' },
 			aaaaaaaaaaaaaaaaaaaaaa: bbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
-			ccccccccccccc: ddddddddddddddddd,
+			ccccccccccccc: ddddddddddddddddd
 		}
 	);
 </script>

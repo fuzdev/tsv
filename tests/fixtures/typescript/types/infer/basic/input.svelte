@@ -12,7 +12,7 @@
 	type FirstArg<T> = T extends (first: infer F, ...rest: any[]) => any ? F : never;
 
 	// Multiple infers
-	type Both<T> = T extends {a: infer A; b: infer B} ? [A, B] : never;
+	type Both<T> = T extends { a: infer A; b: infer B } ? [A, B] : never;
 
 	// Nested infer
 	type DeepUnwrap<T> = T extends Promise<infer U> ? (U extends Promise<infer V> ? V : U) : T;

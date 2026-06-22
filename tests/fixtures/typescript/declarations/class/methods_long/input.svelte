@@ -9,7 +9,7 @@
 			bbbbbb: string,
 			cccccc: string,
 			dddddd: string,
-			eeeeeeee: string,
+			eeeeeeee: string
 		): void {}
 
 		// Async method - 100 chars (stays inline)
@@ -21,7 +21,7 @@
 			bbb: string,
 			ccc: string,
 			ddd: string,
-			eeeee: string,
+			eeeee: string
 		): Promise<void> {}
 
 		// Static method - 100 chars (stays inline)
@@ -33,7 +33,7 @@
 			bbb: string,
 			ccc: string,
 			ddd: string,
-			eeeeeeeeeeeee: string,
+			eeeeeeeeeeeee: string
 		): void {}
 
 		// Generic method - 100 chars (stays inline)
@@ -47,7 +47,7 @@
 			ddd: string,
 			eee: string,
 			fff: string,
-			gggggggg: T,
+			gggggggg: T
 		): T {}
 	}
 </script>

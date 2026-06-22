@@ -4,13 +4,13 @@
 	// comma. The block is neither dropped nor moved past the comma.
 	new A(
 		a /* c1 */, // c2
-		b,
+		b
 	);
 
 	// Two block comments before the comma, then a line comment after it.
 	new A(
 		a /* c1 */ /* c2 */, // c3
-		b,
+		b
 	);
 
 	// A blank line after the commented arg routes through the blank-line args path;
@@ -18,6 +18,6 @@
 	new A(
 		a /* c1 */, // c2
 
-		b,
+		b
 	);
 </script>

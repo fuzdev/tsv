@@ -1,7 +1,7 @@
 <script lang="ts">
 	fn(
 		/* before */ {
-			prop: 'value',
-		},
+			prop: 'value'
+		}
 	);
 </script>

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 170,
+	"end": 166,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -29,8 +29,8 @@
 		{
 			"type": "Line",
 			"value": " trail",
-			"start": 31,
-			"end": 39,
+			"start": 30,
+			"end": 38,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " lead",
-			"start": 52,
-			"end": 59,
+			"start": 51,
+			"end": 58,
 			"loc": {
 				"start": {
 					"line": 9,
@@ -61,8 +61,8 @@
 		{
 			"type": "Block",
 			"value": " trail ",
-			"start": 67,
-			"end": 78,
+			"start": 65,
+			"end": 76,
 			"loc": {
 				"start": {
 					"line": 11,
@@ -77,8 +77,8 @@
 		{
 			"type": "Block",
 			"value": " lead ",
-			"start": 91,
-			"end": 101,
+			"start": 89,
+			"end": 99,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " trail",
-			"start": 107,
-			"end": 115,
+			"start": 104,
+			"end": 112,
 			"loc": {
 				"start": {
 					"line": 16,
@@ -109,8 +109,8 @@
 		{
 			"type": "Block",
 			"value": " lead ",
-			"start": 128,
-			"end": 138,
+			"start": 125,
+			"end": 135,
 			"loc": {
 				"start": {
 					"line": 20,
@@ -125,8 +125,8 @@
 		{
 			"type": "Block",
 			"value": " trail ",
-			"start": 144,
-			"end": 155,
+			"start": 140,
+			"end": 151,
 			"loc": {
 				"start": {
 					"line": 21,
@@ -142,12 +142,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 169,
+		"end": 165,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 160,
+			"end": 156,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -162,7 +162,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 10,
-					"end": 43,
+					"end": 42,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -176,7 +176,7 @@
 					"expression": {
 						"type": "CallExpression",
 						"start": 10,
-						"end": 42,
+						"end": 41,
 						"loc": {
 							"start": {
 								"line": 2,
@@ -234,8 +234,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 46,
-					"end": 82,
+					"start": 45,
+					"end": 80,
 					"loc": {
 						"start": {
 							"line": 8,
@@ -248,8 +248,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 46,
-						"end": 81,
+						"start": 45,
+						"end": 79,
 						"loc": {
 							"start": {
 								"line": 8,
@@ -262,8 +262,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 46,
-							"end": 48,
+							"start": 45,
+							"end": 47,
 							"loc": {
 								"start": {
 									"line": 8,
@@ -279,8 +279,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 62,
-								"end": 63,
+								"start": 61,
+								"end": 62,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -296,8 +296,8 @@
 									{
 										"type": "Line",
 										"value": " lead",
-										"start": 52,
-										"end": 59
+										"start": 51,
+										"end": 58
 									}
 								]
 							}
@@ -308,15 +308,15 @@
 						{
 							"type": "Line",
 							"value": " trail",
-							"start": 31,
-							"end": 39
+							"start": 30,
+							"end": 38
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 85,
-					"end": 119,
+					"start": 83,
+					"end": 116,
 					"loc": {
 						"start": {
 							"line": 14,
@@ -329,8 +329,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 85,
-						"end": 118,
+						"start": 83,
+						"end": 115,
 						"loc": {
 							"start": {
 								"line": 14,
@@ -343,8 +343,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 85,
-							"end": 87,
+							"start": 83,
+							"end": 85,
 							"loc": {
 								"start": {
 									"line": 14,
@@ -360,8 +360,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 102,
-								"end": 103,
+								"start": 100,
+								"end": 101,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -377,8 +377,8 @@
 									{
 										"type": "Block",
 										"value": " lead ",
-										"start": 91,
-										"end": 101
+										"start": 89,
+										"end": 99
 									}
 								]
 							}
@@ -389,15 +389,15 @@
 						{
 							"type": "Block",
 							"value": " trail ",
-							"start": 67,
-							"end": 78
+							"start": 65,
+							"end": 76
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 122,
-					"end": 159,
+					"start": 119,
+					"end": 155,
 					"loc": {
 						"start": {
 							"line": 19,
@@ -410,8 +410,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 122,
-						"end": 158,
+						"start": 119,
+						"end": 154,
 						"loc": {
 							"start": {
 								"line": 19,
@@ -424,8 +424,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 122,
-							"end": 124,
+							"start": 119,
+							"end": 121,
 							"loc": {
 								"start": {
 									"line": 19,
@@ -441,8 +441,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 139,
-								"end": 140,
+								"start": 136,
+								"end": 137,
 								"loc": {
 									"start": {
 										"line": 20,
@@ -458,8 +458,8 @@
 									{
 										"type": "Block",
 										"value": " lead ",
-										"start": 128,
-										"end": 138
+										"start": 125,
+										"end": 135
 									}
 								]
 							}
@@ -470,16 +470,16 @@
 						{
 							"type": "Line",
 							"value": " trail",
-							"start": 107,
-							"end": 115
+							"start": 104,
+							"end": 112
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Block",
 							"value": " trail ",
-							"start": 144,
-							"end": 155
+							"start": 140,
+							"end": 151
 						}
 					]
 				}

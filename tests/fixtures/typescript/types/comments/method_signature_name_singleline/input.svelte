@@ -1,3 +1,3 @@
 <script lang="ts">
-	type A = {a /* comment */(): void};
+	type A = { a /* comment */(): void };
 </script>

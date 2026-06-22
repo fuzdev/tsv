@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 557,
+	"end": 559,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -189,16 +189,16 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 534,
-			"end": 541,
+			"start": 536,
+			"end": 543,
 			"loc": {
 				"start": {
 					"line": 18,
-					"column": 17
+					"column": 19
 				},
 				"end": {
 					"line": 18,
-					"column": 24
+					"column": 26
 				}
 			}
 		}
@@ -206,12 +206,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 556,
+		"end": 558,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 547,
+			"end": 549,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -444,7 +444,7 @@
 				{
 					"type": "ExportNamedDeclaration",
 					"start": 518,
-					"end": 546,
+					"end": 548,
 					"loc": {
 						"start": {
 							"line": 18,
@@ -452,7 +452,7 @@
 						},
 						"end": {
 							"line": 18,
-							"column": 29
+							"column": 31
 						}
 					},
 					"exportKind": "value",
@@ -460,46 +460,46 @@
 					"specifiers": [
 						{
 							"type": "ExportSpecifier",
-							"start": 526,
-							"end": 527,
+							"start": 527,
+							"end": 528,
 							"loc": {
 								"start": {
 									"line": 18,
-									"column": 9
+									"column": 10
 								},
 								"end": {
 									"line": 18,
-									"column": 10
+									"column": 11
 								}
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 526,
-								"end": 527,
+								"start": 527,
+								"end": 528,
 								"loc": {
 									"start": {
 										"line": 18,
-										"column": 9
+										"column": 10
 									},
 									"end": {
 										"line": 18,
-										"column": 10
+										"column": 11
 									}
 								},
 								"name": "a"
 							},
 							"exported": {
 								"type": "Identifier",
-								"start": 526,
-								"end": 527,
+								"start": 527,
+								"end": 528,
 								"loc": {
 									"start": {
 										"line": 18,
-										"column": 9
+										"column": 10
 									},
 									"end": {
 										"line": 18,
-										"column": 10
+										"column": 11
 									}
 								},
 								"name": "a"
@@ -509,16 +509,16 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 542,
-						"end": 545,
+						"start": 544,
+						"end": 547,
 						"loc": {
 							"start": {
 								"line": 18,
-								"column": 25
+								"column": 27
 							},
 							"end": {
 								"line": 18,
-								"column": 28
+								"column": 30
 							}
 						},
 						"value": "f",
@@ -527,8 +527,8 @@
 							{
 								"type": "Block",
 								"value": " c ",
-								"start": 534,
-								"end": 541
+								"start": 536,
+								"end": 543
 							}
 						]
 					},

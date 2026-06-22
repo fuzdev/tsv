@@ -5,19 +5,19 @@
 	// 2-segment chain with call - expands args (101 chars)
 	a = b = fn(
 		cccccccccccccccccccccccccccccccccccccccccccc,
-		dddddddddddddddddddddddddddddddddddddddd,
+		dddddddddddddddddddddddddddddddddddddddd
 	);
 
 	// 2-segment chain with array - expands elements
 	a = b = [
 		ccccccccccccccccccccc,
-		ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd,
+		ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
 	];
 
 	// 2-segment chain with new - expands args
 	a = b = new Fn(
 		cccccccccccccccccccccccccc,
-		ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd,
+		ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
 	);
 
 	// 2-segment chain with binary - break after operator

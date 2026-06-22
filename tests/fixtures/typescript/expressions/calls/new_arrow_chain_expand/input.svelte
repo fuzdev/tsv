@@ -7,7 +7,7 @@
 	// Single arg: new expression with arrow returning arrow - object body
 	new A(() => () => ({
 		x: 1,
-		y: 2,
+		y: 2
 	}));
 
 	// Single arg: arrow chain with call body - does NOT expand

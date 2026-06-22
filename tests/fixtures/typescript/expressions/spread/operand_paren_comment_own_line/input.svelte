@@ -1,11 +1,11 @@
 <script>
 	const a = [
-		...x,
+		...x
 		/* block */
 	];
 
 	const b = fn(
-		...x,
+		...x
 		/* block */
 	);
 </script>

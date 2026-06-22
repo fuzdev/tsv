@@ -18,7 +18,7 @@
 
 	// named specifiers: line comment between from and source
 	import {
-		a, // c
+		a // c
 	} from './e';
 
 	// default binding: line comment between from and source

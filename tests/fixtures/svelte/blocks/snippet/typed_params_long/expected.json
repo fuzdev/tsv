@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 401,
+	"end": 400,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -505,7 +505,7 @@
 			{
 				"type": "SnippetBlock",
 				"start": 266,
-				"end": 400,
+				"end": 399,
 				"expression": {
 					"type": "Identifier",
 					"name": "fn",
@@ -911,26 +911,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 372,
-							"end": 374,
+							"start": 371,
+							"end": 373,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 374,
-							"end": 389,
+							"start": 373,
+							"end": 388,
 							"name": "div",
 							"name_loc": {
 								"start": {
 									"line": 15,
 									"column": 2,
-									"character": 375
+									"character": 374
 								},
 								"end": {
 									"line": 15,
 									"column": 5,
-									"character": 378
+									"character": 377
 								}
 							},
 							"attributes": [],
@@ -939,8 +939,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 379,
-										"end": 383,
+										"start": 378,
+										"end": 382,
 										"raw": "text",
 										"data": "text"
 									}
@@ -949,8 +949,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 389,
-							"end": 390,
+							"start": 388,
+							"end": 389,
 							"raw": "\n",
 							"data": "\n"
 						}

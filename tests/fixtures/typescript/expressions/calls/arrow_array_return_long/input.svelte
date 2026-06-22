@@ -5,6 +5,6 @@
 	// 101 visual chars - arrow params hug `map(`, array breaks
 	const b = arrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr.map(([aaaaaa, bbbbbb]) => [
 		bbbbbb,
-		aaaaaa,
+		aaaaaa
 	]);
 </script>

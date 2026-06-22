@@ -1358,18 +1358,17 @@ impl<'a> Printer<'a> {
             let params_doc = d.concat(&parts);
 
             let indent_sl = d.indent_softline(params_doc);
-            let trailing = d.trailing_comma();
             let softline = d.softline();
             // The params are a call-like `(…)`: when they wrap, `)` dedents to base,
-            // so `}` hugs it (`)}`) — no dangle. Key the opening group to `BlockHead`
-            // so the body can expand when the params wrap (below).
+            // so `}` hugs it (`)}`) — no dangle (no trailing comma; trailingComma:
+            // 'none'). Key the opening group to `BlockHead` so the body can expand when
+            // the params wrap (below).
             let inner = d.concat(&[
                 d.text("{#snippet "),
                 d.text_owned(name.to_string()),
                 type_params_part,
                 d.text("("),
                 indent_sl,
-                trailing,
                 softline,
                 d.text(")}"),
             ]);

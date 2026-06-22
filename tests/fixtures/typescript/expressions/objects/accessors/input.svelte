@@ -11,6 +11,6 @@
 		},
 		set z(v) {
 			return v;
-		},
+		}
 	};
 </script>

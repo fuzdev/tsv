@@ -1,3 +1,3 @@
 <script lang="ts">
-	const mod = await import('./a', {with: {type: 'json'}} /* block comment */);
+	const mod = await import('./a', { with: { type: 'json' } } /* block comment */);
 </script>

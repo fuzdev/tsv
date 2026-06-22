@@ -5,7 +5,7 @@
 	/* prettier-ignore */
 	const   d  =   [   1,   2,   3   ];
 
-	const e = {f: 1, g: 2};
+	const e = { f: 1, g: 2 };
 </script>
 
 <style>

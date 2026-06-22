@@ -13,5 +13,5 @@
 	a.fn1('x').fn2('y').fn3('z');
 
 	// Object with simple nested call stays inline (0-arg call is simple)
-	a.fn1({key: nested.call()}).fn2().fn3();
+	a.fn1({ key: nested.call() }).fn2().fn3();
 </script>

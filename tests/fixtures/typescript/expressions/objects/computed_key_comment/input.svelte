@@ -1,5 +1,5 @@
 <script>
-	let a = {[x /* c */]: 1};
+	let a = { [x /* c */]: 1 };
 
 	let b = {
 		[x /* c */]() {},
@@ -8,6 +8,6 @@
 		get [x /* c */]() {
 			return 1;
 		},
-		set [x /* c */](a) {},
+		set [x /* c */](a) {}
 	};
 </script>

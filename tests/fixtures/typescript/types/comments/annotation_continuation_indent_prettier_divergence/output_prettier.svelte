@@ -16,7 +16,7 @@
 	// Function parameter, simple type: continuation indents one level
 	function fn(
 		a: // c4
-		X,
+		X
 	) {}
 
 	// Function return type, simple type: continuation indents one level

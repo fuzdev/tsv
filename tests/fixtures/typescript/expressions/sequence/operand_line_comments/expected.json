@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 423,
+	"end": 419,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " Block comment before the comma and line comment after — both preserved",
-			"start": 115,
-			"end": 188,
+			"start": 114,
+			"end": 187,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -61,8 +61,8 @@
 		{
 			"type": "Block",
 			"value": " b1 ",
-			"start": 199,
-			"end": 207,
+			"start": 198,
+			"end": 206,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 209,
-			"end": 214,
+			"start": 208,
+			"end": 213,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " A line comment in each gap of a three-operand sequence",
-			"start": 227,
-			"end": 284,
+			"start": 225,
+			"end": 282,
 			"loc": {
 				"start": {
 					"line": 14,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 296,
-			"end": 301,
+			"start": 294,
+			"end": 299,
 			"loc": {
 				"start": {
 					"line": 16,
@@ -125,8 +125,8 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 307,
-			"end": 312,
+			"start": 305,
+			"end": 310,
 			"loc": {
 				"start": {
 					"line": 17,
@@ -141,8 +141,8 @@
 		{
 			"type": "Line",
 			"value": " Own-line comment after the comma leads the next operand",
-			"start": 325,
-			"end": 383,
+			"start": 322,
+			"end": 380,
 			"loc": {
 				"start": {
 					"line": 21,
@@ -157,8 +157,8 @@
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 397,
-			"end": 402,
+			"start": 394,
+			"end": 399,
 			"loc": {
 				"start": {
 					"line": 24,
@@ -174,12 +174,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 422,
+		"end": 418,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 413,
+			"end": 409,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -194,7 +194,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 87,
-					"end": 112,
+					"end": 111,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -208,7 +208,7 @@
 					"expression": {
 						"type": "CallExpression",
 						"start": 87,
-						"end": 111,
+						"end": 110,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -307,8 +307,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 190,
-					"end": 224,
+					"start": 189,
+					"end": 222,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -321,8 +321,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 190,
-						"end": 223,
+						"start": 189,
+						"end": 221,
 						"loc": {
 							"start": {
 								"line": 9,
@@ -335,8 +335,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 190,
-							"end": 192,
+							"start": 189,
+							"end": 191,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -352,8 +352,8 @@
 						"arguments": [
 							{
 								"type": "SequenceExpression",
-								"start": 197,
-								"end": 218,
+								"start": 196,
+								"end": 217,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -367,8 +367,8 @@
 								"expressions": [
 									{
 										"type": "Identifier",
-										"start": 197,
-										"end": 198,
+										"start": 196,
+										"end": 197,
 										"loc": {
 											"start": {
 												"line": 10,
@@ -384,15 +384,15 @@
 											{
 												"type": "Block",
 												"value": " b1 ",
-												"start": 199,
-												"end": 207
+												"start": 198,
+												"end": 206
 											}
 										]
 									},
 									{
 										"type": "Identifier",
-										"start": 217,
-										"end": 218,
+										"start": 216,
+										"end": 217,
 										"loc": {
 											"start": {
 												"line": 11,
@@ -408,8 +408,8 @@
 											{
 												"type": "Line",
 												"value": " c1",
-												"start": 209,
-												"end": 214
+												"start": 208,
+												"end": 213
 											}
 										]
 									}
@@ -422,15 +422,15 @@
 						{
 							"type": "Line",
 							"value": " Block comment before the comma and line comment after — both preserved",
-							"start": 115,
-							"end": 188
+							"start": 114,
+							"end": 187
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 286,
-					"end": 322,
+					"start": 284,
+					"end": 319,
 					"loc": {
 						"start": {
 							"line": 15,
@@ -443,8 +443,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 286,
-						"end": 321,
+						"start": 284,
+						"end": 318,
 						"loc": {
 							"start": {
 								"line": 15,
@@ -457,8 +457,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 286,
-							"end": 288,
+							"start": 284,
+							"end": 286,
 							"loc": {
 								"start": {
 									"line": 15,
@@ -474,8 +474,8 @@
 						"arguments": [
 							{
 								"type": "SequenceExpression",
-								"start": 293,
-								"end": 316,
+								"start": 291,
+								"end": 314,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -489,8 +489,8 @@
 								"expressions": [
 									{
 										"type": "Identifier",
-										"start": 293,
-										"end": 294,
+										"start": 291,
+										"end": 292,
 										"loc": {
 											"start": {
 												"line": 16,
@@ -506,15 +506,15 @@
 											{
 												"type": "Line",
 												"value": " c1",
-												"start": 296,
-												"end": 301
+												"start": 294,
+												"end": 299
 											}
 										]
 									},
 									{
 										"type": "Identifier",
-										"start": 304,
-										"end": 305,
+										"start": 302,
+										"end": 303,
 										"loc": {
 											"start": {
 												"line": 17,
@@ -530,15 +530,15 @@
 											{
 												"type": "Line",
 												"value": " c2",
-												"start": 307,
-												"end": 312
+												"start": 305,
+												"end": 310
 											}
 										]
 									},
 									{
 										"type": "Identifier",
-										"start": 315,
-										"end": 316,
+										"start": 313,
+										"end": 314,
 										"loc": {
 											"start": {
 												"line": 18,
@@ -560,15 +560,15 @@
 						{
 							"type": "Line",
 							"value": " A line comment in each gap of a three-operand sequence",
-							"start": 227,
-							"end": 284
+							"start": 225,
+							"end": 282
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 385,
-					"end": 412,
+					"start": 382,
+					"end": 408,
 					"loc": {
 						"start": {
 							"line": 22,
@@ -581,8 +581,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 385,
-						"end": 411,
+						"start": 382,
+						"end": 407,
 						"loc": {
 							"start": {
 								"line": 22,
@@ -595,8 +595,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 385,
-							"end": 387,
+							"start": 382,
+							"end": 384,
 							"loc": {
 								"start": {
 									"line": 22,
@@ -612,8 +612,8 @@
 						"arguments": [
 							{
 								"type": "SequenceExpression",
-								"start": 392,
-								"end": 406,
+								"start": 389,
+								"end": 403,
 								"loc": {
 									"start": {
 										"line": 23,
@@ -627,8 +627,8 @@
 								"expressions": [
 									{
 										"type": "Identifier",
-										"start": 392,
-										"end": 393,
+										"start": 389,
+										"end": 390,
 										"loc": {
 											"start": {
 												"line": 23,
@@ -643,8 +643,8 @@
 									},
 									{
 										"type": "Identifier",
-										"start": 405,
-										"end": 406,
+										"start": 402,
+										"end": 403,
 										"loc": {
 											"start": {
 												"line": 25,
@@ -660,8 +660,8 @@
 											{
 												"type": "Line",
 												"value": " c1",
-												"start": 397,
-												"end": 402
+												"start": 394,
+												"end": 399
 											}
 										]
 									}
@@ -674,8 +674,8 @@
 						{
 							"type": "Line",
 							"value": " Own-line comment after the comma leads the next operand",
-							"start": 325,
-							"end": 383
+							"start": 322,
+							"end": 380
 						}
 					]
 				}

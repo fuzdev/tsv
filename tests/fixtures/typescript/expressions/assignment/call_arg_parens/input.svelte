@@ -38,6 +38,6 @@
 	const t3 = `${x} ${(a = b)} ${y}`;
 
 	// Computed property keys
-	const obj1 = {[(a = b)]: c};
-	const obj2 = {x, [(a = b)]: c, y};
+	const obj1 = { [(a = b)]: c };
+	const obj2 = { x, [(a = b)]: c, y };
 </script>

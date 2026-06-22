@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 279,
+	"end": 277,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " tuple element",
-			"start": 97,
-			"end": 113,
+			"start": 96,
+			"end": 112,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -61,8 +61,8 @@
 		{
 			"type": "Line",
 			"value": " leading",
-			"start": 128,
-			"end": 138,
+			"start": 127,
+			"end": 137,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " generic type argument",
-			"start": 155,
-			"end": 179,
+			"start": 153,
+			"end": 177,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " leading",
-			"start": 196,
-			"end": 206,
+			"start": 194,
+			"end": 204,
 			"loc": {
 				"start": {
 					"line": 16,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " function type return",
-			"start": 214,
-			"end": 237,
+			"start": 212,
+			"end": 235,
 			"loc": {
 				"start": {
 					"line": 19,
@@ -125,8 +125,8 @@
 		{
 			"type": "Line",
 			"value": " leading",
-			"start": 254,
-			"end": 264,
+			"start": 252,
+			"end": 262,
 			"loc": {
 				"start": {
 					"line": 20,
@@ -142,12 +142,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 278,
+		"end": 276,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 269,
+			"end": 267,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -162,7 +162,7 @@
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 50,
-					"end": 94,
+					"end": 93,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -192,7 +192,7 @@
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
 						"start": 56,
-						"end": 89,
+						"end": 88,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -259,15 +259,12 @@
 									]
 								}
 							}
-						],
-						"extra": {
-							"trailingComma": 85
-						}
+						]
 					},
 					"typeAnnotation": {
 						"type": "TSTypeReference",
-						"start": 92,
-						"end": 93,
+						"start": 91,
+						"end": 92,
 						"loc": {
 							"start": {
 								"line": 6,
@@ -280,8 +277,8 @@
 						},
 						"typeName": {
 							"type": "Identifier",
-							"start": 92,
-							"end": 93,
+							"start": 91,
+							"end": 92,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -306,8 +303,8 @@
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 115,
-					"end": 152,
+					"start": 114,
+					"end": 150,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -320,8 +317,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 120,
-						"end": 121,
+						"start": 119,
+						"end": 120,
 						"loc": {
 							"start": {
 								"line": 9,
@@ -336,8 +333,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSTupleType",
-						"start": 124,
-						"end": 151,
+						"start": 123,
+						"end": 149,
 						"loc": {
 							"start": {
 								"line": 9,
@@ -351,8 +348,8 @@
 						"elementTypes": [
 							{
 								"type": "TSTypeReference",
-								"start": 141,
-								"end": 142,
+								"start": 140,
+								"end": 141,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -365,8 +362,8 @@
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 141,
-									"end": 142,
+									"start": 140,
+									"end": 141,
 									"loc": {
 										"start": {
 											"line": 11,
@@ -383,15 +380,15 @@
 									{
 										"type": "Line",
 										"value": " leading",
-										"start": 128,
-										"end": 138
+										"start": 127,
+										"end": 137
 									}
 								]
 							},
 							{
 								"type": "TSTypeReference",
-								"start": 146,
-								"end": 147,
+								"start": 145,
+								"end": 146,
 								"loc": {
 									"start": {
 										"line": 12,
@@ -404,8 +401,8 @@
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 146,
-									"end": 147,
+									"start": 145,
+									"end": 146,
 									"loc": {
 										"start": {
 											"line": 12,
@@ -425,15 +422,15 @@
 						{
 							"type": "Line",
 							"value": " tuple element",
-							"start": 97,
-							"end": 113
+							"start": 96,
+							"end": 112
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 181,
-					"end": 211,
+					"start": 179,
+					"end": 209,
 					"loc": {
 						"start": {
 							"line": 16,
@@ -446,8 +443,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 186,
-						"end": 187,
+						"start": 184,
+						"end": 185,
 						"loc": {
 							"start": {
 								"line": 16,
@@ -462,8 +459,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSTypeReference",
-						"start": 190,
-						"end": 210,
+						"start": 188,
+						"end": 208,
 						"loc": {
 							"start": {
 								"line": 16,
@@ -476,8 +473,8 @@
 						},
 						"typeName": {
 							"type": "Identifier",
-							"start": 190,
-							"end": 195,
+							"start": 188,
+							"end": 193,
 							"loc": {
 								"start": {
 									"line": 16,
@@ -492,8 +489,8 @@
 						},
 						"typeArguments": {
 							"type": "TSTypeParameterInstantiation",
-							"start": 195,
-							"end": 210,
+							"start": 193,
+							"end": 208,
 							"loc": {
 								"start": {
 									"line": 16,
@@ -507,8 +504,8 @@
 							"params": [
 								{
 									"type": "TSTypeReference",
-									"start": 208,
-									"end": 209,
+									"start": 206,
+									"end": 207,
 									"loc": {
 										"start": {
 											"line": 17,
@@ -521,8 +518,8 @@
 									},
 									"typeName": {
 										"type": "Identifier",
-										"start": 208,
-										"end": 209,
+										"start": 206,
+										"end": 207,
 										"loc": {
 											"start": {
 												"line": 17,
@@ -539,8 +536,8 @@
 										{
 											"type": "Line",
 											"value": " leading",
-											"start": 196,
-											"end": 206
+											"start": 194,
+											"end": 204
 										}
 									]
 								}
@@ -551,15 +548,15 @@
 						{
 							"type": "Line",
 							"value": " generic type argument",
-							"start": 155,
-							"end": 179
+							"start": 153,
+							"end": 177
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 239,
-					"end": 268,
+					"start": 237,
+					"end": 266,
 					"loc": {
 						"start": {
 							"line": 20,
@@ -572,8 +569,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 244,
-						"end": 245,
+						"start": 242,
+						"end": 243,
 						"loc": {
 							"start": {
 								"line": 20,
@@ -588,8 +585,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSFunctionType",
-						"start": 248,
-						"end": 267,
+						"start": 246,
+						"end": 265,
 						"loc": {
 							"start": {
 								"line": 20,
@@ -603,8 +600,8 @@
 						"parameters": [],
 						"typeAnnotation": {
 							"type": "TSTypeAnnotation",
-							"start": 251,
-							"end": 267,
+							"start": 249,
+							"end": 265,
 							"loc": {
 								"start": {
 									"line": 20,
@@ -617,8 +614,8 @@
 							},
 							"typeAnnotation": {
 								"type": "TSTypeReference",
-								"start": 266,
-								"end": 267,
+								"start": 264,
+								"end": 265,
 								"loc": {
 									"start": {
 										"line": 21,
@@ -631,8 +628,8 @@
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 266,
-									"end": 267,
+									"start": 264,
+									"end": 265,
 									"loc": {
 										"start": {
 											"line": 21,
@@ -649,8 +646,8 @@
 									{
 										"type": "Line",
 										"value": " leading",
-										"start": 254,
-										"end": 264
+										"start": 252,
+										"end": 262
 									}
 								]
 							}
@@ -660,8 +657,8 @@
 						{
 							"type": "Line",
 							"value": " function type return",
-							"start": 214,
-							"end": 237
+							"start": 212,
+							"end": 235
 						}
 					]
 				}

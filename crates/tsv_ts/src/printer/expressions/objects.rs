@@ -222,17 +222,10 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_comment_doc(comment));
                 }
 
-                // Add comma
+                // Add separator comma between properties; no trailing comma on the
+                // last property under `trailingComma: 'none'`.
                 if i < obj.properties.len() - 1 {
                     parts.push(d.text(","));
-                } else if must_break {
-                    // Last property in must_break: always add comma
-                    // (trailing_comma() uses if_break which needs a group, but
-                    // must_break objects don't create a group)
-                    parts.push(d.text(","));
-                } else {
-                    // Last property: trailing comma only when broken
-                    parts.push(d.trailing_comma());
                 }
 
                 // Block comments after the comma (last property): preserve position
@@ -297,11 +290,11 @@ impl<'a> Printer<'a> {
                     d.text("}"),
                 ])
             } else {
-                // May stay inline - use group with softlines for width-based breaking
-                // (brace_line_prefix is empty here — pulling implies must_break).
-                let inner = d.concat(&[d.softline(), d.concat(&parts)]);
-                let (indented_content, closing_line) =
-                    self.wrap_with_decl_indent(inner, d.softline());
+                // May stay inline - use group with bracketSpacing boundaries for
+                // width-based breaking: a space when flat (`{ foo }`), a newline when
+                // it breaks (brace_line_prefix is empty here — pulling implies must_break).
+                let inner = d.concat(&[d.line(), d.concat(&parts)]);
+                let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.line());
 
                 self.wrap_object_braces(indented_content, closing_line, has_source_newline)
             }
@@ -342,15 +335,14 @@ impl<'a> Printer<'a> {
                     if !next_has_blank {
                         parts.push(d.line());
                     }
-                } else {
-                    // Last property: trailing comma only when broken
-                    parts.push(d.trailing_comma());
                 }
+                // No trailing comma on the last property (trailingComma: 'none').
             }
 
-            // Width-based wrapping
-            let inner = d.concat(&[d.softline(), d.concat(&parts)]);
-            let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.softline());
+            // Width-based wrapping: bracketSpacing boundaries (space when flat
+            // `{ foo }`, newline when broken).
+            let inner = d.concat(&[d.line(), d.concat(&parts)]);
+            let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.line());
 
             self.wrap_object_braces(indented_content, closing_line, has_source_newline)
         }
@@ -397,10 +389,8 @@ impl<'a> Printer<'a> {
             if i < obj.properties.len() - 1 {
                 parts.push(d.text(","));
                 parts.push(d.hardline());
-            } else {
-                // Trailing comma on last property
-                parts.push(d.text(","));
             }
+            // No trailing comma on the last property under `trailingComma: 'none'`.
         }
 
         d.concat(&[

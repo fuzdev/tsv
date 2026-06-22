@@ -1,6 +1,6 @@
 <Comp
 	items={[
 		// comment
-		a,
+		a
 	]}
 />

@@ -13,7 +13,7 @@
 		/**
 		 * JSDoc section
 		 */
-		c,
+		c
 	} = obj;
 
 	// Array destructuring with consecutive comments and blank lines
@@ -30,6 +30,6 @@
 		/**
 		 * JSDoc section
 		 */
-		z,
+		z
 	] = arr;
 </script>

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 532,
+	"end": 530,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -61,8 +61,8 @@
 		{
 			"type": "Line",
 			"value": " Type param declaration: trailing block comment before comma",
-			"start": 141,
-			"end": 203,
+			"start": 140,
+			"end": 202,
 			"loc": {
 				"start": {
 					"line": 9,
@@ -77,8 +77,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 223,
-			"end": 230,
+			"start": 222,
+			"end": 229,
 			"loc": {
 				"start": {
 					"line": 11,
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " line comment",
-			"start": 234,
-			"end": 249,
+			"start": 233,
+			"end": 248,
 			"loc": {
 				"start": {
 					"line": 12,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " Type param instantiation (call): inline block comment after comma",
-			"start": 265,
-			"end": 333,
+			"start": 263,
+			"end": 331,
 			"loc": {
 				"start": {
 					"line": 16,
@@ -125,8 +125,8 @@
 		{
 			"type": "Line",
 			"value": " line comment",
-			"start": 352,
-			"end": 367,
+			"start": 350,
+			"end": 365,
 			"loc": {
 				"start": {
 					"line": 19,
@@ -141,8 +141,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 370,
-			"end": 377,
+			"start": 368,
+			"end": 375,
 			"loc": {
 				"start": {
 					"line": 20,
@@ -157,8 +157,8 @@
 		{
 			"type": "Line",
 			"value": " Type param instantiation (call): trailing block comment before comma",
-			"start": 393,
-			"end": 464,
+			"start": 391,
+			"end": 462,
 			"loc": {
 				"start": {
 					"line": 23,
@@ -173,8 +173,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 480,
-			"end": 487,
+			"start": 478,
+			"end": 485,
 			"loc": {
 				"start": {
 					"line": 25,
@@ -189,8 +189,8 @@
 		{
 			"type": "Line",
 			"value": " line comment",
-			"start": 491,
-			"end": 506,
+			"start": 489,
+			"end": 504,
 			"loc": {
 				"start": {
 					"line": 26,
@@ -206,12 +206,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 531,
+		"end": 529,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 522,
+			"end": 520,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -226,7 +226,7 @@
 				{
 					"type": "FunctionDeclaration",
 					"start": 81,
-					"end": 138,
+					"end": 137,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -259,7 +259,7 @@
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
 						"start": 93,
-						"end": 133,
+						"end": 132,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -317,16 +317,13 @@
 									}
 								]
 							}
-						],
-						"extra": {
-							"trailingComma": 129
-						}
+						]
 					},
 					"params": [],
 					"body": {
 						"type": "BlockStatement",
-						"start": 136,
-						"end": 138,
+						"start": 135,
+						"end": 137,
 						"loc": {
 							"start": {
 								"line": 7,
@@ -350,8 +347,8 @@
 				},
 				{
 					"type": "FunctionDeclaration",
-					"start": 205,
-					"end": 262,
+					"start": 204,
+					"end": 260,
 					"loc": {
 						"start": {
 							"line": 10,
@@ -364,8 +361,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 214,
-						"end": 217,
+						"start": 213,
+						"end": 216,
 						"loc": {
 							"start": {
 								"line": 10,
@@ -383,8 +380,8 @@
 					"async": false,
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
-						"start": 217,
-						"end": 257,
+						"start": 216,
+						"end": 255,
 						"loc": {
 							"start": {
 								"line": 10,
@@ -398,8 +395,8 @@
 						"params": [
 							{
 								"type": "TSTypeParameter",
-								"start": 221,
-								"end": 222,
+								"start": 220,
+								"end": 221,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -415,15 +412,15 @@
 									{
 										"type": "Block",
 										"value": " c ",
-										"start": 223,
-										"end": 230
+										"start": 222,
+										"end": 229
 									}
 								]
 							},
 							{
 								"type": "TSTypeParameter",
-								"start": 252,
-								"end": 253,
+								"start": 251,
+								"end": 252,
 								"loc": {
 									"start": {
 										"line": 13,
@@ -439,21 +436,18 @@
 									{
 										"type": "Line",
 										"value": " line comment",
-										"start": 234,
-										"end": 249
+										"start": 233,
+										"end": 248
 									}
 								]
 							}
-						],
-						"extra": {
-							"trailingComma": 253
-						}
+						]
 					},
 					"params": [],
 					"body": {
 						"type": "BlockStatement",
-						"start": 260,
-						"end": 262,
+						"start": 258,
+						"end": 260,
 						"loc": {
 							"start": {
 								"line": 14,
@@ -470,15 +464,15 @@
 						{
 							"type": "Line",
 							"value": " Type param declaration: trailing block comment before comma",
-							"start": 141,
-							"end": 203
+							"start": 140,
+							"end": 202
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 335,
-					"end": 390,
+					"start": 333,
+					"end": 388,
 					"loc": {
 						"start": {
 							"line": 17,
@@ -491,8 +485,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 335,
-						"end": 389,
+						"start": 333,
+						"end": 387,
 						"loc": {
 							"start": {
 								"line": 17,
@@ -505,8 +499,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 335,
-							"end": 338,
+							"start": 333,
+							"end": 336,
 							"loc": {
 								"start": {
 									"line": 17,
@@ -522,8 +516,8 @@
 						"arguments": [],
 						"typeArguments": {
 							"type": "TSTypeParameterInstantiation",
-							"start": 338,
-							"end": 387,
+							"start": 336,
+							"end": 385,
 							"loc": {
 								"start": {
 									"line": 17,
@@ -537,8 +531,8 @@
 							"params": [
 								{
 									"type": "TSStringKeyword",
-									"start": 342,
-									"end": 348,
+									"start": 340,
+									"end": 346,
 									"loc": {
 										"start": {
 											"line": 18,
@@ -552,8 +546,8 @@
 								},
 								{
 									"type": "TSNumberKeyword",
-									"start": 378,
-									"end": 384,
+									"start": 376,
+									"end": 382,
 									"loc": {
 										"start": {
 											"line": 20,
@@ -568,14 +562,14 @@
 										{
 											"type": "Line",
 											"value": " line comment",
-											"start": 352,
-											"end": 367
+											"start": 350,
+											"end": 365
 										},
 										{
 											"type": "Block",
 											"value": " c ",
-											"start": 370,
-											"end": 377
+											"start": 368,
+											"end": 375
 										}
 									]
 								}
@@ -586,15 +580,15 @@
 						{
 							"type": "Line",
 							"value": " Type param instantiation (call): inline block comment after comma",
-							"start": 265,
-							"end": 333
+							"start": 263,
+							"end": 331
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 466,
-					"end": 521,
+					"start": 464,
+					"end": 519,
 					"loc": {
 						"start": {
 							"line": 24,
@@ -607,8 +601,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 466,
-						"end": 520,
+						"start": 464,
+						"end": 518,
 						"loc": {
 							"start": {
 								"line": 24,
@@ -621,8 +615,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 466,
-							"end": 469,
+							"start": 464,
+							"end": 467,
 							"loc": {
 								"start": {
 									"line": 24,
@@ -638,8 +632,8 @@
 						"arguments": [],
 						"typeArguments": {
 							"type": "TSTypeParameterInstantiation",
-							"start": 469,
-							"end": 518,
+							"start": 467,
+							"end": 516,
 							"loc": {
 								"start": {
 									"line": 24,
@@ -653,8 +647,8 @@
 							"params": [
 								{
 									"type": "TSStringKeyword",
-									"start": 473,
-									"end": 479,
+									"start": 471,
+									"end": 477,
 									"loc": {
 										"start": {
 											"line": 25,
@@ -669,15 +663,15 @@
 										{
 											"type": "Block",
 											"value": " c ",
-											"start": 480,
-											"end": 487
+											"start": 478,
+											"end": 485
 										}
 									]
 								},
 								{
 									"type": "TSNumberKeyword",
-									"start": 509,
-									"end": 515,
+									"start": 507,
+									"end": 513,
 									"loc": {
 										"start": {
 											"line": 27,
@@ -692,8 +686,8 @@
 										{
 											"type": "Line",
 											"value": " line comment",
-											"start": 491,
-											"end": 506
+											"start": 489,
+											"end": 504
 										}
 									]
 								}
@@ -704,8 +698,8 @@
 						{
 							"type": "Line",
 							"value": " Type param instantiation (call): trailing block comment before comma",
-							"start": 393,
-							"end": 464
+							"start": 391,
+							"end": 462
 						}
 					]
 				}

@@ -9,13 +9,13 @@
 
 	// Destructuring
 	{
-		const {satisfies} = obj;
+		const { satisfies } = obj;
 	}
 	{
 		const [satisfies] = arr;
 	}
 	{
-		const {satisfies: s} = obj;
+		const { satisfies: s } = obj;
 	}
 
 	// Assignment
@@ -35,19 +35,19 @@
 	// Object property shorthand
 	{
 		const satisfies = 'a';
-		const obj2 = {satisfies};
+		const obj2 = { satisfies };
 	}
 
 	// Object property key
-	const obj3 = {satisfies: 'value'};
+	const obj3 = { satisfies: 'value' };
 
 	// Method name
 	const obj4 = {
 		satisfies() {
 			return 'a';
-		},
+		}
 	};
 
 	// Don't confuse with satisfies operator
-	const x = {a: 1} satisfies Record<string, number>;
+	const x = { a: 1 } satisfies Record<string, number>;
 </script>

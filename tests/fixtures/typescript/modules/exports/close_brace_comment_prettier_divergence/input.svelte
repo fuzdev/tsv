@@ -3,10 +3,10 @@
 		b = 2;
 
 	// block comment between `}` and `;` stays after the brace
-	export {a as x} /* c */;
+	export { a as x } /* c */;
 
 	// line comments between `}` and `;` stay where the user placed them
-	export {b as y} // 1
+	export { b as y } // 1
 	// 2
 	;
 </script>

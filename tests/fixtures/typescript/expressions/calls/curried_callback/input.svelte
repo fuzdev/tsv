@@ -31,7 +31,7 @@
 
 		() => {
 			fn();
-		},
+		}
 	);
 
 	// Leading comment before first arg - forces expansion
@@ -40,6 +40,6 @@
 		'a',
 		() => {
 			fn();
-		},
+		}
 	);
 </script>

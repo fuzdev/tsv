@@ -39,7 +39,7 @@ Three formatters (`format_svelte`, `format_typescript`, `format_css`) take a sou
 
 AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `import type` any node directly.
 
-tsv is non-configurable: formatter settings are fixed at Prettier's defaults except `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and `bracketSpacing: false` — no options, like `gofmt` and Black.
+tsv is non-configurable: formatter settings are fixed at Prettier's defaults except `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and `trailingComma: 'none'` — no options, like `gofmt` and Black.
 
 ## Status
 

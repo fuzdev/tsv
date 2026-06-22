@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 109,
+	"end": 107,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,12 +13,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 108,
+		"end": 106,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 99,
+			"end": 97,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -33,7 +33,7 @@
 				{
 					"type": "ExportNamedDeclaration",
 					"start": 20,
-					"end": 53,
+					"end": 52,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -48,7 +48,7 @@
 					"declaration": {
 						"type": "TSEnumDeclaration",
 						"start": 27,
-						"end": 53,
+						"end": 52,
 						"loc": {
 							"start": {
 								"line": 2,
@@ -176,8 +176,8 @@
 				},
 				{
 					"type": "ExportNamedDeclaration",
-					"start": 56,
-					"end": 98,
+					"start": 55,
+					"end": 96,
 					"loc": {
 						"start": {
 							"line": 8,
@@ -191,8 +191,8 @@
 					"exportKind": "value",
 					"declaration": {
 						"type": "TSEnumDeclaration",
-						"start": 63,
-						"end": 98,
+						"start": 62,
+						"end": 96,
 						"loc": {
 							"start": {
 								"line": 8,
@@ -206,8 +206,8 @@
 						"const": true,
 						"id": {
 							"type": "Identifier",
-							"start": 74,
-							"end": 75,
+							"start": 73,
+							"end": 74,
 							"loc": {
 								"start": {
 									"line": 8,
@@ -223,8 +223,8 @@
 						"members": [
 							{
 								"type": "TSEnumMember",
-								"start": 80,
-								"end": 85,
+								"start": 79,
+								"end": 84,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -237,8 +237,8 @@
 								},
 								"id": {
 									"type": "Identifier",
-									"start": 80,
-									"end": 81,
+									"start": 79,
+									"end": 80,
 									"loc": {
 										"start": {
 											"line": 9,
@@ -253,8 +253,8 @@
 								},
 								"initializer": {
 									"type": "Literal",
-									"start": 84,
-									"end": 85,
+									"start": 83,
+									"end": 84,
 									"loc": {
 										"start": {
 											"line": 9,
@@ -271,8 +271,8 @@
 							},
 							{
 								"type": "TSEnumMember",
-								"start": 89,
-								"end": 94,
+								"start": 88,
+								"end": 93,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -285,8 +285,8 @@
 								},
 								"id": {
 									"type": "Identifier",
-									"start": 89,
-									"end": 90,
+									"start": 88,
+									"end": 89,
 									"loc": {
 										"start": {
 											"line": 10,
@@ -301,8 +301,8 @@
 								},
 								"initializer": {
 									"type": "Literal",
-									"start": 93,
-									"end": 94,
+									"start": 92,
+									"end": 93,
 									"loc": {
 										"start": {
 											"line": 10,

@@ -1,10 +1,10 @@
 <script>
 	const f = (
-		a, // comment
+		a // comment
 	) => {};
 
 	const g = (
 		a,
-		b, // comment
+		b // comment
 	) => {};
 </script>

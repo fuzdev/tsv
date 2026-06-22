@@ -1,6 +1,6 @@
 <script>
 	foo(
 		'multi \
-line',
+line'
 	);
 </script>

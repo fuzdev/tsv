@@ -32,7 +32,7 @@
 	const guards = {
 		isUndef(x: unknown): x is undefined {
 			return x === undefined;
-		},
+		}
 	};
 
 	// Type predicate with complex type
@@ -49,7 +49,7 @@
 	class Box<T> {
 		value: T | null = null;
 
-		hasValue(): this is {value: T} {
+		hasValue(): this is { value: T } {
 			return this.value !== null;
 		}
 	}

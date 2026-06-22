@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 724,
+	"end": 726,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " Exported decorated class",
-			"start": 339,
-			"end": 366,
+			"start": 341,
+			"end": 368,
 			"loc": {
 				"start": {
 					"line": 23,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " Default exported decorated class",
-			"start": 399,
-			"end": 434,
+			"start": 401,
+			"end": 436,
 			"loc": {
 				"start": {
 					"line": 27,
@@ -125,8 +125,8 @@
 		{
 			"type": "Line",
 			"value": " Decorated class with generic",
-			"start": 482,
-			"end": 513,
+			"start": 484,
+			"end": 515,
 			"loc": {
 				"start": {
 					"line": 31,
@@ -141,8 +141,8 @@
 		{
 			"type": "Line",
 			"value": " Decorated class extending another",
-			"start": 555,
-			"end": 591,
+			"start": 557,
+			"end": 593,
 			"loc": {
 				"start": {
 					"line": 37,
@@ -157,8 +157,8 @@
 		{
 			"type": "Line",
 			"value": " Member access decorator expression",
-			"start": 642,
-			"end": 679,
+			"start": 644,
+			"end": 681,
 			"loc": {
 				"start": {
 					"line": 43,
@@ -174,12 +174,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 723,
+		"end": 725,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 714,
+			"end": 716,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -647,7 +647,7 @@
 				{
 					"type": "ClassDeclaration",
 					"start": 290,
-					"end": 336,
+					"end": 338,
 					"loc": {
 						"start": {
 							"line": 20,
@@ -662,7 +662,7 @@
 						{
 							"type": "Decorator",
 							"start": 290,
-							"end": 315,
+							"end": 317,
 							"loc": {
 								"start": {
 									"line": 20,
@@ -670,13 +670,13 @@
 								},
 								"end": {
 									"line": 20,
-									"column": 26
+									"column": 28
 								}
 							},
 							"expression": {
 								"type": "CallExpression",
 								"start": 291,
-								"end": 315,
+								"end": 317,
 								"loc": {
 									"start": {
 										"line": 20,
@@ -684,7 +684,7 @@
 									},
 									"end": {
 										"line": 20,
-										"column": 26
+										"column": 28
 									}
 								},
 								"callee": {
@@ -707,7 +707,7 @@
 									{
 										"type": "ObjectExpression",
 										"start": 293,
-										"end": 314,
+										"end": 316,
 										"loc": {
 											"start": {
 												"line": 20,
@@ -715,22 +715,22 @@
 											},
 											"end": {
 												"line": 20,
-												"column": 25
+												"column": 27
 											}
 										},
 										"properties": [
 											{
 												"type": "Property",
-												"start": 294,
-												"end": 304,
+												"start": 295,
+												"end": 305,
 												"loc": {
 													"start": {
 														"line": 20,
-														"column": 5
+														"column": 6
 													},
 													"end": {
 														"line": 20,
-														"column": 15
+														"column": 16
 													}
 												},
 												"method": false,
@@ -738,32 +738,32 @@
 												"computed": false,
 												"key": {
 													"type": "Identifier",
-													"start": 294,
-													"end": 295,
+													"start": 295,
+													"end": 296,
 													"loc": {
 														"start": {
 															"line": 20,
-															"column": 5
+															"column": 6
 														},
 														"end": {
 															"line": 20,
-															"column": 6
+															"column": 7
 														}
 													},
 													"name": "a"
 												},
 												"value": {
 													"type": "Literal",
-													"start": 297,
-													"end": 304,
+													"start": 298,
+													"end": 305,
 													"loc": {
 														"start": {
 															"line": 20,
-															"column": 8
+															"column": 9
 														},
 														"end": {
 															"line": 20,
-															"column": 15
+															"column": 16
 														}
 													},
 													"value": "value",
@@ -773,16 +773,16 @@
 											},
 											{
 												"type": "Property",
-												"start": 306,
-												"end": 313,
+												"start": 307,
+												"end": 314,
 												"loc": {
 													"start": {
 														"line": 20,
-														"column": 17
+														"column": 18
 													},
 													"end": {
 														"line": 20,
-														"column": 24
+														"column": 25
 													}
 												},
 												"method": false,
@@ -790,32 +790,32 @@
 												"computed": false,
 												"key": {
 													"type": "Identifier",
-													"start": 306,
-													"end": 307,
+													"start": 307,
+													"end": 308,
 													"loc": {
 														"start": {
 															"line": 20,
-															"column": 17
+															"column": 18
 														},
 														"end": {
 															"line": 20,
-															"column": 18
+															"column": 19
 														}
 													},
 													"name": "b"
 												},
 												"value": {
 													"type": "Literal",
-													"start": 309,
-													"end": 313,
+													"start": 310,
+													"end": 314,
 													"loc": {
 														"start": {
 															"line": 20,
-															"column": 20
+															"column": 21
 														},
 														"end": {
 															"line": 20,
-															"column": 24
+															"column": 25
 														}
 													},
 													"value": true,
@@ -831,8 +831,8 @@
 					],
 					"id": {
 						"type": "Identifier",
-						"start": 323,
-						"end": 333,
+						"start": 325,
+						"end": 335,
 						"loc": {
 							"start": {
 								"line": 21,
@@ -848,8 +848,8 @@
 					"superClass": null,
 					"body": {
 						"type": "ClassBody",
-						"start": 334,
-						"end": 336,
+						"start": 336,
+						"end": 338,
 						"loc": {
 							"start": {
 								"line": 21,
@@ -873,8 +873,8 @@
 				},
 				{
 					"type": "ExportNamedDeclaration",
-					"start": 372,
-					"end": 396,
+					"start": 374,
+					"end": 398,
 					"loc": {
 						"start": {
 							"line": 25,
@@ -888,8 +888,8 @@
 					"exportKind": "value",
 					"declaration": {
 						"type": "ClassDeclaration",
-						"start": 368,
-						"end": 396,
+						"start": 370,
+						"end": 398,
 						"loc": {
 							"start": {
 								"line": 24,
@@ -903,8 +903,8 @@
 						"decorators": [
 							{
 								"type": "Decorator",
-								"start": 368,
-								"end": 370,
+								"start": 370,
+								"end": 372,
 								"loc": {
 									"start": {
 										"line": 24,
@@ -917,8 +917,8 @@
 								},
 								"expression": {
 									"type": "Identifier",
-									"start": 369,
-									"end": 370,
+									"start": 371,
+									"end": 372,
 									"loc": {
 										"start": {
 											"line": 24,
@@ -935,8 +935,8 @@
 						],
 						"id": {
 							"type": "Identifier",
-							"start": 385,
-							"end": 393,
+							"start": 387,
+							"end": 395,
 							"loc": {
 								"start": {
 									"line": 25,
@@ -952,8 +952,8 @@
 						"superClass": null,
 						"body": {
 							"type": "ClassBody",
-							"start": 394,
-							"end": 396,
+							"start": 396,
+							"end": 398,
 							"loc": {
 								"start": {
 									"line": 25,
@@ -973,15 +973,15 @@
 						{
 							"type": "Line",
 							"value": " Exported decorated class",
-							"start": 339,
-							"end": 366
+							"start": 341,
+							"end": 368
 						}
 					]
 				},
 				{
 					"type": "ExportDefaultDeclaration",
-					"start": 440,
-					"end": 479,
+					"start": 442,
+					"end": 481,
 					"loc": {
 						"start": {
 							"line": 29,
@@ -995,8 +995,8 @@
 					"exportKind": "value",
 					"declaration": {
 						"type": "ClassDeclaration",
-						"start": 436,
-						"end": 479,
+						"start": 438,
+						"end": 481,
 						"loc": {
 							"start": {
 								"line": 28,
@@ -1010,8 +1010,8 @@
 						"decorators": [
 							{
 								"type": "Decorator",
-								"start": 436,
-								"end": 438,
+								"start": 438,
+								"end": 440,
 								"loc": {
 									"start": {
 										"line": 28,
@@ -1024,8 +1024,8 @@
 								},
 								"expression": {
 									"type": "Identifier",
-									"start": 437,
-									"end": 438,
+									"start": 439,
+									"end": 440,
 									"loc": {
 										"start": {
 											"line": 28,
@@ -1042,8 +1042,8 @@
 						],
 						"id": {
 							"type": "Identifier",
-							"start": 461,
-							"end": 476,
+							"start": 463,
+							"end": 478,
 							"loc": {
 								"start": {
 									"line": 29,
@@ -1059,8 +1059,8 @@
 						"superClass": null,
 						"body": {
 							"type": "ClassBody",
-							"start": 477,
-							"end": 479,
+							"start": 479,
+							"end": 481,
 							"loc": {
 								"start": {
 									"line": 29,
@@ -1078,15 +1078,15 @@
 						{
 							"type": "Line",
 							"value": " Default exported decorated class",
-							"start": 399,
-							"end": 434
+							"start": 401,
+							"end": 436
 						}
 					]
 				},
 				{
 					"type": "ClassDeclaration",
-					"start": 515,
-					"end": 552,
+					"start": 517,
+					"end": 554,
 					"loc": {
 						"start": {
 							"line": 32,
@@ -1100,8 +1100,8 @@
 					"decorators": [
 						{
 							"type": "Decorator",
-							"start": 515,
-							"end": 517,
+							"start": 517,
+							"end": 519,
 							"loc": {
 								"start": {
 									"line": 32,
@@ -1114,8 +1114,8 @@
 							},
 							"expression": {
 								"type": "Identifier",
-								"start": 516,
-								"end": 517,
+								"start": 518,
+								"end": 519,
 								"loc": {
 									"start": {
 										"line": 32,
@@ -1132,8 +1132,8 @@
 					],
 					"id": {
 						"type": "Identifier",
-						"start": 525,
-						"end": 532,
+						"start": 527,
+						"end": 534,
 						"loc": {
 							"start": {
 								"line": 33,
@@ -1148,8 +1148,8 @@
 					},
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
-						"start": 532,
-						"end": 535,
+						"start": 534,
+						"end": 537,
 						"loc": {
 							"start": {
 								"line": 33,
@@ -1163,8 +1163,8 @@
 						"params": [
 							{
 								"type": "TSTypeParameter",
-								"start": 533,
-								"end": 534,
+								"start": 535,
+								"end": 536,
 								"loc": {
 									"start": {
 										"line": 33,
@@ -1182,8 +1182,8 @@
 					"superClass": null,
 					"body": {
 						"type": "ClassBody",
-						"start": 536,
-						"end": 552,
+						"start": 538,
+						"end": 554,
 						"loc": {
 							"start": {
 								"line": 33,
@@ -1197,8 +1197,8 @@
 						"body": [
 							{
 								"type": "PropertyDefinition",
-								"start": 540,
-								"end": 549,
+								"start": 542,
+								"end": 551,
 								"loc": {
 									"start": {
 										"line": 34,
@@ -1213,8 +1213,8 @@
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 540,
-									"end": 545,
+									"start": 542,
+									"end": 547,
 									"loc": {
 										"start": {
 											"line": 34,
@@ -1229,8 +1229,8 @@
 								},
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 545,
-									"end": 548,
+									"start": 547,
+									"end": 550,
 									"loc": {
 										"start": {
 											"line": 34,
@@ -1243,8 +1243,8 @@
 									},
 									"typeAnnotation": {
 										"type": "TSTypeReference",
-										"start": 547,
-										"end": 548,
+										"start": 549,
+										"end": 550,
 										"loc": {
 											"start": {
 												"line": 34,
@@ -1257,8 +1257,8 @@
 										},
 										"typeName": {
 											"type": "Identifier",
-											"start": 547,
-											"end": 548,
+											"start": 549,
+											"end": 550,
 											"loc": {
 												"start": {
 													"line": 34,
@@ -1281,15 +1281,15 @@
 						{
 							"type": "Line",
 							"value": " Decorated class with generic",
-							"start": 482,
-							"end": 513
+							"start": 484,
+							"end": 515
 						}
 					]
 				},
 				{
 					"type": "ClassDeclaration",
-					"start": 593,
-					"end": 639,
+					"start": 595,
+					"end": 641,
 					"loc": {
 						"start": {
 							"line": 38,
@@ -1303,8 +1303,8 @@
 					"decorators": [
 						{
 							"type": "Decorator",
-							"start": 593,
-							"end": 595,
+							"start": 595,
+							"end": 597,
 							"loc": {
 								"start": {
 									"line": 38,
@@ -1317,8 +1317,8 @@
 							},
 							"expression": {
 								"type": "Identifier",
-								"start": 594,
-								"end": 595,
+								"start": 596,
+								"end": 597,
 								"loc": {
 									"start": {
 										"line": 38,
@@ -1335,8 +1335,8 @@
 					],
 					"id": {
 						"type": "Identifier",
-						"start": 603,
-						"end": 611,
+						"start": 605,
+						"end": 613,
 						"loc": {
 							"start": {
 								"line": 39,
@@ -1351,8 +1351,8 @@
 					},
 					"superClass": {
 						"type": "Identifier",
-						"start": 620,
-						"end": 624,
+						"start": 622,
+						"end": 626,
 						"loc": {
 							"start": {
 								"line": 39,
@@ -1367,8 +1367,8 @@
 					},
 					"body": {
 						"type": "ClassBody",
-						"start": 625,
-						"end": 639,
+						"start": 627,
+						"end": 641,
 						"loc": {
 							"start": {
 								"line": 39,
@@ -1382,8 +1382,8 @@
 						"body": [
 							{
 								"type": "MethodDefinition",
-								"start": 629,
-								"end": 636,
+								"start": 631,
+								"end": 638,
 								"loc": {
 									"start": {
 										"line": 40,
@@ -1398,8 +1398,8 @@
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 629,
-									"end": 631,
+									"start": 631,
+									"end": 633,
 									"loc": {
 										"start": {
 											"line": 40,
@@ -1415,8 +1415,8 @@
 								"kind": "method",
 								"value": {
 									"type": "FunctionExpression",
-									"start": 631,
-									"end": 636,
+									"start": 633,
+									"end": 638,
 									"loc": {
 										"start": {
 											"line": 40,
@@ -1434,8 +1434,8 @@
 									"params": [],
 									"body": {
 										"type": "BlockStatement",
-										"start": 634,
-										"end": 636,
+										"start": 636,
+										"end": 638,
 										"loc": {
 											"start": {
 												"line": 40,
@@ -1456,15 +1456,15 @@
 						{
 							"type": "Line",
 							"value": " Decorated class extending another",
-							"start": 555,
-							"end": 591
+							"start": 557,
+							"end": 593
 						}
 					]
 				},
 				{
 					"type": "ClassDeclaration",
-					"start": 681,
-					"end": 713,
+					"start": 683,
+					"end": 715,
 					"loc": {
 						"start": {
 							"line": 44,
@@ -1478,8 +1478,8 @@
 					"decorators": [
 						{
 							"type": "Decorator",
-							"start": 681,
-							"end": 690,
+							"start": 683,
+							"end": 692,
 							"loc": {
 								"start": {
 									"line": 44,
@@ -1492,8 +1492,8 @@
 							},
 							"expression": {
 								"type": "MemberExpression",
-								"start": 682,
-								"end": 690,
+								"start": 684,
+								"end": 692,
 								"loc": {
 									"start": {
 										"line": 44,
@@ -1506,8 +1506,8 @@
 								},
 								"object": {
 									"type": "Identifier",
-									"start": 682,
-									"end": 683,
+									"start": 684,
+									"end": 685,
 									"loc": {
 										"start": {
 											"line": 44,
@@ -1522,8 +1522,8 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 684,
-									"end": 690,
+									"start": 686,
+									"end": 692,
 									"loc": {
 										"start": {
 											"line": 44,
@@ -1542,8 +1542,8 @@
 					],
 					"id": {
 						"type": "Identifier",
-						"start": 698,
-						"end": 710,
+						"start": 700,
+						"end": 712,
 						"loc": {
 							"start": {
 								"line": 45,
@@ -1559,8 +1559,8 @@
 					"superClass": null,
 					"body": {
 						"type": "ClassBody",
-						"start": 711,
-						"end": 713,
+						"start": 713,
+						"end": 715,
 						"loc": {
 							"start": {
 								"line": 45,
@@ -1577,8 +1577,8 @@
 						{
 							"type": "Line",
 							"value": " Member access decorator expression",
-							"start": 642,
-							"end": 679
+							"start": 644,
+							"end": 681
 						}
 					]
 				}

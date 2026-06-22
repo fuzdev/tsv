@@ -17,7 +17,7 @@
 			content +
 			items
 				.map((x) => ({
-					a: x,
+					a: x
 				}))
 				.join('')
 		);

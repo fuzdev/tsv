@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 75,
+	"end": 74,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,16 +13,16 @@
 		{
 			"type": "Line",
 			"value": " comment",
-			"start": 44,
-			"end": 54,
+			"start": 43,
+			"end": 53,
 			"loc": {
 				"start": {
 					"line": 5,
-					"column": 6
+					"column": 5
 				},
 				"end": {
 					"line": 5,
-					"column": 16
+					"column": 15
 				}
 			}
 		}
@@ -30,12 +30,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 74,
+		"end": 73,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 65,
+			"end": 64,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -50,7 +50,7 @@
 				{
 					"type": "ClassDeclaration",
 					"start": 10,
-					"end": 64,
+					"end": 63,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -81,7 +81,7 @@
 					"body": {
 						"type": "ClassBody",
 						"start": 20,
-						"end": 64,
+						"end": 63,
 						"loc": {
 							"start": {
 								"line": 2,
@@ -96,7 +96,7 @@
 							{
 								"type": "MethodDefinition",
 								"start": 24,
-								"end": 61,
+								"end": 60,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -129,7 +129,7 @@
 								"value": {
 									"type": "FunctionExpression",
 									"start": 30,
-									"end": 61,
+									"end": 60,
 									"loc": {
 										"start": {
 											"line": 3,
@@ -180,16 +180,16 @@
 												{
 													"type": "Line",
 													"value": " comment",
-													"start": 44,
-													"end": 54
+													"start": 43,
+													"end": 53
 												}
 											]
 										}
 									],
 									"body": {
 										"type": "BlockStatement",
-										"start": 59,
-										"end": 61,
+										"start": 58,
+										"end": 60,
 										"loc": {
 											"start": {
 												"line": 6,

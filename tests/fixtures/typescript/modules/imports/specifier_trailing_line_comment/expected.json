@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 533,
+	"end": 531,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -29,24 +29,24 @@
 		{
 			"type": "Line",
 			"value": " comment",
-			"start": 72,
-			"end": 82,
+			"start": 71,
+			"end": 81,
 			"loc": {
 				"start": {
 					"line": 4,
-					"column": 5
+					"column": 4
 				},
 				"end": {
 					"line": 4,
-					"column": 15
+					"column": 14
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " last specifier trailing line comment",
-			"start": 100,
-			"end": 139,
+			"start": 99,
+			"end": 138,
 			"loc": {
 				"start": {
 					"line": 7,
@@ -61,24 +61,24 @@
 		{
 			"type": "Line",
 			"value": " comment",
-			"start": 160,
-			"end": 170,
+			"start": 158,
+			"end": 168,
 			"loc": {
 				"start": {
 					"line": 10,
-					"column": 5
+					"column": 4
 				},
 				"end": {
 					"line": 10,
-					"column": 15
+					"column": 14
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " all specifiers with trailing line comments",
-			"start": 188,
-			"end": 233,
+			"start": 186,
+			"end": 231,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " comment1",
-			"start": 249,
-			"end": 260,
+			"start": 247,
+			"end": 258,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -109,24 +109,24 @@
 		{
 			"type": "Line",
 			"value": " comment2",
-			"start": 266,
-			"end": 277,
+			"start": 263,
+			"end": 274,
 			"loc": {
 				"start": {
 					"line": 16,
-					"column": 5
+					"column": 4
 				},
 				"end": {
 					"line": 16,
-					"column": 16
+					"column": 15
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " hardline path (expanding comment) + last trailing line comment",
-			"start": 295,
-			"end": 360,
+			"start": 292,
+			"end": 357,
 			"loc": {
 				"start": {
 					"line": 19,
@@ -141,8 +141,8 @@
 		{
 			"type": "Line",
 			"value": " group",
-			"start": 373,
-			"end": 381,
+			"start": 370,
+			"end": 378,
 			"loc": {
 				"start": {
 					"line": 21,
@@ -157,24 +157,24 @@
 		{
 			"type": "Line",
 			"value": " comment",
-			"start": 392,
-			"end": 402,
+			"start": 388,
+			"end": 398,
 			"loc": {
 				"start": {
 					"line": 23,
-					"column": 5
+					"column": 4
 				},
 				"end": {
 					"line": 23,
-					"column": 15
+					"column": 14
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " block comment on last specifier (should work - contrast case)",
-			"start": 420,
-			"end": 484,
+			"start": 416,
+			"end": 480,
 			"loc": {
 				"start": {
 					"line": 26,
@@ -189,16 +189,16 @@
 		{
 			"type": "Block",
 			"value": " comment ",
-			"start": 496,
-			"end": 509,
+			"start": 493,
+			"end": 506,
 			"loc": {
 				"start": {
 					"line": 27,
-					"column": 11
+					"column": 12
 				},
 				"end": {
 					"line": 27,
-					"column": 24
+					"column": 25
 				}
 			}
 		}
@@ -206,12 +206,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 532,
+		"end": 530,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 523,
+			"end": 521,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -226,7 +226,7 @@
 				{
 					"type": "ImportDeclaration",
 					"start": 58,
-					"end": 97,
+					"end": 96,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -288,16 +288,16 @@
 								{
 									"type": "Line",
 									"value": " comment",
-									"start": 72,
-									"end": 82
+									"start": 71,
+									"end": 81
 								}
 							]
 						}
 					],
 					"source": {
 						"type": "Literal",
-						"start": 91,
-						"end": 96,
+						"start": 90,
+						"end": 95,
 						"loc": {
 							"start": {
 								"line": 5,
@@ -323,8 +323,8 @@
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 141,
-					"end": 185,
+					"start": 140,
+					"end": 183,
 					"loc": {
 						"start": {
 							"line": 8,
@@ -338,8 +338,8 @@
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
-							"start": 152,
-							"end": 153,
+							"start": 151,
+							"end": 152,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -352,8 +352,8 @@
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 152,
-								"end": 153,
+								"start": 151,
+								"end": 152,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -368,8 +368,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 152,
-								"end": 153,
+								"start": 151,
+								"end": 152,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -385,8 +385,8 @@
 						},
 						{
 							"type": "ImportSpecifier",
-							"start": 157,
-							"end": 158,
+							"start": 156,
+							"end": 157,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -399,8 +399,8 @@
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 157,
-								"end": 158,
+								"start": 156,
+								"end": 157,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -415,8 +415,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 157,
-								"end": 158,
+								"start": 156,
+								"end": 157,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -433,16 +433,16 @@
 								{
 									"type": "Line",
 									"value": " comment",
-									"start": 160,
-									"end": 170
+									"start": 158,
+									"end": 168
 								}
 							]
 						}
 					],
 					"source": {
 						"type": "Literal",
-						"start": 179,
-						"end": 184,
+						"start": 177,
+						"end": 182,
 						"loc": {
 							"start": {
 								"line": 11,
@@ -461,15 +461,15 @@
 						{
 							"type": "Line",
 							"value": " last specifier trailing line comment",
-							"start": 100,
-							"end": 139
+							"start": 99,
+							"end": 138
 						}
 					]
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 235,
-					"end": 292,
+					"start": 233,
+					"end": 289,
 					"loc": {
 						"start": {
 							"line": 14,
@@ -483,8 +483,8 @@
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
-							"start": 246,
-							"end": 247,
+							"start": 244,
+							"end": 245,
 							"loc": {
 								"start": {
 									"line": 15,
@@ -497,8 +497,8 @@
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 246,
-								"end": 247,
+								"start": 244,
+								"end": 245,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -513,8 +513,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 246,
-								"end": 247,
+								"start": 244,
+								"end": 245,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -531,15 +531,15 @@
 								{
 									"type": "Line",
 									"value": " comment1",
-									"start": 249,
-									"end": 260
+									"start": 247,
+									"end": 258
 								}
 							]
 						},
 						{
 							"type": "ImportSpecifier",
-							"start": 263,
-							"end": 264,
+							"start": 261,
+							"end": 262,
 							"loc": {
 								"start": {
 									"line": 16,
@@ -552,8 +552,8 @@
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 263,
-								"end": 264,
+								"start": 261,
+								"end": 262,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -568,8 +568,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 263,
-								"end": 264,
+								"start": 261,
+								"end": 262,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -586,16 +586,16 @@
 								{
 									"type": "Line",
 									"value": " comment2",
-									"start": 266,
-									"end": 277
+									"start": 263,
+									"end": 274
 								}
 							]
 						}
 					],
 					"source": {
 						"type": "Literal",
-						"start": 286,
-						"end": 291,
+						"start": 283,
+						"end": 288,
 						"loc": {
 							"start": {
 								"line": 17,
@@ -614,15 +614,15 @@
 						{
 							"type": "Line",
 							"value": " all specifiers with trailing line comments",
-							"start": 188,
-							"end": 233
+							"start": 186,
+							"end": 231
 						}
 					]
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 362,
-					"end": 417,
+					"start": 359,
+					"end": 413,
 					"loc": {
 						"start": {
 							"line": 20,
@@ -636,8 +636,8 @@
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
-							"start": 384,
-							"end": 385,
+							"start": 381,
+							"end": 382,
 							"loc": {
 								"start": {
 									"line": 22,
@@ -650,8 +650,8 @@
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 384,
-								"end": 385,
+								"start": 381,
+								"end": 382,
 								"loc": {
 									"start": {
 										"line": 22,
@@ -666,8 +666,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 384,
-								"end": 385,
+								"start": 381,
+								"end": 382,
 								"loc": {
 									"start": {
 										"line": 22,
@@ -684,15 +684,15 @@
 								{
 									"type": "Line",
 									"value": " group",
-									"start": 373,
-									"end": 381
+									"start": 370,
+									"end": 378
 								}
 							]
 						},
 						{
 							"type": "ImportSpecifier",
-							"start": 389,
-							"end": 390,
+							"start": 386,
+							"end": 387,
 							"loc": {
 								"start": {
 									"line": 23,
@@ -705,8 +705,8 @@
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 389,
-								"end": 390,
+								"start": 386,
+								"end": 387,
 								"loc": {
 									"start": {
 										"line": 23,
@@ -721,8 +721,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 389,
-								"end": 390,
+								"start": 386,
+								"end": 387,
 								"loc": {
 									"start": {
 										"line": 23,
@@ -739,16 +739,16 @@
 								{
 									"type": "Line",
 									"value": " comment",
-									"start": 392,
-									"end": 402
+									"start": 388,
+									"end": 398
 								}
 							]
 						}
 					],
 					"source": {
 						"type": "Literal",
-						"start": 411,
-						"end": 416,
+						"start": 407,
+						"end": 412,
 						"loc": {
 							"start": {
 								"line": 24,
@@ -767,15 +767,15 @@
 						{
 							"type": "Line",
 							"value": " hardline path (expanding comment) + last trailing line comment",
-							"start": 295,
-							"end": 360
+							"start": 292,
+							"end": 357
 						}
 					]
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 486,
-					"end": 522,
+					"start": 482,
+					"end": 520,
 					"loc": {
 						"start": {
 							"line": 27,
@@ -783,52 +783,52 @@
 						},
 						"end": {
 							"line": 27,
-							"column": 37
+							"column": 39
 						}
 					},
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
-							"start": 494,
-							"end": 495,
+							"start": 491,
+							"end": 492,
 							"loc": {
 								"start": {
 									"line": 27,
-									"column": 9
+									"column": 10
 								},
 								"end": {
 									"line": 27,
-									"column": 10
+									"column": 11
 								}
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 494,
-								"end": 495,
+								"start": 491,
+								"end": 492,
 								"loc": {
 									"start": {
 										"line": 27,
-										"column": 9
+										"column": 10
 									},
 									"end": {
 										"line": 27,
-										"column": 10
+										"column": 11
 									}
 								},
 								"name": "h"
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 494,
-								"end": 495,
+								"start": 491,
+								"end": 492,
 								"loc": {
 									"start": {
 										"line": 27,
-										"column": 9
+										"column": 10
 									},
 									"end": {
 										"line": 27,
-										"column": 10
+										"column": 11
 									}
 								},
 								"name": "h"
@@ -837,24 +837,24 @@
 								{
 									"type": "Block",
 									"value": " comment ",
-									"start": 496,
-									"end": 509
+									"start": 493,
+									"end": 506
 								}
 							]
 						}
 					],
 					"source": {
 						"type": "Literal",
-						"start": 516,
-						"end": 521,
+						"start": 514,
+						"end": 519,
 						"loc": {
 							"start": {
 								"line": 27,
-								"column": 31
+								"column": 33
 							},
 							"end": {
 								"line": 27,
-								"column": 36
+								"column": 38
 							}
 						},
 						"value": "./e",
@@ -865,8 +865,8 @@
 						{
 							"type": "Line",
 							"value": " block comment on last specifier (should work - contrast case)",
-							"start": 420,
-							"end": 484
+							"start": 416,
+							"end": 480
 						}
 					]
 				}

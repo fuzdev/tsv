@@ -12,6 +12,6 @@
 		// inner comment1
 		prop1: 1, // trailing2
 		/* inner comment2 */
-		prop2: 2,
+		prop2: 2
 	};
 </script>

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 412,
+	"end": 411,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -23,7 +23,7 @@
 			{
 				"type": "RegularElement",
 				"start": 260,
-				"end": 411,
+				"end": 410,
 				"name": "span",
 				"name_loc": {
 					"start": {
@@ -51,11 +51,11 @@
 						{
 							"type": "KeyBlock",
 							"start": 268,
-							"end": 403,
+							"end": 402,
 							"expression": {
 								"type": "CallExpression",
 								"start": 274,
-								"end": 388,
+								"end": 387,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -171,19 +171,19 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 389,
-										"end": 392,
+										"start": 388,
+										"end": 391,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "ExpressionTag",
-										"start": 392,
-										"end": 395,
+										"start": 391,
+										"end": 394,
 										"expression": {
 											"type": "Identifier",
-											"start": 393,
-											"end": 394,
+											"start": 392,
+											"end": 393,
 											"loc": {
 												"start": {
 													"line": 10,
@@ -199,8 +199,8 @@
 									},
 									{
 										"type": "Text",
-										"start": 395,
-										"end": 397,
+										"start": 394,
+										"end": 396,
 										"raw": "\n\t",
 										"data": "\n\t"
 									}
@@ -209,8 +209,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 403,
-							"end": 404,
+							"start": 402,
+							"end": 403,
 							"raw": "\n",
 							"data": "\n"
 						}

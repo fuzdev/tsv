@@ -68,19 +68,19 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
   but has its own internal optimal AST
 - non-configurable: formatter settings are fixed at Prettier's defaults except
   `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and
-  `bracketSpacing: false` (tight object braces stay distinct from function/block `{`),
+  `trailingComma: 'none'` (no trailing comma on multiline lists, matching the
+  Svelte project's own Prettier config),
   and there are no config files or CLI options for formatting style;
   tsv is opinionated like `gofmt` and Python's Black,
   see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
 - `tsv format` discovery is gitignore-aware, honoring `.gitignore` and `.formatignore`
-  hierarchically (nested files like git, unlike Prettier)
+  hierarchically (nested files like git, unlike Prettier; also `.formatignore` is original to tsv)
   plus a compatible `.prettierignore`
   (but relative to repo root if available, not cwd like Prettier's default)
   ([gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format))
 - Rust-only implementation that never embeds or calls a JS runtime, for performance;
-  JS reaches tsv through the WASM bindings, and native N-API bindings are
-  undecided (open to requests)
-- "optimal artifacts" is an invariant, not a preference: runtime speed and compiled
+  JS reaches tsv through the WASM bindings, and native N-API bindings are not yet published
+- outputs optimal artifacts as an invariant, not a preference: runtime speed and compiled
   code size are first-class goals for every shipped artifact, and heavier future
   layers (incremental parsing, CST for LSP) will be feature-gated so they
   don't regress the artifacts that exist today

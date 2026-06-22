@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 228,
+	"end": 227,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -17,11 +17,11 @@
 			{
 				"type": "HtmlTag",
 				"start": 65,
-				"end": 121,
+				"end": 120,
 				"expression": {
 					"type": "CallExpression",
 					"start": 72,
-					"end": 120,
+					"end": 119,
 					"loc": {
 						"start": {
 							"line": 5,
@@ -104,12 +104,12 @@
 			{
 				"type": "IfBlock",
 				"elseif": false,
-				"start": 121,
-				"end": 227,
+				"start": 120,
+				"end": 226,
 				"test": {
 					"type": "LogicalExpression",
-					"start": 126,
-					"end": 211,
+					"start": 125,
+					"end": 210,
 					"loc": {
 						"start": {
 							"line": 7,
@@ -122,8 +122,8 @@
 					},
 					"left": {
 						"type": "LogicalExpression",
-						"start": 126,
-						"end": 166,
+						"start": 125,
+						"end": 165,
 						"loc": {
 							"start": {
 								"line": 7,
@@ -136,8 +136,8 @@
 						},
 						"left": {
 							"type": "Identifier",
-							"start": 126,
-							"end": 144,
+							"start": 125,
+							"end": 143,
 							"loc": {
 								"start": {
 									"line": 7,
@@ -153,8 +153,8 @@
 						"operator": "&&",
 						"right": {
 							"type": "Identifier",
-							"start": 148,
-							"end": 166,
+							"start": 147,
+							"end": 165,
 							"loc": {
 								"start": {
 									"line": 7,
@@ -171,8 +171,8 @@
 					"operator": "&&",
 					"right": {
 						"type": "BinaryExpression",
-						"start": 170,
-						"end": 211,
+						"start": 169,
+						"end": 210,
 						"loc": {
 							"start": {
 								"line": 7,
@@ -185,8 +185,8 @@
 						},
 						"left": {
 							"type": "Identifier",
-							"start": 170,
-							"end": 188,
+							"start": 169,
+							"end": 187,
 							"loc": {
 								"start": {
 									"line": 7,
@@ -202,8 +202,8 @@
 						"operator": "!==",
 						"right": {
 							"type": "Identifier",
-							"start": 193,
-							"end": 211,
+							"start": 192,
+							"end": 210,
 							"loc": {
 								"start": {
 									"line": 7,
@@ -223,8 +223,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 212,
-							"end": 222,
+							"start": 211,
+							"end": 221,
 							"raw": ",\n\tupdated",
 							"data": ",\n\tupdated"
 						}

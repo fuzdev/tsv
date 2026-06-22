@@ -23,13 +23,13 @@
 	fn(
 		a &&
 			// comment
-			b,
+			b
 	);
 
 	// Multiple consecutive line comments (must stay on separate lines)
 	fn(
 		a && // comment1
 			// comment2
-			b,
+			b
 	);
 </script>

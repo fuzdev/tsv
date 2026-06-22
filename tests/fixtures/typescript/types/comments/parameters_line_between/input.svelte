@@ -3,7 +3,7 @@
 	type T<
 		A,
 		// comment before B
-		B,
+		B
 	> = A | B;
 
 	// Line comment between multiple type parameters
@@ -12,7 +12,7 @@
 		// comment before B
 		B,
 		// comment before C
-		C,
+		C
 	> = A | B | C;
 
 	// Multiple consecutive line comments
@@ -20,6 +20,6 @@
 		A,
 		// comment line 1
 		// comment line 2
-		B,
+		B
 	> = A | B;
 </script>

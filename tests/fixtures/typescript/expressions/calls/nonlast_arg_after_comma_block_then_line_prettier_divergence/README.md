@@ -9,7 +9,7 @@ relocates the block to **before** the comma.
 // tsv                          // prettier
 fn(                             fn(
 	a, /* c1 */ // c2                 a /* c1 */, // c2
-	b,                                b,
+	b                                 b
 );                              );
 ```
 

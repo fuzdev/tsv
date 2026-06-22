@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 263,
+	"end": 264,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -29,8 +29,8 @@
 		{
 			"type": "Block",
 			"value": " Long method - wraps (103 chars with indent) ",
-			"start": 84,
-			"end": 133,
+			"start": 86,
+			"end": 135,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -46,12 +46,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 262,
+		"end": 263,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 253,
+			"end": 254,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -66,7 +66,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 56,
-					"end": 81,
+					"end": 83,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -74,14 +74,14 @@
 						},
 						"end": {
 							"line": 3,
-							"column": 26
+							"column": 28
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 62,
-							"end": 80,
+							"end": 82,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -89,7 +89,7 @@
 								},
 								"end": {
 									"line": 3,
-									"column": 25
+									"column": 27
 								}
 							},
 							"id": {
@@ -111,7 +111,7 @@
 							"init": {
 								"type": "ObjectExpression",
 								"start": 70,
-								"end": 80,
+								"end": 82,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -119,22 +119,22 @@
 									},
 									"end": {
 										"line": 3,
-										"column": 25
+										"column": 27
 									}
 								},
 								"properties": [
 									{
 										"type": "Property",
-										"start": 71,
-										"end": 79,
+										"start": 72,
+										"end": 80,
 										"loc": {
 											"start": {
 												"line": 3,
-												"column": 16
+												"column": 17
 											},
 											"end": {
 												"line": 3,
-												"column": 24
+												"column": 25
 											}
 										},
 										"method": true,
@@ -142,32 +142,32 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 71,
-											"end": 74,
+											"start": 72,
+											"end": 75,
 											"loc": {
 												"start": {
 													"line": 3,
-													"column": 16
+													"column": 17
 												},
 												"end": {
 													"line": 3,
-													"column": 19
+													"column": 20
 												}
 											},
 											"name": "foo"
 										},
 										"value": {
 											"type": "FunctionExpression",
-											"start": 74,
-											"end": 79,
+											"start": 75,
+											"end": 80,
 											"loc": {
 												"start": {
 													"line": 3,
-													"column": 19
+													"column": 20
 												},
 												"end": {
 													"line": 3,
-													"column": 24
+													"column": 25
 												}
 											},
 											"id": null,
@@ -177,16 +177,16 @@
 											"params": [],
 											"body": {
 												"type": "BlockStatement",
-												"start": 77,
-												"end": 79,
+												"start": 78,
+												"end": 80,
 												"loc": {
 													"start": {
 														"line": 3,
-														"column": 22
+														"column": 23
 													},
 													"end": {
 														"line": 3,
-														"column": 24
+														"column": 25
 													}
 												},
 												"body": []
@@ -210,8 +210,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 135,
-					"end": 252,
+					"start": 137,
+					"end": 253,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -225,8 +225,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 141,
-							"end": 251,
+							"start": 143,
+							"end": 252,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -239,8 +239,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 141,
-								"end": 145,
+								"start": 143,
+								"end": 147,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -255,8 +255,8 @@
 							},
 							"init": {
 								"type": "ObjectExpression",
-								"start": 148,
-								"end": 251,
+								"start": 150,
+								"end": 252,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -270,8 +270,8 @@
 								"properties": [
 									{
 										"type": "Property",
-										"start": 152,
-										"end": 247,
+										"start": 154,
+										"end": 249,
 										"loc": {
 											"start": {
 												"line": 7,
@@ -287,8 +287,8 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 152,
-											"end": 226,
+											"start": 154,
+											"end": 228,
 											"loc": {
 												"start": {
 													"line": 7,
@@ -303,8 +303,8 @@
 										},
 										"value": {
 											"type": "FunctionExpression",
-											"start": 226,
-											"end": 247,
+											"start": 228,
+											"end": 249,
 											"loc": {
 												"start": {
 													"line": 7,
@@ -322,8 +322,8 @@
 											"params": [],
 											"body": {
 												"type": "BlockStatement",
-												"start": 229,
-												"end": 247,
+												"start": 231,
+												"end": 249,
 												"loc": {
 													"start": {
 														"line": 7,
@@ -337,8 +337,8 @@
 												"body": [
 													{
 														"type": "ReturnStatement",
-														"start": 234,
-														"end": 243,
+														"start": 236,
+														"end": 245,
 														"loc": {
 															"start": {
 																"line": 8,
@@ -351,8 +351,8 @@
 														},
 														"argument": {
 															"type": "Literal",
-															"start": 241,
-															"end": 242,
+															"start": 243,
+															"end": 244,
 															"loc": {
 																"start": {
 																	"line": 8,
@@ -381,8 +381,8 @@
 						{
 							"type": "Block",
 							"value": " Long method - wraps (103 chars with indent) ",
-							"start": 84,
-							"end": 133
+							"start": 86,
+							"end": 135
 						}
 					]
 				}

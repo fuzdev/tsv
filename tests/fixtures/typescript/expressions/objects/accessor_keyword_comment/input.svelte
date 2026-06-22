@@ -4,6 +4,6 @@
 		get /* c1 */ a() {
 			return 1;
 		},
-		set /* c2 */ a(v) {},
+		set /* c2 */ a(v) {}
 	};
 </script>

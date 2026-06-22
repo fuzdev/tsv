@@ -4,6 +4,6 @@
 
 	// Single identifier arg at 101 visual width - wraps argument to new line
 	const b = obj.method(
-		argument_long_long_long_long_long_long_long_long_long_long_long_xxxxxxxxxxxx,
+		argument_long_long_long_long_long_long_long_long_long_long_long_xxxxxxxxxxxx
 	);
 </script>

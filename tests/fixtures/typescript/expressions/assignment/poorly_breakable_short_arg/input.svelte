@@ -28,7 +28,7 @@
 
 	// Zero-arg call: long callee — NOT short (name exceeds threshold - 2 = 23)
 	const gggggggggggggggggggggggggggg = VeryLongClassName.createSomethingWithAVeryLongMethodNameHere(
-		veryLongFunctionNameHereXX(),
+		veryLongFunctionNameHereXX()
 	);
 
 	// Control: already-handled short types

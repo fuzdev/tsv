@@ -15,6 +15,6 @@
 
 	// object method
 	const obj = {
-		m(a) /* c */ {},
+		m(a) /* c */ {}
 	};
 </script>

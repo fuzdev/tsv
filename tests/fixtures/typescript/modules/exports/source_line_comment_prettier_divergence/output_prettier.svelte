@@ -9,6 +9,6 @@
 
 	// named specifiers: line comment between from and source
 	export {
-		a, // c
+		a // c
 	} from './c';
 </script>

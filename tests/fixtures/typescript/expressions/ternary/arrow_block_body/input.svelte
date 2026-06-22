@@ -12,7 +12,7 @@
 			? (e) => {
 					fn(e);
 				}
-			: undefined,
+			: undefined
 	};
 
 	// Arrow block body in ternary alternate

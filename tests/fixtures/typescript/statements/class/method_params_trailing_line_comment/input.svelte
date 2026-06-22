@@ -2,7 +2,7 @@
 	class Foo {
 		method(
 			a,
-			b, // comment
+			b // comment
 		) {}
 	}
 </script>

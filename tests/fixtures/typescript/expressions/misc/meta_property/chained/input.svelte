@@ -20,8 +20,8 @@
 	const template = `URL: ${import.meta.url}`;
 
 	// import.meta with destructuring
-	const {url, env} = import.meta;
-	const {DEV, MODE} = import.meta.env;
+	const { url, env } = import.meta;
+	const { DEV, MODE } = import.meta.env;
 
 	// import.meta as argument
 	console.log(import.meta.url);

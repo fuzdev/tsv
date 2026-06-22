@@ -1,7 +1,7 @@
 <script lang="ts">
 	let result;
 	let a;
-	let b: {c: number};
+	let b: { c: number };
 
 	// Assignment as initializer value (parentheses required for clarity)
 	const j1 = (result = a < b.c);

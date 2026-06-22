@@ -7,7 +7,7 @@
 		let async = 'b';
 	}
 	{
-		const {async} = obj;
+		const { async } = obj;
 	}
 	{
 		const [async] = arr;
@@ -18,13 +18,13 @@
 	const fn2 = (async: string) => async;
 	{
 		const async = 'a';
-		const obj2 = {async};
+		const obj2 = { async };
 	}
-	const obj3 = {async: 'value'};
+	const obj3 = { async: 'value' };
 	const obj4 = {
 		async() {
 			return 'a';
-		},
+		}
 	};
 	{
 		let async;
@@ -32,14 +32,14 @@
 	}
 
 	// await is more restricted - only works in property positions
-	const obj5 = {await: 'value'};
+	const obj5 = { await: 'value' };
 	const obj6 = {
 		await() {
 			return 'a';
-		},
+		}
 	};
 	{
-		const {await: a} = obj;
+		const { await: a } = obj;
 	}
 
 	// Inside async functions, await is the operator

@@ -6,7 +6,7 @@
 	};
 
 	// Block comment after opening brace, member on same line: stays inline
-	type B = {/* c */ a: number};
+	type B = { /* c */ a: number };
 
 	// Multiple members, comment after opening brace
 	type C = {

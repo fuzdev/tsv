@@ -1,3 +1,3 @@
 <script>
-	let {a, ...rest} = $props();
+	let { a, ...rest } = $props();
 </script>

@@ -8,21 +8,21 @@ relocates a line comment past the `;`, and relocates a block comment after
 import attributes *inside* the attribute braces (`output_prettier.svelte`):
 
 ```
-import {a} from './a' /* c */;
-import {b} from './b'; // 1
+import { a } from './a' /* c */;
+import { b } from './b'; // 1
 // 2
-import c from './c' with {type: 'json' /* c */};
+import c from './c' with { type: 'json' /* c */ };
 ```
 
 **tsv**: preserves them where the user placed them — a block comment trails the
 source / attribute `}`, line comments stay on their own line with `;` following:
 
 ```
-import {a} from './a' /* c */;
-import {b} from './b' // 1
+import { a } from './a' /* c */;
+import { b } from './b' // 1
 // 2
 ;
-import c from './c' with {type: 'json'} /* c */;
+import c from './c' with { type: 'json' } /* c */;
 ```
 
 Per Comment Position Philosophy (and the before-semicolon divergence), the user's

@@ -1,7 +1,7 @@
 <script lang="ts">
 	new A(
 		(
-			a: string, // comment
-		) => {},
+			a: string // comment
+		) => {}
 	);
 </script>

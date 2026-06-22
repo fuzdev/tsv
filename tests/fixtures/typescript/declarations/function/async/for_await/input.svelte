@@ -8,7 +8,7 @@
 
 	// For-await with destructuring
 	async function processEvents(events) {
-		for await (const {type, data} of events) {
+		for await (const { type, data } of events) {
 			handle(type, data);
 		}
 	}

@@ -15,10 +15,10 @@
 	type D = ns.from;
 
 	// index signature
-	type E = {[from: string]: number};
+	type E = { [from: string]: number };
 
 	// mapped type
-	type F = {[from in 'a' | 'b']: number};
+	type F = { [from in 'a' | 'b']: number };
 
 	// type predicate
 	function fn1(from: unknown): from is string {

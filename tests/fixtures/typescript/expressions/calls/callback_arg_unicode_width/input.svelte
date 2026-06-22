@@ -7,7 +7,7 @@
 
 			// ASCII: 101 visual width - breaks
 			fn(
-				a.method((x) => typeof x === 'string' && x.includes('valuevaluevaluevaluevaluevaluevalv')),
+				a.method((x) => typeof x === 'string' && x.includes('valuevaluevaluevaluevaluevaluevalv'))
 			);
 
 			// Emoji (width=2): 100 visual width - stays inline
@@ -15,7 +15,7 @@
 
 			// Emoji (width=2): 101 visual width - breaks
 			fn(
-				a.method((x) => typeof x === 'string' && x.includes('valuevaluevaluevaluevaluevalueva⭐')),
+				a.method((x) => typeof x === 'string' && x.includes('valuevaluevaluevaluevaluevalueva⭐'))
 			);
 
 			// CJK (width=2): 100 visual width - stays inline
@@ -23,7 +23,7 @@
 
 			// CJK (width=2): 101 visual width - breaks
 			fn(
-				a.method((x) => typeof x === 'string' && x.includes('valuevaluevaluevaluevaluevalueva中')),
+				a.method((x) => typeof x === 'string' && x.includes('valuevaluevaluevaluevaluevalueva中'))
 			);
 
 			// Multiple emoji (each 🔥=2): 100 visual width - stays inline
@@ -31,7 +31,7 @@
 
 			// Multiple emoji (each 🔥=2): 101 visual width - breaks
 			fn(
-				a.method((x) => typeof x === 'string' && x.includes('valuevaluevaluevaluevaluevalv🔥🔥🔥')),
+				a.method((x) => typeof x === 'string' && x.includes('valuevaluevaluevaluevaluevalv🔥🔥🔥'))
 			);
 
 			// Emoji + skin tone modifier (👋🏽): stays inline (Prettier measures as ~2)

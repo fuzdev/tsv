@@ -2,14 +2,14 @@
 	// Line comment on own line before first param
 	const a = (
 		// line
-		x,
+		x
 	) => x;
 
 	// Line comment on own line before second param
 	const b = (
 		x,
 		// line
-		y,
+		y
 	) => x + y;
 
 	// Line comment before each param
@@ -17,6 +17,6 @@
 		// first
 		x,
 		// second
-		y,
+		y
 	) => x + y;
 </script>

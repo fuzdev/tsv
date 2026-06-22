@@ -1,14 +1,14 @@
 <script lang="ts">
 	enum A {
 		X,
-		Y,
+		Y
 
 		// line comment
 	}
 
 	enum B {
 		X,
-		Y,
+		Y
 
 		/* block comment */
 	}

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 137,
+	"end": 136,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -29,16 +29,16 @@
 		{
 			"type": "Line",
 			"value": " isn't",
-			"start": 106,
-			"end": 114,
+			"start": 105,
+			"end": 113,
 			"loc": {
 				"start": {
 					"line": 7,
-					"column": 9
+					"column": 8
 				},
 				"end": {
 					"line": 7,
-					"column": 17
+					"column": 16
 				}
 			}
 		}
@@ -46,12 +46,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 136,
+		"end": 135,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 127,
+			"end": 126,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -140,7 +140,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 77,
-					"end": 126,
+					"end": 125,
 					"loc": {
 						"start": {
 							"line": 5,
@@ -155,7 +155,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 83,
-							"end": 125,
+							"end": 124,
 							"loc": {
 								"start": {
 									"line": 5,
@@ -185,7 +185,7 @@
 							"init": {
 								"type": "ArrowFunctionExpression",
 								"start": 87,
-								"end": 125,
+								"end": 124,
 								"loc": {
 									"start": {
 										"line": 5,
@@ -198,8 +198,8 @@
 								},
 								"returnType": {
 									"type": "TSTypeAnnotation",
-									"start": 117,
-									"end": 120,
+									"start": 116,
+									"end": 119,
 									"loc": {
 										"start": {
 											"line": 8,
@@ -212,8 +212,8 @@
 									},
 									"typeAnnotation": {
 										"type": "TSTypeReference",
-										"start": 119,
-										"end": 120,
+										"start": 118,
+										"end": 119,
 										"loc": {
 											"start": {
 												"line": 8,
@@ -226,8 +226,8 @@
 										},
 										"typeName": {
 											"type": "Identifier",
-											"start": 119,
-											"end": 120,
+											"start": 118,
+											"end": 119,
 											"loc": {
 												"start": {
 													"line": 8,
@@ -245,8 +245,8 @@
 										{
 											"type": "Line",
 											"value": " isn't",
-											"start": 106,
-											"end": 114
+											"start": 105,
+											"end": 113
 										}
 									]
 								},
@@ -367,8 +367,8 @@
 								],
 								"body": {
 									"type": "Identifier",
-									"start": 124,
-									"end": 125,
+									"start": 123,
+									"end": 124,
 									"loc": {
 										"start": {
 											"line": 8,

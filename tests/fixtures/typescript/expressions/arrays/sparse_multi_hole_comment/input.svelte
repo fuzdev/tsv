@@ -6,7 +6,7 @@
 		,
 		// c1
 		// c2
-		2,
+		2
 	];
 
 	// Block comment between elision commas (multiline-forced)
@@ -15,7 +15,7 @@
 		,
 		,
 		/* c */
-		2,
+		2
 	];
 
 	// Comment at start before two consecutive elisions
@@ -23,6 +23,6 @@
 		,
 		,
 		// c
-		1,
+		1
 	];
 </script>

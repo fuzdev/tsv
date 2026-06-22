@@ -8,11 +8,11 @@ preserved where the user placed them.
 comment (`output_prettier.svelte`); a line comment also expands the braces:
 
 ```
-import type {/* c1 */ A} from './a';
-import type {/* c2 */ B} from './b';
+import type { /* c1 */ A } from './a';
+import type { /* c2 */ B } from './b';
 import type {
 	// c3
-	C,
+	C
 } from './c';
 ```
 
@@ -20,12 +20,12 @@ import type {
 a line comment stays on its own line with the following token after it:
 
 ```
-import /* c1 */ type {A} from './a';
-import type /* c2 */ {B} from './b';
+import /* c1 */ type { A } from './a';
+import type /* c2 */ { B } from './b';
 import // c3
-type {C} from './c';
+type { C } from './c';
 import type // c4
-{D} from './d';
+{ D } from './d';
 ```
 
 Per Comment Position Philosophy, the user's chosen position is preserved. The

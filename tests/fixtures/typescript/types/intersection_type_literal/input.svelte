@@ -6,7 +6,7 @@
 
 	// In destructuring pattern
 	const {
-		rest,
+		rest
 	}: OmitStrict<Props, 'content'> & {
 		text_part: TextPart;
 	} = $props();

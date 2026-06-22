@@ -8,13 +8,13 @@
 
 	// Enum declarations
 	enum /* f */ F {
-		X,
+		X
 	}
 	const enum /* g */ G {
-		X,
+		X
 	}
 	declare enum /* h */ H {
-		X,
+		X
 	}
 
 	// Namespace/module declarations

@@ -4,8 +4,8 @@
 	fn(
 		z
 			.string()
-			.meta({aliases: ['v']})
-			.optional(),
+			.meta({ aliases: ['v'] })
+			.optional()
 	);
 
 	// Deeper nesting - chain inside nested call arguments
@@ -13,14 +13,14 @@
 		fn2(
 			z
 				.string()
-				.meta({aliases: ['v']})
-				.optional(),
-		),
+				.meta({ aliases: ['v'] })
+				.optional()
+		)
 	);
 
 	// Contrast: same chain as expression statement - z SHOULD merge with .string()
 	// (isShort heuristic applies to expression statements only)
 	z.string()
-		.meta({aliases: ['v']})
+		.meta({ aliases: ['v'] })
 		.optional();
 </script>

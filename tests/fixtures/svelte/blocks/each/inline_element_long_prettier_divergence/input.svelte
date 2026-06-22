@@ -5,7 +5,7 @@
 		bbbbbbbbbbbbbbb,
 		ccccccccccccccc,
 		ddddddddddddddd,
-		eeeeeeeeeeeeeee,
+		eeeeeeeeeeeeeee
 	) as item}
 		{item}
 	{/each}

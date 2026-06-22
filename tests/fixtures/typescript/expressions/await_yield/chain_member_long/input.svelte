@@ -4,23 +4,23 @@
 		// When exceeding print width, break after `= (` and keep object compact
 
 		// 100 chars total - no wrap needed
-		const a = (await fn({...o, a: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb})).prop?.method();
+		const a = (await fn({ ...o, a: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb })).prop?.method();
 
 		// 101 chars total - breaks after `= (`, object stays compact
 		const b = (
-			await fn({...o, a: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb})
+			await fn({ ...o, a: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb })
 		).prop?.method();
 
 		// Inner await line at 100 chars - object stays compact
 		const c = (
-			await fn({...o, a: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb})
+			await fn({ ...o, a: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb })
 		).prop?.method();
 
 		// Inner await line at 101 chars - object expands
 		const d = (
 			await fn({
 				...o,
-				a: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+				a: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 			})
 		).prop?.method();
 
@@ -28,7 +28,7 @@
 		const e = (
 			await fn({
 				...o,
-				a: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+				a: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 			})
 		).prop?.method();
 
@@ -36,7 +36,7 @@
 		const f = (
 			await fn({
 				...o,
-				a: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+				a: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 			})
 		).prop?.method();
 	}

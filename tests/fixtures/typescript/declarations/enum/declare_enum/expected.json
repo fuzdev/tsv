@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 110,
+	"end": 108,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,12 +13,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 109,
+		"end": 107,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 100,
+			"end": 98,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -33,7 +33,7 @@
 				{
 					"type": "TSEnumDeclaration",
 					"start": 20,
-					"end": 49,
+					"end": 48,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -128,8 +128,8 @@
 				},
 				{
 					"type": "TSEnumDeclaration",
-					"start": 52,
-					"end": 99,
+					"start": 51,
+					"end": 97,
 					"loc": {
 						"start": {
 							"line": 7,
@@ -144,8 +144,8 @@
 					"declare": true,
 					"id": {
 						"type": "Identifier",
-						"start": 71,
-						"end": 72,
+						"start": 70,
+						"end": 71,
 						"loc": {
 							"start": {
 								"line": 7,
@@ -161,8 +161,8 @@
 					"members": [
 						{
 							"type": "TSEnumMember",
-							"start": 77,
-							"end": 84,
+							"start": 76,
+							"end": 83,
 							"loc": {
 								"start": {
 									"line": 8,
@@ -175,8 +175,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 77,
-								"end": 78,
+								"start": 76,
+								"end": 77,
 								"loc": {
 									"start": {
 										"line": 8,
@@ -191,8 +191,8 @@
 							},
 							"initializer": {
 								"type": "Literal",
-								"start": 81,
-								"end": 84,
+								"start": 80,
+								"end": 83,
 								"loc": {
 									"start": {
 										"line": 8,
@@ -209,8 +209,8 @@
 						},
 						{
 							"type": "TSEnumMember",
-							"start": 88,
-							"end": 95,
+							"start": 87,
+							"end": 94,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -223,8 +223,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 88,
-								"end": 89,
+								"start": 87,
+								"end": 88,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -239,8 +239,8 @@
 							},
 							"initializer": {
 								"type": "Literal",
-								"start": 92,
-								"end": 95,
+								"start": 91,
+								"end": 94,
 								"loc": {
 									"start": {
 										"line": 9,

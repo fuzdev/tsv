@@ -25,7 +25,7 @@
 				? b.fn1('xxxxxxxxxx')
 					? b
 					: `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx${fn2(b, 'x')}`
-				: '')) + (c ? fn3(c, 'x') : ''),
+				: '')) + (c ? fn3(c, 'x') : '')
 	);
 
 	// Nullish + nested ternary: 100 chars - keeps + on same line
@@ -35,7 +35,7 @@
 				? b.fn1('xxxxxxxxxx')
 					? b
 					: `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx${fn2(b, 'x')}`
-				: '')) + (c ? fn3(c, 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx') : ''),
+				: '')) + (c ? fn3(c, 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx') : '')
 	);
 
 	// Nullish + nested ternary: 101 chars - binary breaks after +
@@ -46,6 +46,6 @@
 					? b
 					: `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx${fn2(b, 'x')}`
 				: '')) +
-			(c ? fn3(c, 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx') : ''),
+			(c ? fn3(c, 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx') : '')
 	);
 </script>

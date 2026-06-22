@@ -21,7 +21,7 @@
 	class Container<T> {
 		value: T | undefined;
 
-		assertHasValue(): asserts this is {value: T} {
+		assertHasValue(): asserts this is { value: T } {
 			if (this.value === undefined) throw new Error('err');
 		}
 	}

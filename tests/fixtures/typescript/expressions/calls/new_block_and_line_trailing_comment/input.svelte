@@ -1,5 +1,5 @@
 <script lang="ts">
 	new A(
-		() => {} /* block */, // line
+		() => {} /* block */ // line
 	);
 </script>

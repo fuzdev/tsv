@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 111,
+	"end": 113,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,12 +13,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 110,
+		"end": 112,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 101,
+			"end": 103,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -116,7 +116,7 @@
 				{
 					"type": "ExportNamedDeclaration",
 					"start": 72,
-					"end": 100,
+					"end": 102,
 					"loc": {
 						"start": {
 							"line": 4,
@@ -124,53 +124,53 @@
 						},
 						"end": {
 							"line": 4,
-							"column": 29
+							"column": 31
 						}
 					},
 					"declaration": null,
 					"specifiers": [
 						{
 							"type": "ExportSpecifier",
-							"start": 80,
-							"end": 81,
+							"start": 81,
+							"end": 82,
 							"loc": {
 								"start": {
 									"line": 4,
-									"column": 9
+									"column": 10
 								},
 								"end": {
 									"line": 4,
-									"column": 10
+									"column": 11
 								}
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 80,
-								"end": 81,
+								"start": 81,
+								"end": 82,
 								"loc": {
 									"start": {
 										"line": 4,
-										"column": 9
+										"column": 10
 									},
 									"end": {
 										"line": 4,
-										"column": 10
+										"column": 11
 									}
 								},
 								"name": "c"
 							},
 							"exported": {
 								"type": "Identifier",
-								"start": 80,
-								"end": 81,
+								"start": 81,
+								"end": 82,
 								"loc": {
 									"start": {
 										"line": 4,
-										"column": 9
+										"column": 10
 									},
 									"end": {
 										"line": 4,
-										"column": 10
+										"column": 11
 									}
 								},
 								"name": "c"
@@ -179,16 +179,16 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 88,
-						"end": 91,
+						"start": 90,
+						"end": 93,
 						"loc": {
 							"start": {
 								"line": 4,
-								"column": 17
+								"column": 19
 							},
 							"end": {
 								"line": 4,
-								"column": 20
+								"column": 22
 							}
 						},
 						"value": "c",

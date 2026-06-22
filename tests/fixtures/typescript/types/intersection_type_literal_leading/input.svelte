@@ -18,5 +18,5 @@
 		C;
 
 	// Used in variable type annotation
-	let {a, b}: {a: A} & B = $props();
+	let { a, b }: { a: A } & B = $props();
 </script>

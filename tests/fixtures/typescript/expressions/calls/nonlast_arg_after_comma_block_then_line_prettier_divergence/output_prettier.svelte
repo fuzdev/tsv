@@ -4,13 +4,13 @@
 	// comment trails the comma.
 	fn(
 		a /* c1 */, // c2
-		b,
+		b
 	);
 
 	// The after-comma block+line in the middle of three args (not just the first).
 	fn(
 		a /* c1 */, // c2
 		b,
-		c,
+		c
 	);
 </script>

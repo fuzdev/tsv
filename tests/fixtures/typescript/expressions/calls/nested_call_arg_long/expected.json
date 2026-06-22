@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 332,
+	"end": 331,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -46,12 +46,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 331,
+		"end": 330,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 322,
+			"end": 321,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -257,7 +257,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 214,
-					"end": 321,
+					"end": 320,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -271,7 +271,7 @@
 					"expression": {
 						"type": "CallExpression",
 						"start": 214,
-						"end": 320,
+						"end": 319,
 						"loc": {
 							"start": {
 								"line": 6,

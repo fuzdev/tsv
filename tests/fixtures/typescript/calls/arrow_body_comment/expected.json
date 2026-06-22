@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 485,
+	"end": 483,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " Arrow body comment with ternary body",
-			"start": 322,
-			"end": 361,
+			"start": 321,
+			"end": 360,
 			"loc": {
 				"start": {
 					"line": 14,
@@ -93,8 +93,8 @@
 		{
 			"type": "Block",
 			"value": " comment_long_enough_to_force_break_aaaaaaa ",
-			"start": 393,
-			"end": 441,
+			"start": 392,
+			"end": 440,
 			"loc": {
 				"start": {
 					"line": 17,
@@ -110,12 +110,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 484,
+		"end": 482,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 475,
+			"end": 473,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -333,7 +333,7 @@
 				{
 					"type": "BlockStatement",
 					"start": 205,
-					"end": 319,
+					"end": 318,
 					"loc": {
 						"start": {
 							"line": 8,
@@ -348,7 +348,7 @@
 						{
 							"type": "VariableDeclaration",
 							"start": 209,
-							"end": 316,
+							"end": 315,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -363,7 +363,7 @@
 								{
 									"type": "VariableDeclarator",
 									"start": 213,
-									"end": 315,
+									"end": 314,
 									"loc": {
 										"start": {
 											"line": 9,
@@ -393,7 +393,7 @@
 									"init": {
 										"type": "NewExpression",
 										"start": 217,
-										"end": 315,
+										"end": 314,
 										"loc": {
 											"start": {
 												"line": 9,
@@ -534,8 +534,8 @@
 				},
 				{
 					"type": "BlockStatement",
-					"start": 363,
-					"end": 474,
+					"start": 362,
+					"end": 472,
 					"loc": {
 						"start": {
 							"line": 15,
@@ -549,8 +549,8 @@
 					"body": [
 						{
 							"type": "VariableDeclaration",
-							"start": 367,
-							"end": 471,
+							"start": 366,
+							"end": 469,
 							"loc": {
 								"start": {
 									"line": 16,
@@ -564,8 +564,8 @@
 							"declarations": [
 								{
 									"type": "VariableDeclarator",
-									"start": 371,
-									"end": 470,
+									"start": 370,
+									"end": 468,
 									"loc": {
 										"start": {
 											"line": 16,
@@ -578,8 +578,8 @@
 									},
 									"id": {
 										"type": "Identifier",
-										"start": 371,
-										"end": 372,
+										"start": 370,
+										"end": 371,
 										"loc": {
 											"start": {
 												"line": 16,
@@ -594,8 +594,8 @@
 									},
 									"init": {
 										"type": "CallExpression",
-										"start": 375,
-										"end": 470,
+										"start": 374,
+										"end": 468,
 										"loc": {
 											"start": {
 												"line": 16,
@@ -608,8 +608,8 @@
 										},
 										"callee": {
 											"type": "Identifier",
-											"start": 375,
-											"end": 378,
+											"start": 374,
+											"end": 377,
 											"loc": {
 												"start": {
 													"line": 16,
@@ -625,8 +625,8 @@
 										"arguments": [
 											{
 												"type": "ArrowFunctionExpression",
-												"start": 379,
-												"end": 465,
+												"start": 378,
+												"end": 464,
 												"loc": {
 													"start": {
 														"line": 16,
@@ -644,8 +644,8 @@
 												"params": [
 													{
 														"type": "Identifier",
-														"start": 380,
-														"end": 385,
+														"start": 379,
+														"end": 384,
 														"loc": {
 															"start": {
 																"line": 16,
@@ -661,8 +661,8 @@
 												],
 												"body": {
 													"type": "ConditionalExpression",
-													"start": 442,
-													"end": 465,
+													"start": 441,
+													"end": 464,
 													"loc": {
 														"start": {
 															"line": 17,
@@ -675,8 +675,8 @@
 													},
 													"test": {
 														"type": "Identifier",
-														"start": 442,
-														"end": 447,
+														"start": 441,
+														"end": 446,
 														"loc": {
 															"start": {
 																"line": 17,
@@ -691,8 +691,8 @@
 													},
 													"consequent": {
 														"type": "Identifier",
-														"start": 450,
-														"end": 456,
+														"start": 449,
+														"end": 455,
 														"loc": {
 															"start": {
 																"line": 17,
@@ -707,8 +707,8 @@
 													},
 													"alternate": {
 														"type": "Identifier",
-														"start": 459,
-														"end": 465,
+														"start": 458,
+														"end": 464,
 														"loc": {
 															"start": {
 																"line": 17,
@@ -725,8 +725,8 @@
 														{
 															"type": "Block",
 															"value": " comment_long_enough_to_force_break_aaaaaaa ",
-															"start": 393,
-															"end": 441
+															"start": 392,
+															"end": 440
 														}
 													]
 												}
@@ -743,8 +743,8 @@
 						{
 							"type": "Line",
 							"value": " Arrow body comment with ternary body",
-							"start": 322,
-							"end": 361
+							"start": 321,
+							"end": 360
 						}
 					]
 				}

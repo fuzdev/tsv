@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 436,
+	"end": 435,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " own-line block comment before first property forces expansion",
-			"start": 113,
-			"end": 177,
+			"start": 112,
+			"end": 176,
 			"loc": {
 				"start": {
 					"line": 9,
@@ -61,8 +61,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 189,
-			"end": 196,
+			"start": 188,
+			"end": 195,
 			"loc": {
 				"start": {
 					"line": 11,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " own-line block comment after last property forces expansion",
-			"start": 221,
-			"end": 283,
+			"start": 219,
+			"end": 281,
 			"loc": {
 				"start": {
 					"line": 16,
@@ -93,8 +93,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 307,
-			"end": 314,
+			"start": 304,
+			"end": 311,
 			"loc": {
 				"start": {
 					"line": 20,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " same-line block comment does NOT force expansion (short pattern)",
-			"start": 327,
-			"end": 394,
+			"start": 324,
+			"end": 391,
 			"loc": {
 				"start": {
 					"line": 23,
@@ -125,16 +125,16 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 407,
-			"end": 414,
+			"start": 405,
+			"end": 412,
 			"loc": {
 				"start": {
 					"line": 24,
-					"column": 12
+					"column": 13
 				},
 				"end": {
 					"line": 24,
-					"column": 19
+					"column": 20
 				}
 			}
 		}
@@ -142,12 +142,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 435,
+		"end": 434,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 426,
+			"end": 425,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -162,7 +162,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 73,
-					"end": 110,
+					"end": 109,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -177,7 +177,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 79,
-							"end": 109,
+							"end": 108,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -191,7 +191,7 @@
 							"id": {
 								"type": "ObjectPattern",
 								"start": 79,
-								"end": 103,
+								"end": 102,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -317,8 +317,8 @@
 							},
 							"init": {
 								"type": "Identifier",
-								"start": 106,
-								"end": 109,
+								"start": 105,
+								"end": 108,
 								"loc": {
 									"start": {
 										"line": 7,
@@ -345,8 +345,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 179,
-					"end": 218,
+					"start": 178,
+					"end": 216,
 					"loc": {
 						"start": {
 							"line": 10,
@@ -360,8 +360,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 185,
-							"end": 217,
+							"start": 184,
+							"end": 215,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -374,8 +374,8 @@
 							},
 							"id": {
 								"type": "ObjectPattern",
-								"start": 185,
-								"end": 211,
+								"start": 184,
+								"end": 209,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -389,8 +389,8 @@
 								"properties": [
 									{
 										"type": "Property",
-										"start": 199,
-										"end": 201,
+										"start": 198,
+										"end": 200,
 										"loc": {
 											"start": {
 												"line": 12,
@@ -406,8 +406,8 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 199,
-											"end": 201,
+											"start": 198,
+											"end": 200,
 											"loc": {
 												"start": {
 													"line": 12,
@@ -422,8 +422,8 @@
 										},
 										"value": {
 											"type": "Identifier",
-											"start": 199,
-											"end": 201,
+											"start": 198,
+											"end": 200,
 											"loc": {
 												"start": {
 													"line": 12,
@@ -441,15 +441,15 @@
 											{
 												"type": "Block",
 												"value": " c ",
-												"start": 189,
-												"end": 196
+												"start": 188,
+												"end": 195
 											}
 										]
 									},
 									{
 										"type": "Property",
-										"start": 205,
-										"end": 207,
+										"start": 204,
+										"end": 206,
 										"loc": {
 											"start": {
 												"line": 13,
@@ -465,8 +465,8 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 205,
-											"end": 207,
+											"start": 204,
+											"end": 206,
 											"loc": {
 												"start": {
 													"line": 13,
@@ -481,8 +481,8 @@
 										},
 										"value": {
 											"type": "Identifier",
-											"start": 205,
-											"end": 207,
+											"start": 204,
+											"end": 206,
 											"loc": {
 												"start": {
 													"line": 13,
@@ -501,8 +501,8 @@
 							},
 							"init": {
 								"type": "Identifier",
-								"start": 214,
-								"end": 217,
+								"start": 212,
+								"end": 215,
 								"loc": {
 									"start": {
 										"line": 14,
@@ -522,15 +522,15 @@
 						{
 							"type": "Line",
 							"value": " own-line block comment before first property forces expansion",
-							"start": 113,
-							"end": 177
+							"start": 112,
+							"end": 176
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 285,
-					"end": 324,
+					"start": 283,
+					"end": 321,
 					"loc": {
 						"start": {
 							"line": 17,
@@ -544,8 +544,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 291,
-							"end": 323,
+							"start": 289,
+							"end": 320,
 							"loc": {
 								"start": {
 									"line": 17,
@@ -558,8 +558,8 @@
 							},
 							"id": {
 								"type": "ObjectPattern",
-								"start": 291,
-								"end": 317,
+								"start": 289,
+								"end": 314,
 								"loc": {
 									"start": {
 										"line": 17,
@@ -573,8 +573,8 @@
 								"properties": [
 									{
 										"type": "Property",
-										"start": 295,
-										"end": 297,
+										"start": 293,
+										"end": 295,
 										"loc": {
 											"start": {
 												"line": 18,
@@ -590,8 +590,8 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 295,
-											"end": 297,
+											"start": 293,
+											"end": 295,
 											"loc": {
 												"start": {
 													"line": 18,
@@ -606,8 +606,8 @@
 										},
 										"value": {
 											"type": "Identifier",
-											"start": 295,
-											"end": 297,
+											"start": 293,
+											"end": 295,
 											"loc": {
 												"start": {
 													"line": 18,
@@ -624,8 +624,8 @@
 									},
 									{
 										"type": "Property",
-										"start": 301,
-										"end": 303,
+										"start": 299,
+										"end": 301,
 										"loc": {
 											"start": {
 												"line": 19,
@@ -641,8 +641,8 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 301,
-											"end": 303,
+											"start": 299,
+											"end": 301,
 											"loc": {
 												"start": {
 													"line": 19,
@@ -657,8 +657,8 @@
 										},
 										"value": {
 											"type": "Identifier",
-											"start": 301,
-											"end": 303,
+											"start": 299,
+											"end": 301,
 											"loc": {
 												"start": {
 													"line": 19,
@@ -677,8 +677,8 @@
 							},
 							"init": {
 								"type": "Identifier",
-								"start": 320,
-								"end": 323,
+								"start": 317,
+								"end": 320,
 								"loc": {
 									"start": {
 										"line": 21,
@@ -694,8 +694,8 @@
 									{
 										"type": "Block",
 										"value": " c ",
-										"start": 307,
-										"end": 314
+										"start": 304,
+										"end": 311
 									}
 								]
 							}
@@ -706,15 +706,15 @@
 						{
 							"type": "Line",
 							"value": " own-line block comment after last property forces expansion",
-							"start": 221,
-							"end": 283
+							"start": 219,
+							"end": 281
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 396,
-					"end": 425,
+					"start": 393,
+					"end": 424,
 					"loc": {
 						"start": {
 							"line": 24,
@@ -722,14 +722,14 @@
 						},
 						"end": {
 							"line": 24,
-							"column": 30
+							"column": 32
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 402,
-							"end": 424,
+							"start": 399,
+							"end": 423,
 							"loc": {
 								"start": {
 									"line": 24,
@@ -737,13 +737,13 @@
 								},
 								"end": {
 									"line": 24,
-									"column": 29
+									"column": 31
 								}
 							},
 							"id": {
 								"type": "ObjectPattern",
-								"start": 402,
-								"end": 418,
+								"start": 399,
+								"end": 417,
 								"loc": {
 									"start": {
 										"line": 24,
@@ -751,22 +751,22 @@
 									},
 									"end": {
 										"line": 24,
-										"column": 23
+										"column": 25
 									}
 								},
 								"properties": [
 									{
 										"type": "Property",
-										"start": 403,
-										"end": 405,
+										"start": 401,
+										"end": 403,
 										"loc": {
 											"start": {
 												"line": 24,
-												"column": 8
+												"column": 9
 											},
 											"end": {
 												"line": 24,
-												"column": 10
+												"column": 11
 											}
 										},
 										"method": false,
@@ -774,32 +774,32 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 403,
-											"end": 405,
+											"start": 401,
+											"end": 403,
 											"loc": {
 												"start": {
 													"line": 24,
-													"column": 8
+													"column": 9
 												},
 												"end": {
 													"line": 24,
-													"column": 10
+													"column": 11
 												}
 											},
 											"name": "a3"
 										},
 										"value": {
 											"type": "Identifier",
-											"start": 403,
-											"end": 405,
+											"start": 401,
+											"end": 403,
 											"loc": {
 												"start": {
 													"line": 24,
-													"column": 8
+													"column": 9
 												},
 												"end": {
 													"line": 24,
-													"column": 10
+													"column": 11
 												}
 											},
 											"name": "a3"
@@ -809,23 +809,23 @@
 											{
 												"type": "Block",
 												"value": " c ",
-												"start": 407,
-												"end": 414
+												"start": 405,
+												"end": 412
 											}
 										]
 									},
 									{
 										"type": "Property",
-										"start": 415,
-										"end": 417,
+										"start": 413,
+										"end": 415,
 										"loc": {
 											"start": {
 												"line": 24,
-												"column": 20
+												"column": 21
 											},
 											"end": {
 												"line": 24,
-												"column": 22
+												"column": 23
 											}
 										},
 										"method": false,
@@ -833,32 +833,32 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 415,
-											"end": 417,
+											"start": 413,
+											"end": 415,
 											"loc": {
 												"start": {
 													"line": 24,
-													"column": 20
+													"column": 21
 												},
 												"end": {
 													"line": 24,
-													"column": 22
+													"column": 23
 												}
 											},
 											"name": "b3"
 										},
 										"value": {
 											"type": "Identifier",
-											"start": 415,
-											"end": 417,
+											"start": 413,
+											"end": 415,
 											"loc": {
 												"start": {
 													"line": 24,
-													"column": 20
+													"column": 21
 												},
 												"end": {
 													"line": 24,
-													"column": 22
+													"column": 23
 												}
 											},
 											"name": "b3"
@@ -869,16 +869,16 @@
 							},
 							"init": {
 								"type": "Identifier",
-								"start": 421,
-								"end": 424,
+								"start": 420,
+								"end": 423,
 								"loc": {
 									"start": {
 										"line": 24,
-										"column": 26
+										"column": 28
 									},
 									"end": {
 										"line": 24,
-										"column": 29
+										"column": 31
 									}
 								},
 								"name": "obj"
@@ -890,8 +890,8 @@
 						{
 							"type": "Line",
 							"value": " same-line block comment does NOT force expansion (short pattern)",
-							"start": 327,
-							"end": 394
+							"start": 324,
+							"end": 391
 						}
 					]
 				}

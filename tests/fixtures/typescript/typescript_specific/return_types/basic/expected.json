@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 325,
+	"end": 324,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,12 +13,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 324,
+		"end": 323,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 315,
+			"end": 314,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -573,7 +573,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 186,
-					"end": 262,
+					"end": 261,
 					"loc": {
 						"start": {
 							"line": 10,
@@ -588,7 +588,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 192,
-							"end": 261,
+							"end": 260,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -618,7 +618,7 @@
 							"init": {
 								"type": "ObjectExpression",
 								"start": 198,
-								"end": 261,
+								"end": 260,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -873,8 +873,8 @@
 				},
 				{
 					"type": "ClassDeclaration",
-					"start": 264,
-					"end": 314,
+					"start": 263,
+					"end": 313,
 					"loc": {
 						"start": {
 							"line": 16,
@@ -887,8 +887,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 270,
-						"end": 271,
+						"start": 269,
+						"end": 270,
 						"loc": {
 							"start": {
 								"line": 16,
@@ -904,8 +904,8 @@
 					"superClass": null,
 					"body": {
 						"type": "ClassBody",
-						"start": 272,
-						"end": 314,
+						"start": 271,
+						"end": 313,
 						"loc": {
 							"start": {
 								"line": 16,
@@ -919,8 +919,8 @@
 						"body": [
 							{
 								"type": "MethodDefinition",
-								"start": 276,
-								"end": 311,
+								"start": 275,
+								"end": 310,
 								"loc": {
 									"start": {
 										"line": 17,
@@ -935,8 +935,8 @@
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 276,
-									"end": 282,
+									"start": 275,
+									"end": 281,
 									"loc": {
 										"start": {
 											"line": 17,
@@ -952,8 +952,8 @@
 								"kind": "method",
 								"value": {
 									"type": "FunctionExpression",
-									"start": 282,
-									"end": 311,
+									"start": 281,
+									"end": 310,
 									"loc": {
 										"start": {
 											"line": 17,
@@ -971,8 +971,8 @@
 									"params": [],
 									"returnType": {
 										"type": "TSTypeAnnotation",
-										"start": 284,
-										"end": 292,
+										"start": 283,
+										"end": 291,
 										"loc": {
 											"start": {
 												"line": 17,
@@ -985,8 +985,8 @@
 										},
 										"typeAnnotation": {
 											"type": "TSNumberKeyword",
-											"start": 286,
-											"end": 292,
+											"start": 285,
+											"end": 291,
 											"loc": {
 												"start": {
 													"line": 17,
@@ -1001,8 +1001,8 @@
 									},
 									"body": {
 										"type": "BlockStatement",
-										"start": 293,
-										"end": 311,
+										"start": 292,
+										"end": 310,
 										"loc": {
 											"start": {
 												"line": 17,
@@ -1016,8 +1016,8 @@
 										"body": [
 											{
 												"type": "ReturnStatement",
-												"start": 298,
-												"end": 307,
+												"start": 297,
+												"end": 306,
 												"loc": {
 													"start": {
 														"line": 18,
@@ -1030,8 +1030,8 @@
 												},
 												"argument": {
 													"type": "Literal",
-													"start": 305,
-													"end": 306,
+													"start": 304,
+													"end": 305,
 													"loc": {
 														"start": {
 															"line": 18,

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 551,
+	"end": 550,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -62,12 +62,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 550,
+		"end": 549,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 541,
+			"end": 540,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -563,7 +563,7 @@
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 400,
-					"end": 540,
+					"end": 539,
 					"loc": {
 						"start": {
 							"line": 11,
@@ -593,7 +593,7 @@
 					"typeAnnotation": {
 						"type": "TSUnionType",
 						"start": 413,
-						"end": 539,
+						"end": 538,
 						"loc": {
 							"start": {
 								"line": 12,
@@ -608,7 +608,7 @@
 							{
 								"type": "TSParenthesizedType",
 								"start": 415,
-								"end": 532,
+								"end": 531,
 								"loc": {
 									"start": {
 										"line": 12,
@@ -622,7 +622,7 @@
 								"typeAnnotation": {
 									"type": "TSFunctionType",
 									"start": 416,
-									"end": 531,
+									"end": 530,
 									"loc": {
 										"start": {
 											"line": 12,
@@ -821,8 +821,8 @@
 									],
 									"typeAnnotation": {
 										"type": "TSTypeAnnotation",
-										"start": 524,
-										"end": 531,
+										"start": 523,
+										"end": 530,
 										"loc": {
 											"start": {
 												"line": 17,
@@ -835,8 +835,8 @@
 										},
 										"typeAnnotation": {
 											"type": "TSVoidKeyword",
-											"start": 527,
-											"end": 531,
+											"start": 526,
+											"end": 530,
 											"loc": {
 												"start": {
 													"line": 17,
@@ -853,8 +853,8 @@
 							},
 							{
 								"type": "TSTypeReference",
-								"start": 537,
-								"end": 539,
+								"start": 536,
+								"end": 538,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -867,8 +867,8 @@
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 537,
-									"end": 539,
+									"start": 536,
+									"end": 538,
 									"loc": {
 										"start": {
 											"line": 18,

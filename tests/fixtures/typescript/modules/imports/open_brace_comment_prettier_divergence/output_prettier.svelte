@@ -2,20 +2,20 @@
 	// line comment trailing import `{` - single specifier
 	import {
 		// c1
-		a,
+		a
 	} from './a';
 
 	// line comment trailing import `{` - multiple specifiers
 	import {
 		// c2
 		b,
-		c,
+		c
 	} from './b';
 
 	// block comment trailing `{`, then own-line leading comment
 	import {
 		/* brace */
 		// lead
-		d,
+		d
 	} from './d';
 </script>

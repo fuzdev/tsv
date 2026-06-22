@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 138,
+	"end": 140,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -46,12 +46,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 137,
+		"end": 139,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 128,
+			"end": 130,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -66,7 +66,7 @@
 				{
 					"type": "ImportDeclaration",
 					"start": 79,
-					"end": 127,
+					"end": 129,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -74,7 +74,7 @@
 						},
 						"end": {
 							"line": 4,
-							"column": 22
+							"column": 24
 						}
 					},
 					"importKind": "value",
@@ -139,46 +139,46 @@
 					"attributes": [
 						{
 							"type": "ImportAttribute",
-							"start": 113,
-							"end": 125,
+							"start": 114,
+							"end": 126,
 							"loc": {
 								"start": {
 									"line": 4,
-									"column": 8
+									"column": 9
 								},
 								"end": {
 									"line": 4,
-									"column": 20
+									"column": 21
 								}
 							},
 							"key": {
 								"type": "Identifier",
-								"start": 113,
-								"end": 117,
+								"start": 114,
+								"end": 118,
 								"loc": {
 									"start": {
 										"line": 4,
-										"column": 8
+										"column": 9
 									},
 									"end": {
 										"line": 4,
-										"column": 12
+										"column": 13
 									}
 								},
 								"name": "type"
 							},
 							"value": {
 								"type": "Literal",
-								"start": 119,
-								"end": 125,
+								"start": 120,
+								"end": 126,
 								"loc": {
 									"start": {
 										"line": 4,
-										"column": 14
+										"column": 15
 									},
 									"end": {
 										"line": 4,
-										"column": 20
+										"column": 21
 									}
 								},
 								"value": "json",

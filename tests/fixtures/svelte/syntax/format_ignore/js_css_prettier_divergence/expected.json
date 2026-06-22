@@ -1,21 +1,21 @@
 {
 	"css": {
 		"type": "StyleSheet",
-		"start": 228,
-		"end": 410,
+		"start": 230,
+		"end": 412,
 		"attributes": [],
 		"children": [
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 258,
-					"end": 261,
+					"start": 260,
+					"end": 263,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 258,
-							"end": 261,
+							"start": 260,
+							"end": 263,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -24,12 +24,12 @@
 										{
 											"type": "TypeSelector",
 											"name": "div",
-											"start": 258,
-											"end": 261
+											"start": 260,
+											"end": 263
 										}
 									],
-									"start": 258,
-									"end": 261
+									"start": 260,
+									"end": 263
 								}
 							]
 						}
@@ -37,39 +37,39 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 264,
-					"end": 307,
+					"start": 266,
+					"end": 309,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 268,
-							"end": 280,
+							"start": 270,
+							"end": 282,
 							"property": "color",
 							"value": "red"
 						},
 						{
 							"type": "Declaration",
-							"start": 284,
-							"end": 302,
+							"start": 286,
+							"end": 304,
 							"property": "background",
 							"value": "blue"
 						}
 					]
 				},
-				"start": 258,
-				"end": 307
+				"start": 260,
+				"end": 309
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 333,
-					"end": 334,
+					"start": 335,
+					"end": 336,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 333,
-							"end": 334,
+							"start": 335,
+							"end": 336,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -78,12 +78,12 @@
 										{
 											"type": "TypeSelector",
 											"name": "p",
-											"start": 333,
-											"end": 334
+											"start": 335,
+											"end": 336
 										}
 									],
-									"start": 333,
-									"end": 334
+									"start": 335,
+									"end": 336
 								}
 							]
 						}
@@ -91,39 +91,39 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 337,
-					"end": 375,
+					"start": 339,
+					"end": 377,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 341,
-							"end": 355,
+							"start": 343,
+							"end": 357,
 							"property": "color",
 							"value": "green"
 						},
 						{
 							"type": "Declaration",
-							"start": 359,
-							"end": 370,
+							"start": 361,
+							"end": 372,
 							"property": "margin",
 							"value": "0"
 						}
 					]
 				},
-				"start": 333,
-				"end": 375
+				"start": 335,
+				"end": 377
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 378,
-					"end": 382,
+					"start": 380,
+					"end": 384,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 378,
-							"end": 382,
+							"start": 380,
+							"end": 384,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -132,12 +132,12 @@
 										{
 											"type": "TypeSelector",
 											"name": "span",
-											"start": 378,
-											"end": 382
+											"start": 380,
+											"end": 384
 										}
 									],
-									"start": 378,
-									"end": 382
+									"start": 380,
+									"end": 384
 								}
 							]
 						}
@@ -145,40 +145,40 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 383,
-					"end": 401,
+					"start": 385,
+					"end": 403,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 387,
-							"end": 397,
+							"start": 389,
+							"end": 399,
 							"property": "color",
 							"value": "red"
 						}
 					]
 				},
-				"start": 378,
-				"end": 401
+				"start": 380,
+				"end": 403
 			}
 		],
 		"content": {
-			"start": 235,
-			"end": 402,
+			"start": 237,
+			"end": 404,
 			"styles": "\n\t/* format-ignore */\n\tdiv   {   color:   red;   background:   blue;   }\n\n\t/* prettier-ignore */\n\tp   {   color:   green;   margin:   0;   }\n\n\tspan {\n\t\tcolor: red;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 411,
+	"end": 413,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
 		"nodes": [
 			{
 				"type": "Text",
-				"start": 226,
-				"end": 228,
+				"start": 228,
+				"end": 230,
 				"raw": "\n\n",
 				"data": "\n\n"
 			}
@@ -238,12 +238,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 226,
+		"end": 228,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 217,
+			"end": 219,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -739,7 +739,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 193,
-					"end": 216,
+					"end": 218,
 					"loc": {
 						"start": {
 							"line": 11,
@@ -747,14 +747,14 @@
 						},
 						"end": {
 							"line": 11,
-							"column": 24
+							"column": 26
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 199,
-							"end": 215,
+							"end": 217,
 							"loc": {
 								"start": {
 									"line": 11,
@@ -762,7 +762,7 @@
 								},
 								"end": {
 									"line": 11,
-									"column": 23
+									"column": 25
 								}
 							},
 							"id": {
@@ -784,7 +784,7 @@
 							"init": {
 								"type": "ObjectExpression",
 								"start": 203,
-								"end": 215,
+								"end": 217,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -792,22 +792,22 @@
 									},
 									"end": {
 										"line": 11,
-										"column": 23
+										"column": 25
 									}
 								},
 								"properties": [
 									{
 										"type": "Property",
-										"start": 204,
-										"end": 208,
+										"start": 205,
+										"end": 209,
 										"loc": {
 											"start": {
 												"line": 11,
-												"column": 12
+												"column": 13
 											},
 											"end": {
 												"line": 11,
-												"column": 16
+												"column": 17
 											}
 										},
 										"method": false,
@@ -815,32 +815,32 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 204,
-											"end": 205,
+											"start": 205,
+											"end": 206,
 											"loc": {
 												"start": {
 													"line": 11,
-													"column": 12
+													"column": 13
 												},
 												"end": {
 													"line": 11,
-													"column": 13
+													"column": 14
 												}
 											},
 											"name": "f"
 										},
 										"value": {
 											"type": "Literal",
-											"start": 207,
-											"end": 208,
+											"start": 208,
+											"end": 209,
 											"loc": {
 												"start": {
 													"line": 11,
-													"column": 15
+													"column": 16
 												},
 												"end": {
 													"line": 11,
-													"column": 16
+													"column": 17
 												}
 											},
 											"value": 1,
@@ -850,16 +850,16 @@
 									},
 									{
 										"type": "Property",
-										"start": 210,
-										"end": 214,
+										"start": 211,
+										"end": 215,
 										"loc": {
 											"start": {
 												"line": 11,
-												"column": 18
+												"column": 19
 											},
 											"end": {
 												"line": 11,
-												"column": 22
+												"column": 23
 											}
 										},
 										"method": false,
@@ -867,32 +867,32 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 210,
-											"end": 211,
+											"start": 211,
+											"end": 212,
 											"loc": {
 												"start": {
 													"line": 11,
-													"column": 18
+													"column": 19
 												},
 												"end": {
 													"line": 11,
-													"column": 19
+													"column": 20
 												}
 											},
 											"name": "g"
 										},
 										"value": {
 											"type": "Literal",
-											"start": 213,
-											"end": 214,
+											"start": 214,
+											"end": 215,
 											"loc": {
 												"start": {
 													"line": 11,
-													"column": 21
+													"column": 22
 												},
 												"end": {
 													"line": 11,
-													"column": 22
+													"column": 23
 												}
 											},
 											"value": 2,

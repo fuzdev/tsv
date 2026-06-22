@@ -11,18 +11,29 @@
 <!-- Object parameter -->
 
 <!-- 100 chars - object stays inline -->
-<div use:action={{a: 'a', b: 'b', c: 'c', d: 'd', e: 'e', f: 'f', g: 'g', h: 'hhhhhhhhhhhh'}}></div>
+<div
+	use:action={{ a: 'a', b: 'b', c: 'c', d: 'd', e: 'e', f: 'f', g: 'g', h: 'hhhhhhhhhhhh' }}
+></div>
 
 <!-- 101 chars - element wraps, object on its own line -->
 <div
-	use:action={{a: 'a', b: 'b', c: 'c', d: 'd', e: 'e', f: 'f', g: 'g', h: 'hhhhhhhhhhhhh'}}
+	use:action={{ a: 'a', b: 'b', c: 'c', d: 'd', e: 'e', f: 'f', g: 'g', h: 'hhhhhhhhhhhhh' }}
 ></div>
 
 <!-- Object properties wrap when attribute line exceeds 100 chars -->
 
 <!-- 100 chars attribute line - object inline -->
 <div
-	use:action={{a: 'a', b: 'b', c: 'c', d: 'd', e: 'e', f: 'f', g: 'g', h: 'hhhhhhhhhhhhhhhhhhhhhh'}}
+	use:action={{
+		a: 'a',
+		b: 'b',
+		c: 'c',
+		d: 'd',
+		e: 'e',
+		f: 'f',
+		g: 'g',
+		h: 'hhhhhhhhhhhhhhhhhhhhhh'
+	}}
 ></div>
 
 <!-- 101 chars attribute line - object properties wrap -->
@@ -35,7 +46,7 @@
 		e: 'e',
 		f: 'f',
 		g: 'g',
-		h: 'hhhhhhhhhhhhhhhhhhhhhhh',
+		h: 'hhhhhhhhhhhhhhhhhhhhhhh'
 	}}
 ></div>
 
@@ -108,7 +119,7 @@
 		aaa,
 		aaa,
 		aaa,
-		aaaaaaa,
+		aaaaaaa
 	)}
 ></div>
 
@@ -135,7 +146,7 @@
 		aaa,
 		aaa,
 		aaa,
-		aaaaaaaaaaa,
+		aaaaaaaaaaa
 	)}
 ></div>
 
@@ -164,6 +175,6 @@
 		aaa,
 		aaa,
 		aaa,
-		aaaaaaaaa,
+		aaaaaaaaa
 	]}
 ></div>

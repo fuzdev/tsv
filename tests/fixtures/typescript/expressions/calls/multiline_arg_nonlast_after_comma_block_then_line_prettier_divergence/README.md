@@ -11,7 +11,7 @@ comma line. Prettier relocates it before the comma.
 fn(                             fn(
 	a, /* c1 */ // c2                 a /* c1 */, // c2
 	`line1                            `line1
-line2`,                         line2`,
+line2`                          line2`
 );                              );
 ```
 

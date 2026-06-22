@@ -21,5 +21,5 @@
 	import {} from /* { */ 'k';
 
 	// block comment between from and source (with specifiers)
-	import {a} from /* c */ 'i';
+	import { a } from /* c */ 'i';
 </script>

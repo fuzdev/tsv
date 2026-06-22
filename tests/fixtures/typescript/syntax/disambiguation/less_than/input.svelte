@@ -99,8 +99,8 @@
 	const k2 = (x as T).a < (y as U).b;
 
 	// --- In object literal ---
-	const l1 = {a: x < y};
-	const l2 = {a: x.a < x.b, b: y < z};
+	const l1 = { a: x < y };
+	const l2 = { a: x.a < x.b, b: y < z };
 
 	// --- In array literal ---
 	const m1 = [a < b, c < d];
@@ -173,7 +173,7 @@
 	type W3 = X<T[K]>;
 
 	// --- Type literal as type arg ---
-	fn<{a: T}>();
+	fn<{ a: T }>();
 	fn<[T, U]>();
 	fn<'a' | 'b'>();
 

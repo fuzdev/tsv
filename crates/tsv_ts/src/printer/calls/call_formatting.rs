@@ -115,8 +115,8 @@ pub(super) fn build_call_doc_with_wrapping(
         // Own-line trailing comments after the arg (any line comment, or a block
         // comment on a line below the arg) aren't handled by the single-arg
         // branches below — defer to the general comment path (which emits them
-        // after the trailing comma). Same-line inline trailing block comments
-        // (e.g. `fn(/* c */ a /* t */)`) stay on this fast path.
+        // after the last arg, no trailing comma). Same-line inline trailing block
+        // comments (e.g. `fn(/* c */ a /* t */)`) stay on this fast path.
         let has_own_line_trailing_comment =
             tsv_lang::comments_in_range(printer.comments, arg_end, paren_close).any(|c| {
                 !c.is_block
@@ -159,7 +159,7 @@ pub(super) fn build_call_doc_with_wrapping(
                 callee,
                 d.text("("),
                 d.concat(&paren_line_prefix),
-                d.indent(d.concat(&[d.hardline(), d.concat(&inner), d.text(",")])),
+                d.indent(d.concat(&[d.hardline(), d.concat(&inner)])),
                 d.hardline(),
                 d.text(")"),
             ]);
@@ -330,7 +330,7 @@ pub(super) fn build_call_doc_with_wrapping(
                     return d.concat(&[
                         callee,
                         d.text("("),
-                        d.indent(d.concat(&[d.softline(), arrow_doc, d.text(",")])),
+                        d.indent(d.concat(&[d.softline(), arrow_doc])),
                         d.softline(),
                         d.text(")"),
                     ]);
@@ -349,19 +349,18 @@ pub(super) fn build_call_doc_with_wrapping(
                     )
                 {
                     // When the arrow has own-line comments between => and body,
-                    // keep the arrow start on the same line as callee(, but add
-                    // trailing comma and break closing paren to its own line.
-                    // Matches Prettier's expandLastArg behavior where the arrow
-                    // is reprinted with trailingComma + softline appended.
+                    // keep the arrow start on the same line as callee(, and break the
+                    // closing paren to its own line (no trailing comma; trailingComma:
+                    // 'none'). Matches Prettier's expandLastArg behavior where the arrow
+                    // is reprinted with a softline appended.
                     let body_start = body_expr.span().start;
                     let arrow_token = printer.find_arrow_token_for(arrow);
                     if printer.has_own_line_post_arrow_comment(arrow_token, body_start) {
-                        // group_break forces the arrow to break. Trailing comma
-                        // and softline after it cause `,\n)` when the group breaks.
+                        // group_break forces the arrow to break. The softline after it
+                        // causes `\n)` when the group breaks.
                         let inner = d.concat(&[
                             d.text("("),
                             d.group_break(arrow_doc),
-                            d.text(","),
                             d.softline(),
                             d.text(")"),
                         ]);
@@ -377,7 +376,7 @@ pub(super) fn build_call_doc_with_wrapping(
                         callee,
                         d.group_break(d.concat(&[
                             d.text("("),
-                            d.indent(d.concat(&[d.line(), arrow_doc, d.trailing_comma()])),
+                            d.indent(d.concat(&[d.line(), arrow_doc])),
                             d.line(),
                             d.text(")"),
                         ])),
@@ -392,7 +391,7 @@ pub(super) fn build_call_doc_with_wrapping(
                     d.concat(&[
                         callee,
                         d.text("("),
-                        d.indent(d.concat(&[d.softline(), arrow_doc, d.text(",")])),
+                        d.indent(d.concat(&[d.softline(), arrow_doc])),
                         d.softline(),
                         d.text(")"),
                     ]),
@@ -500,16 +499,16 @@ pub(super) fn build_call_doc_with_wrapping(
                         );
 
                         // Build state 1: break version with params on call line, body breaks
-                        // Structure: callee + "(" + sig + " =>" + indent([hardline, body, ","]) + hardline + ")"
+                        // Structure: callee + "(" + sig + " =>" + indent([hardline, body]) + hardline + ")"
                         // First hardline: breaks after "=>"
                         // Second hardline: breaks before ")" to put closing paren on its own line
-                        // Note: Use literal "," not trailing_comma() because state[1] is used in Flat mode
+                        // No trailing comma (trailingComma: 'none').
                         let state_break = d.concat(&[
                             callee,
                             d.text("("),
                             sig_doc,
                             d.text(" =>"),
-                            d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
+                            d.indent(d.concat(&[d.hardline(), body_doc])),
                             d.hardline(),
                             d.text(")"),
                         ]);
@@ -544,7 +543,7 @@ pub(super) fn build_call_doc_with_wrapping(
                                 d.hardline(),
                                 sig_doc,
                                 d.text(" =>"),
-                                d.indent(d.concat(&[d.hardline(), body_doc, d.trailing_comma()])),
+                                d.indent(d.concat(&[d.hardline(), body_doc])),
                             ])),
                             d.hardline(),
                             d.text(")"),
@@ -986,9 +985,9 @@ pub(super) fn build_call_doc_with_wrapping(
         // line). Injected after `(` in the force-expansion wrap below.
         let mut paren_line_prefix_parts: Vec<DocId> = Vec::new();
         let mut force_expansion = false;
-        let mut has_trailing_comma_on_last = false;
-        // Block comment trailing the last arg after the comma — preserved after the
-        // (synthetic) trailing comma (prettier relocates before; see conformance_prettier.md).
+        // Block comment trailing the last arg after its source comma — preserved past
+        // where the comma was (no trailing comma; prettier relocates before; see
+        // conformance_prettier.md).
         let mut last_after_comma: Vec<DocId> = Vec::new();
 
         for (i, arg) in call.arguments.iter().enumerate() {
@@ -1141,11 +1140,11 @@ pub(super) fn build_call_doc_with_wrapping(
                 // avoids merging consecutive comments onto one line (which reverses their
                 // order) and content loss. The `new`/member-chain last-arg paths do the
                 // same via the shared emit_* helpers; this path keeps its own loop only
-                // for the block comma-split (`b /* c */,` vs past the trailing comma).
+                // for the block comma-split (before- vs after-comma; no trailing comma).
 
                 // (1) Same-line block comments: before-comma blocks trail the arg, after-
-                // comma blocks are preserved past the trailing comma. Don't force
-                // expansion on their own — let width/source newlines decide.
+                // comma blocks are preserved past where the comma was (no trailing comma).
+                // Don't force expansion on their own — let width/source newlines decide.
                 // e.g., fn({short} /* c */) stays inline, fn({long...} /* c */) expands.
                 let comma_pos = find_comma_pos(printer.source, effective_arg_end, paren_close);
                 for comment in &pc.trailing_block {
@@ -1158,13 +1157,9 @@ pub(super) fn build_call_doc_with_wrapping(
                     }
                 }
 
-                // (2) Same-line line comment, after the comma, via `line_suffix`.
+                // (2) Same-line line comment after the last arg, via `line_suffix`.
+                // No trailing comma precedes it (trailingComma: 'none').
                 if pc.has_trailing_line() {
-                    if !has_trailing_comma_on_last {
-                        arg_parts.push(d.text(","));
-                        has_trailing_comma_on_last = true;
-                    }
-
                     // Build comment docs: " // comment" for each
                     let comment_docs: Vec<_> = pc
                         .trailing_line
@@ -1183,15 +1178,12 @@ pub(super) fn build_call_doc_with_wrapping(
                 }
 
                 // (3) Own-line comments (block or line) after the last arg, before the
-                // closing paren — emitted after the trailing comma, each on its own line.
-                // Also handles spread with stripped parens via effective_arg_end.
+                // closing paren — emitted each on its own line, with no trailing comma
+                // (trailingComma: 'none'). Also handles spread with stripped parens via
+                // effective_arg_end.
                 if !pc.leading.is_empty() {
                     force_expansion = true;
-                    pc.emit_last_arg_dangling_comments(
-                        &mut arg_parts,
-                        printer,
-                        &mut has_trailing_comma_on_last,
-                    );
+                    pc.emit_dangling_comments(&mut arg_parts, printer);
                 }
             }
         }
@@ -1202,13 +1194,7 @@ pub(super) fn build_call_doc_with_wrapping(
         // Use a group with break_parent instead of literal hardlines to avoid
         // propagating breaks to parent (e.g., assignment) during fits().
         if force_expansion {
-            // Build manually when we have trailing comments (we already added our commas)
-            // Add trailing comma after last arg ONLY if we didn't already add one
-            let trailing = if has_trailing_comma_on_last {
-                d.empty()
-            } else {
-                d.text(",")
-            };
+            // No trailing comma after the last arg (trailingComma: 'none').
             // Use hardlines for the expansion. The assignment should use NeverBreakAfterOperator
             // for calls since they handle their own expansion.
             // Wrap in group_break so line() separators between non-commented args
@@ -1220,45 +1206,21 @@ pub(super) fn build_call_doc_with_wrapping(
                 d.text("("),
                 d.concat(&paren_line_prefix_parts),
                 d.group_break(d.concat(&[
-                    d.indent(d.concat(&[
-                        d.hardline(),
-                        arg_doc,
-                        trailing,
-                        d.concat(&last_after_comma),
-                    ])),
+                    d.indent(d.concat(&[d.hardline(), arg_doc, d.concat(&last_after_comma)])),
                     d.hardline(),
                 ])),
                 d.text(")"),
             ]);
         }
 
-        // When we have a trailing comment on the last arg, we already added the comma
-        // before the comment. Use a custom soft-break structure that doesn't add
-        // another trailing comma.
-        if has_trailing_comma_on_last {
-            return d.concat(&[
-                callee,
-                d.group(d.concat(&[
-                    d.text("("),
-                    d.indent_softline(d.concat(&[arg_doc, d.concat(&last_after_comma)])),
-                    d.softline(),
-                    d.text(")"),
-                ])),
-            ]);
-        }
-
-        // After-comma block comment on the last arg: preserve it past the trailing
-        // comma (soft-break wrapper with the comment inserted after `trailing_comma`).
+        // After-comma block comment on the last arg: preserved past where the comma
+        // was (soft-break wrapper; no trailing comma, trailingComma: 'none').
         if !last_after_comma.is_empty() {
             return d.concat(&[
                 callee,
                 d.group(d.concat(&[
                     d.text("("),
-                    d.indent_softline(d.concat(&[
-                        arg_doc,
-                        d.trailing_comma(),
-                        d.concat(&last_after_comma),
-                    ])),
+                    d.indent_softline(d.concat(&[arg_doc, d.concat(&last_after_comma)])),
                     d.softline(),
                     d.text(")"),
                 ])),
@@ -1324,7 +1286,7 @@ pub(super) fn build_call_doc_with_wrapping(
             callee,
             d.group_break(d.concat(&[
                 d.text("("),
-                d.indent_softline(d.concat(&[arg_parts, d.trailing_comma()])),
+                d.indent_softline(arg_parts),
                 d.softline(),
                 d.text(")"),
             ])),

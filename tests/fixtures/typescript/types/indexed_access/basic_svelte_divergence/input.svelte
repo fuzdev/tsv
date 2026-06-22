@@ -38,5 +38,5 @@
 	type N = (A & B)[K];
 
 	// In mapped type value
-	type O<T> = {[P in keyof T]: T[P]};
+	type O<T> = { [P in keyof T]: T[P] };
 </script>

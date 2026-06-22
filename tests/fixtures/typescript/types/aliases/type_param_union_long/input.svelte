@@ -3,13 +3,13 @@
 	type Constraint<
 		AAAAAAAAAAAAAAAAAAAAAAAAA extends
 			| Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-			| Cccccccccccccccccccccccccccccccccc,
+			| Cccccccccccccccccccccccccccccccccc
 	> = X;
 
 	// union default breaks after `=` the same way
 	type Default<
 		AAAAAAAAAAAAAAAAAAAAAAAAAAAAA =
 			| Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-			| Cccccccccccccccccccccccccccccccccc,
+			| Cccccccccccccccccccccccccccccccccc
 	> = X;
 </script>

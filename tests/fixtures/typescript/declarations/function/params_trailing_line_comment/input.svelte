@@ -1,6 +1,6 @@
 <script>
 	const f = function (
 		a,
-		b, // comment
+		b // comment
 	) {};
 </script>

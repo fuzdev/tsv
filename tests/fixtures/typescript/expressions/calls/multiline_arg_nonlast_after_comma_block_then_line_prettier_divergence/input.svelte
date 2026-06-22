@@ -5,6 +5,6 @@
 	fn(
 		a, /* c1 */ // c2
 		`line1
-line2`,
+line2`
 	);
 </script>

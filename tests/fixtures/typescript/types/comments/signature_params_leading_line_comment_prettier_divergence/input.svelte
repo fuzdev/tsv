@@ -1,10 +1,10 @@
 <script lang="ts">
 	type A = {
 		( // c
-			p: T,
+			p: T
 		): void;
 		new ( // c
-			p: T,
+			p: T
 		): void;
 	};
 </script>

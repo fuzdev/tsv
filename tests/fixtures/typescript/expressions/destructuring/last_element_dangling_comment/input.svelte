@@ -1,14 +1,14 @@
 <script>
 	// object pattern: own-line comments after last property
 	const {
-		a,
+		a
 		// c1
 		// c2
 	} = obj1;
 
 	// array pattern: own-line comments after last element
 	const [
-		b,
+		b
 		// c1
 		// c2
 	] = arr1;
@@ -17,7 +17,7 @@
 	const {
 		c,
 		// between
-		d,
+		d
 		// after
 	} = obj2;
 
@@ -25,7 +25,7 @@
 	const [
 		e,
 		// between
-		f,
+		f
 		// after
 	] = arr2;
 </script>

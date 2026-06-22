@@ -3,14 +3,14 @@
 	function fn1<
 		T,
 		// line comment
-		/* c */ U,
+		/* c */ U
 	>() {}
 
 	// Type param declaration: trailing block comment before comma
 	function fn2<
 		T /* c */,
 		// line comment
-		U,
+		U
 	>() {}
 
 	// Type param instantiation (call): inline block comment after comma

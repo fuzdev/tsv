@@ -672,17 +672,17 @@ impl<'a> PartitionedComments<'a> {
         }
     }
 
-    /// Emit the **last** argument's same-line trailing comments split around its
-    /// (possibly synthetic) trailing comma, then push the comma and set `comma_added`:
-    /// before-comma blocks — and, when the source has no trailing comma, every block —
-    /// trail the arg; after-comma blocks stay past the comma (`b, /* c */`), the tsv
-    /// divergence prettier relocates to `b /* c */,`; the same-line line comment follows
-    /// via `line_suffix`.
+    /// Emit the **last** argument's same-line trailing comments split around its source
+    /// comma position: before-comma blocks — and, when the source has no comma, every
+    /// block — trail the arg; after-comma blocks stay past where the comma was
+    /// (`b /* c */`, the tsv divergence prettier relocates to `b /* c */`); the same-line
+    /// line comment follows via `line_suffix`. No trailing comma is emitted
+    /// (trailingComma: 'none').
     ///
     /// The last-argument analogue of [`emit_trailing_comments_around_comma`]: that one
     /// assumes a real separating comma exists (a non-last gap) and drops a before-comma
-    /// block if none is found, whereas the last arg's comma is the synthetic trailing
-    /// one, so a block with no source comma must still precede it. Shared by the
+    /// block if none is found, whereas the last arg has no trailing comma, so a block
+    /// with no source comma must still precede the closing paren. Shared by the
     /// member-chain and `new` last-arg paths so the split rule lives in one place.
     pub fn emit_last_arg_trailing_around_comma(
         &self,
@@ -690,7 +690,6 @@ impl<'a> PartitionedComments<'a> {
         printer: &Printer<'_>,
         arg_end: u32,
         boundary: u32,
-        comma_added: &mut bool,
     ) {
         let d = printer.d();
         let comma_pos = find_comma_pos(printer.source, arg_end, boundary);
@@ -700,8 +699,6 @@ impl<'a> PartitionedComments<'a> {
                 parts.push(printer.build_comment_doc(comment));
             }
         }
-        parts.push(d.text(","));
-        *comma_added = true;
         if let Some(cp) = comma_pos {
             for comment in &self.trailing_block {
                 if is_comment_after_comma(comment, cp) {
@@ -717,10 +714,9 @@ impl<'a> PartitionedComments<'a> {
 
     /// Emit own-line ("leading") comments each on its own line (hardline before),
     /// with no comma. The bare dangling-comment emission shared by every last-argument
-    /// path; callers needing a trailing comma first use
-    /// [`emit_last_arg_dangling_comments`], while comma-less shapes (dynamic `import()`,
-    /// which takes no trailing comma) call this directly. Without it, own-line comments
-    /// before the closing paren are dropped (content loss).
+    /// path (no trailing comma precedes them — trailingComma: 'none') and by comma-less
+    /// shapes (dynamic `import()`). Without it, own-line comments before the closing paren
+    /// are dropped (content loss).
     pub fn emit_dangling_comments(&self, parts: &mut Vec<DocId>, printer: &Printer<'_>) {
         let d = printer.d();
         for comment in &self.leading {
@@ -729,57 +725,27 @@ impl<'a> PartitionedComments<'a> {
         }
     }
 
-    /// Emit own-line ("leading") comments after the last argument, past its
-    /// trailing comma — each on its own line (hardline before).
-    ///
-    /// Ensures the trailing comma is present first, updating `comma_added`, then defers
-    /// to [`emit_dangling_comments`]. Used by the last-argument path of every
-    /// call-shaped printer (plain, `new`, and member-callee chains). Block-only callers
-    /// already worked via their own filters, but line comments need this shared path.
-    pub fn emit_last_arg_dangling_comments(
-        &self,
-        parts: &mut Vec<DocId>,
-        printer: &Printer<'_>,
-        comma_added: &mut bool,
-    ) {
-        if self.leading.is_empty() {
-            return;
-        }
-        if !*comma_added {
-            parts.push(printer.d().text(","));
-            *comma_added = true;
-        }
-        self.emit_dangling_comments(parts, printer);
-    }
-
     /// Emit a last argument's complete trailing-comment region: same-line comments split
-    /// around the (synthetic) trailing comma when any are present (via
-    /// [`emit_last_arg_trailing_around_comma`]), then own-line dangling comments past the
-    /// comma (via [`emit_last_arg_dangling_comments`]), updating `comma_added`.
+    /// around the source comma position when any are present (via
+    /// [`emit_last_arg_trailing_around_comma`]), then own-line dangling comments (via
+    /// [`emit_dangling_comments`]). No trailing comma is emitted (trailingComma: 'none').
     ///
     /// The last-argument counterpart to [`Printer::open_inter_arg_gap`] (the non-last
-    /// gap): shared by the `new` and member-chain last-arg paths so the guard + ordering
-    /// live in one place. (`call_formatting` keeps its own same-line handling — it defers
+    /// gap): shared by the `new` and member-chain last-arg paths so the ordering lives in
+    /// one place. (`call_formatting` keeps its own same-line handling — it defers
     /// after-comma blocks into a separate doc and feeds `force_expansion` — and so calls
-    /// only `emit_last_arg_dangling_comments` directly.)
+    /// only `emit_dangling_comments` directly.)
     pub fn emit_last_arg_comments(
         &self,
         parts: &mut Vec<DocId>,
         printer: &Printer<'_>,
         arg_end: u32,
         boundary: u32,
-        comma_added: &mut bool,
     ) {
         if self.has_trailing_line() || self.has_trailing_block() {
-            self.emit_last_arg_trailing_around_comma(
-                parts,
-                printer,
-                arg_end,
-                boundary,
-                comma_added,
-            );
+            self.emit_last_arg_trailing_around_comma(parts, printer, arg_end, boundary);
         }
-        self.emit_last_arg_dangling_comments(parts, printer, comma_added);
+        self.emit_dangling_comments(parts, printer);
     }
 
     /// Emit leading comments, keeping inline block comments on the same line as `next_pos`.

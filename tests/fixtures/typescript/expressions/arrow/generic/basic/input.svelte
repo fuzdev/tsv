@@ -21,7 +21,7 @@
 	const complexParams = <T, U extends T, V = number>(x: T, y: U, z: V) => [x, y, z];
 
 	// Complex constraint (object type)
-	const objectConstraint = <T extends {foo: string}>(x: T): T => x;
+	const objectConstraint = <T extends { foo: string }>(x: T): T => x;
 
 	// Complex constraint (function type)
 	const fnConstraint = <T extends (x: string) => number>(f: T): T => f;

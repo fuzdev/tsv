@@ -6,12 +6,12 @@
 		c,
 		// group 2
 		d,
-		e,
+		e
 	} from './a';
 
 	import {
 		a1,
 		// mid comment
-		b1,
+		b1
 	} from './b';
 </script>

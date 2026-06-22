@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 459,
+	"end": 458,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -23,7 +23,7 @@
 			{
 				"type": "RegularElement",
 				"start": 304,
-				"end": 458,
+				"end": 457,
 				"name": "span",
 				"name_loc": {
 					"start": {
@@ -51,11 +51,11 @@
 						{
 							"type": "AwaitBlock",
 							"start": 312,
-							"end": 450,
+							"end": 449,
 							"expression": {
 								"type": "CallExpression",
 								"start": 320,
-								"end": 426,
+								"end": 425,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -169,18 +169,18 @@
 							"value": {
 								"type": "Identifier",
 								"name": "r",
-								"start": 432,
-								"end": 433,
+								"start": 431,
+								"end": 432,
 								"loc": {
 									"start": {
 										"line": 9,
 										"column": 8,
-										"character": 432
+										"character": 431
 									},
 									"end": {
 										"line": 9,
 										"column": 9,
-										"character": 433
+										"character": 432
 									}
 								}
 							},
@@ -191,19 +191,19 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 434,
-										"end": 437,
+										"start": 433,
+										"end": 436,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "ExpressionTag",
-										"start": 437,
-										"end": 440,
+										"start": 436,
+										"end": 439,
 										"expression": {
 											"type": "Identifier",
-											"start": 438,
-											"end": 439,
+											"start": 437,
+											"end": 438,
 											"loc": {
 												"start": {
 													"line": 10,
@@ -219,8 +219,8 @@
 									},
 									{
 										"type": "Text",
-										"start": 440,
-										"end": 442,
+										"start": 439,
+										"end": 441,
 										"raw": "\n\t",
 										"data": "\n\t"
 									}
@@ -230,8 +230,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 450,
-							"end": 451,
+							"start": 449,
+							"end": 450,
 							"raw": "\n",
 							"data": "\n"
 						}

@@ -19,7 +19,7 @@
 	const obj = {
 		async method() {
 			return await this.load();
-		},
+		}
 	};
 
 	// Await expression

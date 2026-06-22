@@ -12,7 +12,7 @@
 	type W = A | (B & C) | D;
 
 	// Intersection with object literal
-	type X = A | (B & {c: C}) | D;
+	type X = A | (B & { c: C }) | D;
 
 	// Already parenthesized (preserved)
 	type Y = A | (B & C);

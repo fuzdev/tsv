@@ -10,7 +10,7 @@
 	};
 
 	// Short value type - stays on one line (under 100 chars)
-	type ShortValue = {[key: string]: string | number | boolean};
+	type ShortValue = { [key: string]: string | number | boolean };
 
 	// Long readonly - wraps when exceeds 100 chars
 	type LongReadonly = {

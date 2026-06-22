@@ -7,14 +7,14 @@
 		TParam extends
 			| Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 			| Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-			| Ccccccccccccccccccccccccccccccccccccccccccc,
+			| Ccccccccccccccccccccccccccccccccccccccccccc
 	> = TParam;
 
 	// Long intersection constraint: stripped, first member hugs, rest wrap
 	type LongConstraintI<
 		TParam extends Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa &
 			Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb &
-			Ccccccccccccccccccccccccccccccccccccccccccc,
+			Ccccccccccccccccccccccccccccccccccccccccccc
 	> = TParam;
 
 	// Long union default: stripped, breaks after `=`
@@ -22,13 +22,13 @@
 		TParam =
 			| Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 			| Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-			| Ccccccccccccccccccccccccccccccccccccccccccc,
+			| Ccccccccccccccccccccccccccccccccccccccccccc
 	> = TParam;
 
 	// Long intersection default: stripped, first member hugs, rest wrap
 	type LongDefaultI<
 		TParam = Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa &
 			Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb &
-			Ccccccccccccccccccccccccccccccccccccccccccc,
+			Ccccccccccccccccccccccccccccccccccccccccccc
 	> = TParam;
 </script>

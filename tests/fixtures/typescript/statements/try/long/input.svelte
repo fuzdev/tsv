@@ -21,7 +21,35 @@
 
 	// 100 chars exactly - stays inline (at boundary)
 	try {
-	} catch ({a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa}: T) {}
+	} catch ({
+		a,
+		b,
+		c,
+		d,
+		e,
+		f,
+		g,
+		h,
+		i,
+		j,
+		k,
+		l,
+		m,
+		n,
+		o,
+		p,
+		q,
+		r,
+		s,
+		t,
+		u,
+		v,
+		w,
+		x,
+		y,
+		z,
+		aa
+	}: T) {}
 
 	// 101 chars - destructured pattern wraps (exceeds print_width)
 	try {
@@ -52,6 +80,6 @@
 		x,
 		y,
 		z,
-		aaa,
+		aaa
 	}: T) {}
 </script>

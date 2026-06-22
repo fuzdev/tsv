@@ -13,7 +13,7 @@
 				aaaaaaaa: string,
 				bbbbbbbb: string,
 				cccccccc: string,
-				ddddddddddddddddddddd: string,
+				ddddddddddddddddddddd: string
 		  ) => void)
 		| xx;
 </script>

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 101,
+	"end": 99,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,8 +13,8 @@
 		{
 			"type": "Line",
 			"value": " comment",
-			"start": 34,
-			"end": 44,
+			"start": 33,
+			"end": 43,
 			"loc": {
 				"start": {
 					"line": 4,
@@ -29,8 +29,8 @@
 		{
 			"type": "Block",
 			"value": " block ",
-			"start": 65,
-			"end": 76,
+			"start": 63,
+			"end": 74,
 			"loc": {
 				"start": {
 					"line": 9,
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " line",
-			"start": 79,
-			"end": 86,
+			"start": 77,
+			"end": 84,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -62,12 +62,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 100,
+		"end": 98,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 91,
+			"end": 89,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -82,7 +82,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 20,
-					"end": 48,
+					"end": 47,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -96,7 +96,7 @@
 					"expression": {
 						"type": "NewExpression",
 						"start": 20,
-						"end": 47,
+						"end": 46,
 						"loc": {
 							"start": {
 								"line": 2,
@@ -145,8 +145,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 51,
-					"end": 90,
+					"start": 50,
+					"end": 88,
 					"loc": {
 						"start": {
 							"line": 7,
@@ -159,8 +159,8 @@
 					},
 					"expression": {
 						"type": "NewExpression",
-						"start": 51,
-						"end": 89,
+						"start": 50,
+						"end": 87,
 						"loc": {
 							"start": {
 								"line": 7,
@@ -173,8 +173,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 55,
-							"end": 56,
+							"start": 54,
+							"end": 55,
 							"loc": {
 								"start": {
 									"line": 7,
@@ -190,8 +190,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 60,
-								"end": 61,
+								"start": 59,
+								"end": 60,
 								"loc": {
 									"start": {
 										"line": 8,
@@ -210,22 +210,22 @@
 						{
 							"type": "Line",
 							"value": " comment",
-							"start": 34,
-							"end": 44
+							"start": 33,
+							"end": 43
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Block",
 							"value": " block ",
-							"start": 65,
-							"end": 76
+							"start": 63,
+							"end": 74
 						},
 						{
 							"type": "Line",
 							"value": " line",
-							"start": 79,
-							"end": 86
+							"start": 77,
+							"end": 84
 						}
 					]
 				}

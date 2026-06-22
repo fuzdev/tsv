@@ -2,8 +2,8 @@
 	let {
 		name,
 		count = $bindable(0),
-		id = $props.id(),
-	}: {name: string; count: number; id: string} = $props();
+		id = $props.id()
+	}: { name: string; count: number; id: string } = $props();
 </script>
 
 <label for={id}>{name}</label>

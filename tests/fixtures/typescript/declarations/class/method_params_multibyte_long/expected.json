@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 408,
+	"end": 407,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -62,12 +62,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 407,
+		"end": 406,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 398,
+			"end": 397,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -82,7 +82,7 @@
 				{
 					"type": "ClassDeclaration",
 					"start": 20,
-					"end": 397,
+					"end": 396,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -113,7 +113,7 @@
 					"body": {
 						"type": "ClassBody",
 						"start": 28,
-						"end": 397,
+						"end": 396,
 						"loc": {
 							"start": {
 								"line": 2,
@@ -562,7 +562,7 @@
 							{
 								"type": "MethodDefinition",
 								"start": 318,
-								"end": 394,
+								"end": 393,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -595,7 +595,7 @@
 								"value": {
 									"type": "FunctionExpression",
 									"start": 324,
-									"end": 394,
+									"end": 393,
 									"loc": {
 										"start": {
 											"line": 10,
@@ -722,8 +722,8 @@
 									],
 									"returnType": {
 										"type": "TSTypeAnnotation",
-										"start": 385,
-										"end": 391,
+										"start": 384,
+										"end": 390,
 										"loc": {
 											"start": {
 												"line": 13,
@@ -736,8 +736,8 @@
 										},
 										"typeAnnotation": {
 											"type": "TSVoidKeyword",
-											"start": 387,
-											"end": 391,
+											"start": 386,
+											"end": 390,
 											"loc": {
 												"start": {
 													"line": 13,
@@ -752,8 +752,8 @@
 									},
 									"body": {
 										"type": "BlockStatement",
-										"start": 392,
-										"end": 394,
+										"start": 391,
+										"end": 393,
 										"loc": {
 											"start": {
 												"line": 13,

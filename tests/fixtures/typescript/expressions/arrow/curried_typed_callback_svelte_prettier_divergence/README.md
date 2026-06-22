@@ -1,8 +1,7 @@
 # Curried Typed Callback — Svelte + Prettier Divergence
 
-Tests curried arrow functions with generic type parameters, including print width
-boundary behavior (100/101 chars) for callback body wrapping. Two independent
-divergences apply.
+Tests curried arrow functions with generic type parameters, including callback
+body wrapping when the body exceeds print width. Two independent divergences apply.
 
 ## 1. Parser (Svelte) — dropped params
 
@@ -14,7 +13,7 @@ curried context:
 const e =
 	(b: A) =>
 	async <T>(fn: (c: B) => Promise<T>): Promise<T> =>  // acorn-typescript: params: [] (bug)
-		b.c(async (tx) => fn(new C({a: tx, b: d})));
+		b.c(async (tx) => fn(new C({ a: tx, b: d })));
 ```
 
 The non-async generic arrows (first three test cases) parse correctly — only the
@@ -27,8 +26,8 @@ parameters (`expected_ours.json`; `expected_svelte.json` captures Svelte's dropp
 
 Each arrow has a single unconstrained type param, so prettier forces `<T,>` (TSX
 disambiguation) while tsv emits bare `<T>` — see single_type_param_prettier_divergence.
-The `<T>` sits on its own line, above the width-boundary body lines, so the comma does not
-shift the 100/101 boundary. `output_prettier.svelte` records prettier's forced-comma output.
+The `<T>` sits on its own line, above the body lines, so the comma does not affect body
+wrapping. `output_prettier.svelte` records prettier's forced-comma output.
 
 Reason: **Design choice** (formatter). See
 [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §TypeScript.

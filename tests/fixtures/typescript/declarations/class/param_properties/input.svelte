@@ -6,7 +6,7 @@
 	class B {
 		constructor(
 			private readonly y: string,
-			protected z: boolean,
+			protected z: boolean
 		) {}
 	}
 
@@ -14,7 +14,7 @@
 		constructor(
 			public a: number,
 			private b: string,
-			c: boolean,
+			c: boolean
 		) {}
 	}
 
@@ -22,7 +22,7 @@
 		constructor(
 			public x = 1,
 			private y = 'default',
-			protected z: boolean = true,
+			protected z: boolean = true
 		) {}
 	}
 
