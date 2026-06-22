@@ -29,7 +29,7 @@
 		},
 		(y) => {
 			fn2(y);
-		},
+		}
 	);
 
 	// Callback with other args
@@ -46,7 +46,7 @@
 	fn(<T, U>(x: T, y: U) => x);
 
 	// Callback returning object literal (needs parens)
-	arr.map((x) => ({a: x}));
+	arr.map((x) => ({ a: x }));
 
 	// Arrow with explicit return type
 	fn((): number => 1);

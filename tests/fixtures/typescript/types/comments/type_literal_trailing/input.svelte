@@ -1,6 +1,6 @@
 <script lang="ts">
 	let {
-		a,
+		a
 	}: {
 		a: A; // comment
 		b: B;

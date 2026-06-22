@@ -1,7 +1,7 @@
 <script lang="ts">
 	// Short - stays inline
 	[a, b, c] = arr;
-	({a, b, c} = obj);
+	({ a, b, c } = obj);
 
 	// Long array - wraps
 	[veryLongVariableName1, veryLongVariableName2, veryLongVariableName3, veryLongVariableName4] =
@@ -19,19 +19,19 @@
 	({
 		[veryLongKeyExpression1]: value1,
 		[veryLongKeyExpression2]: value2,
-		[veryLongKeyExpression3]: value3,
+		[veryLongKeyExpression3]: value3
 	} = longObject);
 
 	// Long declaration (needs parser work)
-	const {firstProperty, secondProperty, thirdProperty, fourthProperty} = veryLongObjectName;
+	const { firstProperty, secondProperty, thirdProperty, fourthProperty } = veryLongObjectName;
 
 	// Long nested
 	const {
 		outer: {
-			inner: {deep: value},
-		},
+			inner: { deep: value }
+		}
 	} = veryDeepObject;
 
 	// Long rest-only
-	const {...veryLongRestVariableName} = objectWithManyProperties;
+	const { ...veryLongRestVariableName } = objectWithManyProperties;
 </script>

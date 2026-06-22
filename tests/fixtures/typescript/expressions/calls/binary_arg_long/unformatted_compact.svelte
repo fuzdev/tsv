@@ -6,10 +6,10 @@ const a=fn(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&&bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdef
 const b=fn(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&&bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefghijklmnopqrs);
 
 /* 100 chars arg line - binary stays inline */
-const c=fn(aaaaaaaaaaaaaaaaaaaaaaaaaaa&&bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdef);
+const c=fn(aaaaaaaaaaaaaaaaaaaaaaaaaaa&&bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefg);
 
 /* 101 chars arg line - binary breaks, continuation gets extra indent */
-const d=fn(aaaaaaaaaaaaaaaaaaaaaaaaaaa&&bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefg);
+const d=fn(aaaaaaaaaaaaaaaaaaaaaaaaaaa&&bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefgh);
 
 /* Multi-operand chain - each continuation indented */
 const e=fn(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&&bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&&cccccccccccccccccccccccccccccc);

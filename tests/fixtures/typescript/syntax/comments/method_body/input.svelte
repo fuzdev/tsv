@@ -11,6 +11,6 @@
 		fn() {
 			// comment
 			return 1;
-		},
+		}
 	};
 </script>

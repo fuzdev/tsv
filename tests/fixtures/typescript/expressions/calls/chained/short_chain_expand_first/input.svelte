@@ -4,7 +4,7 @@
 		(x) => {
 			return x;
 		},
-		{a: 1},
+		{ a: 1 }
 	);
 
 	// Same with longer base
@@ -12,7 +12,7 @@
 		(x) => {
 			return x;
 		},
-		{a: 1},
+		{ a: 1 }
 	);
 
 	// Contrast: 3-group chain works
@@ -23,7 +23,7 @@
 			(x) => {
 				return x;
 			},
-			{a: 1},
+			{ a: 1 }
 		);
 
 	// Contrast: single member call works (not a chain)
@@ -31,6 +31,6 @@
 		(x) => {
 			return x;
 		},
-		{a: 1},
+		{ a: 1 }
 	);
 </script>

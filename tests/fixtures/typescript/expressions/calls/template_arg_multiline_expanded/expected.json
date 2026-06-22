@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 408,
+	"end": 405,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -61,8 +61,8 @@
 		{
 			"type": "Line",
 			"value": " Member expression callee",
-			"start": 277,
-			"end": 304,
+			"start": 276,
+			"end": 303,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " Simple callee",
-			"start": 352,
-			"end": 368,
+			"start": 350,
+			"end": 366,
 			"loc": {
 				"start": {
 					"line": 21,
@@ -94,12 +94,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 407,
+		"end": 404,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 398,
+			"end": 395,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -114,7 +114,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 208,
-					"end": 274,
+					"end": 273,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -128,7 +128,7 @@
 					"expression": {
 						"type": "CallExpression",
 						"start": 208,
-						"end": 273,
+						"end": 272,
 						"loc": {
 							"start": {
 								"line": 6,
@@ -287,8 +287,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 306,
-					"end": 349,
+					"start": 305,
+					"end": 347,
 					"loc": {
 						"start": {
 							"line": 14,
@@ -301,8 +301,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 306,
-						"end": 348,
+						"start": 305,
+						"end": 346,
 						"loc": {
 							"start": {
 								"line": 14,
@@ -315,8 +315,8 @@
 						},
 						"callee": {
 							"type": "MemberExpression",
-							"start": 306,
-							"end": 317,
+							"start": 305,
+							"end": 316,
 							"loc": {
 								"start": {
 									"line": 14,
@@ -329,8 +329,8 @@
 							},
 							"object": {
 								"type": "Identifier",
-								"start": 306,
-								"end": 313,
+								"start": 305,
+								"end": 312,
 								"loc": {
 									"start": {
 										"line": 14,
@@ -345,8 +345,8 @@
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 314,
-								"end": 317,
+								"start": 313,
+								"end": 316,
 								"loc": {
 									"start": {
 										"line": 14,
@@ -365,8 +365,8 @@
 						"arguments": [
 							{
 								"type": "TemplateLiteral",
-								"start": 321,
-								"end": 344,
+								"start": 320,
+								"end": 343,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -381,8 +381,8 @@
 								"quasis": [
 									{
 										"type": "TemplateElement",
-										"start": 322,
-										"end": 343,
+										"start": 321,
+										"end": 342,
 										"loc": {
 											"start": {
 												"line": 15,
@@ -408,15 +408,15 @@
 						{
 							"type": "Line",
 							"value": " Member expression callee",
-							"start": 277,
-							"end": 304
+							"start": 276,
+							"end": 303
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 370,
-					"end": 397,
+					"start": 368,
+					"end": 394,
 					"loc": {
 						"start": {
 							"line": 22,
@@ -429,8 +429,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 370,
-						"end": 396,
+						"start": 368,
+						"end": 393,
 						"loc": {
 							"start": {
 								"line": 22,
@@ -443,8 +443,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 370,
-							"end": 372,
+							"start": 368,
+							"end": 370,
 							"loc": {
 								"start": {
 									"line": 22,
@@ -460,8 +460,8 @@
 						"arguments": [
 							{
 								"type": "TemplateLiteral",
-								"start": 376,
-								"end": 392,
+								"start": 374,
+								"end": 390,
 								"loc": {
 									"start": {
 										"line": 23,
@@ -476,8 +476,8 @@
 								"quasis": [
 									{
 										"type": "TemplateElement",
-										"start": 377,
-										"end": 391,
+										"start": 375,
+										"end": 389,
 										"loc": {
 											"start": {
 												"line": 23,
@@ -503,8 +503,8 @@
 						{
 							"type": "Line",
 							"value": " Simple callee",
-							"start": 352,
-							"end": 368
+							"start": 350,
+							"end": 366
 						}
 					]
 				}

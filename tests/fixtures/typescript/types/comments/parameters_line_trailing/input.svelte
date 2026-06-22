@@ -2,19 +2,19 @@
 	// Line comment trailing first type parameter
 	type T<
 		A, // trailing
-		B,
+		B
 	> = A | B;
 
 	// Line comment trailing multiple type parameters
 	type U<
 		A, // trailing A
 		B, // trailing B
-		C,
+		C
 	> = A | B | C;
 
 	// Trailing on last type parameter
 	type V<
 		A,
-		B, // trailing
+		B // trailing
 	> = A | B;
 </script>

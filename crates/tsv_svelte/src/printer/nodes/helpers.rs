@@ -160,17 +160,19 @@ impl<'a> Printer<'a> {
     /// Build a doc for a pattern (destructuring context)
     ///
     /// Patterns use specific whitespace rules:
-    /// - Object patterns: `{a, b}` (hugged braces, `bracketSpacing: false`)
-    /// - Array patterns: `[a, b]` (no spaces inside brackets)
+    /// - Object patterns: `{ a, b }` (inner-padded braces, `bracketSpacing: true`)
+    /// - Array patterns: `[a, b]` (no spaces inside brackets — `bracketSpacing`
+    ///   governs object braces, not array brackets)
     ///
     /// Used for `{#each ... as pattern}`, `{#await ... then pattern}`,
-    /// `{:then pattern}`, and `{:catch pattern}` binding contexts. Object braces
-    /// hug uniformly with `bracketSpacing: false` (like `{@const}` and every
-    /// other object tsv emits); prettier-plugin-svelte keeps the spaced form here.
-    /// Literal **default values** likewise normalize through the TS printer
-    /// (string quotes + numeric form), where prettier-plugin-svelte preserves the
-    /// author's source token — both deliberate divergences (see
-    /// conformance_prettier.md §Svelte: destructuring literal normalization).
+    /// `{:then pattern}`, and `{:catch pattern}` binding contexts. Non-empty object
+    /// braces carry an inner space (`{ a, b }`) under the project-wide
+    /// `bracketSpacing: true`, consistent with every other object tsv emits and
+    /// matching prettier-plugin-svelte; an empty `{}` stays tight.
+    /// Literal **default values** normalize through the TS printer (string quotes +
+    /// numeric form), where prettier-plugin-svelte preserves the author's source
+    /// token — a deliberate divergence (see conformance_prettier.md §Svelte:
+    /// destructuring literal normalization).
     /// Build a doc for a non-shorthand object-pattern property key.
     ///
     /// A **computed** key (`{[expr]: v}`) keeps its `[ ]` brackets so it reads the
@@ -194,7 +196,13 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match expr {
             tsv_ts::Expression::ObjectPattern(obj) => {
+                // `bracketSpacing: true`: pad non-empty object-pattern braces with an
+                // inner space (`{ a, b }`); empty `{}` stays tight.
+                let has_props = !obj.properties.is_empty();
                 let mut parts = vec![d.text("{")];
+                if has_props {
+                    parts.push(d.text(" "));
+                }
                 for (i, prop) in obj.properties.iter().enumerate() {
                     if i > 0 {
                         parts.push(d.text(", "));
@@ -218,12 +226,19 @@ impl<'a> Printer<'a> {
                         }
                     }
                 }
+                if has_props {
+                    parts.push(d.text(" "));
+                }
                 parts.push(d.text("}"));
                 d.concat(&parts)
             }
             tsv_ts::Expression::ObjectExpression(obj) => {
                 // Legacy AST - treat same as ObjectPattern
+                let has_props = !obj.properties.is_empty();
                 let mut parts = vec![d.text("{")];
+                if has_props {
+                    parts.push(d.text(" "));
+                }
                 for (i, prop) in obj.properties.iter().enumerate() {
                     if i > 0 {
                         parts.push(d.text(", "));
@@ -244,6 +259,9 @@ impl<'a> Printer<'a> {
                             parts.push(self.build_pattern_doc(&s.argument));
                         }
                     }
+                }
+                if has_props {
+                    parts.push(d.text(" "));
                 }
                 parts.push(d.text("}"));
                 d.concat(&parts)

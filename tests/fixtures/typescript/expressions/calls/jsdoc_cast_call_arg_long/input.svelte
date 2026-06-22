@@ -7,8 +7,8 @@
 		/** @type {Expression} */ call(
 			aaaaaaaaaaaaaaaaaaa,
 			bbbbbbbbbbbbbbbbbbbbbb,
-			ccccccccccccccccccc,
-		),
+			cccccccccccccccccccc
+		)
 	);
 
 	// Expanded: with preceding args - inner call line exceeds 100
@@ -16,8 +16,8 @@
 		aaaa,
 		/** @type {Expression} */ call(
 			aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-			bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
-		),
+			bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+		)
 	);
 
 	// Expanded: JSDoc cast before ternary as call arg
@@ -25,6 +25,6 @@
 		a,
 		/** @type {Expression} */ conddddd
 			? aaaaaaaaaaaaaaaaaaaaaaaaaaaa
-			: bbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+			: bbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 	);
 </script>

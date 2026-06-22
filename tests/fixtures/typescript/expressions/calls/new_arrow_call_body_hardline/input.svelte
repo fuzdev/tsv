@@ -4,7 +4,7 @@
 		fn(x, () => {
 			doSomething();
 			doSomethingElse();
-		}),
+		})
 	);
 
 	// with await
@@ -12,6 +12,6 @@
 		fn(x, () => {
 			doSomething();
 			doSomethingElse();
-		}),
+		})
 	);
 </script>

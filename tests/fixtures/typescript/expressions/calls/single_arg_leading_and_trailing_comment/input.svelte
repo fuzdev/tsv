@@ -1,23 +1,23 @@
 <script>
 	fn(
 		// lead
-		a,
+		a
 		// trail
 	);
 
 	fn(
 		// lead
-		b,
+		b
 		/* trail */
 	);
 
 	fn(
-		/* lead */ c,
+		/* lead */ c
 		// trail
 	);
 
 	fn(
-		/* lead */ d,
+		/* lead */ d
 		/* trail */
 	);
 </script>

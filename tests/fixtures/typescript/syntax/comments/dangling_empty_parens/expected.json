@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 707,
+	"end": 709,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -189,24 +189,24 @@
 		{
 			"type": "Block",
 			"value": " dangling ",
-			"start": 499,
-			"end": 513,
+			"start": 500,
+			"end": 514,
 			"loc": {
 				"start": {
 					"line": 18,
-					"column": 13
+					"column": 14
 				},
 				"end": {
 					"line": 18,
-					"column": 27
+					"column": 28
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " Optional call - dangling comment",
-			"start": 522,
-			"end": 557,
+			"start": 524,
+			"end": 559,
 			"loc": {
 				"start": {
 					"line": 20,
@@ -221,8 +221,8 @@
 		{
 			"type": "Block",
 			"value": " dangling ",
-			"start": 564,
-			"end": 578,
+			"start": 566,
+			"end": 580,
 			"loc": {
 				"start": {
 					"line": 21,
@@ -237,8 +237,8 @@
 		{
 			"type": "Line",
 			"value": " Comment containing close paren character",
-			"start": 583,
-			"end": 626,
+			"start": 585,
+			"end": 628,
 			"loc": {
 				"start": {
 					"line": 23,
@@ -253,8 +253,8 @@
 		{
 			"type": "Block",
 			"value": " has ) paren ",
-			"start": 639,
-			"end": 656,
+			"start": 641,
+			"end": 658,
 			"loc": {
 				"start": {
 					"line": 24,
@@ -269,8 +269,8 @@
 		{
 			"type": "Block",
 			"value": " has ) paren ",
-			"start": 671,
-			"end": 688,
+			"start": 673,
+			"end": 690,
 			"loc": {
 				"start": {
 					"line": 25,
@@ -286,12 +286,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 706,
+		"end": 708,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 697,
+			"end": 699,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -698,7 +698,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 487,
-					"end": 519,
+					"end": 521,
 					"loc": {
 						"start": {
 							"line": 18,
@@ -706,14 +706,14 @@
 						},
 						"end": {
 							"line": 18,
-							"column": 33
+							"column": 35
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 491,
-							"end": 518,
+							"end": 520,
 							"loc": {
 								"start": {
 									"line": 18,
@@ -721,7 +721,7 @@
 								},
 								"end": {
 									"line": 18,
-									"column": 32
+									"column": 34
 								}
 							},
 							"id": {
@@ -743,7 +743,7 @@
 							"init": {
 								"type": "ObjectExpression",
 								"start": 495,
-								"end": 518,
+								"end": 520,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -751,22 +751,22 @@
 									},
 									"end": {
 										"line": 18,
-										"column": 32
+										"column": 34
 									}
 								},
 								"properties": [
 									{
 										"type": "Property",
-										"start": 496,
-										"end": 517,
+										"start": 497,
+										"end": 518,
 										"loc": {
 											"start": {
 												"line": 18,
-												"column": 10
+												"column": 11
 											},
 											"end": {
 												"line": 18,
-												"column": 31
+												"column": 32
 											}
 										},
 										"method": true,
@@ -774,32 +774,32 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 496,
-											"end": 498,
+											"start": 497,
+											"end": 499,
 											"loc": {
 												"start": {
 													"line": 18,
-													"column": 10
+													"column": 11
 												},
 												"end": {
 													"line": 18,
-													"column": 12
+													"column": 13
 												}
 											},
 											"name": "fn"
 										},
 										"value": {
 											"type": "FunctionExpression",
-											"start": 498,
-											"end": 517,
+											"start": 499,
+											"end": 518,
 											"loc": {
 												"start": {
 													"line": 18,
-													"column": 12
+													"column": 13
 												},
 												"end": {
 													"line": 18,
-													"column": 31
+													"column": 32
 												}
 											},
 											"id": null,
@@ -809,16 +809,16 @@
 											"params": [],
 											"body": {
 												"type": "BlockStatement",
-												"start": 515,
-												"end": 517,
+												"start": 516,
+												"end": 518,
 												"loc": {
 													"start": {
 														"line": 18,
-														"column": 29
+														"column": 30
 													},
 													"end": {
 														"line": 18,
-														"column": 31
+														"column": 32
 													}
 												},
 												"body": [],
@@ -826,8 +826,8 @@
 													{
 														"type": "Block",
 														"value": " dangling ",
-														"start": 499,
-														"end": 513
+														"start": 500,
+														"end": 514
 													}
 												]
 											}
@@ -850,8 +850,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 559,
-					"end": 580,
+					"start": 561,
+					"end": 582,
 					"loc": {
 						"start": {
 							"line": 21,
@@ -864,8 +864,8 @@
 					},
 					"expression": {
 						"type": "ChainExpression",
-						"start": 559,
-						"end": 579,
+						"start": 561,
+						"end": 581,
 						"loc": {
 							"start": {
 								"line": 21,
@@ -878,8 +878,8 @@
 						},
 						"expression": {
 							"type": "CallExpression",
-							"start": 559,
-							"end": 579,
+							"start": 561,
+							"end": 581,
 							"loc": {
 								"start": {
 									"line": 21,
@@ -892,8 +892,8 @@
 							},
 							"callee": {
 								"type": "Identifier",
-								"start": 559,
-								"end": 561,
+								"start": 561,
+								"end": 563,
 								"loc": {
 									"start": {
 										"line": 21,
@@ -914,15 +914,15 @@
 						{
 							"type": "Line",
 							"value": " Optional call - dangling comment",
-							"start": 522,
-							"end": 557
+							"start": 524,
+							"end": 559
 						}
 					]
 				},
 				{
 					"type": "FunctionDeclaration",
-					"start": 628,
-					"end": 660,
+					"start": 630,
+					"end": 662,
 					"loc": {
 						"start": {
 							"line": 24,
@@ -935,8 +935,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 637,
-						"end": 638,
+						"start": 639,
+						"end": 640,
 						"loc": {
 							"start": {
 								"line": 24,
@@ -955,8 +955,8 @@
 					"params": [],
 					"body": {
 						"type": "BlockStatement",
-						"start": 658,
-						"end": 660,
+						"start": 660,
+						"end": 662,
 						"loc": {
 							"start": {
 								"line": 24,
@@ -972,8 +972,8 @@
 							{
 								"type": "Block",
 								"value": " has ) paren ",
-								"start": 639,
-								"end": 656
+								"start": 641,
+								"end": 658
 							}
 						]
 					},
@@ -981,21 +981,21 @@
 						{
 							"type": "Block",
 							"value": " dangling ",
-							"start": 564,
-							"end": 578
+							"start": 566,
+							"end": 580
 						},
 						{
 							"type": "Line",
 							"value": " Comment containing close paren character",
-							"start": 583,
-							"end": 626
+							"start": 585,
+							"end": 628
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 662,
-					"end": 696,
+					"start": 664,
+					"end": 698,
 					"loc": {
 						"start": {
 							"line": 25,
@@ -1009,8 +1009,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 666,
-							"end": 695,
+							"start": 668,
+							"end": 697,
 							"loc": {
 								"start": {
 									"line": 25,
@@ -1023,8 +1023,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 666,
-								"end": 667,
+								"start": 668,
+								"end": 669,
 								"loc": {
 									"start": {
 										"line": 25,
@@ -1039,8 +1039,8 @@
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
-								"start": 670,
-								"end": 695,
+								"start": 672,
+								"end": 697,
 								"loc": {
 									"start": {
 										"line": 25,
@@ -1058,8 +1058,8 @@
 								"params": [],
 								"body": {
 									"type": "BlockStatement",
-									"start": 693,
-									"end": 695,
+									"start": 695,
+									"end": 697,
 									"loc": {
 										"start": {
 											"line": 25,
@@ -1075,8 +1075,8 @@
 										{
 											"type": "Block",
 											"value": " has ) paren ",
-											"start": 671,
-											"end": 688
+											"start": 673,
+											"end": 690
 										}
 									]
 								}

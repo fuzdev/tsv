@@ -21,7 +21,7 @@
 	}
 
 	// In generic constraint
-	type G<T extends typeof x> = {value: T};
+	type G<T extends typeof x> = { value: T };
 
 	// In union
 	type H = typeof a | typeof b;

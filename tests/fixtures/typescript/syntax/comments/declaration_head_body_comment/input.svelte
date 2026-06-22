@@ -7,7 +7,7 @@
 
 	// Method - block comment before body
 	let c = {
-		d() /* comment */ {},
+		d() /* comment */ {}
 	};
 
 	// Class - block comment before body
@@ -21,7 +21,7 @@
 	// Enum - block comment before body
 	enum C /* comment */ {
 		A,
-		B,
+		B
 	}
 
 	// Namespace - block comment before body

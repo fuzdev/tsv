@@ -3,11 +3,11 @@
 	type T = ns.X;
 
 	// Top-level union/intersection - prettier strips parens
-	type U = ns.X & {a: number};
+	type U = ns.X & { a: number };
 	type V = ns.X | null;
 
 	// Indexed access - parens semantically required
-	type W = (ns.X & {a: number})[keyof ns.X];
+	type W = (ns.X & { a: number })[keyof ns.X];
 	type X = (A | B)[K];
 
 	// typeof before indexed access - parens required

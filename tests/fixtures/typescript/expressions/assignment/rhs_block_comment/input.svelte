@@ -11,7 +11,7 @@
 	a += /* comment */ expr;
 
 	// block comment before object literal
-	a = /* comment */ {b: 1};
+	a = /* comment */ { b: 1 };
 
 	// block comment before array literal
 	a = /* comment */ [1, 2];

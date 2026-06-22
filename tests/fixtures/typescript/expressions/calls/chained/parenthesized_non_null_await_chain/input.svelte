@@ -1,6 +1,6 @@
 <script lang="ts">
 	// long chain (4+ calls with complex args) - force expansion
-	const a = (await fn(arg, {withTypes: true}))!
+	const a = (await fn(arg, { withTypes: true }))!
 		.filter((x) => x.isValid())
 		.map((x) => x.value)
 		.sort();

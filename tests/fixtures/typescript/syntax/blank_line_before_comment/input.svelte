@@ -1,16 +1,16 @@
 <script lang="ts">
 	const a = [
-		{b: 'c'},
-		{d: 'e'},
+		{ b: 'c' },
+		{ d: 'e' },
 
 		// group 1
-		{f: 'g'},
-		{h: 'i'},
+		{ f: 'g' },
+		{ h: 'i' },
 
 		// group 2
 
 		// group 3
-		{j: 'k'},
+		{ j: 'k' }
 	];
 
 	function fn1() {

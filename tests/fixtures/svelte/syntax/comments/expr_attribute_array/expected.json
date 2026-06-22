@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 41,
+	"end": 40,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,7 +10,7 @@
 			{
 				"type": "Component",
 				"start": 0,
-				"end": 40,
+				"end": 39,
 				"name": "Comp",
 				"name_loc": {
 					"start": {
@@ -28,7 +28,7 @@
 					{
 						"type": "Attribute",
 						"start": 7,
-						"end": 37,
+						"end": 36,
 						"name": "items",
 						"name_loc": {
 							"start": {
@@ -45,11 +45,11 @@
 						"value": {
 							"type": "ExpressionTag",
 							"start": 13,
-							"end": 37,
+							"end": 36,
 							"expression": {
 								"type": "ArrayExpression",
 								"start": 14,
-								"end": 36,
+								"end": 35,
 								"loc": {
 									"start": {
 										"line": 2,

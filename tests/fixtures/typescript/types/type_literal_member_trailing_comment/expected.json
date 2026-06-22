@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 532,
+	"end": 536,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -141,24 +141,24 @@
 		{
 			"type": "Block",
 			"value": " trailing ",
-			"start": 387,
-			"end": 401,
+			"start": 388,
+			"end": 402,
 			"loc": {
 				"start": {
 					"line": 19,
-					"column": 21
+					"column": 22
 				},
 				"end": {
 					"line": 19,
-					"column": 35
+					"column": 36
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " Multiple members with trailing comments (single-line)",
-			"start": 406,
-			"end": 462,
+			"start": 408,
+			"end": 464,
 			"loc": {
 				"start": {
 					"line": 21,
@@ -173,32 +173,32 @@
 		{
 			"type": "Block",
 			"value": " first ",
-			"start": 485,
-			"end": 496,
+			"start": 488,
+			"end": 499,
 			"loc": {
 				"start": {
 					"line": 22,
-					"column": 22
+					"column": 23
 				},
 				"end": {
 					"line": 22,
-					"column": 33
+					"column": 34
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " second ",
-			"start": 507,
-			"end": 519,
+			"start": 510,
+			"end": 522,
 			"loc": {
 				"start": {
 					"line": 22,
-					"column": 44
+					"column": 45
 				},
 				"end": {
 					"line": 22,
-					"column": 56
+					"column": 57
 				}
 			}
 		}
@@ -206,12 +206,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 531,
+		"end": 535,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 522,
+			"end": 526,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -674,7 +674,7 @@
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 367,
-					"end": 403,
+					"end": 405,
 					"loc": {
 						"start": {
 							"line": 19,
@@ -682,7 +682,7 @@
 						},
 						"end": {
 							"line": 19,
-							"column": 37
+							"column": 39
 						}
 					},
 					"id": {
@@ -704,7 +704,7 @@
 					"typeAnnotation": {
 						"type": "TSTypeLiteral",
 						"start": 376,
-						"end": 402,
+						"end": 404,
 						"loc": {
 							"start": {
 								"line": 19,
@@ -712,67 +712,67 @@
 							},
 							"end": {
 								"line": 19,
-								"column": 36
+								"column": 38
 							}
 						},
 						"members": [
 							{
 								"type": "TSPropertySignature",
-								"start": 377,
-								"end": 386,
+								"start": 378,
+								"end": 387,
 								"loc": {
 									"start": {
 										"line": 19,
-										"column": 11
+										"column": 12
 									},
 									"end": {
 										"line": 19,
-										"column": 20
+										"column": 21
 									}
 								},
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 377,
-									"end": 378,
+									"start": 378,
+									"end": 379,
 									"loc": {
 										"start": {
 											"line": 19,
-											"column": 11
+											"column": 12
 										},
 										"end": {
 											"line": 19,
-											"column": 12
+											"column": 13
 										}
 									},
 									"name": "a"
 								},
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 378,
-									"end": 386,
+									"start": 379,
+									"end": 387,
 									"loc": {
 										"start": {
 											"line": 19,
-											"column": 12
+											"column": 13
 										},
 										"end": {
 											"line": 19,
-											"column": 20
+											"column": 21
 										}
 									},
 									"typeAnnotation": {
 										"type": "TSNumberKeyword",
-										"start": 380,
-										"end": 386,
+										"start": 381,
+										"end": 387,
 										"loc": {
 											"start": {
 												"line": 19,
-												"column": 14
+												"column": 15
 											},
 											"end": {
 												"line": 19,
-												"column": 20
+												"column": 21
 											}
 										}
 									}
@@ -781,8 +781,8 @@
 									{
 										"type": "Block",
 										"value": " trailing ",
-										"start": 387,
-										"end": 401
+										"start": 388,
+										"end": 402
 									}
 								]
 							}
@@ -799,8 +799,8 @@
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 464,
-					"end": 521,
+					"start": 466,
+					"end": 525,
 					"loc": {
 						"start": {
 							"line": 22,
@@ -808,13 +808,13 @@
 						},
 						"end": {
 							"line": 22,
-							"column": 58
+							"column": 60
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 469,
-						"end": 470,
+						"start": 471,
+						"end": 472,
 						"loc": {
 							"start": {
 								"line": 22,
@@ -829,8 +829,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSTypeLiteral",
-						"start": 473,
-						"end": 520,
+						"start": 475,
+						"end": 524,
 						"loc": {
 							"start": {
 								"line": 22,
@@ -838,67 +838,67 @@
 							},
 							"end": {
 								"line": 22,
-								"column": 57
+								"column": 59
 							}
 						},
 						"members": [
 							{
 								"type": "TSPropertySignature",
-								"start": 474,
-								"end": 484,
+								"start": 477,
+								"end": 487,
 								"loc": {
 									"start": {
 										"line": 22,
-										"column": 11
+										"column": 12
 									},
 									"end": {
 										"line": 22,
-										"column": 21
+										"column": 22
 									}
 								},
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 474,
-									"end": 475,
+									"start": 477,
+									"end": 478,
 									"loc": {
 										"start": {
 											"line": 22,
-											"column": 11
+											"column": 12
 										},
 										"end": {
 											"line": 22,
-											"column": 12
+											"column": 13
 										}
 									},
 									"name": "a"
 								},
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 475,
-									"end": 483,
+									"start": 478,
+									"end": 486,
 									"loc": {
 										"start": {
 											"line": 22,
-											"column": 12
+											"column": 13
 										},
 										"end": {
 											"line": 22,
-											"column": 20
+											"column": 21
 										}
 									},
 									"typeAnnotation": {
 										"type": "TSNumberKeyword",
-										"start": 477,
-										"end": 483,
+										"start": 480,
+										"end": 486,
 										"loc": {
 											"start": {
 												"line": 22,
-												"column": 14
+												"column": 15
 											},
 											"end": {
 												"line": 22,
-												"column": 20
+												"column": 21
 											}
 										}
 									}
@@ -907,68 +907,68 @@
 									{
 										"type": "Block",
 										"value": " first ",
-										"start": 485,
-										"end": 496
+										"start": 488,
+										"end": 499
 									}
 								]
 							},
 							{
 								"type": "TSPropertySignature",
-								"start": 497,
-								"end": 506,
+								"start": 500,
+								"end": 509,
 								"loc": {
 									"start": {
 										"line": 22,
-										"column": 34
+										"column": 35
 									},
 									"end": {
 										"line": 22,
-										"column": 43
+										"column": 44
 									}
 								},
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 497,
-									"end": 498,
+									"start": 500,
+									"end": 501,
 									"loc": {
 										"start": {
 											"line": 22,
-											"column": 34
+											"column": 35
 										},
 										"end": {
 											"line": 22,
-											"column": 35
+											"column": 36
 										}
 									},
 									"name": "b"
 								},
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 498,
-									"end": 506,
+									"start": 501,
+									"end": 509,
 									"loc": {
 										"start": {
 											"line": 22,
-											"column": 35
+											"column": 36
 										},
 										"end": {
 											"line": 22,
-											"column": 43
+											"column": 44
 										}
 									},
 									"typeAnnotation": {
 										"type": "TSStringKeyword",
-										"start": 500,
-										"end": 506,
+										"start": 503,
+										"end": 509,
 										"loc": {
 											"start": {
 												"line": 22,
-												"column": 37
+												"column": 38
 											},
 											"end": {
 												"line": 22,
-												"column": 43
+												"column": 44
 											}
 										}
 									}
@@ -977,8 +977,8 @@
 									{
 										"type": "Block",
 										"value": " second ",
-										"start": 507,
-										"end": 519
+										"start": 510,
+										"end": 522
 									}
 								]
 							}
@@ -988,8 +988,8 @@
 						{
 							"type": "Line",
 							"value": " Multiple members with trailing comments (single-line)",
-							"start": 406,
-							"end": 462
+							"start": 408,
+							"end": 464
 						}
 					]
 				}

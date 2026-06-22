@@ -2,7 +2,7 @@
 	// Line comment in call signature type params (non-wrapping path)
 	type A = {
 		<
-			T, // c
+			T // c
 		>(): void;
 	};
 
@@ -14,7 +14,7 @@
 	// Line comment in construct signature type params
 	type C = {
 		new <
-			T, // c
+			T // c
 		>(): C;
 	};
 </script>

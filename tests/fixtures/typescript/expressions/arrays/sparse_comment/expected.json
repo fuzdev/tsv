@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 444,
+	"end": 439,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " Line comment then hole in middle of multiline array",
-			"start": 100,
-			"end": 154,
+			"start": 99,
+			"end": 153,
 			"loc": {
 				"start": {
 					"line": 9,
@@ -61,8 +61,8 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 179,
-			"end": 184,
+			"start": 178,
+			"end": 183,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " Multi-line block comment then hole",
-			"start": 196,
-			"end": 233,
+			"start": 194,
+			"end": 231,
 			"loc": {
 				"start": {
 					"line": 17,
@@ -93,8 +93,8 @@
 		{
 			"type": "Block",
 			"value": "\n\t  c3\n\t",
-			"start": 253,
-			"end": 265,
+			"start": 251,
+			"end": 263,
 			"loc": {
 				"start": {
 					"line": 20,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " Multi-line block comment then hole in middle",
-			"start": 277,
-			"end": 324,
+			"start": 274,
+			"end": 321,
 			"loc": {
 				"start": {
 					"line": 26,
@@ -125,8 +125,8 @@
 		{
 			"type": "Block",
 			"value": "\n\t  c4\n\t",
-			"start": 349,
-			"end": 361,
+			"start": 346,
+			"end": 358,
 			"loc": {
 				"start": {
 					"line": 30,
@@ -141,8 +141,8 @@
 		{
 			"type": "Line",
 			"value": " Line comment after hole",
-			"start": 373,
-			"end": 399,
+			"start": 369,
+			"end": 395,
 			"loc": {
 				"start": {
 					"line": 36,
@@ -157,8 +157,8 @@
 		{
 			"type": "Line",
 			"value": " c5",
-			"start": 419,
-			"end": 424,
+			"start": 415,
+			"end": 420,
 			"loc": {
 				"start": {
 					"line": 39,
@@ -174,12 +174,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 443,
+		"end": 438,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 434,
+			"end": 429,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -194,7 +194,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 65,
-					"end": 97,
+					"end": 96,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -209,7 +209,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 71,
-							"end": 96,
+							"end": 95,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -239,7 +239,7 @@
 							"init": {
 								"type": "ArrayExpression",
 								"start": 75,
-								"end": 96,
+								"end": 95,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -293,8 +293,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 156,
-					"end": 193,
+					"start": 155,
+					"end": 191,
 					"loc": {
 						"start": {
 							"line": 10,
@@ -308,8 +308,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 162,
-							"end": 192,
+							"start": 161,
+							"end": 190,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -322,8 +322,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 162,
-								"end": 163,
+								"start": 161,
+								"end": 162,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -338,8 +338,8 @@
 							},
 							"init": {
 								"type": "ArrayExpression",
-								"start": 166,
-								"end": 192,
+								"start": 165,
+								"end": 190,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -353,8 +353,8 @@
 								"elements": [
 									{
 										"type": "Literal",
-										"start": 170,
-										"end": 171,
+										"start": 169,
+										"end": 170,
 										"loc": {
 											"start": {
 												"line": 11,
@@ -371,8 +371,8 @@
 									null,
 									{
 										"type": "Literal",
-										"start": 187,
-										"end": 188,
+										"start": 186,
+										"end": 187,
 										"loc": {
 											"start": {
 												"line": 14,
@@ -389,8 +389,8 @@
 											{
 												"type": "Line",
 												"value": " c2",
-												"start": 179,
-												"end": 184
+												"start": 178,
+												"end": 183
 											}
 										]
 									}
@@ -403,15 +403,15 @@
 						{
 							"type": "Line",
 							"value": " Line comment then hole in middle of multiline array",
-							"start": 100,
-							"end": 154
+							"start": 99,
+							"end": 153
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 235,
-					"end": 274,
+					"start": 233,
+					"end": 271,
 					"loc": {
 						"start": {
 							"line": 18,
@@ -425,8 +425,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 241,
-							"end": 273,
+							"start": 239,
+							"end": 270,
 							"loc": {
 								"start": {
 									"line": 18,
@@ -439,8 +439,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 241,
-								"end": 242,
+								"start": 239,
+								"end": 240,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -455,8 +455,8 @@
 							},
 							"init": {
 								"type": "ArrayExpression",
-								"start": 245,
-								"end": 273,
+								"start": 243,
+								"end": 270,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -471,8 +471,8 @@
 									null,
 									{
 										"type": "Literal",
-										"start": 268,
-										"end": 269,
+										"start": 266,
+										"end": 267,
 										"loc": {
 											"start": {
 												"line": 23,
@@ -489,8 +489,8 @@
 											{
 												"type": "Block",
 												"value": "\n\t  c3\n\t",
-												"start": 253,
-												"end": 265
+												"start": 251,
+												"end": 263
 											}
 										]
 									}
@@ -503,15 +503,15 @@
 						{
 							"type": "Line",
 							"value": " Multi-line block comment then hole",
-							"start": 196,
-							"end": 233
+							"start": 194,
+							"end": 231
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 326,
-					"end": 370,
+					"start": 323,
+					"end": 366,
 					"loc": {
 						"start": {
 							"line": 27,
@@ -525,8 +525,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 332,
-							"end": 369,
+							"start": 329,
+							"end": 365,
 							"loc": {
 								"start": {
 									"line": 27,
@@ -539,8 +539,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 332,
-								"end": 333,
+								"start": 329,
+								"end": 330,
 								"loc": {
 									"start": {
 										"line": 27,
@@ -555,8 +555,8 @@
 							},
 							"init": {
 								"type": "ArrayExpression",
-								"start": 336,
-								"end": 369,
+								"start": 333,
+								"end": 365,
 								"loc": {
 									"start": {
 										"line": 27,
@@ -570,8 +570,8 @@
 								"elements": [
 									{
 										"type": "Literal",
-										"start": 340,
-										"end": 341,
+										"start": 337,
+										"end": 338,
 										"loc": {
 											"start": {
 												"line": 28,
@@ -588,8 +588,8 @@
 									null,
 									{
 										"type": "Literal",
-										"start": 364,
-										"end": 365,
+										"start": 361,
+										"end": 362,
 										"loc": {
 											"start": {
 												"line": 33,
@@ -606,8 +606,8 @@
 											{
 												"type": "Block",
 												"value": "\n\t  c4\n\t",
-												"start": 349,
-												"end": 361
+												"start": 346,
+												"end": 358
 											}
 										]
 									}
@@ -620,15 +620,15 @@
 						{
 							"type": "Line",
 							"value": " Multi-line block comment then hole in middle",
-							"start": 277,
-							"end": 324
+							"start": 274,
+							"end": 321
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 401,
-					"end": 433,
+					"start": 397,
+					"end": 428,
 					"loc": {
 						"start": {
 							"line": 37,
@@ -642,8 +642,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 407,
-							"end": 432,
+							"start": 403,
+							"end": 427,
 							"loc": {
 								"start": {
 									"line": 37,
@@ -656,8 +656,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 407,
-								"end": 408,
+								"start": 403,
+								"end": 404,
 								"loc": {
 									"start": {
 										"line": 37,
@@ -672,8 +672,8 @@
 							},
 							"init": {
 								"type": "ArrayExpression",
-								"start": 411,
-								"end": 432,
+								"start": 407,
+								"end": 427,
 								"loc": {
 									"start": {
 										"line": 37,
@@ -688,8 +688,8 @@
 									null,
 									{
 										"type": "Literal",
-										"start": 427,
-										"end": 428,
+										"start": 423,
+										"end": 424,
 										"loc": {
 											"start": {
 												"line": 40,
@@ -706,8 +706,8 @@
 											{
 												"type": "Line",
 												"value": " c5",
-												"start": 419,
-												"end": 424
+												"start": 415,
+												"end": 420
 											}
 										]
 									}
@@ -720,8 +720,8 @@
 						{
 							"type": "Line",
 							"value": " Line comment after hole",
-							"start": 373,
-							"end": 399
+							"start": 369,
+							"end": 395
 						}
 					]
 				}

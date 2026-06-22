@@ -5,14 +5,14 @@
 	foo
 		.bar(
 			x,
-			a /* c1 */, // c2
+			a /* c1 */ // c2
 		)
 		.baz();
 
 	// Single argument form.
 	foo
 		.bar(
-			a /* c1 */, // c2
+			a /* c1 */ // c2
 		)
 		.baz();
 </script>

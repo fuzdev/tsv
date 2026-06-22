@@ -2,40 +2,40 @@
 	// Assignment parens in function composition args (call with nested arrow/function)
 	fn(
 		(a = b),
-		g(() => a),
+		g(() => a)
 	);
 	fn(
 		(a += b),
-		g(() => a),
+		g(() => a)
 	);
 	fn(
 		(a &&= b),
-		g(() => a),
+		g(() => a)
 	);
 	fn(
 		(a ||= b),
-		g(() => a),
+		g(() => a)
 	);
 	fn(
 		(a ??= b),
-		g(() => a),
+		g(() => a)
 	);
 
 	// Multiple assignments with composition
 	fn(
 		(a = b),
 		g(() => a),
-		(c = d),
+		(c = d)
 	);
 
 	// Member expression LHS
 	fn(
 		(a[b] = c),
-		g(() => a),
+		g(() => a)
 	);
 	fn(
 		(a.b = c),
-		g(() => a),
+		g(() => a)
 	);
 
 	// In return context
@@ -44,7 +44,7 @@
 			(a = b),
 			g(() => a),
 			c,
-			d,
+			d
 		);
 	}
 
@@ -52,6 +52,6 @@
 	fn(
 		(a = b),
 		`line1
-line2`,
+line2`
 	);
 </script>

@@ -3,14 +3,14 @@
 	const [
 		a,
 		/* c */
-		b,
+		b
 	] = arr;
 
 	// Own-line block comment before first element forces expansion
 	const [
 		/* c */
 		a1,
-		b1,
+		b1
 	] = arr;
 
 	// Multiple own-line block comments between elements
@@ -18,7 +18,7 @@
 		a2,
 		/* c1 */
 		/* c2 */
-		b2,
+		b2
 	] = arr;
 
 	// Same-line block comment does NOT force expansion (short destructuring)

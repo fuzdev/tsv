@@ -20,7 +20,7 @@
 	}
 
 	// In generic constraint
-	type F<T extends import('./g').Base> = {value: T};
+	type F<T extends import('./g').Base> = { value: T };
 
 	// Array of import type
 	type G = import('h').T[];

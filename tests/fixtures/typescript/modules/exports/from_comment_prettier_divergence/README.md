@@ -8,20 +8,20 @@ specifier's trailing comment — a block comment inline, a line comment expandin
 multiline:
 
 ```
-export {a /* c1 */} from './a';
+export { a /* c1 */ } from './a';
 export {
-	b, // c2
+	b // c2
 } from './b';
-export {c, d /* c3 */} from './c';
+export { c, d /* c3 */ } from './c';
 ```
 
 **tsv**: preserves each comment between `}` and `from`:
 
 ```
-export {a} /* c1 */ from './a';
-export {b} // c2
+export { a } /* c1 */ from './a';
+export { b } // c2
 	from './b';
-export {c, d} /* c3 */ from './c';
+export { c, d } /* c3 */ from './c';
 ```
 
 Per Comment Position Philosophy. The into-braces relocation matches the sibling import

@@ -2,7 +2,7 @@
 	// parenthesized default values (sequence and assignment forms keep their parens)
 	function fn1(a, b = (c, d)) {}
 	const fn2 = (a = (b = c)) => a;
-	const {e = (f, g)} = h;
+	const { e = (f, g) } = h;
 
 	// parenthesized class property values
 	class A {

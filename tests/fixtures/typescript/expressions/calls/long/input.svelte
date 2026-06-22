@@ -11,6 +11,6 @@
 		argument5,
 		argument6,
 		argument7,
-		argument8,
+		argument8
 	);
 </script>

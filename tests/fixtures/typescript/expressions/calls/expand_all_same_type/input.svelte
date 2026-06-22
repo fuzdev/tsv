@@ -3,12 +3,12 @@
 	fn1(() => {
 		fn2(async () => {
 			await fn3(
-				{a: fn4()},
+				{ a: fn4() },
 				{
 					b: 'c',
 					d,
-					e: f,
-				},
+					e: f
+				}
 			);
 		});
 	});
@@ -16,7 +16,7 @@
 	// two objects where both fit flat - stays inline
 	fn1(() => {
 		fn2(async () => {
-			await fn3({a: fn4()}, {b: 'c', d, e: f});
+			await fn3({ a: fn4() }, { b: 'c', d, e: f });
 		});
 	});
 </script>

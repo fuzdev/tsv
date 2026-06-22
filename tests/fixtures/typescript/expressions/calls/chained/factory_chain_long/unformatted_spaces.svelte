@@ -31,7 +31,7 @@
 	.map(
 		
 	inner(
-			a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa, bb, cc),
+			a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa, bb, ccc),
 	);
 
 	// Inner line 101 chars - inner call args break
@@ -67,7 +67,7 @@
 			z,
 			aa,
 			bb,
-			ccc,
+			cccc,
 		),
 
 	);

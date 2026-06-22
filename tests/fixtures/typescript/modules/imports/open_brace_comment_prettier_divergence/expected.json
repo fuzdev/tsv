@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 337,
+	"end": 334,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " line comment trailing import `{` - multiple specifiers",
-			"start": 113,
-			"end": 170,
+			"start": 112,
+			"end": 169,
 			"loc": {
 				"start": {
 					"line": 7,
@@ -61,8 +61,8 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 181,
-			"end": 186,
+			"start": 180,
+			"end": 185,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " block comment trailing `{`, then own-line leading comment",
-			"start": 214,
-			"end": 274,
+			"start": 212,
+			"end": 272,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -93,8 +93,8 @@
 		{
 			"type": "Block",
 			"value": " brace ",
-			"start": 285,
-			"end": 296,
+			"start": 283,
+			"end": 294,
 			"loc": {
 				"start": {
 					"line": 14,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " lead",
-			"start": 299,
-			"end": 306,
+			"start": 297,
+			"end": 304,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -126,12 +126,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 336,
+		"end": 333,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 327,
+			"end": 324,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -146,7 +146,7 @@
 				{
 					"type": "ImportDeclaration",
 					"start": 76,
-					"end": 110,
+					"end": 109,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -218,8 +218,8 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 104,
-						"end": 109,
+						"start": 103,
+						"end": 108,
 						"loc": {
 							"start": {
 								"line": 5,
@@ -244,8 +244,8 @@
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 172,
-					"end": 211,
+					"start": 171,
+					"end": 209,
 					"loc": {
 						"start": {
 							"line": 8,
@@ -260,8 +260,8 @@
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
-							"start": 189,
-							"end": 190,
+							"start": 188,
+							"end": 189,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -274,8 +274,8 @@
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 189,
-								"end": 190,
+								"start": 188,
+								"end": 189,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -290,8 +290,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 189,
-								"end": 190,
+								"start": 188,
+								"end": 189,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -309,15 +309,15 @@
 								{
 									"type": "Line",
 									"value": " c2",
-									"start": 181,
-									"end": 186
+									"start": 180,
+									"end": 185
 								}
 							]
 						},
 						{
 							"type": "ImportSpecifier",
-							"start": 194,
-							"end": 195,
+							"start": 193,
+							"end": 194,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -330,8 +330,8 @@
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 194,
-								"end": 195,
+								"start": 193,
+								"end": 194,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -346,8 +346,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 194,
-								"end": 195,
+								"start": 193,
+								"end": 194,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -365,8 +365,8 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 205,
-						"end": 210,
+						"start": 203,
+						"end": 208,
 						"loc": {
 							"start": {
 								"line": 11,
@@ -384,15 +384,15 @@
 						{
 							"type": "Line",
 							"value": " line comment trailing import `{` - multiple specifiers",
-							"start": 113,
-							"end": 170
+							"start": 112,
+							"end": 169
 						}
 					]
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 276,
-					"end": 326,
+					"start": 274,
+					"end": 323,
 					"loc": {
 						"start": {
 							"line": 14,
@@ -407,8 +407,8 @@
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
-							"start": 309,
-							"end": 310,
+							"start": 307,
+							"end": 308,
 							"loc": {
 								"start": {
 									"line": 16,
@@ -421,8 +421,8 @@
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 309,
-								"end": 310,
+								"start": 307,
+								"end": 308,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -437,8 +437,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 309,
-								"end": 310,
+								"start": 307,
+								"end": 308,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -456,22 +456,22 @@
 								{
 									"type": "Block",
 									"value": " brace ",
-									"start": 285,
-									"end": 296
+									"start": 283,
+									"end": 294
 								},
 								{
 									"type": "Line",
 									"value": " lead",
-									"start": 299,
-									"end": 306
+									"start": 297,
+									"end": 304
 								}
 							]
 						}
 					],
 					"source": {
 						"type": "Literal",
-						"start": 320,
-						"end": 325,
+						"start": 317,
+						"end": 322,
 						"loc": {
 							"start": {
 								"line": 17,
@@ -489,8 +489,8 @@
 						{
 							"type": "Line",
 							"value": " block comment trailing `{`, then own-line leading comment",
-							"start": 214,
-							"end": 274
+							"start": 212,
+							"end": 272
 						}
 					]
 				}

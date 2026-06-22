@@ -1,6 +1,6 @@
 <script lang="ts">
 	// type literal method signature (reference - already correct)
-	type T = {m(a) /* c */ : void};
+	type T = { m(a) /* c */ : void };
 
 	// interface method signature
 	interface I1 {

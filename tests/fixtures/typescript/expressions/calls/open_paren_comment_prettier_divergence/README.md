@@ -10,8 +10,8 @@ Prettier: moves the comment down to its own line
 ```
 // tsv                          // prettier
 fn( // c1                       fn(
-	a,                                // c1
-);                                a,
+	a                                  // c1
+);                                a
                                 );
 ```
 

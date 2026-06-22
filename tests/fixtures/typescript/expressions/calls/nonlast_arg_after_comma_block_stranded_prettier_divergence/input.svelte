@@ -1,23 +1,23 @@
 <script lang="ts">
 	fn(
 		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, /* c */
-		bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+		bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 	);
 
 	fn(
 		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa /* b1 */, /* s */
-		bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+		bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 	);
 
 	new A(
 		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, /* c */
-		bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+		bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 	);
 
 	foo
 		.bar(
 			aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, /* c */
-			bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+			bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 		)
 		.baz();
 </script>

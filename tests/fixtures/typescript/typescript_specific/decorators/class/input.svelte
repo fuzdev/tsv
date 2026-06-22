@@ -17,7 +17,7 @@
 	class Stacked {}
 
 	// Decorator factory with complex argument
-	@d({a: 'value', b: true})
+	@d({ a: 'value', b: true })
 	class WithObject {}
 
 	// Exported decorated class

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 210,
+	"end": 209,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -62,12 +62,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 209,
+		"end": 208,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 200,
+			"end": 199,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -82,7 +82,7 @@
 				{
 					"type": "FunctionDeclaration",
 					"start": 159,
-					"end": 199,
+					"end": 198,
 					"loc": {
 						"start": {
 							"line": 4,
@@ -170,8 +170,8 @@
 					],
 					"body": {
 						"type": "BlockStatement",
-						"start": 197,
-						"end": 199,
+						"start": 196,
+						"end": 198,
 						"loc": {
 							"start": {
 								"line": 7,

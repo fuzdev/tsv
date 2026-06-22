@@ -4,7 +4,7 @@
 		/* comment */ () => 'a',
 		(b) => {
 			return b;
-		},
+		}
 	);
 
 	// Block-body arrow with leading comment, last arg is block arrow
@@ -14,7 +14,7 @@
 		},
 		(b) => {
 			return b;
-		},
+		}
 	);
 
 	// Function expression with leading comment, last arg is block arrow
@@ -24,7 +24,7 @@
 		},
 		(b) => {
 			return b;
-		},
+		}
 	);
 
 	// Multiple commented callbacks before last block-body arrow
@@ -33,7 +33,7 @@
 		/* c2 */ () => 'b',
 		(c) => {
 			return c;
-		},
+		}
 	);
 
 	// Short inline control - comment stays (no expand-last trigger)

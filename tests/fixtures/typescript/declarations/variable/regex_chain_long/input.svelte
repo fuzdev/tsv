@@ -17,7 +17,7 @@
 	function fn2() {
 		function inner2() {
 			const e = /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/.exec(
-				b,
+				b
 			);
 		}
 	}

@@ -3,7 +3,7 @@
 	const a = [
 		,
 		// c1
-		1,
+		1
 	];
 
 	// Line comment then hole in middle of multiline array
@@ -11,7 +11,7 @@
 		1,
 		,
 		// c2
-		2,
+		2
 	];
 
 	// Multi-line block comment then hole
@@ -20,7 +20,7 @@
 		/*
 	  c3
 	*/
-		1,
+		1
 	];
 
 	// Multi-line block comment then hole in middle
@@ -30,13 +30,13 @@
 		/*
 	  c4
 	*/
-		2,
+		2
 	];
 
 	// Line comment after hole
 	const e = [
 		,
 		// c5
-		1,
+		1
 	];
 </script>

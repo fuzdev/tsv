@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 270,
+	"end": 273,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -29,8 +29,8 @@
 		{
 			"type": "Line",
 			"value": " Inside generators, yield is the operator",
-			"start": 181,
-			"end": 224,
+			"start": 184,
+			"end": 227,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -46,12 +46,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 269,
+		"end": 272,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 260,
+			"end": 263,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -66,7 +66,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 63,
-					"end": 92,
+					"end": 94,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -74,14 +74,14 @@
 						},
 						"end": {
 							"line": 3,
-							"column": 30
+							"column": 32
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 69,
-							"end": 91,
+							"end": 93,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -89,7 +89,7 @@
 								},
 								"end": {
 									"line": 3,
-									"column": 29
+									"column": 31
 								}
 							},
 							"id": {
@@ -111,7 +111,7 @@
 							"init": {
 								"type": "ObjectExpression",
 								"start": 75,
-								"end": 91,
+								"end": 93,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -119,22 +119,22 @@
 									},
 									"end": {
 										"line": 3,
-										"column": 29
+										"column": 31
 									}
 								},
 								"properties": [
 									{
 										"type": "Property",
-										"start": 76,
-										"end": 90,
+										"start": 77,
+										"end": 91,
 										"loc": {
 											"start": {
 												"line": 3,
-												"column": 14
+												"column": 15
 											},
 											"end": {
 												"line": 3,
-												"column": 28
+												"column": 29
 											}
 										},
 										"method": false,
@@ -142,32 +142,32 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 76,
-											"end": 81,
+											"start": 77,
+											"end": 82,
 											"loc": {
 												"start": {
 													"line": 3,
-													"column": 14
+													"column": 15
 												},
 												"end": {
 													"line": 3,
-													"column": 19
+													"column": 20
 												}
 											},
 											"name": "yield"
 										},
 										"value": {
 											"type": "Literal",
-											"start": 83,
-											"end": 90,
+											"start": 84,
+											"end": 91,
 											"loc": {
 												"start": {
 													"line": 3,
-													"column": 21
+													"column": 22
 												},
 												"end": {
 													"line": 3,
-													"column": 28
+													"column": 29
 												}
 											},
 											"value": "value",
@@ -191,8 +191,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 95,
-					"end": 145,
+					"start": 97,
+					"end": 146,
 					"loc": {
 						"start": {
 							"line": 5,
@@ -206,8 +206,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 101,
-							"end": 144,
+							"start": 103,
+							"end": 145,
 							"loc": {
 								"start": {
 									"line": 5,
@@ -220,8 +220,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 101,
-								"end": 105,
+								"start": 103,
+								"end": 107,
 								"loc": {
 									"start": {
 										"line": 5,
@@ -236,8 +236,8 @@
 							},
 							"init": {
 								"type": "ObjectExpression",
-								"start": 108,
-								"end": 144,
+								"start": 110,
+								"end": 145,
 								"loc": {
 									"start": {
 										"line": 5,
@@ -251,8 +251,8 @@
 								"properties": [
 									{
 										"type": "Property",
-										"start": 112,
-										"end": 140,
+										"start": 114,
+										"end": 142,
 										"loc": {
 											"start": {
 												"line": 6,
@@ -268,8 +268,8 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 112,
-											"end": 117,
+											"start": 114,
+											"end": 119,
 											"loc": {
 												"start": {
 													"line": 6,
@@ -284,8 +284,8 @@
 										},
 										"value": {
 											"type": "FunctionExpression",
-											"start": 117,
-											"end": 140,
+											"start": 119,
+											"end": 142,
 											"loc": {
 												"start": {
 													"line": 6,
@@ -303,8 +303,8 @@
 											"params": [],
 											"body": {
 												"type": "BlockStatement",
-												"start": 120,
-												"end": 140,
+												"start": 122,
+												"end": 142,
 												"loc": {
 													"start": {
 														"line": 6,
@@ -318,8 +318,8 @@
 												"body": [
 													{
 														"type": "ReturnStatement",
-														"start": 125,
-														"end": 136,
+														"start": 127,
+														"end": 138,
 														"loc": {
 															"start": {
 																"line": 7,
@@ -332,8 +332,8 @@
 														},
 														"argument": {
 															"type": "Literal",
-															"start": 132,
-															"end": 135,
+															"start": 134,
+															"end": 137,
 															"loc": {
 																"start": {
 																	"line": 7,
@@ -361,8 +361,8 @@
 				},
 				{
 					"type": "BlockStatement",
-					"start": 148,
-					"end": 178,
+					"start": 149,
+					"end": 181,
 					"loc": {
 						"start": {
 							"line": 11,
@@ -376,8 +376,8 @@
 					"body": [
 						{
 							"type": "VariableDeclaration",
-							"start": 152,
-							"end": 175,
+							"start": 153,
+							"end": 178,
 							"loc": {
 								"start": {
 									"line": 12,
@@ -385,14 +385,14 @@
 								},
 								"end": {
 									"line": 12,
-									"column": 25
+									"column": 27
 								}
 							},
 							"declarations": [
 								{
 									"type": "VariableDeclarator",
-									"start": 158,
-									"end": 174,
+									"start": 159,
+									"end": 177,
 									"loc": {
 										"start": {
 											"line": 12,
@@ -400,13 +400,13 @@
 										},
 										"end": {
 											"line": 12,
-											"column": 24
+											"column": 26
 										}
 									},
 									"id": {
 										"type": "ObjectPattern",
-										"start": 158,
-										"end": 168,
+										"start": 159,
+										"end": 171,
 										"loc": {
 											"start": {
 												"line": 12,
@@ -414,22 +414,22 @@
 											},
 											"end": {
 												"line": 12,
-												"column": 18
+												"column": 20
 											}
 										},
 										"properties": [
 											{
 												"type": "Property",
-												"start": 159,
-												"end": 167,
+												"start": 161,
+												"end": 169,
 												"loc": {
 													"start": {
 														"line": 12,
-														"column": 9
+														"column": 10
 													},
 													"end": {
 														"line": 12,
-														"column": 17
+														"column": 18
 													}
 												},
 												"method": false,
@@ -437,32 +437,32 @@
 												"computed": false,
 												"key": {
 													"type": "Identifier",
-													"start": 159,
-													"end": 164,
+													"start": 161,
+													"end": 166,
 													"loc": {
 														"start": {
 															"line": 12,
-															"column": 9
+															"column": 10
 														},
 														"end": {
 															"line": 12,
-															"column": 14
+															"column": 15
 														}
 													},
 													"name": "yield"
 												},
 												"value": {
 													"type": "Identifier",
-													"start": 166,
-													"end": 167,
+													"start": 168,
+													"end": 169,
 													"loc": {
 														"start": {
 															"line": 12,
-															"column": 16
+															"column": 17
 														},
 														"end": {
 															"line": 12,
-															"column": 17
+															"column": 18
 														}
 													},
 													"name": "y"
@@ -473,16 +473,16 @@
 									},
 									"init": {
 										"type": "Identifier",
-										"start": 171,
-										"end": 174,
+										"start": 174,
+										"end": 177,
 										"loc": {
 											"start": {
 												"line": 12,
-												"column": 21
+												"column": 23
 											},
 											"end": {
 												"line": 12,
-												"column": 24
+												"column": 26
 											}
 										},
 										"name": "obj"
@@ -495,8 +495,8 @@
 				},
 				{
 					"type": "FunctionDeclaration",
-					"start": 226,
-					"end": 259,
+					"start": 229,
+					"end": 262,
 					"loc": {
 						"start": {
 							"line": 16,
@@ -509,8 +509,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 236,
-						"end": 239,
+						"start": 239,
+						"end": 242,
 						"loc": {
 							"start": {
 								"line": 16,
@@ -529,8 +529,8 @@
 					"params": [],
 					"body": {
 						"type": "BlockStatement",
-						"start": 242,
-						"end": 259,
+						"start": 245,
+						"end": 262,
 						"loc": {
 							"start": {
 								"line": 16,
@@ -544,8 +544,8 @@
 						"body": [
 							{
 								"type": "ExpressionStatement",
-								"start": 246,
-								"end": 256,
+								"start": 249,
+								"end": 259,
 								"loc": {
 									"start": {
 										"line": 17,
@@ -558,8 +558,8 @@
 								},
 								"expression": {
 									"type": "YieldExpression",
-									"start": 246,
-									"end": 255,
+									"start": 249,
+									"end": 258,
 									"loc": {
 										"start": {
 											"line": 17,
@@ -573,8 +573,8 @@
 									"delegate": false,
 									"argument": {
 										"type": "Literal",
-										"start": 252,
-										"end": 255,
+										"start": 255,
+										"end": 258,
 										"loc": {
 											"start": {
 												"line": 17,
@@ -596,8 +596,8 @@
 						{
 							"type": "Line",
 							"value": " Inside generators, yield is the operator",
-							"start": 181,
-							"end": 224
+							"start": 184,
+							"end": 227
 						}
 					]
 				}

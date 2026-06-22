@@ -7,5 +7,5 @@
 		[key: string /* ] */]: number;
 	}
 
-	type C = {[key: string /* ] */]: number};
+	type C = { [key: string /* ] */]: number };
 </script>

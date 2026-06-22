@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 616,
+	"end": 614,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -61,8 +61,8 @@
 		{
 			"type": "Line",
 			"value": " Class expression — same superclass call breaks identically",
-			"start": 424,
-			"end": 485,
+			"start": 423,
+			"end": 484,
 			"loc": {
 				"start": {
 					"line": 17,
@@ -78,12 +78,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 615,
+		"end": 613,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 606,
+			"end": 604,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -388,7 +388,7 @@
 				{
 					"type": "ClassDeclaration",
 					"start": 308,
-					"end": 421,
+					"end": 420,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -418,7 +418,7 @@
 					"superClass": {
 						"type": "CallExpression",
 						"start": 328,
-						"end": 418,
+						"end": 417,
 						"loc": {
 							"start": {
 								"line": 9,
@@ -531,8 +531,8 @@
 					},
 					"body": {
 						"type": "ClassBody",
-						"start": 419,
-						"end": 421,
+						"start": 418,
+						"end": 420,
 						"loc": {
 							"start": {
 								"line": 15,
@@ -556,8 +556,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 487,
-					"end": 605,
+					"start": 486,
+					"end": 603,
 					"loc": {
 						"start": {
 							"line": 18,
@@ -571,8 +571,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 493,
-							"end": 604,
+							"start": 492,
+							"end": 602,
 							"loc": {
 								"start": {
 									"line": 18,
@@ -585,8 +585,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 493,
-								"end": 494,
+								"start": 492,
+								"end": 493,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -601,8 +601,8 @@
 							},
 							"init": {
 								"type": "ClassExpression",
-								"start": 497,
-								"end": 604,
+								"start": 496,
+								"end": 602,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -616,8 +616,8 @@
 								"id": null,
 								"superClass": {
 									"type": "CallExpression",
-									"start": 511,
-									"end": 601,
+									"start": 510,
+									"end": 599,
 									"loc": {
 										"start": {
 											"line": 18,
@@ -630,8 +630,8 @@
 									},
 									"callee": {
 										"type": "Identifier",
-										"start": 511,
-										"end": 521,
+										"start": 510,
+										"end": 520,
 										"loc": {
 											"start": {
 												"line": 18,
@@ -647,8 +647,8 @@
 									"arguments": [
 										{
 											"type": "Identifier",
-											"start": 525,
-											"end": 533,
+											"start": 524,
+											"end": 532,
 											"loc": {
 												"start": {
 													"line": 19,
@@ -663,8 +663,8 @@
 										},
 										{
 											"type": "Identifier",
-											"start": 537,
-											"end": 545,
+											"start": 536,
+											"end": 544,
 											"loc": {
 												"start": {
 													"line": 20,
@@ -679,8 +679,8 @@
 										},
 										{
 											"type": "Identifier",
-											"start": 549,
-											"end": 557,
+											"start": 548,
+											"end": 556,
 											"loc": {
 												"start": {
 													"line": 21,
@@ -695,8 +695,8 @@
 										},
 										{
 											"type": "Identifier",
-											"start": 561,
-											"end": 569,
+											"start": 560,
+											"end": 568,
 											"loc": {
 												"start": {
 													"line": 22,
@@ -711,8 +711,8 @@
 										},
 										{
 											"type": "Identifier",
-											"start": 573,
-											"end": 597,
+											"start": 572,
+											"end": 596,
 											"loc": {
 												"start": {
 													"line": 23,
@@ -730,8 +730,8 @@
 								},
 								"body": {
 									"type": "ClassBody",
-									"start": 602,
-									"end": 604,
+									"start": 600,
+									"end": 602,
 									"loc": {
 										"start": {
 											"line": 24,
@@ -752,8 +752,8 @@
 						{
 							"type": "Line",
 							"value": " Class expression — same superclass call breaks identically",
-							"start": 424,
-							"end": 485
+							"start": 423,
+							"end": 484
 						}
 					]
 				}

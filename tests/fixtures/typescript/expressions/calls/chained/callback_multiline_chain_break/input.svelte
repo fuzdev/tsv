@@ -3,7 +3,7 @@
 	const a = items
 		.filter((x) => x.a)
 		.map((x) => ({
-			a: x.a,
+			a: x.a
 		}));
 
 	// Chain with callback before callback - multiline body forces chain break
@@ -18,17 +18,17 @@
 		.filter((x) => x.a)
 		.map((x) => ({
 			a: x.a,
-			b: x.b,
+			b: x.b
 		}))
 		.sort();
 
 	// Non-callback method before callback - chain stays inline
 	const d = items.slice(0, 10).map((x) => ({
-		a: x.a,
+		a: x.a
 	}));
 
 	// Single method with multiline callback - no chain to break
 	const e = items.map((x) => ({
-		a: x.a,
+		a: x.a
 	}));
 </script>

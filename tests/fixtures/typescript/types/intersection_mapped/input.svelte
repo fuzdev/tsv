@@ -1,6 +1,6 @@
 <script lang="ts">
 	// Intersection with mapped type last - `& {` should hug
-	type A = {[P in K]: T[P]} & {
+	type A = { [P in K]: T[P] } & {
 		[P in Exclude<keyof T, K>]?: T[P];
 	};
 

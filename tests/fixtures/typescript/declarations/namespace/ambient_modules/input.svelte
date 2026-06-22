@@ -56,7 +56,7 @@
 	// Module with re-exports
 	declare module 'reexport' {
 		export * from './a';
-		export {B, C} from './b';
+		export { B, C } from './b';
 	}
 
 	// Empty module (type-only augmentation marker)

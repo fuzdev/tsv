@@ -9,7 +9,7 @@
 		'name',
 		/* c2 */ () => {
 			fn();
-		},
+		}
 	);
 
 	// Both comments - expands (comment after comma)
@@ -17,6 +17,6 @@
 		'name' /* c1 */,
 		/* c2 */ () => {
 			fn();
-		},
+		}
 	);
 </script>

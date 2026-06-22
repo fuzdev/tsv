@@ -10,7 +10,7 @@
 <!-- 101 chars - each param wraps to its own line -->
 {#snippet fn(
 	a: A | 'bbbbb' | 'ccccc' | 'ddddd' | 'eeeee' | 'fffff' | 'ggggg' | null,
-	b: A = '6000',
+	b: A = '6000'
 )}
 	<div>text</div>
 {/snippet}

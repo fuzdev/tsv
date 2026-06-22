@@ -9,16 +9,16 @@
 
 	// Destructuring
 	{
-		const {as} = obj;
+		const { as } = obj;
 	}
 	{
 		const [as] = arr;
 	}
 	{
-		const {as: a} = obj;
+		const { as: a } = obj;
 	}
 	{
-		const {from, as} = obj;
+		const { from, as } = obj;
 	}
 
 	// Assignment
@@ -38,17 +38,17 @@
 	// Object property shorthand
 	{
 		const as = 'a';
-		const obj2 = {as};
+		const obj2 = { as };
 	}
 
 	// Object property key
-	const obj3 = {as: 'value'};
+	const obj3 = { as: 'value' };
 
 	// Method name
 	const obj4 = {
 		as() {
 			return 'a';
-		},
+		}
 	};
 
 	// For-of with destructuring (common pattern)

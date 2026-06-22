@@ -11,8 +11,8 @@ Prettier: moves the comment down to its own line
 ```
 // tsv                       // prettier
 type Fn = ( // c            type Fn = (
-	p: T,                       // c
-) => void;                      p: T,
+	p: T                        // c
+) => void;                      p: T
                             ) => void;
 ```
 

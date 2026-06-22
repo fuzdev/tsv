@@ -67,7 +67,7 @@
 
 	// Destructuring with type keywords as property names
 	{
-		const {number, string, boolean} = obj;
+		const { number, string, boolean } = obj;
 	}
 
 	// Object with type keywords as keys
@@ -79,7 +79,7 @@
 		never: 'y',
 		unknown: 'z',
 		object: {},
-		bigint: 1n,
+		bigint: 1n
 	};
 
 	// Assignment

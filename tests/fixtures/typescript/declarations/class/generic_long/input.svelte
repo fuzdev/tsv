@@ -7,7 +7,7 @@
 	// 101 chars - wraps (exceeds print_width)
 	class AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA<
 		T,
-		U,
+		U
 	> {}
 
 	// Type parameters with extends constraint
@@ -18,7 +18,7 @@
 	// 101 chars - wraps (exceeds print_width)
 	class Wraps<
 		T extends string | number | boolean,
-		U extends Record<string, unknown_____________>,
+		U extends Record<string, unknown_____________>
 	> {}
 
 	// Type parameters with defaults
@@ -30,7 +30,7 @@
 	class WrapsDefaults<
 		T = string,
 		U extends T = T,
-		W = Record<string, unknown___________________>,
+		W = Record<string, unknown___________________>
 	> {}
 
 	// Named class expression
@@ -41,7 +41,7 @@
 	// 101 chars - wraps (exceeds print_width)
 	const Ew = class Inner<
 		T extends string | number | boolean,
-		U extends Record<string, un______>,
+		U extends Record<string, un______>
 	> {};
 
 	// Anonymous class expression
@@ -52,6 +52,6 @@
 	// 101 chars - wraps (exceeds print_width)
 	const AnonWraps = class<
 		T extends string | number | boolean,
-		U extends Record<string, u______>,
+		U extends Record<string, u______>
 	> {};
 </script>

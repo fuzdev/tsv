@@ -460,17 +460,14 @@ impl<'a> Printer<'a> {
     }
 
     /// Wrap a specifier list in its own group so it fits independently of the outer
-    /// statement: `{ <inner> }` with softline padding. The independent group keeps a
+    /// statement: `{ <inner> }` with bracketSpacing padding (a space when flat,
+    /// `{ a }`, a newline when the group breaks). The independent group keeps a
     /// preserved header line comment (which forces the outer group to break) from
-    /// expanding a `{a}` that would otherwise stay inline.
-    fn braced_softline_group(&self, inner: DocId) -> DocId {
+    /// expanding a `{ a }` that would otherwise stay inline. Shared by named
+    /// imports, named exports, and `with {…}`/`assert {…}` import attributes.
+    fn braced_group(&self, inner: DocId) -> DocId {
         let d = self.d();
-        d.group(d.concat(&[
-            d.text("{"),
-            d.indent_softline(inner),
-            d.softline(),
-            d.text("}"),
-        ]))
+        d.group(d.concat(&[d.text("{"), d.indent_line(inner), d.line(), d.text("}")]))
     }
 
     /// Finish a module statement: emit any comments between the last content token
@@ -867,7 +864,7 @@ impl<'a> Printer<'a> {
                 // Own group so the braces fit independently of the outer statement —
                 // a preserved header line comment (source→`with` / `with`→`{`) forces
                 // the outer group to break but must not expand inline attributes.
-                self.braced_softline_group(attr_doc)
+                self.braced_group(attr_doc)
             }
         };
 
@@ -966,7 +963,7 @@ impl<'a> Printer<'a> {
                 &get_span,
                 &build_item,
             );
-            self.braced_softline_group(spec_doc)
+            self.braced_group(spec_doc)
         };
 
         // The keyword→`{` gap comment (`import /* c */ {a}`, `import type // c\n{a}`,
@@ -1267,9 +1264,10 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut inner_parts = Vec::new();
         let mut prev_end = brace_start + 1; // After opening `{`
-        // Block comment trailing the LAST item after the comma — preserved after
-        // the (synthetic) trailing comma rather than relocated before it (prettier
-        // relocates before; see conformance_prettier.md §Comment relocation).
+        // Block comment trailing the LAST item after its source comma — preserved past
+        // where the comma was (no trailing comma; trailingComma: 'none') rather than
+        // relocated before it (prettier relocates before; see conformance_prettier.md
+        // §Comment relocation).
         let mut last_after_comma = Vec::new();
 
         for (i, item) in items.iter().enumerate() {
@@ -1295,9 +1293,9 @@ impl<'a> Printer<'a> {
                 self.append_trailing_inline_block_comments(&mut item_parts, item_end, comma_pos);
                 prev_end = comma_pos + 1;
             } else {
-                // Split the last item's trailing block comments around a source
-                // trailing comma: before-comma stay with the item; after-comma are
-                // preserved after the comma (emitted below, after `trailing_comma`).
+                // Split the last item's trailing block comments around a source comma:
+                // before-comma stay with the item; after-comma are preserved below, past
+                // where the comma was (no trailing comma; trailingComma: 'none').
                 self.append_last_trailing_block_comments_split(
                     &mut item_parts,
                     &mut last_after_comma,
@@ -1315,9 +1313,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Trailing comma when broken (matches join_trailing behavior)
-        let trailing_comma = d.if_break(d.text(","), d.text(""));
-        inner_parts.push(trailing_comma);
+        // No trailing comma when the list breaks (trailingComma: 'none').
         // Preserved after-comma block comment(s) on the last item
         inner_parts.extend(last_after_comma);
 
@@ -1442,12 +1438,9 @@ impl<'a> Printer<'a> {
 
                 parts.extend(self.build_trailing_same_line_comment_docs(comma_pos + 1, next_start));
             } else {
-                // Last item: emit comma between same-line block and line comments,
-                // then own-line comments before the closing brace.
-                // Block comments go before comma: `a /* c */ ,`
-                // Line comments go after comma: `a, // comment`
-                // Own-line comments get hardlines: `a,\n// comment`
-                let mut emitted_comma = false;
+                // Last item: no trailing comma (trailingComma: 'none'). Same-line block
+                // comments hug the item (`a /* c */`), same-line line comments follow
+                // (`a // comment`), and own-line comments get hardlines (`a\n// comment`).
                 let mut prev_pos = item_end;
                 // Track line reference for multi-line block comments
                 let mut line_ref = item_end;
@@ -1461,17 +1454,9 @@ impl<'a> Printer<'a> {
                                 line_ref = comment.span.end;
                             }
                         } else {
-                            if !emitted_comma {
-                                parts.push(d.text(","));
-                                emitted_comma = true;
-                            }
                             parts.push(self.build_trailing_line_comment_doc(comment));
                         }
                     } else {
-                        if !emitted_comma {
-                            parts.push(d.text(","));
-                            emitted_comma = true;
-                        }
                         if self.has_blank_line_between(prev_pos, comment.span.start) {
                             parts.push(d.literalline());
                         }
@@ -1479,9 +1464,6 @@ impl<'a> Printer<'a> {
                         parts.push(self.build_comment_doc(comment));
                     }
                     prev_pos = comment.span.end;
-                }
-                if !emitted_comma {
-                    parts.push(d.text(","));
                 }
             }
 

@@ -6,7 +6,7 @@
 
 			// 101 chars: break at .toBe( keeping first call args inline
 			expect(aaaaaaaaaaaaaaaaaaaaaaaaaaaaa(b, c), `${d} eeeeeeeeeeeee fffffffffff ${g}`).toBe(
-				false,
+				false
 			);
 		}
 	};

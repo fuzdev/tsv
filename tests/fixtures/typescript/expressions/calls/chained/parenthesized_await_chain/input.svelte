@@ -1,6 +1,6 @@
 <script>
 	// long chain - breaks at chain points, await stays flat
-	const a = (await fn(arg, {withTypes: true}))
+	const a = (await fn(arg, { withTypes: true }))
 		.filter((x) => x.isValid())
 		.map((x) => x.value)
 		.sort();

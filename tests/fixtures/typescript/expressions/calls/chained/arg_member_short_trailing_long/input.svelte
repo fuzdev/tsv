@@ -12,9 +12,9 @@
 									/** @type {number} */ /** @type {AssignmentExpression} */ assignment_in_labeled
 										.right.start,
 									/** @type {number} */ /** @type {AssignmentExpression} */ assignment_in_labeled
-										.right.end,
+										.right.end
 								)
-								.toString(),
+								.toString()
 						);
 					}
 				}

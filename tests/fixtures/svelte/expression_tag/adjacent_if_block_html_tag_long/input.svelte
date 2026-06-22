@@ -3,6 +3,6 @@
 </script>
 
 {@html fn(
-	aaaaaaaaaaaaaaaaaa || bbbbbbbbbbbbbbbbbb,
+	aaaaaaaaaaaaaaaaaa || bbbbbbbbbbbbbbbbbb
 )}{#if aaaaaaaaaaaaaaaaaa && bbbbbbbbbbbbbbbbbb && aaaaaaaaaaaaaaaaaa !== bbbbbbbbbbbbbbbbbb},
 	updated{/if}

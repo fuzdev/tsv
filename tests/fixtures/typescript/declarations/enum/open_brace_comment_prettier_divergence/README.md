@@ -10,8 +10,8 @@ Prettier: moves the comment down to its own line
 ```
 // tsv                          // prettier
 enum E { // c1                  enum E {
-	A,                                 // c1
-}                                  A,
+	A                                  // c1
+}                                  A
                                  }
 ```
 

@@ -10,8 +10,8 @@ Prettier: moves the comment down to its own line
 ```
 // tsv                          // prettier
 import { // c1                  import {
-	a,                                 // c1
-} from './a';                      a,
+	a                                  // c1
+} from './a';                      a
                                  } from './a';
 ```
 

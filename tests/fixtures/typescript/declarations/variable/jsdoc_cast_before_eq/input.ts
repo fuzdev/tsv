@@ -3,5 +3,5 @@ var a /** @type {number} */ = /** @type {string} */ b.c;
 
 // Nested JSDoc casts with long call expression
 const d /** @type {any[]} */ = /** @type {A} */ e.f.find(
-	(x) => x.type === 'aaaa' && x.name === 'bbbbb' && x.value !== true,
+	(x) => x.type === 'aaaa' && x.name === 'bbbbb' && x.value !== true
 );

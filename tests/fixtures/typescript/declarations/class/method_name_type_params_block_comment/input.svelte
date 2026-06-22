@@ -4,7 +4,7 @@
 	}
 
 	const b = {
-		fn1/* c2 */ <T>() {},
+		fn1/* c2 */ <T>() {}
 	};
 
 	interface C {

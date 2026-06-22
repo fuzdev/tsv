@@ -5,7 +5,7 @@
 	};
 
 	// Source is one-line - stays one-line
-	type B = {[K in keyof U]: V};
+	type B = { [K in keyof U]: V };
 
 	// Multi-line with modifiers
 	type C = {

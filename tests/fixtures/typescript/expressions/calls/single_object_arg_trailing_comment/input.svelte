@@ -1,7 +1,7 @@
 <script lang="ts">
 	fn(
 		{
-			prop: 'value',
-		} /* trailing */,
+			prop: 'value'
+		} /* trailing */
 	);
 </script>

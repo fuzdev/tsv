@@ -19,6 +19,6 @@
 	function fn(
 		x: A &
 			// comment before B
-			B,
+			B
 	) {}
 </script>

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 388,
+	"end": 390,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " Already parenthesized (preserved)",
-			"start": 318,
-			"end": 354,
+			"start": 320,
+			"end": 356,
 			"loc": {
 				"start": {
 					"line": 17,
@@ -110,12 +110,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 387,
+		"end": 389,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 378,
+			"end": 380,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -948,7 +948,7 @@
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 285,
-					"end": 315,
+					"end": 317,
 					"loc": {
 						"start": {
 							"line": 15,
@@ -956,7 +956,7 @@
 						},
 						"end": {
 							"line": 15,
-							"column": 31
+							"column": 33
 						}
 					},
 					"id": {
@@ -978,7 +978,7 @@
 					"typeAnnotation": {
 						"type": "TSUnionType",
 						"start": 294,
-						"end": 314,
+						"end": 316,
 						"loc": {
 							"start": {
 								"line": 15,
@@ -986,7 +986,7 @@
 							},
 							"end": {
 								"line": 15,
-								"column": 30
+								"column": 32
 							}
 						},
 						"types": [
@@ -1024,7 +1024,7 @@
 							{
 								"type": "TSParenthesizedType",
 								"start": 298,
-								"end": 310,
+								"end": 312,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -1032,13 +1032,13 @@
 									},
 									"end": {
 										"line": 15,
-										"column": 26
+										"column": 28
 									}
 								},
 								"typeAnnotation": {
 									"type": "TSIntersectionType",
 									"start": 299,
-									"end": 309,
+									"end": 311,
 									"loc": {
 										"start": {
 											"line": 15,
@@ -1046,7 +1046,7 @@
 										},
 										"end": {
 											"line": 15,
-											"column": 25
+											"column": 27
 										}
 									},
 									"types": [
@@ -1084,7 +1084,7 @@
 										{
 											"type": "TSTypeLiteral",
 											"start": 303,
-											"end": 309,
+											"end": 311,
 											"loc": {
 												"start": {
 													"line": 15,
@@ -1092,81 +1092,81 @@
 												},
 												"end": {
 													"line": 15,
-													"column": 25
+													"column": 27
 												}
 											},
 											"members": [
 												{
 													"type": "TSPropertySignature",
-													"start": 304,
-													"end": 308,
+													"start": 305,
+													"end": 309,
 													"loc": {
 														"start": {
 															"line": 15,
-															"column": 20
+															"column": 21
 														},
 														"end": {
 															"line": 15,
-															"column": 24
+															"column": 25
 														}
 													},
 													"computed": false,
 													"key": {
 														"type": "Identifier",
-														"start": 304,
-														"end": 305,
+														"start": 305,
+														"end": 306,
 														"loc": {
 															"start": {
 																"line": 15,
-																"column": 20
+																"column": 21
 															},
 															"end": {
 																"line": 15,
-																"column": 21
+																"column": 22
 															}
 														},
 														"name": "c"
 													},
 													"typeAnnotation": {
 														"type": "TSTypeAnnotation",
-														"start": 305,
-														"end": 308,
+														"start": 306,
+														"end": 309,
 														"loc": {
 															"start": {
 																"line": 15,
-																"column": 21
+																"column": 22
 															},
 															"end": {
 																"line": 15,
-																"column": 24
+																"column": 25
 															}
 														},
 														"typeAnnotation": {
 															"type": "TSTypeReference",
-															"start": 307,
-															"end": 308,
+															"start": 308,
+															"end": 309,
 															"loc": {
 																"start": {
 																	"line": 15,
-																	"column": 23
+																	"column": 24
 																},
 																"end": {
 																	"line": 15,
-																	"column": 24
+																	"column": 25
 																}
 															},
 															"typeName": {
 																"type": "Identifier",
-																"start": 307,
-																"end": 308,
+																"start": 308,
+																"end": 309,
 																"loc": {
 																	"start": {
 																		"line": 15,
-																		"column": 23
+																		"column": 24
 																	},
 																	"end": {
 																		"line": 15,
-																		"column": 24
+																		"column": 25
 																	}
 																},
 																"name": "C"
@@ -1181,30 +1181,30 @@
 							},
 							{
 								"type": "TSTypeReference",
-								"start": 313,
-								"end": 314,
+								"start": 315,
+								"end": 316,
 								"loc": {
 									"start": {
 										"line": 15,
-										"column": 29
+										"column": 31
 									},
 									"end": {
 										"line": 15,
-										"column": 30
+										"column": 32
 									}
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 313,
-									"end": 314,
+									"start": 315,
+									"end": 316,
 									"loc": {
 										"start": {
 											"line": 15,
-											"column": 29
+											"column": 31
 										},
 										"end": {
 											"line": 15,
-											"column": 30
+											"column": 32
 										}
 									},
 									"name": "D"
@@ -1223,8 +1223,8 @@
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 356,
-					"end": 377,
+					"start": 358,
+					"end": 379,
 					"loc": {
 						"start": {
 							"line": 18,
@@ -1237,8 +1237,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 361,
-						"end": 362,
+						"start": 363,
+						"end": 364,
 						"loc": {
 							"start": {
 								"line": 18,
@@ -1253,8 +1253,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
-						"start": 365,
-						"end": 376,
+						"start": 367,
+						"end": 378,
 						"loc": {
 							"start": {
 								"line": 18,
@@ -1268,8 +1268,8 @@
 						"types": [
 							{
 								"type": "TSTypeReference",
-								"start": 365,
-								"end": 366,
+								"start": 367,
+								"end": 368,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -1282,8 +1282,8 @@
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 365,
-									"end": 366,
+									"start": 367,
+									"end": 368,
 									"loc": {
 										"start": {
 											"line": 18,
@@ -1299,8 +1299,8 @@
 							},
 							{
 								"type": "TSParenthesizedType",
-								"start": 369,
-								"end": 376,
+								"start": 371,
+								"end": 378,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -1313,8 +1313,8 @@
 								},
 								"typeAnnotation": {
 									"type": "TSIntersectionType",
-									"start": 370,
-									"end": 375,
+									"start": 372,
+									"end": 377,
 									"loc": {
 										"start": {
 											"line": 18,
@@ -1328,8 +1328,8 @@
 									"types": [
 										{
 											"type": "TSTypeReference",
-											"start": 370,
-											"end": 371,
+											"start": 372,
+											"end": 373,
 											"loc": {
 												"start": {
 													"line": 18,
@@ -1342,8 +1342,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 370,
-												"end": 371,
+												"start": 372,
+												"end": 373,
 												"loc": {
 													"start": {
 														"line": 18,
@@ -1359,8 +1359,8 @@
 										},
 										{
 											"type": "TSTypeReference",
-											"start": 374,
-											"end": 375,
+											"start": 376,
+											"end": 377,
 											"loc": {
 												"start": {
 													"line": 18,
@@ -1373,8 +1373,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 374,
-												"end": 375,
+												"start": 376,
+												"end": 377,
 												"loc": {
 													"start": {
 														"line": 18,
@@ -1397,8 +1397,8 @@
 						{
 							"type": "Line",
 							"value": " Already parenthesized (preserved)",
-							"start": 318,
-							"end": 354
+							"start": 320,
+							"end": 356
 						}
 					]
 				}

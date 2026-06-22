@@ -1,7 +1,7 @@
 {
 	"type": "Program",
 	"start": 0,
-	"end": 657,
+	"end": 655,
 	"loc": {
 		"start": {
 			"line": 1,
@@ -540,7 +540,7 @@
 		{
 			"type": "VariableDeclaration",
 			"start": 480,
-			"end": 656,
+			"end": 654,
 			"loc": {
 				"start": {
 					"line": 12,
@@ -555,7 +555,7 @@
 				{
 					"type": "VariableDeclarator",
 					"start": 486,
-					"end": 655,
+					"end": 653,
 					"loc": {
 						"start": {
 							"line": 12,
@@ -585,7 +585,7 @@
 					"init": {
 						"type": "ArrowFunctionExpression",
 						"start": 491,
-						"end": 655,
+						"end": 653,
 						"loc": {
 							"start": {
 								"line": 12,
@@ -603,8 +603,8 @@
 						"params": [
 							{
 								"type": "Identifier",
-								"start": 597,
-								"end": 647,
+								"start": 596,
+								"end": 646,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -618,8 +618,8 @@
 								"name": "x",
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 598,
-									"end": 647,
+									"start": 597,
+									"end": 646,
 									"loc": {
 										"start": {
 											"line": 16,
@@ -632,8 +632,8 @@
 									},
 									"typeAnnotation": {
 										"type": "TSTypeReference",
-										"start": 600,
-										"end": 647,
+										"start": 599,
+										"end": 646,
 										"loc": {
 											"start": {
 												"line": 16,
@@ -646,8 +646,8 @@
 										},
 										"typeName": {
 											"type": "Identifier",
-											"start": 600,
-											"end": 647,
+											"start": 599,
+											"end": 646,
 											"loc": {
 												"start": {
 													"line": 16,
@@ -666,8 +666,8 @@
 						],
 						"body": {
 							"type": "Identifier",
-							"start": 654,
-							"end": 655,
+							"start": 652,
+							"end": 653,
 							"loc": {
 								"start": {
 									"line": 17,
@@ -683,7 +683,7 @@
 						"typeParameters": {
 							"type": "TSTypeParameterDeclaration",
 							"start": 491,
-							"end": 594,
+							"end": 593,
 							"loc": {
 								"start": {
 									"line": 12,
@@ -727,10 +727,7 @@
 									},
 									"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 								}
-							],
-							"extra": {
-								"trailingComma": 591
-							}
+							]
 						}
 					}
 				}

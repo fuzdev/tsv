@@ -4,12 +4,12 @@
 	fn(
 		a && a_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_condition
 			? consequent
-			: alternate,
+			: alternate
 	);
 
 	new Fn(
 		a && a_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_condition
 			? consequent
-			: alternate,
+			: alternate
 	);
 </script>

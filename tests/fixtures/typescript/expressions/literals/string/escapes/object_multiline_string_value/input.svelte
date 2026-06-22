@@ -1,6 +1,6 @@
 <script>
 	const obj = {
 		key: 'multi \
-line',
+line'
 	};
 </script>

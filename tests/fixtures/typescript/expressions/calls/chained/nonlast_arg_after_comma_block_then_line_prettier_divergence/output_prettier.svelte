@@ -5,7 +5,7 @@
 	foo
 		.bar(
 			a /* c1 */, // c2
-			b,
+			b
 		)
 		.baz();
 </script>

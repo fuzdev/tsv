@@ -17,12 +17,12 @@
 				cond2
 				? b
 				: c
-			: d,
+			: d
 	};
 
 	// Object property without comment - stays inline
 	const obj2 = {
-		prop: cond1 ? (cond2 ? b : c) : d,
+		prop: cond1 ? (cond2 ? b : c) : d
 	};
 
 	// Trailing comment on nested consequent

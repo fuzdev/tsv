@@ -2,7 +2,7 @@
 	// Object literal callback - call stays with =
 	a = b.map((x) => ({
 		...x,
-		c: true,
+		c: true
 	}));
 
 	// Block body callback - call stays with =

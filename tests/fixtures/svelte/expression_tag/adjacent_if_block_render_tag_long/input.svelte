@@ -3,6 +3,6 @@
 </script>
 
 {@render menu(
-	aaaaaaaaaaaaaaaaaa || bbbbbbbbbbbbbbbbbb,
+	aaaaaaaaaaaaaaaaaa || bbbbbbbbbbbbbbbbbb
 )}{#if aaaaaaaaaaaaaaaaaa && bbbbbbbbbbbbbbbbbb && aaaaaaaaaaaaaaaaaa !== bbbbbbbbbbbbbbbbbb},
 	updated{/if}

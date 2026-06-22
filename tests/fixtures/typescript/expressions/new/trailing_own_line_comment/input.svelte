@@ -1,11 +1,11 @@
 <script lang="ts">
 	const a = new A(
-		x,
+		x
 		/* block */
 	);
 
 	const b = new A<T>(
-		x,
+		x
 		/* block */
 	);
 </script>

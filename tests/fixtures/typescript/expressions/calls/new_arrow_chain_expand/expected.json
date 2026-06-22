@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 337,
+	"end": 336,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " Single arg: arrow chain with call body - does NOT expand",
-			"start": 240,
-			"end": 299,
+			"start": 239,
+			"end": 298,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -62,12 +62,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 336,
+		"end": 335,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 327,
+			"end": 326,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -261,7 +261,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 195,
-					"end": 237,
+					"end": 236,
 					"loc": {
 						"start": {
 							"line": 8,
@@ -275,7 +275,7 @@
 					"expression": {
 						"type": "NewExpression",
 						"start": 195,
-						"end": 236,
+						"end": 235,
 						"loc": {
 							"start": {
 								"line": 8,
@@ -306,7 +306,7 @@
 							{
 								"type": "ArrowFunctionExpression",
 								"start": 201,
-								"end": 235,
+								"end": 234,
 								"loc": {
 									"start": {
 										"line": 8,
@@ -325,7 +325,7 @@
 								"body": {
 									"type": "ArrowFunctionExpression",
 									"start": 207,
-									"end": 235,
+									"end": 234,
 									"loc": {
 										"start": {
 											"line": 8,
@@ -344,7 +344,7 @@
 									"body": {
 										"type": "ObjectExpression",
 										"start": 214,
-										"end": 234,
+										"end": 233,
 										"loc": {
 											"start": {
 												"line": 8,
@@ -477,8 +477,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 301,
-					"end": 326,
+					"start": 300,
+					"end": 325,
 					"loc": {
 						"start": {
 							"line": 14,
@@ -491,8 +491,8 @@
 					},
 					"expression": {
 						"type": "NewExpression",
-						"start": 301,
-						"end": 325,
+						"start": 300,
+						"end": 324,
 						"loc": {
 							"start": {
 								"line": 14,
@@ -505,8 +505,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 305,
-							"end": 306,
+							"start": 304,
+							"end": 305,
 							"loc": {
 								"start": {
 									"line": 14,
@@ -522,8 +522,8 @@
 						"arguments": [
 							{
 								"type": "ArrowFunctionExpression",
-								"start": 307,
-								"end": 324,
+								"start": 306,
+								"end": 323,
 								"loc": {
 									"start": {
 										"line": 14,
@@ -541,8 +541,8 @@
 								"params": [],
 								"body": {
 									"type": "ArrowFunctionExpression",
-									"start": 313,
-									"end": 324,
+									"start": 312,
+									"end": 323,
 									"loc": {
 										"start": {
 											"line": 14,
@@ -560,8 +560,8 @@
 									"params": [],
 									"body": {
 										"type": "CallExpression",
-										"start": 319,
-										"end": 324,
+										"start": 318,
+										"end": 323,
 										"loc": {
 											"start": {
 												"line": 14,
@@ -574,8 +574,8 @@
 										},
 										"callee": {
 											"type": "Identifier",
-											"start": 319,
-											"end": 321,
+											"start": 318,
+											"end": 320,
 											"loc": {
 												"start": {
 													"line": 14,
@@ -591,8 +591,8 @@
 										"arguments": [
 											{
 												"type": "Identifier",
-												"start": 322,
-												"end": 323,
+												"start": 321,
+												"end": 322,
 												"loc": {
 													"start": {
 														"line": 14,
@@ -616,8 +616,8 @@
 						{
 							"type": "Line",
 							"value": " Single arg: arrow chain with call body - does NOT expand",
-							"start": 240,
-							"end": 299
+							"start": 239,
+							"end": 298
 						}
 					]
 				}

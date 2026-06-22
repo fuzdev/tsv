@@ -5,7 +5,7 @@
 
 		// 101 chars - params break, return type stays with )
 		async send(
-			messageParam: VeryLongParameterTypeNameAAAABBB,
+			messageParam: VeryLongParameterTypeNameAAAABBB
 		): Promise<VeryLongReturnType | null> {}
 	}
 </script>

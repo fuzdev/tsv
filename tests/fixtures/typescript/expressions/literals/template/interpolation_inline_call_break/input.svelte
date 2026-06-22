@@ -4,7 +4,7 @@
 		return `prefix
 text text text text text text text text text text text text text text: ${x}, ${fn(
 			aaaaaaaaaa,
-			bbb,
+			bbb
 		)}`;
 	};
 
@@ -14,7 +14,7 @@ text text text text text text text text text text text text text text: ${x}, ${f
 			return `prefix
 text text text text text text text text text text text text text text: ${x}, ${fn(
 				aaaaaaaaaa,
-				bbb,
+				bbb
 			)}`;
 		}
 	};

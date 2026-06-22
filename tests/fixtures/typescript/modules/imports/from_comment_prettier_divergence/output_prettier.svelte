@@ -12,10 +12,10 @@
 	import * as ns2 from './d'; // c4
 
 	// named specifiers, block comment before from
-	import {a /* c5 */} from './e';
+	import { a /* c5 */ } from './e';
 
 	// named specifiers, line comment before from
 	import {
-		b, // c6
+		b // c6
 	} from './f';
 </script>

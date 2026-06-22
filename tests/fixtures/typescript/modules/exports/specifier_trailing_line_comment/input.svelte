@@ -7,18 +7,18 @@
 
 	// single specifier with trailing line comment
 	export {
-		a, // comment
+		a // comment
 	};
 
 	// last specifier trailing line comment
 	export {
 		b,
-		c, // comment
+		c // comment
 	};
 
 	// all specifiers with trailing line comments
 	export {
 		d, // comment1
-		e, // comment2
+		e // comment2
 	};
 </script>

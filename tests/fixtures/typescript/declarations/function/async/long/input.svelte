@@ -6,7 +6,7 @@
 	async function longParams(
 		veryLongParameterNameOne: VeryLongTypeName,
 		veryLongParameterNameTwo: AnotherLongTypeName,
-		veryLongParameterNameThree: YetAnotherLongTypeName,
+		veryLongParameterNameThree: YetAnotherLongTypeName
 	): Promise<void> {
 		await Promise.resolve();
 	}
@@ -14,7 +14,7 @@
 	// Long async with generic - type params wrap
 	async function longGeneric<
 		T extends VeryLongConstraintTypeName,
-		U extends AnotherLongConstraintTypeName,
+		U extends AnotherLongConstraintTypeName
 	>(x: T, y: U): Promise<[T, U]> {
 		return [x, y];
 	}
@@ -22,7 +22,7 @@
 	// Async generator with long signature
 	async function* longAsyncGenerator(
 		veryLongParameterNameOne: VeryLongTypeName,
-		veryLongParameterNameTwo: AnotherLongTypeName,
+		veryLongParameterNameTwo: AnotherLongTypeName
 	): AsyncGenerator<VeryLongYieldTypeName> {
 		yield await Promise.resolve({} as VeryLongYieldTypeName);
 	}
@@ -30,7 +30,7 @@
 	// Long async arrow function
 	const longArrow = async (
 		veryLongParameterNameOne: VeryLongTypeName,
-		veryLongParameterNameTwo: AnotherLongTypeName,
+		veryLongParameterNameTwo: AnotherLongTypeName
 	): Promise<void> => {
 		await Promise.resolve();
 	};
@@ -39,16 +39,16 @@
 	const obj = {
 		async longMethod(
 			veryLongParameterNameOne: VeryLongTypeName,
-			veryLongParameterNameTwo: AnotherLongTypeName,
+			veryLongParameterNameTwo: AnotherLongTypeName
 		): Promise<void> {
 			await Promise.resolve();
-		},
+		}
 	};
 
 	// Exported async with long signature
 	export async function exportedLong(
 		veryLongParameterNameOne: VeryLongTypeName,
-		veryLongParameterNameTwo: AnotherLongTypeName,
+		veryLongParameterNameTwo: AnotherLongTypeName
 	): Promise<VeryLongReturnTypeName> {
 		return {} as VeryLongReturnTypeName;
 	}

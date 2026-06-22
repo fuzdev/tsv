@@ -142,7 +142,7 @@ impl<'a> Printer<'a> {
                 let state_expand_all = d.concat(&[
                     callee_doc,
                     d.text("("),
-                    d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
+                    d.indent(d.concat(&[d.line(), all_args_broken])),
                     d.line(),
                     d.text(")"),
                 ]);

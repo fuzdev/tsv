@@ -1,10 +1,10 @@
 <script lang="ts">
 	fn(
 		(
-			a: string, // comment
+			a: string // comment
 		) =>
 			(
-				b: number, // comment
-			) => {},
+				b: number // comment
+			) => {}
 	);
 </script>

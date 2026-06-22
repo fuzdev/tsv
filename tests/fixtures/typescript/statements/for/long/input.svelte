@@ -34,7 +34,7 @@
 		item7,
 		item8,
 		item9,
-		item10ABCDEF,
+		item10ABCDEF
 	]) {
 		a;
 	}
@@ -45,7 +45,17 @@
 	}
 
 	// for-in with object literal - 100 chars exactly - stays inline
-	for (const key in {aaa: 1, bbb: 2, ccc: 3, ddd: 4, eee: 5, fff: 6, ggg: 7, hhh: 8, iiiiiiii: 9}) {
+	for (const key in {
+		aaa: 1,
+		bbb: 2,
+		ccc: 3,
+		ddd: 4,
+		eee: 5,
+		fff: 6,
+		ggg: 7,
+		hhh: 8,
+		iiiiiiii: 9
+	}) {
 		a;
 	}
 
@@ -59,7 +69,7 @@
 		fff: 6,
 		ggg: 7,
 		hhh: 8,
-		iiiiiiiii: 9,
+		iiiiiiiii: 9
 	}) {
 		a;
 	}

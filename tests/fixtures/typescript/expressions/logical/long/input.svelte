@@ -10,7 +10,7 @@
 	const foo = Boolean(
 		cond_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ||
 		cond_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ||
-		cond_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+		cond_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 	);
 
 	/* Inside !!() - wraps arguments */

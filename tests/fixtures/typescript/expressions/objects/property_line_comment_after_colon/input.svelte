@@ -6,6 +6,6 @@
 		key2:
 			// multi-line comment
 			// continues here
-			value2,
+			value2
 	};
 </script>

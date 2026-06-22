@@ -2,6 +2,6 @@
 	enum A {
 		X,
 		Y,
-		Z,
+		Z
 	}
 </script>

@@ -3,13 +3,13 @@
 	type Default<
 		U =
 			// c
-			V,
+			V
 	> = U;
 
 	// Own-line comment after `extends` stays on its own line.
 	type Constraint<
 		T extends
 			// c
-			A,
+			A
 	> = T;
 </script>

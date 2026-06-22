@@ -13,7 +13,7 @@
 	paramF,
 	paramG,
 	paramH,
-	paramIIIIIIIIIIIIIIIII,
+	paramIIIIIIIIIIIIIIIII
 )}
 	<div>text</div>
 {/snippet}

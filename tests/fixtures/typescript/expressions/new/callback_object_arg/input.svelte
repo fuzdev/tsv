@@ -4,7 +4,7 @@
 		(x) => {
 			fn1(x);
 		},
-		{prop},
+		{ prop }
 	);
 
 	// Block callback with multi-property object arg
@@ -16,8 +16,8 @@
 			}
 		},
 		{
-			prop1: 1,
-		},
+			prop1: 1
+		}
 	);
 
 	// Single-statement block callback with object arg
@@ -25,7 +25,7 @@
 		(x) => {
 			return x;
 		},
-		{prop},
+		{ prop }
 	);
 
 	// Regular call (same pattern - should match)
@@ -33,6 +33,6 @@
 		(x) => {
 			fn1(x);
 		},
-		{prop},
+		{ prop }
 	);
 </script>

@@ -9,7 +9,7 @@ prettier attaches it to the preceding argument and relocates it **before** the c
 // input (author's placement)   // tsv (preserve)        // prettier (relocate)
 fn(                             fn(                       fn(
 	a, /* c */                      a, /* c */                a /* c */,
-	b,                              b,                        b,
+	b                               b                         b
 );                              );                        );
 ```
 

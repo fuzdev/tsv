@@ -12,19 +12,19 @@
 		cond
 			? a.d(e_value, fn2(f_value.left), f_value.right)
 			: a.e(e_value, fn2(f_value.argument), f_value.prefix),
-		g_value,
+		g_value
 	);
 
 	// Object property: stripped parens on value
 	const obj = {
 		x: b ? c : d,
-		y: e,
+		y: e
 	};
 
 	// Array element: stripped parens
 	const arr = [
 		bbbbbbbbbbb ? ccccccccccc : ddddddddddd,
 		eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee,
-		ffffffffffffffffffffffffffffffffffff,
+		ffffffffffffffffffffffffffffffffffff
 	];
 </script>

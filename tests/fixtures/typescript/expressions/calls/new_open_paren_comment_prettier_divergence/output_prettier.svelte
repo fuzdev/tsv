@@ -8,6 +8,6 @@
 	// block comment trailing `(`, then own-line leading comment
 	new Foo /* paren */(
 		// lead
-		a,
+		a
 	);
 </script>

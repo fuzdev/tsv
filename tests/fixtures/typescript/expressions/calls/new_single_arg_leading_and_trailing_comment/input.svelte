@@ -1,17 +1,17 @@
 <script>
 	new Foo(
 		// lead
-		a,
+		a
 		// trail
 	);
 
 	new Foo(
-		/* lead */ b,
+		/* lead */ b
 		// trail
 	);
 
 	new Foo(
-		/* lead */ c,
+		/* lead */ c
 		/* trail */
 	);
 </script>

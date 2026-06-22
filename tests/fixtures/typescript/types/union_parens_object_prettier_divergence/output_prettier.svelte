@@ -3,7 +3,7 @@
 	// Union breaks with indent after ( and before )
 	let {
 		a,
-		b,
+		b
 	}: (
 		| {
 				a: string;
@@ -18,5 +18,5 @@
 	} = {};
 
 	// Short parenthesized union stays flat
-	type T = ({a: string} | {b: string}) & C;
+	type T = ({ a: string } | { b: string }) & C;
 </script>

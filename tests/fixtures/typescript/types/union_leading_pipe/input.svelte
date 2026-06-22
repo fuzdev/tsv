@@ -6,11 +6,11 @@
 	type B = string | number;
 
 	// Leading pipe in intersection context - parens preserved for precedence
-	type C = A & ({a: string} | {b: number});
+	type C = A & ({ a: string } | { b: number });
 
 	// Leading ampersand in intersection
-	type D = {a: string} & {b: number};
+	type D = { a: string } & { b: number };
 
 	// Leading pipe in destructuring type annotation - parens preserved for precedence
-	const {a}: A & ({a: string} | {a: number}) = x;
+	const { a }: A & ({ a: string } | { a: number }) = x;
 </script>

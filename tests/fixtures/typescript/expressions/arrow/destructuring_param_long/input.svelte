@@ -1,6 +1,6 @@
 <script lang="ts">
 	// Exactly 100 chars - stays inline (contrast case)
-	export const fn1 = ({a, b, c, d, e = new BackendWebsocketTransport()}: Aaaaaaaaaaaaa): void => {};
+	export const fn1 = ({ a, b, c, d, e = new BackendWebsocketTransport() }: Aaaaaaaaaaa): void => {};
 
 	// 101 chars - wraps with destructuring expanded, closing line stays together
 	export const fn2 = ({
@@ -8,6 +8,6 @@
 		b,
 		c,
 		d,
-		e = new BackendWebsocketTransport(),
-	}: Aaaaaaaaaaaaaa): void => {};
+		e = new BackendWebsocketTransport()
+	}: Aaaaaaaaaaaa): void => {};
 </script>

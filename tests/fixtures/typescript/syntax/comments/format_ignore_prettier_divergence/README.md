@@ -16,7 +16,7 @@ both `format-ignore`d ones are reformatted — those are the entire divergence:
 
 ```ts
 // format-ignore
-const a = {b:   1,   c:   2};   // tsv keeps; prettier reformats → {b: 1, c: 2}
+const a = {b:   1,   c:   2};   // tsv keeps; prettier reformats → { b: 1, c: 2 }
 
 /* format-ignore */
 const d = [1,    2,    3];      // tsv keeps; prettier reformats → [1, 2, 3]

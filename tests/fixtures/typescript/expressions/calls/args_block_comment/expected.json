@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 299,
+	"end": 297,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " Multiple args with multiple comments",
-			"start": 91,
-			"end": 130,
+			"start": 90,
+			"end": 129,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -61,8 +61,8 @@
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 140,
-			"end": 148,
+			"start": 139,
+			"end": 147,
 			"loc": {
 				"start": {
 					"line": 11,
@@ -77,8 +77,8 @@
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 154,
-			"end": 162,
+			"start": 153,
+			"end": 161,
 			"loc": {
 				"start": {
 					"line": 11,
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " Leading and inter-argument comments",
-			"start": 171,
-			"end": 209,
+			"start": 170,
+			"end": 208,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -109,8 +109,8 @@
 		{
 			"type": "Block",
 			"value": " leading comment ",
-			"start": 217,
-			"end": 238,
+			"start": 216,
+			"end": 237,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -125,8 +125,8 @@
 		{
 			"type": "Block",
 			"value": " inter-arg comment ",
-			"start": 251,
-			"end": 274,
+			"start": 250,
+			"end": 273,
 			"loc": {
 				"start": {
 					"line": 17,
@@ -142,12 +142,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 298,
+		"end": 296,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 289,
+			"end": 287,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -253,7 +253,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 39,
-					"end": 88,
+					"end": 87,
 					"loc": {
 						"start": {
 							"line": 4,
@@ -267,7 +267,7 @@
 					"expression": {
 						"type": "CallExpression",
 						"start": 39,
-						"end": 87,
+						"end": 86,
 						"loc": {
 							"start": {
 								"line": 4,
@@ -343,8 +343,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 132,
-					"end": 168,
+					"start": 131,
+					"end": 167,
 					"loc": {
 						"start": {
 							"line": 11,
@@ -357,8 +357,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 132,
-						"end": 167,
+						"start": 131,
+						"end": 166,
 						"loc": {
 							"start": {
 								"line": 11,
@@ -371,8 +371,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 132,
-							"end": 134,
+							"start": 131,
+							"end": 133,
 							"loc": {
 								"start": {
 									"line": 11,
@@ -388,8 +388,8 @@
 						"arguments": [
 							{
 								"type": "Literal",
-								"start": 135,
-								"end": 138,
+								"start": 134,
+								"end": 137,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -406,15 +406,15 @@
 									{
 										"type": "Block",
 										"value": " c1 ",
-										"start": 140,
-										"end": 148
+										"start": 139,
+										"end": 147
 									}
 								]
 							},
 							{
 								"type": "Literal",
-								"start": 149,
-								"end": 152,
+								"start": 148,
+								"end": 151,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -431,15 +431,15 @@
 									{
 										"type": "Block",
 										"value": " c2 ",
-										"start": 154,
-										"end": 162
+										"start": 153,
+										"end": 161
 									}
 								]
 							},
 							{
 								"type": "Literal",
-								"start": 163,
-								"end": 166,
+								"start": 162,
+								"end": 165,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -460,15 +460,15 @@
 						{
 							"type": "Line",
 							"value": " Multiple args with multiple comments",
-							"start": 91,
-							"end": 130
+							"start": 90,
+							"end": 129
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 211,
-					"end": 288,
+					"start": 210,
+					"end": 286,
 					"loc": {
 						"start": {
 							"line": 14,
@@ -481,8 +481,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 211,
-						"end": 287,
+						"start": 210,
+						"end": 285,
 						"loc": {
 							"start": {
 								"line": 14,
@@ -495,8 +495,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 211,
-							"end": 213,
+							"start": 210,
+							"end": 212,
 							"loc": {
 								"start": {
 									"line": 14,
@@ -512,8 +512,8 @@
 						"arguments": [
 							{
 								"type": "Literal",
-								"start": 241,
-								"end": 247,
+								"start": 240,
+								"end": 246,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -530,15 +530,15 @@
 									{
 										"type": "Block",
 										"value": " leading comment ",
-										"start": 217,
-										"end": 238
+										"start": 216,
+										"end": 237
 									}
 								]
 							},
 							{
 								"type": "Literal",
-								"start": 277,
-								"end": 283,
+								"start": 276,
+								"end": 282,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -555,8 +555,8 @@
 									{
 										"type": "Block",
 										"value": " inter-arg comment ",
-										"start": 251,
-										"end": 274
+										"start": 250,
+										"end": 273
 									}
 								]
 							}
@@ -567,8 +567,8 @@
 						{
 							"type": "Line",
 							"value": " Leading and inter-argument comments",
-							"start": 171,
-							"end": 209
+							"start": 170,
+							"end": 208
 						}
 					]
 				}

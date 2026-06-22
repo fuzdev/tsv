@@ -18,7 +18,7 @@
 	x.push(
 		fn(...a)
 			.b()
-			.c(),
+			.c()
 	);
 
 	// spread in middle call

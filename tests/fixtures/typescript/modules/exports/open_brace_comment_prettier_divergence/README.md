@@ -12,8 +12,8 @@ Prettier: moves the comment down to its own line
 ```
 // tsv                          // prettier
 export { // c1                  export {
-	a,                                 // c1
-} from './a';                      a,
+	a                                  // c1
+} from './a';                      a
                                  } from './a';
 ```
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	// type literal method signature
-	type T = {m(cb: (x: number) => void /* c */): void};
+	type T = { m(cb: (x: number) => void /* c */): void };
 
 	// interface method signature
 	interface I1 {

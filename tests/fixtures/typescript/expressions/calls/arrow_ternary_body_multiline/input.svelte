@@ -2,27 +2,27 @@
 	// Ternary with block arrow consequent
 	const a = fn(() =>
 		cond
-			? ({x}) => {
+			? ({ x }) => {
 					if (x) {
 						add(x);
 					} else {
 						remove(x);
 					}
 				}
-			: null,
+			: null
 	);
 
 	// Ternary with block arrow alternate
 	const b = fn(() =>
 		cond
 			? null
-			: ({x}) => {
+			: ({ x }) => {
 					if (x) {
 						add(x);
 					} else {
 						remove(x);
 					}
-				},
+				}
 	);
 
 	// Simple - no block bodies, should stay flat

@@ -4,7 +4,7 @@
 		(x) => {
 			return x;
 		},
-		{a: 1},
+		{ a: 1 }
 	);
 
 	// Callback first, array last
@@ -12,7 +12,7 @@
 		(x) => {
 			return x;
 		},
-		[1, 2],
+		[1, 2]
 	);
 
 	// Multiple args: string, callback, object
@@ -21,6 +21,6 @@
 		(x) => {
 			return x;
 		},
-		{a: 1},
+		{ a: 1 }
 	);
 </script>

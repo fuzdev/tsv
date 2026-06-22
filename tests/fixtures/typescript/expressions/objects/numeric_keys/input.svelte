@@ -5,7 +5,7 @@
 		0b1_1n: 'value2',
 		1n: 'value3',
 		0x123abcdef456abcdef: 'value4',
-		1_8_7: 'value5',
+		1_8_7: 'value5'
 	};
 
 	// literal class member keys (string, numeric, bigint)

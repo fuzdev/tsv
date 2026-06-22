@@ -1,11 +1,11 @@
 <script>
 	fn(
-		a,
+		a
 		// comment
 	);
 
 	fn(
-		b,
+		b
 		/* block */
 		// line
 	);

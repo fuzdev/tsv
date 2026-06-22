@@ -5,6 +5,6 @@
 	// 101 chars - breaks outer call, nested call stays inline
 	fn1(a).methodAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA(
 		'value1 value2 value3 value4',
-		fn2(x),
+		fn2(x)
 	);
 </script>

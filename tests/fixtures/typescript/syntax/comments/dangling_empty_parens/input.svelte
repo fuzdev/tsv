@@ -15,7 +15,7 @@
 	let c = function (/* dangling */) {};
 
 	// Method - dangling comment in empty params
-	let d = {fn(/* dangling */) {}};
+	let d = { fn(/* dangling */) {} };
 
 	// Optional call - dangling comment
 	fn?.(/* dangling */);

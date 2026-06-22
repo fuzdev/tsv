@@ -8,7 +8,7 @@
 	// prettier-ignore
 	const   h  =   {   i:   5,   j:   6   };
 
-	const e = {f: 1, g: 2};
+	const e = { f: 1, g: 2 };
 </script>
 
 <style>

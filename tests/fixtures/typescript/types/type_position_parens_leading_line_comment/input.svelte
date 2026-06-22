@@ -2,14 +2,14 @@
 	// type parameter constraint
 	type A<
 		T extends // leading
-			a,
+			a
 	> = T;
 
 	// tuple element
 	type B = [
 		// leading
 		a,
-		b,
+		b
 	];
 
 	// generic type argument

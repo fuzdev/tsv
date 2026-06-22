@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 88,
+	"end": 86,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -29,8 +29,8 @@
 		{
 			"type": "Line",
 			"value": " comment",
-			"start": 58,
-			"end": 68,
+			"start": 57,
+			"end": 67,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -46,12 +46,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 87,
+		"end": 85,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 78,
+			"end": 76,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -66,7 +66,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 10,
-					"end": 46,
+					"end": 45,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -81,7 +81,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 16,
-							"end": 45,
+							"end": 44,
 							"loc": {
 								"start": {
 									"line": 2,
@@ -111,7 +111,7 @@
 							"init": {
 								"type": "ArrayExpression",
 								"start": 20,
-								"end": 45,
+								"end": 44,
 								"loc": {
 									"start": {
 										"line": 2,
@@ -170,8 +170,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 49,
-					"end": 77,
+					"start": 48,
+					"end": 75,
 					"loc": {
 						"start": {
 							"line": 7,
@@ -184,8 +184,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 49,
-						"end": 76,
+						"start": 48,
+						"end": 74,
 						"loc": {
 							"start": {
 								"line": 7,
@@ -198,8 +198,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 49,
-							"end": 51,
+							"start": 48,
+							"end": 50,
 							"loc": {
 								"start": {
 									"line": 7,
@@ -215,8 +215,8 @@
 						"arguments": [
 							{
 								"type": "SpreadElement",
-								"start": 55,
-								"end": 72,
+								"start": 54,
+								"end": 71,
 								"loc": {
 									"start": {
 										"line": 8,
@@ -229,8 +229,8 @@
 								},
 								"argument": {
 									"type": "Identifier",
-									"start": 71,
-									"end": 72,
+									"start": 70,
+									"end": 71,
 									"loc": {
 										"start": {
 											"line": 9,
@@ -246,8 +246,8 @@
 										{
 											"type": "Line",
 											"value": " comment",
-											"start": 58,
-											"end": 68
+											"start": 57,
+											"end": 67
 										}
 									]
 								}

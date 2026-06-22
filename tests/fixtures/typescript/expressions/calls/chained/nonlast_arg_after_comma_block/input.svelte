@@ -2,7 +2,7 @@
 	foo
 		.bar(
 			aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-			/* c */ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+			/* c */ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 		)
 		.baz();
 </script>

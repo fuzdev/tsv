@@ -203,7 +203,7 @@
 											{
 												"type": "BinaryExpression",
 												"start": 86,
-												"end": 179,
+												"end": 180,
 												"loc": {
 													"start": {
 														"line": 5,
@@ -211,7 +211,7 @@
 													},
 													"end": {
 														"line": 5,
-														"column": 96
+														"column": 97
 													}
 												},
 												"left": {
@@ -778,7 +778,7 @@
 												"right": {
 													"type": "Identifier",
 													"start": 176,
-													"end": 179,
+													"end": 180,
 													"loc": {
 														"start": {
 															"line": 5,
@@ -786,10 +786,10 @@
 														},
 														"end": {
 															"line": 5,
-															"column": 96
+															"column": 97
 														}
 													},
-													"name": "sss"
+													"name": "ssss"
 												}
 											}
 										],
@@ -969,7 +969,7 @@
 											{
 												"type": "BinaryExpression",
 												"start": 262,
-												"end": 428,
+												"end": 429,
 												"loc": {
 													"start": {
 														"line": 12,
@@ -977,7 +977,7 @@
 													},
 													"end": {
 														"line": 30,
-														"column": 8
+														"column": 9
 													}
 												},
 												"left": {
@@ -1544,7 +1544,7 @@
 												"right": {
 													"type": "Identifier",
 													"start": 424,
-													"end": 428,
+													"end": 429,
 													"loc": {
 														"start": {
 															"line": 30,
@@ -1552,10 +1552,10 @@
 														},
 														"end": {
 															"line": 30,
-															"column": 8
+															"column": 9
 														}
 													},
-													"name": "ssss"
+													"name": "sssss"
 												}
 											}
 										],

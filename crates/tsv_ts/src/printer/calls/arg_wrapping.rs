@@ -114,9 +114,9 @@ pub(super) enum CallBreakStyle {
 /// that if the callee contains hardlines (e.g., multiline array), they don't
 /// force the arguments to break. The args make their own flat/break decision.
 ///
-/// `post_comma` is emitted immediately after the trailing comma (before the closing
-/// `)`), so an after-comma trailing comment stays past the comma; pass `d.empty()` when
-/// there is none.
+/// `post_comma` is emitted immediately after the last arg (before the closing `)`), so
+/// an after-comma trailing comment stays past where the comma was; pass `d.empty()` when
+/// there is none. No trailing comma is emitted (trailingComma: 'none').
 #[inline]
 fn wrap_call(
     d: &DocArena,
@@ -130,7 +130,7 @@ fn wrap_call(
             callee,
             d.group(d.concat(&[
                 d.text("("),
-                d.indent_softline(d.concat(&[args, d.trailing_comma(), post_comma])),
+                d.indent_softline(d.concat(&[args, post_comma])),
                 d.softline(),
                 d.text(")"),
             ])),
@@ -138,7 +138,7 @@ fn wrap_call(
         CallBreakStyle::Hard => d.concat(&[
             callee,
             d.text("("),
-            d.indent(d.concat(&[d.hardline(), args, d.text(","), post_comma])),
+            d.indent(d.concat(&[d.hardline(), args, post_comma])),
             d.hardline(),
             d.text(")"),
         ]),
@@ -159,8 +159,9 @@ pub(crate) fn wrap_call_with_hard_breaks(d: &DocArena, callee: DocId, args: DocI
     wrap_call(d, callee, args, d.empty(), CallBreakStyle::Hard)
 }
 
-/// Like [`wrap_call_with_soft_breaks`], but emits `post_comma` after the trailing
-/// comma so an after-comma trailing comment is preserved past it (`b, /* c */`).
+/// Like [`wrap_call_with_soft_breaks`], but emits `post_comma` after the last arg so an
+/// after-comma trailing comment is preserved past where the comma was (`b /* c */`; no
+/// trailing comma, trailingComma: 'none').
 #[inline]
 pub(super) fn wrap_call_with_soft_breaks_suffix(
     d: &DocArena,
@@ -171,7 +172,8 @@ pub(super) fn wrap_call_with_soft_breaks_suffix(
     wrap_call(d, callee, args, post_comma, CallBreakStyle::Soft)
 }
 
-/// Like [`wrap_call_with_hard_breaks`], but emits `post_comma` after the trailing comma.
+/// Like [`wrap_call_with_hard_breaks`], but emits `post_comma` after the last arg (no
+/// trailing comma; trailingComma: 'none').
 #[inline]
 pub(super) fn wrap_call_with_hard_breaks_suffix(
     d: &DocArena,
@@ -194,7 +196,7 @@ pub(crate) fn wrap_call_with_will_break_guard(d: &DocArena, callee: DocId, args:
             callee,
             d.group_break(d.concat(&[
                 d.text("("),
-                d.indent_softline(d.concat(&[args, d.trailing_comma()])),
+                d.indent_softline(args),
                 d.softline(),
                 d.text(")"),
             ])),
@@ -375,31 +377,27 @@ fn classify_expression_body(expr: &internal::Expression) -> ChainArgKind {
 /// Wrap arguments with soft breaks (no callee, just prefix like "(" or "?.(")
 ///
 /// Used in chain context where the callee is handled separately.
-/// Structure: `prefix + softline + args + trailing_comma + softline + ")"`
+/// Structure: `prefix + softline + args + softline + ")"` (no trailing comma).
 #[inline]
 pub(super) fn wrap_args_with_soft_breaks(d: &DocArena, prefix: &'static str, args: DocId) -> DocId {
     d.group(d.concat(&[
         d.text(prefix),
-        d.indent_softline(d.concat(&[args, d.trailing_comma()])),
+        d.indent_softline(args),
         d.softline(),
         d.text(")"),
     ]))
 }
 
-/// Wrap a single huggable argument - hugs opening paren but adds trailing comma
-/// when the content breaks internally.
+/// Wrap a single huggable argument - hugs opening paren and breaks the closing
+/// paren onto its own line when the content breaks internally.
 ///
 /// Used for expressions with natural break points (objects, arrays, ternaries)
-/// that should hug the opening paren but still get proper trailing comma handling.
-/// Structure: `prefix + arg + if_break(",\n") + ")"`
+/// that should hug the opening paren. Under tsv's hardcoded `trailingComma: 'none'`
+/// no trailing comma is added; the close still drops to its own line when broken.
+/// Structure: `prefix + arg + softline + ")"`
 #[inline]
 pub(super) fn wrap_huggable_arg(d: &DocArena, prefix: &'static str, arg: DocId) -> DocId {
-    d.group(d.concat(&[
-        d.text(prefix),
-        arg,
-        d.if_break(d.concat(&[d.text(","), d.line()]), d.empty()),
-        d.text(")"),
-    ]))
+    d.group(d.concat(&[d.text(prefix), arg, d.softline(), d.text(")")]))
 }
 
 /// Build argument docs split into head parts (with commas), last arg, and broken form
@@ -528,7 +526,7 @@ pub(crate) fn build_expand_all_args(d: &DocArena, callee: DocId, all_args_broken
         callee,
         d.group_break(d.concat(&[
             d.text("("),
-            d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
+            d.indent(d.concat(&[d.line(), all_args_broken])),
             d.line(),
             d.text(")"),
         ])),
@@ -552,7 +550,7 @@ pub(super) fn build_chain_expand_all_args(
 ) -> DocId {
     d.group_break(d.concat(&[
         d.text(prefix),
-        d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
+        d.indent(d.concat(&[d.line(), all_args_broken])),
         d.line(),
         d.text(")"),
     ]))
@@ -629,7 +627,7 @@ pub(crate) fn build_break_body_state(
         d.concat(head_parts),
         sig_doc,
         d.text(" =>"),
-        d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
+        d.indent(d.concat(&[d.hardline(), body_doc])),
         d.hardline(),
         d.text(")"),
     ])
@@ -667,7 +665,7 @@ pub(crate) fn build_arrow_call_body_states(
             callee,
             d.text("("),
             d.concat(&[sig_doc, d.text(" =>")]),
-            d.group(d.concat(&[d.indent_line(body_doc), d.trailing_comma()])),
+            d.group(d.indent_line(body_doc)),
             d.softline(),
             d.text(")"),
         ]));
@@ -682,7 +680,7 @@ pub(crate) fn build_arrow_call_body_states(
             d.text("("),
             sig_doc,
             d.text(" =>"),
-            d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
+            d.indent(d.concat(&[d.hardline(), body_doc])),
             d.hardline(),
             d.text(")"),
         ]),

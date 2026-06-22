@@ -16,8 +16,8 @@
 	};
 
 	// Single member with trailing comment (single-line)
-	type D = {a: number /* trailing */};
+	type D = { a: number /* trailing */ };
 
 	// Multiple members with trailing comments (single-line)
-	type E = {a: number; /* first */ b: string /* second */};
+	type E = { a: number; /* first */ b: string /* second */ };
 </script>

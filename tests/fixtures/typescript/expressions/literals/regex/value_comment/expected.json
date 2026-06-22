@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 944,
+	"end": 953,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -29,24 +29,24 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 97,
-			"end": 104,
+			"start": 98,
+			"end": 105,
 			"loc": {
 				"start": {
 					"line": 3,
-					"column": 23
+					"column": 24
 				},
 				"end": {
 					"line": 3,
-					"column": 30
+					"column": 31
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " consecutive block comments after a regex value (the collection loop must take both)",
-			"start": 115,
-			"end": 201,
+			"start": 117,
+			"end": 203,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -61,40 +61,40 @@
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 225,
-			"end": 233,
+			"start": 228,
+			"end": 236,
 			"loc": {
 				"start": {
 					"line": 6,
-					"column": 23
+					"column": 24
 				},
 				"end": {
 					"line": 6,
-					"column": 31
+					"column": 32
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 234,
-			"end": 242,
+			"start": 237,
+			"end": 245,
 			"loc": {
 				"start": {
 					"line": 6,
-					"column": 32
+					"column": 33
 				},
 				"end": {
 					"line": 6,
-					"column": 40
+					"column": 41
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " block comment after the sole regex value, before the closing brace",
-			"start": 253,
-			"end": 322,
+			"start": 257,
+			"end": 326,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -109,24 +109,24 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 346,
-			"end": 353,
+			"start": 351,
+			"end": 358,
 			"loc": {
 				"start": {
 					"line": 9,
-					"column": 23
+					"column": 24
 				},
 				"end": {
 					"line": 9,
-					"column": 30
+					"column": 31
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " block comment after a flagged regex value (pattern/flags split, then comment)",
-			"start": 358,
-			"end": 438,
+			"start": 364,
+			"end": 444,
 			"loc": {
 				"start": {
 					"line": 11,
@@ -141,24 +141,24 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 463,
-			"end": 470,
+			"start": 470,
+			"end": 477,
 			"loc": {
 				"start": {
 					"line": 12,
-					"column": 24
+					"column": 25
 				},
 				"end": {
 					"line": 12,
-					"column": 31
+					"column": 32
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " block comment after a regex literal starting with `=` (the /= relex branch)",
-			"start": 481,
-			"end": 559,
+			"start": 489,
+			"end": 567,
 			"loc": {
 				"start": {
 					"line": 14,
@@ -173,24 +173,24 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 584,
-			"end": 591,
+			"start": 593,
+			"end": 600,
 			"loc": {
 				"start": {
 					"line": 15,
-					"column": 24
+					"column": 25
 				},
 				"end": {
 					"line": 15,
-					"column": 31
+					"column": 32
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " block comment after a regex call argument, before the closing paren",
-			"start": 602,
-			"end": 672,
+			"start": 612,
+			"end": 682,
 			"loc": {
 				"start": {
 					"line": 17,
@@ -205,8 +205,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 682,
-			"end": 689,
+			"start": 692,
+			"end": 699,
 			"loc": {
 				"start": {
 					"line": 18,
@@ -221,8 +221,8 @@
 		{
 			"type": "Line",
 			"value": " block comment after a regex array element, before the closing bracket",
-			"start": 694,
-			"end": 766,
+			"start": 704,
+			"end": 776,
 			"loc": {
 				"start": {
 					"line": 20,
@@ -237,8 +237,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 786,
-			"end": 793,
+			"start": 796,
+			"end": 803,
 			"loc": {
 				"start": {
 					"line": 21,
@@ -253,8 +253,8 @@
 		{
 			"type": "Line",
 			"value": " multiline block comment after a regex value (sets the line-terminator flag)",
-			"start": 798,
-			"end": 876,
+			"start": 808,
+			"end": 886,
 			"loc": {
 				"start": {
 					"line": 23,
@@ -269,8 +269,8 @@
 		{
 			"type": "Block",
 			"value": " multi\n\tline ",
-			"start": 903,
-			"end": 920,
+			"start": 913,
+			"end": 930,
 			"loc": {
 				"start": {
 					"line": 25,
@@ -286,12 +286,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 943,
+		"end": 952,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 934,
+			"end": 943,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -306,7 +306,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 75,
-					"end": 112,
+					"end": 114,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -314,14 +314,14 @@
 						},
 						"end": {
 							"line": 3,
-							"column": 38
+							"column": 40
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 81,
-							"end": 111,
+							"end": 113,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -329,7 +329,7 @@
 								},
 								"end": {
 									"line": 3,
-									"column": 37
+									"column": 39
 								}
 							},
 							"id": {
@@ -351,7 +351,7 @@
 							"init": {
 								"type": "ObjectExpression",
 								"start": 88,
-								"end": 111,
+								"end": 113,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -359,22 +359,22 @@
 									},
 									"end": {
 										"line": 3,
-										"column": 37
+										"column": 39
 									}
 								},
 								"properties": [
 									{
 										"type": "Property",
-										"start": 89,
-										"end": 96,
+										"start": 90,
+										"end": 97,
 										"loc": {
 											"start": {
 												"line": 3,
-												"column": 15
+												"column": 16
 											},
 											"end": {
 												"line": 3,
-												"column": 22
+												"column": 23
 											}
 										},
 										"method": false,
@@ -382,32 +382,32 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 89,
-											"end": 90,
+											"start": 90,
+											"end": 91,
 											"loc": {
 												"start": {
 													"line": 3,
-													"column": 15
+													"column": 16
 												},
 												"end": {
 													"line": 3,
-													"column": 16
+													"column": 17
 												}
 											},
 											"name": "a"
 										},
 										"value": {
 											"type": "Literal",
-											"start": 92,
-											"end": 96,
+											"start": 93,
+											"end": 97,
 											"loc": {
 												"start": {
 													"line": 3,
-													"column": 18
+													"column": 19
 												},
 												"end": {
 													"line": 3,
-													"column": 22
+													"column": 23
 												}
 											},
 											"value": {},
@@ -422,23 +422,23 @@
 											{
 												"type": "Block",
 												"value": " c ",
-												"start": 97,
-												"end": 104
+												"start": 98,
+												"end": 105
 											}
 										]
 									},
 									{
 										"type": "Property",
-										"start": 106,
-										"end": 110,
+										"start": 107,
+										"end": 111,
 										"loc": {
 											"start": {
 												"line": 3,
-												"column": 32
+												"column": 33
 											},
 											"end": {
 												"line": 3,
-												"column": 36
+												"column": 37
 											}
 										},
 										"method": false,
@@ -446,32 +446,32 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 106,
-											"end": 107,
+											"start": 107,
+											"end": 108,
 											"loc": {
 												"start": {
 													"line": 3,
-													"column": 32
+													"column": 33
 												},
 												"end": {
 													"line": 3,
-													"column": 33
+													"column": 34
 												}
 											},
 											"name": "b"
 										},
 										"value": {
 											"type": "Literal",
-											"start": 109,
-											"end": 110,
+											"start": 110,
+											"end": 111,
 											"loc": {
 												"start": {
 													"line": 3,
-													"column": 35
+													"column": 36
 												},
 												"end": {
 													"line": 3,
-													"column": 36
+													"column": 37
 												}
 											},
 											"value": 1,
@@ -495,8 +495,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 203,
-					"end": 250,
+					"start": 205,
+					"end": 254,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -504,14 +504,14 @@
 						},
 						"end": {
 							"line": 6,
-							"column": 48
+							"column": 50
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 209,
-							"end": 249,
+							"start": 211,
+							"end": 253,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -519,13 +519,13 @@
 								},
 								"end": {
 									"line": 6,
-									"column": 47
+									"column": 49
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 209,
-								"end": 213,
+								"start": 211,
+								"end": 215,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -540,8 +540,8 @@
 							},
 							"init": {
 								"type": "ObjectExpression",
-								"start": 216,
-								"end": 249,
+								"start": 218,
+								"end": 253,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -549,22 +549,22 @@
 									},
 									"end": {
 										"line": 6,
-										"column": 47
+										"column": 49
 									}
 								},
 								"properties": [
 									{
 										"type": "Property",
-										"start": 217,
-										"end": 224,
+										"start": 220,
+										"end": 227,
 										"loc": {
 											"start": {
 												"line": 6,
-												"column": 15
+												"column": 16
 											},
 											"end": {
 												"line": 6,
-												"column": 22
+												"column": 23
 											}
 										},
 										"method": false,
@@ -572,32 +572,32 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 217,
-											"end": 218,
+											"start": 220,
+											"end": 221,
 											"loc": {
 												"start": {
 													"line": 6,
-													"column": 15
+													"column": 16
 												},
 												"end": {
 													"line": 6,
-													"column": 16
+													"column": 17
 												}
 											},
 											"name": "a"
 										},
 										"value": {
 											"type": "Literal",
-											"start": 220,
-											"end": 224,
+											"start": 223,
+											"end": 227,
 											"loc": {
 												"start": {
 													"line": 6,
-													"column": 18
+													"column": 19
 												},
 												"end": {
 													"line": 6,
-													"column": 22
+													"column": 23
 												}
 											},
 											"value": {},
@@ -612,23 +612,23 @@
 											{
 												"type": "Block",
 												"value": " c1 ",
-												"start": 225,
-												"end": 233
+												"start": 228,
+												"end": 236
 											}
 										]
 									},
 									{
 										"type": "Property",
-										"start": 244,
-										"end": 248,
+										"start": 247,
+										"end": 251,
 										"loc": {
 											"start": {
 												"line": 6,
-												"column": 42
+												"column": 43
 											},
 											"end": {
 												"line": 6,
-												"column": 46
+												"column": 47
 											}
 										},
 										"method": false,
@@ -636,32 +636,32 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 244,
-											"end": 245,
+											"start": 247,
+											"end": 248,
 											"loc": {
 												"start": {
 													"line": 6,
-													"column": 42
+													"column": 43
 												},
 												"end": {
 													"line": 6,
-													"column": 43
+													"column": 44
 												}
 											},
 											"name": "b"
 										},
 										"value": {
 											"type": "Literal",
-											"start": 247,
-											"end": 248,
+											"start": 250,
+											"end": 251,
 											"loc": {
 												"start": {
 													"line": 6,
-													"column": 45
+													"column": 46
 												},
 												"end": {
 													"line": 6,
-													"column": 46
+													"column": 47
 												}
 											},
 											"value": 1,
@@ -672,8 +672,8 @@
 											{
 												"type": "Block",
 												"value": " c2 ",
-												"start": 234,
-												"end": 242
+												"start": 237,
+												"end": 245
 											}
 										]
 									}
@@ -686,15 +686,15 @@
 						{
 							"type": "Line",
 							"value": " consecutive block comments after a regex value (the collection loop must take both)",
-							"start": 115,
-							"end": 201
+							"start": 117,
+							"end": 203
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 324,
-					"end": 355,
+					"start": 328,
+					"end": 361,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -702,14 +702,14 @@
 						},
 						"end": {
 							"line": 9,
-							"column": 32
+							"column": 34
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 330,
-							"end": 354,
+							"start": 334,
+							"end": 360,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -717,13 +717,13 @@
 								},
 								"end": {
 									"line": 9,
-									"column": 31
+									"column": 33
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 330,
-								"end": 334,
+								"start": 334,
+								"end": 338,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -738,8 +738,8 @@
 							},
 							"init": {
 								"type": "ObjectExpression",
-								"start": 337,
-								"end": 354,
+								"start": 341,
+								"end": 360,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -747,22 +747,22 @@
 									},
 									"end": {
 										"line": 9,
-										"column": 31
+										"column": 33
 									}
 								},
 								"properties": [
 									{
 										"type": "Property",
-										"start": 338,
-										"end": 345,
+										"start": 343,
+										"end": 350,
 										"loc": {
 											"start": {
 												"line": 9,
-												"column": 15
+												"column": 16
 											},
 											"end": {
 												"line": 9,
-												"column": 22
+												"column": 23
 											}
 										},
 										"method": false,
@@ -770,32 +770,32 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 338,
-											"end": 339,
+											"start": 343,
+											"end": 344,
 											"loc": {
 												"start": {
 													"line": 9,
-													"column": 15
+													"column": 16
 												},
 												"end": {
 													"line": 9,
-													"column": 16
+													"column": 17
 												}
 											},
 											"name": "a"
 										},
 										"value": {
 											"type": "Literal",
-											"start": 341,
-											"end": 345,
+											"start": 346,
+											"end": 350,
 											"loc": {
 												"start": {
 													"line": 9,
-													"column": 18
+													"column": 19
 												},
 												"end": {
 													"line": 9,
-													"column": 22
+													"column": 23
 												}
 											},
 											"value": {},
@@ -810,8 +810,8 @@
 											{
 												"type": "Block",
 												"value": " c ",
-												"start": 346,
-												"end": 353
+												"start": 351,
+												"end": 358
 											}
 										]
 									}
@@ -824,15 +824,15 @@
 						{
 							"type": "Line",
 							"value": " block comment after the sole regex value, before the closing brace",
-							"start": 253,
-							"end": 322
+							"start": 257,
+							"end": 326
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 440,
-					"end": 478,
+					"start": 446,
+					"end": 486,
 					"loc": {
 						"start": {
 							"line": 12,
@@ -840,14 +840,14 @@
 						},
 						"end": {
 							"line": 12,
-							"column": 39
+							"column": 41
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 446,
-							"end": 477,
+							"start": 452,
+							"end": 485,
 							"loc": {
 								"start": {
 									"line": 12,
@@ -855,13 +855,13 @@
 								},
 								"end": {
 									"line": 12,
-									"column": 38
+									"column": 40
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 446,
-								"end": 450,
+								"start": 452,
+								"end": 456,
 								"loc": {
 									"start": {
 										"line": 12,
@@ -876,8 +876,8 @@
 							},
 							"init": {
 								"type": "ObjectExpression",
-								"start": 453,
-								"end": 477,
+								"start": 459,
+								"end": 485,
 								"loc": {
 									"start": {
 										"line": 12,
@@ -885,22 +885,22 @@
 									},
 									"end": {
 										"line": 12,
-										"column": 38
+										"column": 40
 									}
 								},
 								"properties": [
 									{
 										"type": "Property",
-										"start": 454,
-										"end": 462,
+										"start": 461,
+										"end": 469,
 										"loc": {
 											"start": {
 												"line": 12,
-												"column": 15
+												"column": 16
 											},
 											"end": {
 												"line": 12,
-												"column": 23
+												"column": 24
 											}
 										},
 										"method": false,
@@ -908,32 +908,32 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 454,
-											"end": 455,
+											"start": 461,
+											"end": 462,
 											"loc": {
 												"start": {
 													"line": 12,
-													"column": 15
+													"column": 16
 												},
 												"end": {
 													"line": 12,
-													"column": 16
+													"column": 17
 												}
 											},
 											"name": "a"
 										},
 										"value": {
 											"type": "Literal",
-											"start": 457,
-											"end": 462,
+											"start": 464,
+											"end": 469,
 											"loc": {
 												"start": {
 													"line": 12,
-													"column": 18
+													"column": 19
 												},
 												"end": {
 													"line": 12,
-													"column": 23
+													"column": 24
 												}
 											},
 											"value": {},
@@ -948,23 +948,23 @@
 											{
 												"type": "Block",
 												"value": " c ",
-												"start": 463,
-												"end": 470
+												"start": 470,
+												"end": 477
 											}
 										]
 									},
 									{
 										"type": "Property",
-										"start": 472,
-										"end": 476,
+										"start": 479,
+										"end": 483,
 										"loc": {
 											"start": {
 												"line": 12,
-												"column": 33
+												"column": 34
 											},
 											"end": {
 												"line": 12,
-												"column": 37
+												"column": 38
 											}
 										},
 										"method": false,
@@ -972,32 +972,32 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 472,
-											"end": 473,
+											"start": 479,
+											"end": 480,
 											"loc": {
 												"start": {
 													"line": 12,
-													"column": 33
+													"column": 34
 												},
 												"end": {
 													"line": 12,
-													"column": 34
+													"column": 35
 												}
 											},
 											"name": "b"
 										},
 										"value": {
 											"type": "Literal",
-											"start": 475,
-											"end": 476,
+											"start": 482,
+											"end": 483,
 											"loc": {
 												"start": {
 													"line": 12,
-													"column": 36
+													"column": 37
 												},
 												"end": {
 													"line": 12,
-													"column": 37
+													"column": 38
 												}
 											},
 											"value": 1,
@@ -1014,15 +1014,15 @@
 						{
 							"type": "Line",
 							"value": " block comment after a flagged regex value (pattern/flags split, then comment)",
-							"start": 358,
-							"end": 438
+							"start": 364,
+							"end": 444
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 561,
-					"end": 599,
+					"start": 569,
+					"end": 609,
 					"loc": {
 						"start": {
 							"line": 15,
@@ -1030,14 +1030,14 @@
 						},
 						"end": {
 							"line": 15,
-							"column": 39
+							"column": 41
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 567,
-							"end": 598,
+							"start": 575,
+							"end": 608,
 							"loc": {
 								"start": {
 									"line": 15,
@@ -1045,13 +1045,13 @@
 								},
 								"end": {
 									"line": 15,
-									"column": 38
+									"column": 40
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 567,
-								"end": 571,
+								"start": 575,
+								"end": 579,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -1066,8 +1066,8 @@
 							},
 							"init": {
 								"type": "ObjectExpression",
-								"start": 574,
-								"end": 598,
+								"start": 582,
+								"end": 608,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -1075,22 +1075,22 @@
 									},
 									"end": {
 										"line": 15,
-										"column": 38
+										"column": 40
 									}
 								},
 								"properties": [
 									{
 										"type": "Property",
-										"start": 575,
-										"end": 583,
+										"start": 584,
+										"end": 592,
 										"loc": {
 											"start": {
 												"line": 15,
-												"column": 15
+												"column": 16
 											},
 											"end": {
 												"line": 15,
-												"column": 23
+												"column": 24
 											}
 										},
 										"method": false,
@@ -1098,32 +1098,32 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 575,
-											"end": 576,
+											"start": 584,
+											"end": 585,
 											"loc": {
 												"start": {
 													"line": 15,
-													"column": 15
+													"column": 16
 												},
 												"end": {
 													"line": 15,
-													"column": 16
+													"column": 17
 												}
 											},
 											"name": "a"
 										},
 										"value": {
 											"type": "Literal",
-											"start": 578,
-											"end": 583,
+											"start": 587,
+											"end": 592,
 											"loc": {
 												"start": {
 													"line": 15,
-													"column": 18
+													"column": 19
 												},
 												"end": {
 													"line": 15,
-													"column": 23
+													"column": 24
 												}
 											},
 											"value": {},
@@ -1138,23 +1138,23 @@
 											{
 												"type": "Block",
 												"value": " c ",
-												"start": 584,
-												"end": 591
+												"start": 593,
+												"end": 600
 											}
 										]
 									},
 									{
 										"type": "Property",
-										"start": 593,
-										"end": 597,
+										"start": 602,
+										"end": 606,
 										"loc": {
 											"start": {
 												"line": 15,
-												"column": 33
+												"column": 34
 											},
 											"end": {
 												"line": 15,
-												"column": 37
+												"column": 38
 											}
 										},
 										"method": false,
@@ -1162,32 +1162,32 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 593,
-											"end": 594,
+											"start": 602,
+											"end": 603,
 											"loc": {
 												"start": {
 													"line": 15,
-													"column": 33
+													"column": 34
 												},
 												"end": {
 													"line": 15,
-													"column": 34
+													"column": 35
 												}
 											},
 											"name": "b"
 										},
 										"value": {
 											"type": "Literal",
-											"start": 596,
-											"end": 597,
+											"start": 605,
+											"end": 606,
 											"loc": {
 												"start": {
 													"line": 15,
-													"column": 36
+													"column": 37
 												},
 												"end": {
 													"line": 15,
-													"column": 37
+													"column": 38
 												}
 											},
 											"value": 1,
@@ -1204,15 +1204,15 @@
 						{
 							"type": "Line",
 							"value": " block comment after a regex literal starting with `=` (the /= relex branch)",
-							"start": 481,
-							"end": 559
+							"start": 489,
+							"end": 567
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 674,
-					"end": 691,
+					"start": 684,
+					"end": 701,
 					"loc": {
 						"start": {
 							"line": 18,
@@ -1225,8 +1225,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 674,
-						"end": 690,
+						"start": 684,
+						"end": 700,
 						"loc": {
 							"start": {
 								"line": 18,
@@ -1239,8 +1239,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 674,
-							"end": 676,
+							"start": 684,
+							"end": 686,
 							"loc": {
 								"start": {
 									"line": 18,
@@ -1256,8 +1256,8 @@
 						"arguments": [
 							{
 								"type": "Literal",
-								"start": 677,
-								"end": 681,
+								"start": 687,
+								"end": 691,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -1278,8 +1278,8 @@
 									{
 										"type": "Block",
 										"value": " c ",
-										"start": 682,
-										"end": 689
+										"start": 692,
+										"end": 699
 									}
 								]
 							}
@@ -1290,15 +1290,15 @@
 						{
 							"type": "Line",
 							"value": " block comment after a regex call argument, before the closing paren",
-							"start": 602,
-							"end": 672
+							"start": 612,
+							"end": 682
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 768,
-					"end": 795,
+					"start": 778,
+					"end": 805,
 					"loc": {
 						"start": {
 							"line": 21,
@@ -1312,8 +1312,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 774,
-							"end": 794,
+							"start": 784,
+							"end": 804,
 							"loc": {
 								"start": {
 									"line": 21,
@@ -1326,8 +1326,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 774,
-								"end": 777,
+								"start": 784,
+								"end": 787,
 								"loc": {
 									"start": {
 										"line": 21,
@@ -1342,8 +1342,8 @@
 							},
 							"init": {
 								"type": "ArrayExpression",
-								"start": 780,
-								"end": 794,
+								"start": 790,
+								"end": 804,
 								"loc": {
 									"start": {
 										"line": 21,
@@ -1357,8 +1357,8 @@
 								"elements": [
 									{
 										"type": "Literal",
-										"start": 781,
-										"end": 785,
+										"start": 791,
+										"end": 795,
 										"loc": {
 											"start": {
 												"line": 21,
@@ -1379,8 +1379,8 @@
 											{
 												"type": "Block",
 												"value": " c ",
-												"start": 786,
-												"end": 793
+												"start": 796,
+												"end": 803
 											}
 										]
 									}
@@ -1393,15 +1393,15 @@
 						{
 							"type": "Line",
 							"value": " block comment after a regex array element, before the closing bracket",
-							"start": 694,
-							"end": 766
+							"start": 704,
+							"end": 776
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 878,
-					"end": 933,
+					"start": 888,
+					"end": 942,
 					"loc": {
 						"start": {
 							"line": 24,
@@ -1415,8 +1415,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 884,
-							"end": 932,
+							"start": 894,
+							"end": 941,
 							"loc": {
 								"start": {
 									"line": 24,
@@ -1429,8 +1429,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 884,
-								"end": 888,
+								"start": 894,
+								"end": 898,
 								"loc": {
 									"start": {
 										"line": 24,
@@ -1445,8 +1445,8 @@
 							},
 							"init": {
 								"type": "ObjectExpression",
-								"start": 891,
-								"end": 932,
+								"start": 901,
+								"end": 941,
 								"loc": {
 									"start": {
 										"line": 24,
@@ -1460,8 +1460,8 @@
 								"properties": [
 									{
 										"type": "Property",
-										"start": 895,
-										"end": 902,
+										"start": 905,
+										"end": 912,
 										"loc": {
 											"start": {
 												"line": 25,
@@ -1477,8 +1477,8 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 895,
-											"end": 896,
+											"start": 905,
+											"end": 906,
 											"loc": {
 												"start": {
 													"line": 25,
@@ -1493,8 +1493,8 @@
 										},
 										"value": {
 											"type": "Literal",
-											"start": 898,
-											"end": 902,
+											"start": 908,
+											"end": 912,
 											"loc": {
 												"start": {
 													"line": 25,
@@ -1517,15 +1517,15 @@
 											{
 												"type": "Block",
 												"value": " multi\n\tline ",
-												"start": 903,
-												"end": 920
+												"start": 913,
+												"end": 930
 											}
 										]
 									},
 									{
 										"type": "Property",
-										"start": 924,
-										"end": 928,
+										"start": 934,
+										"end": 938,
 										"loc": {
 											"start": {
 												"line": 27,
@@ -1541,8 +1541,8 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 924,
-											"end": 925,
+											"start": 934,
+											"end": 935,
 											"loc": {
 												"start": {
 													"line": 27,
@@ -1557,8 +1557,8 @@
 										},
 										"value": {
 											"type": "Literal",
-											"start": 927,
-											"end": 928,
+											"start": 937,
+											"end": 938,
 											"loc": {
 												"start": {
 													"line": 27,
@@ -1583,8 +1583,8 @@
 						{
 							"type": "Line",
 							"value": " multiline block comment after a regex value (sets the line-terminator flag)",
-							"start": 798,
-							"end": 876
+							"start": 808,
+							"end": 886
 						}
 					]
 				}

@@ -3,14 +3,14 @@
 	type A = [
 		string,
 		/* c */
-		number,
+		number
 	];
 
 	// Own-line block comment before first element forces expansion
 	type B = [
 		/* c */
 		string,
-		number,
+		number
 	];
 
 	// Multiple own-line block comments between elements
@@ -18,7 +18,7 @@
 		string,
 		/* c1 */
 		/* c2 */
-		number,
+		number
 	];
 
 	// Same-line block comment does NOT force expansion (short tuple)

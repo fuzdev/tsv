@@ -2,7 +2,7 @@
 	// MemberExpression extends with long type params - extends inline after >
 	class InlineExtends<
 		T extends VeryLongTypeName | AnotherLongTypeName,
-		U extends ExtraLongConstraintType | MoreTypes,
+		U extends ExtraLongConstraintType | MoreTypes
 	> extends A.B<T> {
 		value: T;
 	}
@@ -10,7 +10,7 @@
 	// MemberExpression extends with long type params and implements - all break
 	class BothBreak<
 		T extends VeryLongTypeName | AnotherLongTypeName,
-		U extends ExtraLongConstraintType | MoreTypes,
+		U extends ExtraLongConstraintType | MoreTypes
 	>
 		extends A.B<T>
 		implements Contract<U>

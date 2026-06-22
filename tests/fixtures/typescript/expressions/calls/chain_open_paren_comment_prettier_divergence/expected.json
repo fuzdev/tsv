@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 365,
+	"end": 361,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " line comment trailing `(` — multiple args",
-			"start": 82,
-			"end": 126,
+			"start": 81,
+			"end": 125,
 			"loc": {
 				"start": {
 					"line": 7,
@@ -61,8 +61,8 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 140,
-			"end": 145,
+			"start": 139,
+			"end": 144,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " block comment trailing `(`, then own-line leading comment",
-			"start": 162,
-			"end": 222,
+			"start": 160,
+			"end": 220,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -93,8 +93,8 @@
 		{
 			"type": "Block",
 			"value": " paren ",
-			"start": 236,
-			"end": 247,
+			"start": 234,
+			"end": 245,
 			"loc": {
 				"start": {
 					"line": 14,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " lead",
-			"start": 250,
-			"end": 257,
+			"start": 248,
+			"end": 255,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -125,8 +125,8 @@
 		{
 			"type": "Line",
 			"value": " two-method chain, same gap shape",
-			"start": 269,
-			"end": 304,
+			"start": 266,
+			"end": 301,
 			"loc": {
 				"start": {
 					"line": 19,
@@ -141,8 +141,8 @@
 		{
 			"type": "Block",
 			"value": " paren ",
-			"start": 322,
-			"end": 333,
+			"start": 319,
+			"end": 330,
 			"loc": {
 				"start": {
 					"line": 20,
@@ -157,8 +157,8 @@
 		{
 			"type": "Line",
 			"value": " lead",
-			"start": 336,
-			"end": 343,
+			"start": 333,
+			"end": 340,
 			"loc": {
 				"start": {
 					"line": 21,
@@ -174,12 +174,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 364,
+		"end": 360,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 355,
+			"end": 351,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -194,7 +194,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 53,
-					"end": 79,
+					"end": 78,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -208,7 +208,7 @@
 					"expression": {
 						"type": "CallExpression",
 						"start": 53,
-						"end": 78,
+						"end": 77,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -307,8 +307,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 128,
-					"end": 159,
+					"start": 127,
+					"end": 157,
 					"loc": {
 						"start": {
 							"line": 8,
@@ -321,8 +321,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 128,
-						"end": 158,
+						"start": 127,
+						"end": 156,
 						"loc": {
 							"start": {
 								"line": 8,
@@ -335,8 +335,8 @@
 						},
 						"callee": {
 							"type": "MemberExpression",
-							"start": 128,
-							"end": 138,
+							"start": 127,
+							"end": 137,
 							"loc": {
 								"start": {
 									"line": 8,
@@ -349,8 +349,8 @@
 							},
 							"object": {
 								"type": "Identifier",
-								"start": 128,
-								"end": 131,
+								"start": 127,
+								"end": 130,
 								"loc": {
 									"start": {
 										"line": 8,
@@ -365,8 +365,8 @@
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 132,
-								"end": 138,
+								"start": 131,
+								"end": 137,
 								"loc": {
 									"start": {
 										"line": 8,
@@ -385,8 +385,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 148,
-								"end": 149,
+								"start": 147,
+								"end": 148,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -402,15 +402,15 @@
 									{
 										"type": "Line",
 										"value": " c2",
-										"start": 140,
-										"end": 145
+										"start": 139,
+										"end": 144
 									}
 								]
 							},
 							{
 								"type": "Identifier",
-								"start": 153,
-								"end": 154,
+								"start": 152,
+								"end": 153,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -430,15 +430,15 @@
 						{
 							"type": "Line",
 							"value": " line comment trailing `(` — multiple args",
-							"start": 82,
-							"end": 126
+							"start": 81,
+							"end": 125
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 224,
-					"end": 266,
+					"start": 222,
+					"end": 263,
 					"loc": {
 						"start": {
 							"line": 14,
@@ -451,8 +451,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 224,
-						"end": 265,
+						"start": 222,
+						"end": 262,
 						"loc": {
 							"start": {
 								"line": 14,
@@ -465,8 +465,8 @@
 						},
 						"callee": {
 							"type": "MemberExpression",
-							"start": 224,
-							"end": 234,
+							"start": 222,
+							"end": 232,
 							"loc": {
 								"start": {
 									"line": 14,
@@ -479,8 +479,8 @@
 							},
 							"object": {
 								"type": "Identifier",
-								"start": 224,
-								"end": 227,
+								"start": 222,
+								"end": 225,
 								"loc": {
 									"start": {
 										"line": 14,
@@ -495,8 +495,8 @@
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 228,
-								"end": 234,
+								"start": 226,
+								"end": 232,
 								"loc": {
 									"start": {
 										"line": 14,
@@ -515,8 +515,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 260,
-								"end": 261,
+								"start": 258,
+								"end": 259,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -532,14 +532,14 @@
 									{
 										"type": "Block",
 										"value": " paren ",
-										"start": 236,
-										"end": 247
+										"start": 234,
+										"end": 245
 									},
 									{
 										"type": "Line",
 										"value": " lead",
-										"start": 250,
-										"end": 257
+										"start": 248,
+										"end": 255
 									}
 								]
 							}
@@ -550,15 +550,15 @@
 						{
 							"type": "Line",
 							"value": " block comment trailing `(`, then own-line leading comment",
-							"start": 162,
-							"end": 222
+							"start": 160,
+							"end": 220
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 306,
-					"end": 354,
+					"start": 303,
+					"end": 350,
 					"loc": {
 						"start": {
 							"line": 20,
@@ -571,8 +571,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 306,
-						"end": 353,
+						"start": 303,
+						"end": 349,
 						"loc": {
 							"start": {
 								"line": 20,
@@ -585,8 +585,8 @@
 						},
 						"callee": {
 							"type": "MemberExpression",
-							"start": 306,
-							"end": 320,
+							"start": 303,
+							"end": 317,
 							"loc": {
 								"start": {
 									"line": 20,
@@ -599,8 +599,8 @@
 							},
 							"object": {
 								"type": "CallExpression",
-								"start": 306,
-								"end": 313,
+								"start": 303,
+								"end": 310,
 								"loc": {
 									"start": {
 										"line": 20,
@@ -613,8 +613,8 @@
 								},
 								"callee": {
 									"type": "MemberExpression",
-									"start": 306,
-									"end": 311,
+									"start": 303,
+									"end": 308,
 									"loc": {
 										"start": {
 											"line": 20,
@@ -627,8 +627,8 @@
 									},
 									"object": {
 										"type": "Identifier",
-										"start": 306,
-										"end": 309,
+										"start": 303,
+										"end": 306,
 										"loc": {
 											"start": {
 												"line": 20,
@@ -643,8 +643,8 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 310,
-										"end": 311,
+										"start": 307,
+										"end": 308,
 										"loc": {
 											"start": {
 												"line": 20,
@@ -665,8 +665,8 @@
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 314,
-								"end": 320,
+								"start": 311,
+								"end": 317,
 								"loc": {
 									"start": {
 										"line": 20,
@@ -685,8 +685,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 346,
-								"end": 349,
+								"start": 343,
+								"end": 346,
 								"loc": {
 									"start": {
 										"line": 22,
@@ -702,14 +702,14 @@
 									{
 										"type": "Block",
 										"value": " paren ",
-										"start": 322,
-										"end": 333
+										"start": 319,
+										"end": 330
 									},
 									{
 										"type": "Line",
 										"value": " lead",
-										"start": 336,
-										"end": 343
+										"start": 333,
+										"end": 340
 									}
 								]
 							}
@@ -720,8 +720,8 @@
 						{
 							"type": "Line",
 							"value": " two-method chain, same gap shape",
-							"start": 269,
-							"end": 304
+							"start": 266,
+							"end": 301
 						}
 					]
 				}

@@ -249,10 +249,6 @@ impl<'a> Printer<'a> {
                 // Use group with line breaks for width-based expansion
                 // Include type annotation in the group so its width is considered
                 let mut parts = Vec::new();
-                let last_is_rest = matches!(
-                    obj.properties.last(),
-                    Some(ObjectPatternProperty::RestElement(_))
-                );
 
                 // Track previous end for comment detection (start after `{`)
                 let mut prev_end = obj.span.start + 1;
@@ -278,15 +274,9 @@ impl<'a> Printer<'a> {
                         .unwrap_or(obj.span.end);
                     let trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
 
-                    // Hard comma between properties; trailing comma (break-only) on
-                    // the last unless it is the rest element
-                    let comma = if !is_last {
-                        d.text(",")
-                    } else if !last_is_rest {
-                        d.trailing_comma()
-                    } else {
-                        d.empty()
-                    };
+                    // Separator comma between properties; no trailing comma on the last
+                    // property (trailingComma: 'none').
+                    let comma = if !is_last { d.text(",") } else { d.empty() };
                     self.push_element_comma_trailing(&mut parts, &trailing, comma);
 
                     // Add line break between properties
@@ -302,11 +292,12 @@ impl<'a> Printer<'a> {
                 let trailing = self.build_object_pattern_trailing_comments(obj);
                 parts.push(trailing);
 
-                // Build group contents: { + properties + }
+                // Build group contents: { + properties + } with bracketSpacing
+                // boundaries (space when flat `{ a }`, newline when broken).
                 let mut group_parts = vec![
                     d.text("{"),
-                    d.indent_softline(d.concat(&parts)),
-                    d.softline(),
+                    d.indent_line(d.concat(&parts)),
+                    d.line(),
                     d.text("}"),
                 ];
 
@@ -565,10 +556,6 @@ impl<'a> Printer<'a> {
     /// Build expanded doc for object pattern with hardlines (always multiline)
     fn build_expanded_object_pattern_doc(&self, obj: &internal::ObjectPattern) -> DocId {
         let d = self.d();
-        let last_is_rest = matches!(
-            obj.properties.last(),
-            Some(ObjectPatternProperty::RestElement(_))
-        );
 
         // A comment trailing the opening `{` on its own line is kept on the `{`
         // line when the pattern expands (divergence from prettier, which relocates
@@ -619,12 +606,10 @@ impl<'a> Printer<'a> {
                 .unwrap_or(obj.span.end);
             let trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
 
-            // Trailing comma unless this is the rest element (syntax error)
-            let comma = if !is_last || !last_is_rest {
-                d.text(",")
-            } else {
-                d.empty()
-            };
+            // Separator comma between properties; no trailing comma on the last
+            // property under `trailingComma: 'none'` (a rest element never takes one
+            // either — it is a syntax error there).
+            let comma = if !is_last { d.text(",") } else { d.empty() };
             self.push_element_comma_trailing(&mut prop_parts, &trailing, comma);
 
             if !is_last {
@@ -855,12 +840,11 @@ impl<'a> Printer<'a> {
                 // Block comments go before comma (line comments handled in expanded version)
                 parts.push(self.build_block_comments_doc(&trailing.block));
 
-                // Add comma
+                // Separator comma between elements; no trailing comma on the last
+                // (trailingComma: 'none').
                 if !is_last {
                     parts.push(d.text(","));
                     parts.push(d.line());
-                } else {
-                    parts.push(d.trailing_comma());
                 }
 
                 // Block comments after the comma (last element): preserve position
@@ -901,13 +885,6 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = Vec::new();
         let mut prev_end = arr.span.start + 1;
-
-        // Check if last element is a rest element (no trailing comma allowed)
-        let last_is_rest = arr
-            .elements
-            .last()
-            .and_then(|opt| opt.as_ref())
-            .is_some_and(|e| matches!(e, Expression::RestElement(_)));
 
         // A comment trailing the opening `[` on its own line is kept on the `[`
         // line when the pattern expands (divergence from prettier, which relocates
@@ -955,12 +932,10 @@ impl<'a> Printer<'a> {
                     .unwrap_or(arr.span.end);
                 let trailing = self.collect_trailing_comments(elem_end, upper_bound, is_last);
 
-                // Comma unless this is the last element AND a rest element
-                let comma = if !is_last || !last_is_rest {
-                    d.text(",")
-                } else {
-                    d.empty()
-                };
+                // Separator comma between elements; no trailing comma on the last
+                // element under `trailingComma: 'none'` (a rest element never takes one
+                // either — it is a syntax error there).
+                let comma = if !is_last { d.text(",") } else { d.empty() };
                 self.push_element_comma_trailing(&mut parts, &trailing, comma);
 
                 if !is_last {

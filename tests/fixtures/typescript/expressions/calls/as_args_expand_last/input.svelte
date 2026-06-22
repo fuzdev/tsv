@@ -3,8 +3,8 @@
 	const a = fn(
 		x as unknown as A,
 		{
-			a: (error: unknown) => Promise.resolve(transform(error)),
-		} as any,
+			a: (error: unknown) => Promise.resolve(transform(error))
+		} as any
 	);
 
 	// Both args are TSSatisfiesExpression - expand-last disabled
@@ -12,7 +12,7 @@
 		x satisfies A,
 		{
 			a: 1,
-			b: 2,
-		} satisfies B,
+			b: 2
+		} satisfies B
 	);
 </script>

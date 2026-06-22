@@ -2,7 +2,7 @@
 	foo(
 		bar(
 			'multi \
-line',
-		),
+line'
+		)
 	);
 </script>

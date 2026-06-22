@@ -2,27 +2,27 @@
 	// line comment trailing re-export `{` - single specifier
 	export {
 		// c1
-		a,
+		a
 	} from './a';
 
 	// line comment trailing re-export `{` - multiple specifiers
 	export {
 		// c2
 		b,
-		c,
+		c
 	} from './b';
 
 	// line comment trailing export `{` (no source)
 	const d = 1;
 	export {
 		// c3
-		d,
+		d
 	};
 
 	// block comment trailing `{`, then own-line leading comment
 	export {
 		/* brace */
 		// lead
-		e,
+		e
 	} from './e';
 </script>

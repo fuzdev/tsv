@@ -1,0 +1,100 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 117,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 77,
+				"data": " an empty object destructure binding keeps tight braces: {} (not { }) "
+			},
+			{
+				"type": "Text",
+				"start": 77,
+				"end": 78,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 78,
+				"end": 116,
+				"expression": {
+					"type": "Identifier",
+					"start": 85,
+					"end": 90,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 7
+						},
+						"end": {
+							"line": 2,
+							"column": 12
+						}
+					},
+					"name": "items"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 97,
+							"end": 109,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 20,
+									"character": 98
+								},
+								"end": {
+									"line": 2,
+									"column": 23,
+									"character": 101
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 102,
+										"end": 103,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "ObjectPattern",
+					"start": 94,
+					"end": 96,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 17
+						},
+						"end": {
+							"line": 2,
+							"column": 19
+						}
+					},
+					"properties": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

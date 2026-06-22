@@ -3,14 +3,14 @@
 	// formatters keep on each breaking type-param list below (extra.trailingComma)
 	// must translate too.
 	const fn = <
-		Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa extends Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+		Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa extends Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 	>(
-		x: Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+		x: Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 	) => x;
 
 	const fn2 = <
-		Cccccccccccccccccccccccccccccccccccccc extends Dddddddddddddddddddddddddddddddddddddddddddd,
+		Cccccccccccccccccccccccccccccccccccccc extends Dddddddddddddddddddddddddddddddddddddddddddd
 	>(
-		y: Cccccccccccccccccccccccccccccccccccccc,
+		y: Cccccccccccccccccccccccccccccccccccccc
 	) => y;
 </script>

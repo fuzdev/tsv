@@ -15,5 +15,5 @@
 	const [[a6]]: [[number]] = arr;
 
 	// Mixed array/object in type
-	const [x2]: [{a: number; b: string}] = arr;
+	const [x2]: [{ a: number; b: string }] = arr;
 </script>

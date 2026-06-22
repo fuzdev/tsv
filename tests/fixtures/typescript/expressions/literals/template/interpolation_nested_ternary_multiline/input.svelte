@@ -10,6 +10,6 @@
 ${obj.content}
 </body>
 </html>`
-			: alt,
+			: alt
 	);
 </script>

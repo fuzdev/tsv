@@ -6,6 +6,6 @@
 		},
 		b: 3,
 		arrow: () => 4,
-		...spread,
+		...spread
 	};
 </script>

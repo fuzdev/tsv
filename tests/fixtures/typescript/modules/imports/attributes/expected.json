@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 320,
+	"end": 338,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,12 +13,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 319,
+		"end": 337,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 310,
+			"end": 328,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -33,7 +33,7 @@
 				{
 					"type": "ImportDeclaration",
 					"start": 10,
-					"end": 48,
+					"end": 50,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -41,7 +41,7 @@
 						},
 						"end": {
 							"line": 2,
-							"column": 39
+							"column": 41
 						}
 					},
 					"specifiers": [
@@ -97,46 +97,46 @@
 					"attributes": [
 						{
 							"type": "ImportAttribute",
-							"start": 34,
-							"end": 46,
+							"start": 35,
+							"end": 47,
 							"loc": {
 								"start": {
 									"line": 2,
-									"column": 25
+									"column": 26
 								},
 								"end": {
 									"line": 2,
-									"column": 37
+									"column": 38
 								}
 							},
 							"key": {
 								"type": "Identifier",
-								"start": 34,
-								"end": 38,
+								"start": 35,
+								"end": 39,
 								"loc": {
 									"start": {
 										"line": 2,
-										"column": 25
+										"column": 26
 									},
 									"end": {
 										"line": 2,
-										"column": 29
+										"column": 30
 									}
 								},
 								"name": "type"
 							},
 							"value": {
 								"type": "Literal",
-								"start": 40,
-								"end": 46,
+								"start": 41,
+								"end": 47,
 								"loc": {
 									"start": {
 										"line": 2,
-										"column": 31
+										"column": 32
 									},
 									"end": {
 										"line": 2,
-										"column": 37
+										"column": 38
 									}
 								},
 								"value": "json",
@@ -147,8 +147,8 @@
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 50,
-					"end": 90,
+					"start": 52,
+					"end": 96,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -156,52 +156,52 @@
 						},
 						"end": {
 							"line": 3,
-							"column": 41
+							"column": 45
 						}
 					},
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
-							"start": 58,
-							"end": 59,
+							"start": 61,
+							"end": 62,
 							"loc": {
 								"start": {
 									"line": 3,
-									"column": 9
+									"column": 10
 								},
 								"end": {
 									"line": 3,
-									"column": 10
+									"column": 11
 								}
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 58,
-								"end": 59,
+								"start": 61,
+								"end": 62,
 								"loc": {
 									"start": {
 										"line": 3,
-										"column": 9
+										"column": 10
 									},
 									"end": {
 										"line": 3,
-										"column": 10
+										"column": 11
 									}
 								},
 								"name": "b"
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 58,
-								"end": 59,
+								"start": 61,
+								"end": 62,
 								"loc": {
 									"start": {
 										"line": 3,
-										"column": 9
+										"column": 10
 									},
 									"end": {
 										"line": 3,
-										"column": 10
+										"column": 11
 									}
 								},
 								"name": "b"
@@ -210,16 +210,16 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 66,
-						"end": 69,
+						"start": 70,
+						"end": 73,
 						"loc": {
 							"start": {
 								"line": 3,
-								"column": 17
+								"column": 19
 							},
 							"end": {
 								"line": 3,
-								"column": 20
+								"column": 22
 							}
 						},
 						"value": "b",
@@ -228,46 +228,46 @@
 					"attributes": [
 						{
 							"type": "ImportAttribute",
-							"start": 76,
-							"end": 88,
+							"start": 81,
+							"end": 93,
 							"loc": {
 								"start": {
 									"line": 3,
-									"column": 27
+									"column": 30
 								},
 								"end": {
 									"line": 3,
-									"column": 39
+									"column": 42
 								}
 							},
 							"key": {
 								"type": "Identifier",
-								"start": 76,
-								"end": 80,
+								"start": 81,
+								"end": 85,
 								"loc": {
 									"start": {
 										"line": 3,
-										"column": 27
+										"column": 30
 									},
 									"end": {
 										"line": 3,
-										"column": 31
+										"column": 34
 									}
 								},
 								"name": "type"
 							},
 							"value": {
 								"type": "Literal",
-								"start": 82,
-								"end": 88,
+								"start": 87,
+								"end": 93,
 								"loc": {
 									"start": {
 										"line": 3,
-										"column": 33
+										"column": 36
 									},
 									"end": {
 										"line": 3,
-										"column": 39
+										"column": 42
 									}
 								},
 								"value": "json",
@@ -278,8 +278,8 @@
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 92,
-					"end": 135,
+					"start": 98,
+					"end": 143,
 					"loc": {
 						"start": {
 							"line": 4,
@@ -287,14 +287,14 @@
 						},
 						"end": {
 							"line": 4,
-							"column": 44
+							"column": 46
 						}
 					},
 					"specifiers": [
 						{
 							"type": "ImportNamespaceSpecifier",
-							"start": 99,
-							"end": 105,
+							"start": 105,
+							"end": 111,
 							"loc": {
 								"start": {
 									"line": 4,
@@ -307,8 +307,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 104,
-								"end": 105,
+								"start": 110,
+								"end": 111,
 								"loc": {
 									"start": {
 										"line": 4,
@@ -325,8 +325,8 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 111,
-						"end": 114,
+						"start": 117,
+						"end": 120,
 						"loc": {
 							"start": {
 								"line": 4,
@@ -343,46 +343,46 @@
 					"attributes": [
 						{
 							"type": "ImportAttribute",
-							"start": 121,
-							"end": 133,
+							"start": 128,
+							"end": 140,
 							"loc": {
 								"start": {
 									"line": 4,
-									"column": 30
+									"column": 31
 								},
 								"end": {
 									"line": 4,
-									"column": 42
+									"column": 43
 								}
 							},
 							"key": {
 								"type": "Identifier",
-								"start": 121,
-								"end": 125,
+								"start": 128,
+								"end": 132,
 								"loc": {
 									"start": {
 										"line": 4,
-										"column": 30
+										"column": 31
 									},
 									"end": {
 										"line": 4,
-										"column": 34
+										"column": 35
 									}
 								},
 								"name": "type"
 							},
 							"value": {
 								"type": "Literal",
-								"start": 127,
-								"end": 133,
+								"start": 134,
+								"end": 140,
 								"loc": {
 									"start": {
 										"line": 4,
-										"column": 36
+										"column": 37
 									},
 									"end": {
 										"line": 4,
-										"column": 42
+										"column": 43
 									}
 								},
 								"value": "json",
@@ -393,8 +393,8 @@
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 137,
-					"end": 180,
+					"start": 145,
+					"end": 192,
 					"loc": {
 						"start": {
 							"line": 5,
@@ -402,14 +402,14 @@
 						},
 						"end": {
 							"line": 5,
-							"column": 44
+							"column": 48
 						}
 					},
 					"specifiers": [
 						{
 							"type": "ImportDefaultSpecifier",
-							"start": 144,
-							"end": 145,
+							"start": 152,
+							"end": 153,
 							"loc": {
 								"start": {
 									"line": 5,
@@ -422,8 +422,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 144,
-								"end": 145,
+								"start": 152,
+								"end": 153,
 								"loc": {
 									"start": {
 										"line": 5,
@@ -439,46 +439,46 @@
 						},
 						{
 							"type": "ImportSpecifier",
-							"start": 148,
-							"end": 149,
+							"start": 157,
+							"end": 158,
 							"loc": {
 								"start": {
 									"line": 5,
-									"column": 12
+									"column": 13
 								},
 								"end": {
 									"line": 5,
-									"column": 13
+									"column": 14
 								}
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 148,
-								"end": 149,
+								"start": 157,
+								"end": 158,
 								"loc": {
 									"start": {
 										"line": 5,
-										"column": 12
+										"column": 13
 									},
 									"end": {
 										"line": 5,
-										"column": 13
+										"column": 14
 									}
 								},
 								"name": "e"
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 148,
-								"end": 149,
+								"start": 157,
+								"end": 158,
 								"loc": {
 									"start": {
 										"line": 5,
-										"column": 12
+										"column": 13
 									},
 									"end": {
 										"line": 5,
-										"column": 13
+										"column": 14
 									}
 								},
 								"name": "e"
@@ -487,16 +487,16 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 156,
-						"end": 159,
+						"start": 166,
+						"end": 169,
 						"loc": {
 							"start": {
 								"line": 5,
-								"column": 20
+								"column": 22
 							},
 							"end": {
 								"line": 5,
-								"column": 23
+								"column": 25
 							}
 						},
 						"value": "d",
@@ -505,46 +505,46 @@
 					"attributes": [
 						{
 							"type": "ImportAttribute",
-							"start": 166,
-							"end": 178,
+							"start": 177,
+							"end": 189,
 							"loc": {
 								"start": {
 									"line": 5,
-									"column": 30
+									"column": 33
 								},
 								"end": {
 									"line": 5,
-									"column": 42
+									"column": 45
 								}
 							},
 							"key": {
 								"type": "Identifier",
-								"start": 166,
-								"end": 170,
+								"start": 177,
+								"end": 181,
 								"loc": {
 									"start": {
 										"line": 5,
-										"column": 30
+										"column": 33
 									},
 									"end": {
 										"line": 5,
-										"column": 34
+										"column": 37
 									}
 								},
 								"name": "type"
 							},
 							"value": {
 								"type": "Literal",
-								"start": 172,
-								"end": 178,
+								"start": 183,
+								"end": 189,
 								"loc": {
 									"start": {
 										"line": 5,
-										"column": 36
+										"column": 39
 									},
 									"end": {
 										"line": 5,
-										"column": 42
+										"column": 45
 									}
 								},
 								"value": "json",
@@ -555,8 +555,8 @@
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 182,
-					"end": 213,
+					"start": 194,
+					"end": 227,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -564,14 +564,14 @@
 						},
 						"end": {
 							"line": 6,
-							"column": 32
+							"column": 34
 						}
 					},
 					"specifiers": [],
 					"source": {
 						"type": "Literal",
-						"start": 189,
-						"end": 192,
+						"start": 201,
+						"end": 204,
 						"loc": {
 							"start": {
 								"line": 6,
@@ -588,46 +588,46 @@
 					"attributes": [
 						{
 							"type": "ImportAttribute",
-							"start": 199,
-							"end": 211,
+							"start": 212,
+							"end": 224,
 							"loc": {
 								"start": {
 									"line": 6,
-									"column": 18
+									"column": 19
 								},
 								"end": {
 									"line": 6,
-									"column": 30
+									"column": 31
 								}
 							},
 							"key": {
 								"type": "Identifier",
-								"start": 199,
-								"end": 203,
+								"start": 212,
+								"end": 216,
 								"loc": {
 									"start": {
 										"line": 6,
-										"column": 18
+										"column": 19
 									},
 									"end": {
 										"line": 6,
-										"column": 22
+										"column": 23
 									}
 								},
 								"name": "type"
 							},
 							"value": {
 								"type": "Literal",
-								"start": 205,
-								"end": 211,
+								"start": 218,
+								"end": 224,
 								"loc": {
 									"start": {
 										"line": 6,
-										"column": 24
+										"column": 25
 									},
 									"end": {
 										"line": 6,
-										"column": 30
+										"column": 31
 									}
 								},
 								"value": "json",
@@ -638,8 +638,8 @@
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 215,
-					"end": 254,
+					"start": 229,
+					"end": 270,
 					"loc": {
 						"start": {
 							"line": 7,
@@ -647,14 +647,14 @@
 						},
 						"end": {
 							"line": 7,
-							"column": 40
+							"column": 42
 						}
 					},
 					"specifiers": [],
 					"source": {
 						"type": "Literal",
-						"start": 230,
-						"end": 233,
+						"start": 244,
+						"end": 247,
 						"loc": {
 							"start": {
 								"line": 7,
@@ -671,46 +671,46 @@
 					"attributes": [
 						{
 							"type": "ImportAttribute",
-							"start": 240,
-							"end": 252,
+							"start": 255,
+							"end": 267,
 							"loc": {
 								"start": {
 									"line": 7,
-									"column": 26
+									"column": 27
 								},
 								"end": {
 									"line": 7,
-									"column": 38
+									"column": 39
 								}
 							},
 							"key": {
 								"type": "Identifier",
-								"start": 240,
-								"end": 244,
+								"start": 255,
+								"end": 259,
 								"loc": {
 									"start": {
 										"line": 7,
-										"column": 26
+										"column": 27
 									},
 									"end": {
 										"line": 7,
-										"column": 30
+										"column": 31
 									}
 								},
 								"name": "type"
 							},
 							"value": {
 								"type": "Literal",
-								"start": 246,
-								"end": 252,
+								"start": 261,
+								"end": 267,
 								"loc": {
 									"start": {
 										"line": 7,
-										"column": 32
+										"column": 33
 									},
 									"end": {
 										"line": 7,
-										"column": 38
+										"column": 39
 									}
 								},
 								"value": "json",
@@ -721,8 +721,8 @@
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 256,
-					"end": 309,
+					"start": 272,
+					"end": 327,
 					"loc": {
 						"start": {
 							"line": 8,
@@ -730,14 +730,14 @@
 						},
 						"end": {
 							"line": 8,
-							"column": 54
+							"column": 56
 						}
 					},
 					"specifiers": [
 						{
 							"type": "ImportDefaultSpecifier",
-							"start": 263,
-							"end": 264,
+							"start": 279,
+							"end": 280,
 							"loc": {
 								"start": {
 									"line": 8,
@@ -750,8 +750,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 263,
-								"end": 264,
+								"start": 279,
+								"end": 280,
 								"loc": {
 									"start": {
 										"line": 8,
@@ -768,8 +768,8 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 270,
-						"end": 273,
+						"start": 286,
+						"end": 289,
 						"loc": {
 							"start": {
 								"line": 8,
@@ -786,46 +786,46 @@
 					"attributes": [
 						{
 							"type": "ImportAttribute",
-							"start": 280,
-							"end": 292,
+							"start": 297,
+							"end": 309,
 							"loc": {
 								"start": {
 									"line": 8,
-									"column": 25
+									"column": 26
 								},
 								"end": {
 									"line": 8,
-									"column": 37
+									"column": 38
 								}
 							},
 							"key": {
 								"type": "Identifier",
-								"start": 280,
-								"end": 284,
+								"start": 297,
+								"end": 301,
 								"loc": {
 									"start": {
 										"line": 8,
-										"column": 25
+										"column": 26
 									},
 									"end": {
 										"line": 8,
-										"column": 29
+										"column": 30
 									}
 								},
 								"name": "type"
 							},
 							"value": {
 								"type": "Literal",
-								"start": 286,
-								"end": 292,
+								"start": 303,
+								"end": 309,
 								"loc": {
 									"start": {
 										"line": 8,
-										"column": 31
+										"column": 32
 									},
 									"end": {
 										"line": 8,
-										"column": 37
+										"column": 38
 									}
 								},
 								"value": "json",
@@ -834,46 +834,46 @@
 						},
 						{
 							"type": "ImportAttribute",
-							"start": 294,
-							"end": 307,
+							"start": 311,
+							"end": 324,
 							"loc": {
 								"start": {
 									"line": 8,
-									"column": 39
+									"column": 40
 								},
 								"end": {
 									"line": 8,
-									"column": 52
+									"column": 53
 								}
 							},
 							"key": {
 								"type": "Identifier",
-								"start": 294,
-								"end": 298,
+								"start": 311,
+								"end": 315,
 								"loc": {
 									"start": {
 										"line": 8,
-										"column": 39
+										"column": 40
 									},
 									"end": {
 										"line": 8,
-										"column": 43
+										"column": 44
 									}
 								},
 								"name": "attr"
 							},
 							"value": {
 								"type": "Literal",
-								"start": 300,
-								"end": 307,
+								"start": 317,
+								"end": 324,
 								"loc": {
 									"start": {
 										"line": 8,
-										"column": 45
+										"column": 46
 									},
 									"end": {
 										"line": 8,
-										"column": 52
+										"column": 53
 									}
 								},
 								"value": "value",

@@ -3,7 +3,7 @@
 	obj.method1().method2(
 		a,
 		// comment between args
-		b,
+		b
 	);
 
 	// Inter-argument block comment (inline)

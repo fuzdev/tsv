@@ -7,7 +7,7 @@
 
 	// 101 chars - breaks after .call( (65 a's)
 	const b = this.fn().call(
-		inner(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa),
+		inner(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)
 	);
 
 	// Inner boundary tests: when inner call line hits 100/101 chars
@@ -15,7 +15,7 @@
 
 	// Inner line 100 chars - inner call stays inline
 	const c = this.fn().call(
-		inner(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa, bb, cc),
+		inner(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa, bb, ccc)
 	);
 
 	// Inner line 101 chars - inner call args break
@@ -49,7 +49,7 @@
 			z,
 			aa,
 			bb,
-			ccc,
-		),
+			cccc
+		)
 	);
 </script>

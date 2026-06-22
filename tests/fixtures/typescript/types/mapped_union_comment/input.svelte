@@ -16,5 +16,5 @@
 	};
 
 	// Mapped type without comments - stays inline
-	type D = {[K in T]?: B<K> | null};
+	type D = { [K in T]?: B<K> | null };
 </script>

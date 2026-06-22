@@ -302,7 +302,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        let inner = d.concat(&[d.softline(), d.fill(&parts), d.trailing_comma()]);
+        let inner = d.concat(&[d.softline(), d.fill(&parts)]);
         let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.softline());
 
         d.group(d.concat(&[d.text("["), indented_content, closing_line, d.text("]")]))
@@ -396,16 +396,8 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Use trailing_comma() only if last element is NOT an elision
-        // (elision trailing comma was already added unconditionally above)
-        let trailing = if has_trailing_elision {
-            d.empty()
-        } else {
-            d.trailing_comma()
-        };
-
         // Own-line block comments after the last element (before closing bracket).
-        // These appear as siblings after the trailing comma, forcing the array to break.
+        // These appear as siblings after the last element, forcing the array to break.
         // Also picks up comments from spread with stripped parens that
         // build_spread_doc intentionally skips.
         let last_elem_end = arr.elements.last().and_then(|e| e.as_ref()).map(|e| {
@@ -439,7 +431,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        let mut inner_parts = vec![d.softline(), d.concat(&parts), trailing];
+        let mut inner_parts = vec![d.softline(), d.concat(&parts)];
         for comment in &trailing_same_line_after_comma {
             inner_parts.push(d.text(" "));
             inner_parts.push(self.build_comment_doc(comment));
@@ -499,7 +491,7 @@ impl<'a> Printer<'a> {
         }
 
         // Own-line block comments after the last element (before closing bracket).
-        // These appear after the trailing comma, so we add comma + comment separately.
+        // These appear after the last element (no trailing comma), each on its own line.
         let mut trailing_comments = Vec::new();
         if let Some(last) = arr.elements.last().and_then(|e| e.as_ref()) {
             let search_start = last.span().end;
@@ -511,12 +503,13 @@ impl<'a> Printer<'a> {
         }
 
         if trailing_comments.is_empty() {
-            let inner = d.concat(&[d.hardline(), d.concat(&parts), d.text(",")]);
+            // No trailing comma after the last element under `trailingComma: 'none'`.
+            let inner = d.concat(&[d.hardline(), d.concat(&parts)]);
             let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.hardline());
             d.concat(&[d.text("["), indented_content, closing_line, d.text("]")])
         } else {
-            // Trailing comma after last element, then comments on own lines
-            parts.push(d.text(","));
+            // No trailing comma after the last element under `trailingComma: 'none'`,
+            // then comments on own lines.
             for comment in &trailing_comments {
                 parts.push(d.hardline());
                 parts.push(self.build_comment_doc(comment));
@@ -679,7 +672,13 @@ impl<'a> Printer<'a> {
                 parts.push(self.build_comment_doc(comment));
             }
 
-            parts.push(d.text(","));
+            // Separator comma between elements; under `trailingComma: 'none'` the last
+            // REAL element gets no trailing comma, but a trailing-elision hole keeps its
+            // (syntactically significant) comma.
+            let is_last = i + 1 == arr.elements.len();
+            if !is_last || elem.is_none() {
+                parts.push(d.text(","));
+            }
 
             for comment in trailing.iter().filter(|c| !c.is_block) {
                 parts.push(self.build_trailing_line_comment_doc(comment));
@@ -809,8 +808,9 @@ impl<'a> Printer<'a> {
             if i < arr.elements.len() - 1 {
                 parts.push(d.text(","));
                 parts.push(d.hardline());
-            } else {
-                // Trailing comma on last element
+            } else if elem.is_none() {
+                // Trailing-elision hole keeps its (syntactically significant) comma;
+                // a real last element gets no trailing comma under `trailingComma: 'none'`.
                 parts.push(d.text(","));
             }
         }

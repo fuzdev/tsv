@@ -2,12 +2,12 @@
 	// single-type `extends` constraint overflows: break after `extends`, indent the type
 	type Constraint<
 		AAAAAAAAAAAAAAAAAAAAAAAAAAAAA extends
-			Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+			Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 	> = X;
 
 	// single-type `=` default overflows: break after `=`, indent the type
 	type Default<
 		AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA =
-			Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+			Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 	> = X;
 </script>

@@ -4,7 +4,7 @@
 		prop1: 'aaaaaaaaaaaaa',
 		prop2: 'bbbbbbbbbbbbb',
 		prop3: 'ccccccccccccc',
-		prop4: 'dddddddddddd',
+		prop4: 'dddddddddddd'
 	}}
 	{a}
 {/each}

@@ -72,7 +72,7 @@
 		argument3xxxx,
 		argument4xxxx,
 		argument5xxxx,
-		arg6,
+		arg6
 	)}
 		z
 	{/if}
@@ -91,14 +91,14 @@
 		afffffffffffffffffffffffffffffffffffff,
 		bbbbbbbbbbbbbbbbbbbbb,
 		ssssssssssssssssssssss,
-		dd,
+		dd
 	)
 		.bar()
 		.baz()
 		.fooooooooooooooooooooooooooooooooooooooo(
 			aaaaaaaaaaaaaaaaaaaa,
 			bbbbbbbbbbbbb,
-			ccccccccccccccccc,
+			ccccccccccccccccc
 		)
 	}
 		x

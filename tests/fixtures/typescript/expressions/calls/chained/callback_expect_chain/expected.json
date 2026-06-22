@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 227,
+	"end": 228,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -30,12 +30,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 226,
+		"end": 227,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 217,
+			"end": 218,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -50,7 +50,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 89,
-					"end": 216,
+					"end": 217,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -64,7 +64,7 @@
 					"expression": {
 						"type": "CallExpression",
 						"start": 89,
-						"end": 215,
+						"end": 216,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -78,7 +78,7 @@
 						"callee": {
 							"type": "MemberExpression",
 							"start": 89,
-							"end": 158,
+							"end": 160,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -86,13 +86,13 @@
 								},
 								"end": {
 									"line": 3,
-									"column": 70
+									"column": 72
 								}
 							},
 							"object": {
 								"type": "CallExpression",
 								"start": 89,
-								"end": 150,
+								"end": 152,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -100,7 +100,7 @@
 									},
 									"end": {
 										"line": 3,
-										"column": 62
+										"column": 64
 									}
 								},
 								"callee": {
@@ -123,7 +123,7 @@
 									{
 										"type": "ArrowFunctionExpression",
 										"start": 96,
-										"end": 149,
+										"end": 151,
 										"loc": {
 											"start": {
 												"line": 3,
@@ -131,7 +131,7 @@
 											},
 											"end": {
 												"line": 3,
-												"column": 61
+												"column": 63
 											}
 										},
 										"id": null,
@@ -142,7 +142,7 @@
 										"body": {
 											"type": "CallExpression",
 											"start": 102,
-											"end": 149,
+											"end": 151,
 											"loc": {
 												"start": {
 													"line": 3,
@@ -150,7 +150,7 @@
 												},
 												"end": {
 													"line": 3,
-													"column": 61
+													"column": 63
 												}
 											},
 											"callee": {
@@ -189,7 +189,7 @@
 												{
 													"type": "ObjectExpression",
 													"start": 129,
-													"end": 148,
+													"end": 150,
 													"loc": {
 														"start": {
 															"line": 3,
@@ -197,22 +197,22 @@
 														},
 														"end": {
 															"line": 3,
-															"column": 60
+															"column": 62
 														}
 													},
 													"properties": [
 														{
 															"type": "Property",
-															"start": 130,
-															"end": 147,
+															"start": 131,
+															"end": 148,
 															"loc": {
 																"start": {
 																	"line": 3,
-																	"column": 42
+																	"column": 43
 																},
 																"end": {
 																	"line": 3,
-																	"column": 59
+																	"column": 60
 																}
 															},
 															"method": false,
@@ -220,32 +220,32 @@
 															"computed": false,
 															"key": {
 																"type": "Identifier",
-																"start": 130,
-																"end": 141,
+																"start": 131,
+																"end": 142,
 																"loc": {
 																	"start": {
 																		"line": 3,
-																		"column": 42
+																		"column": 43
 																	},
 																	"end": {
 																		"line": 3,
-																		"column": 53
+																		"column": 54
 																	}
 																},
 																"name": "option_flag"
 															},
 															"value": {
 																"type": "Literal",
-																"start": 143,
-																"end": 147,
+																"start": 144,
+																"end": 148,
 																"loc": {
 																	"start": {
 																		"line": 3,
-																		"column": 55
+																		"column": 56
 																	},
 																	"end": {
 																		"line": 3,
-																		"column": 59
+																		"column": 60
 																	}
 																},
 																"value": true,
@@ -264,16 +264,16 @@
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 151,
-								"end": 158,
+								"start": 153,
+								"end": 160,
 								"loc": {
 									"start": {
 										"line": 3,
-										"column": 63
+										"column": 65
 									},
 									"end": {
 										"line": 3,
-										"column": 70
+										"column": 72
 									}
 								},
 								"name": "toThrow"
@@ -284,8 +284,8 @@
 						"arguments": [
 							{
 								"type": "Literal",
-								"start": 162,
-								"end": 211,
+								"start": 164,
+								"end": 213,
 								"loc": {
 									"start": {
 										"line": 4,

@@ -10,8 +10,8 @@ Prettier: moves the comment down to its own line
 ```
 // tsv                          // prettier
 type A = [ // c1                type A = [
-	string,                            // c1
-];                                 string,
+	string                             // c1
+];                                 string
                                  ];
 ```
 

@@ -5,8 +5,8 @@
 		await call(
 			applicationObjectLong,
 			specificationObjectLong,
-			{aaa: parentNodeId, bbb: childNodeId},
-			hh,
+			{ aaa: parentNodeId, bbb: childNodeId },
+			hh
 		)
 	).ok;
 
@@ -16,8 +16,8 @@
 		await call(
 			applicationObjectLong,
 			specificationObjectLong,
-			{aaa: parentNodeId, bbb: childNodeId},
-			hh,
+			{ aaa: parentNodeId, bbb: childNodeId },
+			hh
 		)
 	)!.ok;
 </script>

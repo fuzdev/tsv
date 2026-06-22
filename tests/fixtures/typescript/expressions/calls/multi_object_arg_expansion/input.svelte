@@ -1,11 +1,11 @@
 <script lang="ts">
 	const a = [
 		...fn(
-			{...b, c: d},
+			{ ...b, c: d },
 			{
 				e: f,
-				g: null,
-			},
-		),
+				g: null
+			}
+		)
 	];
 </script>
