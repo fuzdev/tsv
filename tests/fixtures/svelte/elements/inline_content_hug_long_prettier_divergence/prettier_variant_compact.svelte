@@ -3,20 +3,20 @@
 	<small>{a !== 1 ? 's' : ''}{b !== 1 ? 's' : ''}{ccccccccccccccccccccccccccccccccccccccccc}</small>
 </div>
 
-<!-- 101 chars: <tag>content</tag> exceeds but <tag>content</tag fits, only closing > breaks -->
+<!-- 101 chars - overflows, lays out block-style (both tags intact, content on its own indented line) -->
 <div>
 	<small>{a !== 1 ? 's' : ''}{b !== 1 ? 's' : ''}{cccccccccccccccccccccccccccccccccccccccccc}</small
 	>
 </div>
 
-<!-- 102 chars: we break second ternary; Prettier breaks opening bracket -->
+<!-- 102 chars - block-style; content still fits unbroken once on its own indented line -->
 <div>
 	<small
 		>{a !== 1 ? 's' : ''}{b !== 1 ? 's' : ''}{ccccccccccccccccccccccccccccccccccccccccccc}</small
 	>
 </div>
 
-<!-- Logical chain: we break at &&; Prettier breaks opening bracket -->
+<!-- Logical chain - block-style; the && chain fits unbroken on its own indented line (prettier breaks it one-per-line) -->
 <div>
 	<small
 		>{aaa &&
@@ -35,7 +35,7 @@
 	>
 </div>
 
-<!-- Binary chain: we break at +; Prettier breaks opening bracket -->
+<!-- Binary chain - block-style; the + chain fits unbroken on its own indented line (prettier breaks it one-per-line) -->
 <div>
 	<small
 		>{arr[0] +

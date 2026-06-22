@@ -1,8 +1,9 @@
+<!-- 100 chars - stays inline -->
 {#snippet fn(paramA, paramB, paramC, paramD, paramE, paramF, paramG, paramH, paramIIIIIIIIIIIIIIII)}
-	<!-- 100 chars - stays inline -->
 	<div>text</div>
 {/snippet}
 
+<!-- 101 chars - wraps -->
 {#snippet fn(
 	paramA,
 	paramB,
@@ -14,6 +15,5 @@
 	paramH,
 	paramIIIIIIIIIIIIIIIII,
 )}
-	<!-- 101 chars - wraps -->
 	<div>text</div>
 {/snippet}

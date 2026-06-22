@@ -1,5 +1,9 @@
 # member_expr_break_order_prettier_divergence
 
+Pins inline content that combines a member expression with an `{#if}` block: tsv keeps it on one
+block-style indented line (unbroken here); prettier dangles the tags and breaks the member
+expression.
+
 tsv lays out this inline element's wrapping content **block-style** — both tags stay intact and the
 content moves to its own indented line(s), collapsing to `<tag>content</tag>` when it fits. Prettier
 instead dangles the tag delimiters (`<tag⏎\t>content</tag⏎>`). Content-boundary whitespace is

@@ -1,5 +1,9 @@
 # member_expr_break_order_long_prettier_divergence
 
+The wide companion of `member_expr_break_order`: the content is wide enough that even block-style it
+wraps, so tsv hard-limits printWidth (the member expression wraps at `.cccc`) while prettier dangles
+and tolerates a 107-char line.
+
 tsv lays out this inline element's wrapping content **block-style** — both tags stay intact and the
 content moves to its own indented line(s), collapsing to `<tag>content</tag>` when it fits. Prettier
 instead dangles the tag delimiters (`<tag⏎\t>content</tag⏎>`). Content-boundary whitespace is

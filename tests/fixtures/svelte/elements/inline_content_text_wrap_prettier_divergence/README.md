@@ -2,7 +2,9 @@
 
 An inline element (`<small>`) whose **text content** overflows print width lays out **block-style**:
 both tags stay intact and the content moves to its own indented line, exactly like a block element.
-Content that fits stays inline (`<small>short text</small>`).
+Content that fits stays inline (`<small>short text</small>`). The exact flip is pinned at the
+100/101 boundary: a 100-char `<small>` of breakable words stays inline, one char longer (101) flips
+to block-style.
 
 ```
 <small>

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 529,
+	"end": 634,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -99,31 +99,31 @@
 			{
 				"type": "Comment",
 				"start": 177,
-				"end": 228,
-				"data": " 101 chars: only trailing > breaks (84 x's) "
+				"end": 309,
+				"data": " 101 chars: overflows; tsv lays out block-style (unbreakable 84-x word on its own line), prettier dangles only the closing > "
 			},
 			{
 				"type": "Text",
-				"start": 228,
-				"end": 229,
+				"start": 309,
+				"end": 310,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 229,
-				"end": 347,
+				"start": 310,
+				"end": 428,
 				"name": "div",
 				"name_loc": {
 					"start": {
 						"line": 7,
 						"column": 1,
-						"character": 230
+						"character": 311
 					},
 					"end": {
 						"line": 7,
 						"column": 4,
-						"character": 233
+						"character": 314
 					}
 				},
 				"attributes": [],
@@ -132,26 +132,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 234,
-							"end": 236,
+							"start": 315,
+							"end": 317,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 236,
-							"end": 340,
+							"start": 317,
+							"end": 421,
 							"name": "small",
 							"name_loc": {
 								"start": {
 									"line": 8,
 									"column": 2,
-									"character": 237
+									"character": 318
 								},
 								"end": {
 									"line": 8,
 									"column": 7,
-									"character": 242
+									"character": 323
 								}
 							},
 							"attributes": [],
@@ -160,8 +160,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 243,
-										"end": 332,
+										"start": 324,
+										"end": 413,
 										"raw": "\n\t\txxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\t",
 										"data": "\n\t\txxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\t"
 									}
@@ -170,8 +170,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 340,
-							"end": 341,
+							"start": 421,
+							"end": 422,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -180,39 +180,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 347,
-				"end": 349,
+				"start": 428,
+				"end": 430,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 349,
-				"end": 408,
-				"data": " 102 chars: both opening and closing break (85 x's) "
+				"start": 430,
+				"end": 513,
+				"data": " 102 chars: same tsv block-style shape (85 x's); prettier dangles both tags "
 			},
 			{
 				"type": "Text",
-				"start": 408,
-				"end": 409,
+				"start": 513,
+				"end": 514,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 409,
-				"end": 528,
+				"start": 514,
+				"end": 633,
 				"name": "div",
 				"name_loc": {
 					"start": {
 						"line": 14,
 						"column": 1,
-						"character": 410
+						"character": 515
 					},
 					"end": {
 						"line": 14,
 						"column": 4,
-						"character": 413
+						"character": 518
 					}
 				},
 				"attributes": [],
@@ -221,26 +221,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 414,
-							"end": 416,
+							"start": 519,
+							"end": 521,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 416,
-							"end": 521,
+							"start": 521,
+							"end": 626,
 							"name": "small",
 							"name_loc": {
 								"start": {
 									"line": 15,
 									"column": 2,
-									"character": 417
+									"character": 522
 								},
 								"end": {
 									"line": 15,
 									"column": 7,
-									"character": 422
+									"character": 527
 								}
 							},
 							"attributes": [],
@@ -249,8 +249,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 423,
-										"end": 513,
+										"start": 528,
+										"end": 618,
 										"raw": "\n\t\txxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\t",
 										"data": "\n\t\txxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\t"
 									}
@@ -259,8 +259,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 521,
-							"end": 522,
+							"start": 626,
+							"end": 627,
 							"raw": "\n",
 							"data": "\n"
 						}

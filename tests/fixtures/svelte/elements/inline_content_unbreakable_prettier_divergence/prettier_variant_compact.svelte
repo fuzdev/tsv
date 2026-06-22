@@ -3,13 +3,13 @@
 	<small>xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</small>
 </div>
 
-<!-- 101 chars: only trailing > breaks (84 x's) -->
+<!-- 101 chars: overflows; tsv lays out block-style (unbreakable 84-x word on its own line), prettier dangles only the closing > -->
 <div>
 	<small>xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</small
 	>
 </div>
 
-<!-- 102 chars: both opening and closing break (85 x's) -->
+<!-- 102 chars: same tsv block-style shape (85 x's); prettier dangles both tags -->
 <div>
 	<small
 		>xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</small

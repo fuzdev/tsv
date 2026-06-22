@@ -1,5 +1,9 @@
 # long_prettier_divergence
 
+Pins `on:` event-handler directives (arrow bodies, call-arg lists, modifiers, block bodies) across
+the 100/101 boundary — the directive-expression wrapping matches prettier; the block-style
+divergence below is in the `<button>`'s text content.
+
 tsv lays out this inline element's wrapping content **block-style** — both tags stay intact and the
 content moves to its own indented line(s), collapsing to `<tag>content</tag>` when it fits. Prettier
 instead dangles the tag delimiters (`<tag⏎\t>content</tag⏎>`). Content-boundary whitespace is

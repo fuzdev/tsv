@@ -1,7 +1,7 @@
 <!-- Short handler - stays completely inline -->
 <button on:click={() => fn(aaaa)}>text</button>
 
-<!-- 100 chars - hug mode (at boundary) -->
+<!-- 100 chars (at boundary) - attr fits inline so prettier hugs the content; tsv wraps the attr and lays content block-style -->
 <button on:click={() => fn(aaaa, bbbb, cccc, dddd, eeee, ffff, gggg, hhhh, iiii, jjjj, kkkk, lllll)}
 	>t</button
 >
@@ -53,7 +53,7 @@
 		)}>t</button
 >
 
-<!-- With modifiers: 100 chars - hug mode (at boundary) -->
+<!-- With modifiers: 100 chars (at boundary) - attr fits inline so prettier hugs; tsv wraps the attr and lays content block-style -->
 <button on:click|preventDefault={() => fn(aaaa, bbbb, cccc, dddd, eeee, ffff, gggg, hhhh, iiii, jj)}
 	>t</button
 >

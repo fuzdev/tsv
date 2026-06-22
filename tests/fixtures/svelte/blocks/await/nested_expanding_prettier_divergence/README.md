@@ -1,5 +1,8 @@
 # nested_expanding_prettier_divergence
 
+Pins an `{#await}` block wrapping another block (`{#if}` / `{#each}` / `{#key}`) as an inline
+element's sole content.
+
 tsv lays out this inline element's wrapping content **block-style** — both tags stay intact and the
 content moves to its own indented line(s), collapsing to `<tag>content</tag>` when it fits. Prettier
 instead dangles the tag delimiters (`<tag⏎\t>content</tag⏎>`). Content-boundary whitespace is

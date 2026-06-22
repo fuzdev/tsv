@@ -1,5 +1,9 @@
 # directive_expr_logical_long_prettier_divergence
 
+Pins a `class:` directive whose logical (`&&`) expression crosses the 100/101 boundary — both
+formatters break it at the operators identically; the block-style divergence below is in the host
+element's `text` content.
+
 tsv lays out this inline element's wrapping content **block-style** — both tags stay intact and the
 content moves to its own indented line(s), collapsing to `<tag>content</tag>` when it fits. Prettier
 instead dangles the tag delimiters (`<tag⏎\t>content</tag⏎>`). Content-boundary whitespace is

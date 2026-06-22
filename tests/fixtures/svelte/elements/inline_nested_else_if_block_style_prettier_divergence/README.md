@@ -1,4 +1,4 @@
-# inline_nested_else_if_hugged_prettier_divergence
+# inline_nested_else_if_block_style_prettier_divergence
 
 tsv lays out this inline element's wrapping content **block-style** — both tags stay intact and the
 content moves to its own indented line(s), collapsing to `<tag>content</tag>` when it fits. Prettier

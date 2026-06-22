@@ -1,5 +1,9 @@
 # table_cell_hug_long_prettier_divergence
 
+Pins table cells (`td` / `th` / `tr` / `tbody` / `thead` / `tfoot`) — all inline-classified —
+laying out block-style, including the 109-char cascade where the inner `<a>`'s content also moves to
+its own line.
+
 tsv lays out this inline element's wrapping content **block-style** — both tags stay intact and the
 content moves to its own indented line(s), collapsing to `<tag>content</tag>` when it fits. Prettier
 instead dangles the tag delimiters (`<tag⏎\t>content</tag⏎>`). Content-boundary whitespace is

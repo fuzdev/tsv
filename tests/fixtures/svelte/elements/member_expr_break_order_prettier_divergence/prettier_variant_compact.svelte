@@ -1,6 +1,4 @@
-<!-- Test: member expression break ORDER when multiple expressions exist in inline content -->
-<!-- BUG: We break the {#if} condition while Prettier breaks the FIRST expression -->
-<!-- Prettier breaks first expr at .bbbb.cccc; we incorrectly break condition at .y.z -->
+<!-- Member expr + {#if} as inline content: tsv lays it out block-style (both tags intact, content on its own indented line), here unbroken; prettier dangles the tag delimiters. -->
 <div>
 	<div>
 		<div>

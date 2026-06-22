@@ -1,5 +1,9 @@
 # inline_nbsp_boundary_long_prettier_divergence
 
+Pins how non-breaking spaces interact with the block-style boundary: an NBSP (literal U+00A0 or
+`&nbsp;`) glues the trailing `tex` to `</code>`, so the over-wide run lays `<code>` out block-style
+(`.x` on its own line) and never breaks at the glued text.
+
 tsv lays out this inline element's wrapping content **block-style** — both tags stay intact and the
 content moves to its own indented line(s), collapsing to `<tag>content</tag>` when it fits. Prettier
 instead dangles the tag delimiters (`<tag⏎\t>content</tag⏎>`). Content-boundary whitespace is
