@@ -1,21 +1,19 @@
 # inline_content_text_wrap_prettier_divergence
 
-An inline element (`<small>`) whose **text content** overflows print width. tsv keeps the **opening
-tag intact** and flows the text after it, wrapping at spaces — only the closing `>` dangles:
+An inline element (`<small>`) whose **text content** overflows print width lays out **block-style**:
+both tags stay intact and the content moves to its own indented line, exactly like a block element.
+Content that fits stays inline (`<small>short text</small>`).
 
 ```
-<small>word word … word
-	word word word word</small
->
+<small>
+	word word … word
+</small>
 ```
 
-The principle: **text content has internal break points at every space**, so it flows like a
-paragraph and needs no opening-`>` dangle. The dangle is reserved for *element/component* children
-(atomic, whitespace-significant — where it avoids whitespace injection and communicates nesting).
+Content-boundary whitespace is render-free under Svelte 5, so tsv places the block-style boundaries
+freely. Prettier instead **dangles** the tag delimiters — pre-breaking the opening tag and dangling
+the closing `>` — even for plain text; tsv keeps both tags intact and lays out block-style for
+readability. `unformatted_ours_compact` (a single-line authoring) normalizes to this form under tsv
+in one pass.
 
-Prettier instead pre-breaks the opening tag uniformly (`<small⏎\t>…content…</small⏎\t>`), even for
-plain text — see `output_prettier.svelte`. tsv diverges here for readability.
-
-`unformatted_ours_compact` (a single-line authoring) normalizes to this form under tsv in one pass.
-
-See [conformance_prettier.md §Svelte: Elements](../../../../../docs/conformance_prettier.md#svelte-elements).
+See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).

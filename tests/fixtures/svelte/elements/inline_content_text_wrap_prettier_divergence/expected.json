@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 505,
+	"end": 627,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 361,
-				"data": " Inline element with text content: the opening tag stays intact and the text flows after it, wrapping at spaces; only the closing > dangles. tsv keeps tags attached to text content (text has internal break points at every space, so no >-dangle is needed). Prettier instead pre-breaks the opening tag (<small> -> <small\\n>); see output_prettier + README. "
+				"end": 470,
+				"data": " An inline element (`<small>`) whose text content overflows print width lays out block-style:\n     both tags stay intact and the content moves to its own indented line, exactly like a block\n     element. Content that fits stays inline (`<small>short text</small>`). Content-boundary\n     whitespace is render-free under Svelte 5, so tsv places it freely. Prettier instead pre-breaks\n     the opening tag and dangles the closing `>`; see output_prettier + README. "
 			},
 			{
 				"type": "Text",
-				"start": 361,
-				"end": 362,
+				"start": 470,
+				"end": 471,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 362,
-				"end": 504,
+				"start": 471,
+				"end": 626,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 2,
+						"line": 6,
 						"column": 1,
-						"character": 363
+						"character": 472
 					},
 					"end": {
-						"line": 2,
+						"line": 6,
 						"column": 4,
-						"character": 366
+						"character": 475
 					}
 				},
 				"attributes": [],
@@ -43,26 +43,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 367,
-							"end": 369,
+							"start": 476,
+							"end": 478,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 369,
-							"end": 497,
+							"start": 478,
+							"end": 503,
 							"name": "small",
 							"name_loc": {
 								"start": {
-									"line": 3,
+									"line": 7,
 									"column": 2,
-									"character": 370
+									"character": 479
 								},
 								"end": {
-									"line": 3,
+									"line": 7,
 									"column": 7,
-									"character": 375
+									"character": 484
 								}
 							},
 							"attributes": [],
@@ -71,18 +71,56 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 376,
-										"end": 487,
-										"raw": "word word word word word word word word word word word word word word word word word word\n\t\tword word word word",
-										"data": "word word word word word word word word word word word word word word word word word word\n\t\tword word word word"
+										"start": 485,
+										"end": 495,
+										"raw": "short text",
+										"data": "short text"
 									}
 								]
 							}
 						},
 						{
 							"type": "Text",
-							"start": 497,
-							"end": 498,
+							"start": 503,
+							"end": 505,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 505,
+							"end": 619,
+							"name": "small",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 2,
+									"character": 506
+								},
+								"end": {
+									"line": 8,
+									"column": 7,
+									"character": 511
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 512,
+										"end": 611,
+										"raw": "\n\t\tword word word word word word word word word word word word word word word word word word word\n\t",
+										"data": "\n\t\tword word word word word word word word word word word word word word word word word word word\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 619,
+							"end": 620,
 							"raw": "\n",
 							"data": "\n"
 						}

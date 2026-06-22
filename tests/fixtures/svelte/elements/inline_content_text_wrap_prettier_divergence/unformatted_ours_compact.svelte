@@ -1,2 +1,6 @@
-<!-- Inline element with text content: the opening tag stays intact and the text flows after it, wrapping at spaces; only the closing > dangles. tsv keeps tags attached to text content (text has internal break points at every space, so no >-dangle is needed). Prettier instead pre-breaks the opening tag (<small> -> <small\n>); see output_prettier + README. -->
-<div><small>word word word word word word word word word word word word word word word word word word word word word word</small></div>
+<!-- An inline element (`<small>`) whose text content overflows print width lays out block-style:
+     both tags stay intact and the content moves to its own indented line, exactly like a block
+     element. Content that fits stays inline (`<small>short text</small>`). Content-boundary
+     whitespace is render-free under Svelte 5, so tsv places it freely. Prettier instead pre-breaks
+     the opening tag and dangles the closing `>`; see output_prettier + README. -->
+<div><small>short text</small> <small>word word word word word word word word word word word word word word word word word word word</small></div>

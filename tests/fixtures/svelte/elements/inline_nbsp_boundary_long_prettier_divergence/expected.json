@@ -1,0 +1,363 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 906,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 85,
+				"data": " literal non-breaking space, exactly 100: glues \"te\" to </code>, stays inline "
+			},
+			{
+				"type": "Text",
+				"start": 85,
+				"end": 86,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 86,
+				"end": 194,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 87
+					},
+					"end": {
+						"line": 2,
+						"column": 2,
+						"character": 88
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 89,
+							"end": 171,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaa ",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaa "
+						},
+						{
+							"type": "RegularElement",
+							"start": 171,
+							"end": 186,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 82,
+									"character": 172
+								},
+								"end": {
+									"line": 3,
+									"column": 86,
+									"character": 176
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 177,
+										"end": 179,
+										"raw": ".x",
+										"data": ".x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 186,
+							"end": 190,
+							"raw": " te\n",
+							"data": " te\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 194,
+				"end": 196,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 196,
+				"end": 348,
+				"data": " literal non-breaking space, exactly 101: \"tex\" tips past printWidth; the NBSP stays glued, so the break is the closing > (hug), never the space "
+			},
+			{
+				"type": "Text",
+				"start": 348,
+				"end": 349,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 349,
+				"end": 463,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 350
+					},
+					"end": {
+						"line": 7,
+						"column": 2,
+						"character": 351
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 352,
+							"end": 434,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaa ",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaa "
+						},
+						{
+							"type": "RegularElement",
+							"start": 434,
+							"end": 454,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 82,
+									"character": 435
+								},
+								"end": {
+									"line": 8,
+									"column": 86,
+									"character": 439
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 440,
+										"end": 447,
+										"raw": "\n\t\t.x\n\t",
+										"data": "\n\t\t.x\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 454,
+							"end": 459,
+							"raw": " tex\n",
+							"data": " tex\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 463,
+				"end": 465,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 465,
+				"end": 537,
+				"data": " &nbsp; entity, exactly 100: glues \"te\" to </code>, stays inline "
+			},
+			{
+				"type": "Text",
+				"start": 537,
+				"end": 538,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 538,
+				"end": 646,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 539
+					},
+					"end": {
+						"line": 14,
+						"column": 2,
+						"character": 540
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 541,
+							"end": 618,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 ",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 618,
+							"end": 633,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 15,
+									"column": 77,
+									"character": 619
+								},
+								"end": {
+									"line": 15,
+									"column": 81,
+									"character": 623
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 624,
+										"end": 626,
+										"raw": ".x",
+										"data": ".x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 633,
+							"end": 642,
+							"raw": "&nbsp;te\n",
+							"data": " te\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 646,
+				"end": 648,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 648,
+				"end": 790,
+				"data": " &nbsp; entity, exactly 101: \"tex\" tips past printWidth; the entity stays glued, so the break is the closing > (hug), never the entity "
+			},
+			{
+				"type": "Text",
+				"start": 790,
+				"end": 791,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 791,
+				"end": 905,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 19,
+						"column": 1,
+						"character": 792
+					},
+					"end": {
+						"line": 19,
+						"column": 2,
+						"character": 793
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 794,
+							"end": 871,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 ",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 871,
+							"end": 891,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 20,
+									"column": 77,
+									"character": 872
+								},
+								"end": {
+									"line": 20,
+									"column": 81,
+									"character": 876
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 877,
+										"end": 884,
+										"raw": "\n\t\t.x\n\t",
+										"data": "\n\t\t.x\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 891,
+							"end": 901,
+							"raw": "&nbsp;tex\n",
+							"data": " tex\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

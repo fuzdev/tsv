@@ -42,6 +42,13 @@
 					"type": "Fragment",
 					"nodes": [
 						{
+							"type": "Text",
+							"start": 35,
+							"end": 37,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
 							"type": "AwaitBlock",
 							"start": 37,
 							"end": 160,
@@ -52,11 +59,11 @@
 								"loc": {
 									"start": {
 										"line": 3,
-										"column": 10
+										"column": 9
 									},
 									"end": {
 										"line": 3,
-										"column": 17
+										"column": 16
 									}
 								},
 								"name": "promise"
@@ -69,12 +76,12 @@
 								"loc": {
 									"start": {
 										"line": 3,
-										"column": 23,
+										"column": 22,
 										"character": 58
 									},
 									"end": {
 										"line": 3,
-										"column": 28,
+										"column": 27,
 										"character": 63
 									}
 								}
@@ -320,6 +327,13 @@
 								]
 							},
 							"catch": null
+						},
+						{
+							"type": "Text",
+							"start": 160,
+							"end": 161,
+							"raw": "\n",
+							"data": "\n"
 						}
 					]
 				}
@@ -366,6 +380,13 @@
 					"type": "Fragment",
 					"nodes": [
 						{
+							"type": "Text",
+							"start": 211,
+							"end": 213,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
 							"type": "AwaitBlock",
 							"start": 213,
 							"end": 337,
@@ -376,11 +397,11 @@
 								"loc": {
 									"start": {
 										"line": 10,
-										"column": 10
+										"column": 9
 									},
 									"end": {
 										"line": 10,
-										"column": 17
+										"column": 16
 									}
 								},
 								"name": "promise"
@@ -394,12 +415,12 @@
 								"loc": {
 									"start": {
 										"line": 10,
-										"column": 24,
+										"column": 23,
 										"character": 235
 									},
 									"end": {
 										"line": 10,
-										"column": 29,
+										"column": 28,
 										"character": 240
 									}
 								}
@@ -644,6 +665,13 @@
 									}
 								]
 							}
+						},
+						{
+							"type": "Text",
+							"start": 337,
+							"end": 338,
+							"raw": "\n",
+							"data": "\n"
 						}
 					]
 				}

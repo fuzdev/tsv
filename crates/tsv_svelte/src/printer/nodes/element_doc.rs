@@ -594,146 +594,35 @@ impl<'a> Printer<'a> {
             d.hardline()
         };
 
-        // Hug both sides: ><content></tag\n>
-        // When attrs break, > stays inline with last attr:
-        //   <Comp
-        //     attr="val"><body></Comp
-        //   >
-        // Structure: <tag, indent([attrs]), >, body, </tag, softline, >
-        // The > immediately follows attrs (no softline before it)
+        // Block-style content (shared by the no-attrs and with-attrs paths via
+        // `build_inline_block_style`): both tags intact, content on its own indented line(s),
+        // collapsing to `<tag…>content</tag>` when it fits. `force` makes the content
+        // always-multiline (hardline boundaries) when an expanding control-flow block (if/each/key,
+        // or nested in await), a non-inline snippet body, or another multiline trigger is present;
+        // otherwise the softline boundaries collapse-when-fits. Computed once for both paths.
+        // (A control-flow-bearing *child* element already carries a hardline that propagates
+        // `will_break`, so it needs no separate force term; `source_has_leading_break` is impossible
+        // on the Hug/Hug path — there is no leading boundary break — so it is dropped too.)
+        let force = super::helpers::has_any_expanding_blocks(&element.fragment.nodes)
+            || (ctx.has_block_flow_children && self.block_flow_forces_multiline(element))
+            || ctx.needs_multiline;
+
         if !has_attrs {
-            // No attrs - structure depends on whether we need to force breaks
-            // Check if children contain elements that will produce multiline output
-            // (e.g., inner spans with block flow children)
-            let has_multiline_element_children = element.fragment.nodes.iter().any(|n| {
-                if let FragmentNode::Element(child_el) = n {
-                    // Check if child element has block flow that forces multiline
-                    child_el
-                        .fragment
-                        .nodes
-                        .iter()
-                        .any(super::helpers::is_control_flow_block)
-                } else {
-                    false
-                }
-            });
-
-            // Force multiline when:
-            // - Expanding control flow blocks (if, each, key) - always force break
-            //   Note: await blocks do NOT force break - they stay inline in inline elements
-            // - Expanding blocks nested inside await blocks also force break
-            // - Snippet blocks only force break when their content is not inline
-            // - Content needs multiline (multiple blocks, mixed content, source breaks)
-            // - Source has leading break (preserve author's multiline structure)
-            // - Children contain elements that will be multiline
-            let has_expanding_blocks =
-                super::helpers::has_any_expanding_blocks(&element.fragment.nodes);
-            let snippet_forces_break =
-                ctx.has_block_flow_children && self.block_flow_forces_multiline(element);
-            let force_break = has_expanding_blocks
-                || snippet_forces_break
-                || ctx.needs_multiline
-                || ctx.source_has_leading_break
-                || has_multiline_element_children;
-
-            if force_break {
-                // Block flow or multiline: use hardlines with indent
-                let inner_group = d.group(d.concat(&[
-                    d.text(">"),
-                    children_doc,
-                    d.text("</"),
-                    d.symbol(tag_sym),
-                ]));
-                let hugged_content = d.concat(&[d.hardline(), inner_group]);
-
-                let hugged = if ctx.is_empty {
-                    d.group(hugged_content)
-                } else {
-                    d.indent(hugged_content)
-                };
-                d.group(d.concat(&[
-                    d.text("<"),
-                    d.symbol(tag_sym),
-                    hugged,
-                    close_break_hard,
-                    close_gt,
-                ]))
-            } else {
-                // Check if any expression has internal break points (ternary, &&, ||, +, etc.)
-                // When breakable expressions exist, keep opening bracket hugging so expression
-                // breaks are preferred over bracket breaks (reduces indentation drift).
-                let has_breakable_expressions =
-                    Self::nodes_have_breakable_expression(&element.fragment.nodes);
-
-                if has_breakable_expressions {
-                    // Breakable expressions: keep opening hugging, expressions break internally
-                    // This reduces indentation drift (1 less tab level) - intentional divergence
-                    d.group(d.concat(&[
-                        d.text("<"),
-                        d.symbol(tag_sym),
-                        d.text(">"),
-                        children_doc,
-                        d.text("</"),
-                        d.symbol(tag_sym),
-                        close_break_soft,
-                        close_gt,
-                    ]))
-                } else {
-                    // Text content flows like a paragraph: keep the opening tag intact and let
-                    // the text wrap after `>` at its internal spaces — text has break points
-                    // everywhere, so no opening-`>` dangle is needed. Only the closing `>` may
-                    // dangle. Element/expression first children keep the dangle (the `else` arm):
-                    // they are atomic, so the dangle avoids whitespace injection and communicates
-                    // nesting. This diverges from prettier, which pre-breaks the opening tag
-                    // uniformly — see conformance_prettier.md "Inline text content tags intact".
-                    // Attach only when the leading text has an *internal* break point (ASCII
-                    // whitespace): the fill can then wrap to keep every line within printWidth.
-                    // An unbreakable leading token (single word, or non-breaking-space-joined text)
-                    // has nowhere to wrap, so attaching `<tag>token</tag` could overshoot — keep the
-                    // dangle, which gives the token its own line and more room.
-                    let first_text_wraps = matches!(
-                        element.fragment.nodes.first(),
-                        Some(FragmentNode::Text(t))
-                            if t.raw.trim_ascii().contains(|c: char| c.is_ascii_whitespace())
-                    );
-                    if first_text_wraps {
-                        let body =
-                            d.indent(d.concat(&[children_doc, d.text("</"), d.symbol(tag_sym)]));
-                        d.group(d.concat(&[
-                            d.text("<"),
-                            d.symbol(tag_sym),
-                            d.text(">"),
-                            body,
-                            close_break_soft,
-                            close_gt,
-                        ]))
-                    } else {
-                        // Element/expression first child: the inner group keeps content together,
-                        // the outer group lets the closing > break independently. The softline
-                        // before ">content</tag" is also critical for fits(): when trailing content
-                        // (e.g., an IfBlock) is on the rest-commands stack in Break mode, fits()
-                        // hits it early and returns true, keeping the element flat.
-                        let inner_group = d.group(d.concat(&[
-                            d.softline(),
-                            d.text(">"),
-                            children_doc,
-                            d.text("</"),
-                            d.symbol(tag_sym),
-                        ]));
-                        let indent_inner = d.indent(inner_group);
-                        d.group(d.concat(&[
-                            d.text("<"),
-                            d.symbol(tag_sym),
-                            indent_inner,
-                            close_break_soft,
-                            close_gt,
-                        ]))
-                    }
-                }
-            }
+            // Opening is just `<tag`. Content-boundary whitespace is render-free under Svelte 5,
+            // so the softline boundaries are injected freely — replacing the former opening-attach /
+            // closing-`>` dangle pyramid. See conformance_prettier.md + the inline-layout lore.
+            let opening = d.concat(&[d.text("<"), d.symbol(tag_sym)]);
+            self.build_inline_block_style(
+                opening,
+                tag_sym,
+                children_doc,
+                force,
+                close_break_soft,
+                close_break_hard,
+                close_gt,
+            )
         } else {
-            // With attrs - layout depends on whether there are block flow children
-            // Rebuild attr_docs since we're in a different branch
+            // Rebuild attr_docs since we're in a different branch.
             let hug_attr_docs = self.build_element_attrs_doc(
                 &element.attributes,
                 self.d().line(),
@@ -741,146 +630,107 @@ impl<'a> Printer<'a> {
                 element.open_tag_end,
                 is_html,
             );
-            // Expanding blocks (if/each/key) always force multiline
-            // Note: await blocks do NOT force multiline - they stay inline in inline elements
-            // But expanding blocks nested inside await blocks DO force multiline
-            // Snippet blocks only force multiline when content is not inline
-            let has_expanding_blocks =
-                super::helpers::has_any_expanding_blocks(&element.fragment.nodes);
-            let snippet_forces_break =
-                ctx.has_block_flow_children && self.block_flow_forces_multiline(element);
-            if has_expanding_blocks || snippet_forces_break {
-                // Block flow forces multiline: > on new line after attrs
-                // <span attr="val"
-                //     >{#if ...}{/if}</span
-                // >
-                // Use nested group for opening tag to keep attrs flat
-                let attr_concat = d.concat(&hug_attr_docs);
-                let attr_indent = d.indent(attr_concat);
-                let inner_group = d.group(d.concat(&[d.text("<"), d.symbol(tag_sym), attr_indent]));
-                let body_indent = d.indent(d.concat(&[
-                    d.hardline(),
-                    d.text(">"),
-                    children_doc,
-                    d.text("</"),
+            // Empty inline/component elements keep the hug-mode conditional group (nothing to lay
+            // out block-style). Likely unreachable — `is_empty` routes to `ElementLayout::Empty`
+            // before `build_content_element_doc`/`build_hug_both_doc` — but kept defensively.
+            let is_inline_elem = ctx.kind.is_inline() || ctx.kind.is_component();
+            if is_inline_elem && ctx.is_empty {
+                // Empty: conditional group — 1: all inline `<tag attrs></tag>`, 2: attrs inline
+                // with `>` on its own line, 3: attrs each on their own line.
+                let closing = d.concat(&[d.text("></"), d.symbol(tag_sym), close_gt]);
+
+                let attr_concat1 = d.concat(&hug_attr_docs);
+                let attr_indent1 = d.indent(attr_concat1);
+                let inline_state =
+                    d.concat(&[d.text("<"), d.symbol(tag_sym), attr_indent1, closing]);
+
+                let hug_space_attrs = self.build_element_attrs_doc(
+                    &element.attributes,
+                    self.d().text(" "),
+                    element.name_span.end,
+                    element.open_tag_end,
+                    is_html,
+                );
+                let hug_state = d.concat(&[
+                    d.text("<"),
                     d.symbol(tag_sym),
-                ]));
-                d.group(d.concat(&[inner_group, body_indent, close_break_hard, close_gt]))
+                    d.concat(&hug_space_attrs),
+                    d.hardline(),
+                    closing,
+                ]);
+
+                let attr_concat3 = d.concat(&hug_attr_docs);
+                let attr_indent3 = d.indent(attr_concat3);
+                let multiline_state = d.concat(&[
+                    d.text("<"),
+                    d.symbol(tag_sym),
+                    attr_indent3,
+                    d.hardline(),
+                    closing,
+                ]);
+
+                d.conditional_group(&[inline_state, hug_state, multiline_state])
             } else {
-                // No block flow - check if we need hug mode for inline elements
-                // Inline elements with long attrs use hug mode: attrs inline, > on new line
-                let is_inline_elem = ctx.kind.is_inline() || ctx.kind.is_component();
-                if is_inline_elem && ctx.is_empty {
-                    // Use conditional_group for proper hug mode:
-                    // 1. All inline: <tag attrs></tag>
-                    // 2. Hug mode: <tag attrs\n></tag> (attrs inline, > on new line)
-                    // 3. Full multiline: <tag\n\tattr\n></tag>
-                    let closing = d.concat(&[d.text("></"), d.symbol(tag_sym), close_gt]);
-
-                    // State 1: All inline
-                    let attr_concat1 = d.concat(&hug_attr_docs);
-                    let attr_indent1 = d.indent(attr_concat1);
-                    let inline_state =
-                        d.concat(&[d.text("<"), d.symbol(tag_sym), attr_indent1, closing]);
-
-                    // State 2: Hug mode - attrs inline (space-separated), > on new line
-                    let hug_space_attrs = self.build_element_attrs_doc(
-                        &element.attributes,
-                        self.d().text(" "),
-                        element.name_span.end,
-                        element.open_tag_end,
-                        is_html,
-                    );
-                    let hug_state = d.concat(&[
-                        d.text("<"),
-                        d.symbol(tag_sym),
-                        d.concat(&hug_space_attrs),
-                        d.hardline(),
-                        closing,
-                    ]);
-
-                    // State 3: Full multiline - attrs on separate lines, > on new line
-                    let attr_concat3 = d.concat(&hug_attr_docs);
-                    let attr_indent3 = d.indent(attr_concat3);
-                    let multiline_state = d.concat(&[
-                        d.text("<"),
-                        d.symbol(tag_sym),
-                        attr_indent3,
-                        d.hardline(),
-                        closing,
-                    ]);
-
-                    d.conditional_group(&[inline_state, hug_state, multiline_state])
-                } else if ctx.kind.is_component() {
-                    // Components with hugging content: structure like Prettier
-                    //
-                    // group([
-                    //   <Name
-                    //   indent(group(attrs))
-                    //   group(indent([softline, group([> content </Name])])),
-                    //   softline,
-                    //   >
-                    // ])
-                    //
-                    // When attrs break, softline before > becomes newline, putting > on its own line.
-                    // When attrs fit, everything stays inline.
-                    let inner_inner_group = d.group(d.concat(&[
-                        d.text(">"),
-                        children_doc,
-                        d.text("</"),
-                        d.symbol(tag_sym),
-                    ]));
-                    let indent_inner = d.indent(d.concat(&[d.softline(), inner_inner_group]));
-                    let hugged_content = d.group(indent_inner);
-                    let attr_group = d.group(d.concat(&hug_attr_docs));
-                    let attr_indent = d.indent(attr_group);
-                    d.group(d.concat(&[
-                        d.text("<"),
-                        d.symbol(tag_sym),
-                        attr_indent,
-                        hugged_content,
-                        close_break_soft,
-                        close_gt,
-                    ]))
-                } else {
-                    // HTML elements with content - use nested groups for breaking:
-                    // - Outer group: controls whether content goes on new line
-                    // - Inner group (around attrs): controls whether attrs break
-                    //
-                    // This produces 4 possible outputs:
-                    // 1. Inline: <tag attrs>content</tag>
-                    // 2. Content breaks: <tag attrs\n\t>content</tag\n>
-                    // 3. Attrs break: <tag\n\tattrs>content</tag> (attrs break, body hugs)
-                    // 4. Both break: <tag\n\tattrs\n\t>content</tag\n>
-                    //
-                    // Note: body doesn't include trailing > since it's outside for hug mode
-                    // (Text-first opening-`>` attach is NOT applied to the with-attrs case. The
-                    // delimiter-dangle MECHANISM is shared with blocks — `group_with_id` on the
-                    // attrs + `if_break_with_id` on `>`, exactly like the block `}` keyed on its
-                    // head — but inline content FLOWS on the tag lines with no hardline barrier, so
-                    // the `>`-attach couples to content wrapping AND the closing-`>` dangle; that
-                    // coupling produced fresh non-idempotencies (long-href attr-wrap; closing-`>`
-                    // flip on mixed text+`{expr}`). Blocks avoid this because their body is
-                    // hardline-separated. Robustly attaching with attrs needs the content decoupled
-                    // first — the Svelte-5 block-style content direction — so it is deferred. The
-                    // no-attrs text attach in the `!has_attrs` branch above has no attr interaction
-                    // and is idempotent.
-                    let html_body =
-                        d.concat(&[d.text(">"), children_doc, d.text("</"), d.symbol(tag_sym)]);
-                    let attr_group = d.group(d.concat(&hug_attr_docs));
-                    let attr_indent = d.indent(attr_group);
-                    let body_indent_softline = d.group(d.indent_softline(html_body));
-                    d.group(d.concat(&[
-                        d.text("<"),
-                        d.symbol(tag_sym),
-                        attr_indent,
-                        body_indent_softline,
-                        close_break_soft,
-                        close_gt,
-                    ]))
-                }
+                // `build_opening_tag(hug_start=false)` makes the `>` attr-keyed: it hugs the last
+                // attr when attrs fit and dedents to its own line when they wrap. The attr group and
+                // the content group are SEPARATE, so attr-wrapping and content-wrapping decouple —
+                // the decoupling that makes the with-attrs case idempotent now that content no
+                // longer flows on the tag lines. See conformance_prettier.md + the inline-layout lore.
+                let opening = self.build_opening_tag(
+                    tag_sym,
+                    &hug_attr_docs,
+                    false,
+                    false,
+                    ctx.has_multiline_attr,
+                );
+                self.build_inline_block_style(
+                    opening,
+                    tag_sym,
+                    children_doc,
+                    force,
+                    close_break_soft,
+                    close_break_hard,
+                    close_gt,
+                )
             }
         }
+    }
+
+    /// Block-style inline content, shared by the no-attrs and with-attrs paths of
+    /// [`Self::build_hug_both_doc`]. `opening` is everything before the content's `>` (`<tag` for
+    /// no-attrs, the attr-keyed `build_opening_tag(…)` for attrs); this appends `>`, puts the
+    /// content on its own indented line(s) — collapsing to `<…>content</tag>` when it fits — and
+    /// closes with `</tag>`. `force` ⇒ always multiline (hardline boundaries); otherwise softline
+    /// collapses-when-fits. The `close_*` args carry the external-close state (all empty when the
+    /// trailing `>` is emitted elsewhere — the sibling-`>` dangle).
+    #[allow(clippy::too_many_arguments)]
+    fn build_inline_block_style(
+        &self,
+        opening: DocId,
+        tag_sym: u32,
+        children_doc: DocId,
+        force: bool,
+        close_break_soft: DocId,
+        close_break_hard: DocId,
+        close_gt: DocId,
+    ) -> DocId {
+        let d = self.d();
+        let leading = if force { d.hardline() } else { d.softline() };
+        let trailing = if force {
+            close_break_hard
+        } else {
+            close_break_soft
+        };
+        let body = d.indent(d.concat(&[leading, children_doc]));
+        d.group(d.concat(&[
+            opening,
+            d.text(">"),
+            body,
+            trailing,
+            d.text("</"),
+            d.symbol(tag_sym),
+            close_gt,
+        ]))
     }
 
     fn first_child_has_leading_ws(nodes: &[FragmentNode]) -> bool {
@@ -2102,9 +1952,13 @@ impl<'a> Printer<'a> {
             return true;
         }
 
-        // Block elements with expanding blocks (if/each/key, or those inside await) always expand
-        // Note: await blocks alone do NOT force expansion in block elements
-        if kind.is_block() && super::helpers::has_any_expanding_blocks(&element.fragment.nodes) {
+        // Elements with expanding blocks (if/each/key, or those inside await) always expand to
+        // block-style multiline — inline elements too, not just block. The expanding block forces
+        // block-style layout in `build_hug_both_doc` regardless; matching `needs_multiline` here so
+        // the children are *built* multiline (one node per line) keeps the expanding block from
+        // overshooting printWidth when authored compactly (it would otherwise flow inline).
+        // Note: await blocks alone do NOT force expansion.
+        if super::helpers::has_any_expanding_blocks(&element.fragment.nodes) {
             return true;
         }
 

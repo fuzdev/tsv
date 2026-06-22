@@ -29,6 +29,13 @@
 					"type": "Fragment",
 					"nodes": [
 						{
+							"type": "Text",
+							"start": 11,
+							"end": 13,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
 							"type": "SnippetBlock",
 							"start": 13,
 							"end": 126,
@@ -40,12 +47,12 @@
 								"loc": {
 									"start": {
 										"line": 2,
-										"column": 12,
+										"column": 11,
 										"character": 23
 									},
 									"end": {
 										"line": 2,
-										"column": 14,
+										"column": 13,
 										"character": 25
 									}
 								}
@@ -289,6 +296,13 @@
 									}
 								]
 							}
+						},
+						{
+							"type": "Text",
+							"start": 126,
+							"end": 127,
+							"raw": "\n",
+							"data": "\n"
 						}
 					]
 				}

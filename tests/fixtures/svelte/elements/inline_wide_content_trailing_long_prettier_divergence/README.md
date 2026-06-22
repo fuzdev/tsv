@@ -5,36 +5,35 @@ trailing text authored with a **space** boundary, inside a block (`<p>`). Covers
 (no attributes) and an `<a>` (short `href`) — the divergence is the same for both. The
 newline-authored counterpart is the sibling `inline_wide_content_trailing_newline_long`.
 
-tsv treats printWidth as a hard limit: the over-wide content wraps **inside** the element so every
-line stays ≤100, and the trailing text **hugs** the dangled closing `>` (`</tag⏎> tail`), respecting
-the author's space. The no-attribute `<strong>` keeps its **opening tag attached** (`<strong>word…`,
-text flows after `>`); the attributed `<a>` still dangles its opening `>` for now — the with-attrs
-opening-attach is a pending follow-up (attrs-wrap makes the naive form non-idempotent). The two
-`unformatted_ours_*` variants pin idempotence: the single-line `unformatted_ours_compact` and the
-multiline-authored `unformatted_ours_multiline` both normalize to `input.svelte` in one pass.
+tsv lays the content out **block-style**: both tags stay intact and the over-wide content wraps on
+its own indented line(s) so every line stays ≤100. The space-authored trailing text **hugs the
+intact closing tag** (`</tag> tail`), respecting the author's space; a newline boundary instead
+keeps the text on its own line (the sibling fixture). The two `unformatted_ours_*` variants pin
+idempotence: the single-line `unformatted_ours_compact` and the multiline-authored
+`unformatted_ours_multiline` both normalize to `input.svelte` in one pass.
 
-Prettier keeps the content on a **single over-width line** (`>…content…</tag`) — it lets the
-content exceed printWidth rather than wrap it — but hugs the trailing text the same way
-(`output_prettier.svelte`), so the **sole divergence is the content wrap**.
+Prettier keeps the content on a **single over-width line** and **dangles** the tag delimiters
+(`>…content…</tag`) rather than laying out block-style, letting the content exceed printWidth; it
+hugs the trailing text the same way. So the **sole divergence is the block-style content layout**.
 
 ```
-tsv:       content wraps across lines (≤100), trailing text hugs `> tail`
-Prettier:  content on one line (>100),        trailing text hugs `> tail`
+tsv:       content lays out block-style (≤100), trailing space hugs `</tag> tail`
+Prettier:  content on one over-width line,       trailing space hugs the dangled `> tail`
 ```
 
 ## Reason
 
 Two deliberate choices:
 
-1. **Content wraps** — tsv keeps printWidth a hard limit and wraps the element's content rather
-   than emitting prettier's single over-width line. (The content wrap is the only difference from
-   prettier here.)
-2. **Trailing text hugs the dangled `>`** — tsv treats the boundary whitespace before trailing
-   text as a **meaningful authoring choice**, not noise to normalize away. A *space* (`</tag> tail`)
-   means "keep the text attached," so tsv flows it onto the dangled-`>` line; a *newline*
-   (`</tag>⏎tail`, the sibling fixture) means "put it below," so tsv keeps it on its own line. This
-   is exactly how a *short* inline element already behaves (`<el>x</el> tail` for a space,
-   own-line for a newline) — wide and short elements now treat the boundary the same way.
+1. **Block-style content** — tsv keeps printWidth a hard limit and lays the element out block-style
+   (both tags intact, content on its own indented line) rather than emitting prettier's single
+   over-width dangled line.
+2. **Trailing text follows the authored boundary** — tsv treats the boundary whitespace before
+   trailing text as a **meaningful authoring choice**, not noise to normalize away. A *space*
+   (`</tag> tail`) means "keep the text attached," so tsv hugs it onto the closing-tag line; a
+   *newline* (`</tag>⏎tail`, the sibling fixture) means "put it below," so tsv keeps it on its own
+   line. This is exactly how a *short* inline element already behaves — wide and short elements treat
+   the boundary the same way.
 
    This deliberately makes the wide case authoring-*dependent* (space ≠ newline), the same as the
    short case and the same as Prettier here (Prettier hugs a space, breaks a newline). tsv is *not*
@@ -43,4 +42,4 @@ Two deliberate choices:
    reserved for cases where one authoring would be degenerate — over-width, a split tag, or an
    unstable form — e.g. the non-terminal cascade in `inline_wide_content_text_sibling_long`.)
 
-See [conformance_prettier.md §Svelte: Elements](../../../../../docs/conformance_prettier.md#svelte-elements).
+See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).

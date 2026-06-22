@@ -5,9 +5,8 @@
      stays on its own line — hugging it is non-convergent (it shifts the following element's fit).
      prettier agrees on the `mid` line, so the divergence is purely the content wrap. -->
 <p>
-	<a href="#"
-		>alpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november
-		oscar</a
-	>
+	<a href="#">
+		alpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar
+	</a>
 	mid <b>x</b>
 </p>

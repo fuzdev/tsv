@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 845,
+	"end": 847,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -23,7 +23,7 @@
 			{
 				"type": "RegularElement",
 				"start": 82,
-				"end": 213,
+				"end": 215,
 				"name": "span",
 				"name_loc": {
 					"start": {
@@ -44,48 +44,48 @@
 						{
 							"type": "Text",
 							"start": 88,
-							"end": 205,
-							"raw": "word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14\n\tword15 word16 word17 word18",
-							"data": "word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14\n\tword15 word16 word17 word18"
+							"end": 208,
+							"raw": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15\n\tword16 word17 word18\n",
+							"data": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15\n\tword16 word17 word18\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 213,
-				"end": 215,
+				"start": 215,
+				"end": 217,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 215,
-				"end": 302,
+				"start": 217,
+				"end": 304,
 				"data": " Non-breaking spaces (U+00A0) are not break points: long text stays on one line "
 			},
 			{
 				"type": "Text",
-				"start": 302,
-				"end": 303,
+				"start": 304,
+				"end": 305,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 303,
-				"end": 435,
+				"start": 305,
+				"end": 437,
 				"name": "span",
 				"name_loc": {
 					"start": {
-						"line": 7,
+						"line": 8,
 						"column": 1,
-						"character": 304
+						"character": 306
 					},
 					"end": {
-						"line": 7,
+						"line": 8,
 						"column": 5,
-						"character": 308
+						"character": 310
 					}
 				},
 				"attributes": [],
@@ -95,48 +95,48 @@
 						{
 							"type": "Text",
 							"start": 311,
-							"end": 427,
-							"raw": "word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15 word16 word17 word18",
-							"data": "word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15 word16 word17 word18"
+							"end": 430,
+							"raw": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15 word16 word17 word18\n",
+							"data": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15 word16 word17 word18\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 435,
-				"end": 437,
+				"start": 437,
+				"end": 439,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 437,
-				"end": 502,
+				"start": 439,
+				"end": 504,
 				"data": " Narrow non-breaking space (U+202F) is preserved verbatim "
 			},
 			{
 				"type": "Text",
-				"start": 502,
-				"end": 503,
+				"start": 504,
+				"end": 505,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 503,
-				"end": 527,
+				"start": 505,
+				"end": 529,
 				"name": "span",
 				"name_loc": {
 					"start": {
-						"line": 12,
+						"line": 13,
 						"column": 1,
-						"character": 504
+						"character": 506
 					},
 					"end": {
-						"line": 12,
+						"line": 13,
 						"column": 5,
-						"character": 508
+						"character": 510
 					}
 				},
 				"attributes": [],
@@ -145,8 +145,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 509,
-							"end": 520,
+							"start": 511,
+							"end": 522,
 							"raw": "Prix : 32 €",
 							"data": "Prix : 32 €"
 						}
@@ -155,39 +155,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 527,
-				"end": 529,
+				"start": 529,
+				"end": 531,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 529,
-				"end": 610,
+				"start": 531,
+				"end": 612,
 				"data": " Leading non-breaking space is preserved, not turned into a regular space "
 			},
 			{
 				"type": "Text",
-				"start": 610,
-				"end": 611,
+				"start": 612,
+				"end": 613,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 611,
-				"end": 636,
+				"start": 613,
+				"end": 638,
 				"name": "span",
 				"name_loc": {
 					"start": {
-						"line": 15,
+						"line": 16,
 						"column": 1,
-						"character": 612
+						"character": 614
 					},
 					"end": {
-						"line": 15,
+						"line": 16,
 						"column": 5,
-						"character": 616
+						"character": 618
 					}
 				},
 				"attributes": [],
@@ -196,8 +196,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 617,
-							"end": 629,
+							"start": 619,
+							"end": 631,
 							"raw": " word1 word2",
 							"data": " word1 word2"
 						}
@@ -206,39 +206,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 636,
-				"end": 638,
+				"start": 638,
+				"end": 640,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 638,
-				"end": 720,
+				"start": 640,
+				"end": 722,
 				"data": " Trailing non-breaking space is preserved, not turned into a regular space "
 			},
 			{
 				"type": "Text",
-				"start": 720,
-				"end": 721,
+				"start": 722,
+				"end": 723,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 721,
-				"end": 746,
+				"start": 723,
+				"end": 748,
 				"name": "span",
 				"name_loc": {
 					"start": {
-						"line": 18,
+						"line": 19,
 						"column": 1,
-						"character": 722
+						"character": 724
 					},
 					"end": {
-						"line": 18,
+						"line": 19,
 						"column": 5,
-						"character": 726
+						"character": 728
 					}
 				},
 				"attributes": [],
@@ -247,8 +247,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 727,
-							"end": 739,
+							"start": 729,
+							"end": 741,
 							"raw": "word1 word2 ",
 							"data": "word1 word2 "
 						}
@@ -257,21 +257,21 @@
 			},
 			{
 				"type": "Text",
-				"start": 746,
-				"end": 748,
+				"start": 748,
+				"end": 750,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 748,
-				"end": 828,
+				"start": 750,
+				"end": 830,
 				"data": " Root-level text: non-breaking spaces preserved, regular spaces collapse "
 			},
 			{
 				"type": "Text",
-				"start": 828,
-				"end": 844,
+				"start": 830,
+				"end": 846,
 				"raw": "\nfoo bar baz qux",
 				"data": "\nfoo bar baz qux"
 			}

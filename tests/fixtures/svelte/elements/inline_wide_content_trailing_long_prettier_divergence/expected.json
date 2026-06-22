@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 774,
+	"end": 773,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -23,7 +23,7 @@
 			{
 				"type": "RegularElement",
 				"start": 511,
-				"end": 640,
+				"end": 641,
 				"name": "p",
 				"name_loc": {
 					"start": {
@@ -51,7 +51,7 @@
 						{
 							"type": "RegularElement",
 							"start": 516,
-							"end": 630,
+							"end": 631,
 							"name": "strong",
 							"name_loc": {
 								"start": {
@@ -72,17 +72,17 @@
 									{
 										"type": "Text",
 										"start": 524,
-										"end": 619,
-										"raw": "alpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november\n\t\toscar",
-										"data": "alpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november\n\t\toscar"
+										"end": 622,
+										"raw": "\n\t\talpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar\n\t",
+										"data": "\n\t\talpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar\n\t"
 									}
 								]
 							}
 						},
 						{
 							"type": "Text",
-							"start": 630,
-							"end": 636,
+							"start": 631,
+							"end": 637,
 							"raw": " tail\n",
 							"data": " tail\n"
 						}
@@ -91,26 +91,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 640,
-				"end": 642,
+				"start": 641,
+				"end": 643,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 642,
-				"end": 773,
+				"start": 643,
+				"end": 772,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 13,
 						"column": 1,
-						"character": 643
+						"character": 644
 					},
 					"end": {
 						"line": 13,
 						"column": 2,
-						"character": 644
+						"character": 645
 					}
 				},
 				"attributes": [],
@@ -119,50 +119,50 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 645,
-							"end": 647,
+							"start": 646,
+							"end": 648,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 647,
-							"end": 763,
+							"start": 648,
+							"end": 762,
 							"name": "a",
 							"name_loc": {
 								"start": {
 									"line": 14,
 									"column": 2,
-									"character": 648
+									"character": 649
 								},
 								"end": {
 									"line": 14,
 									"column": 3,
-									"character": 649
+									"character": 650
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 650,
-									"end": 658,
+									"start": 651,
+									"end": 659,
 									"name": "href",
 									"name_loc": {
 										"start": {
 											"line": 14,
 											"column": 4,
-											"character": 650
+											"character": 651
 										},
 										"end": {
 											"line": 14,
 											"column": 8,
-											"character": 654
+											"character": 655
 										}
 									},
 									"value": [
 										{
-											"start": 656,
-											"end": 657,
+											"start": 657,
+											"end": 658,
 											"type": "Text",
 											"raw": "#",
 											"data": "#"
@@ -175,18 +175,18 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 662,
-										"end": 757,
-										"raw": "november oscar papa quebec romeo sierra tango uniform victor whiskey xray yankee zulu\n\t\tabcdefg",
-										"data": "november oscar papa quebec romeo sierra tango uniform victor whiskey xray yankee zulu\n\t\tabcdefg"
+										"start": 660,
+										"end": 758,
+										"raw": "\n\t\tnovember oscar papa quebec romeo sierra tango uniform victor whiskey xray yankee zulu abcdefg\n\t",
+										"data": "\n\t\tnovember oscar papa quebec romeo sierra tango uniform victor whiskey xray yankee zulu abcdefg\n\t"
 									}
 								]
 							}
 						},
 						{
 							"type": "Text",
-							"start": 763,
-							"end": 769,
+							"start": 762,
+							"end": 768,
 							"raw": " tail\n",
 							"data": " tail\n"
 						}

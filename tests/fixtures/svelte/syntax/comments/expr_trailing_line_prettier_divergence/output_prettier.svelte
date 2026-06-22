@@ -21,6 +21,6 @@
 <input bind:value={val} />
 <div {@attach fn}></div>
 <div data-attr={expr}></div>
-<button on:click={fn}>text</button>
+<button on:click={fn}> text </button>
 <div class:class1={cond}></div>
 <div use:fn={expr}></div>
