@@ -51,8 +51,12 @@ impl TsFixtureAuditCommand {
 /// dissolve coverage. Matched by relative-path suffix.
 const INTENTIONAL_TS: &[(&str, &str)] = &[
     (
-        "typescript/syntax/comments/jsdoc_type_cast",
-        "standalone-TS proof that the JSDoc-cast paren divergence is Svelte-only (see conformance_prettier.md + jsdoc_type_cast_prettier_divergence/README.md)",
+        "typescript/syntax/comments/jsdoc_type_cast_ts_prettier_divergence",
+        "standalone-TS proof of the JSDoc-cast paren divergence: tsv preserves, prettier's oxc-ts strips. The JS-context match is jsdoc_type_cast_svelte (see conformance_prettier.md §JSDoc / paren semantics)",
+    ),
+    (
+        "typescript/syntax/comments/jsdoc_type_cast_ts",
+        "standalone-TS negative match for JSDoc casts (never-add parens, non-@type comments still strip, no double-wrap) — pins the tsv_ts + prettier-typescript path",
     ),
     (
         "typescript/types/function_type/open_paren_comment_prettier_divergence",

@@ -68,13 +68,13 @@ mkdir -p tests/fixtures/typescript/[category]/[name]
 **Choose input file type:**
 
 - `input.svelte` (preferred) - Tests code embedded in Svelte `<script>`/`<style>` context
-- `input.ts` (rare) - Only when a feature can't be tested in `.svelte`: byte-0 file-level features (hashbang, BOM) or context-dependent formatting (JSDoc cast paren stripping). TS-only _syntax_ (`import =`, `export =`, types, decorators, `declare`) is **not** a reason — it formats identically in `<script lang="ts">`. See [fixture_overview.md §Input File Types](./fixture_overview.md#input-file-types)
+- `input.ts` (rare) - Only when a feature can't be tested in `.svelte`: byte-0 file-level features (hashbang, BOM) or context-dependent formatting (e.g. the `<T>` vs `<T,>` arrow type-parameter trailing comma). TS-only _syntax_ (`import =`, `export =`, types, decorators, `declare`) is **not** a reason — it formats identically in `<script lang="ts">`. See [fixture_overview.md §Input File Types](./fixture_overview.md#input-file-types)
 - `input.css` (rare) - Only for file-level CSS features at byte position 0 (e.g., BOM)
 - `input.svelte.ts` (runes) - Svelte rune modules (`$state`, `$derived`, etc.)
 
 ⚠️ **Prefer `.svelte`** - it's the only path with an external canonical source for CSS. See [fixture_overview.md](./fixture_overview.md#why-svelte-is-the-default-canonical-source) for details.
 
-⚠️ **Prefer plain block comments over JSDoc** — When testing comment-related formatting (e.g., comment placement, paren stripping, blank line detection), use plain `/* comment */` instead of `/** @type {T} */` unless the fixture specifically tests JSDoc cast behavior. JSDoc casts have different paren-stripping behavior between Svelte and TypeScript contexts, which can obscure the real formatting issue being tested. Plain block comments trigger the same code paths without the context-dependent paren semantics.
+⚠️ **Prefer plain block comments over JSDoc** — When testing comment-related formatting (e.g., comment placement, blank line detection), use plain `/* comment */` instead of `/** @type {T} */` unless the fixture specifically tests JSDoc cast behavior. A JSDoc cast triggers paren *preservation* — a dedicated code path whose prettier-oracle behavior differs by parser backend (oxc-ts strips, babel keeps) — which can obscure the real formatting issue being tested. Plain block comments exercise the same comment-placement paths without the cast's preservation semantics.
 
 Write input content with:
 

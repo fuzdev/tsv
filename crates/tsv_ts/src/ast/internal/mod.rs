@@ -71,9 +71,9 @@ pub use statements::{
 pub use expressions::{
     ArrayExpression, ArrowFunctionBody, ArrowFunctionExpression, AssignmentExpression,
     AssignmentOperator, AwaitExpression, BinaryExpression, BinaryOperator, CallExpression,
-    ConditionalExpression, Expression, FunctionExpression, ImportExpression, MemberExpression,
-    MetaProperty, NewExpression, ObjectExpression, ObjectProperty, Property, PropertyKind,
-    RegexLiteral, SequenceExpression, SpreadElement, Super, TSAsExpression,
+    ConditionalExpression, Expression, FunctionExpression, ImportExpression, JsdocCast,
+    MemberExpression, MetaProperty, NewExpression, ObjectExpression, ObjectProperty, Property,
+    PropertyKind, RegexLiteral, SequenceExpression, SpreadElement, Super, TSAsExpression,
     TSInstantiationExpression, TSNonNullExpression, TSSatisfiesExpression, TSTypeAssertion,
     TaggedTemplateExpression, TemplateElement, TemplateLiteral, ThisExpression, UnaryExpression,
     UnaryOperator, UpdateExpression, UpdateOperator, YieldExpression,
