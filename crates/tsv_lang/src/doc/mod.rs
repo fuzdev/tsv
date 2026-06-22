@@ -394,7 +394,8 @@ mod arena_tests {
         let docs = vec![a.text("a"), a.text("b"), a.text("c")];
         let trailing = a.join_trailing(docs, sep);
         let doc = a.group(trailing);
-        assert_eq!(render_pw_spaces(&a, doc, 3), "a,\nb,\nc,");
+        // trailingComma: 'none' — no trailing comma when the list breaks
+        assert_eq!(render_pw_spaces(&a, doc, 3), "a,\nb,\nc");
     }
 
     #[test]
@@ -558,9 +559,10 @@ mod arena_tests {
         let sl2_2 = a2.softline();
         let doc2 = a2.group(a2.concat(&[a2.text("["), indented2, sl2_2, a2.text("]")]));
 
+        // trailingComma: 'none' — no trailing comma when the list breaks
         assert_eq!(
             render_pw_spaces(&a2, doc2, 15),
-            "[\n  item1,\n  item2,\n  item3,\n]"
+            "[\n  item1,\n  item2,\n  item3\n]"
         );
     }
 

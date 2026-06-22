@@ -26,3 +26,5 @@ strip the parens and use expand-last.
 
 - `prettier_variant_with_parens.svelte` — prettier-plugin-svelte's stable form
   with parens preserved. Our formatter normalizes to `input.svelte` (strips parens).
+
+See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §TypeScript (JSDoc cast expand-last).

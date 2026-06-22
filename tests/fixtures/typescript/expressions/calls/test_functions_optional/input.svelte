@@ -3,7 +3,7 @@
 	// normal call when long (prettier excludes optional calls from isTestCall).
 	describe?.(
 		'does something really long and complicated so I have to write a long test name',
-		() => {},
+		() => {}
 	);
 
 	// Short optional call still fits on one line.

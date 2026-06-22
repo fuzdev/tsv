@@ -1269,15 +1269,9 @@ impl<'a> Printer<'a> {
             || has_leading_own_line_comment
             || should_break_for_param_properties;
 
-        // Check if last param is a rest parameter - no trailing comma after rest
-        let has_rest_param = params
-            .last()
-            .is_some_and(|p| matches!(p, internal::Expression::RestElement(_)));
-
         let mut inner_parts = Vec::new();
-        // Block comment trailing the last param after the comma, when the comma is
-        // the synthetic trailing comma emitted after the loop (softline path) —
-        // preserved after it (prettier relocates before; see conformance_prettier.md).
+        // Block comment trailing the last param after its source comma — emitted past
+        // where the comma was, after the loop (no trailing comma; trailingComma: 'none').
         let mut last_after_comma_docs = Vec::new();
         for (i, param) in params.iter().enumerate() {
             let param_start = param.span().start;
@@ -1351,30 +1345,24 @@ impl<'a> Printer<'a> {
                 inner_parts.push(self.build_comment_doc(comment));
             }
 
-            // Add trailing comma
-            // For non-last params: always add comma (it's a separator)
-            // For last param: add comma if forcing break and not rest param
-            let needs_comma = !is_last || (force_break && !has_rest_param);
+            // Add inter-param separator comma (only between params; the last param
+            // gets no trailing comma — trailingComma: 'none').
+            let needs_comma = !is_last;
             if needs_comma {
                 inner_parts.push(d.text(","));
             }
 
-            // Block comments AFTER the comma on the last param: preserve after the
-            // comma. When the comma is emitted here (needs_comma), emit inline;
-            // otherwise it is the synthetic trailing comma below — defer.
+            // Block comments AFTER the comma on the last param: preserve their position.
+            // The last param has no trailing comma, so an after-comma block is deferred to
+            // last_after_comma_docs (emitted after the loop, past where the comma was).
             if is_last {
                 let after: Vec<_> = same_line_comments
                     .iter()
                     .filter(|c| c.is_block && comma_pos.is_some_and(|pos| c.span.start > pos))
                     .collect();
-                let sink = if needs_comma {
-                    &mut inner_parts
-                } else {
-                    &mut last_after_comma_docs
-                };
                 for comment in after {
-                    sink.push(d.text(" "));
-                    sink.push(self.build_comment_doc(comment));
+                    last_after_comma_docs.push(d.text(" "));
+                    last_after_comma_docs.push(self.build_comment_doc(comment));
                 }
             }
 
@@ -1400,15 +1388,15 @@ impl<'a> Printer<'a> {
         let mut result = vec![d.text("(")];
 
         if force_break {
-            // When forcing break (trailing comments or param properties), use hardlines
+            // When forcing break (trailing comments or param properties), use hardlines.
+            // No trailing comma (trailingComma: 'none'); a preserved after-comma block
+            // comment on the last param still lands past where the comma was.
+            inner_parts.append(&mut last_after_comma_docs);
             result.push(d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])));
             result.push(d.hardline());
         } else {
             result.push(d.indent_softline(d.concat(&inner_parts)));
-            // Trailing comma when broken, unless there's a rest param
-            if !has_rest_param {
-                result.push(d.trailing_comma());
-            }
+            // No trailing comma (trailingComma: 'none').
             // Preserved after-comma block comment(s) on the last param
             result.append(&mut last_after_comma_docs);
             result.push(d.softline());

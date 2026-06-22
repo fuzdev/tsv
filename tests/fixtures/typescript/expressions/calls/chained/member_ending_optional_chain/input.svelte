@@ -1,16 +1,16 @@
 <script lang="ts">
 	// Optional chain ending with member - object hugs inline
 	aaa?.bbb?.ccc({
-		prop: 'value',
+		prop: 'value'
 	})?.length;
 
 	// Longer optional chain
 	aaaaaaaa?.bbbbbbbb?.cccccccc({
-		prop: 'value',
+		prop: 'value'
 	})?.length;
 
 	// Mixed optional and regular
 	aaa.bbb?.ccc({
-		prop: 'value',
+		prop: 'value'
 	})?.length;
 </script>

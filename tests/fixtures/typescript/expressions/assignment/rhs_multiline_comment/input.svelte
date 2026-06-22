@@ -8,7 +8,7 @@
 			 */
 			(x) => {
 				return x;
-			},
+			}
 	};
 
 	// multiline block comment before value in variable declaration
@@ -26,12 +26,12 @@
 			/**
 			 * comment
 			 */
-			fn(),
+			fn()
 	};
 
 	// inline (single-line) block comment stays inline - no break
 	const z = {
-		a: /** inline */ fn(),
+		a: /** inline */ fn()
 	};
 
 	// inline block comment on variable declaration stays inline

@@ -9,7 +9,7 @@ it before the comma.
 // tsv                          // prettier
 new A(                          new A(
 	a, /* c1 */ // c2                 a /* c1 */, // c2
-	b,                                b,
+	b                                 b
 );                              );
 ```
 

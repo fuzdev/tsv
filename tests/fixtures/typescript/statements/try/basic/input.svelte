@@ -27,7 +27,7 @@
 
 	try {
 		expr;
-	} catch ({message}) {
+	} catch ({ message }) {
 		expr;
 	}
 </script>

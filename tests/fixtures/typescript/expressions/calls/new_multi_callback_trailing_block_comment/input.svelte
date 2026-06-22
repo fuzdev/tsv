@@ -1,6 +1,6 @@
 <script lang="ts">
 	new A(
 		() => {},
-		() => {} /* block comment */,
+		() => {} /* block comment */
 	);
 </script>

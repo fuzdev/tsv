@@ -4,7 +4,7 @@
 		'name', // comment
 		() => {
 			fn();
-		},
+		}
 	);
 
 	// Line comment before callback
@@ -13,6 +13,6 @@
 		// leading comment
 		() => {
 			fn();
-		},
+		}
 	);
 </script>

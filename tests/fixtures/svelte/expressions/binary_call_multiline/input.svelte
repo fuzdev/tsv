@@ -14,7 +14,7 @@
 						<button>
 							{a.b.c.fn(
 								aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-								bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb + '/',
+								bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb + '/'
 							) ?? 'text'}
 						</button>
 					</div>

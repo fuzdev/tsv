@@ -8,7 +8,7 @@
   <entry>
     <id>${item.id}</id>
     <title>${item.title}</title>
-  </entry>`,
+  </entry>`
 		)
 		.join('\n')}
 footer`;

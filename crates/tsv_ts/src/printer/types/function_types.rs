@@ -496,7 +496,6 @@ impl<'a> Printer<'a> {
                 let param_start = p.span().start;
                 let param_end = p.span().end;
                 let is_last = i == params.len() - 1;
-                let is_rest = matches!(p, internal::Expression::RestElement(_));
 
                 let skip_delim = if i == 0 { paren_pull_pos } else { None };
                 inner_parts.extend(self.build_leading_comments_multiline_opt(
@@ -515,9 +514,7 @@ impl<'a> Printer<'a> {
                     );
                 } else {
                     let close = close_paren_pos.unwrap_or(param_end);
-                    if !is_rest {
-                        inner_parts.push(d.text(","));
-                    }
+                    // No trailing comma after the last param (trailingComma: 'none').
                     inner_parts.extend(self.build_trailing_comments_multiline(param_end, close));
                 }
             }
@@ -832,8 +829,6 @@ impl<'a> Printer<'a> {
 
             inner_parts.push(self.build_function_type_param_expression_doc(p));
 
-            let is_rest = matches!(p, internal::Expression::RestElement(_));
-
             if !is_last {
                 let next_start = params[i + 1].span().start;
                 prev_end = self.emit_multiline_comma_with_comments(
@@ -842,13 +837,10 @@ impl<'a> Printer<'a> {
                     next_start,
                 );
             } else {
-                // Last param: trailing comma (unless rest) + comments before `)`
+                // Last param: no trailing comma (trailingComma: 'none') + comments before `)`
                 let close_paren = paren_pos
                     .and_then(|p| self.matching_close_paren(p))
                     .unwrap_or(param_end);
-                if !is_rest {
-                    inner_parts.push(d.text(","));
-                }
                 inner_parts.extend(self.build_trailing_comments_multiline(param_end, close_paren));
                 prev_end = close_paren;
             }

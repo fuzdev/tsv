@@ -4,8 +4,8 @@
 		fn2(
 			a,
 			// @ts-expect-error
-			b,
-		),
+			b
+		)
 	);
 
 	// Own-line block comment forces inner call to break - same pattern
@@ -13,16 +13,16 @@
 		fn2(
 			a,
 			/* comment */
-			b,
-		),
+			b
+		)
 	);
 
 	// Trailing comment on last arg
 	const d = fn1(() =>
 		fn2(
 			a,
-			b, // comment
-		),
+			b // comment
+		)
 	);
 
 	// Short control - no comment, fits inline

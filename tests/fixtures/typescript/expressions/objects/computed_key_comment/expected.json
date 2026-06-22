@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 194,
+	"end": 195,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,24 +13,24 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 22,
-			"end": 29,
+			"start": 23,
+			"end": 30,
 			"loc": {
 				"start": {
 					"line": 2,
-					"column": 13
+					"column": 14
 				},
 				"end": {
 					"line": 2,
-					"column": 20
+					"column": 21
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 53,
-			"end": 60,
+			"start": 55,
+			"end": 62,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -45,8 +45,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 79,
-			"end": 86,
+			"start": 81,
+			"end": 88,
 			"loc": {
 				"start": {
 					"line": 6,
@@ -61,8 +61,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 100,
-			"end": 107,
+			"start": 102,
+			"end": 109,
 			"loc": {
 				"start": {
 					"line": 7,
@@ -77,8 +77,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 124,
-			"end": 131,
+			"start": 126,
+			"end": 133,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -93,8 +93,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 164,
-			"end": 171,
+			"start": 166,
+			"end": 173,
 			"loc": {
 				"start": {
 					"line": 11,
@@ -110,12 +110,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 193,
+		"end": 194,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 184,
+			"end": 185,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -130,7 +130,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 10,
-					"end": 35,
+					"end": 37,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -138,14 +138,14 @@
 						},
 						"end": {
 							"line": 2,
-							"column": 26
+							"column": 28
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 14,
-							"end": 34,
+							"end": 36,
 							"loc": {
 								"start": {
 									"line": 2,
@@ -153,7 +153,7 @@
 								},
 								"end": {
 									"line": 2,
-									"column": 25
+									"column": 27
 								}
 							},
 							"id": {
@@ -175,7 +175,7 @@
 							"init": {
 								"type": "ObjectExpression",
 								"start": 18,
-								"end": 34,
+								"end": 36,
 								"loc": {
 									"start": {
 										"line": 2,
@@ -183,22 +183,22 @@
 									},
 									"end": {
 										"line": 2,
-										"column": 25
+										"column": 27
 									}
 								},
 								"properties": [
 									{
 										"type": "Property",
-										"start": 19,
-										"end": 33,
+										"start": 20,
+										"end": 34,
 										"loc": {
 											"start": {
 												"line": 2,
-												"column": 10
+												"column": 11
 											},
 											"end": {
 												"line": 2,
-												"column": 24
+												"column": 25
 											}
 										},
 										"method": false,
@@ -206,16 +206,16 @@
 										"computed": true,
 										"key": {
 											"type": "Identifier",
-											"start": 20,
-											"end": 21,
+											"start": 21,
+											"end": 22,
 											"loc": {
 												"start": {
 													"line": 2,
-													"column": 11
+													"column": 12
 												},
 												"end": {
 													"line": 2,
-													"column": 12
+													"column": 13
 												}
 											},
 											"name": "x",
@@ -223,23 +223,23 @@
 												{
 													"type": "Block",
 													"value": " c ",
-													"start": 22,
-													"end": 29
+													"start": 23,
+													"end": 30
 												}
 											]
 										},
 										"value": {
 											"type": "Literal",
-											"start": 32,
-											"end": 33,
+											"start": 33,
+											"end": 34,
 											"loc": {
 												"start": {
 													"line": 2,
-													"column": 23
+													"column": 24
 												},
 												"end": {
 													"line": 2,
-													"column": 24
+													"column": 25
 												}
 											},
 											"value": 1,
@@ -255,8 +255,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 38,
-					"end": 183,
+					"start": 40,
+					"end": 184,
 					"loc": {
 						"start": {
 							"line": 4,
@@ -270,8 +270,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 42,
-							"end": 182,
+							"start": 44,
+							"end": 183,
 							"loc": {
 								"start": {
 									"line": 4,
@@ -284,8 +284,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 42,
-								"end": 43,
+								"start": 44,
+								"end": 45,
 								"loc": {
 									"start": {
 										"line": 4,
@@ -300,8 +300,8 @@
 							},
 							"init": {
 								"type": "ObjectExpression",
-								"start": 46,
-								"end": 182,
+								"start": 48,
+								"end": 183,
 								"loc": {
 									"start": {
 										"line": 4,
@@ -315,8 +315,8 @@
 								"properties": [
 									{
 										"type": "Property",
-										"start": 50,
-										"end": 66,
+										"start": 52,
+										"end": 68,
 										"loc": {
 											"start": {
 												"line": 5,
@@ -332,8 +332,8 @@
 										"computed": true,
 										"key": {
 											"type": "Identifier",
-											"start": 51,
-											"end": 52,
+											"start": 53,
+											"end": 54,
 											"loc": {
 												"start": {
 													"line": 5,
@@ -349,15 +349,15 @@
 												{
 													"type": "Block",
 													"value": " c ",
-													"start": 53,
-													"end": 60
+													"start": 55,
+													"end": 62
 												}
 											]
 										},
 										"value": {
 											"type": "FunctionExpression",
-											"start": 61,
-											"end": 66,
+											"start": 63,
+											"end": 68,
 											"loc": {
 												"start": {
 													"line": 5,
@@ -375,8 +375,8 @@
 											"params": [],
 											"body": {
 												"type": "BlockStatement",
-												"start": 64,
-												"end": 66,
+												"start": 66,
+												"end": 68,
 												"loc": {
 													"start": {
 														"line": 5,
@@ -394,8 +394,8 @@
 									},
 									{
 										"type": "Property",
-										"start": 70,
-										"end": 92,
+										"start": 72,
+										"end": 94,
 										"loc": {
 											"start": {
 												"line": 6,
@@ -411,8 +411,8 @@
 										"computed": true,
 										"key": {
 											"type": "Identifier",
-											"start": 77,
-											"end": 78,
+											"start": 79,
+											"end": 80,
 											"loc": {
 												"start": {
 													"line": 6,
@@ -428,15 +428,15 @@
 												{
 													"type": "Block",
 													"value": " c ",
-													"start": 79,
-													"end": 86
+													"start": 81,
+													"end": 88
 												}
 											]
 										},
 										"value": {
 											"type": "FunctionExpression",
-											"start": 87,
-											"end": 92,
+											"start": 89,
+											"end": 94,
 											"loc": {
 												"start": {
 													"line": 6,
@@ -454,8 +454,8 @@
 											"params": [],
 											"body": {
 												"type": "BlockStatement",
-												"start": 90,
-												"end": 92,
+												"start": 92,
+												"end": 94,
 												"loc": {
 													"start": {
 														"line": 6,
@@ -473,8 +473,8 @@
 									},
 									{
 										"type": "Property",
-										"start": 96,
-										"end": 113,
+										"start": 98,
+										"end": 115,
 										"loc": {
 											"start": {
 												"line": 7,
@@ -490,8 +490,8 @@
 										"computed": true,
 										"key": {
 											"type": "Identifier",
-											"start": 98,
-											"end": 99,
+											"start": 100,
+											"end": 101,
 											"loc": {
 												"start": {
 													"line": 7,
@@ -507,15 +507,15 @@
 												{
 													"type": "Block",
 													"value": " c ",
-													"start": 100,
-													"end": 107
+													"start": 102,
+													"end": 109
 												}
 											]
 										},
 										"value": {
 											"type": "FunctionExpression",
-											"start": 108,
-											"end": 113,
+											"start": 110,
+											"end": 115,
 											"loc": {
 												"start": {
 													"line": 7,
@@ -533,8 +533,8 @@
 											"params": [],
 											"body": {
 												"type": "BlockStatement",
-												"start": 111,
-												"end": 113,
+												"start": 113,
+												"end": 115,
 												"loc": {
 													"start": {
 														"line": 7,
@@ -552,8 +552,8 @@
 									},
 									{
 										"type": "Property",
-										"start": 117,
-										"end": 153,
+										"start": 119,
+										"end": 155,
 										"loc": {
 											"start": {
 												"line": 8,
@@ -569,8 +569,8 @@
 										"computed": true,
 										"key": {
 											"type": "Identifier",
-											"start": 122,
-											"end": 123,
+											"start": 124,
+											"end": 125,
 											"loc": {
 												"start": {
 													"line": 8,
@@ -586,15 +586,15 @@
 												{
 													"type": "Block",
 													"value": " c ",
-													"start": 124,
-													"end": 131
+													"start": 126,
+													"end": 133
 												}
 											]
 										},
 										"value": {
 											"type": "FunctionExpression",
-											"start": 132,
-											"end": 153,
+											"start": 134,
+											"end": 155,
 											"loc": {
 												"start": {
 													"line": 8,
@@ -612,8 +612,8 @@
 											"params": [],
 											"body": {
 												"type": "BlockStatement",
-												"start": 135,
-												"end": 153,
+												"start": 137,
+												"end": 155,
 												"loc": {
 													"start": {
 														"line": 8,
@@ -627,8 +627,8 @@
 												"body": [
 													{
 														"type": "ReturnStatement",
-														"start": 140,
-														"end": 149,
+														"start": 142,
+														"end": 151,
 														"loc": {
 															"start": {
 																"line": 9,
@@ -641,8 +641,8 @@
 														},
 														"argument": {
 															"type": "Literal",
-															"start": 147,
-															"end": 148,
+															"start": 149,
+															"end": 150,
 															"loc": {
 																"start": {
 																	"line": 9,
@@ -664,8 +664,8 @@
 									},
 									{
 										"type": "Property",
-										"start": 157,
-										"end": 178,
+										"start": 159,
+										"end": 180,
 										"loc": {
 											"start": {
 												"line": 11,
@@ -681,8 +681,8 @@
 										"computed": true,
 										"key": {
 											"type": "Identifier",
-											"start": 162,
-											"end": 163,
+											"start": 164,
+											"end": 165,
 											"loc": {
 												"start": {
 													"line": 11,
@@ -698,15 +698,15 @@
 												{
 													"type": "Block",
 													"value": " c ",
-													"start": 164,
-													"end": 171
+													"start": 166,
+													"end": 173
 												}
 											]
 										},
 										"value": {
 											"type": "FunctionExpression",
-											"start": 172,
-											"end": 178,
+											"start": 174,
+											"end": 180,
 											"loc": {
 												"start": {
 													"line": 11,
@@ -724,8 +724,8 @@
 											"params": [
 												{
 													"type": "Identifier",
-													"start": 173,
-													"end": 174,
+													"start": 175,
+													"end": 176,
 													"loc": {
 														"start": {
 															"line": 11,
@@ -741,8 +741,8 @@
 											],
 											"body": {
 												"type": "BlockStatement",
-												"start": 176,
-												"end": 178,
+												"start": 178,
+												"end": 180,
 												"loc": {
 													"start": {
 														"line": 11,

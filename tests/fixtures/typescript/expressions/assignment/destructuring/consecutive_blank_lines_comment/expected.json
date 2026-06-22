@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 385,
+	"end": 383,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " Array destructuring with consecutive comments and blank lines",
-			"start": 199,
-			"end": 263,
+			"start": 198,
+			"end": 262,
 			"loc": {
 				"start": {
 					"line": 19,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " section1",
-			"start": 281,
-			"end": 292,
+			"start": 280,
+			"end": 291,
 			"loc": {
 				"start": {
 					"line": 23,
@@ -125,8 +125,8 @@
 		{
 			"type": "Line",
 			"value": " section2",
-			"start": 296,
-			"end": 307,
+			"start": 295,
+			"end": 306,
 			"loc": {
 				"start": {
 					"line": 25,
@@ -141,8 +141,8 @@
 		{
 			"type": "Line",
 			"value": " section3",
-			"start": 316,
-			"end": 327,
+			"start": 315,
+			"end": 326,
 			"loc": {
 				"start": {
 					"line": 28,
@@ -157,8 +157,8 @@
 		{
 			"type": "Block",
 			"value": "*\n * JSDoc section\n ",
-			"start": 331,
-			"end": 359,
+			"start": 330,
+			"end": 358,
 			"loc": {
 				"start": {
 					"line": 30,
@@ -174,12 +174,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 384,
+		"end": 382,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 375,
+			"end": 373,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -194,7 +194,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 87,
-					"end": 196,
+					"end": 195,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -209,7 +209,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 93,
-							"end": 195,
+							"end": 194,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -223,7 +223,7 @@
 							"id": {
 								"type": "ObjectPattern",
 								"start": 93,
-								"end": 189,
+								"end": 188,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -420,8 +420,8 @@
 							},
 							"init": {
 								"type": "Identifier",
-								"start": 192,
-								"end": 195,
+								"start": 191,
+								"end": 194,
 								"loc": {
 									"start": {
 										"line": 17,
@@ -448,8 +448,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 265,
-					"end": 374,
+					"start": 264,
+					"end": 372,
 					"loc": {
 						"start": {
 							"line": 20,
@@ -463,8 +463,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 271,
-							"end": 373,
+							"start": 270,
+							"end": 371,
 							"loc": {
 								"start": {
 									"line": 20,
@@ -477,8 +477,8 @@
 							},
 							"id": {
 								"type": "ArrayPattern",
-								"start": 271,
-								"end": 367,
+								"start": 270,
+								"end": 365,
 								"loc": {
 									"start": {
 										"line": 20,
@@ -492,8 +492,8 @@
 								"elements": [
 									{
 										"type": "Identifier",
-										"start": 275,
-										"end": 276,
+										"start": 274,
+										"end": 275,
 										"loc": {
 											"start": {
 												"line": 21,
@@ -508,8 +508,8 @@
 									},
 									{
 										"type": "Identifier",
-										"start": 310,
-										"end": 311,
+										"start": 309,
+										"end": 310,
 										"loc": {
 											"start": {
 												"line": 26,
@@ -525,21 +525,21 @@
 											{
 												"type": "Line",
 												"value": " section1",
-												"start": 281,
-												"end": 292
+												"start": 280,
+												"end": 291
 											},
 											{
 												"type": "Line",
 												"value": " section2",
-												"start": 296,
-												"end": 307
+												"start": 295,
+												"end": 306
 											}
 										]
 									},
 									{
 										"type": "Identifier",
-										"start": 362,
-										"end": 363,
+										"start": 361,
+										"end": 362,
 										"loc": {
 											"start": {
 												"line": 33,
@@ -555,14 +555,14 @@
 											{
 												"type": "Line",
 												"value": " section3",
-												"start": 316,
-												"end": 327
+												"start": 315,
+												"end": 326
 											},
 											{
 												"type": "Block",
 												"value": "*\n * JSDoc section\n ",
-												"start": 331,
-												"end": 359
+												"start": 330,
+												"end": 358
 											}
 										]
 									}
@@ -570,8 +570,8 @@
 							},
 							"init": {
 								"type": "Identifier",
-								"start": 370,
-								"end": 373,
+								"start": 368,
+								"end": 371,
 								"loc": {
 									"start": {
 										"line": 34,
@@ -591,8 +591,8 @@
 						{
 							"type": "Line",
 							"value": " Array destructuring with consecutive comments and blank lines",
-							"start": 199,
-							"end": 263
+							"start": 198,
+							"end": 262
 						}
 					]
 				}

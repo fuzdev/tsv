@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 340,
+	"end": 339,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -46,12 +46,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 339,
+		"end": 338,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 330,
+			"end": 329,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -66,7 +66,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 168,
-					"end": 329,
+					"end": 328,
 					"loc": {
 						"start": {
 							"line": 4,
@@ -81,7 +81,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 174,
-							"end": 328,
+							"end": 327,
 							"loc": {
 								"start": {
 									"line": 4,
@@ -111,7 +111,7 @@
 							"init": {
 								"type": "TemplateLiteral",
 								"start": 181,
-								"end": 328,
+								"end": 327,
 								"loc": {
 									"start": {
 										"line": 4,
@@ -126,7 +126,7 @@
 									{
 										"type": "CallExpression",
 										"start": 193,
-										"end": 319,
+										"end": 318,
 										"loc": {
 											"start": {
 												"line": 5,
@@ -140,7 +140,7 @@
 										"callee": {
 											"type": "MemberExpression",
 											"start": 193,
-											"end": 313,
+											"end": 312,
 											"loc": {
 												"start": {
 													"line": 5,
@@ -154,7 +154,7 @@
 											"object": {
 												"type": "CallExpression",
 												"start": 193,
-												"end": 305,
+												"end": 304,
 												"loc": {
 													"start": {
 														"line": 5,
@@ -434,8 +434,8 @@
 											},
 											"property": {
 												"type": "Identifier",
-												"start": 309,
-												"end": 313,
+												"start": 308,
+												"end": 312,
 												"loc": {
 													"start": {
 														"line": 13,
@@ -454,8 +454,8 @@
 										"arguments": [
 											{
 												"type": "Literal",
-												"start": 314,
-												"end": 318,
+												"start": 313,
+												"end": 317,
 												"loc": {
 													"start": {
 														"line": 13,
@@ -496,8 +496,8 @@
 									},
 									{
 										"type": "TemplateElement",
-										"start": 320,
-										"end": 327,
+										"start": 319,
+										"end": 326,
 										"loc": {
 											"start": {
 												"line": 13,

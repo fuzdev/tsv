@@ -2,7 +2,7 @@
 <nav>
 	<a href={root}>Home</a
 	>{#each path_pieces as piece (piece)}
-		<a href={base + piece.path} class={{selected: piece.selected}}>{piece.name}</a>
+		<a href={base + piece.path} class={{ selected: piece.selected }}>{piece.name}</a>
 	{/each}
 </nav>
 

@@ -11,5 +11,5 @@
 		z: boolean;
 	}
 
-	const a: A = {x: 1, y: 'a', z: true};
+	const a: A = { x: 1, y: 'a', z: true };
 </script>

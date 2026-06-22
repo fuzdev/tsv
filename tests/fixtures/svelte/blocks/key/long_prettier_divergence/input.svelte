@@ -7,15 +7,14 @@
 		aaaaaaaaaaaaaaaaaaa,
 		bbbbbbbbbbbbbbbbbbb,
 		ccccccccccccccccccc,
-		dddddddddddddddddddd,
+		dddddddddddddddddddd
 	)}
 		{x}
 	{/key}
 
 	<!-- member-call (.filter) with arrow body: call breaks open, ) dedents, } dangles (divergence) -->
 	{#key a.filter(
-		(item) =>
-			item.a && item.b && item.c && item.d && item.e && item.f && item.g && item.h && item.i,
+		(item) => item.a && item.b && item.c && item.d && item.e && item.f && item.g && item.h && item.i
 	)}
 		{x}
 	{/key}

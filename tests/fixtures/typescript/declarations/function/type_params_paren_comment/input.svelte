@@ -16,5 +16,5 @@
 	}
 
 	// Object method
-	const obj = {m<T> /* c */(x: T) {}};
+	const obj = { m<T> /* c */(x: T) {} };
 </script>

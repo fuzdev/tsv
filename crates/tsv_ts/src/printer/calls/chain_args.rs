@@ -440,7 +440,7 @@ fn build_call_args_doc_for_chain_impl(
                 parts.push(d.text(prefix));
                 parts.push(sig_doc);
                 parts.push(d.text(" =>"));
-                parts.push(d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])));
+                parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
                 parts.push(d.hardline());
                 parts.push(d.text(")"));
                 return d.concat(&parts);
@@ -454,7 +454,6 @@ fn build_call_args_doc_for_chain_impl(
         // (divergence from prettier, which relocates them to their own line).
         // Injected after the `(` in the wrap below.
         let mut paren_line_prefix_parts: Vec<DocId> = Vec::new();
-        let mut trailing_comma_already_added = false;
 
         for (i, arg) in call.arguments.iter().enumerate() {
             let arg_start = arg.span().start;
@@ -588,27 +587,20 @@ fn build_call_args_doc_for_chain_impl(
                     arg_end,
                     next_boundary,
                 );
-                // Last argument - same-line trailing comments split around the (synthetic)
-                // trailing comma (before-comma blocks trail the arg, after-comma blocks +
-                // line stay past it), then own-line dangling comments past the comma.
-                pc.emit_last_arg_comments(
-                    &mut arg_parts,
-                    printer,
-                    arg_end,
-                    next_boundary,
-                    &mut trailing_comma_already_added,
-                );
+                // Last argument - same-line trailing comments split around the source comma
+                // position (before-comma blocks trail the arg, after-comma blocks + line
+                // stay past it), then own-line dangling comments. No trailing comma
+                // (trailingComma: 'none').
+                pc.emit_last_arg_comments(&mut arg_parts, printer, arg_end, next_boundary);
             }
         }
 
         parts.push(d.text(prefix));
         parts.push(d.concat(&paren_line_prefix_parts));
-        let trailing = if trailing_comma_already_added {
-            d.empty()
-        } else {
-            d.text(",")
-        };
-        parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&arg_parts), trailing])));
+        // No trailing comma after the last arg (trailingComma: 'none') — the last-arg
+        // comment emit splits same-line comments around the source comma position but
+        // emits no comma, and nothing is appended here.
+        parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&arg_parts)])));
         parts.push(d.hardline());
         parts.push(d.text(")"));
         d.concat(&parts)
@@ -619,7 +611,7 @@ fn build_call_args_doc_for_chain_impl(
 
             // Special case: arrow function with call expression body
             // Prettier keeps `(sig =>` hugged, breaking after `=>` to the body.
-            // Structure: `(sig =>\n  body,\n)` instead of `(\n  sig =>\n    body,\n)`
+            // Structure: `(sig =>\n  body\n)` instead of `(\n  sig =>\n    body\n)`
             //
             // Arrows with TSTypeReference return types (e.g., `: Promise<any>`) are NOT
             // expandable per prettier's couldExpandArg, so they fall through to default
@@ -641,12 +633,12 @@ fn build_call_args_doc_for_chain_impl(
                 let sig_doc = build_arrow_sig_doc(printer, arrow);
                 let sig_doc = prepend_leading(d, leading_comment_doc, sig_doc);
 
-                // State 1: sig hugged, body indented — (sig =>\n  body,\n)
+                // State 1: sig hugged, body indented — (sig =>\n  body\n)
                 let break_state = d.concat(&[
                     d.text(prefix),
                     sig_doc,
                     d.text(" =>"),
-                    d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
+                    d.indent(d.concat(&[d.hardline(), body_doc])),
                     d.hardline(),
                     d.text(")"),
                 ]);
@@ -663,7 +655,7 @@ fn build_call_args_doc_for_chain_impl(
                 ]));
 
                 // If body will break (multiline content), use break state directly
-                // This ensures trailing comma is present when content is multiline
+                // so the hugged-signature layout is preserved when content is multiline
                 if d.will_break(body_doc) {
                     parts.push(break_state);
                 } else {
@@ -682,7 +674,7 @@ fn build_call_args_doc_for_chain_impl(
             // Special case: arrow function with ternary body
             // Prettier uses conditional parens:
             // - Flat: `map((x) => (x ? y : z))` - with parens
-            // - Break: `map((x) =>\n  x ? y : z,)` - no parens, body indented
+            // - Break: `map((x) =>\n  x ? y : z)` - no parens, body indented
             // Arrows with TSTypeReference return types are NOT expandable
             // (prettier's couldExpandArg returns false), so they fall through.
             // Leading comments block expand-last (prettier's shouldExpandLastArg).
@@ -714,7 +706,7 @@ fn build_call_args_doc_for_chain_impl(
                     d.text(prefix),
                     sig_doc,
                     d.text(" =>"),
-                    d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
+                    d.indent(d.concat(&[d.hardline(), body_doc])),
                     d.hardline(),
                     d.text(")"),
                 ]);
@@ -851,7 +843,7 @@ fn build_call_args_doc_for_chain_impl(
             if template_on_own_line {
                 let arg_doc = printer.build_expression_doc(arg);
                 parts.push(d.text(prefix));
-                parts.push(d.indent(d.concat(&[d.hardline(), arg_doc, d.text(",")])));
+                parts.push(d.indent(d.concat(&[d.hardline(), arg_doc])));
                 parts.push(d.hardline());
                 parts.push(d.text(")"));
                 return d.concat(&parts);
@@ -1119,7 +1111,7 @@ fn build_call_args_doc_for_chain_impl(
                 }
                 all_parts.push(second_arg_doc);
                 parts.push(d.text(prefix));
-                parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&all_parts), d.text(",")])));
+                parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&all_parts)])));
                 parts.push(d.hardline());
                 parts.push(d.text(")"));
                 return d.concat(&parts);

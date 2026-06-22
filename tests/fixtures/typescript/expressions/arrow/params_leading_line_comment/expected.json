@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 295,
+	"end": 292,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " Line comment on own line before second param",
-			"start": 96,
-			"end": 143,
+			"start": 95,
+			"end": 142,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -61,8 +61,8 @@
 		{
 			"type": "Line",
 			"value": " line",
-			"start": 164,
-			"end": 171,
+			"start": 163,
+			"end": 170,
 			"loc": {
 				"start": {
 					"line": 11,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " Line comment before each param",
-			"start": 192,
-			"end": 225,
+			"start": 190,
+			"end": 223,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " first",
-			"start": 241,
-			"end": 249,
+			"start": 239,
+			"end": 247,
 			"loc": {
 				"start": {
 					"line": 17,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " second",
-			"start": 257,
-			"end": 266,
+			"start": 255,
+			"end": 264,
 			"loc": {
 				"start": {
 					"line": 19,
@@ -126,12 +126,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 294,
+		"end": 291,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 285,
+			"end": 282,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -146,7 +146,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 58,
-					"end": 93,
+					"end": 92,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -161,7 +161,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 64,
-							"end": 92,
+							"end": 91,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -191,7 +191,7 @@
 							"init": {
 								"type": "ArrowFunctionExpression",
 								"start": 68,
-								"end": 92,
+								"end": 91,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -234,8 +234,8 @@
 								],
 								"body": {
 									"type": "Identifier",
-									"start": 91,
-									"end": 92,
+									"start": 90,
+									"end": 91,
 									"loc": {
 										"start": {
 											"line": 6,
@@ -263,8 +263,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 145,
-					"end": 189,
+					"start": 144,
+					"end": 187,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -278,8 +278,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 151,
-							"end": 188,
+							"start": 150,
+							"end": 186,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -292,8 +292,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 151,
-								"end": 152,
+								"start": 150,
+								"end": 151,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -308,8 +308,8 @@
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
-								"start": 155,
-								"end": 188,
+								"start": 154,
+								"end": 186,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -327,8 +327,8 @@
 								"params": [
 									{
 										"type": "Identifier",
-										"start": 159,
-										"end": 160,
+										"start": 158,
+										"end": 159,
 										"loc": {
 											"start": {
 												"line": 10,
@@ -343,8 +343,8 @@
 									},
 									{
 										"type": "Identifier",
-										"start": 174,
-										"end": 175,
+										"start": 173,
+										"end": 174,
 										"loc": {
 											"start": {
 												"line": 12,
@@ -360,16 +360,16 @@
 											{
 												"type": "Line",
 												"value": " line",
-												"start": 164,
-												"end": 171
+												"start": 163,
+												"end": 170
 											}
 										]
 									}
 								],
 								"body": {
 									"type": "BinaryExpression",
-									"start": 183,
-									"end": 188,
+									"start": 181,
+									"end": 186,
 									"loc": {
 										"start": {
 											"line": 13,
@@ -382,8 +382,8 @@
 									},
 									"left": {
 										"type": "Identifier",
-										"start": 183,
-										"end": 184,
+										"start": 181,
+										"end": 182,
 										"loc": {
 											"start": {
 												"line": 13,
@@ -399,8 +399,8 @@
 									"operator": "+",
 									"right": {
 										"type": "Identifier",
-										"start": 187,
-										"end": 188,
+										"start": 185,
+										"end": 186,
 										"loc": {
 											"start": {
 												"line": 13,
@@ -422,15 +422,15 @@
 						{
 							"type": "Line",
 							"value": " Line comment on own line before second param",
-							"start": 96,
-							"end": 143
+							"start": 95,
+							"end": 142
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 227,
-					"end": 284,
+					"start": 225,
+					"end": 281,
 					"loc": {
 						"start": {
 							"line": 16,
@@ -444,8 +444,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 233,
-							"end": 283,
+							"start": 231,
+							"end": 280,
 							"loc": {
 								"start": {
 									"line": 16,
@@ -458,8 +458,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 233,
-								"end": 234,
+								"start": 231,
+								"end": 232,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -474,8 +474,8 @@
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
-								"start": 237,
-								"end": 283,
+								"start": 235,
+								"end": 280,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -493,8 +493,8 @@
 								"params": [
 									{
 										"type": "Identifier",
-										"start": 252,
-										"end": 253,
+										"start": 250,
+										"end": 251,
 										"loc": {
 											"start": {
 												"line": 18,
@@ -510,15 +510,15 @@
 											{
 												"type": "Line",
 												"value": " first",
-												"start": 241,
-												"end": 249
+												"start": 239,
+												"end": 247
 											}
 										]
 									},
 									{
 										"type": "Identifier",
-										"start": 269,
-										"end": 270,
+										"start": 267,
+										"end": 268,
 										"loc": {
 											"start": {
 												"line": 20,
@@ -534,16 +534,16 @@
 											{
 												"type": "Line",
 												"value": " second",
-												"start": 257,
-												"end": 266
+												"start": 255,
+												"end": 264
 											}
 										]
 									}
 								],
 								"body": {
 									"type": "BinaryExpression",
-									"start": 278,
-									"end": 283,
+									"start": 275,
+									"end": 280,
 									"loc": {
 										"start": {
 											"line": 21,
@@ -556,8 +556,8 @@
 									},
 									"left": {
 										"type": "Identifier",
-										"start": 278,
-										"end": 279,
+										"start": 275,
+										"end": 276,
 										"loc": {
 											"start": {
 												"line": 21,
@@ -573,8 +573,8 @@
 									"operator": "+",
 									"right": {
 										"type": "Identifier",
-										"start": 282,
-										"end": 283,
+										"start": 279,
+										"end": 280,
 										"loc": {
 											"start": {
 												"line": 21,
@@ -596,8 +596,8 @@
 						{
 							"type": "Line",
 							"value": " Line comment before each param",
-							"start": 192,
-							"end": 225
+							"start": 190,
+							"end": 223
 						}
 					]
 				}

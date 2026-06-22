@@ -5,5 +5,5 @@
 		c: number;
 	}
 
-	type T = {a /* c3 */; d: number};
+	type T = { a /* c3 */; d: number };
 </script>

@@ -4,9 +4,9 @@
 		fn(graph: T): {
 			a: Array<Array<string>>;
 			b: Array<Array<string>>;
-			c: Array<{x: string; y: string; z: string}>;
+			c: Array<{ x: string; y: string; z: string }>;
 		} {
-			return {a: [], b: [], c: []};
+			return { a: [], b: [], c: [] };
 		}
 	}
 </script>

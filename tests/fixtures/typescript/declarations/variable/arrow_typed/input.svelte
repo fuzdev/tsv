@@ -11,7 +11,7 @@
 	const aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: (x: number, y: string, z: boolean) => void = (
 		x,
 		y,
-		z,
+		z
 	) => {
 		console.log(x);
 	};

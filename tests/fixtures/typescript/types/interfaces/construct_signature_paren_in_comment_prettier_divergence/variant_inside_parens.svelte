@@ -6,7 +6,7 @@
 		new (/* c3(d) */ b: string): A;
 		new (
 			// c5
-			c: boolean,
+			c: boolean
 		): A;
 	}
 

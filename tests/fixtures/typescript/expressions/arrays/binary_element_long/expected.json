@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 879,
+	"end": 872,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,8 +45,8 @@
 		{
 			"type": "Block",
 			"value": " 100 chars element line - binary stays inline ",
-			"start": 321,
-			"end": 371,
+			"start": 320,
+			"end": 370,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -61,8 +61,8 @@
 		{
 			"type": "Block",
 			"value": " 101 chars element line - binary breaks, continuation gets extra indent ",
-			"start": 490,
-			"end": 566,
+			"start": 488,
+			"end": 564,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -77,15 +77,15 @@
 		{
 			"type": "Block",
 			"value": " Multi-operand chain - each continuation indented ",
-			"start": 689,
-			"end": 743,
+			"start": 683,
+			"end": 737,
 			"loc": {
 				"start": {
-					"line": 21,
+					"line": 20,
 					"column": 1
 				},
 				"end": {
-					"line": 21,
+					"line": 20,
 					"column": 55
 				}
 			}
@@ -94,19 +94,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 878,
+		"end": 871,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 869,
+			"end": 862,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 27,
+					"line": 26,
 					"column": 9
 				}
 			},
@@ -236,7 +236,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 213,
-					"end": 318,
+					"end": 317,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -251,7 +251,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 219,
-							"end": 317,
+							"end": 316,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -281,7 +281,7 @@
 							"init": {
 								"type": "ArrayExpression",
 								"start": 223,
-								"end": 317,
+								"end": 316,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -357,8 +357,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 373,
-					"end": 487,
+					"start": 372,
+					"end": 485,
 					"loc": {
 						"start": {
 							"line": 11,
@@ -372,8 +372,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 379,
-							"end": 486,
+							"start": 378,
+							"end": 484,
 							"loc": {
 								"start": {
 									"line": 11,
@@ -386,8 +386,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 379,
-								"end": 380,
+								"start": 378,
+								"end": 379,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -402,8 +402,8 @@
 							},
 							"init": {
 								"type": "ArrayExpression",
-								"start": 383,
-								"end": 486,
+								"start": 382,
+								"end": 484,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -417,8 +417,8 @@
 								"elements": [
 									{
 										"type": "LogicalExpression",
-										"start": 387,
-										"end": 482,
+										"start": 386,
+										"end": 481,
 										"loc": {
 											"start": {
 												"line": 12,
@@ -431,8 +431,8 @@
 										},
 										"left": {
 											"type": "Identifier",
-											"start": 387,
-											"end": 414,
+											"start": 386,
+											"end": 413,
 											"loc": {
 												"start": {
 													"line": 12,
@@ -448,8 +448,8 @@
 										"operator": "&&",
 										"right": {
 											"type": "Identifier",
-											"start": 418,
-											"end": 482,
+											"start": 417,
+											"end": 481,
 											"loc": {
 												"start": {
 													"line": 12,
@@ -472,44 +472,44 @@
 						{
 							"type": "Block",
 							"value": " 100 chars element line - binary stays inline ",
-							"start": 321,
-							"end": 371
+							"start": 320,
+							"end": 370
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 568,
-					"end": 686,
+					"start": 566,
+					"end": 680,
 					"loc": {
 						"start": {
 							"line": 16,
 							"column": 1
 						},
 						"end": {
-							"line": 19,
+							"line": 18,
 							"column": 3
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 574,
-							"end": 685,
+							"start": 572,
+							"end": 679,
 							"loc": {
 								"start": {
 									"line": 16,
 									"column": 7
 								},
 								"end": {
-									"line": 19,
+									"line": 18,
 									"column": 2
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 574,
-								"end": 575,
+								"start": 572,
+								"end": 573,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -524,37 +524,37 @@
 							},
 							"init": {
 								"type": "ArrayExpression",
-								"start": 578,
-								"end": 685,
+								"start": 576,
+								"end": 679,
 								"loc": {
 									"start": {
 										"line": 16,
 										"column": 11
 									},
 									"end": {
-										"line": 19,
+										"line": 18,
 										"column": 2
 									}
 								},
 								"elements": [
 									{
 										"type": "LogicalExpression",
-										"start": 582,
-										"end": 681,
+										"start": 580,
+										"end": 676,
 										"loc": {
 											"start": {
 												"line": 17,
 												"column": 2
 											},
 											"end": {
-												"line": 18,
-												"column": 68
+												"line": 17,
+												"column": 98
 											}
 										},
 										"left": {
 											"type": "Identifier",
-											"start": 582,
-											"end": 609,
+											"start": 580,
+											"end": 607,
 											"loc": {
 												"start": {
 													"line": 17,
@@ -570,16 +570,16 @@
 										"operator": "&&",
 										"right": {
 											"type": "Identifier",
-											"start": 616,
-											"end": 681,
+											"start": 611,
+											"end": 676,
 											"loc": {
 												"start": {
-													"line": 18,
-													"column": 3
+													"line": 17,
+													"column": 33
 												},
 												"end": {
-													"line": 18,
-													"column": 68
+													"line": 17,
+													"column": 98
 												}
 											},
 											"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefg"
@@ -594,51 +594,51 @@
 						{
 							"type": "Block",
 							"value": " 101 chars element line - binary breaks, continuation gets extra indent ",
-							"start": 490,
-							"end": 566
+							"start": 488,
+							"end": 564
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 745,
-					"end": 868,
+					"start": 739,
+					"end": 861,
 					"loc": {
 						"start": {
-							"line": 22,
+							"line": 21,
 							"column": 1
 						},
 						"end": {
-							"line": 26,
+							"line": 25,
 							"column": 3
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 751,
-							"end": 867,
+							"start": 745,
+							"end": 860,
 							"loc": {
 								"start": {
-									"line": 22,
+									"line": 21,
 									"column": 7
 								},
 								"end": {
-									"line": 26,
+									"line": 25,
 									"column": 2
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 751,
-								"end": 752,
+								"start": 745,
+								"end": 746,
 								"loc": {
 									"start": {
-										"line": 22,
+										"line": 21,
 										"column": 7
 									},
 									"end": {
-										"line": 22,
+										"line": 21,
 										"column": 8
 									}
 								},
@@ -646,58 +646,58 @@
 							},
 							"init": {
 								"type": "ArrayExpression",
-								"start": 755,
-								"end": 867,
+								"start": 749,
+								"end": 860,
 								"loc": {
 									"start": {
-										"line": 22,
+										"line": 21,
 										"column": 11
 									},
 									"end": {
-										"line": 26,
+										"line": 25,
 										"column": 2
 									}
 								},
 								"elements": [
 									{
 										"type": "LogicalExpression",
-										"start": 759,
-										"end": 863,
+										"start": 753,
+										"end": 857,
 										"loc": {
 											"start": {
-												"line": 23,
+												"line": 22,
 												"column": 2
 											},
 											"end": {
-												"line": 25,
+												"line": 24,
 												"column": 33
 											}
 										},
 										"left": {
 											"type": "LogicalExpression",
-											"start": 759,
-											"end": 826,
+											"start": 753,
+											"end": 820,
 											"loc": {
 												"start": {
-													"line": 23,
+													"line": 22,
 													"column": 2
 												},
 												"end": {
-													"line": 24,
+													"line": 23,
 													"column": 33
 												}
 											},
 											"left": {
 												"type": "Identifier",
-												"start": 759,
-												"end": 789,
+												"start": 753,
+												"end": 783,
 												"loc": {
 													"start": {
-														"line": 23,
+														"line": 22,
 														"column": 2
 													},
 													"end": {
-														"line": 23,
+														"line": 22,
 														"column": 32
 													}
 												},
@@ -706,15 +706,15 @@
 											"operator": "&&",
 											"right": {
 												"type": "Identifier",
-												"start": 796,
-												"end": 826,
+												"start": 790,
+												"end": 820,
 												"loc": {
 													"start": {
-														"line": 24,
+														"line": 23,
 														"column": 3
 													},
 													"end": {
-														"line": 24,
+														"line": 23,
 														"column": 33
 													}
 												},
@@ -724,15 +724,15 @@
 										"operator": "&&",
 										"right": {
 											"type": "Identifier",
-											"start": 833,
-											"end": 863,
+											"start": 827,
+											"end": 857,
 											"loc": {
 												"start": {
-													"line": 25,
+													"line": 24,
 													"column": 3
 												},
 												"end": {
-													"line": 25,
+													"line": 24,
 													"column": 33
 												}
 											},
@@ -748,8 +748,8 @@
 						{
 							"type": "Block",
 							"value": " Multi-operand chain - each continuation indented ",
-							"start": 689,
-							"end": 743
+							"start": 683,
+							"end": 737
 						}
 					]
 				}

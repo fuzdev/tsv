@@ -6,7 +6,7 @@
 
 	// Long union type predicate: parens stripped, breaks after `is`
 	function longU(
-		p: unknown,
+		p: unknown
 	): p is
 		| Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 		| Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
@@ -21,7 +21,7 @@
 
 	// Long intersection type predicate: stripped, first member hugs, rest wrap
 	function longI(
-		p: unknown,
+		p: unknown
 	): p is Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa &
 		Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb &
 		Ccccccccccccccccccccccccccccccccccccccccccc {

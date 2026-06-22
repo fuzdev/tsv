@@ -1,5 +1,5 @@
 <script lang="ts">
-	type Box<T> = {value: T};
+	type Box<T> = { value: T };
 
 	type Pair<A, B> = [A, B];
 

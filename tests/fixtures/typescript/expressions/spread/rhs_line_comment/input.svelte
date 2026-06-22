@@ -1,11 +1,11 @@
 <script>
 	const a = [
 		...// comment
-		b,
+		b
 	];
 
 	fn(
 		...// comment
-		b,
+		b
 	);
 </script>

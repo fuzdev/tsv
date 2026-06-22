@@ -1,7 +1,7 @@
 <script lang="ts">
 	fn(
 		{
-			...spread,
-		} /* after */,
+			...spread
+		} /* after */
 	);
 </script>

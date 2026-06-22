@@ -3,7 +3,7 @@
 	type T = (
 		a: A,
 		// comment before b
-		b: B,
+		b: B
 	) => C;
 
 	// Line comment between multiple function type parameters
@@ -12,7 +12,7 @@
 		// comment before b
 		b: B,
 		// comment before c
-		c: C,
+		c: C
 	) => D;
 
 	// Multiple consecutive line comments
@@ -20,6 +20,6 @@
 		a: A,
 		// comment line 1
 		// comment line 2
-		b: B,
+		b: B
 	) => C;
 </script>

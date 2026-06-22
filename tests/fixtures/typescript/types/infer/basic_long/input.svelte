@@ -7,7 +7,7 @@
 		T extends Promise<infer LongInferredTypeName> ? LongInferredTypeName : never;
 
 	// Long extends clause stays inline, ternary arms break
-	type LongMultiInfer<T> = T extends {first: infer FirstLongType; second: infer SecondLongType}
+	type LongMultiInfer<T> = T extends { first: infer FirstLongType; second: infer SecondLongType }
 		? [FirstLongType, SecondLongType]
 		: never;
 

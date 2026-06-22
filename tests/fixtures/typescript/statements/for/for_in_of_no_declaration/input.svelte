@@ -19,7 +19,7 @@
 	}
 
 	// Object destructuring
-	for ({a, b} of arr) {
+	for ({ a, b } of arr) {
 		expr;
 	}
 </script>

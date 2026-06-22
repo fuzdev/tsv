@@ -7,7 +7,7 @@
 		label:
 			| Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 			| Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-			| Ccccccccccccccccccccccccccccccccccccccccccc,
+			| Ccccccccccccccccccccccccccccccccccccccccccc
 	];
 
 	// Short intersection named-tuple member: stripped, stays inline
@@ -17,6 +17,6 @@
 	type LongI = [
 		label: Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa &
 			Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb &
-			Ccccccccccccccccccccccccccccccccccccccccccc,
+			Ccccccccccccccccccccccccccccccccccccccccccc
 	];
 </script>

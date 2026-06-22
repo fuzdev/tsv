@@ -3,33 +3,33 @@
 	const a = [
 		cond1 && {
 			prop1: 'value1',
-			prop2: 'value2',
+			prop2: 'value2'
 		},
 		cond2 && {
 			prop: 'value',
 			fn: () => {
 				a = {
 					b: 'value1',
-					c: 'value2',
+					c: 'value2'
 				};
-			},
-		},
+			}
+		}
 	];
 
 	// Logical || with object literal
 	const b = fn(
 		(x ? y : z) || {
 			prop1: 0,
-			prop2: 'value',
-		},
+			prop2: 'value'
+		}
 	);
 
 	// Logical ?? with object literal
 	const c = fn(
 		expr ?? {
 			prop1: 'value1',
-			prop2: 'value2',
-		},
+			prop2: 'value2'
+		}
 	);
 
 	// Logical && with array literal
@@ -39,7 +39,7 @@
 	const e = [
 		cond1 &&
 			cond2 && {
-				prop: 'value',
-			},
+				prop: 'value'
+			}
 	];
 </script>

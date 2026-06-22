@@ -4,7 +4,7 @@
 
 	// 101 chars - prettier breaks at .toBe(), keeps inner call inline
 	await expect(fn([], 3, async () => {}, aaaaaaaaaaaaaaa)).rejects.toBe(
-		'bbbbbbbbbbbbbbbbbbbbbbbbb',
+		'bbbbbbbbbbbbbbbbbbbbbbbbb'
 	);
 
 	// Short - fits trivially

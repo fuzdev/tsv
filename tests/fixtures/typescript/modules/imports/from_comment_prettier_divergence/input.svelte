@@ -14,9 +14,9 @@
 		from './d';
 
 	// named specifiers, block comment before from
-	import {a} /* c5 */ from './e';
+	import { a } /* c5 */ from './e';
 
 	// named specifiers, line comment before from
-	import {b} // c6
+	import { b } // c6
 		from './f';
 </script>

@@ -13,7 +13,7 @@
 	function fn3() {
 		return /* comment */ (a ??= {
 			b: c(),
-			d: e(),
+			d: e()
 		});
 	}
 
@@ -31,7 +31,7 @@
 	function fn6() {
 		throw /* comment */ (a ??= {
 			b: c(),
-			d: e(),
+			d: e()
 		});
 	}
 </script>

@@ -3,7 +3,7 @@
 TypeScript import attributes in dynamic `import()` type expressions:
 
 ```typescript
-type T = import('module', {with: {type: 'json'}}).Foo;
+type T = import('module', { with: { type: 'json' } }).Foo;
 ```
 
 ## Status

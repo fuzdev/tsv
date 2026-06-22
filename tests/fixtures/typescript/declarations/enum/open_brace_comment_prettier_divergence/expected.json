@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 208,
+	"end": 206,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " block comment trailing the body `{`, then own-line leading comment",
-			"start": 88,
-			"end": 157,
+			"start": 87,
+			"end": 156,
 			"loc": {
 				"start": {
 					"line": 7,
@@ -61,8 +61,8 @@
 		{
 			"type": "Block",
 			"value": " brace ",
-			"start": 168,
-			"end": 179,
+			"start": 167,
+			"end": 178,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " lead",
-			"start": 182,
-			"end": 189,
+			"start": 181,
+			"end": 188,
 			"loc": {
 				"start": {
 					"line": 9,
@@ -94,12 +94,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 207,
+		"end": 205,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 198,
+			"end": 196,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -114,7 +114,7 @@
 				{
 					"type": "TSEnumDeclaration",
 					"start": 63,
-					"end": 85,
+					"end": 84,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -193,8 +193,8 @@
 				},
 				{
 					"type": "TSEnumDeclaration",
-					"start": 159,
-					"end": 197,
+					"start": 158,
+					"end": 195,
 					"loc": {
 						"start": {
 							"line": 8,
@@ -207,8 +207,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 164,
-						"end": 165,
+						"start": 163,
+						"end": 164,
 						"loc": {
 							"start": {
 								"line": 8,
@@ -224,8 +224,8 @@
 					"members": [
 						{
 							"type": "TSEnumMember",
-							"start": 192,
-							"end": 193,
+							"start": 191,
+							"end": 192,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -238,8 +238,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 192,
-								"end": 193,
+								"start": 191,
+								"end": 192,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -256,14 +256,14 @@
 								{
 									"type": "Block",
 									"value": " brace ",
-									"start": 168,
-									"end": 179
+									"start": 167,
+									"end": 178
 								},
 								{
 									"type": "Line",
 									"value": " lead",
-									"start": 182,
-									"end": 189
+									"start": 181,
+									"end": 188
 								}
 							]
 						}
@@ -272,8 +272,8 @@
 						{
 							"type": "Line",
 							"value": " block comment trailing the body `{`, then own-line leading comment",
-							"start": 88,
-							"end": 157
+							"start": 87,
+							"end": 156
 						}
 					]
 				}

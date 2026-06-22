@@ -6,7 +6,7 @@
 	fn(
 		[
 			'element1_long_string_here_aaaaaaaaaaaaaaaa',
-			'element2_another_long_string_bbbbbbbbbbbb',
-		] /* after */,
+			'element2_another_long_string_bbbbbbbbbbbb'
+		] /* after */
 	);
 </script>

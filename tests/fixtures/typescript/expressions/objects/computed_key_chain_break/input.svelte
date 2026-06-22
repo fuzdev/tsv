@@ -5,15 +5,14 @@
 	// Line at 100 chars - should NOT wrap
 	let fits100 = {
 		ab: aaaaaaaaaa.bbbbbbbbbb.cccccccccc.dddddddddd.eeeeeeeeee.ffffffffff.gggggggggg.hhhhhhhhhhhhhh,
-		[b]: aaaaaaaaaa.bbbbbbbbbb.cccccccccc.dddddddddd.eeeeeeeeee.ffffffffff.gggggggggg.hhhhhhhhhhhhh,
+		[b]: aaaaaaaaaa.bbbbbbbbbb.cccccccccc.dddddddddd.eeeeeeeeee.ffffffffff.gggggggggg.hhhhhhhhhhhhh
 	};
 
 	// Line at 101 chars - should wrap at last segment
 	let wraps101 = {
 		ab: aaaaaaaaaa.bbbbbbbbbb.cccccccccc.dddddddddd.eeeeeeeeee.ffffffffff.gggggggggg
 			.hhhhhhhhhhhhhhh,
-		[b]: aaaaaaaaaa.bbbbbbbbbb.cccccccccc.dddddddddd.eeeeeeeeee.ffffffffff.gggggggggg
-			.hhhhhhhhhhhhhh,
+		[b]: aaaaaaaaaa.bbbbbbbbbb.cccccccccc.dddddddddd.eeeeeeeeee.ffffffffff.gggggggggg.hhhhhhhhhhhhhh
 	};
 
 	// Line at 103 chars with .ii - should break optimally at .ii, keeping max on first line
@@ -21,6 +20,6 @@
 		ab: aaaaaaaaaa.bbbbbbbbbb.cccccccccc.dddddddddd.eeeeeeeeee.ffffffffff.gggggggggg.hhhhhhhhhhhhhhh
 			.ii,
 		[b]: aaaaaaaaaa.bbbbbbbbbb.cccccccccc.dddddddddd.eeeeeeeeee.ffffffffff.gggggggggg.hhhhhhhhhhhhhh
-			.ii,
+			.ii
 	};
 </script>

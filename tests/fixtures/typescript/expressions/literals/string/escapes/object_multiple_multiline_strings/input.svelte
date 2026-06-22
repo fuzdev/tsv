@@ -3,6 +3,6 @@
 		a: 'multi \
 line1',
 		b: 'multi \
-line2',
+line2'
 	};
 </script>

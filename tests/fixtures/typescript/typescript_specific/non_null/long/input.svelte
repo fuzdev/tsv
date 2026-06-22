@@ -36,12 +36,11 @@
 	veryLongFunctionName(
 		veryLongArgumentOne!.property,
 		veryLongArgumentTwo!.property,
-		veryLongArgumentThree!.property,
+		veryLongArgumentThree!.property
 	);
 
 	// Nested long non-null in object
 	const obj = {
-		prop: veryLongObjectName0000000!.veryLongPropertyName0000000!
-			.anotherVeryLongPropertyName000000!,
+		prop: veryLongObjectName0000000!.veryLongPropertyName0000000!.anotherVeryLongPropertyName000000!
 	};
 </script>

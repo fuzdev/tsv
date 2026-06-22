@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 336,
+	"end": 335,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -46,12 +46,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 335,
+		"end": 334,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 326,
+			"end": 325,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -309,7 +309,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 218,
-					"end": 325,
+					"end": 324,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -324,7 +324,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 224,
-							"end": 324,
+							"end": 323,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -354,7 +354,7 @@
 							"init": {
 								"type": "CallExpression",
 								"start": 228,
-								"end": 324,
+								"end": 323,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -418,7 +418,7 @@
 									{
 										"type": "ArrowFunctionExpression",
 										"start": 277,
-										"end": 323,
+										"end": 322,
 										"loc": {
 											"start": {
 												"line": 6,
@@ -487,7 +487,7 @@
 										"body": {
 											"type": "ArrayExpression",
 											"start": 299,
-											"end": 323,
+											"end": 322,
 											"loc": {
 												"start": {
 													"line": 6,

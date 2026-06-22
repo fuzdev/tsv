@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 44,
+	"end": 46,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,11 +10,11 @@
 			{
 				"type": "EachBlock",
 				"start": 0,
-				"end": 43,
+				"end": 45,
 				"expression": {
 					"type": "ObjectExpression",
 					"start": 7,
-					"end": 18,
+					"end": 20,
 					"loc": {
 						"start": {
 							"line": 1,
@@ -22,22 +22,22 @@
 						},
 						"end": {
 							"line": 1,
-							"column": 18
+							"column": 20
 						}
 					},
 					"properties": [
 						{
 							"type": "Property",
-							"start": 8,
-							"end": 17,
+							"start": 9,
+							"end": 18,
 							"loc": {
 								"start": {
 									"line": 1,
-									"column": 8
+									"column": 9
 								},
 								"end": {
 									"line": 1,
-									"column": 17
+									"column": 18
 								}
 							},
 							"method": false,
@@ -45,32 +45,32 @@
 							"computed": false,
 							"key": {
 								"type": "Identifier",
-								"start": 8,
-								"end": 14,
+								"start": 9,
+								"end": 15,
 								"loc": {
 									"start": {
 										"line": 1,
-										"column": 8
+										"column": 9
 									},
 									"end": {
 										"line": 1,
-										"column": 14
+										"column": 15
 									}
 								},
 								"name": "length"
 							},
 							"value": {
 								"type": "Literal",
-								"start": 16,
-								"end": 17,
+								"start": 17,
+								"end": 18,
 								"loc": {
 									"start": {
 										"line": 1,
-										"column": 16
+										"column": 17
 									},
 									"end": {
 										"line": 1,
-										"column": 17
+										"column": 18
 									}
 								},
 								"value": 5,
@@ -85,19 +85,19 @@
 					"nodes": [
 						{
 							"type": "RegularElement",
-							"start": 22,
-							"end": 36,
+							"start": 24,
+							"end": 38,
 							"name": "div",
 							"name_loc": {
 								"start": {
 									"line": 1,
-									"column": 23,
-									"character": 23
+									"column": 25,
+									"character": 25
 								},
 								"end": {
 									"line": 1,
-									"column": 26,
-									"character": 26
+									"column": 28,
+									"character": 28
 								}
 							},
 							"attributes": [],
@@ -106,20 +106,20 @@
 								"nodes": [
 									{
 										"type": "ExpressionTag",
-										"start": 27,
-										"end": 30,
+										"start": 29,
+										"end": 32,
 										"expression": {
 											"type": "Identifier",
-											"start": 28,
-											"end": 29,
+											"start": 30,
+											"end": 31,
 											"loc": {
 												"start": {
 													"line": 1,
-													"column": 28
+													"column": 30
 												},
 												"end": {
 													"line": 1,
-													"column": 29
+													"column": 31
 												}
 											},
 											"name": "i"

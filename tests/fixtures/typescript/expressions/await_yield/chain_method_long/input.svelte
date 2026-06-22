@@ -4,7 +4,7 @@
 		const g = (
 			await fn({
 				...o,
-				a: bbbbbbb,
+				a: bbbbbbb
 			})
 		).prop?.method_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc();
 
@@ -12,7 +12,7 @@
 		const h = (
 			await fn({
 				...o,
-				a: bbbbbbb,
+				a: bbbbbbb
 			})
 		).prop?.method_ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc();
 
@@ -20,7 +20,7 @@
 		const i = (
 			await fn({
 				...o,
-				a: bbbbbbb,
+				a: bbbbbbb
 			})
 		).prop
 			?.method_ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc()
@@ -30,7 +30,7 @@
 		const j = (
 			await fn({
 				...o,
-				a: bbbbbbb,
+				a: bbbbbbb
 			})
 		).prop
 			?.method_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc()

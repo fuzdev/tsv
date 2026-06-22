@@ -4,6 +4,6 @@
 
 	const f = (
 		a: A,
-		b = x, // isn't
+		b = x // isn't
 	): B => a;
 </script>

@@ -70,7 +70,8 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
   but keeps its own internal AST optimized for manipulation over serialization
 - non-configurable: formatter settings are fixed at Prettier's defaults except
   `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and
-  `bracketSpacing: false` (tight object braces stay distinct from function/block `{`),
+  `trailingComma: 'none'` (no trailing comma on multiline lists, matching the
+  Svelte project's own Prettier config),
   and there are no config files or CLI options for formatting style;
   tsv is opinionated like `gofmt` and Python's Black,
   see [CLAUDE.md § Configuration](CLAUDE.md#configuration)

@@ -4,7 +4,7 @@
 
 	// 101 chars at 1-tab: filter args expand
 	const b = cccccc.ddddddddddddddddd.eeeeeeeeeeeeeee.filter(
-		(x) => x.s === 'a' || x.s === 'bbbbbbb',
+		(x) => x.s === 'a' || x.s === 'bbbbbbb'
 	);
 
 	// 100 chars at 5-tab opening line: filter args still expanded
@@ -13,7 +13,7 @@
 			if (true) {
 				if (true) {
 					const eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee = cccccc.ddddddddddddddddd.eeeeeeeeeeeeeee.filter(
-						(x) => x.s === 'a' || x.s === 'b',
+						(x) => x.s === 'a' || x.s === 'b'
 					);
 				}
 			}

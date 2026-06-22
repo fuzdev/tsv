@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 348,
+	"end": 356,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -29,24 +29,24 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 85,
-			"end": 92,
+			"start": 86,
+			"end": 93,
 			"loc": {
 				"start": {
 					"line": 3,
-					"column": 11
+					"column": 12
 				},
 				"end": {
 					"line": 3,
-					"column": 18
+					"column": 19
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " type specifier with block comment",
-			"start": 111,
-			"end": 147,
+			"start": 113,
+			"end": 149,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -61,24 +61,24 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 164,
-			"end": 171,
+			"start": 167,
+			"end": 174,
 			"loc": {
 				"start": {
 					"line": 6,
-					"column": 16
+					"column": 17
 				},
 				"end": {
 					"line": 6,
-					"column": 23
+					"column": 24
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " export specifier rename comment",
-			"start": 190,
-			"end": 224,
+			"start": 194,
+			"end": 228,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -93,24 +93,24 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 236,
-			"end": 243,
+			"start": 241,
+			"end": 248,
 			"loc": {
 				"start": {
 					"line": 9,
-					"column": 11
+					"column": 12
 				},
 				"end": {
 					"line": 9,
-					"column": 18
+					"column": 19
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " export specifier rename comment with re-export",
-			"start": 253,
-			"end": 302,
+			"start": 259,
+			"end": 308,
 			"loc": {
 				"start": {
 					"line": 11,
@@ -125,16 +125,16 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 314,
-			"end": 321,
+			"start": 321,
+			"end": 328,
 			"loc": {
 				"start": {
 					"line": 12,
-					"column": 11
+					"column": 12
 				},
 				"end": {
 					"line": 12,
-					"column": 18
+					"column": 19
 				}
 			}
 		}
@@ -142,12 +142,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 347,
+		"end": 355,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 338,
+			"end": 346,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -162,7 +162,7 @@
 				{
 					"type": "ImportDeclaration",
 					"start": 75,
-					"end": 108,
+					"end": 110,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -170,37 +170,37 @@
 						},
 						"end": {
 							"line": 3,
-							"column": 34
+							"column": 36
 						}
 					},
 					"importKind": "value",
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
-							"start": 83,
-							"end": 97,
+							"start": 84,
+							"end": 98,
 							"loc": {
 								"start": {
 									"line": 3,
-									"column": 9
+									"column": 10
 								},
 								"end": {
 									"line": 3,
-									"column": 23
+									"column": 24
 								}
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 83,
-								"end": 84,
+								"start": 84,
+								"end": 85,
 								"loc": {
 									"start": {
 										"line": 3,
-										"column": 9
+										"column": 10
 									},
 									"end": {
 										"line": 3,
-										"column": 10
+										"column": 11
 									}
 								},
 								"name": "a",
@@ -208,23 +208,23 @@
 									{
 										"type": "Block",
 										"value": " c ",
-										"start": 85,
-										"end": 92
+										"start": 86,
+										"end": 93
 									}
 								]
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 96,
-								"end": 97,
+								"start": 97,
+								"end": 98,
 								"loc": {
 									"start": {
 										"line": 3,
-										"column": 22
+										"column": 23
 									},
 									"end": {
 										"line": 3,
-										"column": 23
+										"column": 24
 									}
 								},
 								"name": "b"
@@ -234,16 +234,16 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 104,
-						"end": 107,
+						"start": 106,
+						"end": 109,
 						"loc": {
 							"start": {
 								"line": 3,
-								"column": 30
+								"column": 32
 							},
 							"end": {
 								"line": 3,
-								"column": 33
+								"column": 35
 							}
 						},
 						"value": "x",
@@ -260,8 +260,8 @@
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 149,
-					"end": 187,
+					"start": 151,
+					"end": 191,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -269,37 +269,37 @@
 						},
 						"end": {
 							"line": 6,
-							"column": 39
+							"column": 41
 						}
 					},
 					"importKind": "value",
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
-							"start": 157,
-							"end": 176,
+							"start": 160,
+							"end": 179,
 							"loc": {
 								"start": {
 									"line": 6,
-									"column": 9
+									"column": 10
 								},
 								"end": {
 									"line": 6,
-									"column": 28
+									"column": 29
 								}
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 162,
-								"end": 163,
+								"start": 165,
+								"end": 166,
 								"loc": {
 									"start": {
 										"line": 6,
-										"column": 14
+										"column": 15
 									},
 									"end": {
 										"line": 6,
-										"column": 15
+										"column": 16
 									}
 								},
 								"name": "c",
@@ -307,23 +307,23 @@
 									{
 										"type": "Block",
 										"value": " c ",
-										"start": 164,
-										"end": 171
+										"start": 167,
+										"end": 174
 									}
 								]
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 175,
-								"end": 176,
+								"start": 178,
+								"end": 179,
 								"loc": {
 									"start": {
 										"line": 6,
-										"column": 27
+										"column": 28
 									},
 									"end": {
 										"line": 6,
-										"column": 28
+										"column": 29
 									}
 								},
 								"name": "d"
@@ -333,16 +333,16 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 183,
-						"end": 186,
+						"start": 187,
+						"end": 190,
 						"loc": {
 							"start": {
 								"line": 6,
-								"column": 35
+								"column": 37
 							},
 							"end": {
 								"line": 6,
-								"column": 38
+								"column": 40
 							}
 						},
 						"value": "x",
@@ -352,15 +352,15 @@
 						{
 							"type": "Line",
 							"value": " type specifier with block comment",
-							"start": 111,
-							"end": 147
+							"start": 113,
+							"end": 149
 						}
 					]
 				},
 				{
 					"type": "ExportNamedDeclaration",
-					"start": 226,
-					"end": 250,
+					"start": 230,
+					"end": 256,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -368,7 +368,7 @@
 						},
 						"end": {
 							"line": 9,
-							"column": 25
+							"column": 27
 						}
 					},
 					"exportKind": "value",
@@ -376,30 +376,30 @@
 					"specifiers": [
 						{
 							"type": "ExportSpecifier",
-							"start": 234,
-							"end": 248,
+							"start": 239,
+							"end": 253,
 							"loc": {
 								"start": {
 									"line": 9,
-									"column": 9
+									"column": 10
 								},
 								"end": {
 									"line": 9,
-									"column": 23
+									"column": 24
 								}
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 234,
-								"end": 235,
+								"start": 239,
+								"end": 240,
 								"loc": {
 									"start": {
 										"line": 9,
-										"column": 9
+										"column": 10
 									},
 									"end": {
 										"line": 9,
-										"column": 10
+										"column": 11
 									}
 								},
 								"name": "a",
@@ -407,23 +407,23 @@
 									{
 										"type": "Block",
 										"value": " c ",
-										"start": 236,
-										"end": 243
+										"start": 241,
+										"end": 248
 									}
 								]
 							},
 							"exported": {
 								"type": "Identifier",
-								"start": 247,
-								"end": 248,
+								"start": 252,
+								"end": 253,
 								"loc": {
 									"start": {
 										"line": 9,
-										"column": 22
+										"column": 23
 									},
 									"end": {
 										"line": 9,
-										"column": 23
+										"column": 24
 									}
 								},
 								"name": "b"
@@ -436,15 +436,15 @@
 						{
 							"type": "Line",
 							"value": " export specifier rename comment",
-							"start": 190,
-							"end": 224
+							"start": 194,
+							"end": 228
 						}
 					]
 				},
 				{
 					"type": "ExportNamedDeclaration",
-					"start": 304,
-					"end": 337,
+					"start": 310,
+					"end": 345,
 					"loc": {
 						"start": {
 							"line": 12,
@@ -452,7 +452,7 @@
 						},
 						"end": {
 							"line": 12,
-							"column": 34
+							"column": 36
 						}
 					},
 					"exportKind": "value",
@@ -460,30 +460,30 @@
 					"specifiers": [
 						{
 							"type": "ExportSpecifier",
-							"start": 312,
-							"end": 326,
+							"start": 319,
+							"end": 333,
 							"loc": {
 								"start": {
 									"line": 12,
-									"column": 9
+									"column": 10
 								},
 								"end": {
 									"line": 12,
-									"column": 23
+									"column": 24
 								}
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 312,
-								"end": 313,
+								"start": 319,
+								"end": 320,
 								"loc": {
 									"start": {
 										"line": 12,
-										"column": 9
+										"column": 10
 									},
 									"end": {
 										"line": 12,
-										"column": 10
+										"column": 11
 									}
 								},
 								"name": "a",
@@ -491,23 +491,23 @@
 									{
 										"type": "Block",
 										"value": " c ",
-										"start": 314,
-										"end": 321
+										"start": 321,
+										"end": 328
 									}
 								]
 							},
 							"exported": {
 								"type": "Identifier",
-								"start": 325,
-								"end": 326,
+								"start": 332,
+								"end": 333,
 								"loc": {
 									"start": {
 										"line": 12,
-										"column": 22
+										"column": 23
 									},
 									"end": {
 										"line": 12,
-										"column": 23
+										"column": 24
 									}
 								},
 								"name": "b"
@@ -517,16 +517,16 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 333,
-						"end": 336,
+						"start": 341,
+						"end": 344,
 						"loc": {
 							"start": {
 								"line": 12,
-								"column": 30
+								"column": 32
 							},
 							"end": {
 								"line": 12,
-								"column": 33
+								"column": 35
 							}
 						},
 						"value": "y",
@@ -536,8 +536,8 @@
 						{
 							"type": "Line",
 							"value": " export specifier rename comment with re-export",
-							"start": 253,
-							"end": 302
+							"start": 259,
+							"end": 308
 						}
 					]
 				}

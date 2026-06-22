@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 75,
+	"end": 74,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -30,12 +30,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 74,
+		"end": 73,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 65,
+			"end": 64,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -50,7 +50,7 @@
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 20,
-					"end": 64,
+					"end": 63,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -80,7 +80,7 @@
 					"typeAnnotation": {
 						"type": "TSTypeLiteral",
 						"start": 29,
-						"end": 63,
+						"end": 62,
 						"loc": {
 							"start": {
 								"line": 2,
@@ -95,7 +95,7 @@
 							{
 								"type": "TSMethodSignature",
 								"start": 33,
-								"end": 60,
+								"end": 59,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -197,8 +197,8 @@
 								],
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 53,
-									"end": 59,
+									"start": 52,
+									"end": 58,
 									"loc": {
 										"start": {
 											"line": 5,
@@ -211,8 +211,8 @@
 									},
 									"typeAnnotation": {
 										"type": "TSVoidKeyword",
-										"start": 55,
-										"end": 59,
+										"start": 54,
+										"end": 58,
 										"loc": {
 											"start": {
 												"line": 5,

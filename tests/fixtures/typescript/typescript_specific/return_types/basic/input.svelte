@@ -11,7 +11,7 @@
 		method(): void {},
 		get x(): number {
 			return 0;
-		},
+		}
 	};
 	class A {
 		method(): number {

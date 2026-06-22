@@ -1,18 +1,18 @@
 <script lang="ts">
 	obj.method(
-		a,
+		a
 		// comment
 	);
 
 	obj
 		.method(
-			b,
+			b
 			// line
 		)
 		.next();
 
 	obj.method(
-		c,
+		c
 		/* block */
 		// line
 	);

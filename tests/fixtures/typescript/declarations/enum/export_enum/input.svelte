@@ -2,11 +2,11 @@
 	export enum A {
 		X,
 		Y,
-		Z,
+		Z
 	}
 
 	export const enum B {
 		X = 1,
-		Y = 0,
+		Y = 0
 	}
 </script>

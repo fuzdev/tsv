@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 305,
+	"end": 302,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " Constructor call - bug: trailing comment is stripped",
-			"start": 91,
-			"end": 146,
+			"start": 90,
+			"end": 145,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -61,8 +61,8 @@
 		{
 			"type": "Line",
 			"value": " comment",
-			"start": 167,
-			"end": 177,
+			"start": 166,
+			"end": 176,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " Multiple trailing comments in constructor",
-			"start": 192,
-			"end": 236,
+			"start": 190,
+			"end": 234,
 			"loc": {
 				"start": {
 					"line": 14,
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " comment 1",
-			"start": 257,
-			"end": 269,
+			"start": 255,
+			"end": 267,
 			"loc": {
 				"start": {
 					"line": 16,
@@ -109,16 +109,16 @@
 		{
 			"type": "Line",
 			"value": " comment 2",
-			"start": 278,
-			"end": 290,
+			"start": 275,
+			"end": 287,
 			"loc": {
 				"start": {
 					"line": 17,
-					"column": 8
+					"column": 7
 				},
 				"end": {
 					"line": 17,
-					"column": 20
+					"column": 19
 				}
 			}
 		}
@@ -126,12 +126,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 304,
+		"end": 301,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 295,
+			"end": 292,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -146,7 +146,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 54,
-					"end": 88,
+					"end": 87,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -160,7 +160,7 @@
 					"expression": {
 						"type": "CallExpression",
 						"start": 54,
-						"end": 87,
+						"end": 86,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -242,8 +242,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 148,
-					"end": 189,
+					"start": 147,
+					"end": 187,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -256,8 +256,8 @@
 					},
 					"expression": {
 						"type": "NewExpression",
-						"start": 148,
-						"end": 188,
+						"start": 147,
+						"end": 186,
 						"loc": {
 							"start": {
 								"line": 9,
@@ -270,8 +270,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 152,
-							"end": 157,
+							"start": 151,
+							"end": 156,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -287,8 +287,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 161,
-								"end": 165,
+								"start": 160,
+								"end": 164,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -304,15 +304,15 @@
 									{
 										"type": "Line",
 										"value": " comment",
-										"start": 167,
-										"end": 177
+										"start": 166,
+										"end": 176
 									}
 								]
 							},
 							{
 								"type": "Identifier",
-								"start": 180,
-								"end": 184,
+								"start": 179,
+								"end": 183,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -331,15 +331,15 @@
 						{
 							"type": "Line",
 							"value": " Constructor call - bug: trailing comment is stripped",
-							"start": 91,
-							"end": 146
+							"start": 90,
+							"end": 145
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 238,
-					"end": 294,
+					"start": 236,
+					"end": 291,
 					"loc": {
 						"start": {
 							"line": 15,
@@ -352,8 +352,8 @@
 					},
 					"expression": {
 						"type": "NewExpression",
-						"start": 238,
-						"end": 293,
+						"start": 236,
+						"end": 290,
 						"loc": {
 							"start": {
 								"line": 15,
@@ -366,8 +366,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 242,
-							"end": 247,
+							"start": 240,
+							"end": 245,
 							"loc": {
 								"start": {
 									"line": 15,
@@ -383,8 +383,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 251,
-								"end": 255,
+								"start": 249,
+								"end": 253,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -400,15 +400,15 @@
 									{
 										"type": "Line",
 										"value": " comment 1",
-										"start": 257,
-										"end": 269
+										"start": 255,
+										"end": 267
 									}
 								]
 							},
 							{
 								"type": "Identifier",
-								"start": 272,
-								"end": 276,
+								"start": 270,
+								"end": 274,
 								"loc": {
 									"start": {
 										"line": 17,
@@ -424,8 +424,8 @@
 									{
 										"type": "Line",
 										"value": " comment 2",
-										"start": 278,
-										"end": 290
+										"start": 275,
+										"end": 287
 									}
 								]
 							}
@@ -435,8 +435,8 @@
 						{
 							"type": "Line",
 							"value": " Multiple trailing comments in constructor",
-							"start": 192,
-							"end": 236
+							"start": 190,
+							"end": 234
 						}
 					]
 				}

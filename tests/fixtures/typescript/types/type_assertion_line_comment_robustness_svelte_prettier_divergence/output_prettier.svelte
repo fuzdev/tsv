@@ -6,7 +6,7 @@
 	// object operand after `>` goes on the continuation line (not the cast-hug layout)
 	const b = <
 		T // c
-	>{x: 1};
+	>{ x: 1 };
 	// block + line comment together trailing `<`, both kept on the `<` line
 	const c = <
 		/* b */ // c

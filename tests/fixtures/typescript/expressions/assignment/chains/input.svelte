@@ -17,7 +17,7 @@
 	const f = (g = (x) => (y) => x + y);
 
 	// Chain with object
-	obj1 = obj2 = {key: 'value'};
+	obj1 = obj2 = { key: 'value' };
 
 	// Chain exceeding line width
 	veryLongVariableNameHere =
@@ -39,6 +39,6 @@
 
 	// Nested in object
 	const nested = {
-		prop: (a = b = c = 1),
+		prop: (a = b = c = 1)
 	};
 </script>

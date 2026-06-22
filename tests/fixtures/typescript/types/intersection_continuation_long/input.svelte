@@ -1,6 +1,6 @@
 <script lang="ts">
 	// Short - stays inline
-	const a: A & B & {c: C} = $props();
+	const a: A & B & { c: C } = $props();
 
 	// Long with type literal - wraps at & with continuation indentation
 	const {

@@ -8,14 +8,14 @@ and its constraint/default value (`R extends\n// c\nA`, `U =\n// c\nV`).
 ```
 U =
 	// c
-	V,
+	V
 ```
 
 **Prettier**: pulls the first leading comment up onto the keyword line:
 
 ```
 U = // c
-	V,
+	V
 ```
 
 Prettier is **non-idempotent** getting there — its first pass lands the value at

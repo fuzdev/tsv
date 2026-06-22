@@ -14,7 +14,7 @@
 		undefined,
 		symbol,
 		bigint,
-		neverrrrrrrrrrrrrrrrr,
+		neverrrrrrrrrrrrrrrrr
 	];
 
 	// Labeled tuples
@@ -28,6 +28,6 @@
 		second: number,
 		third: boolean,
 		fourth: object,
-		fifth: neverrrrrrrrrrrrr,
+		fifth: neverrrrrrrrrrrrr
 	];
 </script>

@@ -1,5 +1,5 @@
 <script>
 	let a = {
-		*/* comment */ b() {},
+		*/* comment */ b() {}
 	};
 </script>

@@ -4,8 +4,8 @@
 	const B = class extends Base<T> {};
 
 	// Object-literal type arg hugs the angle bracket — both forms
-	class C extends Base<{a: string; b: number}> {}
-	const D = class extends Base<{a: string; b: number}> {};
+	class C extends Base<{ a: string; b: number }> {}
+	const D = class extends Base<{ a: string; b: number }> {};
 
 	// Multiple type args — both forms
 	class E extends Base<T, U> {}

@@ -31,7 +31,8 @@ const PRETTIER_OPTIONS = {
 	useTabs: true,
 	printWidth: 100,
 	singleQuote: true,
-	bracketSpacing: false,
+	bracketSpacing: true,
+	trailingComma: 'none',
 } as const;
 
 export class CanonicalImplementation implements TsvImplementation {

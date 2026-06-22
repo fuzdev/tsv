@@ -11,7 +11,7 @@
 		bbbbbbbb,
 		cccccccc,
 		dddddddd,
-		eeeeeeeeeeeeeeeeeeeeeeee,
+		eeeeeeeeeeeeeeeeeeeeeeee
 	) {}
 
 	// Class expression — same superclass call breaks identically
@@ -20,6 +20,6 @@
 		bbbbbbbb,
 		cccccccc,
 		dddddddd,
-		eeeeeeeeeeeeeeeeeeeeeeee,
+		eeeeeeeeeeeeeeeeeeeeeeee
 	) {};
 </script>

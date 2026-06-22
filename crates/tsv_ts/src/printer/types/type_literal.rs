@@ -334,15 +334,24 @@ impl<'a> Printer<'a> {
         let mut member_parts = vec![];
         let mut prev_end = t.span.start + 1; // after opening brace
 
-        // Emit the first member's leading block comments. The force_multiline
-        // branch handles them per-member via `build_multiline_member_prefix_doc`,
-        // but the width-aware branch below does not — without this a union-member
-        // object's interior leading comment is dropped (`{ /* c */ a: 1 } | B`).
-        // Mirrors the width-aware branch of `build_type_literal_doc_inner`.
-        if !force_multiline && let Some(first) = t.members.first() {
-            member_parts.extend(
-                self.build_type_literal_leading_comments_inline(t.span.start, first.span().start),
-            );
+        // Width-aware: the opening bracketSpacing boundary leads (a space when flat
+        // `{ a }`, a newline when broken), THEN the first member's leading block
+        // comments, so the padding sits before the comment (`{ /* c */ a }`).
+        // The force_multiline branch handles leading comments per-member via
+        // `build_multiline_member_prefix_doc`; the width-aware branch does not —
+        // without this a union-member object's interior leading comment is dropped
+        // (`{ /* c */ a: 1 } | B`). Mirrors the width-aware branch of
+        // `build_type_literal_doc_inner`.
+        if !force_multiline {
+            member_parts.push(d.bracket_spacing());
+            if let Some(first) = t.members.first() {
+                member_parts.extend(
+                    self.build_type_literal_leading_comments_inline(
+                        t.span.start,
+                        first.span().start,
+                    ),
+                );
+            }
         }
 
         for (i, m) in t.members.iter().enumerate() {
@@ -378,8 +387,13 @@ impl<'a> Printer<'a> {
                     upper_bound,
                 ));
             } else {
-                // Width-aware: softlines, conditional semicolons
-                member_parts.push(d.softline());
+                // Width-aware: softlines, conditional semicolons. The opening
+                // bracketSpacing boundary precedes the first member (emitted before
+                // the loop); subsequent members keep a softline (the inter-member
+                // flat space is the non-last `if_break(empty, " ")` below).
+                if !is_first {
+                    member_parts.push(d.softline());
+                }
                 member_parts.push(self.build_type_member_doc_inner(m));
 
                 // Handle trailing comments - preserve position relative to semicolon
@@ -468,10 +482,13 @@ impl<'a> Printer<'a> {
         let members_doc =
             self.build_type_literal_members_only_doc_for_alignment(obj, force_multiline);
 
+        // Closing inner boundary: a hardline when forced multiline, else the
+        // bracketSpacing boundary (a space when flat `{ a }`, a newline when the
+        // group breaks).
         let line_doc = if force_multiline {
             d.hardline()
         } else {
-            d.softline()
+            d.bracket_spacing()
         };
 
         d.group(d.concat(&[
@@ -600,7 +617,10 @@ impl<'a> Printer<'a> {
             parts.push(d.indent(d.concat(&member_parts)));
             parts.push(d.hardline());
         } else if hug {
-            // Hugging mode: inline content with `; ` separators
+            // Hugging mode: inline content with `; ` separators. Under
+            // bracketSpacing the hug stays on one line, so the inner padding is a
+            // literal space (never a breakable boundary): `{ a: T; b: U }`.
+            parts.push(d.text(" "));
             // Preserve comment position relative to semicolon
             if let Some(first) = t.members.first() {
                 parts.extend(
@@ -638,24 +658,34 @@ impl<'a> Printer<'a> {
                     }
                 }
             }
+            // Closing bracketSpacing for the hug (literal space — see opening above).
+            parts.push(d.text(" "));
         } else {
-            // Width-aware format: stays inline if fits, wraps if too long
-            // Preserve comment position relative to semicolon
+            // Width-aware format: stays inline if fits, wraps if too long.
+            // The opening bracketSpacing boundary leads (a space when flat `{ a }`,
+            // a newline when broken), THEN any interior leading comments, so the
+            // padding sits before the comment (`{ /* c */ a }`, not `{/* c */ a }`).
+            let mut member_parts = vec![d.bracket_spacing()];
             if let Some(first) = t.members.first() {
-                parts.extend(
+                member_parts.extend(
                     self.build_type_literal_leading_comments_inline(
                         t.span.start,
                         first.span().start,
                     ),
                 );
             }
-            let mut member_parts = vec![];
             for (i, m) in t.members.iter().enumerate() {
+                let is_first = i == 0;
                 let is_last = i == t.members.len() - 1;
                 // Use content_end for comment detection (before trailing separator)
                 let member_content_end = m.content_end(self.source);
 
-                member_parts.push(d.softline());
+                // First member follows the opening boundary directly; subsequent
+                // members keep a softline — the inter-member flat space is emitted
+                // by the non-last `if_break(empty, " ")` below.
+                if !is_first {
+                    member_parts.push(d.softline());
+                }
                 member_parts.push(self.build_type_member_doc_inner(m));
 
                 let upper_bound = t
@@ -683,7 +713,7 @@ impl<'a> Printer<'a> {
                 }
             }
             parts.push(d.indent(d.concat(&member_parts)));
-            parts.push(d.softline());
+            parts.push(d.bracket_spacing());
         }
         parts.push(d.text("}"));
 

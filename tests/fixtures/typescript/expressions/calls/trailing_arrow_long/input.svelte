@@ -9,7 +9,7 @@
 		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
 		(x) => {
 			return y;
-		},
+		}
 	);
 
 	// Multiple short args, 100 chars - stays inline
@@ -24,6 +24,6 @@
 		'cccccccccccccccccccccccccccccccccccccc',
 		(x) => {
 			return y;
-		},
+		}
 	);
 </script>

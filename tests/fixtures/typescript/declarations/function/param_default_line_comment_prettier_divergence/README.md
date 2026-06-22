@@ -8,16 +8,16 @@ value (`function fn(p = // c\n\tv) {}`).
 ```
 function fn(
 	p = // c
-	v,
+	v
 ) {}
 ```
 
 **Prettier**: floats the comment out to trail the whole parameter, after the
-value and its comma:
+value:
 
 ```
 function fn(
-	p = v, // c
+	p = v // c
 ) {}
 ```
 

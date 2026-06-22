@@ -8,7 +8,7 @@
 	const aaaaaaaaaaaaaaa = a.fn(
 		(b: string, c: ReadonlyArray<string>, d: Record<string, unknown>) => {
 			return b;
-		},
+		}
 	);
 
 	// Short control — stays inline

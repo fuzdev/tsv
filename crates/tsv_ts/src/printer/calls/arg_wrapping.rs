@@ -138,7 +138,7 @@ fn wrap_call(
         CallBreakStyle::Hard => d.concat(&[
             callee,
             d.text("("),
-            d.indent(d.concat(&[d.hardline(), args, d.text(","), post_comma])),
+            d.indent(d.concat(&[d.hardline(), args, post_comma])),
             d.hardline(),
             d.text(")"),
         ]),
@@ -386,18 +386,19 @@ pub(super) fn wrap_args_with_soft_breaks(d: &DocArena, prefix: &'static str, arg
     ]))
 }
 
-/// Wrap a single huggable argument - hugs opening paren but adds trailing comma
-/// when the content breaks internally.
+/// Wrap a single huggable argument - hugs opening paren and breaks the closing
+/// paren onto its own line when the content breaks internally.
 ///
 /// Used for expressions with natural break points (objects, arrays, ternaries)
-/// that should hug the opening paren but still get proper trailing comma handling.
-/// Structure: `prefix + arg + if_break(",\n") + ")"`
+/// that should hug the opening paren. Under tsv's hardcoded `trailingComma: 'none'`
+/// no trailing comma is added; the close still drops to its own line when broken.
+/// Structure: `prefix + arg + if_break("\n") + ")"`
 #[inline]
 pub(super) fn wrap_huggable_arg(d: &DocArena, prefix: &'static str, arg: DocId) -> DocId {
     d.group(d.concat(&[
         d.text(prefix),
         arg,
-        d.if_break(d.concat(&[d.text(","), d.line()]), d.empty()),
+        d.if_break(d.line(), d.empty()),
         d.text(")"),
     ]))
 }
@@ -528,7 +529,7 @@ pub(crate) fn build_expand_all_args(d: &DocArena, callee: DocId, all_args_broken
         callee,
         d.group_break(d.concat(&[
             d.text("("),
-            d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
+            d.indent(d.concat(&[d.line(), all_args_broken])),
             d.line(),
             d.text(")"),
         ])),
@@ -552,7 +553,7 @@ pub(super) fn build_chain_expand_all_args(
 ) -> DocId {
     d.group_break(d.concat(&[
         d.text(prefix),
-        d.indent(d.concat(&[d.line(), all_args_broken, d.text(",")])),
+        d.indent(d.concat(&[d.line(), all_args_broken])),
         d.line(),
         d.text(")"),
     ]))
@@ -629,7 +630,7 @@ pub(crate) fn build_break_body_state(
         d.concat(head_parts),
         sig_doc,
         d.text(" =>"),
-        d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
+        d.indent(d.concat(&[d.hardline(), body_doc])),
         d.hardline(),
         d.text(")"),
     ])
@@ -682,7 +683,7 @@ pub(crate) fn build_arrow_call_body_states(
             d.text("("),
             sig_doc,
             d.text(" =>"),
-            d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
+            d.indent(d.concat(&[d.hardline(), body_doc])),
             d.hardline(),
             d.text(")"),
         ]),

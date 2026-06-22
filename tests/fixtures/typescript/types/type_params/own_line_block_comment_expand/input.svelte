@@ -3,14 +3,14 @@
 	function fn1<
 		T,
 		/* c */
-		U,
+		U
 	>() {}
 
 	// Own-line block comment before first param forces expansion
 	function fn2<
 		/* c */
 		T,
-		U,
+		U
 	>() {}
 
 	// Multiple own-line block comments between params
@@ -18,7 +18,7 @@
 		T,
 		/* c1 */
 		/* c2 */
-		U,
+		U
 	>() {}
 
 	// Same-line block comment does NOT force expansion (short)

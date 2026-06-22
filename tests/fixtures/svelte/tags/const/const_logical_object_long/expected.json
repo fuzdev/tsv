@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 239,
+	"end": 238,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -23,7 +23,7 @@
 			{
 				"type": "EachBlock",
 				"start": 74,
-				"end": 238,
+				"end": 237,
 				"expression": {
 					"type": "Identifier",
 					"start": 81,
@@ -53,7 +53,7 @@
 						{
 							"type": "ConstTag",
 							"start": 97,
-							"end": 225,
+							"end": 224,
 							"declaration": {
 								"type": "VariableDeclaration",
 								"kind": "const",
@@ -81,7 +81,7 @@
 										"init": {
 											"type": "LogicalExpression",
 											"start": 109,
-											"end": 224,
+											"end": 223,
 											"loc": {
 												"start": {
 													"line": 3,
@@ -112,7 +112,7 @@
 											"right": {
 												"type": "ObjectExpression",
 												"start": 117,
-												"end": 224,
+												"end": 223,
 												"loc": {
 													"start": {
 														"line": 3,
@@ -336,28 +336,28 @@
 											}
 										},
 										"start": 105,
-										"end": 224
+										"end": 223
 									}
 								],
 								"start": 99,
-								"end": 224
+								"end": 223
 							}
 						},
 						{
 							"type": "Text",
-							"start": 225,
-							"end": 227,
+							"start": 224,
+							"end": 226,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 227,
-							"end": 230,
+							"start": 226,
+							"end": 229,
 							"expression": {
 								"type": "Identifier",
-								"start": 228,
-								"end": 229,
+								"start": 227,
+								"end": 228,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -373,8 +373,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 230,
-							"end": 231,
+							"start": 229,
+							"end": 230,
 							"raw": "\n",
 							"data": "\n"
 						}

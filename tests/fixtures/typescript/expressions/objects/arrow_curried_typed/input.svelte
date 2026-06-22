@@ -3,6 +3,6 @@
 		method:
 			(x: T): H =>
 			(y) =>
-				x + y,
+				x + y
 	};
 </script>

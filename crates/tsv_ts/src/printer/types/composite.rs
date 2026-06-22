@@ -733,15 +733,17 @@ impl<'a> Printer<'a> {
                 d.text("}"),
             ])
         } else {
-            // One-line source: width-aware (stays inline if fits, wraps if too long)
-            let mut all_parts = vec![d.softline()];
+            // One-line source: width-aware (stays inline if fits, wraps if too long).
+            // bracketSpacing boundaries: a space when flat (`{ [K in T]: U }`), a
+            // newline when broken.
+            let mut all_parts = vec![d.bracket_spacing()];
             all_parts.extend(body_parts);
             all_parts.push(d.if_break(d.text(";"), d.empty()));
 
             d.group(d.concat(&[
                 d.text("{"),
                 d.indent(d.concat(&all_parts)),
-                d.softline(),
+                d.bracket_spacing(),
                 d.text("}"),
             ]))
         }
@@ -866,9 +868,9 @@ impl<'a> Printer<'a> {
                 prev_end =
                     self.emit_multiline_comma_with_comments(&mut inner_parts, elem_end, next_start);
             } else {
-                // Last element: trailing comma + comments before `]`
+                // Last element: no trailing comma under `trailingComma: 'none'`, then
+                // comments before `]`.
                 let before_close = t.span.end - 1;
-                inner_parts.push(d.text(","));
                 inner_parts.extend(self.build_trailing_comments_multiline(elem_end, before_close));
                 prev_end = before_close;
             }

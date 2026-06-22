@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 402,
+	"end": 399,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -141,8 +141,8 @@
 		{
 			"type": "Block",
 			"value": " g ",
-			"start": 242,
-			"end": 249,
+			"start": 241,
+			"end": 248,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -157,8 +157,8 @@
 		{
 			"type": "Block",
 			"value": " h ",
-			"start": 276,
-			"end": 283,
+			"start": 274,
+			"end": 281,
 			"loc": {
 				"start": {
 					"line": 16,
@@ -173,8 +173,8 @@
 		{
 			"type": "Line",
 			"value": " Namespace/module declarations",
-			"start": 298,
-			"end": 330,
+			"start": 295,
+			"end": 327,
 			"loc": {
 				"start": {
 					"line": 20,
@@ -189,8 +189,8 @@
 		{
 			"type": "Block",
 			"value": " i ",
-			"start": 350,
-			"end": 357,
+			"start": 347,
+			"end": 354,
 			"loc": {
 				"start": {
 					"line": 21,
@@ -205,8 +205,8 @@
 		{
 			"type": "Block",
 			"value": " j ",
-			"start": 379,
-			"end": 386,
+			"start": 376,
+			"end": 383,
 			"loc": {
 				"start": {
 					"line": 22,
@@ -222,12 +222,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 401,
+		"end": 398,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 392,
+			"end": 389,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -566,7 +566,7 @@
 				{
 					"type": "TSEnumDeclaration",
 					"start": 205,
-					"end": 229,
+					"end": 228,
 					"loc": {
 						"start": {
 							"line": 10,
@@ -645,8 +645,8 @@
 				},
 				{
 					"type": "TSEnumDeclaration",
-					"start": 231,
-					"end": 261,
+					"start": 230,
+					"end": 259,
 					"loc": {
 						"start": {
 							"line": 13,
@@ -660,8 +660,8 @@
 					"const": true,
 					"id": {
 						"type": "Identifier",
-						"start": 250,
-						"end": 251,
+						"start": 249,
+						"end": 250,
 						"loc": {
 							"start": {
 								"line": 13,
@@ -677,16 +677,16 @@
 							{
 								"type": "Block",
 								"value": " g ",
-								"start": 242,
-								"end": 249
+								"start": 241,
+								"end": 248
 							}
 						]
 					},
 					"members": [
 						{
 							"type": "TSEnumMember",
-							"start": 256,
-							"end": 257,
+							"start": 255,
+							"end": 256,
 							"loc": {
 								"start": {
 									"line": 14,
@@ -699,8 +699,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 256,
-								"end": 257,
+								"start": 255,
+								"end": 256,
 								"loc": {
 									"start": {
 										"line": 14,
@@ -718,8 +718,8 @@
 				},
 				{
 					"type": "TSEnumDeclaration",
-					"start": 263,
-					"end": 295,
+					"start": 261,
+					"end": 292,
 					"loc": {
 						"start": {
 							"line": 16,
@@ -733,8 +733,8 @@
 					"declare": true,
 					"id": {
 						"type": "Identifier",
-						"start": 284,
-						"end": 285,
+						"start": 282,
+						"end": 283,
 						"loc": {
 							"start": {
 								"line": 16,
@@ -750,16 +750,16 @@
 							{
 								"type": "Block",
 								"value": " h ",
-								"start": 276,
-								"end": 283
+								"start": 274,
+								"end": 281
 							}
 						]
 					},
 					"members": [
 						{
 							"type": "TSEnumMember",
-							"start": 290,
-							"end": 291,
+							"start": 288,
+							"end": 289,
 							"loc": {
 								"start": {
 									"line": 17,
@@ -772,8 +772,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 290,
-								"end": 291,
+								"start": 288,
+								"end": 289,
 								"loc": {
 									"start": {
 										"line": 17,
@@ -791,8 +791,8 @@
 				},
 				{
 					"type": "TSModuleDeclaration",
-					"start": 332,
-					"end": 362,
+					"start": 329,
+					"end": 359,
 					"loc": {
 						"start": {
 							"line": 21,
@@ -805,8 +805,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 358,
-						"end": 359,
+						"start": 355,
+						"end": 356,
 						"loc": {
 							"start": {
 								"line": 21,
@@ -822,15 +822,15 @@
 							{
 								"type": "Block",
 								"value": " i ",
-								"start": 350,
-								"end": 357
+								"start": 347,
+								"end": 354
 							}
 						]
 					},
 					"body": {
 						"type": "TSModuleBlock",
-						"start": 360,
-						"end": 362,
+						"start": 357,
+						"end": 359,
 						"loc": {
 							"start": {
 								"line": 21,
@@ -848,15 +848,15 @@
 						{
 							"type": "Line",
 							"value": " Namespace/module declarations",
-							"start": 298,
-							"end": 330
+							"start": 295,
+							"end": 327
 						}
 					]
 				},
 				{
 					"type": "TSModuleDeclaration",
-					"start": 364,
-					"end": 391,
+					"start": 361,
+					"end": 388,
 					"loc": {
 						"start": {
 							"line": 22,
@@ -869,8 +869,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 387,
-						"end": 388,
+						"start": 384,
+						"end": 385,
 						"loc": {
 							"start": {
 								"line": 22,
@@ -886,15 +886,15 @@
 							{
 								"type": "Block",
 								"value": " j ",
-								"start": 379,
-								"end": 386
+								"start": 376,
+								"end": 383
 							}
 						]
 					},
 					"body": {
 						"type": "TSModuleBlock",
-						"start": 389,
-						"end": 391,
+						"start": 386,
+						"end": 388,
 						"loc": {
 							"start": {
 								"line": 22,

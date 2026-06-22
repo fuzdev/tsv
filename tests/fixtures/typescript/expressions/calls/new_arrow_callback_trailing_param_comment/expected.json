@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 81,
+	"end": 79,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,16 +13,16 @@
 		{
 			"type": "Line",
 			"value": " comment",
-			"start": 45,
-			"end": 55,
+			"start": 44,
+			"end": 54,
 			"loc": {
 				"start": {
 					"line": 4,
-					"column": 14
+					"column": 13
 				},
 				"end": {
 					"line": 4,
-					"column": 24
+					"column": 23
 				}
 			}
 		}
@@ -30,12 +30,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 80,
+		"end": 78,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 71,
+			"end": 69,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -50,7 +50,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 20,
-					"end": 70,
+					"end": 68,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -64,7 +64,7 @@
 					"expression": {
 						"type": "NewExpression",
 						"start": 20,
-						"end": 69,
+						"end": 67,
 						"loc": {
 							"start": {
 								"line": 2,
@@ -95,7 +95,7 @@
 							{
 								"type": "ArrowFunctionExpression",
 								"start": 29,
-								"end": 65,
+								"end": 64,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -160,16 +160,16 @@
 											{
 												"type": "Line",
 												"value": " comment",
-												"start": 45,
-												"end": 55
+												"start": 44,
+												"end": 54
 											}
 										]
 									}
 								],
 								"body": {
 									"type": "BlockStatement",
-									"start": 63,
-									"end": 65,
+									"start": 62,
+									"end": 64,
 									"loc": {
 										"start": {
 											"line": 5,

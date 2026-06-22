@@ -159,7 +159,7 @@ pub(super) fn build_call_doc_with_wrapping(
                 callee,
                 d.text("("),
                 d.concat(&paren_line_prefix),
-                d.indent(d.concat(&[d.hardline(), d.concat(&inner), d.text(",")])),
+                d.indent(d.concat(&[d.hardline(), d.concat(&inner)])),
                 d.hardline(),
                 d.text(")"),
             ]);
@@ -330,7 +330,7 @@ pub(super) fn build_call_doc_with_wrapping(
                     return d.concat(&[
                         callee,
                         d.text("("),
-                        d.indent(d.concat(&[d.softline(), arrow_doc, d.text(",")])),
+                        d.indent(d.concat(&[d.softline(), arrow_doc])),
                         d.softline(),
                         d.text(")"),
                     ]);
@@ -361,7 +361,6 @@ pub(super) fn build_call_doc_with_wrapping(
                         let inner = d.concat(&[
                             d.text("("),
                             d.group_break(arrow_doc),
-                            d.text(","),
                             d.softline(),
                             d.text(")"),
                         ]);
@@ -392,7 +391,7 @@ pub(super) fn build_call_doc_with_wrapping(
                     d.concat(&[
                         callee,
                         d.text("("),
-                        d.indent(d.concat(&[d.softline(), arrow_doc, d.text(",")])),
+                        d.indent(d.concat(&[d.softline(), arrow_doc])),
                         d.softline(),
                         d.text(")"),
                     ]),
@@ -500,16 +499,16 @@ pub(super) fn build_call_doc_with_wrapping(
                         );
 
                         // Build state 1: break version with params on call line, body breaks
-                        // Structure: callee + "(" + sig + " =>" + indent([hardline, body, ","]) + hardline + ")"
+                        // Structure: callee + "(" + sig + " =>" + indent([hardline, body]) + hardline + ")"
                         // First hardline: breaks after "=>"
                         // Second hardline: breaks before ")" to put closing paren on its own line
-                        // Note: Use literal "," not trailing_comma() because state[1] is used in Flat mode
+                        // No trailing comma (trailingComma: 'none').
                         let state_break = d.concat(&[
                             callee,
                             d.text("("),
                             sig_doc,
                             d.text(" =>"),
-                            d.indent(d.concat(&[d.hardline(), body_doc, d.text(",")])),
+                            d.indent(d.concat(&[d.hardline(), body_doc])),
                             d.hardline(),
                             d.text(")"),
                         ]);
@@ -1158,12 +1157,12 @@ pub(super) fn build_call_doc_with_wrapping(
                     }
                 }
 
-                // (2) Same-line line comment, after the comma, via `line_suffix`.
+                // (2) Same-line line comment after the last arg, via `line_suffix`.
+                // No trailing comma precedes it (trailingComma: 'none'); we still mark
+                // the last-arg comma slot accounted for so a following own-line dangling
+                // comment doesn't insert one.
                 if pc.has_trailing_line() {
-                    if !has_trailing_comma_on_last {
-                        arg_parts.push(d.text(","));
-                        has_trailing_comma_on_last = true;
-                    }
+                    has_trailing_comma_on_last = true;
 
                     // Build comment docs: " // comment" for each
                     let comment_docs: Vec<_> = pc
@@ -1183,15 +1182,12 @@ pub(super) fn build_call_doc_with_wrapping(
                 }
 
                 // (3) Own-line comments (block or line) after the last arg, before the
-                // closing paren — emitted after the trailing comma, each on its own line.
-                // Also handles spread with stripped parens via effective_arg_end.
+                // closing paren — emitted each on its own line, with no trailing comma
+                // (trailingComma: 'none'). Also handles spread with stripped parens via
+                // effective_arg_end.
                 if !pc.leading.is_empty() {
                     force_expansion = true;
-                    pc.emit_last_arg_dangling_comments(
-                        &mut arg_parts,
-                        printer,
-                        &mut has_trailing_comma_on_last,
-                    );
+                    pc.emit_dangling_comments(&mut arg_parts, printer);
                 }
             }
         }
@@ -1202,13 +1198,11 @@ pub(super) fn build_call_doc_with_wrapping(
         // Use a group with break_parent instead of literal hardlines to avoid
         // propagating breaks to parent (e.g., assignment) during fits().
         if force_expansion {
-            // Build manually when we have trailing comments (we already added our commas)
-            // Add trailing comma after last arg ONLY if we didn't already add one
-            let trailing = if has_trailing_comma_on_last {
-                d.empty()
-            } else {
-                d.text(",")
-            };
+            // No trailing comma after the last arg (trailingComma: 'none'). A comma may
+            // still have been pushed inline by the dangling-comment emit (which splits
+            // same-line comments around it); `has_trailing_comma_on_last` tracks that for
+            // the soft-break path below, but nothing is appended here.
+            let trailing = d.empty();
             // Use hardlines for the expansion. The assignment should use NeverBreakAfterOperator
             // for calls since they handle their own expansion.
             // Wrap in group_break so line() separators between non-commented args

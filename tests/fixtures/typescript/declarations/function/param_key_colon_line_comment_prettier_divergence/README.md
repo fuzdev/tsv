@@ -9,7 +9,7 @@ keeps the comment after the name and drops the `: type` to a continuation line
 // tsv (continuation indents)   // prettier (flush)
 function fn(                    function fn(
 	a // c                      	a // c
-		: string,               	: string,
+		: string                	: string
 ) {}                            ) {}
 ```
 

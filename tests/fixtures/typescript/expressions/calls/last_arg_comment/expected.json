@@ -1,0 +1,168 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 214,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " block comment trailing the last argument is preserved in place",
+			"start": 10,
+			"end": 75,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 186,
+			"end": 199,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 52
+				},
+				"end": {
+					"line": 5,
+					"column": 65
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 213,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 204,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 77,
+					"end": 203,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 77,
+						"end": 202,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 77,
+							"end": 79,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 83,
+								"end": 132,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 51
+									}
+								},
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							{
+								"type": "Identifier",
+								"start": 136,
+								"end": 185,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 51
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " comment ",
+										"start": 186,
+										"end": 199
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment trailing the last argument is preserved in place",
+							"start": 10,
+							"end": 75
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 337,
+	"end": 336,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -46,12 +46,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 336,
+		"end": 335,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 327,
+			"end": 326,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -66,7 +66,7 @@
 				{
 					"type": "ClassDeclaration",
 					"start": 20,
-					"end": 326,
+					"end": 325,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -97,7 +97,7 @@
 					"body": {
 						"type": "ClassBody",
 						"start": 28,
-						"end": 326,
+						"end": 325,
 						"loc": {
 							"start": {
 								"line": 2,
@@ -379,7 +379,7 @@
 							{
 								"type": "MethodDefinition",
 								"start": 218,
-								"end": 323,
+								"end": 322,
 								"loc": {
 									"start": {
 										"line": 7,
@@ -412,7 +412,7 @@
 								"value": {
 									"type": "FunctionExpression",
 									"start": 228,
-									"end": 323,
+									"end": 322,
 									"loc": {
 										"start": {
 											"line": 7,
@@ -493,8 +493,8 @@
 									],
 									"returnType": {
 										"type": "TSTypeAnnotation",
-										"start": 284,
-										"end": 320,
+										"start": 283,
+										"end": 319,
 										"loc": {
 											"start": {
 												"line": 9,
@@ -507,8 +507,8 @@
 										},
 										"typeAnnotation": {
 											"type": "TSTypeReference",
-											"start": 286,
-											"end": 320,
+											"start": 285,
+											"end": 319,
 											"loc": {
 												"start": {
 													"line": 9,
@@ -521,8 +521,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 286,
-												"end": 293,
+												"start": 285,
+												"end": 292,
 												"loc": {
 													"start": {
 														"line": 9,
@@ -537,8 +537,8 @@
 											},
 											"typeArguments": {
 												"type": "TSTypeParameterInstantiation",
-												"start": 293,
-												"end": 320,
+												"start": 292,
+												"end": 319,
 												"loc": {
 													"start": {
 														"line": 9,
@@ -552,8 +552,8 @@
 												"params": [
 													{
 														"type": "TSUnionType",
-														"start": 294,
-														"end": 319,
+														"start": 293,
+														"end": 318,
 														"loc": {
 															"start": {
 																"line": 9,
@@ -567,8 +567,8 @@
 														"types": [
 															{
 																"type": "TSTypeReference",
-																"start": 294,
-																"end": 312,
+																"start": 293,
+																"end": 311,
 																"loc": {
 																	"start": {
 																		"line": 9,
@@ -581,8 +581,8 @@
 																},
 																"typeName": {
 																	"type": "Identifier",
-																	"start": 294,
-																	"end": 312,
+																	"start": 293,
+																	"end": 311,
 																	"loc": {
 																		"start": {
 																			"line": 9,
@@ -598,8 +598,8 @@
 															},
 															{
 																"type": "TSNullKeyword",
-																"start": 315,
-																"end": 319,
+																"start": 314,
+																"end": 318,
 																"loc": {
 																	"start": {
 																		"line": 9,
@@ -619,8 +619,8 @@
 									},
 									"body": {
 										"type": "BlockStatement",
-										"start": 321,
-										"end": 323,
+										"start": 320,
+										"end": 322,
 										"loc": {
 											"start": {
 												"line": 9,

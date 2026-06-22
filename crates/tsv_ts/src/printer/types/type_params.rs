@@ -114,9 +114,9 @@ impl<'a> Printer<'a> {
                     next_start,
                 );
             } else {
-                // Last param: trailing comma + comments before `>`
+                // Last param: no trailing comma under `trailingComma: 'none'`, then
+                // comments before `>`.
                 let before_close = decl.span.end - 1;
-                inner_parts.push(d.text(","));
                 inner_parts.extend(self.build_trailing_comments_multiline(param_end, before_close));
                 prev_end = before_close;
             }

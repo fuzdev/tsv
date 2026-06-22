@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 439,
+	"end": 437,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " with await - 101 chars",
-			"start": 293,
-			"end": 318,
+			"start": 292,
+			"end": 317,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -62,12 +62,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 438,
+		"end": 436,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 429,
+			"end": 427,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -275,7 +275,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 186,
-					"end": 290,
+					"end": 289,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -290,7 +290,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 192,
-							"end": 289,
+							"end": 288,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -320,7 +320,7 @@
 							"init": {
 								"type": "NewExpression",
 								"start": 196,
-								"end": 289,
+								"end": 288,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -467,8 +467,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 320,
-					"end": 428,
+					"start": 319,
+					"end": 426,
 					"loc": {
 						"start": {
 							"line": 11,
@@ -482,8 +482,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 326,
-							"end": 427,
+							"start": 325,
+							"end": 425,
 							"loc": {
 								"start": {
 									"line": 11,
@@ -496,8 +496,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 326,
-								"end": 327,
+								"start": 325,
+								"end": 326,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -512,8 +512,8 @@
 							},
 							"init": {
 								"type": "AwaitExpression",
-								"start": 330,
-								"end": 427,
+								"start": 329,
+								"end": 425,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -526,8 +526,8 @@
 								},
 								"argument": {
 									"type": "NewExpression",
-									"start": 336,
-									"end": 427,
+									"start": 335,
+									"end": 425,
 									"loc": {
 										"start": {
 											"line": 11,
@@ -540,8 +540,8 @@
 									},
 									"callee": {
 										"type": "Identifier",
-										"start": 340,
-										"end": 342,
+										"start": 339,
+										"end": 341,
 										"loc": {
 											"start": {
 												"line": 11,
@@ -557,8 +557,8 @@
 									"arguments": [
 										{
 											"type": "ArrowFunctionExpression",
-											"start": 343,
-											"end": 423,
+											"start": 342,
+											"end": 422,
 											"loc": {
 												"start": {
 													"line": 11,
@@ -576,8 +576,8 @@
 											"params": [
 												{
 													"type": "Identifier",
-													"start": 344,
-													"end": 345,
+													"start": 343,
+													"end": 344,
 													"loc": {
 														"start": {
 															"line": 11,
@@ -593,8 +593,8 @@
 											],
 											"body": {
 												"type": "CallExpression",
-												"start": 352,
-												"end": 423,
+												"start": 351,
+												"end": 422,
 												"loc": {
 													"start": {
 														"line": 12,
@@ -607,8 +607,8 @@
 												},
 												"callee": {
 													"type": "Identifier",
-													"start": 352,
-													"end": 354,
+													"start": 351,
+													"end": 353,
 													"loc": {
 														"start": {
 															"line": 12,
@@ -624,8 +624,8 @@
 												"arguments": [
 													{
 														"type": "Identifier",
-														"start": 355,
-														"end": 356,
+														"start": 354,
+														"end": 355,
 														"loc": {
 															"start": {
 																"line": 12,
@@ -640,8 +640,8 @@
 													},
 													{
 														"type": "Identifier",
-														"start": 358,
-														"end": 422,
+														"start": 357,
+														"end": 421,
 														"loc": {
 															"start": {
 																"line": 12,
@@ -668,8 +668,8 @@
 						{
 							"type": "Line",
 							"value": " with await - 101 chars",
-							"start": 293,
-							"end": 318
+							"start": 292,
+							"end": 317
 						}
 					]
 				}

@@ -1,7 +1,7 @@
 <script lang="ts">
 	arr.map(
 		(
-			a: string, // comment
-		) => {},
+			a: string // comment
+		) => {}
 	);
 </script>

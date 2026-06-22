@@ -15,5 +15,5 @@
 	export * from /* c */ 'd';
 
 	// block comment between from and source (with specifiers)
-	export {a} from /* c */ 'f';
+	export { a } from /* c */ 'f';
 </script>

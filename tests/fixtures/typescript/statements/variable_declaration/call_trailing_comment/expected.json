@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 209,
+	"end": 207,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -29,32 +29,32 @@
 		{
 			"type": "Line",
 			"value": " trailing comment",
-			"start": 122,
-			"end": 141,
+			"start": 121,
+			"end": 140,
 			"loc": {
 				"start": {
 					"line": 4,
-					"column": 11
+					"column": 10
 				},
 				"end": {
 					"line": 4,
-					"column": 30
+					"column": 29
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " trailing comment",
-			"start": 175,
-			"end": 194,
+			"start": 173,
+			"end": 192,
 			"loc": {
 				"start": {
 					"line": 8,
-					"column": 11
+					"column": 10
 				},
 				"end": {
 					"line": 8,
-					"column": 30
+					"column": 29
 				}
 			}
 		}
@@ -62,12 +62,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 208,
+		"end": 206,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 199,
+			"end": 197,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -82,7 +82,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 97,
-					"end": 145,
+					"end": 144,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -97,7 +97,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 103,
-							"end": 144,
+							"end": 143,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -127,7 +127,7 @@
 							"init": {
 								"type": "CallExpression",
 								"start": 107,
-								"end": 144,
+								"end": 143,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -175,8 +175,8 @@
 											{
 												"type": "Line",
 												"value": " trailing comment",
-												"start": 122,
-												"end": 141
+												"start": 121,
+												"end": 140
 											}
 										]
 									}
@@ -197,8 +197,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 148,
-					"end": 198,
+					"start": 147,
+					"end": 196,
 					"loc": {
 						"start": {
 							"line": 7,
@@ -212,8 +212,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 154,
-							"end": 197,
+							"start": 153,
+							"end": 195,
 							"loc": {
 								"start": {
 									"line": 7,
@@ -226,8 +226,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 154,
-								"end": 155,
+								"start": 153,
+								"end": 154,
 								"loc": {
 									"start": {
 										"line": 7,
@@ -242,8 +242,8 @@
 							},
 							"init": {
 								"type": "CallExpression",
-								"start": 158,
-								"end": 197,
+								"start": 157,
+								"end": 195,
 								"loc": {
 									"start": {
 										"line": 7,
@@ -256,8 +256,8 @@
 								},
 								"callee": {
 									"type": "MemberExpression",
-									"start": 158,
-									"end": 162,
+									"start": 157,
+									"end": 161,
 									"loc": {
 										"start": {
 											"line": 7,
@@ -270,8 +270,8 @@
 									},
 									"object": {
 										"type": "Identifier",
-										"start": 158,
-										"end": 159,
+										"start": 157,
+										"end": 158,
 										"loc": {
 											"start": {
 												"line": 7,
@@ -286,8 +286,8 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 160,
-										"end": 162,
+										"start": 159,
+										"end": 161,
 										"loc": {
 											"start": {
 												"line": 7,
@@ -306,8 +306,8 @@
 								"arguments": [
 									{
 										"type": "Literal",
-										"start": 166,
-										"end": 173,
+										"start": 165,
+										"end": 172,
 										"loc": {
 											"start": {
 												"line": 8,
@@ -324,8 +324,8 @@
 											{
 												"type": "Line",
 												"value": " trailing comment",
-												"start": 175,
-												"end": 194
+												"start": 173,
+												"end": 192
 											}
 										]
 									}

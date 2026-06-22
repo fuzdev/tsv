@@ -10,13 +10,12 @@
 
 	/* call arg 100 chars - stays inline */
 	fn(
-		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' + 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb1',
+		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' + 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb1'
 	);
 
 	/* call arg 101 chars - breaks at + */
 	fn(
-		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' +
-			'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb12',
+		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' + 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb12'
 	);
 
 	/* template 100 chars - stays inline */

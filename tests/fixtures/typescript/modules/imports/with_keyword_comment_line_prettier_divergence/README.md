@@ -5,7 +5,7 @@ makes prettier's `typescript` parser throw:
 
 ```
 import b from './b' // c2
-with {type: 'json'};
+with { type: 'json' };
 ```
 
 ```

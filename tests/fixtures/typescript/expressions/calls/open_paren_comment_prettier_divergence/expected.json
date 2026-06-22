@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 253,
+	"end": 250,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " line comment trailing `(` — multiple args",
-			"start": 74,
-			"end": 118,
+			"start": 73,
+			"end": 117,
 			"loc": {
 				"start": {
 					"line": 7,
@@ -61,8 +61,8 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 124,
-			"end": 129,
+			"start": 123,
+			"end": 128,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " block comment trailing `(`, then own-line leading comment",
-			"start": 146,
-			"end": 206,
+			"start": 144,
+			"end": 204,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -93,8 +93,8 @@
 		{
 			"type": "Block",
 			"value": " paren ",
-			"start": 212,
-			"end": 223,
+			"start": 210,
+			"end": 221,
 			"loc": {
 				"start": {
 					"line": 14,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " lead",
-			"start": 226,
-			"end": 233,
+			"start": 224,
+			"end": 231,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -126,12 +126,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 252,
+		"end": 249,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 243,
+			"end": 240,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -146,7 +146,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 53,
-					"end": 71,
+					"end": 70,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -160,7 +160,7 @@
 					"expression": {
 						"type": "CallExpression",
 						"start": 53,
-						"end": 70,
+						"end": 69,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -226,8 +226,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 120,
-					"end": 143,
+					"start": 119,
+					"end": 141,
 					"loc": {
 						"start": {
 							"line": 8,
@@ -240,8 +240,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 120,
-						"end": 142,
+						"start": 119,
+						"end": 140,
 						"loc": {
 							"start": {
 								"line": 8,
@@ -254,8 +254,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 120,
-							"end": 122,
+							"start": 119,
+							"end": 121,
 							"loc": {
 								"start": {
 									"line": 8,
@@ -271,8 +271,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 132,
-								"end": 133,
+								"start": 131,
+								"end": 132,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -288,15 +288,15 @@
 									{
 										"type": "Line",
 										"value": " c2",
-										"start": 124,
-										"end": 129
+										"start": 123,
+										"end": 128
 									}
 								]
 							},
 							{
 								"type": "Identifier",
-								"start": 137,
-								"end": 138,
+								"start": 136,
+								"end": 137,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -316,15 +316,15 @@
 						{
 							"type": "Line",
 							"value": " line comment trailing `(` — multiple args",
-							"start": 74,
-							"end": 118
+							"start": 73,
+							"end": 117
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 208,
-					"end": 242,
+					"start": 206,
+					"end": 239,
 					"loc": {
 						"start": {
 							"line": 14,
@@ -337,8 +337,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 208,
-						"end": 241,
+						"start": 206,
+						"end": 238,
 						"loc": {
 							"start": {
 								"line": 14,
@@ -351,8 +351,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 208,
-							"end": 210,
+							"start": 206,
+							"end": 208,
 							"loc": {
 								"start": {
 									"line": 14,
@@ -368,8 +368,8 @@
 						"arguments": [
 							{
 								"type": "Identifier",
-								"start": 236,
-								"end": 237,
+								"start": 234,
+								"end": 235,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -385,14 +385,14 @@
 									{
 										"type": "Block",
 										"value": " paren ",
-										"start": 212,
-										"end": 223
+										"start": 210,
+										"end": 221
 									},
 									{
 										"type": "Line",
 										"value": " lead",
-										"start": 226,
-										"end": 233
+										"start": 224,
+										"end": 231
 									}
 								]
 							}
@@ -403,8 +403,8 @@
 						{
 							"type": "Line",
 							"value": " block comment trailing `(`, then own-line leading comment",
-							"start": 146,
-							"end": 206
+							"start": 144,
+							"end": 204
 						}
 					]
 				}

@@ -10,8 +10,8 @@ Prettier: moves the comment down to its own line
 ```
 // tsv                       // prettier
 function f< // c             function f<
-	T,                          // c
->(p: T) {}                      T,
+	T                           // c
+>(p: T) {}                      T
                             >(p: T) {}
 ```
 

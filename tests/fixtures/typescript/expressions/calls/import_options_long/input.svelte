@@ -1,13 +1,13 @@
 <script lang="ts">
 	// expandable object, long source - outer import breaks
 	const a = await import('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', {
-		with: {type: 'json'},
+		with: { type: 'json' }
 	});
 
 	// expandable object + block comment, long source
 	const b = await import(
 		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-		{with: {type: 'json'}} /* comment */
+		{ with: { type: 'json' } } /* comment */
 	);
 
 	// single arg + block comment, long call arg
@@ -16,7 +16,7 @@
 	);
 
 	// short controls - everything fits
-	const d = await import('./a', {with: {type: 'json'}});
-	const e = await import('./a', {with: {type: 'json'}} /* comment */);
+	const d = await import('./a', { with: { type: 'json' } });
+	const e = await import('./a', { with: { type: 'json' } } /* comment */);
 	const f = await import(fn('./a') /* comment */);
 </script>

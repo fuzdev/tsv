@@ -6,5 +6,5 @@
 		aaaaaaaaaaaaaaaa,
 		bbbbbbbbbbbbbbbb,
 		cccccccccccccccc,
-		dddddddddddddddd,
+		dddddddddddddddd
 	)}</pre>

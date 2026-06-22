@@ -41,7 +41,7 @@ const formatted = format_svelte('<script>\nconst   x=1\n</script>');
 
 `init_sync({ module })` is also exported for Workers and custom loading.
 
-tsv is non-configurable: settings are fixed at Prettier's defaults except `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and `bracketSpacing: false` — no options, like `gofmt` and Black.
+tsv is non-configurable: settings are fixed at Prettier's defaults except `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and `trailingComma: 'none'` — no options, like `gofmt` and Black.
 
 ### File scoping (`IgnoreStack`)
 

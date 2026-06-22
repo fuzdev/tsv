@@ -4,6 +4,6 @@
 
 	// 101 visual chars (99 content + 1 tab): break the LAST call's args, not the FIRST
 	expect(obj_name_.method_n(CONST____.OUTSIDE, 'content')).rejects.toThrow(
-		'aaaaaaaaaaaaaaaaaaaaaa',
+		'aaaaaaaaaaaaaaaaaaaaaa'
 	);
 </script>

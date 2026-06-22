@@ -6,9 +6,9 @@ terminating `;` (no `from` clause) are preserved where the user placed them.
 **Prettier**: relocates them inside the specifier braces (`output_prettier.svelte`):
 
 ```
-export {a as x /* c */};
+export { a as x /* c */ };
 export {
-	b as y, // 1
+	b as y // 1
 	// 2
 };
 ```
@@ -17,8 +17,8 @@ export {
 comments stay on their own line with `;` following:
 
 ```
-export {a as x} /* c */;
-export {b as y} // 1
+export { a as x } /* c */;
+export { b as y } // 1
 // 2
 ;
 ```

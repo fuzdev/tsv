@@ -3,21 +3,21 @@
 	const {
 		a,
 
-		b,
+		b
 	} = obj;
 
 	// Assignment with blank line
 	({
 		x,
 
-		y,
+		y
 	} = obj);
 
 	// With defaults and blank line
 	const {
 		first = 1,
 
-		second = 2,
+		second = 2
 	} = obj;
 
 	// Blank line before rest
@@ -32,15 +32,15 @@
 		outer: {
 			inner,
 
-			other,
-		},
+			other
+		}
 	} = obj;
 
 	// Function params with blank line
 	function fn({
 		param1,
 
-		param2,
+		param2
 	}: Props) {}
 
 	// Multiple properties with strategic blank lines
@@ -49,14 +49,14 @@
 		group1B,
 
 		group2A,
-		group2B,
+		group2B
 	} = obj;
 
 	// Blank line after comment
 	const {
 		foo, // comment
 
-		bar,
+		bar
 	} = obj;
 
 	// Blank line before comment
@@ -64,21 +64,21 @@
 		one,
 
 		// comment for two
-		two,
+		two
 	} = obj;
 
 	// Arrow function params
 	const arrow = ({
 		a,
 
-		b,
+		b
 	}: Props) => {};
 
 	// For-of destructuring
 	for (const {
 		x,
 
-		y,
+		y
 	} of items) {
 	}
 
@@ -87,21 +87,21 @@
 	} catch ({
 		message,
 
-		code,
+		code
 	}) {}
 
 	// With type annotation
 	const {
 		typed1,
 
-		typed2,
-	}: {typed1: string; typed2: number} = obj;
+		typed2
+	}: { typed1: string; typed2: number } = obj;
 
 	// With satisfies
 	const {
 		sat1,
 
-		sat2,
+		sat2
 	} = obj satisfies SomeType;
 
 	// Object in array - object preserves blank lines
@@ -109,12 +109,12 @@
 		{
 			nested1,
 
-			nested2,
-		},
+			nested2
+		}
 	] = arr;
 
 	// Array in object - array collapses (no blank line preservation in arrays)
 	const {
-		arr: [elem1, elem2],
+		arr: [elem1, elem2]
 	} = obj;
 </script>

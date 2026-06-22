@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 290,
+	"end": 287,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " line comment trailing `[` - multiple elements",
-			"start": 87,
-			"end": 135,
+			"start": 86,
+			"end": 134,
 			"loc": {
 				"start": {
 					"line": 7,
@@ -61,8 +61,8 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 145,
-			"end": 150,
+			"start": 144,
+			"end": 149,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " block comment trailing `[`, then own-line leading comment",
-			"start": 172,
-			"end": 232,
+			"start": 170,
+			"end": 230,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -93,8 +93,8 @@
 		{
 			"type": "Block",
 			"value": " bracket ",
-			"start": 242,
-			"end": 255,
+			"start": 240,
+			"end": 253,
 			"loc": {
 				"start": {
 					"line": 14,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " lead",
-			"start": 258,
-			"end": 265,
+			"start": 256,
+			"end": 263,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -126,12 +126,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 289,
+		"end": 286,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 280,
+			"end": 277,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -146,7 +146,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 57,
-					"end": 84,
+					"end": 83,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -161,7 +161,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 63,
-							"end": 83,
+							"end": 82,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -175,7 +175,7 @@
 							"id": {
 								"type": "ArrayPattern",
 								"start": 63,
-								"end": 78,
+								"end": 77,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -215,8 +215,8 @@
 							},
 							"init": {
 								"type": "Identifier",
-								"start": 81,
-								"end": 83,
+								"start": 80,
+								"end": 82,
 								"loc": {
 									"start": {
 										"line": 5,
@@ -243,8 +243,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 137,
-					"end": 169,
+					"start": 136,
+					"end": 167,
 					"loc": {
 						"start": {
 							"line": 8,
@@ -258,8 +258,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 143,
-							"end": 168,
+							"start": 142,
+							"end": 166,
 							"loc": {
 								"start": {
 									"line": 8,
@@ -272,8 +272,8 @@
 							},
 							"id": {
 								"type": "ArrayPattern",
-								"start": 143,
-								"end": 163,
+								"start": 142,
+								"end": 161,
 								"loc": {
 									"start": {
 										"line": 8,
@@ -287,8 +287,8 @@
 								"elements": [
 									{
 										"type": "Identifier",
-										"start": 153,
-										"end": 154,
+										"start": 152,
+										"end": 153,
 										"loc": {
 											"start": {
 												"line": 9,
@@ -304,15 +304,15 @@
 											{
 												"type": "Line",
 												"value": " c2",
-												"start": 145,
-												"end": 150
+												"start": 144,
+												"end": 149
 											}
 										]
 									},
 									{
 										"type": "Identifier",
-										"start": 158,
-										"end": 159,
+										"start": 157,
+										"end": 158,
 										"loc": {
 											"start": {
 												"line": 10,
@@ -329,8 +329,8 @@
 							},
 							"init": {
 								"type": "Identifier",
-								"start": 166,
-								"end": 168,
+								"start": 164,
+								"end": 166,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -350,15 +350,15 @@
 						{
 							"type": "Line",
 							"value": " line comment trailing `[` - multiple elements",
-							"start": 87,
-							"end": 135
+							"start": 86,
+							"end": 134
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 234,
-					"end": 279,
+					"start": 232,
+					"end": 276,
 					"loc": {
 						"start": {
 							"line": 14,
@@ -372,8 +372,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 240,
-							"end": 278,
+							"start": 238,
+							"end": 275,
 							"loc": {
 								"start": {
 									"line": 14,
@@ -386,8 +386,8 @@
 							},
 							"id": {
 								"type": "ArrayPattern",
-								"start": 240,
-								"end": 273,
+								"start": 238,
+								"end": 270,
 								"loc": {
 									"start": {
 										"line": 14,
@@ -401,8 +401,8 @@
 								"elements": [
 									{
 										"type": "Identifier",
-										"start": 268,
-										"end": 269,
+										"start": 266,
+										"end": 267,
 										"loc": {
 											"start": {
 												"line": 16,
@@ -418,14 +418,14 @@
 											{
 												"type": "Block",
 												"value": " bracket ",
-												"start": 242,
-												"end": 255
+												"start": 240,
+												"end": 253
 											},
 											{
 												"type": "Line",
 												"value": " lead",
-												"start": 258,
-												"end": 265
+												"start": 256,
+												"end": 263
 											}
 										]
 									}
@@ -433,8 +433,8 @@
 							},
 							"init": {
 								"type": "Identifier",
-								"start": 276,
-								"end": 278,
+								"start": 273,
+								"end": 275,
 								"loc": {
 									"start": {
 										"line": 17,
@@ -454,8 +454,8 @@
 						{
 							"type": "Line",
 							"value": " block comment trailing `[`, then own-line leading comment",
-							"start": 172,
-							"end": 232
+							"start": 170,
+							"end": 230
 						}
 					]
 				}

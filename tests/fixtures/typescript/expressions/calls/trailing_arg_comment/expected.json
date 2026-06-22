@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 64,
+	"end": 63,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,16 +13,16 @@
 		{
 			"type": "Line",
 			"value": " comment",
-			"start": 39,
-			"end": 49,
+			"start": 38,
+			"end": 48,
 			"loc": {
 				"start": {
 					"line": 3,
-					"column": 12
+					"column": 11
 				},
 				"end": {
 					"line": 3,
-					"column": 22
+					"column": 21
 				}
 			}
 		}
@@ -30,12 +30,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 63,
+		"end": 62,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 54,
+			"end": 53,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -50,7 +50,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 20,
-					"end": 53,
+					"end": 52,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -64,7 +64,7 @@
 					"expression": {
 						"type": "NewExpression",
 						"start": 20,
-						"end": 52,
+						"end": 51,
 						"loc": {
 							"start": {
 								"line": 2,
@@ -131,8 +131,8 @@
 									{
 										"type": "Line",
 										"value": " comment",
-										"start": 39,
-										"end": 49
+										"start": 38,
+										"end": 48
 									}
 								]
 							}

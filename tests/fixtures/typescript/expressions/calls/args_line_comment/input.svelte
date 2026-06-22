@@ -2,7 +2,7 @@
 	fn(
 		'arg1',
 		// line comment
-		'arg2',
+		'arg2'
 	);
 
 	fn(
@@ -10,6 +10,6 @@
 		// comment 1
 		'b',
 		// comment 2
-		'c',
+		'c'
 	);
 </script>

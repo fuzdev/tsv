@@ -6,24 +6,24 @@
 	// String literal value with "not short" computed key: breaks after colon
 	const o1 = {
 		['x']:
-			'this is a string literal that should trigger the break path if key is not short xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+			'this is a string literal that should trigger the break path if key is not short xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 	};
 
 	// Regular identifier key: x = 1 char, IS short
 	// Same string literal value: no break after colon (but line still breaks because too long)
 	const o2 = {
-		x: 'this is a string literal that should trigger the break path if key is not short xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+		x: 'this is a string literal that should trigger the break path if key is not short xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 	};
 
 	// Computed identifier key: [x] = 3 chars, IS short
 	// Same string literal value: no break after colon
 	const o3 = {
-		[x]: 'this is a string literal that should trigger the break path if key is not short xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+		[x]: 'this is a string literal that should trigger the break path if key is not short xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 	};
 
 	// Longer computed string literal key: ['abcd'] = 8 chars, NOT short
 	// Line fits at 100 chars, no break needed
 	const o4 = {
-		['abcd']: 'this is a string literal that should trigger the break path if key is not short xxx',
+		['abcd']: 'this is a string literal that should trigger the break path if key is not short xxx'
 	};
 </script>

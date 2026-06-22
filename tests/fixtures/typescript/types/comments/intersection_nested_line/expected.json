@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 503,
+	"end": 501,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " Tuple element, own-line comment",
-			"start": 250,
-			"end": 284,
+			"start": 249,
+			"end": 283,
 			"loc": {
 				"start": {
 					"line": 22,
@@ -125,8 +125,8 @@
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 306,
-			"end": 310,
+			"start": 305,
+			"end": 309,
 			"loc": {
 				"start": {
 					"line": 25,
@@ -141,8 +141,8 @@
 		{
 			"type": "Line",
 			"value": " Mapped value, trailing comment",
-			"start": 328,
-			"end": 361,
+			"start": 326,
+			"end": 359,
 			"loc": {
 				"start": {
 					"line": 30,
@@ -157,8 +157,8 @@
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 393,
-			"end": 397,
+			"start": 391,
+			"end": 395,
 			"loc": {
 				"start": {
 					"line": 32,
@@ -173,8 +173,8 @@
 		{
 			"type": "Line",
 			"value": " Mapped value, own-line comment",
-			"start": 410,
-			"end": 443,
+			"start": 408,
+			"end": 441,
 			"loc": {
 				"start": {
 					"line": 36,
@@ -189,8 +189,8 @@
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 478,
-			"end": 482,
+			"start": 476,
+			"end": 480,
 			"loc": {
 				"start": {
 					"line": 39,
@@ -206,12 +206,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 502,
+		"end": 500,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 493,
+			"end": 491,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -574,7 +574,7 @@
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 211,
-					"end": 247,
+					"end": 246,
 					"loc": {
 						"start": {
 							"line": 16,
@@ -604,7 +604,7 @@
 					"typeAnnotation": {
 						"type": "TSTupleType",
 						"start": 220,
-						"end": 246,
+						"end": 245,
 						"loc": {
 							"start": {
 								"line": 16,
@@ -747,8 +747,8 @@
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 286,
-					"end": 325,
+					"start": 285,
+					"end": 323,
 					"loc": {
 						"start": {
 							"line": 23,
@@ -761,8 +761,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 291,
-						"end": 292,
+						"start": 290,
+						"end": 291,
 						"loc": {
 							"start": {
 								"line": 23,
@@ -777,8 +777,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSTupleType",
-						"start": 295,
-						"end": 324,
+						"start": 294,
+						"end": 322,
 						"loc": {
 							"start": {
 								"line": 23,
@@ -792,8 +792,8 @@
 						"elementTypes": [
 							{
 								"type": "TSIntersectionType",
-								"start": 299,
-								"end": 315,
+								"start": 298,
+								"end": 314,
 								"loc": {
 									"start": {
 										"line": 24,
@@ -807,8 +807,8 @@
 								"types": [
 									{
 										"type": "TSTypeReference",
-										"start": 299,
-										"end": 300,
+										"start": 298,
+										"end": 299,
 										"loc": {
 											"start": {
 												"line": 24,
@@ -821,8 +821,8 @@
 										},
 										"typeName": {
 											"type": "Identifier",
-											"start": 299,
-											"end": 300,
+											"start": 298,
+											"end": 299,
 											"loc": {
 												"start": {
 													"line": 24,
@@ -838,8 +838,8 @@
 									},
 									{
 										"type": "TSTypeReference",
-										"start": 314,
-										"end": 315,
+										"start": 313,
+										"end": 314,
 										"loc": {
 											"start": {
 												"line": 26,
@@ -852,8 +852,8 @@
 										},
 										"typeName": {
 											"type": "Identifier",
-											"start": 314,
-											"end": 315,
+											"start": 313,
+											"end": 314,
 											"loc": {
 												"start": {
 													"line": 26,
@@ -870,8 +870,8 @@
 											{
 												"type": "Line",
 												"value": " c",
-												"start": 306,
-												"end": 310
+												"start": 305,
+												"end": 309
 											}
 										]
 									}
@@ -879,8 +879,8 @@
 							},
 							{
 								"type": "TSTypeReference",
-								"start": 319,
-								"end": 320,
+								"start": 318,
+								"end": 319,
 								"loc": {
 									"start": {
 										"line": 27,
@@ -893,8 +893,8 @@
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 319,
-									"end": 320,
+									"start": 318,
+									"end": 319,
 									"loc": {
 										"start": {
 											"line": 27,
@@ -914,15 +914,15 @@
 						{
 							"type": "Line",
 							"value": " Tuple element, own-line comment",
-							"start": 250,
-							"end": 284
+							"start": 249,
+							"end": 283
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 363,
-					"end": 407,
+					"start": 361,
+					"end": 405,
 					"loc": {
 						"start": {
 							"line": 31,
@@ -935,8 +935,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 368,
-						"end": 369,
+						"start": 366,
+						"end": 367,
 						"loc": {
 							"start": {
 								"line": 31,
@@ -951,8 +951,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSMappedType",
-						"start": 372,
-						"end": 406,
+						"start": 370,
+						"end": 404,
 						"loc": {
 							"start": {
 								"line": 31,
@@ -965,8 +965,8 @@
 						},
 						"typeParameter": {
 							"type": "TSTypeParameter",
-							"start": 377,
-							"end": 386,
+							"start": 375,
+							"end": 384,
 							"loc": {
 								"start": {
 									"line": 32,
@@ -980,8 +980,8 @@
 							"name": "K",
 							"constraint": {
 								"type": "TSTypeReference",
-								"start": 382,
-								"end": 386,
+								"start": 380,
+								"end": 384,
 								"loc": {
 									"start": {
 										"line": 32,
@@ -994,8 +994,8 @@
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 382,
-									"end": 386,
+									"start": 380,
+									"end": 384,
 									"loc": {
 										"start": {
 											"line": 32,
@@ -1013,8 +1013,8 @@
 						"nameType": null,
 						"typeAnnotation": {
 							"type": "TSIntersectionType",
-							"start": 389,
-							"end": 402,
+							"start": 387,
+							"end": 400,
 							"loc": {
 								"start": {
 									"line": 32,
@@ -1028,8 +1028,8 @@
 							"types": [
 								{
 									"type": "TSTypeReference",
-									"start": 389,
-									"end": 390,
+									"start": 387,
+									"end": 388,
 									"loc": {
 										"start": {
 											"line": 32,
@@ -1042,8 +1042,8 @@
 									},
 									"typeName": {
 										"type": "Identifier",
-										"start": 389,
-										"end": 390,
+										"start": 387,
+										"end": 388,
 										"loc": {
 											"start": {
 												"line": 32,
@@ -1059,8 +1059,8 @@
 								},
 								{
 									"type": "TSTypeReference",
-									"start": 401,
-									"end": 402,
+									"start": 399,
+									"end": 400,
 									"loc": {
 										"start": {
 											"line": 33,
@@ -1073,8 +1073,8 @@
 									},
 									"typeName": {
 										"type": "Identifier",
-										"start": 401,
-										"end": 402,
+										"start": 399,
+										"end": 400,
 										"loc": {
 											"start": {
 												"line": 33,
@@ -1091,8 +1091,8 @@
 										{
 											"type": "Line",
 											"value": " c",
-											"start": 393,
-											"end": 397
+											"start": 391,
+											"end": 395
 										}
 									]
 								}
@@ -1103,15 +1103,15 @@
 						{
 							"type": "Line",
 							"value": " Mapped value, trailing comment",
-							"start": 328,
-							"end": 361
+							"start": 326,
+							"end": 359
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 445,
-					"end": 492,
+					"start": 443,
+					"end": 490,
 					"loc": {
 						"start": {
 							"line": 37,
@@ -1124,8 +1124,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 450,
-						"end": 451,
+						"start": 448,
+						"end": 449,
 						"loc": {
 							"start": {
 								"line": 37,
@@ -1140,8 +1140,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSMappedType",
-						"start": 454,
-						"end": 491,
+						"start": 452,
+						"end": 489,
 						"loc": {
 							"start": {
 								"line": 37,
@@ -1154,8 +1154,8 @@
 						},
 						"typeParameter": {
 							"type": "TSTypeParameter",
-							"start": 459,
-							"end": 468,
+							"start": 457,
+							"end": 466,
 							"loc": {
 								"start": {
 									"line": 38,
@@ -1169,8 +1169,8 @@
 							"name": "K",
 							"constraint": {
 								"type": "TSTypeReference",
-								"start": 464,
-								"end": 468,
+								"start": 462,
+								"end": 466,
 								"loc": {
 									"start": {
 										"line": 38,
@@ -1183,8 +1183,8 @@
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 464,
-									"end": 468,
+									"start": 462,
+									"end": 466,
 									"loc": {
 										"start": {
 											"line": 38,
@@ -1202,8 +1202,8 @@
 						"nameType": null,
 						"typeAnnotation": {
 							"type": "TSIntersectionType",
-							"start": 471,
-							"end": 487,
+							"start": 469,
+							"end": 485,
 							"loc": {
 								"start": {
 									"line": 38,
@@ -1217,8 +1217,8 @@
 							"types": [
 								{
 									"type": "TSTypeReference",
-									"start": 471,
-									"end": 472,
+									"start": 469,
+									"end": 470,
 									"loc": {
 										"start": {
 											"line": 38,
@@ -1231,8 +1231,8 @@
 									},
 									"typeName": {
 										"type": "Identifier",
-										"start": 471,
-										"end": 472,
+										"start": 469,
+										"end": 470,
 										"loc": {
 											"start": {
 												"line": 38,
@@ -1248,8 +1248,8 @@
 								},
 								{
 									"type": "TSTypeReference",
-									"start": 486,
-									"end": 487,
+									"start": 484,
+									"end": 485,
 									"loc": {
 										"start": {
 											"line": 40,
@@ -1262,8 +1262,8 @@
 									},
 									"typeName": {
 										"type": "Identifier",
-										"start": 486,
-										"end": 487,
+										"start": 484,
+										"end": 485,
 										"loc": {
 											"start": {
 												"line": 40,
@@ -1280,8 +1280,8 @@
 										{
 											"type": "Line",
 											"value": " c",
-											"start": 478,
-											"end": 482
+											"start": 476,
+											"end": 480
 										}
 									]
 								}
@@ -1292,8 +1292,8 @@
 						{
 							"type": "Line",
 							"value": " Mapped value, own-line comment",
-							"start": 410,
-							"end": 443
+							"start": 408,
+							"end": 441
 						}
 					]
 				}

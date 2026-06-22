@@ -9,7 +9,7 @@
 			'bbb-bbb',
 			'ccc-ccc',
 			'ddd-ddddd',
-			'eee-eee',
+			'eee-eee'
 		] as Array<TTTTTTTTTTTTTTTTTT>;
 
 		// Array with satisfies - at 101 chars, array expands
@@ -18,7 +18,7 @@
 			'bbb-bbb',
 			'ccc-ccc',
 			'ddd-ddddd',
-			'eee-eee',
+			'eee-eee'
 		] satisfies Array<TTTTTTTTTTT>;
 	}
 </script>

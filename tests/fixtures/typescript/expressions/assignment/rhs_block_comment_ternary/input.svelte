@@ -5,14 +5,12 @@
 			// forces break-after-operator layout
 			const a = {
 				prop:
-					/* @type {string | ArrayBufferView} */ input instanceof Request && cloned_body
-						? fn(a)
-						: b,
+					/* @type {string | ArrayBufferView} */ input instanceof Request && cloned_body ? fn(a) : b
 			};
 
 			// Without comment, same ternary: fits inline
 			const c = {
-				prop: input instanceof Request && cloned_body ? fn(a) : b,
+				prop: input instanceof Request && cloned_body ? fn(a) : b
 			};
 
 			// Without comment, same ternary exceeding width: also breaks after colon
@@ -20,7 +18,7 @@
 				prop:
 					input_abcd instanceof Request && cloned_body_abcdefghijklmnopqrstuvwxyzabcdefghijkl
 						? fn(a)
-						: b,
+						: b
 			};
 		}
 	}

@@ -1,7 +1,7 @@
 {
 	"type": "Program",
 	"start": 0,
-	"end": 164,
+	"end": 166,
 	"loc": {
 		"start": {
 			"line": 1,
@@ -473,7 +473,7 @@
 		{
 			"type": "VariableDeclaration",
 			"start": 146,
-			"end": 163,
+			"end": 165,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -481,14 +481,14 @@
 				},
 				"end": {
 					"line": 10,
-					"column": 17
+					"column": 19
 				}
 			},
 			"declarations": [
 				{
 					"type": "VariableDeclarator",
 					"start": 152,
-					"end": 162,
+					"end": 164,
 					"loc": {
 						"start": {
 							"line": 10,
@@ -496,7 +496,7 @@
 						},
 						"end": {
 							"line": 10,
-							"column": 16
+							"column": 18
 						}
 					},
 					"id": {
@@ -518,7 +518,7 @@
 					"init": {
 						"type": "ObjectExpression",
 						"start": 156,
-						"end": 162,
+						"end": 164,
 						"loc": {
 							"start": {
 								"line": 10,
@@ -526,22 +526,22 @@
 							},
 							"end": {
 								"line": 10,
-								"column": 16
+								"column": 18
 							}
 						},
 						"properties": [
 							{
 								"type": "Property",
-								"start": 157,
-								"end": 161,
+								"start": 158,
+								"end": 162,
 								"loc": {
 									"start": {
 										"line": 10,
-										"column": 11
+										"column": 12
 									},
 									"end": {
 										"line": 10,
-										"column": 15
+										"column": 16
 									}
 								},
 								"method": false,
@@ -549,32 +549,32 @@
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 157,
-									"end": 158,
+									"start": 158,
+									"end": 159,
 									"loc": {
 										"start": {
 											"line": 10,
-											"column": 11
+											"column": 12
 										},
 										"end": {
 											"line": 10,
-											"column": 12
+											"column": 13
 										}
 									},
 									"name": "h"
 								},
 								"value": {
 									"type": "Literal",
-									"start": 160,
-									"end": 161,
+									"start": 161,
+									"end": 162,
 									"loc": {
 										"start": {
 											"line": 10,
-											"column": 14
+											"column": 15
 										},
 										"end": {
 											"line": 10,
-											"column": 15
+											"column": 16
 										}
 									},
 									"value": 1,

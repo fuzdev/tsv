@@ -51,8 +51,8 @@
 		});
 
 	// Destructuring parameter
-	const a21 = b || (({x}) => x);
+	const a21 = b || (({ x }) => x);
 
 	// Returning object literal
-	const a22 = b || ((x) => ({y: x}));
+	const a22 = b || ((x) => ({ y: x }));
 </script>

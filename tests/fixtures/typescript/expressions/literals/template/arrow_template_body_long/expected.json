@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 730,
+	"end": 727,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " 100 chars at 2-tab: map call broken, arrow body at boundary",
-			"start": 352,
-			"end": 414,
+			"start": 351,
+			"end": 413,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -61,8 +61,8 @@
 		{
 			"type": "Line",
 			"value": " 101 chars at 2-tab: arrow breaks to new line",
-			"start": 542,
-			"end": 589,
+			"start": 540,
+			"end": 587,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -78,12 +78,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 729,
+		"end": 726,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 720,
+			"end": 717,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -334,7 +334,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 244,
-					"end": 349,
+					"end": 348,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -349,7 +349,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 250,
-							"end": 348,
+							"end": 347,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -379,7 +379,7 @@
 							"init": {
 								"type": "CallExpression",
 								"start": 254,
-								"end": 348,
+								"end": 347,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -569,8 +569,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 416,
-					"end": 539,
+					"start": 415,
+					"end": 537,
 					"loc": {
 						"start": {
 							"line": 11,
@@ -584,8 +584,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 422,
-							"end": 538,
+							"start": 421,
+							"end": 536,
 							"loc": {
 								"start": {
 									"line": 11,
@@ -598,8 +598,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 422,
-								"end": 423,
+								"start": 421,
+								"end": 422,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -614,8 +614,8 @@
 							},
 							"init": {
 								"type": "CallExpression",
-								"start": 426,
-								"end": 538,
+								"start": 425,
+								"end": 536,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -628,8 +628,8 @@
 								},
 								"callee": {
 									"type": "MemberExpression",
-									"start": 426,
-									"end": 435,
+									"start": 425,
+									"end": 434,
 									"loc": {
 										"start": {
 											"line": 11,
@@ -642,8 +642,8 @@
 									},
 									"object": {
 										"type": "Identifier",
-										"start": 426,
-										"end": 431,
+										"start": 425,
+										"end": 430,
 										"loc": {
 											"start": {
 												"line": 11,
@@ -658,8 +658,8 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 432,
-										"end": 435,
+										"start": 431,
+										"end": 434,
 										"loc": {
 											"start": {
 												"line": 11,
@@ -678,8 +678,8 @@
 								"arguments": [
 									{
 										"type": "ArrowFunctionExpression",
-										"start": 439,
-										"end": 534,
+										"start": 438,
+										"end": 533,
 										"loc": {
 											"start": {
 												"line": 12,
@@ -697,8 +697,8 @@
 										"params": [
 											{
 												"type": "Identifier",
-												"start": 440,
-												"end": 441,
+												"start": 439,
+												"end": 440,
 												"loc": {
 													"start": {
 														"line": 12,
@@ -714,8 +714,8 @@
 										],
 										"body": {
 											"type": "TemplateLiteral",
-											"start": 446,
-											"end": 534,
+											"start": 445,
+											"end": 533,
 											"loc": {
 												"start": {
 													"line": 12,
@@ -729,8 +729,8 @@
 											"expressions": [
 												{
 													"type": "Identifier",
-													"start": 449,
-													"end": 532,
+													"start": 448,
+													"end": 531,
 													"loc": {
 														"start": {
 															"line": 12,
@@ -747,8 +747,8 @@
 											"quasis": [
 												{
 													"type": "TemplateElement",
-													"start": 447,
-													"end": 447,
+													"start": 446,
+													"end": 446,
 													"loc": {
 														"start": {
 															"line": 12,
@@ -767,8 +767,8 @@
 												},
 												{
 													"type": "TemplateElement",
-													"start": 533,
-													"end": 533,
+													"start": 532,
+													"end": 532,
 													"loc": {
 														"start": {
 															"line": 12,
@@ -798,15 +798,15 @@
 						{
 							"type": "Line",
 							"value": " 100 chars at 2-tab: map call broken, arrow body at boundary",
-							"start": 352,
-							"end": 414
+							"start": 351,
+							"end": 413
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 591,
-					"end": 719,
+					"start": 589,
+					"end": 716,
 					"loc": {
 						"start": {
 							"line": 16,
@@ -820,8 +820,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 597,
-							"end": 718,
+							"start": 595,
+							"end": 715,
 							"loc": {
 								"start": {
 									"line": 16,
@@ -834,8 +834,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 597,
-								"end": 598,
+								"start": 595,
+								"end": 596,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -850,8 +850,8 @@
 							},
 							"init": {
 								"type": "CallExpression",
-								"start": 601,
-								"end": 718,
+								"start": 599,
+								"end": 715,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -864,8 +864,8 @@
 								},
 								"callee": {
 									"type": "MemberExpression",
-									"start": 601,
-									"end": 610,
+									"start": 599,
+									"end": 608,
 									"loc": {
 										"start": {
 											"line": 16,
@@ -878,8 +878,8 @@
 									},
 									"object": {
 										"type": "Identifier",
-										"start": 601,
-										"end": 606,
+										"start": 599,
+										"end": 604,
 										"loc": {
 											"start": {
 												"line": 16,
@@ -894,8 +894,8 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 607,
-										"end": 610,
+										"start": 605,
+										"end": 608,
 										"loc": {
 											"start": {
 												"line": 16,
@@ -914,8 +914,8 @@
 								"arguments": [
 									{
 										"type": "ArrowFunctionExpression",
-										"start": 614,
-										"end": 714,
+										"start": 612,
+										"end": 712,
 										"loc": {
 											"start": {
 												"line": 17,
@@ -933,8 +933,8 @@
 										"params": [
 											{
 												"type": "Identifier",
-												"start": 615,
-												"end": 616,
+												"start": 613,
+												"end": 614,
 												"loc": {
 													"start": {
 														"line": 17,
@@ -950,8 +950,8 @@
 										],
 										"body": {
 											"type": "TemplateLiteral",
-											"start": 624,
-											"end": 714,
+											"start": 622,
+											"end": 712,
 											"loc": {
 												"start": {
 													"line": 18,
@@ -965,8 +965,8 @@
 											"expressions": [
 												{
 													"type": "Identifier",
-													"start": 627,
-													"end": 712,
+													"start": 625,
+													"end": 710,
 													"loc": {
 														"start": {
 															"line": 18,
@@ -983,8 +983,8 @@
 											"quasis": [
 												{
 													"type": "TemplateElement",
-													"start": 625,
-													"end": 625,
+													"start": 623,
+													"end": 623,
 													"loc": {
 														"start": {
 															"line": 18,
@@ -1003,8 +1003,8 @@
 												},
 												{
 													"type": "TemplateElement",
-													"start": 713,
-													"end": 713,
+													"start": 711,
+													"end": 711,
 													"loc": {
 														"start": {
 															"line": 18,
@@ -1034,8 +1034,8 @@
 						{
 							"type": "Line",
 							"value": " 101 chars at 2-tab: arrow breaks to new line",
-							"start": 542,
-							"end": 589
+							"start": 540,
+							"end": 587
 						}
 					]
 				}

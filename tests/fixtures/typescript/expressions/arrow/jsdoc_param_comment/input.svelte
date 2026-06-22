@@ -11,6 +11,6 @@
 			for (var entry of entries) {
 				process(entry);
 			}
-		},
+		}
 	);
 </script>

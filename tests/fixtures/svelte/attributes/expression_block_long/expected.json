@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 842,
+	"end": 841,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -449,7 +449,7 @@
 			{
 				"type": "RegularElement",
 				"start": 714,
-				"end": 841,
+				"end": 840,
 				"name": "div",
 				"name_loc": {
 					"start": {
@@ -467,7 +467,7 @@
 					{
 						"type": "Attribute",
 						"start": 720,
-						"end": 833,
+						"end": 832,
 						"name": "data-x",
 						"name_loc": {
 							"start": {
@@ -484,11 +484,11 @@
 						"value": {
 							"type": "ExpressionTag",
 							"start": 727,
-							"end": 833,
+							"end": 832,
 							"expression": {
 								"type": "CallExpression",
 								"start": 728,
-								"end": 832,
+								"end": 831,
 								"loc": {
 									"start": {
 										"line": 23,

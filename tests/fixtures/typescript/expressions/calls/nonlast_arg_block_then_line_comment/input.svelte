@@ -4,19 +4,19 @@
 	// Neither is dropped.
 	fn(
 		a /* c1 */, // c2
-		b,
+		b
 	);
 
 	// Two block comments before the comma, then a line comment after it: all kept.
 	fn(
 		a /* c1 */ /* c2 */, // c3
-		b,
+		b
 	);
 
 	// The block+line argument in the middle of three args (not just the last).
 	fn(
 		a /* c1 */, // c2
 		b,
-		c,
+		c
 	);
 </script>

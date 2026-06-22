@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 634,
+	"end": 633,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " Await expression",
-			"start": 384,
-			"end": 403,
+			"start": 383,
+			"end": 402,
 			"loc": {
 				"start": {
 					"line": 25,
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " Await with member expression",
-			"start": 437,
-			"end": 468,
+			"start": 436,
+			"end": 467,
 			"loc": {
 				"start": {
 					"line": 28,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " Await with call expression",
-			"start": 505,
-			"end": 534,
+			"start": 504,
+			"end": 533,
 			"loc": {
 				"start": {
 					"line": 31,
@@ -125,8 +125,8 @@
 		{
 			"type": "Line",
 			"value": " Nested await",
-			"start": 565,
-			"end": 580,
+			"start": 564,
+			"end": 579,
 			"loc": {
 				"start": {
 					"line": 34,
@@ -142,12 +142,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 633,
+		"end": 632,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 624,
+			"end": 623,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -716,7 +716,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 311,
-					"end": 381,
+					"end": 380,
 					"loc": {
 						"start": {
 							"line": 19,
@@ -731,7 +731,7 @@
 						{
 							"type": "VariableDeclarator",
 							"start": 317,
-							"end": 380,
+							"end": 379,
 							"loc": {
 								"start": {
 									"line": 19,
@@ -761,7 +761,7 @@
 							"init": {
 								"type": "ObjectExpression",
 								"start": 323,
-								"end": 380,
+								"end": 379,
 								"loc": {
 									"start": {
 										"line": 19,
@@ -956,8 +956,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 405,
-					"end": 434,
+					"start": 404,
+					"end": 433,
 					"loc": {
 						"start": {
 							"line": 26,
@@ -971,8 +971,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 411,
-							"end": 433,
+							"start": 410,
+							"end": 432,
 							"loc": {
 								"start": {
 									"line": 26,
@@ -985,8 +985,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 411,
-								"end": 417,
+								"start": 410,
+								"end": 416,
 								"loc": {
 									"start": {
 										"line": 26,
@@ -1001,8 +1001,8 @@
 							},
 							"init": {
 								"type": "AwaitExpression",
-								"start": 420,
-								"end": 433,
+								"start": 419,
+								"end": 432,
 								"loc": {
 									"start": {
 										"line": 26,
@@ -1015,8 +1015,8 @@
 								},
 								"argument": {
 									"type": "Identifier",
-									"start": 426,
-									"end": 433,
+									"start": 425,
+									"end": 432,
 									"loc": {
 										"start": {
 											"line": 26,
@@ -1037,15 +1037,15 @@
 						{
 							"type": "Line",
 							"value": " Await expression",
-							"start": 384,
-							"end": 403
+							"start": 383,
+							"end": 402
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 470,
-					"end": 502,
+					"start": 469,
+					"end": 501,
 					"loc": {
 						"start": {
 							"line": 29,
@@ -1059,8 +1059,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 476,
-							"end": 501,
+							"start": 475,
+							"end": 500,
 							"loc": {
 								"start": {
 									"line": 29,
@@ -1073,8 +1073,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 476,
-								"end": 480,
+								"start": 475,
+								"end": 479,
 								"loc": {
 									"start": {
 										"line": 29,
@@ -1089,8 +1089,8 @@
 							},
 							"init": {
 								"type": "AwaitExpression",
-								"start": 483,
-								"end": 501,
+								"start": 482,
+								"end": 500,
 								"loc": {
 									"start": {
 										"line": 29,
@@ -1103,8 +1103,8 @@
 								},
 								"argument": {
 									"type": "CallExpression",
-									"start": 489,
-									"end": 501,
+									"start": 488,
+									"end": 500,
 									"loc": {
 										"start": {
 											"line": 29,
@@ -1117,8 +1117,8 @@
 									},
 									"callee": {
 										"type": "MemberExpression",
-										"start": 489,
-										"end": 499,
+										"start": 488,
+										"end": 498,
 										"loc": {
 											"start": {
 												"line": 29,
@@ -1131,8 +1131,8 @@
 										},
 										"object": {
 											"type": "Identifier",
-											"start": 489,
-											"end": 492,
+											"start": 488,
+											"end": 491,
 											"loc": {
 												"start": {
 													"line": 29,
@@ -1147,8 +1147,8 @@
 										},
 										"property": {
 											"type": "Identifier",
-											"start": 493,
-											"end": 499,
+											"start": 492,
+											"end": 498,
 											"loc": {
 												"start": {
 													"line": 29,
@@ -1175,15 +1175,15 @@
 						{
 							"type": "Line",
 							"value": " Await with member expression",
-							"start": 437,
-							"end": 468
+							"start": 436,
+							"end": 467
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 536,
-					"end": 562,
+					"start": 535,
+					"end": 561,
 					"loc": {
 						"start": {
 							"line": 32,
@@ -1197,8 +1197,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 542,
-							"end": 561,
+							"start": 541,
+							"end": 560,
 							"loc": {
 								"start": {
 									"line": 32,
@@ -1211,8 +1211,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 542,
-								"end": 547,
+								"start": 541,
+								"end": 546,
 								"loc": {
 									"start": {
 										"line": 32,
@@ -1227,8 +1227,8 @@
 							},
 							"init": {
 								"type": "AwaitExpression",
-								"start": 550,
-								"end": 561,
+								"start": 549,
+								"end": 560,
 								"loc": {
 									"start": {
 										"line": 32,
@@ -1241,8 +1241,8 @@
 								},
 								"argument": {
 									"type": "CallExpression",
-									"start": 556,
-									"end": 561,
+									"start": 555,
+									"end": 560,
 									"loc": {
 										"start": {
 											"line": 32,
@@ -1255,8 +1255,8 @@
 									},
 									"callee": {
 										"type": "Identifier",
-										"start": 556,
-										"end": 559,
+										"start": 555,
+										"end": 558,
 										"loc": {
 											"start": {
 												"line": 32,
@@ -1280,15 +1280,15 @@
 						{
 							"type": "Line",
 							"value": " Await with call expression",
-							"start": 505,
-							"end": 534
+							"start": 504,
+							"end": 533
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 582,
-					"end": 623,
+					"start": 581,
+					"end": 622,
 					"loc": {
 						"start": {
 							"line": 35,
@@ -1302,8 +1302,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 588,
-							"end": 622,
+							"start": 587,
+							"end": 621,
 							"loc": {
 								"start": {
 									"line": 35,
@@ -1316,8 +1316,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 588,
-								"end": 594,
+								"start": 587,
+								"end": 593,
 								"loc": {
 									"start": {
 										"line": 35,
@@ -1332,8 +1332,8 @@
 							},
 							"init": {
 								"type": "AwaitExpression",
-								"start": 597,
-								"end": 622,
+								"start": 596,
+								"end": 621,
 								"loc": {
 									"start": {
 										"line": 35,
@@ -1346,8 +1346,8 @@
 								},
 								"argument": {
 									"type": "MemberExpression",
-									"start": 603,
-									"end": 622,
+									"start": 602,
+									"end": 621,
 									"loc": {
 										"start": {
 											"line": 35,
@@ -1360,8 +1360,8 @@
 									},
 									"object": {
 										"type": "AwaitExpression",
-										"start": 604,
-										"end": 615,
+										"start": 603,
+										"end": 614,
 										"loc": {
 											"start": {
 												"line": 35,
@@ -1374,8 +1374,8 @@
 										},
 										"argument": {
 											"type": "CallExpression",
-											"start": 610,
-											"end": 615,
+											"start": 609,
+											"end": 614,
 											"loc": {
 												"start": {
 													"line": 35,
@@ -1388,8 +1388,8 @@
 											},
 											"callee": {
 												"type": "Identifier",
-												"start": 610,
-												"end": 613,
+												"start": 609,
+												"end": 612,
 												"loc": {
 													"start": {
 														"line": 35,
@@ -1408,8 +1408,8 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 617,
-										"end": 622,
+										"start": 616,
+										"end": 621,
 										"loc": {
 											"start": {
 												"line": 35,
@@ -1433,8 +1433,8 @@
 						{
 							"type": "Line",
 							"value": " Nested await",
-							"start": 565,
-							"end": 580
+							"start": 564,
+							"end": 579
 						}
 					]
 				}

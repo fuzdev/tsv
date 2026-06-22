@@ -460,15 +460,17 @@ impl<'a> Printer<'a> {
     }
 
     /// Wrap a specifier list in its own group so it fits independently of the outer
-    /// statement: `{ <inner> }` with softline padding. The independent group keeps a
+    /// statement: `{ <inner> }` with bracketSpacing padding (a space when flat,
+    /// `{ a }`, a newline when the group breaks). The independent group keeps a
     /// preserved header line comment (which forces the outer group to break) from
-    /// expanding a `{a}` that would otherwise stay inline.
+    /// expanding a `{ a }` that would otherwise stay inline. Shared by named
+    /// imports, named exports, and `with {…}`/`assert {…}` import attributes.
     fn braced_softline_group(&self, inner: DocId) -> DocId {
         let d = self.d();
         d.group(d.concat(&[
             d.text("{"),
-            d.indent_softline(inner),
-            d.softline(),
+            d.indent_line(inner),
+            d.bracket_spacing(),
             d.text("}"),
         ]))
     }
@@ -1315,9 +1317,8 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Trailing comma when broken (matches join_trailing behavior)
-        let trailing_comma = d.if_break(d.text(","), d.text(""));
-        inner_parts.push(trailing_comma);
+        // trailingComma: 'none' — no trailing comma when the list breaks (matches
+        // join_trailing behavior)
         // Preserved after-comma block comment(s) on the last item
         inner_parts.extend(last_after_comma);
 
@@ -1442,12 +1443,9 @@ impl<'a> Printer<'a> {
 
                 parts.extend(self.build_trailing_same_line_comment_docs(comma_pos + 1, next_start));
             } else {
-                // Last item: emit comma between same-line block and line comments,
-                // then own-line comments before the closing brace.
-                // Block comments go before comma: `a /* c */ ,`
-                // Line comments go after comma: `a, // comment`
-                // Own-line comments get hardlines: `a,\n// comment`
-                let mut emitted_comma = false;
+                // Last item: no trailing comma (trailingComma: 'none'). Same-line block
+                // comments hug the item (`a /* c */`), same-line line comments follow
+                // (`a // comment`), and own-line comments get hardlines (`a\n// comment`).
                 let mut prev_pos = item_end;
                 // Track line reference for multi-line block comments
                 let mut line_ref = item_end;
@@ -1461,17 +1459,9 @@ impl<'a> Printer<'a> {
                                 line_ref = comment.span.end;
                             }
                         } else {
-                            if !emitted_comma {
-                                parts.push(d.text(","));
-                                emitted_comma = true;
-                            }
                             parts.push(self.build_trailing_line_comment_doc(comment));
                         }
                     } else {
-                        if !emitted_comma {
-                            parts.push(d.text(","));
-                            emitted_comma = true;
-                        }
                         if self.has_blank_line_between(prev_pos, comment.span.start) {
                             parts.push(d.literalline());
                         }
@@ -1479,9 +1469,6 @@ impl<'a> Printer<'a> {
                         parts.push(self.build_comment_doc(comment));
                     }
                     prev_pos = comment.span.end;
-                }
-                if !emitted_comma {
-                    parts.push(d.text(","));
                 }
             }
 

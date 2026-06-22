@@ -569,7 +569,13 @@ impl DocArena {
         }
     }
 
-    /// Join docs with separator, adding trailing separator only when breaking.
+    /// Join docs with separator.
+    ///
+    /// Under tsv's hardcoded `trailingComma: 'none'` this adds no trailing separator when the
+    /// list breaks — only the inter-item separators. It remains distinct from `join()` to mark
+    /// the break-path positions where prettier's `'all'` would append a trailing separator.
+    // TODO: under `'none'` this is now equivalent to `join()` — candidate for a follow-up
+    // collapse into `join()` once the trailing-comma machinery is ripped out.
     pub fn join_trailing(&self, docs: impl IntoIterator<Item = DocId>, separator: DocId) -> DocId {
         let iter = docs.into_iter();
         let (lower, _) = iter.size_hint();
@@ -583,50 +589,7 @@ impl DocArena {
         if parts.is_empty() {
             return self.empty();
         }
-        // Add trailing separator only when breaking
-        let trailing = self.extract_trailing_punctuation(separator);
-        let empty = self.text("");
-        parts.push(self.if_break(trailing, empty));
         self.concat(&parts)
-    }
-
-    /// Extract the punctuation part from a separator for trailing comma.
-    fn extract_trailing_punctuation(&self, separator: DocId) -> DocId {
-        // Extract text info while borrowing, then create node after dropping borrows
-        enum TextInfo {
-            Static(&'static str),
-            Owned(String),
-            Symbol(u32),
-        }
-        let text_info = {
-            let nodes = self.nodes.borrow();
-            match &nodes[separator.index()] {
-                DocNode::Concat(range) => {
-                    let children = self.children.borrow();
-                    let kids = range.resolve(&children);
-                    let mut found = None;
-                    for &kid_id in kids {
-                        if let DocNode::Text(doc_text) = &nodes[kid_id.index()] {
-                            found = Some(match doc_text {
-                                DocText::Static(s, _) => TextInfo::Static(s),
-                                DocText::Owned(s, _) => TextInfo::Owned(s.clone()),
-                                DocText::Symbol(id) => TextInfo::Symbol(*id),
-                            });
-                            break;
-                        }
-                    }
-                    found
-                }
-                DocNode::Text(_) => None, // separator itself is fine
-                _ => None,
-            }
-        };
-        match text_info {
-            Some(TextInfo::Static(s)) => self.text(s),
-            Some(TextInfo::Owned(s)) => self.text_owned(s),
-            Some(TextInfo::Symbol(id)) => self.symbol(id),
-            None => separator,
-        }
     }
 
     /// Wrap a doc with open and close delimiters.
@@ -651,6 +614,14 @@ impl DocArena {
     #[inline]
     pub fn braces(&self, inner: DocId) -> DocId {
         self.wrap("{", inner, "}")
+    }
+
+    /// Inner padding for object-like braces under `bracketSpacing: true`:
+    /// a space when flat (`{ foo }`), a newline when the group breaks.
+    /// Mirrors prettier's `spacing = bracketSpacing ? line : softline`.
+    #[inline]
+    pub fn bracket_spacing(&self) -> DocId {
+        self.line()
     }
 
     /// Indent with leading line break.
@@ -679,10 +650,18 @@ impl DocArena {
         self.concat(&[self.text(","), self.hardline()])
     }
 
-    /// Trailing comma (only appears in break mode).
+    /// Trailing comma under `trailingComma: 'all'` — a no-op under tsv's hardcoded
+    /// `trailingComma: 'none'`.
+    ///
+    /// tsv fixes `trailingComma: 'none'` (matching Svelte's own prettier config), so no
+    /// trailing comma is ever emitted when a list breaks. This helper returns the empty doc
+    /// and now only marks the break-path positions where prettier's `'all'` would place a
+    /// trailing comma.
+    // TODO: this and its ~25 callsites are dead machinery under `'none'` — candidate for a
+    // follow-up rip-out (delete the helper and inline the empty at each callsite).
     #[inline]
     pub fn trailing_comma(&self) -> DocId {
-        self.if_break(self.text(","), self.text(""))
+        self.empty()
     }
 
     //

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 127,
+	"end": 125,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -29,8 +29,8 @@
 		{
 			"type": "Line",
 			"value": " comment 1",
-			"start": 71,
-			"end": 83,
+			"start": 70,
+			"end": 82,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " comment 2",
-			"start": 93,
-			"end": 105,
+			"start": 92,
+			"end": 104,
 			"loc": {
 				"start": {
 					"line": 12,
@@ -62,12 +62,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 126,
+		"end": 124,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 117,
+			"end": 115,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -82,7 +82,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 10,
-					"end": 55,
+					"end": 54,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -96,7 +96,7 @@
 					"expression": {
 						"type": "CallExpression",
 						"start": 10,
-						"end": 54,
+						"end": 53,
 						"loc": {
 							"start": {
 								"line": 2,
@@ -172,8 +172,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 58,
-					"end": 116,
+					"start": 57,
+					"end": 114,
 					"loc": {
 						"start": {
 							"line": 8,
@@ -186,8 +186,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 58,
-						"end": 115,
+						"start": 57,
+						"end": 113,
 						"loc": {
 							"start": {
 								"line": 8,
@@ -200,8 +200,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 58,
-							"end": 60,
+							"start": 57,
+							"end": 59,
 							"loc": {
 								"start": {
 									"line": 8,
@@ -217,8 +217,8 @@
 						"arguments": [
 							{
 								"type": "Literal",
-								"start": 64,
-								"end": 67,
+								"start": 63,
+								"end": 66,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -234,8 +234,8 @@
 							},
 							{
 								"type": "Literal",
-								"start": 86,
-								"end": 89,
+								"start": 85,
+								"end": 88,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -252,15 +252,15 @@
 									{
 										"type": "Line",
 										"value": " comment 1",
-										"start": 71,
-										"end": 83
+										"start": 70,
+										"end": 82
 									}
 								]
 							},
 							{
 								"type": "Literal",
-								"start": 108,
-								"end": 111,
+								"start": 107,
+								"end": 110,
 								"loc": {
 									"start": {
 										"line": 13,
@@ -277,8 +277,8 @@
 									{
 										"type": "Line",
 										"value": " comment 2",
-										"start": 93,
-										"end": 105
+										"start": 92,
+										"end": 104
 									}
 								]
 							}

@@ -9,7 +9,7 @@
 		prop: string;
 	};
 
-	type D2 = {prop: string};
+	type D2 = { prop: string };
 
 	type E = (x: number) => string;
 

@@ -4,5 +4,5 @@
 		b: number;
 	}
 
-	type T = {a? /* c */; e: number};
+	type T = { a? /* c */; e: number };
 </script>

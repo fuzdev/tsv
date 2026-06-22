@@ -9,18 +9,18 @@ placed it.
 floats a line comment after `with` past the `;`:
 
 ```
-import a from './a' /* c1 */ with {type: 'json'};
-import c from './c' /* c3 */ with {type: 'json'};
-import d from './d' with {type: 'json'}; // c4
+import a from './a' /* c1 */ with { type: 'json' };
+import c from './c' /* c3 */ with { type: 'json' };
+import d from './d' with { type: 'json' }; // c4
 ```
 
 **tsv**: preserves each comment where the user placed it:
 
 ```
-import a from './a' /* c1 */ with {type: 'json'};
-import c from './c' with /* c3 */ {type: 'json'};
+import a from './a' /* c1 */ with { type: 'json' };
+import c from './c' with /* c3 */ { type: 'json' };
 import d from './d' with // c4
-	{type: 'json'};
+	{ type: 'json' };
 ```
 
 The source→`with` block comment (c1) is dual-stable — both formatters keep it in

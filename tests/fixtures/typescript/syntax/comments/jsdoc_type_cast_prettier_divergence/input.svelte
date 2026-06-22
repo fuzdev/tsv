@@ -26,5 +26,5 @@
 	function fn2(a = /** @type {A} */ b) {}
 	function fn3(a, b = /** @type {A} */ c) {}
 	const fn4 = (a = /** @type {A} */ b) => a;
-	function fn5({a = /** @type {A} */ b} = {}) {}
+	function fn5({ a = /** @type {A} */ b } = {}) {}
 </script>

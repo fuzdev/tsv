@@ -4,31 +4,30 @@
 
 	/* 101 chars total - call wraps, binary stays inline */
 	const b = fn(
-		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa && bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefghijklmnopqrs,
+		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa && bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefghijklmnopqrs
 	);
 
 	/* 100 chars arg line - binary stays inline */
 	const c = fn(
-		aaaaaaaaaaaaaaaaaaaaaaaaaaa && bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdef,
+		aaaaaaaaaaaaaaaaaaaaaaaaaaa && bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdef
 	);
 
 	/* 101 chars arg line - binary breaks, continuation gets extra indent */
 	const d = fn(
-		aaaaaaaaaaaaaaaaaaaaaaaaaaa &&
-			bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefg,
+		aaaaaaaaaaaaaaaaaaaaaaaaaaa && bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabcdefg
 	);
 
 	/* Multi-operand chain - each continuation indented */
 	const e = fn(
 		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa &&
 			bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb &&
-			cccccccccccccccccccccccccccccc,
+			cccccccccccccccccccccccccccccc
 	);
 
 	/* || chain - same behavior */
 	const f = fn(
 		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ||
 			bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb ||
-			cccccccccccccccccccccccccccccc,
+			cccccccccccccccccccccccccccccc
 	);
 </script>

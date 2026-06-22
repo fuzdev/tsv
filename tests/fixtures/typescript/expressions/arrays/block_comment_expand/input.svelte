@@ -4,7 +4,7 @@
 		/* comment line 1
 comment line 2 */ b,
 		c,
-		d,
+		d
 	];
 
 	// Multi-line block comment in middle also forces expansion
@@ -12,7 +12,7 @@ comment line 2 */ b,
 		f,
 		/* comment line 1
 comment line 2 */ g,
-		h,
+		h
 	];
 
 	// Single-line block comment does NOT force expansion (short array)

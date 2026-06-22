@@ -4,24 +4,24 @@
 	// Bug: we expand all args to separate lines
 	a.b(c, (x) => ({
 		y: x,
-		z: x,
+		z: x
 	}));
 
 	// With destructuring parameter
 	a.b(c, ([d, e]) => ({
 		f: d,
 		g: e.h,
-		i: e.j,
+		i: e.j
 	}));
 
 	// String first arg
 	a.b('./c', () => ({
-		d: fn(),
+		d: fn()
 	}));
 
 	// With inline block comment - still hugs
 	something.method(firstArg /* comment */, (x) => ({
 		veryLongPropertyName: x,
-		anotherLongProperty: x,
+		anotherLongProperty: x
 	}));
 </script>

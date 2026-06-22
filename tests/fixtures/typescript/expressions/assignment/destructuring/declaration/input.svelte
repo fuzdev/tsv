@@ -17,48 +17,48 @@
 	const [, , h1, , i1] = arr;
 
 	// Object declarations
-	const {a: a3, b: b3} = obj;
-	let {a: x2, b: y2} = obj;
-	const {c: c2 = 1, ...rest5} = obj;
+	const { a: a3, b: b3 } = obj;
+	let { a: x2, b: y2 } = obj;
+	const { c: c2 = 1, ...rest5 } = obj;
 
 	// Empty patterns
 	const {} = obj;
 	const [] = arr;
 
 	// Rest-only
-	const {...rest6} = obj;
+	const { ...rest6 } = obj;
 	const [...rest7] = arr;
 
 	// Computed keys
-	const {[key]: j1} = obj;
+	const { [key]: j1 } = obj;
 
 	// Numeric/string keys
-	const {0: first3} = obj;
-	const {key: value1} = obj;
+	const { 0: first3 } = obj;
+	const { key: value1 } = obj;
 
 	// Deep nesting
 	const [[k1, l1], [m1, n1]] = arr;
 	const {
 		a: {
-			b: {c: o1},
-		},
+			b: { c: o1 }
+		}
 	} = obj;
 
 	// Nested with defaults
 	const [[p1 = 1]] = arr;
 	const {
-		a: {b: q1 = 1},
+		a: { b: q1 = 1 }
 	} = obj;
 
 	// Nested
 	const {
-		outer: {inner: inner1},
+		outer: { inner: inner1 }
 	} = obj;
 	const [[nested2]] = arr;
 
 	// Mixed nesting
 	const {
-		arr: [first2, second2],
+		arr: [first2, second2]
 	} = obj;
-	let [{a: a4}, {b: b4}] = arr;
+	let [{ a: a4 }, { b: b4 }] = arr;
 </script>

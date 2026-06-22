@@ -10,3 +10,5 @@ Tests various expression contexts: ternaries, logical operators, arrays, functio
 ## Reason
 
 tsv treats printWidth as a hard limit for template interpolations. Consistent with tsv's template literal handling across all contexts.
+
+See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §TypeScript: Template Literals.

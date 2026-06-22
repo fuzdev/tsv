@@ -6,8 +6,8 @@
 	export default function def() {}
 	export * from 'a';
 	export * as ns from 'b';
-	export {a, b} from 'c';
-	export {c as d} from 'd';
-	export {e};
+	export { a, b } from 'c';
+	export { c as d } from 'd';
+	export { e };
 	export {};
 </script>

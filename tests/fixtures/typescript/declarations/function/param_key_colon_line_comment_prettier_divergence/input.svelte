@@ -3,6 +3,6 @@
 	// the name; the `: type` continuation indents one level.
 	function fn(
 		a // c
-			: string,
+			: string
 	) {}
 </script>

@@ -5,7 +5,7 @@
 	// 101 chars - wraps (exceeds print_width)
 	const fn2 = function <
 		T extends string | number | boolean,
-		U extends Record<string, u_______>,
+		U extends Record<string, u_______>
 	>() {};
 
 	// Named function expression - 100 chars
@@ -14,6 +14,6 @@
 	// Named function expression - 101 chars wraps
 	const named2 = function foo<
 		T extends string | number | boolean,
-		U extends Record<string, u_>,
+		U extends Record<string, u_>
 	>() {};
 </script>

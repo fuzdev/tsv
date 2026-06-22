@@ -3,20 +3,20 @@
 	obj.method(
 		/* paren */
 		/* lead */
-		arg,
+		arg
 	);
 
 	// paren-line line comment, then own-line leading comment
 	obj.method(
 		// paren
 		/* lead */
-		arg,
+		arg
 	);
 
 	// two-method chain, same gap shape
 	obj.a().method(
 		/* paren */
 		/* lead */
-		arg,
+		arg
 	);
 </script>

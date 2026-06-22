@@ -4,7 +4,7 @@
 
 	/* require() - 99 content chars (visual 101, we wrap, prettier keeps inline) */
 	const b = require(
-		'./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+		'./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 	);
 
 	/* require.resolve() - breaks at assignment (both match) */
@@ -13,7 +13,7 @@
 
 	/* require.resolve.paths() - we expand args, prettier breaks at chain */
 	const d = require.resolve.paths(
-		'./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+		'./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 	);
 
 	/* await import() - breaks at assignment (both match) */
@@ -22,6 +22,6 @@
 
 	/* import.meta.resolve() - we expand args, prettier breaks at chain */
 	const f = import.meta.resolve(
-		'./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+		'./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 	);
 </script>

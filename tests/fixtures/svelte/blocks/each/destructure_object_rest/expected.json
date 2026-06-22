@@ -1,0 +1,184 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 55,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "EachBlock",
+				"start": 0,
+				"end": 54,
+				"expression": {
+					"type": "Identifier",
+					"start": 7,
+					"end": 12,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 7
+						},
+						"end": {
+							"line": 1,
+							"column": 12
+						}
+					},
+					"name": "items"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 32,
+							"end": 47,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 1,
+									"column": 33,
+									"character": 33
+								},
+								"end": {
+									"line": 1,
+									"column": 36,
+									"character": 36
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 37,
+										"end": 41,
+										"expression": {
+											"type": "Identifier",
+											"start": 38,
+											"end": 40,
+											"loc": {
+												"start": {
+													"line": 1,
+													"column": 38
+												},
+												"end": {
+													"line": 1,
+													"column": 40
+												}
+											},
+											"name": "id"
+										}
+									}
+								]
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "ObjectPattern",
+					"start": 16,
+					"end": 31,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 16
+						},
+						"end": {
+							"line": 1,
+							"column": 31
+						}
+					},
+					"properties": [
+						{
+							"type": "Property",
+							"start": 18,
+							"end": 20,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 18
+								},
+								"end": {
+									"line": 1,
+									"column": 20
+								}
+							},
+							"method": false,
+							"shorthand": true,
+							"computed": false,
+							"key": {
+								"type": "Identifier",
+								"start": 18,
+								"end": 20,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 18
+									},
+									"end": {
+										"line": 1,
+										"column": 20
+									}
+								},
+								"name": "id"
+							},
+							"value": {
+								"type": "Identifier",
+								"start": 18,
+								"end": 20,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 18
+									},
+									"end": {
+										"line": 1,
+										"column": 20
+									}
+								},
+								"name": "id"
+							},
+							"kind": "init"
+						},
+						{
+							"type": "RestElement",
+							"start": 22,
+							"end": 29,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 22
+								},
+								"end": {
+									"line": 1,
+									"column": 29
+								}
+							},
+							"argument": {
+								"type": "Identifier",
+								"start": 25,
+								"end": 29,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 25
+									},
+									"end": {
+										"line": 1,
+										"column": 29
+									}
+								},
+								"name": "rest"
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -16,7 +16,7 @@
 	type V = [
 		A & // c
 			B,
-		C,
+		C
 	];
 
 	// Tuple element, own-line comment
@@ -24,7 +24,7 @@
 		A &
 			// c
 			B,
-		C,
+		C
 	];
 
 	// Mapped value, trailing comment

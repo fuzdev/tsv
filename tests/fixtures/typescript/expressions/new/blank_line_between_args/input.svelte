@@ -3,7 +3,7 @@
 	const a = new Foo(
 		x,
 
-		y,
+		y
 	);
 
 	// Blank line between new expression args with leading comments
@@ -11,14 +11,14 @@
 		x,
 
 		// comment
-		y,
+		y
 	);
 
 	// Blank line with trailing line comment
 	const c = new Foo(
 		x, // trailing
 
-		y,
+		y
 	);
 
 	// Mixed: some blank lines, some not
@@ -26,6 +26,6 @@
 		x,
 		y,
 
-		z,
+		z
 	);
 </script>

@@ -4,13 +4,13 @@
 
 	// 101 chars - wraps (exceeds print_width)
 	abstract class Wraps<
-		T extends TypeAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+		T extends TypeAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 	> {}
 
 	// Long type params with extends heritage - params break, extends inline
 	abstract class WithExtends<
 		T extends VeryLongTypeName | AnotherLongTypeName,
-		U extends ExtraLongConstraintType | MoreTypes,
+		U extends ExtraLongConstraintType | MoreTypes
 	> extends Base<T> {
 		abstract value: T;
 	}
@@ -18,7 +18,7 @@
 	// Long type params with implements - implements breaks, brace on new line
 	abstract class WithImplements<
 		T extends VeryLongTypeName | AnotherLongTypeName,
-		U extends ExtraLongConstraintType | MoreTypes,
+		U extends ExtraLongConstraintType | MoreTypes
 	>
 		implements Contract<T>, Contract<U>
 	{
@@ -29,7 +29,7 @@
 	// Long with both extends and implements - all break
 	abstract class WithBoth<
 		T extends VeryLongTypeName | AnotherLongTypeName,
-		U extends ExtraLongConstraintType | MoreTypes,
+		U extends ExtraLongConstraintType | MoreTypes
 	>
 		extends Base<T>
 		implements Contract<U>

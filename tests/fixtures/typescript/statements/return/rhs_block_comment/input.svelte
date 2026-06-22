@@ -8,7 +8,7 @@
 	}
 
 	function fn3() {
-		return /* comment */ {a: 1};
+		return /* comment */ { a: 1 };
 	}
 
 	function fn4() {

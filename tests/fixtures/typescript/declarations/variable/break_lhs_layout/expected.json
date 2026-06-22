@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 686,
+	"end": 685,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -78,12 +78,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 685,
+		"end": 684,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 676,
+			"end": 675,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -851,7 +851,7 @@
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 554,
-					"end": 675,
+					"end": 674,
 					"loc": {
 						"start": {
 							"line": 21,
@@ -881,7 +881,7 @@
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
 						"start": 577,
-						"end": 615,
+						"end": 614,
 						"loc": {
 							"start": {
 								"line": 21,
@@ -955,15 +955,12 @@
 									}
 								}
 							}
-						],
-						"extra": {
-							"trailingComma": 611
-						}
+						]
 					},
 					"typeAnnotation": {
 						"type": "TSTypeReference",
-						"start": 618,
-						"end": 674,
+						"start": 617,
+						"end": 673,
 						"loc": {
 							"start": {
 								"line": 24,
@@ -976,8 +973,8 @@
 						},
 						"typeName": {
 							"type": "Identifier",
-							"start": 618,
-							"end": 674,
+							"start": 617,
+							"end": 673,
 							"loc": {
 								"start": {
 									"line": 24,

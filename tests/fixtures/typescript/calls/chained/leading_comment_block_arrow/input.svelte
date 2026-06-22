@@ -3,14 +3,14 @@
 	a.b(
 		/** @param {T} x */ (x) => {
 			fn(x);
-		},
+		}
 	);
 
 	// Single-arg: regular block comment before block-body arrow
 	a.b(
 		/* cast */ (x) => {
 			fn(x);
-		},
+		}
 	);
 
 	// Two-arg chain: JSDoc on second arg blocks expand-first
@@ -19,7 +19,7 @@
 			c.e = d;
 			return c;
 		},
-		/** @type {Record<string, string[]>} */ {},
+		/** @type {Record<string, string[]>} */ {}
 	);
 
 	// Two-arg non-chain: same pattern without member expression
@@ -28,7 +28,7 @@
 			c.e = d;
 			return c;
 		},
-		/** @type {Record<string, string[]>} */ {},
+		/** @type {Record<string, string[]>} */ {}
 	);
 
 	// Two-arg new expression: same pattern
@@ -37,7 +37,7 @@
 			c.e = d;
 			return c;
 		},
-		/** @type {Record<string, string[]>} */ {},
+		/** @type {Record<string, string[]>} */ {}
 	);
 
 	// Control: no comment, block-body arrow stays hugged

@@ -1,28 +1,28 @@
 <script lang="ts">
 	// line comment trailing `<` - function declaration
 	function fn< // c
-		T,
+		T
 	>(p: T) {}
 
 	// line comment trailing `<` - class
 	class C< // c
-		T,
+		T
 	> {}
 
 	// line comment trailing `<` - interface
 	interface I< // c
-		T,
+		T
 	> {}
 
 	// line comment trailing `<` - type alias
 	type A< // c
-		T,
+		T
 	> = T;
 
 	// line comment trailing `<` - arrow function
 	const g = < // c
-		T,
+		T
 	>(
-		p: T,
+		p: T
 	): T => p;
 </script>
