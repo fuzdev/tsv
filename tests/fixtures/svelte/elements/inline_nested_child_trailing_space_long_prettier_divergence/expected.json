@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 725,
+	"end": 772,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 569,
-				"data": " Block-style: an inline <span> wraps a wide inline child <span> (its open tag overflows) plus\n     trailing text; both tags stay intact and the content goes on its own indented lines. The\n     trailing-text boundary is authoring-dependent for now: a newline boundary keeps the text on its\n     own line (this input), a space boundary hugs it onto the child's `</span>` line (variant_hug).\n     Both forms are stable under tsv AND prettier. Converging the two (always hug, reflowing the\n     newline as render-free) is a deliberate pending follow-up. See README. "
+				"end": 618,
+				"data": " Block-style: an inline <span> wraps a wide inline child <span> whose open tag overflows, plus\n     trailing text. Both tags stay intact; content goes on its own indented lines. The trailing-text\n     boundary is authoring-dependent for now: a space hugs the text onto the child's `</span>` line\n     (input.svelte), a newline keeps it on its own line (variant_ownline.svelte). Both are stable\n     under tsv AND prettier. A compact authoring dangles under prettier (prettier_variant_compact)\n     but tsv converges it to the hug form. Converging the two boundary forms is a pending follow-up.\n     See README. "
 			},
 			{
 				"type": "Text",
-				"start": 569,
-				"end": 570,
+				"start": 618,
+				"end": 619,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 570,
-				"end": 724,
+				"start": 619,
+				"end": 771,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 7,
+						"line": 8,
 						"column": 1,
-						"character": 571
+						"character": 620
 					},
 					"end": {
-						"line": 7,
+						"line": 8,
 						"column": 2,
-						"character": 572
+						"character": 621
 					}
 				},
 				"attributes": [],
@@ -43,26 +43,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 573,
-							"end": 575,
+							"start": 622,
+							"end": 624,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 575,
-							"end": 719,
+							"start": 624,
+							"end": 766,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 8,
+									"line": 9,
 									"column": 2,
-									"character": 576
+									"character": 625
 								},
 								"end": {
-									"line": 8,
+									"line": 9,
 									"column": 6,
-									"character": 580
+									"character": 629
 								}
 							},
 							"attributes": [],
@@ -71,50 +71,50 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 581,
-										"end": 584,
+										"start": 630,
+										"end": 633,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "RegularElement",
-										"start": 584,
-										"end": 703,
+										"start": 633,
+										"end": 752,
 										"name": "span",
 										"name_loc": {
 											"start": {
-												"line": 9,
+												"line": 10,
 												"column": 3,
-												"character": 585
+												"character": 634
 											},
 											"end": {
-												"line": 9,
+												"line": 10,
 												"column": 7,
-												"character": 589
+												"character": 638
 											}
 										},
 										"attributes": [
 											{
 												"type": "Attribute",
-												"start": 590,
-												"end": 646,
+												"start": 639,
+												"end": 695,
 												"name": "class",
 												"name_loc": {
 													"start": {
-														"line": 9,
+														"line": 10,
 														"column": 8,
-														"character": 590
+														"character": 639
 													},
 													"end": {
-														"line": 9,
+														"line": 10,
 														"column": 13,
-														"character": 595
+														"character": 644
 													}
 												},
 												"value": [
 													{
-														"start": 597,
-														"end": 645,
+														"start": 646,
+														"end": 694,
 														"type": "Text",
 														"raw": "class1 class2 class3 class4 class5 class6 class7",
 														"data": "class1 class2 class3 class4 class5 class6 class7"
@@ -122,27 +122,27 @@
 												]
 											},
 											{
-												"start": 647,
-												"end": 664,
+												"start": 696,
+												"end": 713,
 												"type": "StyleDirective",
 												"name": "width",
 												"name_loc": {
 													"start": {
-														"line": 9,
+														"line": 10,
 														"column": 65,
-														"character": 647
+														"character": 696
 													},
 													"end": {
-														"line": 9,
+														"line": 10,
 														"column": 76,
-														"character": 658
+														"character": 707
 													}
 												},
 												"modifiers": [],
 												"value": [
 													{
-														"start": 660,
-														"end": 663,
+														"start": 709,
+														"end": 712,
 														"type": "Text",
 														"raw": "6ch",
 														"data": "6ch"
@@ -155,40 +155,40 @@
 											"nodes": [
 												{
 													"type": "Text",
-													"start": 665,
-													"end": 669,
+													"start": 714,
+													"end": 718,
 													"raw": "\n\t\t\t",
 													"data": "\n\t\t\t"
 												},
 												{
 													"type": "ExpressionTag",
-													"start": 669,
-													"end": 693,
+													"start": 718,
+													"end": 742,
 													"expression": {
 														"type": "ConditionalExpression",
-														"start": 670,
-														"end": 692,
+														"start": 719,
+														"end": 741,
 														"loc": {
 															"start": {
-																"line": 10,
+																"line": 11,
 																"column": 4
 															},
 															"end": {
-																"line": 10,
+																"line": 11,
 																"column": 26
 															}
 														},
 														"test": {
 															"type": "Identifier",
-															"start": 670,
-															"end": 674,
+															"start": 719,
+															"end": 723,
 															"loc": {
 																"start": {
-																	"line": 10,
+																	"line": 11,
 																	"column": 4
 																},
 																"end": {
-																	"line": 10,
+																	"line": 11,
 																	"column": 8
 																}
 															},
@@ -196,15 +196,15 @@
 														},
 														"consequent": {
 															"type": "Literal",
-															"start": 677,
-															"end": 683,
+															"start": 726,
+															"end": 732,
 															"loc": {
 																"start": {
-																	"line": 10,
+																	"line": 11,
 																	"column": 11
 																},
 																"end": {
-																	"line": 10,
+																	"line": 11,
 																	"column": 17
 																}
 															},
@@ -213,15 +213,15 @@
 														},
 														"alternate": {
 															"type": "Literal",
-															"start": 686,
-															"end": 692,
+															"start": 735,
+															"end": 741,
 															"loc": {
 																"start": {
-																	"line": 10,
+																	"line": 11,
 																	"column": 20
 																},
 																"end": {
-																	"line": 10,
+																	"line": 11,
 																	"column": 26
 																}
 															},
@@ -232,8 +232,8 @@
 												},
 												{
 													"type": "Text",
-													"start": 693,
-													"end": 696,
+													"start": 742,
+													"end": 745,
 													"raw": "\n\t\t",
 													"data": "\n\t\t"
 												}
@@ -242,18 +242,18 @@
 									},
 									{
 										"type": "Text",
-										"start": 703,
-										"end": 712,
-										"raw": "\n\t\ttext\n\t",
-										"data": "\n\t\ttext\n\t"
+										"start": 752,
+										"end": 759,
+										"raw": " text\n\t",
+										"data": " text\n\t"
 									}
 								]
 							}
 						},
 						{
 							"type": "Text",
-							"start": 719,
-							"end": 720,
+							"start": 766,
+							"end": 767,
 							"raw": "\n",
 							"data": "\n"
 						}

@@ -5,10 +5,4 @@
      under tsv AND prettier. A compact authoring dangles under prettier (prettier_variant_compact)
      but tsv converges it to the hug form. Converging the two boundary forms is a pending follow-up.
      See README. -->
-<p>
-	<span>
-		<span class="class1 class2 class3 class4 class5 class6 class7" style:width="6ch">
-			{cond ? 'aaaa' : 'bbbb'}
-		</span> text
-	</span>
-</p>
+<p><span><span class="class1 class2 class3 class4 class5 class6 class7" style:width="6ch">{cond ? 'aaaa' : 'bbbb'}</span> text</span></p>

@@ -9,6 +9,7 @@
 	<span>
 		<span class="class1 class2 class3 class4 class5 class6 class7" style:width="6ch">
 			{cond ? 'aaaa' : 'bbbb'}
-		</span> text
+		</span>
+		text
 	</span>
 </p>
