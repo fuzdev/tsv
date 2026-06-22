@@ -4,10 +4,12 @@ An inline element (`<small>`) whose **text content** overflows print width lays 
 both tags stay intact and the content moves to its own indented line, exactly like a block element.
 Content that fits stays inline (`<small>short text</small>`). The exact flip is pinned at the
 100/101 boundary: a 100-char `<small>` of breakable words stays inline, one char longer (101) flips
-to block-style.
+to block-style. Content too wide even for its own line fill-wraps across lines within the block-style
+body (still no dangle):
 
 ```
 <small>
+	word word … word
 	word word … word
 </small>
 ```

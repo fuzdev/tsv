@@ -10,3 +10,6 @@
 
 <!-- Exact 100/101 boundary: one char longer (101) flips to block-style -->
 <div><small>word word word word word word word word word word word word word word word wordabcde</small></div>
+
+<!-- Wider content fill-wraps within the block-style body (no dangle) -->
+<div><small>word word word word word word word word word word word word word word word word word word word word word word word word word</small></div>

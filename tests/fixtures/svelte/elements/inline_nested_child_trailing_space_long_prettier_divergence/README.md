@@ -20,7 +20,7 @@ delimiters into the pyramid captured by `prettier_variant_compact` (which tsv li
 ## Reason
 
 Converging the two authorings (always hugging the trailing text, reflowing the newline boundary as
-render-free under Svelte 5) is a deliberate **pending follow-up** — the "1b" between/terminal-text
+render-free under Svelte 5) is a deliberate **pending follow-up** — the between/terminal-text
 hug-convergence. The terminal case (`inline_wide_content_trailing_long`) already hugs a space-
 authored tail; this nested-child case goes through a different render branch (the wide child is
 itself multiline) and is not yet converged, so the newline authoring (`variant_ownline`) settles on

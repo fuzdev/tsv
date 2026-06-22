@@ -14,7 +14,7 @@ block-style `input` (wrapping within printWidth), while prettier keeps it over-w
 The own-line block-style `input` is dual-stable (tsv and prettier both keep it); the divergence shows
 only when the content is authored over-width. (The space-authored counterpart hugs the trailing text
 onto the intact `</tag>` — see `inline_wide_content_trailing_long`. Converging the newline boundary
-to that hug — reflowing the newline as render-free — is the pending "1b" follow-up.)
+to that hug — reflowing the newline as render-free — is a deliberate, not-yet-converged follow-up.)
 
 ## Reason
 

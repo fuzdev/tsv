@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1011,
+	"end": 1247,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -299,6 +299,95 @@
 							"type": "Text",
 							"start": 1003,
 							"end": 1004,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1010,
+				"end": 1012,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1012,
+				"end": 1085,
+				"data": " Wider content fill-wraps within the block-style body (no dangle) "
+			},
+			{
+				"type": "Text",
+				"start": 1085,
+				"end": 1086,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1086,
+				"end": 1246,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 26,
+						"column": 1,
+						"character": 1087
+					},
+					"end": {
+						"line": 26,
+						"column": 4,
+						"character": 1090
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1091,
+							"end": 1093,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1093,
+							"end": 1239,
+							"name": "small",
+							"name_loc": {
+								"start": {
+									"line": 27,
+									"column": 2,
+									"character": 1094
+								},
+								"end": {
+									"line": 27,
+									"column": 7,
+									"character": 1099
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1100,
+										"end": 1231,
+										"raw": "\n\t\tword word word word word word word word word word word word word word word word word word word\n\t\tword word word word word word\n\t",
+										"data": "\n\t\tword word word word word word word word word word word word word word word word word word word\n\t\tword word word word word word\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1239,
+							"end": 1240,
 							"raw": "\n",
 							"data": "\n"
 						}
