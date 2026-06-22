@@ -59,12 +59,13 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
 ## Design
 
 - supports Svelte, TypeScript/JS, CSS (and planned HTML/JSON)
-- formatting tracks Prettier and prettier-plugin-svelte for the common case, but intentionally
-  diverges in some cases - see [docs/conformance_prettier.md](docs/conformance_prettier.md)
+- formatting is similar Prettier and prettier-plugin-svelte for the common case,
+  but intentionally diverges in some cases and fixes numerous bugs
+  (see [docs/conformance_prettier.md](docs/conformance_prettier.md))
 - tsv can generate a public JSON AST that should exactly match
   Svelte 5's modern AST with acorn and acorn-typescript
   (see [docs/conformance_svelte.md](docs/conformance_svelte.md)),
-  but keeps its own internal AST optimized for manipulation over serialization
+  but has its own internal optimal AST
 - non-configurable: formatter settings are fixed at Prettier's defaults except
   `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and
   `bracketSpacing: false` (tight object braces stay distinct from function/block `{`),
@@ -84,8 +85,10 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
   layers (incremental parsing, CST for LSP) will be feature-gated so they
   don't regress the artifacts that exist today
 - JS and TS always parse as modules in strict mode - sloppy-mode-only syntax
-  (`with`, legacy octal literals, etc) is rejected; Svelte and TypeScript are
-  inherently strict, so this only matters for standalone JS scripts
+  like `with` is rejected, while strict-mode early errors
+  (e.g. duplicate params, reserved-word bindings) still parse for now, with
+  enforcement deferred to a future diagnostics layer; Svelte and TypeScript
+  are inherently strict, so this only matters for standalone JS scripts
 - pushes complexity and mess to the printer, out of the parser and AST,
   keeping the model clean for the other planned tools
 
