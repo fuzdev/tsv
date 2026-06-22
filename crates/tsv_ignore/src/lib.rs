@@ -231,6 +231,19 @@ impl IgnoreStack {
         !self.gitignore.is_empty()
     }
 
+    /// The format-root-relative directory anchors (`/`-joined; `""` = the root)
+    /// of the pushed `.gitignore` layers, shallow→deep. Lets a per-file discovery
+    /// replay that has no top-down walk — the VS Code extension formats one open
+    /// document at a time — reconstruct `heuristic_active` for each ancestor
+    /// directory: the build-output heuristic is off at a level once a `.gitignore`
+    /// anchored above it is present. Allocates; off the matcher's hot path.
+    pub fn gitignore_anchors(&self) -> Vec<String> {
+        self.gitignore
+            .iter()
+            .map(|layer| layer.anchor.join("/"))
+            .collect()
+    }
+
     /// Whether `path` (relative to the format root, `/`-separated) is ignored.
     /// `is_dir` marks `path` itself as a directory so trailing-`/` patterns
     /// apply to it.

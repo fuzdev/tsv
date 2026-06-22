@@ -70,6 +70,23 @@ crates (the open-convention stance):
   e.g. `tsv format build/sub` with a gitignored `build/`, isn't walk-cleared) —
   `tsv_cli`'s `collect_root` and `cli.js`'s do exactly that. See
   `is_ignored_leaf`'s contract in [`tsv_ignore`](../tsv_ignore/CLAUDE.md).
+- `is_path_pruned(rel, &IgnoreStack) -> bool` — the per-file companion to
+  `classify_dir` for a consumer with **no top-down traversal** (the VS Code
+  extension formats one open document at a time, so it can't thread
+  `heuristic_active` down a walk). Given the matcher assembled from `rel`'s full
+  ancestor chain, it walks the ancestor directories itself and reconstructs each
+  level's `heuristic_active` from the stack's own `.gitignore` anchors
+  (`IgnoreStack::gitignore_anchors`) — off at a level once a `.gitignore` anchored
+  above it is present — returning `true` at the first ancestor `classify_dir` would
+  not descend into. It runs the decision through a private assert-free
+  `classify_dir` half: the full-stack assembly can't satisfy the incremental walk's
+  `heuristic_active ⟹ no .gitignore layer` invariant, yet stays faithful because the
+  matcher's per-level query ignores layers anchored below the queried directory (a
+  deeper layer fails to `relativize`), and the one place a deeper layer *is*
+  consulted picks only `Prune` vs `PruneWithWarning`, which a boolean collapses.
+  Pair with `IgnoreStack::is_ignored(rel, false)` for the file-level match.
+  `classify_dir` stays the primitive for real traversers, which thread
+  `heuristic_active` naturally as they descend.
 - `DirVerdict { Descend, Prune, PruneWithWarning(String) }` — `PruneWithWarning`
   carries the full warning string, so the native caller reports it without
   re-deriving.
@@ -100,13 +117,18 @@ crates (the open-convention stance):
 - **`tsv_wasm`** — the `format`-gated `IgnoreStack` wrapper exposes
   `classify_dir(name, child_rel, heuristic_active) -> string`
   (`"descend"|"prune"|"prune_warn"`), `should_format_file(name, child_rel) ->
-  bool`, `heuristic_shadow_warning(dir) -> string`, and
-  `prettierignore_outside_repo_warning(dir, in_repo, has_prettierignore,
+  bool`, `is_path_pruned(rel) -> bool`, `heuristic_shadow_warning(dir) -> string`,
+  and `prettierignore_outside_repo_warning(dir, in_repo, has_prettierignore,
   has_formatignore) -> string | undefined`. The string-tag encoding
   (rather than a wasm-bindgen enum or a returned struct) needs no
   `patch_npm_package.ts` change and allocates no JS class on the common
   descend path; the `prune_warn` arm fetches the text via the separate method.
-  `npm/cli.js` calls these and keeps no policy of its own.
+  `npm/cli.js` calls the per-directory `classify_dir` (it does a real walk) and
+  keeps no policy of its own.
+- **VS Code extension** (`vscode_extension_tsv_format`) — assembles an
+  `IgnoreStack` per open document and calls `is_ignored(rel, false) ||
+  is_path_pruned(rel)`. It has no directory walk, so `is_path_pruned` is its entry
+  to the shared prune policy; it no longer reconstructs the heuristic walk in TS.
 
 ## Behavior is pinned, not asserted
 
