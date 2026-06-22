@@ -15,10 +15,9 @@ Formatting is now non-configurable by design -
 tsv has no config that changes its formatting style behavior, and none will be added.
 (this has no observable API changes because options had been deferred)
 
-- feat: adopt `bracketSpacing: true` — object, destructuring, and import/export
-  braces are now spaced (`{ a }`), matching Prettier's default
-- feat: adopt `trailingComma: 'none'` — no trailing comma on multiline lists,
-  matching the Svelte project's own Prettier config
+- feat: adopt Svelte's Prettier settings,
+  `bracketSpacing: true` and `trailingComma: 'none'`
+  [#78](https://github.com/fuzdev/tsv/pull/78)
 - feat: rework to block style wrapping using Svelte 5 whitespace changes
   [#76](https://github.com/fuzdev/tsv/pull/76)
 - feat: `tsv format` directory discovery now honors `.gitignore` and the tsv-native
@@ -27,18 +26,12 @@ tsv has no config that changes its formatting style behavior, and none will be a
   relative to the cwd), plus a repo-root `.prettierignore` for drop-in compat
   ([#50](https://github.com/fuzdev/tsv/pull/50))
 - feat: `tsv format --list` prints the in-scope files without formatting
-- feat: `IgnoreStack.is_path_pruned(rel)` on the WASM binding
-  (`@fuzdev/tsv_format_wasm` / `@fuzdev/tsv_wasm`) — a per-file directory-prune
-  query (safety nets + build-output heuristic + matcher) for discovery consumers
-  with no top-down traversal; it reconstructs each ancestor's `heuristic_active`
-  from the stack's own `.gitignore` anchors, so the VS Code extension uses it
-  instead of rebuilding that walk in TypeScript
 - feat: support `format-ignore` as an alias to `prettier-ignore`
   (along with `format-ignore-start` and `format-ignore-end` for templates)
   ([#41](https://github.com/fuzdev/tsv/pull/41))
 - fix: various conformance fixes to the formatter and parser
-- fix: numerous new Prettier divergences including more readable block structure layouts
-  and uniform indentation on continuations
+- feat: uniform indentation on continuations
+  ([#27](https://github.com/fuzdev/tsv/pull/27), [#33](https://github.com/fuzdev/tsv/pull/33))
 - fix: expressions in Svelte block tags now consistently use TS printing paths,
   fixing oversights prettier-plugin-svelte
 - perf: reduce allocations using `SmallVec` and memoizations
