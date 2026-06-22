@@ -2,12 +2,6 @@
 //
 // ARCHITECTURE: This is our internal AST representation, optimized for traversal,
 // manipulation, and formatting. It gets converted to public AST for JSON serialization.
-//
-// POC Status: Intentionally minimal to validate multi-language architecture.
-// Selectors stored as strings, not parsed structure - this was the RIGHT decision
-// for POC to avoid getting bogged down in CSS complexity.
-//
-// See CSS_SPEC.md for full expansion roadmap.
 
 pub use tsv_lang::Comment;
 use tsv_lang::Span;
@@ -90,7 +84,7 @@ pub struct CssRule {
 }
 
 //
-// Selector AST (Phase 2)
+// Selector AST
 //
 //
 // Implements Selectors Level 4 specification:
@@ -196,7 +190,7 @@ pub enum SimpleSelector {
     },
     Percentage {
         value: f64,
-        span: Span, // Phase 3b: @keyframes percentage selectors (0%, 50%, 100%)
+        span: Span, // @keyframes percentage selectors (0%, 50%, 100%)
     },
     /// Invalid selector - unparseable syntax preserved for forgiving parsing
     ///
@@ -336,7 +330,7 @@ impl CssDeclaration {
 }
 
 //
-// CSS Value AST (Phase 4)
+// CSS Value AST
 //
 //
 // Implements CSS Values and Units Level 4 specification:
@@ -475,7 +469,7 @@ pub enum Color {
 }
 
 //
-// At-Rule AST (Phase 3)
+// At-Rule AST
 //
 //
 // Implements CSS Syntax Module Level 3 at-rules:

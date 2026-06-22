@@ -5,7 +5,8 @@
 // linter, type-checker, etc.)
 //
 // References:
-// - HTML spec flow content (block): WHITESPACE_HTML.md line 145233
+// - HTML spec flow content (block): ../html/source, Rendering §"Flow content"
+//   (the UA stylesheet `display: block` element list)
 // - Svelte void elements: node_modules/svelte/src/utils.js:16-41
 // - prettier-plugin-svelte: isInlineElement = !isBlockElement (negation, no positive list)
 //

@@ -184,7 +184,8 @@ When `perf` shows time inside malloc/free internals, it can't say _which_
 allocation sites are responsible — glibc's allocator is diffuse from the CPU
 side. `heaptrack` attributes every allocation to its call site, answering
 "swap the allocator" vs "fix the hot sites" and sizing what an arena would
-eliminate.
+eliminate (see [architecture.md §Nested AST](./architecture.md#nested-ast-not-flatindexed)
+for the AST-allocation decision and its planned re-measurement).
 
 ```bash
 # Record (build with the profiling profile for symbols)

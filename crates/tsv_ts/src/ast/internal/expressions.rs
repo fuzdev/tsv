@@ -465,9 +465,6 @@ pub struct ConditionalExpression {
 /// Supports both expression bodies and block bodies:
 /// - Expression body: `x => x + 1` (body is Expression)
 /// - Block body: `x => { return x + 1; }` (body is BlockStatement)
-///
-/// For now, we only support expression bodies since block statements
-/// require additional parsing infrastructure.
 #[derive(Debug, Clone)]
 pub struct ArrowFunctionExpression {
     /// Type parameters (TypeScript generics): `<T>() => ...`

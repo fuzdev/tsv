@@ -1,4 +1,4 @@
-// CSS value parsing - Phase 4
+// CSS value parsing
 //
 // Parses CSS values into structured AST (CssValue enum).
 // Handles identifiers, strings, numbers/dimensions, colors, functions, and lists.

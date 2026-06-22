@@ -16,6 +16,8 @@
 // - **calls/**: Call and `new` expression formatting (argument wrapping, expand patterns)
 // - **chain/**: Member/call chain linearization, grouping, and rendering
 // - **class_common.rs**: Shared class-header layout for declaration + expression printers
+// - **needs_parens.rs**: Centralized parenthesization logic (`needs_parens(expr, ctx)`)
+// - **layout.rs**: Shared hang-indent "break after operator, then indent continuation" doc shapes
 //
 // ## Design Principles
 //

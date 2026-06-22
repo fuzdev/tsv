@@ -39,7 +39,7 @@ pub struct Root {
     pub node_type: String,
     pub fragment: Fragment,
     pub options: Option<SvelteOptions>,
-    pub comments: Vec<serde_json::Value>, // empty array for now
+    pub comments: Vec<serde_json::Value>, // root comments as JSON values (populated in ast/convert)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instance: Option<Script>,
     #[serde(skip_serializing_if = "Option::is_none")]

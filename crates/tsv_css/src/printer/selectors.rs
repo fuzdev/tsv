@@ -471,7 +471,7 @@ impl<'a> Printer<'a> {
                 // Example: `svg|rect` is extracted as-is from the source
                 //
                 // See:
-                // - docs/SVELTE_COMPATIBILITY.md (CSS Quirks section)
+                // - docs/conformance_svelte.md (CSS Compat Behaviors — escape preservation via raw-source extraction)
                 // - tests/fixtures/css/escapes/type_selector_escaped (demonstrates this behavior)
                 // - Svelte source: node_modules/svelte/src/compiler/phases/1-parse/read/style.js:575-611
                 let raw = span.extract(self.source);
@@ -492,7 +492,7 @@ impl<'a> Printer<'a> {
                 // Example: `.cl\41ss` stays as `.cl\41ss`, not `.clAss`
                 //
                 // See:
-                // - docs/SVELTE_COMPATIBILITY.md (CSS Quirks section)
+                // - docs/conformance_svelte.md (CSS Compat Behaviors — escape preservation via raw-source extraction)
                 // - tests/fixtures/css/escapes/unicode_in_identifiers (demonstrates this behavior)
                 // - Svelte source: node_modules/svelte/src/compiler/phases/1-parse/read/style.js:575-611
                 let raw = span.extract(self.source);
@@ -503,7 +503,7 @@ impl<'a> Printer<'a> {
                 // Same behavior as class selectors - identifiers preserve raw escapes
                 // Example: `#\1F4A9-id` stays as `#\1F4A9-id` (escape not decoded)
                 //
-                // See docs/SVELTE_COMPATIBILITY.md and tests/fixtures/css/escapes/unicode_in_identifiers
+                // See docs/conformance_svelte.md (CSS Compat Behaviors) and tests/fixtures/css/escapes/unicode_in_identifiers
                 let raw = span.extract(self.source);
                 self.write(raw); // Includes the '#' prefix
             }

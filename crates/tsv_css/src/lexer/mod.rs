@@ -2,7 +2,8 @@
 //
 // ARCHITECTURE DECISION: Separate Lexer vs Inline Parsing
 //
-// We use a traditional separate lexer that produces tokens, then the parser consumes them.
+// We use a separate lexer that yields tokens on demand: the parser pulls them one
+// at a time (streaming, single-token lookahead, no token vector).
 // Svelte's CSS parser uses inline parsing (no separate tokenization step) with read_value().
 //
 // TODO: Benchmark both approaches on large stylesheets (10k+ lines) to determine if inline
@@ -19,8 +20,6 @@
 //   - Potentially faster (fewer allocations, single pass)
 //   - String slicing over token objects (lower memory)
 //   - No need to store token positions separately
-//
-// See SVELTE_CSS_PARSING.md "Next Steps & Development Priorities" for details.
 
 mod comments;
 mod identifiers;
