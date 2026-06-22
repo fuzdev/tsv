@@ -52,6 +52,7 @@ pub(in crate::ast) use types::*;
 
 // Public API exports
 pub use expressions::convert_expression;
+pub use statements::convert_variable_declaration;
 
 /// Translate all byte-based positions in a JSON AST to UTF-16 code-unit positions
 ///

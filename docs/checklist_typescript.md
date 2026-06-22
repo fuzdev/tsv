@@ -660,17 +660,29 @@ Stage 2 proposals and experimental features tsv does not yet parse.
 
 ## Strict Mode Only
 
-All code in Svelte scripts runs in strict mode (ES modules). These constructs are intentionally not supported:
+All code in Svelte scripts runs in strict mode (ES modules). tsv parses the
+syntactic grammar; it enforces the *lexical* strict-mode restrictions but not the
+strict-mode *early errors* — those still parse, with enforcement deferred to a
+future diagnostics layer.
 
-- `with` statement — Strict mode SyntaxError
-- Legacy octal literals (`0777`) — Strict mode SyntaxError (use `0o777`)
-- Octal escape sequences — Strict mode SyntaxError in strings
-- Duplicate parameter names — Strict mode SyntaxError
-- `arguments.callee` — Strict mode TypeError (runtime)
-- Assigning to undeclared vars — Strict mode ReferenceError (runtime)
-- Deleting plain names — Strict mode SyntaxError (`delete x`)
+Rejected by the parser today:
 
-The tsv parser may accept some of these for robustness, but fixtures aren't created or tested since they're invalid in Svelte's module context.
+- `with` statement — SyntaxError
+- Legacy octal literals (`0777`) — SyntaxError (use `0o777`)
+
+Early errors that still parse (not yet enforced):
+
+- Octal escape sequences in strings (`'\07'`)
+- Duplicate parameter names (`function f(a, a) {}`)
+- Reserved words as identifiers (`var public = 1`)
+- `delete` of a plain name (`delete x`)
+
+Runtime-only (never a parse concern): `arguments.callee`, assigning to undeclared
+variables.
+
+The unenforced leaks only matter for standalone JS — Svelte/TS module context is
+strict, so the real compiler would still flag them. When the diagnostics layer
+lands, each early-error row gets an `input_invalid_*` fixture.
 
 ---
 

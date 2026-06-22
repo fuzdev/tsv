@@ -737,7 +737,7 @@ dispatch, no workspace-level language registry. Full discussion:
 - **ES Modules**: Always strict (`import`/`export` implies strict)
 - **Svelte `<script>`**: ES modules, always strict
 
-Unsupported sloppy-mode features: `with` statement, legacy octal literals (`010`), duplicate parameter names, reserved words as identifiers.
+tsv parses the syntactic grammar and rejects only the constructs that are *lexically* sloppy-mode — the `with` statement and legacy octal literals (`010`). Strict-mode **early errors** (duplicate parameter names, reserved words as identifiers, octal string escapes, `delete` of a plain name) still parse for now; enforcement is deferred to a future diagnostics layer. These leaks only matter for standalone JS — Svelte/TS module context is strict, so the real compiler would still flag them.
 
 ### Language-Level concerns (classification)
 

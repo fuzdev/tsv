@@ -32,7 +32,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match statement {
             Statement::ExpressionStatement(stmt) => self.build_expression_statement_doc(stmt),
-            Statement::VariableDeclaration(decl) => self.build_variable_declaration_doc(decl),
+            Statement::VariableDeclaration(decl) => self.build_variable_declaration_doc(decl, true),
             Statement::TSTypeAliasDeclaration(decl) => self.build_type_alias_declaration_doc(decl),
             Statement::ReturnStatement(ret) => self.build_return_statement_doc(ret),
             Statement::BlockStatement(block) => self.build_block_statement_doc(block),
