@@ -4,15 +4,15 @@ use crate::lexer::TokenKind;
 use crate::parser::selectors::parse_complex_selector_list;
 use tsv_lang::{ParseError, Span};
 
-/// Parse a `<supports-condition>`: `(prop: val)` parts connected by `and`/`or`,
-/// with an optional leading `not` and function-style `selector(...)` conditions.
+/// Parse a condition query — `(prop: val)` parts connected by `and`/`or`, with
+/// an optional leading `not` and function-style `selector(...)` conditions.
 ///
-/// This *is* the entire `@supports` prelude (CSS Syntax: `@supports
-/// <supports-condition>`), and `@container` reuses it verbatim for its query —
-/// the two grammars are identical; `@container` only adds an optional
-/// `<container-name>` preamble before calling this. The returned span starts at
-/// the parser's current position (the first condition token);
-/// `parse_container_prelude` widens the start to cover the name.
+/// This *is* the entire `@supports` prelude (`<supports-condition>`), and
+/// `@container` reuses it verbatim for its `<container-query>` — the two grammars
+/// are identical; `@container` only adds an optional `<container-name>` preamble
+/// before calling this. The returned span starts at the parser's current
+/// position (the first condition token); `parse_container_prelude` widens the
+/// start to cover the name.
 ///
 /// Examples:
 /// - `(display: grid)` - single condition
@@ -21,10 +21,10 @@ use tsv_lang::{ParseError, Span};
 /// - `(a) and (b) or (c)` - mixed (parsed left-to-right)
 pub(super) fn parse_condition_query(
     parser: &mut CssParser<'_>,
-) -> Result<(SupportsCondition, Span), ParseError> {
+) -> Result<(ConditionQuery, Span), ParseError> {
     let start = parser.base_offset() + parser.current_start;
     let mut parts = Vec::new();
-    let mut current_connector: Option<SupportsConnector> = None;
+    let mut current_connector: Option<ConditionConnector> = None;
     let mut end_pos = start;
 
     while !parser.check(TokenKind::LeftBrace)
@@ -50,9 +50,9 @@ pub(super) fn parse_condition_query(
             if ident == "and" || ident == "or" {
                 // This is a connector between parts
                 current_connector = Some(if ident == "and" {
-                    SupportsConnector::And
+                    ConditionConnector::And
                 } else {
-                    SupportsConnector::Or
+                    ConditionConnector::Or
                 });
                 parser.advance()?;
                 // Register comments after connector (e.g., `and /* comment */ (b)`)
@@ -240,7 +240,7 @@ pub(super) fn parse_condition_query(
         // Build the part
         let content = part_content.join("").trim().to_string();
         if !content.is_empty() {
-            parts.push(SupportsPart {
+            parts.push(ConditionPart {
                 connector: current_connector.take(),
                 content,
                 span: Span {
@@ -256,7 +256,7 @@ pub(super) fn parse_condition_query(
         end: end_pos as u32,
     };
 
-    Ok((SupportsCondition { parts }, span))
+    Ok((ConditionQuery { parts }, span))
 }
 
 /// Parse @container prelude into structured condition parts with optional name
@@ -271,7 +271,7 @@ pub(super) fn parse_condition_query(
 /// - `sidebar (min-width: 100px) and (max-width: 200px)` - named container with conjunction
 pub(super) fn parse_container_prelude(
     parser: &mut CssParser<'_>,
-) -> Result<(Option<String>, SupportsCondition, Span), ParseError> {
+) -> Result<(Option<String>, ConditionQuery, Span), ParseError> {
     let start = parser.base_offset() + parser.current_start;
 
     // Check for optional container name (identifier before first '(')
