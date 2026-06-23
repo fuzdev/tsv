@@ -6,8 +6,7 @@
 // glyphs inside them aren't mistaken for the real token.
 
 use super::Printer;
-use super::analysis::skip_string_or_comment;
-use tsv_lang::source_scan::find_char_skipping_comments;
+use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comments};
 
 impl<'a> Printer<'a> {
     /// Find the position of the next comma delimiter after the given position
@@ -20,21 +19,7 @@ impl<'a> Printer<'a> {
     /// Example: `[A /* , */ , B]` - finds the second comma, not the one in the comment
     pub(crate) fn find_comma_after(&self, pos: u32) -> Option<u32> {
         let source = self.source.as_bytes();
-        let mut i = pos as usize;
-        let end = source.len();
-
-        while i < end {
-            match source[i] {
-                b',' => return Some(i as u32),
-                _ => {
-                    if let Some(skip) = skip_string_or_comment(source, i, end) {
-                        i = skip;
-                    }
-                }
-            }
-            i += 1;
-        }
-        None
+        find_char(source, pos as usize, source.len(), b',', TriviaProfile::JS).map(|i| i as u32)
     }
 
     /// Find an angle-bracket type assertion's closing `>` in `[start, end)`,
@@ -47,18 +32,14 @@ impl<'a> Printer<'a> {
     /// dropping them.
     pub(crate) fn find_assertion_close_angle(&self, start: u32, end: u32) -> u32 {
         let source = self.source.as_bytes();
-        let end_usize = end as usize;
-        let mut i = start as usize;
-        while i < end_usize {
-            if source[i] == b'>' {
-                return i as u32;
-            }
-            if let Some(skip) = skip_string_or_comment(source, i, end_usize) {
-                i = skip;
-            }
-            i += 1;
-        }
-        end
+        find_char(
+            source,
+            start as usize,
+            end as usize,
+            b'>',
+            TriviaProfile::JS,
+        )
+        .map_or(end, |i| i as u32)
     }
 
     /// Find the position of the LAST comma in `[start, end)`, or `None`.
