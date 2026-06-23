@@ -588,10 +588,9 @@ impl<'a> Printer<'a> {
             self.push_member_keyword_doc(&mut parts, "async ", &mut cursor, key_start);
         }
 
-        // Generator marker (owns comment handling from `*` to the key)
+        // Generator marker (owns the `*` and comment handling around it)
         if method.value.generator {
-            parts.push(d.text("*"));
-            self.append_generator_star_comments(&mut parts, cursor, key_start);
+            self.push_generator_star_doc(&mut parts, cursor, key_start);
         }
 
         // Get/set for accessors
