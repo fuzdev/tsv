@@ -452,8 +452,7 @@ impl<'a> Printer<'a> {
                     self.push_member_keyword_doc(&mut parts, "async ", &mut cursor, key_start);
                 }
                 if func.generator {
-                    parts.push(d.text("*"));
-                    self.append_generator_star_comments(&mut parts, cursor, key_start);
+                    self.push_generator_star_doc(&mut parts, cursor, key_start);
                 } else if func.r#async {
                     // Comments before the name (bounded at `[` for computed keys,
                     // whose inner comments the bracket builder handles)

@@ -1,0 +1,392 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 131,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 28,
+			"end": 35,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 8
+				},
+				"end": {
+					"line": 3,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a * b ",
+			"start": 52,
+			"end": 63,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 8
+				},
+				"end": {
+					"line": 4,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " before ",
+			"start": 82,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 8
+				},
+				"end": {
+					"line": 5,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " after ",
+			"start": 96,
+			"end": 107,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 22
+				},
+				"end": {
+					"line": 5,
+					"column": 33
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 130,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 121,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 10,
+					"end": 120,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 16,
+						"end": 17,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 7
+							},
+							"end": {
+								"line": 2,
+								"column": 8
+							}
+						},
+						"name": "A"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 18,
+						"end": 120,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 9
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 22,
+								"end": 43,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 3,
+										"column": 23
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 37,
+									"end": 38,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 17
+										},
+										"end": {
+											"line": 3,
+											"column": 18
+										}
+									},
+									"name": "m",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 28,
+											"end": 35
+										}
+									]
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 38,
+									"end": 43,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 18
+										},
+										"end": {
+											"line": 3,
+											"column": 23
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": true,
+									"async": true,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 41,
+										"end": 43,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 21
+											},
+											"end": {
+												"line": 3,
+												"column": 23
+											}
+										},
+										"body": []
+									}
+								}
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 46,
+								"end": 73,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 29
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 65,
+									"end": 68,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 21
+										},
+										"end": {
+											"line": 4,
+											"column": 24
+										}
+									},
+									"name": "gen",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " a * b ",
+											"start": 52,
+											"end": 63
+										}
+									]
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 68,
+									"end": 73,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 24
+										},
+										"end": {
+											"line": 4,
+											"column": 29
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": true,
+									"async": true,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 71,
+										"end": 73,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 27
+											},
+											"end": {
+												"line": 4,
+												"column": 29
+											}
+										},
+										"body": []
+									}
+								}
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 76,
+								"end": 117,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 43
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 108,
+									"end": 112,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 34
+										},
+										"end": {
+											"line": 5,
+											"column": 38
+										}
+									},
+									"name": "both",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " before ",
+											"start": 82,
+											"end": 94
+										},
+										{
+											"type": "Block",
+											"value": " after ",
+											"start": 96,
+											"end": 107
+										}
+									]
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 112,
+									"end": 117,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 38
+										},
+										"end": {
+											"line": 5,
+											"column": 43
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": true,
+									"async": true,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 115,
+										"end": 117,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 41
+											},
+											"end": {
+												"line": 5,
+												"column": 43
+											}
+										},
+										"body": []
+									}
+								}
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
