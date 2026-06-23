@@ -32,7 +32,7 @@ mod render;
 mod scan;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`.
-pub(super) use super::{Printer, analysis, calls, layout};
+pub(super) use super::{Printer, calls, layout};
 
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;

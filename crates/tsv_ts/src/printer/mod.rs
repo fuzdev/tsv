@@ -70,6 +70,7 @@ use tsv_lang::{
         arena::{DocArena, DocId},
     },
     has_comments_in_range, has_line_comments_in_range, is_format_ignore_directive, printing,
+    source_scan::{TriviaProfile, skip_trivia},
 };
 
 /// The parent context that routes a curried arrow chain (`(a) => (b) => …`)
@@ -634,11 +635,15 @@ impl<'a> Printer<'a> {
     /// the position AFTER the `)` for use as a boundary.
     pub(crate) fn find_closing_paren(&self, start: u32, end: u32) -> Option<u32> {
         let source = self.source.as_bytes();
-        let end = end as usize;
+        let end = (end as usize).min(source.len());
         let mut depth = 0;
         let mut i = start as usize;
 
-        while i < end && i < source.len() {
+        while i < end {
+            if let Some(past) = skip_trivia(source, i, end, TriviaProfile::JS) {
+                i = past;
+                continue;
+            }
             match source[i] {
                 b'(' => depth += 1,
                 b')' => {
@@ -647,11 +652,7 @@ impl<'a> Printer<'a> {
                         return Some((i + 1) as u32);
                     }
                 }
-                _ => {
-                    if let Some(skip) = analysis::skip_string_or_comment(source, i, end) {
-                        i = skip;
-                    }
-                }
+                _ => {}
             }
             i += 1;
         }
@@ -724,15 +725,16 @@ impl<'a> Printer<'a> {
     /// (the start of the arrow token). Skips over comments and strings.
     pub(crate) fn find_arrow_token(&self, start: u32, end: u32) -> Option<u32> {
         let source = self.source.as_bytes();
-        let end = end as usize;
+        let end = (end as usize).min(source.len());
         let mut i = start as usize;
 
-        while i + 1 < end && i + 1 < source.len() {
+        while i + 1 < end {
+            if let Some(past) = skip_trivia(source, i, end, TriviaProfile::JS) {
+                i = past;
+                continue;
+            }
             if source[i] == b'=' && source[i + 1] == b'>' {
                 return Some(i as u32);
-            }
-            if let Some(skip) = analysis::skip_string_or_comment(source, i, end) {
-                i = skip;
             }
             i += 1;
         }
@@ -747,11 +749,15 @@ impl<'a> Printer<'a> {
     pub(crate) fn find_keyword_in_range(&self, start: u32, end: u32, keyword: &str) -> Option<u32> {
         let source = self.source.as_bytes();
         let kw_bytes = keyword.as_bytes();
-        let end = end as usize;
+        let end = (end as usize).min(source.len());
         let kw_len = kw_bytes.len();
         let mut i = start as usize;
 
-        while i + kw_len <= end && i + kw_len <= source.len() {
+        while i + kw_len <= end {
+            if let Some(past) = skip_trivia(source, i, end, TriviaProfile::JS) {
+                i = past;
+                continue;
+            }
             // Check for keyword match
             if &source[i..i + kw_len] == kw_bytes {
                 // Check word boundaries (not part of larger identifier)
@@ -762,9 +768,6 @@ impl<'a> Printer<'a> {
                 if before_ok && after_ok {
                     return Some(i as u32);
                 }
-            }
-            if let Some(skip) = analysis::skip_string_or_comment(source, i, end) {
-                i = skip;
             }
             i += 1;
         }

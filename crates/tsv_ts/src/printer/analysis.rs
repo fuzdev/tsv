@@ -26,46 +26,6 @@ pub(crate) fn skip_identifier_at(bytes: &[u8], pos: usize, end: usize) -> usize 
     i
 }
 
-/// Skip over a string literal or comment starting at position `i`.
-///
-/// Returns `Some(end_pos)` where `end_pos` is the last character of the skipped
-/// content (caller should then `i += 1`), or `None` if not at a string/comment.
-pub(crate) fn skip_string_or_comment(source: &[u8], i: usize, end: usize) -> Option<usize> {
-    match source[i] {
-        b'"' | b'\'' | b'`' => {
-            let quote = source[i];
-            let mut j = i + 1;
-            while j < end && source[j] != quote {
-                if source[j] == b'\\' {
-                    j += 1;
-                }
-                j += 1;
-            }
-            Some(j)
-        }
-        b'/' if i + 1 < end => {
-            if source[i + 1] == b'/' {
-                // Line comment - skip to end of line
-                let mut j = i;
-                while j < end && source[j] != b'\n' {
-                    j += 1;
-                }
-                Some(j)
-            } else if source[i + 1] == b'*' {
-                // Block comment - skip to */
-                let mut j = i + 2;
-                while j + 1 < end && !(source[j] == b'*' && source[j + 1] == b'/') {
-                    j += 1;
-                }
-                Some(j + 1)
-            } else {
-                None
-            }
-        }
-        _ => None,
-    }
-}
-
 /// Check if an expression is a module path call that should use fluid assignment wrapping
 /// (break after `=` if too long, keeping the call together).
 ///
