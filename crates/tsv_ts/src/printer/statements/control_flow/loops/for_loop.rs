@@ -768,34 +768,30 @@ impl<'a> Printer<'a> {
             self.has_line_comments_between(left_start, close)
         };
 
+        // Build the `for ... (` opening once — shared by both the inline and the
+        // breaking (line-comment) layouts, so each preserves any `for`-to-`(`
+        // comment and emits `await` from the AST.
+        let mut parts = Vec::new();
+        self.push_for_open_paren(
+            &mut parts,
+            keyword_comments,
+            for_await_comments,
+            await_paren_comments,
+            is_await,
+        );
+
         if has_line_comments {
             return self.build_for_in_of_with_line_comments(
                 left,
                 right,
                 body,
-                stmt_start,
                 keyword,
                 keyword_pos,
+                open_paren,
                 close_paren,
+                parts,
             );
         }
-
-        let mut parts = vec![d.text("for")];
-        if let Some(kc) = keyword_comments {
-            parts.push(kc);
-        }
-        if let Some(fac) = for_await_comments {
-            parts.push(fac);
-        }
-        parts.push(d.text(" "));
-        if is_await {
-            parts.push(d.text("await"));
-            if let Some(apc) = await_paren_comments {
-                parts.push(apc);
-            }
-            parts.push(d.text(" "));
-        }
-        parts.push(d.text("("));
 
         // Comments between ( and left
         if let Some(open) = open_paren {
@@ -834,16 +830,8 @@ impl<'a> Printer<'a> {
             self.append_for_in_of_trailing_comments(&mut parts, right_end, close);
         }
 
-        // Check for comments between ) and body
-        let paren_end = close_paren.map_or(right_end + 1, |p| p + 1);
-
-        // Prettier expands empty blocks for for-in/for-of
-        if let Statement::BlockStatement(block) = body {
-            self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
-            parts.push(self.build_block_statement_expand_empty_doc(block));
-        } else {
-            self.append_close_paren_with_non_block_body(&mut parts, paren_end, body);
-        }
+        // `)` + comments + body (shared with the breaking layout)
+        self.push_for_close_paren_and_body(&mut parts, body, right_end, close_paren);
 
         // Group so a non-block body's `adjustClause` line breaks on overflow
         // (matches Prettier's `printForXStatement`).
@@ -860,32 +848,20 @@ impl<'a> Printer<'a> {
         left: &internal::ForInOfLeft,
         right: &Expression,
         body: &Statement,
-        stmt_start: u32,
         keyword: &str, // "in" or "of"
         keyword_pos: u32,
+        open_paren: Option<u32>,
         close_paren: Option<u32>,
+        // The `for ... (` opening, prebuilt by the caller (comments preserved,
+        // `await` from the AST) — shared with the inline layout.
+        mut parts: Vec<DocId>,
     ) -> DocId {
         let d = self.d();
         let left_start = self.get_for_in_of_left_start(left);
         let left_end = self.get_for_in_of_left_end(left);
         let right_start = right.span().start;
         let right_end = right.span().end;
-        let open_paren = self.find_open_paren_after(stmt_start);
         let keyword_end = keyword_pos + keyword.len() as u32;
-
-        // Check for "for await" by looking at source before open paren
-        let has_await = if let Some(open) = open_paren {
-            let before_paren = &self.source[stmt_start as usize..open as usize];
-            before_paren.contains("await")
-        } else {
-            false
-        };
-
-        let mut parts = if has_await {
-            vec![d.text("for await (")]
-        } else {
-            vec![d.text("for (")]
-        };
 
         // Inner content with hardline breaks
         let mut inner = Vec::new();
@@ -939,20 +915,67 @@ impl<'a> Printer<'a> {
         parts.push(d.indent(d.concat(&inner)));
         parts.push(d.hardline());
 
-        // Comments between ) and body (matching inline path)
-        let paren_end = close_paren.map_or(right_end + 1, |p| p + 1);
-
-        // Body
-        if let Statement::BlockStatement(block) = body {
-            self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
-            parts.push(self.build_block_statement_expand_empty_doc(block));
-        } else {
-            self.append_close_paren_with_non_block_body(&mut parts, paren_end, body);
-        }
+        // `)` + comments + body (shared with the inline layout)
+        self.push_for_close_paren_and_body(&mut parts, body, right_end, close_paren);
 
         // Group so the non-block body's `adjustClause` line breaks (the
         // hardline-broken header forces this group open via `will_break`).
         d.group(d.concat(&parts))
+    }
+
+    /// Push the `for [comments] [await] (` opening into `parts`.
+    ///
+    /// Shared by the inline and breaking for-in/for-of header layouts so both
+    /// preserve any comment in the `for`-to-`(` region (`keyword_comments` /
+    /// `for_await_comments` / `await_paren_comments`) and emit `await` from
+    /// `is_await` (the AST) — a comment that merely contains the word `await`
+    /// stays a comment, never promoted to a `for await` keyword.
+    fn push_for_open_paren(
+        &self,
+        parts: &mut Vec<DocId>,
+        keyword_comments: Option<DocId>,
+        for_await_comments: Option<DocId>,
+        await_paren_comments: Option<DocId>,
+        is_await: bool,
+    ) {
+        let d = self.d();
+        parts.push(d.text("for"));
+        if let Some(kc) = keyword_comments {
+            parts.push(kc);
+        }
+        if let Some(fac) = for_await_comments {
+            parts.push(fac);
+        }
+        parts.push(d.text(" "));
+        if is_await {
+            parts.push(d.text("await"));
+            if let Some(apc) = await_paren_comments {
+                parts.push(apc);
+            }
+            parts.push(d.text(" "));
+        }
+        parts.push(d.text("("));
+    }
+
+    /// Push `)` + comments + body for a for-in/for-of statement.
+    ///
+    /// Shared by the inline and breaking layouts: a block body expands an empty
+    /// `{}` (`build_block_statement_expand_empty_doc`); a non-block body uses
+    /// Prettier's `adjustClause` indentation.
+    fn push_for_close_paren_and_body(
+        &self,
+        parts: &mut Vec<DocId>,
+        body: &Statement,
+        right_end: u32,
+        close_paren: Option<u32>,
+    ) {
+        let paren_end = close_paren.map_or(right_end + 1, |p| p + 1);
+        if let Statement::BlockStatement(block) = body {
+            self.append_close_paren_with_comments(parts, paren_end, block.span.start);
+            parts.push(self.build_block_statement_expand_empty_doc(block));
+        } else {
+            self.append_close_paren_with_non_block_body(parts, paren_end, body);
+        }
     }
 
     /// Get the end position of the left side of a for-in/for-of statement
