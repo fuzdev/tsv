@@ -340,10 +340,17 @@ All three parsers are **recursive descent** with **fail-fast error handling** (r
 The TS parser is the most complex, using **Pratt parsing** for expressions with multi-phase infix handling:
 
 ```
-expression.rs        — Pratt parser core (binding powers, operator dispatch)
-expression_lookahead.rs — Arrow/generic/type assertion disambiguation
-scan.rs              — Byte-level scanning utilities (fast lookahead without lexing)
-statement/           — Statement parsing (variable, function, class, control flow, modules, types)
+expression.rs            — Pratt parser core (binding powers, prefix/infix/postfix dispatch, primary + paren)
+expression_arrow.rs      — Arrow function predicates and builders
+expression_assignable.rs — Cover-grammar conversion of an expression to an assignable pattern
+expression_literals.rs   — Object and array literal parsing
+expression_lookahead.rs  — Arrow/generic/type-assertion disambiguation (byte-scan)
+expression_template.rs   — Template literal parsing
+expression_type_args.rs  — Type-argument byte-scan lookahead (`<Type, …>` vs `<`)
+scan.rs                  — Byte-level scanning utilities (fast lookahead without lexing)
+parameters.rs            — Parameter and destructuring-pattern parsing
+types.rs, type_members.rs — Type-syntax parsing (annotations, type expressions; interface/type-literal members)
+statement/               — Statement parsing (variable, function, class, control flow, modules, types)
 ```
 
 **Pratt binding powers** (higher = tighter):
