@@ -9,8 +9,11 @@ use tsv_lang::{ParseError, PeekData, SharedInterner, Span};
 
 // Import parsing implementations
 mod expression;
+mod expression_arrow; // Arrow function predicate scans and builders
+mod expression_assignable; // Cover-grammar expression→pattern conversion (`to_assignable`)
 mod expression_literals; // Object and array literal parsing
 mod expression_lookahead; // Arrow function and type argument disambiguation
+mod expression_template; // Template literal parsing (`\`...${expr}...\``)
 mod expression_type_args; // Type-argument byte-scan lookahead (`<Type, ...>` vs `<`)
 mod parameters; // Function/method parameter and destructuring-pattern parsing
 mod scan; // Low-level byte scanning utilities
