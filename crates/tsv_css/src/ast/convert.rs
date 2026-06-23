@@ -17,6 +17,7 @@
 // documented divergence (docs/conformance_svelte.md), not replicated.
 
 use super::internal;
+use tsv_lang::source_scan::{TriviaProfile, find_char};
 
 /// Split a declaration source into property and value, matching Svelte's quirky behavior.
 ///
@@ -34,7 +35,15 @@ use super::internal;
 /// public AST for `color /* c */ : red` ends up as property=`color`, value=`": red"`
 /// (Svelte 5.55+ strips block comments from value strings post-split).
 fn split_declaration_svelte_compat(decl_source: &str) -> (&str, &str) {
-    let Some(colon_pos) = decl_source.find(':') else {
+    // The real `property : value` colon is the first one outside any comment or
+    // string — a property comment may itself contain a `:` (`color /* x:y */: red`).
+    let Some(colon_pos) = find_char(
+        decl_source.as_bytes(),
+        0,
+        decl_source.len(),
+        b':',
+        TriviaProfile::CSS,
+    ) else {
         return (decl_source, "");
     };
 

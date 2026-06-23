@@ -116,7 +116,7 @@ impl<'a> Printer<'a> {
         decl: &crate::ast::internal::CssDeclaration,
     ) -> bool {
         let decl_source = decl.span.extract(self.source);
-        if let Some(colon_pos) = decl_source.find(':') {
+        if let Some(colon_pos) = value_normalization::find_declaration_colon(decl_source) {
             let value_part = &decl_source[colon_pos + 1..];
             value_part.contains("/*")
         } else {

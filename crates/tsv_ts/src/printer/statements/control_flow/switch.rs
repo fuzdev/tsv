@@ -5,7 +5,7 @@
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::source_scan::find_char_skipping_comments;
+use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comments};
 
 impl<'a> Printer<'a> {
     /// Build a doc for a switch statement with proper line-width wrapping
@@ -149,19 +149,24 @@ impl<'a> Printer<'a> {
 
     /// Get the end position of a case label (position after the colon)
     fn get_case_label_end(&self, case: &internal::SwitchCase) -> u32 {
+        let bytes = self.source.as_bytes();
         if let Some(test) = &case.test {
-            // Find ':' after the test expression
+            // Find the label ':' after the test expression, skipping any ':' inside
+            // a comment (`case 1 /* : */:`).
             let test_end = test.span().end;
-            self.source[test_end as usize..]
-                .find(':')
-                .map_or_else(|| test_end + 1, |p| test_end + p as u32 + 1)
+            find_char(
+                bytes,
+                test_end as usize,
+                bytes.len(),
+                b':',
+                TriviaProfile::JS,
+            )
+            .map_or(test_end + 1, |c| c as u32 + 1)
         } else {
-            // "default:" - find the actual ':' position
-            self.source[case.span.start as usize..]
-                .find(':')
-                .map_or(case.span.start + "default:".len() as u32, |p| {
-                    case.span.start + p as u32 + 1
-                })
+            // "default:" - find the actual ':' position (comment-skipping).
+            let start = case.span.start;
+            find_char(bytes, start as usize, bytes.len(), b':', TriviaProfile::JS)
+                .map_or(start + "default:".len() as u32, |c| c as u32 + 1)
         }
     }
 

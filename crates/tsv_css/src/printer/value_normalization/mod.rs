@@ -17,6 +17,21 @@ pub(crate) use splitting::{
 
 use numbers::{is_known_css_unit, normalize_css_number};
 use tsv_lang::printing::format_string_literal;
+use tsv_lang::source_scan::{TriviaProfile, find_char};
+
+/// Find the declaration's `property : value` colon — the first `:` that is not
+/// inside a comment or string. A property comment may itself contain a colon
+/// (`color /* x:y */: red`), which a naive `find(':')` would mis-match. Shared by
+/// the printer's declaration sites (`declarations.rs`, `mod.rs`).
+pub(crate) fn find_declaration_colon(decl_source: &str) -> Option<usize> {
+    find_char(
+        decl_source.as_bytes(),
+        0,
+        decl_source.len(),
+        b':',
+        TriviaProfile::CSS,
+    )
+}
 
 /// Format an identifier value semantically
 ///
@@ -205,7 +220,7 @@ pub(crate) fn format_string_value(content: &str, quote: char) -> String {
 /// - Output: `color /* comment */` (normalized spacing)
 /// - Prettier: `color/* comment */` (no space before comment)
 pub(crate) fn extract_property_name(decl_source: &str) -> String {
-    if let Some(colon_pos) = decl_source.find(':') {
+    if let Some(colon_pos) = find_declaration_colon(decl_source) {
         let property_part = &decl_source[..colon_pos];
 
         // Check if property contains a comment
@@ -288,7 +303,7 @@ fn ends_with_hex_escape(name: &str) -> bool {
 /// assert_eq!(extract_string_value(source, '\''), Some("'hello\\nworld'".to_string()));
 /// ```
 pub(crate) fn extract_string_value(decl_source: &str, quote: char) -> Option<String> {
-    if let Some(colon_pos) = decl_source.find(':') {
+    if let Some(colon_pos) = find_declaration_colon(decl_source) {
         let value_part = decl_source[colon_pos + 1..].trim();
         // String should be quoted
         if value_part.len() >= 2 {
@@ -318,7 +333,7 @@ pub(crate) fn extract_string_value(decl_source: &str, quote: char) -> Option<Str
 /// assert_eq!(extract_value_with_comments(source), Some("10px /* test */ 20px".to_string()));
 /// ```
 pub(crate) fn extract_value_with_comments(decl_source: &str) -> Option<String> {
-    if let Some(colon_pos) = decl_source.find(':') {
+    if let Some(colon_pos) = find_declaration_colon(decl_source) {
         let value_with_ws = &decl_source[colon_pos + 1..];
         let normalized = normalize_value_spacing(value_with_ws);
         Some(normalized)

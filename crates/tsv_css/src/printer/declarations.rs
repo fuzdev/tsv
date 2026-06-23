@@ -90,7 +90,7 @@ impl<'a> Printer<'a> {
 
         // Check source: is there a newline between `:` and the first value?
         let decl_source = decl.span.extract(self.source);
-        if let Some(colon_pos) = decl_source.find(':') {
+        if let Some(colon_pos) = value_normalization::find_declaration_colon(decl_source) {
             let after_colon = &decl_source[colon_pos + 1..];
             for ch in after_colon.chars() {
                 if ch == '\n' {

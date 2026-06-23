@@ -614,26 +614,20 @@ impl<'a> Printer<'a> {
         )
         .map(|i| i as u32);
 
+        // Comments before the `*` lead it, at the author's position. A generator
+        // always has a real `*`; if (defensively) none is found, treat the whole
+        // gap as "before" so no comment is ever dropped.
+        for comment in comments_in_range(self.comments, search_start, star.unwrap_or(key_start)) {
+            parts.push(self.build_comment_doc(comment));
+            parts.push(d.text(" "));
+        }
+        parts.push(d.text("*"));
+        // Comments between the `*` and the key trail it.
         if let Some(star) = star {
-            // Comments before the `*` lead it, at the author's position.
-            for comment in comments_in_range(self.comments, search_start, star) {
-                parts.push(self.build_comment_doc(comment));
-                parts.push(d.text(" "));
-            }
-            parts.push(d.text("*"));
-            // Comments between the `*` and the key trail it.
             for comment in comments_in_range(self.comments, star + 1, key_start) {
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.text(" "));
             }
-        } else {
-            // Defensive: a generator always has a real `*`. If none is found,
-            // keep any comments (never drop them), then the marker.
-            for comment in comments_in_range(self.comments, search_start, key_start) {
-                parts.push(self.build_comment_doc(comment));
-                parts.push(d.text(" "));
-            }
-            parts.push(d.text("*"));
         }
     }
 
