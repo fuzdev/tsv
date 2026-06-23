@@ -147,6 +147,18 @@ impl<'a> Printer<'a> {
         doc
     }
 
+    /// Run `build` with the curried-typed-arrow flag set to `value`, restoring the
+    /// prior value afterward. Mirrors `build_with_arrow_chain_context`: the flag is
+    /// per-chain layout state that must not leak to sibling arrows nested inside the
+    /// body (callbacks, object-property arrows). The arms that set it to the value
+    /// it already holds rely on the restore returning that same value.
+    fn build_with_in_curried(&self, value: bool, build: impl FnOnce() -> DocId) -> DocId {
+        let prev = self.in_curried_typed_arrow.replace(value);
+        let doc = build();
+        self.in_curried_typed_arrow.set(prev);
+        doc
+    }
+
     /// Print an arrow function expression using doc-based formatting with width-aware wrapping.
     ///
     /// Prettier behavior for arrow functions:
@@ -180,41 +192,8 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = Vec::new();
 
-        // Async keyword if present
-        if arrow.r#async {
-            parts.push(d.text("async "));
-        }
-
-        // Build signature parts (will be wrapped in a group)
-        let mut sig_parts = Vec::new();
-
-        // Type parameters: always their own group so they break independently of
-        // the rest of the signature (Prettier's printTypeParameters semantics).
-        if let Some(tp) = &arrow.type_parameters {
-            sig_parts.push(self.build_type_params_doc_for_arrow(tp));
-
-            // Comments between type_params `>` and `(` go after type_params
-            if let Some(pp) = find_char_skipping_comments(
-                self.source.as_bytes(),
-                tp.span.end as usize,
-                self.source.len(),
-                b'(',
-            ) {
-                self.append_type_params_to_paren_comments(&mut sig_parts, tp.span.end, pp as u32);
-            }
-        }
-
-        // Function parameters - NOT in their own group, just softlines
-        // These will break when the outer signature group breaks
-        sig_parts.push(self.build_arrow_params_doc_ungrouped(arrow));
-
-        // Return type annotation - union types need special handling for breaking
-        if let Some(return_type) = &arrow.return_type {
-            sig_parts.push(self.build_arrow_return_type_doc(return_type, arrow.params_start));
-        }
-
-        // Calculate signature end position (after `)` or return type)
-        // This is where comments BEFORE `=>` start
+        // Calculate signature end position (after `)` or return type).
+        // This is where comments BEFORE `=>` start.
         let sig_end = if let Some(rt) = &arrow.return_type {
             rt.span.end
         } else if let Some(params_start) = arrow.params_start {
@@ -237,19 +216,27 @@ impl<'a> Printer<'a> {
             .unwrap_or_else(|| arrow.body.span().start);
         let arrow_end = arrow_pos + "=>".len() as u32;
 
-        // Check for comments between signature and `=>` (e.g., `(x) /* c */ =>`)
-        // Single binary search via comments_in_range
-        for comment in comments_in_range(self.comments, sig_end, arrow_pos) {
-            sig_parts.push(d.text(" "));
-            sig_parts.push(self.build_comment_doc(comment));
-        }
+        // Build the signature (async + type params + params + return type) via the
+        // shared builder, then append any comment between the signature and `=>`
+        // (`(x) /* c */ =>`). The common (no-comment) path uses the signature doc
+        // directly — no extra Vec.
+        let sig_inner = self.build_arrow_signature_doc(arrow);
+        let sig_doc = if self.has_comments_between(sig_end, arrow_pos) {
+            let mut sig_parts = vec![sig_inner];
+            for comment in comments_in_range(self.comments, sig_end, arrow_pos) {
+                sig_parts.push(d.text(" "));
+                sig_parts.push(self.build_comment_doc(comment));
+            }
+            d.concat(&sig_parts)
+        } else {
+            sig_inner
+        };
 
         // Wrap entire signature in a group. In expand-last-arg context, render the
         // signature flat (remove_lines) so the params can't break — prettier's
         // `expandLastArg` path prints params with `removeLines`, which is what lets a
         // force-broken arrow keep its destructuring param inline and fall through to
         // the all-args-broken-out layout instead of shattering the param.
-        let sig_doc = d.concat(&sig_parts);
         if self.expand_last_arg_flat_params.get() {
             parts.push(d.remove_lines(sig_doc));
         } else {
@@ -262,232 +249,244 @@ impl<'a> Printer<'a> {
         // pushes to -1 and forces the sig group to break params.
         parts.push(d.text(" =>"));
 
-        // Body - expression bodies can break to new line with indent
+        // Body: expression bodies can break to a new line with indent; block bodies
+        // stay hugged to `=>`.
         match &arrow.body {
             internal::ArrowFunctionBody::Expression(expr) => {
-                // Check for trailing comments from stripped grouping parens.
-                // When the parser strips parens from `() => (x /* c */)`, comments
-                // between body expr end and arrow span end are lost. Re-add parens
-                // to preserve them, matching the unary expression approach.
-                let body_end = expr.span().end;
-                let has_trailing_paren_comments =
-                    self.has_trailing_paren_comments(body_end, arrow.span.end);
-
-                if has_trailing_paren_comments {
-                    parts.push(d.text(" "));
-                    // Leading comments between `=>` and body (if any):
-                    // `() => /* lead */ (x /* trail */)` — emit inline leading,
-                    // then paren-wrapped body with trailing.
-                    let body_start = expr.span().start;
-                    if self.has_comments_between(arrow_end, body_start) {
-                        for comment in comments_in_range(self.comments, arrow_end, body_start) {
-                            parts.push(self.build_comment_doc(comment));
-                            parts.push(d.text(" "));
-                        }
-                    }
-                    parts.push(self.build_expression_doc_keep_paren_comments(expr, arrow.span.end));
-                    // Skip normal body handling — paren wrapping covers all cases
-                } else {
-                    // Check for comments between `=>` and body start
-                    // These are comments like: `() => /* comment */ expr`
-                    let body_start = expr.span().start;
-                    let has_post_arrow_comments = self.has_comments_between(arrow_end, body_start);
-
-                    // Prettier's `hasLeadingOwnLineComment`: checks if any comment
-                    // between `=>` and body has a newline after it. Inline block
-                    // comments like `=> /* c */ expr` return false (body stays hugged),
-                    // while own-line comments return true (body breaks).
-                    let has_own_line_comment = has_post_arrow_comments
-                        && self.has_own_line_post_arrow_comment(arrow_end, body_start);
-
-                    // Prettier's `shouldPutBodyOnSameLine`: certain expression types stay hugged to =>
-                    // Object/array literals always hug.
-                    // Nested arrows hug ONLY when outer has no return type annotation.
-                    // With return type: const f = (x: T): H => (y) => expr; // breaks
-                    // Without:          const f = (x: T) => (y) => expr;    // hugs
-                    let is_arrow_body =
-                        matches!(&**expr, internal::Expression::ArrowFunctionExpression(_));
-
-                    // Check if this is a curried arrow where ANY arrow triggers chain breaking.
-                    // Triggers: return type with params, type parameters, non-identifier params.
-                    // Skip when skip_arrow_chain is set (call arg expand-last context) — prettier's
-                    // shouldPrintAsChain is false when expandLastArg is true, so chain detection
-                    // is disabled and the body is hugged.
-                    let chain_has_return_type = is_arrow_body
-                        && !self.skip_arrow_chain.get()
-                        && crate::printer::arrow_chain_has_return_type(arrow);
-
-                    // Check if body arrow has trailing param comments (forces break)
-                    let body_arrow_has_trailing_param_comments =
-                        if let internal::Expression::ArrowFunctionExpression(body_arrow) =
-                            expr.as_ref()
-                        {
-                            let arrow_token = self.find_arrow_token_for(body_arrow);
-                            arrow_has_trailing_param_comments(
-                                body_arrow,
-                                arrow_token,
-                                |start, end| self.has_comments_between(start, end),
-                            )
-                        } else {
-                            false
-                        };
-
-                    // Inline block comments don't prevent hugging — only own-line comments do.
-                    // `() => /* comment */ ({...})` hugs (inline block comment)
-                    // `() =>\n  /* comment */\n  ({...})` breaks (own-line comment)
-                    let should_hug = !has_own_line_comment
-                        && (should_hug_arrow_body(expr)
-                            || is_template_on_same_line(self.source, expr))
-                        && !chain_has_return_type
-                        && !body_arrow_has_trailing_param_comments;
-
-                    if has_own_line_comment {
-                        // Own-line or line comments — always break
-                        let body_with_comments =
-                            self.build_arrow_body_with_comments_doc(expr, arrow_end, body_start);
-                        parts.push(hang_after_operator(d, body_with_comments));
-                    } else if should_hug {
-                        // Hugged body (possibly with inline block comments):
-                        // `() => ({...})` or `() => /* c */ ({...})`
-                        parts.push(d.text(" "));
-                        if has_post_arrow_comments {
-                            parts.push(
-                                self.build_inline_post_arrow_comments_doc(arrow_end, body_start),
-                            );
-                        }
-                        parts.push(self.build_arrow_body_doc(expr));
-                    } else if is_arrow_body
-                        && (chain_has_return_type || self.in_curried_typed_arrow.get())
-                    {
-                        // Curried arrow chain - all arrows break without indent so they align:
-                        // const f = (x: T): H => (y) => expr   // outer has return type
-                        // const f = (x: T) => (y): H => expr   // inner has return type
-                        // becomes:
-                        // const f =
-                        //     (x: T): H =>      or      (x: T) =>
-                        //     (y) =>                    (y): H =>
-                        //         expr                      expr
-                        //
-                        // Set context flag when entering chain, restore when done.
-                        let was_in_curried = self.in_curried_typed_arrow.get();
-                        if chain_has_return_type {
-                            self.in_curried_typed_arrow.set(true);
-                        }
-                        let body_doc = self.build_arrow_body_doc(expr);
-                        self.in_curried_typed_arrow.set(was_in_curried);
-                        parts.push(d.concat(&[d.hardline(), body_doc]));
-                    } else if is_arrow_body && body_arrow_has_trailing_param_comments {
-                        // Nested arrow with trailing param comments - first level gets indent,
-                        // subsequent levels align (use curried pattern)
-                        // (a, // c) => (b, // c) => {}
-                        // becomes:
-                        // (a, // c) =>
-                        //     (b, // c) =>
-                        //     (c, // c) => {}
-                        let was_in_curried = self.in_curried_typed_arrow.get();
-                        self.in_curried_typed_arrow.set(true);
-                        let body_doc = self.build_arrow_body_doc(expr);
-                        self.in_curried_typed_arrow.set(was_in_curried);
-                        parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
-                    } else if self.in_curried_typed_arrow.get() {
-                        // Innermost arrow in curried chain - body is NOT another arrow.
-                        // This needs indent since it's the final expression.
-                        // Reset flag so arrows inside the body (e.g. callback args) aren't
-                        // treated as part of the curried chain.
-                        self.in_curried_typed_arrow.set(false);
-                        let body_doc = self.build_arrow_body_doc(expr);
-                        self.in_curried_typed_arrow.set(true);
-                        parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
-                    } else if matches!(&**expr, internal::Expression::ConditionalExpression(_))
-                        && !has_leftmost_object_expression(expr)
-                    {
-                        // Prettier's shouldAddParensIfNotBreak: ternary body gets conditional
-                        // parens when inline, no parens when on its own line.
-                        // Excludes ternaries whose test starts with ObjectExpression (matches
-                        // Prettier's startsWithNoLookaheadToken check) — those fall through
-                        // to the normal path which calls build_arrow_body_doc for object parens.
-                        //
-                        // Structure: [" ", group([ifBreak("","("), indent([softline, body]),
-                        //                         ifBreak("",")")])]
-                        //
-                        // The " " TEXT element before the group is critical for fits() boundary:
-                        // when sig + " =>" = exactly print_width, remaining=0. The " " consumes
-                        // 1 char (→ -1), making the sig group fail fits() and break params.
-                        // With the old group(indent(line, body)), line() in Break mode would
-                        // short-circuit fits() to return true, keeping the sig flat.
-                        //
-                        // Flat:  ` => (cond ? a : b)` — parens, same line
-                        // Break: ` =>\n\tcond ? a : b` — no parens, next line
-                        let body_doc = self.build_expression_doc(expr);
-                        if d.will_break(body_doc) {
-                            // Body has hardlines (multiline template in ternary, etc.)
-                            // Use normal break layout — no parens needed
-                            parts.push(hang_after_operator(d, body_doc));
-                        } else {
-                            parts.push(d.text(" "));
-                            parts.push(d.group(d.concat(&[
-                                d.if_break(d.empty(), d.text("(")),
-                                d.indent(d.concat(&[d.softline(), body_doc])),
-                                d.if_break(d.empty(), d.text(")")),
-                            ])));
-                        }
-                    } else {
-                        // Normal expression: can break after => with indentation
-                        // Short: (x) => x + 1
-                        // Long:  (veryLongParams) =>
-                        //            veryLongExpr
-                        //
-                        // The body is wrapped in a group so it can make its own fits() decision.
-                        // This allows the arrow body to stay inline even when the parent element
-                        // is in break mode, as long as the body content fits from its position.
-                        //
-                        // Normal expression body: can break after => with indentation.
-                        // Template literal bodies with literalline nodes will propagate
-                        // breaks naturally, enabling chain/call expansion decisions.
-                        let body_doc = self.build_arrow_body_doc(expr);
-                        if has_post_arrow_comments {
-                            // Inline block comments before non-huggable body:
-                            // `() => /* comment */ a + b`
-                            let comments_doc =
-                                self.build_inline_post_arrow_comments_doc(arrow_end, body_start);
-                            parts.push(hang_after_operator(d, d.concat(&[comments_doc, body_doc])));
-                        } else {
-                            parts.push(hang_after_operator(d, body_doc));
-                        }
-                    }
-                } // end of `else` (no trailing paren comments)
+                self.build_arrow_expression_body(&mut parts, expr, arrow, arrow_end);
             }
             internal::ArrowFunctionBody::BlockStatement(block) => {
-                // Block body: always stays hugged to => (no break)
-                // (params) => {
-                //     ...
-                // }
-                // Check for comments between `=>` and body start
-                let body_start = block.span.start;
-                let has_post_arrow_comments = self.has_comments_between(arrow_end, body_start);
-
-                if has_post_arrow_comments {
-                    // Build comments doc
-                    let mut comment_parts = Vec::new();
-                    for comment in comments_in_range(self.comments, arrow_end, body_start) {
-                        comment_parts.push(d.text(" "));
-                        comment_parts.push(self.build_comment_doc(comment));
-                    }
-                    parts.push(d.concat(&comment_parts));
-                }
-
-                parts.push(d.text(" "));
-                // A block body terminates any curried-arrow chain — arrows nested
-                // inside it (callbacks, object-property arrows) are NOT part of the
-                // chain, so clear the flag so they aren't force-broken after `=>`.
-                // Mirrors the innermost expression-body case above.
-                let was_in_curried = self.in_curried_typed_arrow.replace(false);
-                parts.push(self.build_block_statement_doc(block));
-                self.in_curried_typed_arrow.set(was_in_curried);
+                self.build_arrow_block_body(&mut parts, block, arrow_end);
             }
         }
 
         d.concat(&parts)
+    }
+
+    /// Emit the body of an arrow with an expression body (the `=>` already pushed)
+    /// into `parts`. Branches on whether the body hugs `=>` (object/array/template),
+    /// hangs on the next line, joins a curried chain, or carries comments — mirroring
+    /// prettier's `shouldPutBodyOnSameLine` / `shouldAddParensIfNotBreak` cascade.
+    fn build_arrow_expression_body(
+        &self,
+        parts: &mut Vec<DocId>,
+        expr: &internal::Expression,
+        arrow: &internal::ArrowFunctionExpression,
+        arrow_end: u32,
+    ) {
+        let d = self.d();
+
+        // Check for trailing comments from stripped grouping parens.
+        // When the parser strips parens from `() => (x /* c */)`, comments
+        // between body expr end and arrow span end are lost. Re-add parens
+        // to preserve them, matching the unary expression approach.
+        let body_end = expr.span().end;
+        let has_trailing_paren_comments =
+            self.has_trailing_paren_comments(body_end, arrow.span.end);
+
+        if has_trailing_paren_comments {
+            parts.push(d.text(" "));
+            // Leading comments between `=>` and body (if any):
+            // `() => /* lead */ (x /* trail */)` — emit inline leading,
+            // then paren-wrapped body with trailing.
+            let body_start = expr.span().start;
+            if self.has_comments_between(arrow_end, body_start) {
+                for comment in comments_in_range(self.comments, arrow_end, body_start) {
+                    parts.push(self.build_comment_doc(comment));
+                    parts.push(d.text(" "));
+                }
+            }
+            parts.push(self.build_expression_doc_keep_paren_comments(expr, arrow.span.end));
+            // Skip normal body handling — paren wrapping covers all cases
+            return;
+        }
+
+        // Check for comments between `=>` and body start
+        // These are comments like: `() => /* comment */ expr`
+        let body_start = expr.span().start;
+        let has_post_arrow_comments = self.has_comments_between(arrow_end, body_start);
+
+        // Prettier's `hasLeadingOwnLineComment`: checks if any comment
+        // between `=>` and body has a newline after it. Inline block
+        // comments like `=> /* c */ expr` return false (body stays hugged),
+        // while own-line comments return true (body breaks).
+        let has_own_line_comment =
+            has_post_arrow_comments && self.has_own_line_post_arrow_comment(arrow_end, body_start);
+
+        // Prettier's `shouldPutBodyOnSameLine`: certain expression types stay hugged to =>
+        // Object/array literals always hug.
+        // Nested arrows hug ONLY when outer has no return type annotation.
+        // With return type: const f = (x: T): H => (y) => expr; // breaks
+        // Without:          const f = (x: T) => (y) => expr;    // hugs
+        let is_arrow_body = matches!(expr, internal::Expression::ArrowFunctionExpression(_));
+
+        // Check if this is a curried arrow where ANY arrow triggers chain breaking.
+        // Triggers: return type with params, type parameters, non-identifier params.
+        // Skip when skip_arrow_chain is set (call arg expand-last context) — prettier's
+        // shouldPrintAsChain is false when expandLastArg is true, so chain detection
+        // is disabled and the body is hugged.
+        let chain_has_return_type = is_arrow_body
+            && !self.skip_arrow_chain.get()
+            && crate::printer::arrow_chain_has_return_type(arrow);
+
+        // Check if body arrow has trailing param comments (forces break)
+        let body_arrow_has_trailing_param_comments =
+            if let internal::Expression::ArrowFunctionExpression(body_arrow) = expr {
+                let arrow_token = self.find_arrow_token_for(body_arrow);
+                arrow_has_trailing_param_comments(body_arrow, arrow_token, |start, end| {
+                    self.has_comments_between(start, end)
+                })
+            } else {
+                false
+            };
+
+        // Inline block comments don't prevent hugging — only own-line comments do.
+        // `() => /* comment */ ({...})` hugs (inline block comment)
+        // `() =>\n  /* comment */\n  ({...})` breaks (own-line comment)
+        let should_hug = !has_own_line_comment
+            && (should_hug_arrow_body(expr) || is_template_on_same_line(self.source, expr))
+            && !chain_has_return_type
+            && !body_arrow_has_trailing_param_comments;
+
+        if has_own_line_comment {
+            // Own-line or line comments — always break
+            let body_with_comments =
+                self.build_arrow_body_with_comments_doc(expr, arrow_end, body_start);
+            parts.push(hang_after_operator(d, body_with_comments));
+        } else if should_hug {
+            // Hugged body (possibly with inline block comments):
+            // `() => ({...})` or `() => /* c */ ({...})`
+            parts.push(d.text(" "));
+            if has_post_arrow_comments {
+                parts.push(self.build_inline_post_arrow_comments_doc(arrow_end, body_start));
+            }
+            parts.push(self.build_arrow_body_doc(expr));
+        } else if is_arrow_body && (chain_has_return_type || self.in_curried_typed_arrow.get()) {
+            // Curried arrow chain - all arrows break without indent so they align:
+            // const f = (x: T): H => (y) => expr   // outer has return type
+            // const f = (x: T) => (y): H => expr   // inner has return type
+            // becomes:
+            // const f =
+            //     (x: T): H =>      or      (x: T) =>
+            //     (y) =>                    (y): H =>
+            //         expr                      expr
+            //
+            // The flag is already set when reached via `in_curried_typed_arrow`, so
+            // unconditionally setting it `true` for the body build is equivalent.
+            let body_doc = self.build_with_in_curried(true, || self.build_arrow_body_doc(expr));
+            parts.push(d.concat(&[d.hardline(), body_doc]));
+        } else if is_arrow_body && body_arrow_has_trailing_param_comments {
+            // Nested arrow with trailing param comments - first level gets indent,
+            // subsequent levels align (use curried pattern)
+            // (a, // c) => (b, // c) => {}
+            // becomes:
+            // (a, // c) =>
+            //     (b, // c) =>
+            //     (c, // c) => {}
+            let body_doc = self.build_with_in_curried(true, || self.build_arrow_body_doc(expr));
+            parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
+        } else if self.in_curried_typed_arrow.get() {
+            // Innermost arrow in curried chain - body is NOT another arrow.
+            // This needs indent since it's the final expression.
+            // Reset flag so arrows inside the body (e.g. callback args) aren't
+            // treated as part of the curried chain; restore to `true` (its value on
+            // entry, since this arm is reached only when the flag is set) afterward.
+            let body_doc = self.build_with_in_curried(false, || self.build_arrow_body_doc(expr));
+            parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
+        } else if matches!(expr, internal::Expression::ConditionalExpression(_))
+            && !has_leftmost_object_expression(expr)
+        {
+            // Prettier's shouldAddParensIfNotBreak: ternary body gets conditional
+            // parens when inline, no parens when on its own line.
+            // Excludes ternaries whose test starts with ObjectExpression (matches
+            // Prettier's startsWithNoLookaheadToken check) — those fall through
+            // to the normal path which calls build_arrow_body_doc for object parens.
+            //
+            // Structure: [" ", group([ifBreak("","("), indent([softline, body]),
+            //                         ifBreak("",")")])]
+            //
+            // The " " TEXT element before the group is critical for fits() boundary:
+            // when sig + " =>" = exactly print_width, remaining=0. The " " consumes
+            // 1 char (→ -1), making the sig group fail fits() and break params.
+            // With the old group(indent(line, body)), line() in Break mode would
+            // short-circuit fits() to return true, keeping the sig flat.
+            //
+            // Flat:  ` => (cond ? a : b)` — parens, same line
+            // Break: ` =>\n\tcond ? a : b` — no parens, next line
+            let body_doc = self.build_expression_doc(expr);
+            if d.will_break(body_doc) {
+                // Body has hardlines (multiline template in ternary, etc.)
+                // Use normal break layout — no parens needed
+                parts.push(hang_after_operator(d, body_doc));
+            } else {
+                parts.push(d.text(" "));
+                parts.push(d.group(d.concat(&[
+                    d.if_break(d.empty(), d.text("(")),
+                    d.indent(d.concat(&[d.softline(), body_doc])),
+                    d.if_break(d.empty(), d.text(")")),
+                ])));
+            }
+        } else {
+            // Normal expression: can break after => with indentation
+            // Short: (x) => x + 1
+            // Long:  (veryLongParams) =>
+            //            veryLongExpr
+            //
+            // The body is wrapped in a group so it can make its own fits() decision.
+            // This allows the arrow body to stay inline even when the parent element
+            // is in break mode, as long as the body content fits from its position.
+            //
+            // Normal expression body: can break after => with indentation.
+            // Template literal bodies with literalline nodes will propagate
+            // breaks naturally, enabling chain/call expansion decisions.
+            let body_doc = self.build_arrow_body_doc(expr);
+            if has_post_arrow_comments {
+                // Inline block comments before non-huggable body:
+                // `() => /* comment */ a + b`
+                let comments_doc = self.build_inline_post_arrow_comments_doc(arrow_end, body_start);
+                parts.push(hang_after_operator(d, d.concat(&[comments_doc, body_doc])));
+            } else {
+                parts.push(hang_after_operator(d, body_doc));
+            }
+        }
+    }
+
+    /// Emit the body of an arrow with a block-statement body (the `=>` already
+    /// pushed) into `parts`. A block body always stays hugged to `=>` and
+    /// terminates any curried-arrow chain.
+    fn build_arrow_block_body(
+        &self,
+        parts: &mut Vec<DocId>,
+        block: &internal::BlockStatement,
+        arrow_end: u32,
+    ) {
+        let d = self.d();
+
+        // Block body: always stays hugged to => (no break)
+        // (params) => {
+        //     ...
+        // }
+        // Check for comments between `=>` and body start
+        let body_start = block.span.start;
+        let has_post_arrow_comments = self.has_comments_between(arrow_end, body_start);
+
+        if has_post_arrow_comments {
+            // Build comments doc
+            let mut comment_parts = Vec::new();
+            for comment in comments_in_range(self.comments, arrow_end, body_start) {
+                comment_parts.push(d.text(" "));
+                comment_parts.push(self.build_comment_doc(comment));
+            }
+            parts.push(d.concat(&comment_parts));
+        }
+
+        parts.push(d.text(" "));
+        // A block body terminates any curried-arrow chain — arrows nested
+        // inside it (callbacks, object-property arrows) are NOT part of the
+        // chain, so clear the flag so they aren't force-broken after `=>`.
+        // Mirrors the innermost expression-body case above.
+        let block_doc = self.build_with_in_curried(false, || self.build_block_statement_doc(block));
+        parts.push(block_doc);
     }
 
     /// Whether to render an arrow as a flattened curried chain (prettier's
