@@ -15,7 +15,7 @@ Each module's visibility (in parens) reflects `pub use`-only modules (private) v
 - `doc` (`doc/*.rs`, pub) — Document builder — arena-based Prettier-compatible IR
 - `comment` (`comment.rs`, private) — Comment type, classification, and O(log n) range lookup
 - `printing` (`printing.rs`, pub) — String literal formatting, same-line detection, visual width
-- `source_scan` (`source_scan.rs`, pub) — Scan utilities skipping JS/CSS comments (used by AST conversion and printers)
+- `source_scan` (`source_scan.rs`, pub) — Scan utilities skipping JS/CSS comments + strings (used by AST conversion, printers, and the Svelte parser's binding/declaration delimiter scans)
 - `interner` (`interner.rs`, private) — String interning traits (`SymbolResolver`, `InfallibleResolve`); implements `doc::TextResolver`
 - `escapes` (`escapes.rs`, private) — Escape sequence handling (quote swapping) — used internally by `printing`
 - `json` (`json.rs`, private) — `estimated_json_capacity` — pre-size heuristic for public-AST JSON serialization buffers
