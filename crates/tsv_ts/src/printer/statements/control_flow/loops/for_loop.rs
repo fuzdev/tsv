@@ -179,14 +179,7 @@ impl<'a> Printer<'a> {
         };
 
         // Find the two semicolons
-        let first_semi = self.source[open_paren as usize..]
-            .find(';')
-            .map(|p| open_paren + p as u32);
-        let second_semi = first_semi.and_then(|p| {
-            self.source[(p + 1) as usize..]
-                .find(';')
-                .map(|off| p + 1 + off as u32)
-        });
+        let (first_semi, second_semi) = self.find_for_semicolons(open_paren);
 
         let mut parts = vec![d.text("for (")];
         let mut inner_parts = Vec::new();
@@ -271,9 +264,6 @@ impl<'a> Printer<'a> {
             return self.build_for_empty_with_comments(stmt);
         }
 
-        // Find paren position for detecting leading comments before init
-        let open_paren = self.find_open_paren_after(stmt.span.start);
-
         // Determine spans for each part
         let init_end = stmt.init.as_ref().map(|i| self.get_for_init_span_end(i));
         let test_end = stmt.test.as_ref().map(|t| t.span().end);
@@ -336,14 +326,7 @@ impl<'a> Printer<'a> {
 
         // Find semicolon positions for proper comment boundary detection
         // The semicolons in `for (init; test; update)` are at specific positions in source
-        let first_semi = self.source[stmt.span.start as usize..]
-            .find(';')
-            .map(|p| stmt.span.start + p as u32);
-        let second_semi = first_semi.and_then(|p| {
-            self.source[(p + 1) as usize..]
-                .find(';')
-                .map(|off| p + 1 + off as u32)
-        });
+        let (first_semi, second_semi) = self.find_for_semicolons(stmt.span.start);
 
         // Init part
         if let Some(init) = &stmt.init {
@@ -364,43 +347,20 @@ impl<'a> Printer<'a> {
                 .or(update_start)
                 .or(close_paren)
                 .unwrap_or(stmt.span.end);
-            for comment in tsv_lang::comments_in_range(self.comments, semi + 1, boundary) {
-                if self.is_same_line(end, comment.span.start) {
-                    inner_parts.push(d.text(" "));
-                    inner_parts.push(self.build_comment_doc(comment));
-                }
-            }
+            self.push_for_clause_same_line_comments(&mut inner_parts, semi + 1, boundary, end);
         }
 
         // Leading comments before test (own line, between first semi and test)
         if let Some(start) = test_start {
-            let search_start = first_semi.map_or_else(
-                || {
-                    init_end.unwrap_or_else(|| {
-                        open_paren.map_or_else(|| stmt.span.start + "for (".len() as u32, |p| p + 1)
-                    })
-                },
-                |s| s + 1,
+            let search_start =
+                self.for_clause_search_start(stmt.span.start, open_paren, first_semi, init_end);
+            self.push_for_clause_leading_section(
+                &mut inner_parts,
+                search_start,
+                start,
+                init_end,
+                has_init,
             );
-            let leading =
-                self.build_for_clause_leading_comments_with_prev(search_start, start, init_end);
-            if !leading.is_empty() {
-                inner_parts.extend(leading);
-            } else if has_init {
-                inner_parts.push(d.line());
-            }
-
-            // Inline block comments before test (on same line)
-            // e.g., `for (let i = 0; /* before test */ i < 10; ...)`
-            for comment in tsv_lang::comments_in_range(self.comments, search_start, start) {
-                if comment.is_block
-                    && self.is_same_line(comment.span.end, start)
-                    && init_end.is_none_or(|ie| !self.is_same_line(ie, comment.span.start))
-                {
-                    inner_parts.push(self.build_comment_doc(comment));
-                    inner_parts.push(d.text(" "));
-                }
-            }
         } else if has_update {
             inner_parts.push(d.line());
         }
@@ -427,43 +387,24 @@ impl<'a> Printer<'a> {
         // Inline comments after test (between second semicolon and update, on same line as test)
         if let (Some(semi), Some(end)) = (second_semi, test_end) {
             let boundary = update_start.or(close_paren).unwrap_or(stmt.span.end);
-            for comment in tsv_lang::comments_in_range(self.comments, semi + 1, boundary) {
-                if self.is_same_line(end, comment.span.start) {
-                    inner_parts.push(d.text(" "));
-                    inner_parts.push(self.build_comment_doc(comment));
-                }
-            }
+            self.push_for_clause_same_line_comments(&mut inner_parts, semi + 1, boundary, end);
         }
 
         // Leading comments before update (own line, between second semi and update)
         if let Some(start) = update_start {
-            let search_start = second_semi.map_or_else(
-                || {
-                    test_end.or(init_end).unwrap_or_else(|| {
-                        open_paren.map_or_else(|| stmt.span.start + "for (".len() as u32, |p| p + 1)
-                    })
-                },
-                |s| s + 1,
+            let search_start = self.for_clause_search_start(
+                stmt.span.start,
+                open_paren,
+                second_semi,
+                test_end.or(init_end),
             );
-            let leading =
-                self.build_for_clause_leading_comments_with_prev(search_start, start, test_end);
-            if !leading.is_empty() {
-                inner_parts.extend(leading);
-            } else {
-                inner_parts.push(d.line());
-            }
-
-            // Inline block comments before update (on same line)
-            // e.g., `for (let i = 0; i < 10; /* before update */ i++)`
-            for comment in tsv_lang::comments_in_range(self.comments, search_start, start) {
-                if comment.is_block
-                    && self.is_same_line(comment.span.end, start)
-                    && test_end.is_none_or(|te| !self.is_same_line(te, comment.span.start))
-                {
-                    inner_parts.push(self.build_comment_doc(comment));
-                    inner_parts.push(d.text(" "));
-                }
-            }
+            self.push_for_clause_leading_section(
+                &mut inner_parts,
+                search_start,
+                start,
+                test_end,
+                true,
+            );
         }
 
         // Update part
@@ -476,12 +417,7 @@ impl<'a> Printer<'a> {
             // Inline comments after update (on same line as update expression)
             if let Some(end) = update_end {
                 let boundary = close_paren.unwrap_or(stmt.span.end);
-                for comment in tsv_lang::comments_in_range(self.comments, end, boundary) {
-                    if self.is_same_line(end, comment.span.start) {
-                        inner_parts.push(d.text(" "));
-                        inner_parts.push(self.build_comment_doc(comment));
-                    }
-                }
+                self.push_for_clause_same_line_comments(&mut inner_parts, end, boundary, end);
             }
         } else if has_test && !has_own_line_comments {
             // Prettier adds trailing space when update is None but test exists (no comments)
@@ -592,6 +528,96 @@ impl<'a> Printer<'a> {
             if comment.is_block == want_block {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
+            }
+        }
+    }
+
+    /// Find the two `;` separators in a for-header, scanning forward from
+    /// `scan_start`. Returns `(first_semi, second_semi)`; the second is only sought
+    /// once the first is found.
+    fn find_for_semicolons(&self, scan_start: u32) -> (Option<u32>, Option<u32>) {
+        let first_semi = self.source[scan_start as usize..]
+            .find(';')
+            .map(|p| scan_start + p as u32);
+        let second_semi = first_semi.and_then(|p| {
+            self.source[(p + 1) as usize..]
+                .find(';')
+                .map(|off| p + 1 + off as u32)
+        });
+        (first_semi, second_semi)
+    }
+
+    /// Resolve where to start searching for a for-clause's leading comments: just
+    /// past the preceding `;` if present, else the previous clause's end, else just
+    /// inside the open paren (or past `for (` when the paren is unknown).
+    fn for_clause_search_start(
+        &self,
+        stmt_start: u32,
+        open_paren: Option<u32>,
+        semi: Option<u32>,
+        prev_end: Option<u32>,
+    ) -> u32 {
+        semi.map_or_else(
+            || {
+                prev_end.unwrap_or_else(|| {
+                    open_paren.map_or_else(|| stmt_start + "for (".len() as u32, |p| p + 1)
+                })
+            },
+            |s| s + 1,
+        )
+    }
+
+    /// Push comments in `range_start..boundary` that sit on the same source line as
+    /// `end`, each inline with a leading space. Used for the inline comments
+    /// trailing a for-clause: after init's `;`, after test's `;`, and after the
+    /// update expression. Unlike `push_for_clause_trailing_comments` (the
+    /// `;`-adjacent block/line split), this emits every comment kind that shares a
+    /// line with the clause end.
+    fn push_for_clause_same_line_comments(
+        &self,
+        parts: &mut Vec<DocId>,
+        range_start: u32,
+        boundary: u32,
+        end: u32,
+    ) {
+        let d = self.d();
+        for comment in tsv_lang::comments_in_range(self.comments, range_start, boundary) {
+            if self.is_same_line(end, comment.span.start) {
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
+            }
+        }
+    }
+
+    /// Emit the lead-in before a for-clause: own-line leading comments (or a `line`
+    /// when there are none and `push_line_when_empty`), then any inline block
+    /// comment on the same line just before the clause.
+    fn push_for_clause_leading_section(
+        &self,
+        parts: &mut Vec<DocId>,
+        search_start: u32,
+        clause_start: u32,
+        prev_end: Option<u32>,
+        push_line_when_empty: bool,
+    ) {
+        let d = self.d();
+        let leading =
+            self.build_for_clause_leading_comments_with_prev(search_start, clause_start, prev_end);
+        if !leading.is_empty() {
+            parts.extend(leading);
+        } else if push_line_when_empty {
+            parts.push(d.line());
+        }
+
+        // Inline block comments on the same line just before the clause
+        // e.g., `for (let i = 0; /* before test */ i < 10; ...)`
+        for comment in tsv_lang::comments_in_range(self.comments, search_start, clause_start) {
+            if comment.is_block
+                && self.is_same_line(comment.span.end, clause_start)
+                && prev_end.is_none_or(|pe| !self.is_same_line(pe, comment.span.start))
+            {
+                parts.push(self.build_comment_doc(comment));
+                parts.push(d.text(" "));
             }
         }
     }
