@@ -469,6 +469,7 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - For non-empty header after `)` (line) → First comment relocated into the parens (trailing the last clause) — [header_body_comment](../tests/fixtures/typescript/statements/for/header_body_comment_prettier_divergence/)
 - For-of loop header → Outside loop header — [of_line_comment](../tests/fixtures/typescript/statements/for/of_line_comment_prettier_divergence/)
 - For-in/of own-line comment → Before statement or after `)` — [in_of_own_line_comment](../tests/fixtures/typescript/statements/for/in_of_own_line_comment_prettier_divergence/)
+- For-in/of pre-paren comment / `for await` (breaking layout) → Pre-paren comment inside the parens, left-trailing line comment after `)` — [in_of_break_pre_paren_comment](../tests/fixtures/typescript/statements/for/in_of_break_pre_paren_comment_prettier_divergence/)
 - Do-while after `(` → After semicolon — [open_paren_comment](../tests/fixtures/typescript/statements/do_while/open_paren_comment_prettier_divergence/)
 - Do-while between `)` and `;` → Inside the condition parens — [close_paren_comment](../tests/fixtures/typescript/statements/do_while/close_paren_comment_prettier_divergence/)
 - If/while/switch keyword before `(` → Inside the condition parens — [keyword_paren_comment](../tests/fixtures/typescript/statements/if/keyword_paren_comment_prettier_divergence/)
