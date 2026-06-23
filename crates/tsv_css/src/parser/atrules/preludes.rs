@@ -4,17 +4,22 @@ use crate::lexer::TokenKind;
 use crate::parser::selectors::parse_complex_selector_list;
 use tsv_lang::{ParseError, Span};
 
-/// Parse @supports prelude into structured condition parts
+/// Parse a `<supports-condition>`: `(prop: val)` parts connected by `and`/`or`,
+/// with an optional leading `not` and function-style `selector(...)` conditions.
 ///
-/// CSS Syntax: `@supports <supports-condition>`
-/// where supports-condition is a combination of `(prop: val)` parts connected by `and`/`or`
+/// This *is* the entire `@supports` prelude (CSS Syntax: `@supports
+/// <supports-condition>`), and `@container` reuses it verbatim for its query —
+/// the two grammars are identical; `@container` only adds an optional
+/// `<container-name>` preamble before calling this. The returned span starts at
+/// the parser's current position (the first condition token);
+/// `parse_container_prelude` widens the start to cover the name.
 ///
 /// Examples:
 /// - `(display: grid)` - single condition
 /// - `(display: grid) and (flex: 1)` - conjunction
 /// - `not (color: red)` - negation
 /// - `(a) and (b) or (c)` - mixed (parsed left-to-right)
-pub(super) fn parse_supports_prelude(
+pub(super) fn parse_condition_query(
     parser: &mut CssParser<'_>,
 ) -> Result<(SupportsCondition, Span), ParseError> {
     let start = parser.base_offset() + parser.current_start;
@@ -292,220 +297,18 @@ pub(super) fn parse_container_prelude(
         None
     };
 
-    // Now parse the condition parts (same logic as @supports)
-    let mut parts = Vec::new();
-    let mut current_connector: Option<SupportsConnector> = None;
-    let mut end_pos = parser.base_offset() + parser.current_start;
+    // Now parse the condition (same grammar as @supports).
+    let (condition, cond_span) = parse_condition_query(parser)?;
 
-    while !parser.check(TokenKind::LeftBrace)
-        && !parser.check(TokenKind::Semicolon)
-        && !parser.check(TokenKind::Eof)
-    {
-        parser.skip_whitespace()?;
-
-        // Register comments between condition parts (e.g., `(a) /* comment */ and (b)`)
-        while parser.check(TokenKind::Comment) {
-            parser.register_current_comment();
-            end_pos = parser.base_offset() + parser.current_end;
-            parser.advance()?;
-            parser.skip_whitespace()?;
-        }
-
-        // Check for `and`/`or` connector
-        if parser.check(TokenKind::Identifier) {
-            let ident = parser
-                .current_identifier()
-                .unwrap_or_else(|| parser.current_value());
-
-            if ident == "and" || ident == "or" {
-                current_connector = Some(if ident == "and" {
-                    SupportsConnector::And
-                } else {
-                    SupportsConnector::Or
-                });
-                parser.advance()?;
-                // Register comments after connector (e.g., `and /* comment */ (b)`)
-                parser.skip_whitespace()?;
-                while parser.check(TokenKind::Comment) {
-                    parser.register_current_comment();
-                    end_pos = parser.base_offset() + parser.current_end;
-                    parser.advance()?;
-                    parser.skip_whitespace()?;
-                }
-                continue;
-            }
-        }
-
-        // Parse a condition part (may start with `not`, then parenthesized content)
-        let part_start = parser.base_offset() + parser.current_start;
-        let mut part_content = Vec::new();
-        let mut paren_depth: usize = 0;
-
-        // Check for leading `not`
-        if parser.check(TokenKind::Identifier) {
-            let ident = parser
-                .current_identifier()
-                .unwrap_or_else(|| parser.current_value());
-            if ident == "not" {
-                part_content.push("not".to_string());
-                parser.advance()?;
-                parser.skip_whitespace()?;
-                // Include comments after `not` in content (e.g., `not /* comment */ (...)`)
-                // These go in part_content rather than being registered, since they're
-                // inside the condition part's span
-                while parser.check(TokenKind::Comment) {
-                    part_content.push(" ".to_string());
-                    part_content.push(parser.current_value().to_string());
-                    end_pos = parser.base_offset() + parser.current_end;
-                    parser.advance()?;
-                    parser.skip_whitespace()?;
-                }
-                part_content.push(" ".to_string());
-            }
-        }
-
-        // Check for function-style condition like `style(--custom: value)`
-        if parser.check(TokenKind::Identifier) {
-            let ident = parser
-                .current_identifier()
-                .unwrap_or_else(|| parser.current_value());
-            let is_function =
-                parser.source.get(parser.current_end..=parser.current_end) == Some("(");
-            if is_function {
-                part_content.push(ident.to_string());
-                parser.advance()?;
-            }
-        }
-
-        // Now parse the parenthesized condition
-        if !parser.check(TokenKind::LeftParen) {
-            break;
-        }
-
-        // Parse until we close all parens
-        let mut prev_token_kind: Option<TokenKind> = None;
-        let mut last_non_whitespace_kind: Option<TokenKind> = None;
-
-        while !parser.check(TokenKind::Eof) {
-            if parser.check(TokenKind::LeftParen) {
-                paren_depth += 1;
-            } else if parser.check(TokenKind::RightParen) {
-                if paren_depth == 0 {
-                    break;
-                }
-                paren_depth -= 1;
-            }
-
-            if paren_depth == 0 && parser.check(TokenKind::RightParen) {
-                part_content.push(")".to_string());
-                end_pos = parser.base_offset() + parser.current_end;
-                parser.advance()?;
-                break;
-            }
-
-            // Handle whitespace normalization
-            if parser.check(TokenKind::Whitespace) {
-                let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
-                    || matches!(parser.peek(), Ok(TokenKind::RightParen));
-
-                parser.advance()?;
-
-                if skip_whitespace {
-                    continue;
-                }
-                part_content.push(" ".to_string());
-                prev_token_kind = Some(TokenKind::Whitespace);
-                continue;
-            }
-
-            // Get token value
-            let part = match &parser.current_kind {
-                TokenKind::Identifier => parser
-                    .current_identifier()
-                    .unwrap_or_else(|| parser.current_value())
-                    .to_string(),
-                TokenKind::String { quote } => {
-                    let content =
-                        &parser.source()[parser.current_start + 1..parser.current_end - 1];
-                    format!("{quote}{content}{quote}")
-                }
-                TokenKind::Number | TokenKind::Percentage | TokenKind::Dimension { .. } => {
-                    parser.current_value().to_string()
-                }
-                TokenKind::Comment => parser.current_value().to_string(),
-                _ => parser.current_value().to_string(),
-            };
-
-            let is_comment = matches!(parser.current_kind, TokenKind::Comment);
-            let is_bool_op = matches!(&parser.current_kind, TokenKind::Identifier)
-                && matches!(part.as_str(), "and" | "or" | "not");
-
-            if is_bool_op && !matches!(prev_token_kind, Some(TokenKind::Whitespace)) {
-                part_content.push(" ".to_string());
-            }
-
-            // Remove trailing whitespace before ':'
-            if matches!(parser.current_kind, TokenKind::Colon) {
-                while part_content.last().is_some_and(|s| s == " ") {
-                    part_content.pop();
-                }
-            }
-
-            part_content.push(part);
-            let current_kind = parser.current_kind;
-            end_pos = parser.base_offset() + parser.current_end;
-            parser.advance()?;
-
-            if is_bool_op && !parser.check(TokenKind::Whitespace) {
-                part_content.push(" ".to_string());
-            }
-
-            if is_comment
-                && !parser.check(TokenKind::Whitespace)
-                && !parser.check(TokenKind::RightParen)
-            {
-                part_content.push(" ".to_string());
-            }
-
-            // Add space after ':' for property:value pairs
-            if !parser.check(TokenKind::Whitespace)
-                && matches!(current_kind, TokenKind::Colon)
-                && matches!(
-                    last_non_whitespace_kind,
-                    Some(TokenKind::Identifier)
-                        | Some(TokenKind::Number)
-                        | Some(TokenKind::Dimension { .. })
-                        | Some(TokenKind::Percentage)
-                )
-            {
-                part_content.push(" ".to_string());
-            }
-
-            prev_token_kind = Some(current_kind);
-            if !matches!(current_kind, TokenKind::Whitespace) {
-                last_non_whitespace_kind = Some(current_kind);
-            }
-        }
-
-        let content = part_content.join("").trim().to_string();
-        if !content.is_empty() {
-            parts.push(SupportsPart {
-                connector: current_connector.take(),
-                content,
-                span: Span {
-                    start: part_start as u32,
-                    end: end_pos as u32,
-                },
-            });
-        }
-    }
-
+    // The prelude span keeps the pre-name `start` and takes the condition's end,
+    // so a named `@container foo (…)` covers the name while an unnamed one matches
+    // `parse_condition_query` exactly.
     let span = Span {
         start: start as u32,
-        end: end_pos as u32,
+        end: cond_span.end,
     };
 
-    Ok((container_name, SupportsCondition { parts }, span))
+    Ok((container_name, condition, span))
 }
 
 /// Parse @scope prelude into structured selector lists
