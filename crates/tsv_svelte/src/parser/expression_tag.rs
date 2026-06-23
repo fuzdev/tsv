@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
+use tsv_lang::source_scan::{TriviaProfile, skip_trivia};
 use tsv_lang::{ParseError, Span};
 
 use super::parser_impl::SvelteParser;
@@ -94,97 +95,42 @@ impl<'a> SvelteParser<'a> {
 /// The single robust brace matcher shared by every `{…}` construct — expression
 /// tags, `{@…}` tags, `{...spread}`, and block tags — so none reimplements it
 /// (and weaker copies can't desync on a `}` inside a regex/comment/string).
+///
+/// Strings and line/block comments are skipped by the shared trivia cursor
+/// (`skip_trivia`, JS profile) — so escape handling is correct in exactly one
+/// place. Regex literals are the one thing the cursor deliberately leaves
+/// significant (disambiguating `/` needs previous-token lookback); this matcher
+/// carries that logic itself via `is_regex_start` / `skip_regex_literal`.
 pub(crate) fn scan_to_matching_brace(bytes: &[u8], scan_start: usize) -> Option<usize> {
-    let mut brace_depth = 1; // the opening `{` before scan_start
-    let mut in_string = false;
-    let mut string_char = '\0';
-    let mut in_block_comment = false;
-    let mut in_line_comment = false;
-    let mut escape_next = false;
+    let end = bytes.len();
+    let mut brace_depth: u32 = 1; // the opening `{` before scan_start
 
     let mut i = scan_start;
-    while i < bytes.len() {
-        let ch = bytes[i] as char;
-
-        // Escape sequences inside strings
-        if in_string && escape_next {
-            escape_next = false;
-            i += 1;
-            continue;
-        }
-        if in_string && ch == '\\' {
-            escape_next = true;
-            i += 1;
+    while i < end {
+        // Strings / line / block comments: a brace inside them isn't significant.
+        if let Some(past) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
+            i = past;
             continue;
         }
 
-        // A newline ends a line comment
-        if in_line_comment {
-            if ch == '\n' {
-                in_line_comment = false;
-            }
-            i += 1;
+        // A `/` the cursor left significant is division or a regex literal. The
+        // `i + 1 < end` guard mirrors the historical scanner (a trailing `/` is
+        // never a regex start). `is_regex_start` only fires here because
+        // `skip_trivia` already consumed `//` and `/*`.
+        if bytes[i] == b'/' && i + 1 < end && is_regex_start(bytes, i, scan_start) {
+            i = skip_regex_literal(bytes, i);
             continue;
         }
 
-        // Strings (braces inside are ignored)
-        if !in_block_comment {
-            if in_string {
-                if ch == string_char {
-                    in_string = false;
-                }
-                i += 1;
-                continue;
-            } else if ch == '"' || ch == '\'' || ch == '`' {
-                in_string = true;
-                string_char = ch;
-                i += 1;
-                continue;
-            }
-        }
-
-        // Comments and regex (braces inside are ignored)
-        if !in_string {
-            if in_block_comment {
-                if ch == '*' && i + 1 < bytes.len() && bytes[i + 1] as char == '/' {
-                    in_block_comment = false;
-                    i += 2; // skip */
-                    continue;
-                }
-                i += 1;
-                continue;
-            } else if ch == '/' && i + 1 < bytes.len() {
-                match bytes[i + 1] as char {
-                    '*' => {
-                        in_block_comment = true;
-                        i += 2; // skip /*
-                        continue;
-                    }
-                    '/' => {
-                        in_line_comment = true;
-                        i += 2; // skip //
-                        continue;
-                    }
-                    _ if is_regex_start(bytes, i, scan_start) => {
-                        i = skip_regex_literal(bytes, i);
-                        continue;
-                    }
-                    // otherwise `/` is division — fall through
-                    _ => {}
-                }
-            }
-        }
-
-        // Count braces only outside strings/comments/regex
-        if !in_string && !in_block_comment {
-            if ch == '{' {
-                brace_depth += 1;
-            } else if ch == '}' {
+        match bytes[i] {
+            b'{' => brace_depth += 1,
+            b'}' => {
                 brace_depth -= 1;
                 if brace_depth == 0 {
                     return Some(i);
                 }
             }
+            _ => {}
         }
 
         i += 1;
