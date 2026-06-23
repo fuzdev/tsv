@@ -6,6 +6,7 @@
 use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::Printer;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::{TriviaProfile, find_char, skip_comment};
 
 /// Span positions for a for loop header
 ///
@@ -536,14 +537,27 @@ impl<'a> Printer<'a> {
     /// `scan_start`. Returns `(first_semi, second_semi)`; the second is only sought
     /// once the first is found.
     fn find_for_semicolons(&self, scan_start: u32) -> (Option<u32>, Option<u32>) {
-        let first_semi = self.source[scan_start as usize..]
-            .find(';')
-            .map(|p| scan_start + p as u32);
-        let second_semi = first_semi.and_then(|p| {
-            self.source[(p + 1) as usize..]
-                .find(';')
-                .map(|off| p + 1 + off as u32)
-        });
+        // Skip any `;` inside a comment in a clause (`for (let i = 0 /* ; */; …)`).
+        let bytes = self.source.as_bytes();
+        let first_semi = find_char(
+            bytes,
+            scan_start as usize,
+            bytes.len(),
+            b';',
+            TriviaProfile::JS,
+        )
+        .map(|p| p as u32);
+        let second_semi = first_semi
+            .and_then(|p| {
+                find_char(
+                    bytes,
+                    (p + 1) as usize,
+                    bytes.len(),
+                    b';',
+                    TriviaProfile::JS,
+                )
+            })
+            .map(|p| p as u32);
         (first_semi, second_semi)
     }
 
@@ -664,7 +678,7 @@ impl<'a> Printer<'a> {
 
         while i + kw_len <= len {
             // Skip over comments
-            if let Some(new_i) = tsv_lang::source_scan::skip_comment(bytes, i, len) {
+            if let Some(new_i) = skip_comment(bytes, i, len) {
                 i = new_i;
                 continue;
             }
