@@ -637,99 +637,14 @@ impl<'a> Printer<'a> {
 
     /// Build a complete for-in statement doc including the body
     fn build_for_in_statement_with_body_doc(&self, stmt: &internal::ForInStatement) -> DocId {
-        let d = self.d();
-        let left_start = self.get_for_in_of_left_start(&stmt.left);
-        let left_end = self.get_for_in_of_left_end(&stmt.left);
-        let right_start = stmt.right.span().start;
-        let right_end = stmt.right.span().end;
-
-        // Find 'in' keyword position (search with or without spaces)
-        let in_pos = self
-            .find_keyword_position(left_end, right_start, "in")
-            .unwrap_or(left_end);
-
-        // Preserve comments between `for` keyword and `(`
-        let for_keyword_end = stmt.span.start + "for".len() as u32;
-        let open_paren = self.find_open_paren_after(stmt.span.start);
-        let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
-        let keyword_comments = self.build_keyword_paren_comments(for_keyword_end, open_paren);
-
-        // Check for line comments in the header - if present, use breaking layout
-        let close = close_paren.unwrap_or(right_end + 1);
-        let has_line_comments = if let Some(open) = open_paren {
-            self.has_line_comments_between(open + 1, close)
-        } else {
-            self.has_line_comments_between(left_start, close)
-        };
-
-        if has_line_comments {
-            return self.build_for_in_of_with_line_comments(
-                &stmt.left,
-                &stmt.right,
-                &stmt.body,
-                stmt.span.start,
-                "in",
-                in_pos,
-                close_paren,
-            );
-        }
-
-        let mut parts = if let Some(kc) = keyword_comments {
-            vec![d.text("for"), kc, d.text(" (")]
-        } else {
-            vec![d.text("for (")]
-        };
-
-        // Comments between ( and left
-        if let Some(open) = open_paren {
-            for comment in tsv_lang::comments_in_range(self.comments, open + 1, left_start) {
-                if comment.is_block {
-                    parts.push(self.build_comment_doc(comment));
-                    parts.push(d.text(" "));
-                }
-            }
-        }
-
-        parts.push(self.build_for_in_of_left_doc(&stmt.left));
-
-        // Comments after left, before 'in'
-        let has_left_comment = self.append_for_in_of_block_comments(&mut parts, left_end, in_pos);
-
-        if has_left_comment {
-            parts.push(d.text("in"));
-        } else {
-            parts.push(d.text(" in"));
-        }
-
-        // Comments after 'in', before right
-        let in_keyword_end = in_pos + "in".len() as u32;
-        let has_comment =
-            self.append_for_in_of_block_comments(&mut parts, in_keyword_end, right_start);
-        if !has_comment {
-            parts.push(d.text(" "));
-        }
-
-        parts.push(self.build_expression_doc(&stmt.right));
-
-        // Comments after right, before close paren (no trailing space needed)
-        if let Some(close) = close_paren {
-            self.append_for_in_of_trailing_comments(&mut parts, right_end, close);
-        }
-
-        // Check for comments between ) and body
-        let paren_end = close_paren.map_or(right_end + 1, |p| p + 1);
-
-        // Prettier expands empty blocks for for-in
-        if let Statement::BlockStatement(block) = stmt.body.as_ref() {
-            self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
-            parts.push(self.build_block_statement_expand_empty_doc(block));
-        } else {
-            self.append_close_paren_with_non_block_body(&mut parts, paren_end, &stmt.body);
-        }
-
-        // Group so a non-block body's `adjustClause` line breaks on overflow
-        // (matches Prettier's `printForXStatement`).
-        d.group(d.concat(&parts))
+        self.build_for_in_of_statement_with_body_doc(
+            &stmt.left,
+            &stmt.right,
+            &stmt.body,
+            stmt.span.start,
+            "in",
+            false,
+        )
     }
 
     /// Find a keyword position between two spans, skipping over comments
@@ -774,24 +689,60 @@ impl<'a> Printer<'a> {
 
     /// Build a complete for-of statement doc including the body
     fn build_for_of_statement_with_body_doc(&self, stmt: &internal::ForOfStatement) -> DocId {
-        let d = self.d();
-        let left_start = self.get_for_in_of_left_start(&stmt.left);
-        let left_end = self.get_for_in_of_left_end(&stmt.left);
-        let right_start = stmt.right.span().start;
-        let right_end = stmt.right.span().end;
+        self.build_for_in_of_statement_with_body_doc(
+            &stmt.left,
+            &stmt.right,
+            &stmt.body,
+            stmt.span.start,
+            "of",
+            stmt.r#await,
+        )
+    }
 
-        // Find 'of' keyword position (search with or without spaces)
-        let of_pos = self
-            .find_keyword_position(left_end, right_start, "of")
+    /// Build a complete for-in/for-of statement doc including the body.
+    ///
+    /// Shared by `build_for_in_statement_with_body_doc` and
+    /// `build_for_of_statement_with_body_doc`: the two differ only in the
+    /// `"in"`/`"of"` keyword and for-of's `for await` handling, which collapses
+    /// to a no-op when `is_await` is false (for-in has no `await` form). The
+    /// `for (` opening is built in split form (`" "` + `"("`) so the optional
+    /// `await` keyword slots in between — render-identical to for-in's fused
+    /// `" ("`.
+    fn build_for_in_of_statement_with_body_doc(
+        &self,
+        left: &internal::ForInOfLeft,
+        right: &Expression,
+        body: &Statement,
+        stmt_start: u32,
+        keyword: &str,  // "in" or "of"
+        is_await: bool, // for-of `for await`; always false for for-in
+    ) -> DocId {
+        let d = self.d();
+        let left_start = self.get_for_in_of_left_start(left);
+        let left_end = self.get_for_in_of_left_end(left);
+        let right_start = right.span().start;
+        let right_end = right.span().end;
+
+        // The keyword as a static literal (`d.text` needs `&'static str`), with
+        // and without the leading space.
+        let (kw, kw_spaced) = if keyword == "of" {
+            ("of", " of")
+        } else {
+            ("in", " in")
+        };
+
+        // Find the keyword position (search with or without spaces)
+        let keyword_pos = self
+            .find_keyword_position(left_end, right_start, keyword)
             .unwrap_or(left_end);
 
         // Preserve comments between keywords and `(`
         // for await: two gaps — for-to-await and await-to-paren
         // for (non-await): one gap — for-to-paren
-        let for_keyword_end = stmt.span.start + "for".len() as u32;
-        let open_paren = self.find_open_paren_after(stmt.span.start);
+        let for_keyword_end = stmt_start + "for".len() as u32;
+        let open_paren = self.find_open_paren_after(stmt_start);
         let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
-        let (for_await_comments, await_paren_comments) = if stmt.r#await {
+        let (for_await_comments, await_paren_comments) = if is_await {
             let await_pos = self.find_keyword_in_source(for_keyword_end, left_start, "await");
             let for_await_c = await_pos
                 .and_then(|ap| self.build_inline_comments_between_doc_opt(for_keyword_end, ap));
@@ -802,10 +753,10 @@ impl<'a> Printer<'a> {
         } else {
             (None, None)
         };
-        let keyword_comments = if !stmt.r#await {
-            self.build_keyword_paren_comments(for_keyword_end, open_paren)
-        } else {
+        let keyword_comments = if is_await {
             None
+        } else {
+            self.build_keyword_paren_comments(for_keyword_end, open_paren)
         };
 
         // Check for line comments in the header - if present, use breaking layout
@@ -819,12 +770,12 @@ impl<'a> Printer<'a> {
 
         if has_line_comments {
             return self.build_for_in_of_with_line_comments(
-                &stmt.left,
-                &stmt.right,
-                &stmt.body,
-                stmt.span.start,
-                "of",
-                of_pos,
+                left,
+                right,
+                body,
+                stmt_start,
+                keyword,
+                keyword_pos,
                 close_paren,
             );
         }
@@ -837,7 +788,7 @@ impl<'a> Printer<'a> {
             parts.push(fac);
         }
         parts.push(d.text(" "));
-        if stmt.r#await {
+        if is_await {
             parts.push(d.text("await"));
             if let Some(apc) = await_paren_comments {
                 parts.push(apc);
@@ -856,26 +807,27 @@ impl<'a> Printer<'a> {
             }
         }
 
-        parts.push(self.build_for_in_of_left_doc(&stmt.left));
+        parts.push(self.build_for_in_of_left_doc(left));
 
-        // Comments after left, before 'of'
-        let has_left_comment = self.append_for_in_of_block_comments(&mut parts, left_end, of_pos);
+        // Comments after left, before the keyword
+        let has_left_comment =
+            self.append_for_in_of_block_comments(&mut parts, left_end, keyword_pos);
 
         if has_left_comment {
-            parts.push(d.text("of"));
+            parts.push(d.text(kw));
         } else {
-            parts.push(d.text(" of"));
+            parts.push(d.text(kw_spaced));
         }
 
-        // Comments after 'of', before right
-        let of_keyword_end = of_pos + "of".len() as u32;
+        // Comments after the keyword, before right
+        let keyword_end = keyword_pos + keyword.len() as u32;
         let has_comment =
-            self.append_for_in_of_block_comments(&mut parts, of_keyword_end, right_start);
+            self.append_for_in_of_block_comments(&mut parts, keyword_end, right_start);
         if !has_comment {
             parts.push(d.text(" "));
         }
 
-        parts.push(self.build_expression_doc(&stmt.right));
+        parts.push(self.build_expression_doc(right));
 
         // Comments after right, before close paren (no trailing space needed)
         if let Some(close) = close_paren {
@@ -885,12 +837,12 @@ impl<'a> Printer<'a> {
         // Check for comments between ) and body
         let paren_end = close_paren.map_or(right_end + 1, |p| p + 1);
 
-        // Prettier expands empty blocks for for-of
-        if let Statement::BlockStatement(block) = stmt.body.as_ref() {
+        // Prettier expands empty blocks for for-in/for-of
+        if let Statement::BlockStatement(block) = body {
             self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
             parts.push(self.build_block_statement_expand_empty_doc(block));
         } else {
-            self.append_close_paren_with_non_block_body(&mut parts, paren_end, &stmt.body);
+            self.append_close_paren_with_non_block_body(&mut parts, paren_end, body);
         }
 
         // Group so a non-block body's `adjustClause` line breaks on overflow
