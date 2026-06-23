@@ -19,8 +19,13 @@
 //   heritage / keyword→name comment emitters.
 // - **lists.rs**: List- and body-level comment emitters (leading/trailing body
 //   comments, delimiter-line prefixes, empty-container comments, comma emission).
+// - **element_comma.rs**: The single source of the `trailingComma: 'none'`
+//   comment-position contract for inline element lists (block-before / comma /
+//   block-after-on-last / line-suffix), shared by the object/array pattern and
+//   object-literal builders.
 
 mod declarations;
+mod element_comma;
 mod lists;
 mod paren;
 mod render;
