@@ -5,12 +5,37 @@ use crate::ast::internal::{
     ClassMember, Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind,
     ExportNamedDeclaration, Expression, FunctionExpression, Identifier, Literal, LiteralValue,
     MemberExpression, MethodDefinition, MethodKind, PropertyDefinition, PropertyModifier,
-    Statement, StaticBlock, TSIndexSignature,
+    Statement, StaticBlock, TSIndexSignature, TSTypeParameterDeclaration,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
+
+/// Everything parsed off the front of a class member before its body — the
+/// modifier set, the (possibly computed) key, and the optional/type-param
+/// markers. `parse_class_member` builds this, then dispatches to
+/// `finish_method_member` / `finish_property_member`.
+#[allow(clippy::struct_excessive_bools)] // independent modifier flags, not a state machine
+struct ClassMemberHeader {
+    start: usize,
+    decorators: Vec<Decorator>,
+    accessibility: Option<Accessibility>,
+    is_static: bool,
+    is_declare: bool,
+    is_override: bool,
+    is_abstract: bool,
+    readonly: bool,
+    accessor: bool,
+    is_generator: bool,
+    is_async: bool,
+    accessor_kind: Option<MethodKind>,
+    computed: bool,
+    key: Expression,
+    method_name: Option<String>,
+    modifier: PropertyModifier,
+    type_parameters: Option<TSTypeParameterDeclaration>,
+}
 
 impl<'a> Parser<'a> {
     pub(super) fn parse_class_declaration(&mut self) -> Result<Statement, ParseError> {
@@ -360,6 +385,25 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Consume the contextual keyword `kw` as a class-member modifier iff the
+    /// current token is the identifier `kw` and the next token begins a member
+    /// name or a generator `*` — otherwise `kw` is itself the member's name
+    /// (e.g. `readonly = 1`). Returns whether it was consumed. Shared by the
+    /// `declare`/`override`/`abstract`/`readonly` detectors; `declare` is
+    /// probed in three positions (before/after accessibility, after `static`).
+    #[inline]
+    fn eat_modifier_keyword(&mut self, kw: &str) -> bool {
+        if matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() == kw
+            && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
+        {
+            self.advance().ok();
+            true
+        } else {
+            false
+        }
+    }
+
     /// Parse a single class member. When `ambient` is true (a `declare class`
     /// member), the result is a bodiless signature and decorators are not parsed
     /// (TypeScript forbids both in ambient context). All other member grammar is
@@ -377,15 +421,7 @@ impl<'a> Parser<'a> {
         // Handle 'declare' contextual keyword - only if followed by a class member name or another modifier
         // Otherwise `declare` itself is the property name: `declare = 1;`
         // Note: declare must be parsed BEFORE accessibility because `declare public a` is valid
-        let is_declare = if matches!(self.current_kind(), TokenKind::Identifier)
-            && self.current_value() == "declare"
-            && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
-        {
-            self.advance().ok();
-            true
-        } else {
-            false
-        };
+        let is_declare = self.eat_modifier_keyword("declare");
 
         // Handle accessibility modifiers (public, private, protected)
         // Only consume as modifier if followed by a class member name or `*` (generator)
@@ -413,19 +449,11 @@ impl<'a> Parser<'a> {
         };
 
         // Handle 'declare' after accessibility (for non-canonical order like `public declare a`)
-        let is_declare = is_declare
-            || if matches!(self.current_kind(), TokenKind::Identifier)
-                && self.current_value() == "declare"
-                && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
-            {
-                self.advance().ok();
-                true
-            } else {
-                false
-            };
+        let is_declare = is_declare || self.eat_modifier_keyword("declare");
 
         // Handle 'static' contextual keyword - only if followed by a class member name or `{` (static block)
         // Otherwise `static` itself is the property name: `static = 2;`
+        // Stays inline: unlike the shared detectors, `static {` (a static block) is also a valid follow.
         let is_static = if matches!(self.current_kind(), TokenKind::Identifier)
             && self.current_value() == "static"
             && (self.peek_is_class_member_name()
@@ -439,16 +467,7 @@ impl<'a> Parser<'a> {
         };
 
         // Handle 'declare' after static (for non-canonical order like `static declare a`)
-        let is_declare = is_declare
-            || if matches!(self.current_kind(), TokenKind::Identifier)
-                && self.current_value() == "declare"
-                && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
-            {
-                self.advance().ok();
-                true
-            } else {
-                false
-            };
+        let is_declare = is_declare || self.eat_modifier_keyword("declare");
 
         // Check for static initialization block: `static { ... }` (ES2022).
         // A static block is a body, so it's forbidden in ambient context — there
@@ -466,42 +485,19 @@ impl<'a> Parser<'a> {
 
         // Handle 'override' contextual keyword - only if followed by a class member name or `*`
         // Otherwise `override` itself is the property name: `override = 1;`
-        let is_override = if matches!(self.current_kind(), TokenKind::Identifier)
-            && self.current_value() == "override"
-            && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
-        {
-            self.advance().ok();
-            true
-        } else {
-            false
-        };
+        let is_override = self.eat_modifier_keyword("override");
 
         // Handle 'abstract' contextual keyword - only if followed by a class member name or `*`
         // Otherwise `abstract` itself is the property name: `abstract = 1;`
-        let is_abstract = if matches!(self.current_kind(), TokenKind::Identifier)
-            && self.current_value() == "abstract"
-            && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
-        {
-            self.advance().ok();
-            true
-        } else {
-            false
-        };
+        let is_abstract = self.eat_modifier_keyword("abstract");
 
         // Handle 'readonly' contextual keyword - only if followed by a class member name
         // Otherwise `readonly` itself is the property name: `readonly = 1;`
-        let readonly = if matches!(self.current_kind(), TokenKind::Identifier)
-            && self.current_value() == "readonly"
-            && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
-        {
-            self.advance().ok();
-            true
-        } else {
-            false
-        };
+        let readonly = self.eat_modifier_keyword("readonly");
 
         // Handle 'accessor' contextual keyword (ES decorator proposal)
-        // Only consume as modifier if followed by a class member name
+        // Only consume as modifier if followed by a class member name.
+        // Stays inline: `accessor` may not prefix a generator, so it omits the `*` follow.
         let accessor = if matches!(self.current_kind(), TokenKind::Identifier)
             && self.current_value() == "accessor"
             && self.peek_is_class_member_name()
@@ -514,6 +510,7 @@ impl<'a> Parser<'a> {
 
         // Handle 'async' keyword for async methods
         // async is only a modifier if followed by: identifier, [, #, or *
+        // Stays inline: `async` is a reserved Keyword token, not an Identifier.
         let is_async = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Async))
             && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
         {
@@ -610,145 +607,219 @@ impl<'a> Parser<'a> {
         // Parse type parameters (TypeScript generics): method<T>()
         let type_parameters = self.parse_optional_type_parameters()?;
 
+        let header = ClassMemberHeader {
+            start,
+            decorators,
+            accessibility,
+            is_static,
+            is_declare,
+            is_override,
+            is_abstract,
+            readonly,
+            accessor,
+            is_generator,
+            is_async,
+            accessor_kind,
+            computed,
+            key,
+            method_name,
+            modifier,
+            type_parameters,
+        };
+
         // Detect if this is a method (has `(`) or property (has `=` or `;` or end of class)
         if matches!(self.current_kind(), TokenKind::ParenOpen) {
-            // Method definition - use accessor_kind if set, otherwise check for constructor
-            let kind = accessor_kind.unwrap_or(match method_name.as_deref() {
-                Some("constructor") => MethodKind::Constructor,
-                _ => MethodKind::Method,
-            });
-
-            // Capture paren position before parsing params (for comment detection)
-            let (params_start, _) = self.current_pos();
-
-            // Parse parameter list and block body (like a function)
-            let params = self.parse_parameter_list()?;
-
-            // Check for return type annotation: (): type or type predicate
-            let return_type = self.parse_optional_return_type()?;
-
-            // Abstract methods and overload signatures have no body - just a semicolon
-            // Method overloads: `parse(x: string): object;` followed by implementation
-            // Note: ASI can insert semicolon on line terminator, but NOT if next token is `{`
-            // (a method with body on next line: `fn()\n{` is valid)
-            // Ambient (`declare class`) methods are always bodiless signatures.
-            let is_overload_or_abstract = ambient
-                || is_abstract
-                || self.check(&TokenKind::Semicolon)
-                || (self.can_insert_semicolon() && !self.check(&TokenKind::BraceOpen));
-            let (body_block, end) = if is_overload_or_abstract {
-                // Without a return type the signature ends at the params' `)` —
-                // the next token's start would overshoot past trailing comments
-                // or onto the next line under ASI
-                let body_end = return_type
-                    .as_ref()
-                    .map_or_else(|| self.prev_token_end() as u32, |rt| rt.span.end);
-                let end = if self.eat(TokenKind::Semicolon) {
-                    self.prev_token_end() as u32
-                } else {
-                    body_end
-                };
-                // Create empty body for abstract methods and overload signatures
-                (
-                    BlockStatement {
-                        body: Vec::new(),
-                        span: Span::new(body_end, body_end),
-                    },
-                    end,
-                )
-            } else {
-                let body_block = self.parse_function_body()?;
-                let end = body_block.span.end;
-                (body_block, end)
-            };
-
-            // Create FunctionExpression for the method value
-            // span starts at params_start (the `(`) to match acorn's FunctionExpression positioning
-            let value = FunctionExpression {
-                id: None,
-                type_parameters,
-                params,
-                return_type,
-                body: body_block,
-                generator: is_generator,
-                r#async: is_async,
-                params_start: params_start as u32,
-                span: Span::new(params_start as u32, end),
-            };
-
-            Ok(ClassMember::MethodDefinition(MethodDefinition {
-                decorators: if decorators.is_empty() {
-                    None
-                } else {
-                    Some(decorators)
-                },
-                key,
-                value,
-                kind,
-                accessibility,
-                is_static,
-                r#override: is_override,
-                r#abstract: is_abstract,
-                computed,
-                optional: matches!(modifier, PropertyModifier::Optional),
-                span: Span::new(start as u32, end),
-            }))
+            self.finish_method_member(header, ambient)
         } else {
-            // Property definition: `name: type = value;` or `name: type;` or `name = value;` or `name;`
-            // The optional/definite marker was already parsed above (shared with methods).
-
-            // Check for type annotation: `name: type`
-            let type_annotation = self.parse_optional_type_annotation()?;
-
-            // Check for value: `= value`
-            let value = if self.eat(TokenKind::Equals) {
-                Some(self.parse_assignment_expression()?)
-            } else {
-                None
-            };
-
-            let end = value.as_ref().map_or_else(
-                || {
-                    type_annotation
-                        .as_ref()
-                        // No type annotation/value: the last consumed token is the key
-                        // (its closing `]` for a computed key) or the `?`/`!` modifier.
-                        // `key.span().end` would stop inside a computed key's brackets,
-                        // so read the previous token's end instead.
-                        .map_or_else(|| self.prev_token_end() as u32, |ta| ta.span.end)
-                },
-                // prev_token_end covers a parenthesized value's closing `)`,
-                // which the paren-stripped value span excludes
-                |_| self.prev_token_end() as u32,
-            );
-
-            // Consume optional semicolon (ASI applies), including it in the span
-            let mut end = end;
-            if self.eat(TokenKind::Semicolon) {
-                end = self.prev_token_end() as u32;
-            }
-
-            Ok(ClassMember::PropertyDefinition(PropertyDefinition {
-                decorators: if decorators.is_empty() {
-                    None
-                } else {
-                    Some(decorators)
-                },
-                key,
-                type_annotation,
-                value,
-                accessibility,
-                is_static,
-                declare: is_declare,
-                r#abstract: is_abstract,
-                r#override: is_override,
-                readonly,
-                computed,
-                accessor,
-                modifier,
-                span: Span::new(start as u32, end),
-            }))
+            self.finish_property_member(header)
         }
+    }
+
+    /// Finish a method member (the `(`-led branch of `parse_class_member`):
+    /// parameter list, optional return type, and body — or a bodiless signature
+    /// for ambient / abstract / overload methods.
+    fn finish_method_member(
+        &mut self,
+        header: ClassMemberHeader,
+        ambient: bool,
+    ) -> Result<ClassMember, ParseError> {
+        let ClassMemberHeader {
+            start,
+            decorators,
+            accessibility,
+            is_static,
+            is_override,
+            is_abstract,
+            is_generator,
+            is_async,
+            accessor_kind,
+            computed,
+            key,
+            method_name,
+            modifier,
+            type_parameters,
+            ..
+        } = header;
+
+        // Method definition - use accessor_kind if set, otherwise check for constructor
+        let kind = accessor_kind.unwrap_or(match method_name.as_deref() {
+            Some("constructor") => MethodKind::Constructor,
+            _ => MethodKind::Method,
+        });
+
+        // Capture paren position before parsing params (for comment detection)
+        let (params_start, _) = self.current_pos();
+
+        // Parse parameter list and block body (like a function)
+        let params = self.parse_parameter_list()?;
+
+        // Check for return type annotation: (): type or type predicate
+        let return_type = self.parse_optional_return_type()?;
+
+        // Abstract methods and overload signatures have no body - just a semicolon
+        // Method overloads: `parse(x: string): object;` followed by implementation
+        // Note: ASI can insert semicolon on line terminator, but NOT if next token is `{`
+        // (a method with body on next line: `fn()\n{` is valid)
+        // Ambient (`declare class`) methods are always bodiless signatures.
+        let is_overload_or_abstract = ambient
+            || is_abstract
+            || self.check(&TokenKind::Semicolon)
+            || (self.can_insert_semicolon() && !self.check(&TokenKind::BraceOpen));
+        let (body_block, end) = if is_overload_or_abstract {
+            // Without a return type the signature ends at the params' `)` —
+            // the next token's start would overshoot past trailing comments
+            // or onto the next line under ASI
+            let body_end = return_type
+                .as_ref()
+                .map_or_else(|| self.prev_token_end() as u32, |rt| rt.span.end);
+            let end = if self.eat(TokenKind::Semicolon) {
+                self.prev_token_end() as u32
+            } else {
+                body_end
+            };
+            // Create empty body for abstract methods and overload signatures
+            (
+                BlockStatement {
+                    body: Vec::new(),
+                    span: Span::new(body_end, body_end),
+                },
+                end,
+            )
+        } else {
+            let body_block = self.parse_function_body()?;
+            let end = body_block.span.end;
+            (body_block, end)
+        };
+
+        // Create FunctionExpression for the method value
+        // span starts at params_start (the `(`) to match acorn's FunctionExpression positioning
+        let value = FunctionExpression {
+            id: None,
+            type_parameters,
+            params,
+            return_type,
+            body: body_block,
+            generator: is_generator,
+            r#async: is_async,
+            params_start: params_start as u32,
+            span: Span::new(params_start as u32, end),
+        };
+
+        Ok(ClassMember::MethodDefinition(MethodDefinition {
+            decorators: if decorators.is_empty() {
+                None
+            } else {
+                Some(decorators)
+            },
+            key,
+            value,
+            kind,
+            accessibility,
+            is_static,
+            r#override: is_override,
+            r#abstract: is_abstract,
+            computed,
+            optional: matches!(modifier, PropertyModifier::Optional),
+            span: Span::new(start as u32, end),
+        }))
+    }
+
+    /// Finish a property member (the non-`(` branch of `parse_class_member`):
+    /// optional type annotation, optional initializer, and trailing semicolon.
+    fn finish_property_member(
+        &mut self,
+        header: ClassMemberHeader,
+    ) -> Result<ClassMember, ParseError> {
+        let ClassMemberHeader {
+            start,
+            decorators,
+            accessibility,
+            is_static,
+            is_declare,
+            is_override,
+            is_abstract,
+            readonly,
+            accessor,
+            computed,
+            key,
+            modifier,
+            ..
+        } = header;
+
+        // Property definition: `name: type = value;` or `name: type;` or `name = value;` or `name;`
+        // The optional/definite marker was already parsed above (shared with methods).
+
+        // Check for type annotation: `name: type`
+        let type_annotation = self.parse_optional_type_annotation()?;
+
+        // Check for value: `= value`
+        let value = if self.eat(TokenKind::Equals) {
+            Some(self.parse_assignment_expression()?)
+        } else {
+            None
+        };
+
+        let end = value.as_ref().map_or_else(
+            || {
+                type_annotation
+                    .as_ref()
+                    // No type annotation/value: the last consumed token is the key
+                    // (its closing `]` for a computed key) or the `?`/`!` modifier.
+                    // `key.span().end` would stop inside a computed key's brackets,
+                    // so read the previous token's end instead.
+                    .map_or_else(|| self.prev_token_end() as u32, |ta| ta.span.end)
+            },
+            // prev_token_end covers a parenthesized value's closing `)`,
+            // which the paren-stripped value span excludes
+            |_| self.prev_token_end() as u32,
+        );
+
+        // Consume optional semicolon (ASI applies), including it in the span
+        let mut end = end;
+        if self.eat(TokenKind::Semicolon) {
+            end = self.prev_token_end() as u32;
+        }
+
+        Ok(ClassMember::PropertyDefinition(PropertyDefinition {
+            decorators: if decorators.is_empty() {
+                None
+            } else {
+                Some(decorators)
+            },
+            key,
+            type_annotation,
+            value,
+            accessibility,
+            is_static,
+            declare: is_declare,
+            r#abstract: is_abstract,
+            r#override: is_override,
+            readonly,
+            computed,
+            accessor,
+            modifier,
+            span: Span::new(start as u32, end),
+        }))
     }
 
     /// Check if current position has type arguments followed by a call: `<T>(`
