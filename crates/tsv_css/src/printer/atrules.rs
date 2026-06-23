@@ -16,11 +16,11 @@ use tsv_lang::doc::{self, Mode, arena::DocId};
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 use tsv_lang::{comments_in_range, is_format_ignore_directive};
 
-/// Convert a supports connector to its string representation
-fn connector_str(conn: internal::SupportsConnector) -> &'static str {
+/// Convert a condition connector to its string representation
+fn connector_str(conn: internal::ConditionConnector) -> &'static str {
     match conn {
-        internal::SupportsConnector::And => "and",
-        internal::SupportsConnector::Or => "or",
+        internal::ConditionConnector::And => "and",
+        internal::ConditionConnector::Or => "or",
     }
 }
 
@@ -41,23 +41,23 @@ enum MediaWrap {
 /// them in one enum keeps those two facts in lockstep (no `name`-without-raw or
 /// raw-without-name combinations).
 #[derive(Clone, Copy)]
-enum ConditionQuery<'a> {
+enum ConditionKind<'a> {
     Supports,
     Container { name: Option<&'a str> },
 }
 
-impl<'a> ConditionQuery<'a> {
+impl<'a> ConditionKind<'a> {
     /// `@supports` values are normalized (numbers + string quotes); `@container`
     /// preludes are emitted verbatim, matching prettier.
     fn normalizes(self) -> bool {
-        matches!(self, ConditionQuery::Supports)
+        matches!(self, ConditionKind::Supports)
     }
 
     /// The optional container name prefix (`@container sidebar (...)`).
     fn name(self) -> Option<&'a str> {
         match self {
-            ConditionQuery::Container { name } => name,
-            ConditionQuery::Supports => None,
+            ConditionKind::Container { name } => name,
+            ConditionKind::Supports => None,
         }
     }
 }
@@ -132,7 +132,7 @@ impl<'a> Printer<'a> {
                 // @supports conditions are declarations, so prettier normalizes
                 // their values (e.g. numbers); @container queries are left raw.
                 self.print_condition_query(
-                    ConditionQuery::Supports,
+                    ConditionKind::Supports,
                     condition,
                     atrule.block.is_some(),
                     Some(*span),
@@ -145,7 +145,7 @@ impl<'a> Printer<'a> {
             } => {
                 self.write(" ");
                 self.print_condition_query(
-                    ConditionQuery::Container {
+                    ConditionKind::Container {
                         name: name.as_deref(),
                     },
                     condition,
@@ -420,8 +420,8 @@ impl<'a> Printer<'a> {
     /// ```
     fn print_condition_query(
         &mut self,
-        kind: ConditionQuery<'_>,
-        condition: &internal::SupportsCondition,
+        kind: ConditionKind<'_>,
+        condition: &internal::ConditionQuery,
         has_block: bool,
         prelude_span: Option<tsv_lang::Span>,
     ) {
@@ -438,10 +438,10 @@ impl<'a> Printer<'a> {
         // Normalize numbers in each part's content (`.5px` → `0.5px`), matching
         // the declaration-value path. Comments/strings within a part are
         // preserved; inter-part comments come from source spans, unaffected.
-        let normalized_parts: Vec<internal::SupportsPart> = condition
+        let normalized_parts: Vec<internal::ConditionPart> = condition
             .parts
             .iter()
-            .map(|p| internal::SupportsPart {
+            .map(|p| internal::ConditionPart {
                 connector: p.connector,
                 content: if kind.normalizes() {
                     value_normalization::normalize_value_text(&p.content)
@@ -587,7 +587,11 @@ impl<'a> Printer<'a> {
     }
 
     /// Write a condition part with its preceding comments and connector
-    fn write_condition_part_with_comments(&mut self, prev_end: u32, part: &internal::SupportsPart) {
+    fn write_condition_part_with_comments(
+        &mut self,
+        prev_end: u32,
+        part: &internal::ConditionPart,
+    ) {
         let (before_conn, after_conn) =
             self.extract_comments_split_by_connector(prev_end, part.span.start, part.connector);
 
@@ -612,7 +616,7 @@ impl<'a> Printer<'a> {
         &self,
         start: u32,
         end: u32,
-        connector: Option<internal::SupportsConnector>,
+        connector: Option<internal::ConditionConnector>,
     ) -> (String, String) {
         let comments: Vec<_> = comments_in_range(self.comments, start, end).collect();
 
@@ -622,8 +626,8 @@ impl<'a> Printer<'a> {
 
         // Find the connector keyword position in the source range
         let connector_keyword = match connector {
-            Some(internal::SupportsConnector::And) => "and",
-            Some(internal::SupportsConnector::Or) => "or",
+            Some(internal::ConditionConnector::And) => "and",
+            Some(internal::ConditionConnector::Or) => "or",
             None => {
                 // No connector - all comments go to "before"
                 let mut result = String::new();
@@ -686,7 +690,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Write a condition connector (if present) with trailing space
-    fn write_connector(&mut self, connector: Option<internal::SupportsConnector>) {
+    fn write_connector(&mut self, connector: Option<internal::ConditionConnector>) {
         if let Some(conn) = connector {
             self.write(connector_str(conn));
             self.write(" ");
@@ -698,7 +702,7 @@ impl<'a> Printer<'a> {
     /// Returns the index of the first part that should go on line 2.
     fn find_condition_split_index(
         &self,
-        parts: &[internal::SupportsPart],
+        parts: &[internal::ConditionPart],
         current_col: usize,
         suffix_len: usize,
     ) -> usize {
@@ -730,7 +734,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc representation of condition query for width checking
-    fn build_condition_doc(&self, parts: &[internal::SupportsPart]) -> DocId {
+    fn build_condition_doc(&self, parts: &[internal::ConditionPart]) -> DocId {
         let d = self.d();
         let mut docs = Vec::new();
         for (i, part) in parts.iter().enumerate() {

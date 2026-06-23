@@ -521,7 +521,7 @@ pub enum PreludeValue {
     /// @supports condition (structured for line-width wrapping)
     /// Example: `(display: grid) and (flex: 1)` → parts connected by `and`/`or`
     Supports {
-        condition: SupportsCondition,
+        condition: ConditionQuery,
         span: Span,
     },
 
@@ -531,7 +531,7 @@ pub enum PreludeValue {
         /// Optional container name (e.g., "sidebar")
         name: Option<String>,
         /// The condition parts connected by `and`/`or`
-        condition: SupportsCondition,
+        condition: ConditionQuery,
         span: Span,
     },
 
@@ -546,29 +546,31 @@ pub enum PreludeValue {
     Media { content: String, span: Span },
 }
 
-/// @supports condition structure for formatting
-///
-/// Allows wrapping at `and`/`or` boundaries while keeping the keyword
-/// on the current line and the condition on the next.
+/// A boolean condition query — the structured prelude shared by `@supports`
+/// (`<supports-condition>`) and `@container` (`<container-query>`), whose
+/// grammars are identical. Structured (rather than raw) so the printer can wrap
+/// at `and`/`or` boundaries, keeping the keyword on the current line and the
+/// condition on the next.
 #[derive(Debug, Clone)]
-pub struct SupportsCondition {
+pub struct ConditionQuery {
     /// The condition parts connected by `and`/`or`
-    pub parts: Vec<SupportsPart>,
+    pub parts: Vec<ConditionPart>,
 }
 
-/// A single part of a @supports condition
+/// A single part of a `ConditionQuery` (one `(prop: val)` term, optionally
+/// `not`-prefixed or function-style like `selector(...)`).
 #[derive(Debug, Clone)]
-pub struct SupportsPart {
+pub struct ConditionPart {
     /// The connector before this part (None for first part)
-    pub connector: Option<SupportsConnector>,
+    pub connector: Option<ConditionConnector>,
     /// The condition content (e.g., "(display: grid)" or "not (color: red)")
     pub content: String,
     pub span: Span,
 }
 
-/// Connector between @supports condition parts
+/// Connector (`and`/`or`) between `ConditionQuery` parts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SupportsConnector {
+pub enum ConditionConnector {
     And,
     Or,
 }
