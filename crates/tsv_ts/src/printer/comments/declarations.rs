@@ -10,7 +10,7 @@ use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::source_scan::find_char_skipping_comments;
+use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comments};
 
 impl<'a> Printer<'a> {
     /// Emit a member keyword (modifier like `static ` / `readonly `, or
@@ -590,23 +590,50 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Append comments between a generator `*` marker and the method/function key.
+    /// Emit a generator `*` marker together with any comments around it,
+    /// preserving the author's position relative to the star.
     ///
-    /// Searches for `*` in the source between `search_start` and `key_start`,
-    /// then emits any comments found after it (e.g., `*/* comment */ gen()`).
-    /// Call after pushing `d.text("*")` to parts.
-    pub(crate) fn append_generator_star_comments(
+    /// Comments authored between `search_start` and the `*` lead it
+    /// (`async /* c */ *m`); comments between the `*` and the key trail it
+    /// (`*/* c */ m`). The `*` is located with the comment/string-skipping scan,
+    /// so a `*` inside a comment (`/* a * b */`) is not mistaken for the marker.
+    /// This pushes the `*` itself — call it instead of pushing `d.text("*")`.
+    pub(crate) fn push_generator_star_doc(
         &self,
         parts: &mut Vec<DocId>,
         search_start: u32,
         key_start: u32,
     ) {
-        if let Some(star_pos) = self.source[search_start as usize..key_start as usize].find('*') {
-            let after_star = search_start + star_pos as u32 + 1;
-            for comment in comments_in_range(self.comments, after_star, key_start) {
+        let d = self.d();
+        let star = find_char(
+            self.source.as_bytes(),
+            search_start as usize,
+            key_start as usize,
+            b'*',
+            TriviaProfile::JS,
+        )
+        .map(|i| i as u32);
+
+        if let Some(star) = star {
+            // Comments before the `*` lead it, at the author's position.
+            for comment in comments_in_range(self.comments, search_start, star) {
                 parts.push(self.build_comment_doc(comment));
-                parts.push(self.d().text(" "));
+                parts.push(d.text(" "));
             }
+            parts.push(d.text("*"));
+            // Comments between the `*` and the key trail it.
+            for comment in comments_in_range(self.comments, star + 1, key_start) {
+                parts.push(self.build_comment_doc(comment));
+                parts.push(d.text(" "));
+            }
+        } else {
+            // Defensive: a generator always has a real `*`. If none is found,
+            // keep any comments (never drop them), then the marker.
+            for comment in comments_in_range(self.comments, search_start, key_start) {
+                parts.push(self.build_comment_doc(comment));
+                parts.push(d.text(" "));
+            }
+            parts.push(d.text("*"));
         }
     }
 
