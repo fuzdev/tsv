@@ -5,10 +5,13 @@
 // - Components (PascalCase)
 // - Void elements (br, img, etc.)
 // - Raw content elements (script, style)
-// - Whitespace-sensitive elements (pre, textarea)
+//
+// Whitespace-sensitive elements (pre, textarea) are dispatched from here to the
+// builders in `element_ws_sensitive_doc.rs`; the analyze/classify predicates live
+// in `element_analysis.rs`. The shared types (`BoundaryMode`, `ElementLayout`,
+// `ElementKind`, `ElementContext`) are defined here and used by both.
 
-use super::blocks_doc::{EACH_BLOCK_OPEN, ELSE_IF_BLOCK_OPEN, IF_BLOCK_OPEN};
-use crate::ast::internal::{self, Fragment, FragmentNode};
+use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
 use tsv_lang::doc::arena::DocId;
@@ -18,7 +21,7 @@ use tsv_lang::{Span, SymbolResolver, SymbolToU32};
 ///
 /// This determines what separator (if any) appears between the tag and content.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum BoundaryMode {
+pub(super) enum BoundaryMode {
     /// Content touches tag directly, no separator
     /// Example: `<span>text` or `text</span>`
     Hug,
@@ -34,7 +37,7 @@ enum BoundaryMode {
 ///
 /// Determines which doc structure to use based on element type and content.
 #[derive(Debug)]
-enum ElementLayout {
+pub(super) enum ElementLayout {
     /// Void element: `<br>`, `<img>`, etc. - no closing tag
     Void,
     /// Self-closing: `<Component />` - explicit self-close
@@ -54,7 +57,7 @@ enum ElementLayout {
 ///
 /// Determines whitespace handling and formatting behavior.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ElementKind {
+pub(super) enum ElementKind {
     /// Svelte component (PascalCase or namespaced like `svelte:component`)
     Component,
     /// HTML block element (div, p, section, etc.)
@@ -64,20 +67,20 @@ enum ElementKind {
 }
 
 impl ElementKind {
-    fn is_component(self) -> bool {
+    pub(super) fn is_component(self) -> bool {
         matches!(self, ElementKind::Component)
     }
 
-    fn is_block(self) -> bool {
+    pub(super) fn is_block(self) -> bool {
         matches!(self, ElementKind::Block)
     }
 
-    fn is_inline(self) -> bool {
+    pub(super) fn is_inline(self) -> bool {
         matches!(self, ElementKind::Inline)
     }
 
     /// Whether this element type preserves source structure at boundaries
-    fn preserves_boundary_breaks(self) -> bool {
+    pub(super) fn preserves_boundary_breaks(self) -> bool {
         matches!(self, ElementKind::Block | ElementKind::Component)
     }
 }
@@ -87,74 +90,48 @@ impl ElementKind {
 /// Computed once per element, used to determine layout and build docs.
 /// The bools capture orthogonal properties needed by different builder methods.
 #[allow(clippy::struct_excessive_bools)]
-struct ElementContext {
+pub(super) struct ElementContext {
     /// Element type classification
-    kind: ElementKind,
+    pub(super) kind: ElementKind,
     /// Whether element is void (br, img, etc.)
-    is_void: bool,
+    pub(super) is_void: bool,
     /// Whether element was self-closing in source
-    is_self_closing: bool,
+    pub(super) is_self_closing: bool,
     /// Whether element has no meaningful content
-    is_empty: bool,
+    pub(super) is_empty: bool,
     /// Whether source has newline at opening boundary
-    source_has_leading_break: bool,
+    pub(super) source_has_leading_break: bool,
     /// Whether source has newline at closing boundary
-    source_has_trailing_break: bool,
+    pub(super) source_has_trailing_break: bool,
     /// Whether content should hug the opening tag
-    hug_start: bool,
+    pub(super) hug_start: bool,
     /// Whether content should hug the closing tag
-    hug_end: bool,
+    pub(super) hug_end: bool,
     /// Whether children need multiline formatting
-    needs_multiline: bool,
+    pub(super) needs_multiline: bool,
     /// Whether block-flow children (if/each/etc.) force this element to multiline layout. Cached
     /// `has_block_flow_children && block_flow_forces_multiline` — the only combination the three
     /// readers (`force` layout, `will_go_multiline`, `compute_needs_multiline`) ever need.
-    block_flow_multiline: bool,
+    pub(super) block_flow_multiline: bool,
     /// Whether to trim boundary whitespace from children
-    trim_boundaries: bool,
+    pub(super) trim_boundaries: bool,
     /// Whether any attribute source contains embedded newlines (forces attr group break)
-    has_multiline_attr: bool,
+    pub(super) has_multiline_attr: bool,
     /// Whether all content children are text nodes (no elements, expressions, blocks)
-    only_text_content: bool,
-}
-
-/// Inputs to the [`Printer::compute_needs_multiline`] decision.
-///
-/// Bundles the per-element flags the predicate reads so they pass by name
-/// rather than as positional bools that are easy to misorder at the call site.
-/// Mirrors the corresponding [`ElementContext`] fields — both are built from
-/// the same locals.
-#[allow(clippy::struct_excessive_bools)]
-#[derive(Clone, Copy)]
-struct MultilineInputs {
-    /// Element type classification
-    kind: ElementKind,
-    /// Whether element has no meaningful content
-    is_empty: bool,
-    /// Whether content should hug the closing tag
-    hug_end: bool,
-    /// Whether source has newline at opening boundary
-    source_has_leading_break: bool,
-    /// Whether source has newline at closing boundary
-    source_has_trailing_break: bool,
-    /// Whether block-flow children force this element multiline (cached, mirrors
-    /// [`ElementContext::block_flow_multiline`])
-    block_flow_multiline: bool,
-    /// Whether all content children are text nodes
-    only_text_content: bool,
+    pub(super) only_text_content: bool,
 }
 
 impl<'a> Printer<'a> {
     /// `<name>` — a start tag with no attributes (HTML spec "start tag").
     #[inline]
-    fn start_tag(&self, name: u32) -> DocId {
+    pub(super) fn start_tag(&self, name: u32) -> DocId {
         let d = self.d();
         d.concat(&[d.text("<"), d.symbol(name), d.text(">")])
     }
 
     /// `</name>` — an end tag (HTML spec "end tag").
     #[inline]
-    fn end_tag(&self, name: u32) -> DocId {
+    pub(super) fn end_tag(&self, name: u32) -> DocId {
         let d = self.d();
         d.concat(&[d.text("</"), d.symbol(name), d.text(">")])
     }
@@ -874,491 +851,6 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build doc for whitespace-sensitive elements (pre, textarea, etc.)
-    ///
-    /// These elements preserve text whitespace exactly as-is, but still format
-    /// expressions, blocks, and other dynamic content normally.
-    ///
-    /// Behavior differs by content type:
-    /// - **Inline with multiline content** (e.g., `<span>` inside `<pre>` with `\n` in text):
-    ///   break `>` to new line at indent+2, preserve content literally. Only when first
-    ///   text starts with non-whitespace (space/newline keeps `>` inline).
-    /// - **Inline with single-line content and attrs** (textarea with content): keep attrs
-    ///   inline, wrap `>content</tag` together based on width.
-    /// - **Block with simple content** (pre with single expression): break `>` when
-    ///   attrs + content would exceed print width.
-    /// - **Fallback**: hug `>` with attrs (block) or break `>` on wrap (inline empty).
-    pub(super) fn build_whitespace_sensitive_element_doc(
-        &self,
-        tag_name: &str,
-        element: &internal::Element,
-        attr_docs: Vec<DocId>,
-    ) -> DocId {
-        let d = self.d();
-        let tag_sym = element.name.to_u32();
-        let is_inline = !tsv_html::is_block_element(tag_name);
-        let is_html = element.kind == internal::ElementKind::Html;
-        let has_content = !element.fragment.nodes.is_empty();
-
-        // Analyze text nodes in one pass for multiline content detection.
-        // When an inline element inside <pre> has multiline content that starts with
-        // visible text (not whitespace), the `>` must break to a new line.
-        // If content starts with whitespace (space or newline), `>` stays inline:
-        // - `<code>\ncontent` → stays inline (\n naturally separates)
-        // - `<span> {expr}\n` → stays inline (space provides natural break)
-        // - `<span>text\n` → `>` breaks (non-whitespace directly after `>`)
-        //
-        // Also tracks whether the last text node ends with \n (used for closing tag).
-        let (content_has_newlines, last_text_ends_with_newline) = if has_content {
-            let mut is_first_node = true;
-            let mut starts_with_ws = false;
-            let mut has_newline = false;
-            let mut last_ends_newline = true;
-            for node in &element.fragment.nodes {
-                if let FragmentNode::Text(text) = node {
-                    if is_first_node {
-                        starts_with_ws = text.raw.starts_with(|c: char| c.is_ascii_whitespace());
-                    }
-                    if text.raw.contains('\n') {
-                        has_newline = true;
-                    }
-                    last_ends_newline = text.raw.trim_end_matches([' ', '\t']).ends_with('\n');
-                }
-                is_first_node = false;
-            }
-            (!starts_with_ws && has_newline, last_ends_newline)
-        } else {
-            (false, true)
-        };
-
-        // Opening-tag layout splits on (is_inline, has_content, has-attrs). Each arm
-        // below returns, so order matters. Cases:
-        //   inline + multiline content              → break `>` to its own line (2 levels)
-        //   inline + single-line content + attrs    → if_break: hug `>content` flat, else break `>`
-        //   block  + content + attrs (simple expr)  → hug `>` with the last attr
-        //   inline + empty + attrs                  → self-closing `/>` drops; explicit `></tag>` hugs unless overflow
-        //   no attrs                                → `<tag>`
-        //   block, otherwise (empty/complex) + attrs → hug `>`, tolerating overflow
-        //
-        // Inline elements with multiline content inside whitespace-sensitive context:
-        // Always break `>` to new line (indented 2 levels), preserve content literally.
-        // Attrs stay inline if short, wrap to separate lines if long.
-        // Example: <pre><span attr="val"\n\t\t>text\n</span></pre>
-        if is_inline && content_has_newlines {
-            let content_doc = self.build_whitespace_sensitive_content_doc(&element.fragment.nodes);
-
-            // When content doesn't end with \n, the closing </tag> has its `>` split
-            // to a new line: `line2</span\n\t>` instead of `\n</span>`
-            let closing = if last_text_ends_with_newline {
-                self.end_tag(tag_sym)
-            } else {
-                // </tag\n\t> — closing > on new line with indent
-                d.concat(&[
-                    d.text("</"),
-                    d.symbol(tag_sym),
-                    d.indent(d.concat(&[d.hardline(), d.text(">")])),
-                ])
-            };
-
-            // Opening `>` at indent+2 (2 levels: one for element nesting, one for attr indent).
-            // Attrs (if any) go in a group at the same level — flat when short, wrapped when long.
-            let opening_break = d.concat(&[d.hardline(), d.text(">")]);
-            let opening_inner = if attr_docs.is_empty() {
-                opening_break
-            } else {
-                let attr_group = d.group(d.concat(&attr_docs));
-                d.concat(&[attr_group, opening_break])
-            };
-
-            return d.concat(&[
-                d.text("<"),
-                d.symbol(tag_sym),
-                d.indent(d.indent(opening_inner)),
-                content_doc,
-                closing,
-            ]);
-        }
-
-        // Inline whitespace-sensitive elements with content and attrs (textarea with content)
-        // have special formatting that depends on whether attrs fit on one line:
-        // - If fits: <tag attrs>content</tag>
-        // - If breaks: <tag attrs\n\t>content</tag\n>
-        //
-        // This preserves no leading whitespace before content while allowing attrs to stay inline when short.
-        //
-        // The closing `>` of `</tag>` is outside the group so fits() doesn't count it.
-        // At the boundary (e.g. 100 chars), `<tag attr>content</tag` fits but adding `>`
-        // would be 101. The softline puts `>` on its own line in that case.
-        if is_inline && has_content && !attr_docs.is_empty() {
-            let content_doc = self.build_whitespace_sensitive_content_doc(&element.fragment.nodes);
-            // Rebuild as space-separated (caller passes line-separated which we can't use here)
-            let space_attrs = self.build_element_attrs_doc(
-                &element.attributes,
-                self.d().text(" "),
-                element.name_span.end,
-                element.open_tag_end,
-                is_html,
-            );
-
-            // In break mode: \n\t>content</tag (closing > handled by outer group)
-            let break_doc = d.indent(d.concat(&[
-                d.hardline(),
-                d.text(">"),
-                content_doc,
-                d.text("</"),
-                d.symbol(tag_sym),
-            ]));
-            // In flat mode: >content</tag (no closing > — it's outside the group)
-            let flat_doc = d.concat(&[d.text(">"), content_doc, d.text("</"), d.symbol(tag_sym)]);
-            let if_break = d.if_break(break_doc, flat_doc);
-            let inner = d.group(d.concat(&[
-                d.text("<"),
-                d.symbol(tag_sym),
-                d.concat(&space_attrs),
-                if_break,
-            ]));
-            // Outer group: closing `>` with softline breaks to new line at boundary.
-            // Inner group stays flat when attrs+content fit, outer breaks only for the `>`.
-            let sl = d.softline();
-            return d.group(d.concat(&[inner, sl, d.text(">")]));
-        }
-
-        // Block whitespace-sensitive elements with content and attrs (pre with content)
-        // Divergence: When attrs wrap and `>{content}</tag>` would exceed print width, break `>` to new line.
-        // This respects print width while preserving whitespace semantics (no text node added).
-        //
-        // Only apply this logic for simple content. For complex content that can break internally
-        // (like function calls), use normal flow so content breaks first.
-        if !is_inline && has_content && !attr_docs.is_empty() {
-            // Check if content is "simple" - single expression tag without internal break points
-            // Complex content (function calls, ternaries, etc.) should break internally first
-            let is_simple_content = element.fragment.nodes.len() == 1
-                && matches!(
-                    &element.fragment.nodes[0],
-                    FragmentNode::ExpressionTag(expr) if !Self::expression_has_break_points(&expr.expression)
-                );
-
-            if is_simple_content {
-                let content_doc =
-                    self.build_whitespace_sensitive_content_doc(&element.fragment.nodes);
-
-                // Inner group decides if `>` needs to break to new line
-                let closing_and_content = d.group(d.concat(&[
-                    d.softline(),
-                    d.text(">"),
-                    content_doc,
-                    d.text("</"),
-                    d.symbol(tag_sym),
-                    d.text(">"),
-                ]));
-
-                // Outer group decides if attrs need to break
-                let dedented = d.dedent(closing_and_content);
-                let attr_concat = d.concat(&attr_docs);
-                let indented = d.indent(d.concat(&[attr_concat, dedented]));
-                return d.group(d.concat(&[d.text("<"), d.symbol(tag_sym), indented]));
-            }
-            // Fall through to normal handling for complex content
-        }
-
-        // Empty inline whitespace-sensitive element with attributes — `<textarea
-        // attrs></textarea>`, a self-closing `<textarea attrs />`, or an inline
-        // element/component inside `<pre>`. The layout splits on the source close form,
-        // which is always preserved (never rewritten between `/>` and `></tag>`):
-        //
-        // - Explicit-empty (`></tag>`): mirror prettier-plugin-svelte's empty
-        //   hugStart/hugEnd — the closing `>` lives in its OWN group, so it hugs the last
-        //   attribute unless `></tag>` (plus any trailing suffix like
-        //   `></textarea></label>`) would overflow, only then breaking to its own line.
-        //   Attributes wrap independently of that decision.
-        // - Self-closing (`/>`): the `/>` shares the element's outer group, so it drops
-        //   to its own line whenever the element breaks — never hugging a wrapped last
-        //   attribute, matching prettier and every other self-closing tag.
-        //
-        // (Block whitespace-sensitive elements like `<pre>` always hug `>`; see the
-        // `else` branch below — prettier never breaks `>` there, tolerating overflow.)
-        if is_inline && !has_content && !attr_docs.is_empty() {
-            let attr_indent = d.indent(d.group(d.concat(&attr_docs)));
-            if self.span_was_self_closing(element.span) {
-                // line() is a space when flat (`<tag attrs />`), a newline when the outer
-                // group breaks. Mirrors build_void_element_doc.
-                return d.group(d.concat(&[
-                    d.text("<"),
-                    d.symbol(tag_sym),
-                    attr_indent,
-                    d.line(),
-                    d.text("/>"),
-                ]));
-            }
-            // group(['>', '</tag']): the final `>` is appended outside, so the softline's
-            // fits() weighs `></tag>` and the trailing suffix together.
-            let close_seq = d.group(d.concat(&[d.text(">"), d.text("</"), d.symbol(tag_sym)]));
-            let hugged = d.group(d.concat(&[d.softline(), close_seq]));
-            return d.group(d.concat(&[
-                d.text("<"),
-                d.symbol(tag_sym),
-                attr_indent,
-                hugged,
-                d.text(">"),
-            ]));
-        }
-
-        // Build opening tag
-        let opening_tag = if attr_docs.is_empty() {
-            self.start_tag(tag_sym)
-        } else {
-            // Block whitespace-sensitive elements (pre): hug `>` with the last attr when
-            // attrs wrap (prettier tolerates the overflow rather than breaking `>`).
-            let attr_concat = d.concat(&attr_docs);
-            let attr_indent = d.indent(attr_concat);
-            d.group(d.concat(&[d.text("<"), d.symbol(tag_sym), attr_indent, d.text(">")]))
-        };
-
-        // Build content preserving text whitespace but formatting expressions/blocks
-        let content_doc = self.build_whitespace_sensitive_content_doc(&element.fragment.nodes);
-
-        d.concat(&[
-            opening_tag,
-            content_doc,
-            d.text("</"),
-            d.symbol(tag_sym),
-            d.text(">"),
-        ])
-    }
-
-    /// Build content for whitespace-sensitive elements (pre, textarea).
-    ///
-    /// Text nodes preserve their exact whitespace (significant for pre/textarea).
-    /// Expressions, blocks, and other dynamic content are formatted normally
-    /// (their internal whitespace is not significant).
-    fn build_whitespace_sensitive_content_doc(&self, nodes: &[FragmentNode]) -> DocId {
-        // Whitespace is significant here (`<pre>`/`<textarea>`): a block must not
-        // dangle its `}` or expand its body — that would inject rendered whitespace.
-        // The dedicated ws-sensitive if/each builders already hug; this also gates
-        // await/key/snippet, which fall through to the normal (dangling) builders.
-        let prev_dangle = self.set_block_dangle_allowed(false);
-        let node_docs: Vec<_> = nodes
-            .iter()
-            .map(|node| self.build_whitespace_sensitive_node_doc(node))
-            .collect();
-        self.set_block_dangle_allowed(prev_dangle);
-        self.d().concat(&node_docs)
-    }
-
-    /// Build doc for a single node in whitespace-sensitive context.
-    ///
-    /// - **Text**: preserve raw whitespace (significant in pre/textarea).
-    /// - **Elements**: recursively use whitespace-sensitive formatting (e.g., `<code>` inside `<pre>`).
-    /// - **If/Each blocks**: use inline ws-sensitive block formatting (no added whitespace,
-    ///   body nodes formatted whitespace-sensitively).
-    /// - **Expressions and other blocks**: format normally WITH indent wrapper (double-indented:
-    ///   once for being inside `<pre>`, once for internal structure).
-    fn build_whitespace_sensitive_node_doc(&self, node: &FragmentNode) -> DocId {
-        let d = self.d();
-        match node {
-            // Text: preserve exact whitespace (significant in pre/textarea)
-            FragmentNode::Text(text) => d.text_owned(text.raw.clone()),
-
-            // Elements: recursively build as whitespace-sensitive (no indent wrapper needed -
-            // the element's own indentation logic handles it)
-            // This handles cases like <pre><code> where <code> inherits whitespace preservation
-            FragmentNode::Element(element) => {
-                let tag_name = self.resolve_symbol(element.name);
-                let ws_is_html = element.kind == internal::ElementKind::Html;
-                // Always use whitespace-sensitive path when nested inside whitespace-sensitive elements
-                let attr_docs = self.build_element_attrs_doc(
-                    &element.attributes,
-                    self.d().line(),
-                    element.name_span.end,
-                    element.open_tag_end,
-                    ws_is_html,
-                );
-                self.build_whitespace_sensitive_element_doc(&tag_name, element, attr_docs)
-            }
-            FragmentNode::SpecialElement(element) => {
-                // Special elements in whitespace-sensitive context: format normally without indent
-                self.build_special_element_doc(element)
-            }
-
-            // Expressions and blocks: format normally WITH indent wrapper
-            // This gives them proper indentation (e.g., expression args inside <pre> get
-            // double-indented: once for <pre>, once for call structure)
-            FragmentNode::ExpressionTag(tag) => {
-                let inner = self.build_expression_tag_doc(tag);
-                d.indent(inner)
-            }
-            FragmentNode::Comment(comment) => {
-                let inner = self.build_html_comment_doc(comment);
-                d.indent(inner)
-            }
-            FragmentNode::IfBlock(block) => {
-                let inner = self.build_ws_sensitive_if_block_doc(block);
-                d.indent(inner)
-            }
-            FragmentNode::EachBlock(block) => {
-                let inner = self.build_ws_sensitive_each_block_doc(block);
-                d.indent(inner)
-            }
-            FragmentNode::AwaitBlock(block) => {
-                let inner = self.build_await_block_doc(block);
-                d.indent(inner)
-            }
-            FragmentNode::KeyBlock(block) => {
-                let inner = self.build_key_block_doc(block);
-                d.indent(inner)
-            }
-            FragmentNode::SnippetBlock(block) => {
-                let inner = self.build_snippet_block_doc(block);
-                d.indent(inner)
-            }
-            FragmentNode::HtmlTag(tag) => {
-                let inner = self.build_html_tag_doc(tag);
-                d.indent(inner)
-            }
-            FragmentNode::ConstTag(tag) => {
-                let inner = self.build_const_tag_doc(tag);
-                d.indent(inner)
-            }
-            FragmentNode::DeclarationTag(tag) => {
-                let inner = self.build_declaration_tag_doc(tag);
-                d.indent(inner)
-            }
-            FragmentNode::DebugTag(tag) => {
-                let inner = self.build_debug_tag_doc(tag);
-                d.indent(inner)
-            }
-            FragmentNode::RenderTag(tag) => {
-                let inner = self.build_render_tag_doc(tag);
-                d.indent(inner)
-            }
-        }
-    }
-
-    /// Build if block doc for whitespace-sensitive context (inside <pre>).
-    ///
-    /// Emits block structure inline without added whitespace. Body nodes are
-    /// formatted with whitespace-sensitive content formatting to preserve
-    /// significant whitespace.
-    fn build_ws_sensitive_if_block_doc(&self, block: &internal::IfBlock) -> DocId {
-        let d = self.d();
-        // Pass false for in_multiline_context: inside whitespace-sensitive elements,
-        // block expressions must not wrap (adding line breaks changes visible content)
-        let expr_doc = self.build_expression_doc_for_block(
-            &block.test,
-            block.opening_tag_span.start + IF_BLOCK_OPEN.len() as u32,
-            block.opening_tag_span.end - 1,
-            IF_BLOCK_OPEN.len(),
-            false,
-        );
-
-        let body_doc = self.build_whitespace_sensitive_content_doc(&block.consequent.nodes);
-
-        let mut parts = vec![d.text(IF_BLOCK_OPEN), expr_doc, d.text("}"), body_doc];
-
-        if let Some(alt) = &block.alternate {
-            self.build_ws_sensitive_if_alternate(alt, &mut parts);
-        }
-
-        parts.push(d.text("{/if}"));
-        d.concat(&parts)
-    }
-
-    /// Build if alternate (else/else-if) for whitespace-sensitive context.
-    #[allow(clippy::literal_string_with_formatting_args)]
-    fn build_ws_sensitive_if_alternate(&self, alt: &Fragment, parts: &mut Vec<DocId>) {
-        let d = self.d();
-
-        // Check if this can be flattened to {:else if ...}
-        if let Some(else_if) = Self::get_flattenable_else_if(alt) {
-            let expr_doc = self.build_else_if_expr_doc(else_if, false);
-
-            let body_doc = self.build_whitespace_sensitive_content_doc(&else_if.consequent.nodes);
-            parts.push(d.text(ELSE_IF_BLOCK_OPEN));
-            parts.push(expr_doc);
-            parts.push(d.text("}"));
-            parts.push(body_doc);
-
-            if let Some(nested_alt) = &else_if.alternate {
-                self.build_ws_sensitive_if_alternate(nested_alt, parts);
-            }
-            return;
-        }
-
-        // Plain {:else}
-        let body_doc = self.build_whitespace_sensitive_content_doc(&alt.nodes);
-        parts.push(d.text("{:else}"));
-        parts.push(body_doc);
-    }
-
-    /// Build each block doc for whitespace-sensitive context (inside <pre>).
-    ///
-    /// Emits block structure inline without added whitespace. Body nodes are
-    /// formatted with whitespace-sensitive content formatting.
-    #[allow(clippy::literal_string_with_formatting_args)]
-    fn build_ws_sensitive_each_block_doc(&self, block: &internal::EachBlock) -> DocId {
-        let d = self.d();
-        let expr_comment_end = block
-            .context
-            .as_ref()
-            .map_or(block.opening_tag_span.end - 1, |c| c.span().start);
-        // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
-        let expr_doc = self.build_expression_doc_for_block(
-            &block.expression,
-            block.opening_tag_span.start + EACH_BLOCK_OPEN.len() as u32,
-            expr_comment_end,
-            EACH_BLOCK_OPEN.len(),
-            false,
-        );
-
-        let mut opening = vec![d.text(EACH_BLOCK_OPEN), expr_doc];
-
-        if let Some(context) = &block.context {
-            opening.push(d.text(" as "));
-            let pattern_doc = self.build_pattern_doc(context);
-            opening.push(pattern_doc);
-            if let Some(index) = &block.index {
-                opening.push(d.text(", "));
-                opening.push(d.text_owned(index.clone()));
-            }
-        } else if let Some(index) = &block.index {
-            opening.push(d.text(", "));
-            opening.push(d.text_owned(index.clone()));
-        }
-
-        if let Some(key) = &block.key {
-            let key_doc = if let Some(key_span) = block.key_span {
-                self.build_expression_doc_for_block(
-                    key,
-                    key_span.start + 1,
-                    key_span.end - 1,
-                    1,
-                    false,
-                )
-            } else {
-                self.build_ts_expression_doc(key)
-            };
-            opening.push(d.text(" ("));
-            opening.push(key_doc);
-            opening.push(d.text(")"));
-        }
-
-        opening.push(d.text("}"));
-
-        let body_doc = self.build_whitespace_sensitive_content_doc(&block.body.nodes);
-
-        let opening_concat = d.concat(&opening);
-        let mut parts = vec![opening_concat, body_doc];
-
-        if let Some(fallback) = &block.fallback {
-            let fallback_doc = self.build_whitespace_sensitive_content_doc(&fallback.nodes);
-            parts.push(d.text("{:else}"));
-            parts.push(fallback_doc);
-        }
-
-        parts.push(d.text("{/each}"));
-        d.concat(&parts)
-    }
-
     /// Build docs for element attributes.
     ///
     /// `separator`: emitted between attributes — `d.line()` for the wrapping
@@ -1494,506 +986,5 @@ impl<'a> Printer<'a> {
     /// building). Shared by regular and special elements.
     pub(super) fn span_was_self_closing(&self, span: Span) -> bool {
         span.extract(self.source).trim_end().ends_with("/>")
-    }
-
-    /// Check if an expression has internal break points (ternary, &&, ||, +, etc.)
-    ///
-    /// When true, the expression can break internally before the containing element
-    /// needs to break its tags. This enables the "hug mode" divergence where we keep
-    /// `<tag>` together and let expressions break, reducing indentation drift.
-    fn expression_has_break_points(expr: &tsv_ts::ast::internal::Expression) -> bool {
-        use tsv_ts::ast::internal::Expression;
-        match expr {
-            // Ternary always has break points
-            Expression::ConditionalExpression(_) => true,
-            // Binary expressions (includes &&, ||, +, -, etc.) have break points
-            Expression::BinaryExpression(_) => true,
-            // Sequence expressions (comma-separated) have break points
-            Expression::SequenceExpression(_) => true,
-            // Call expressions with multiple arguments can break
-            Expression::CallExpression(call) => call.arguments.len() > 1,
-            // New expressions with multiple arguments can break
-            Expression::NewExpression(new) => new.arguments.len() > 1,
-            // Template literals with expressions can break
-            Expression::TemplateLiteral(tpl) => !tpl.expressions.is_empty(),
-            // Array/object literals with multiple elements can break
-            Expression::ArrayExpression(arr) => arr.elements.len() > 1,
-            Expression::ObjectExpression(obj) => obj.properties.len() > 1,
-            // Assignment expressions have break points
-            Expression::AssignmentExpression(_) => true,
-            // Wrapping expressions: check inner
-            Expression::JsdocCast(cast) => Self::expression_has_break_points(&cast.inner),
-            Expression::TSAsExpression(e) => Self::expression_has_break_points(&e.expression),
-            Expression::TSSatisfiesExpression(e) => {
-                Self::expression_has_break_points(&e.expression)
-            }
-            Expression::TSNonNullExpression(e) => Self::expression_has_break_points(&e.expression),
-            Expression::TSTypeAssertion(e) => Self::expression_has_break_points(&e.expression),
-            Expression::AwaitExpression(e) => Self::expression_has_break_points(&e.argument),
-            Expression::YieldExpression(e) => e
-                .argument
-                .as_ref()
-                .is_some_and(|a| Self::expression_has_break_points(a)),
-            // Simple expressions without break points
-            Expression::Literal(_)
-            | Expression::Identifier(_)
-            | Expression::MemberExpression(_)
-            | Expression::PrivateIdentifier(_)
-            | Expression::UnaryExpression(_)
-            | Expression::UpdateExpression(_)
-            | Expression::ArrowFunctionExpression(_)
-            | Expression::FunctionExpression(_)
-            | Expression::ClassExpression(_)
-            | Expression::SpreadElement(_)
-            | Expression::TaggedTemplateExpression(_)
-            | Expression::RegexLiteral(_)
-            | Expression::ThisExpression(_)
-            | Expression::Super(_)
-            | Expression::ObjectPattern(_)
-            | Expression::ArrayPattern(_)
-            | Expression::AssignmentPattern(_)
-            | Expression::RestElement(_)
-            | Expression::TSInstantiationExpression(_)
-            | Expression::TSParameterProperty(_)
-            | Expression::ImportExpression(_)
-            | Expression::MetaProperty(_) => false,
-        }
-    }
-
-    /// Whether any direct child expression tag (`{expr}`) can break internally
-    /// (ternary, binary, call, …). Mirrors the hug-both wrapper's hard-width
-    /// divergence: when true, the children builder must keep those expression
-    /// groups breakable, so boundary text adjacent to them is emitted as plain
-    /// spaces rather than `fill` `line`s — otherwise a `line` in fits()-Break
-    /// mode short-circuits the preceding expression group's width check, leaving
-    /// it flat and overshooting printWidth (the `fill_multiple_expr_long` case).
-    pub(super) fn nodes_have_breakable_expression(nodes: &[FragmentNode]) -> bool {
-        nodes.iter().any(|n| {
-            if let FragmentNode::ExpressionTag(tag) = n {
-                Self::expression_has_break_points(&tag.expression)
-            } else {
-                false
-            }
-        })
-    }
-
-    /// Check if a fragment node is an HTML block element (not component, not control flow)
-    ///
-    /// Used to detect when parent elements need multiline formatting due to
-    /// block-level children. Components and control flow blocks don't trigger
-    /// this - only actual HTML block elements like `<div>`, `<p>`, etc.
-    fn is_block_element_child(&self, node: &FragmentNode) -> bool {
-        match node {
-            // Defer to the one block-element adapter (component + script/style overlay).
-            FragmentNode::Element(el) => self.is_block_element(el),
-            // svelte:* elements and control flow don't trigger multiline
-            _ => false,
-        }
-    }
-
-    /// Check if element content has source breaks (newlines) that should trigger multiline.
-    ///
-    /// The logic differs by element type:
-    /// - **Blocks**: Leading boundary break triggers multiline (preserves `<p>\ntext\n</p>`)
-    /// - **Components**: Require BOTH leading AND trailing break (expressions hug when only leading)
-    /// - **Inline**: Exclude boundary whitespace newlines (they normalize to spaces)
-    fn has_source_breaks_in_content(
-        &self,
-        nodes: &[FragmentNode],
-        kind: ElementKind,
-        source_has_leading_break: bool,
-        source_has_trailing_break: bool,
-    ) -> bool {
-        // Blocks: leading break alone triggers multiline
-        // Components: require both boundaries
-        if (kind.is_block() && source_has_leading_break)
-            || (kind.is_component() && source_has_leading_break && source_has_trailing_break)
-        {
-            return true;
-        }
-
-        // Find first and last non-whitespace content indices
-        let first_content_idx = nodes.iter().position(|n| !n.is_whitespace_only_text());
-        let last_content_idx = nodes.iter().rposition(|n| !n.is_whitespace_only_text());
-
-        let (Some(first), Some(last)) = (first_content_idx, last_content_idx) else {
-            return false;
-        };
-
-        // Inline elements: preserve multiline when content starts with newline AND ends
-        // with any whitespace (space, tab, or newline), and has non-text children.
-        // `<a>\n\t{expr}\n</a>` preserves (leading newline + trailing newline).
-        // `<a>\n\t{expr} </a>` preserves (leading newline + trailing space).
-        // `<a>\n\t{expr}</a>` collapses (leading newline but no trailing whitespace).
-        // `<a>\n  text<span>text</span></a>` collapses (no trailing whitespace).
-        // `<span>  \n  {expr}</span>` collapses (space before \n, not leading).
-        // Fill mode (`{a} {b}`) stays inline even with both breaks.
-        let first_text_starts_with_newline = nodes
-            .first()
-            .is_some_and(|n| matches!(n, FragmentNode::Text(t) if t.raw.starts_with('\n')));
-        let last_text_ends_with_whitespace = nodes.last().is_some_and(
-            |n| matches!(n, FragmentNode::Text(t) if t.raw.ends_with(char::is_whitespace)),
-        );
-
-        if first_text_starts_with_newline && last_text_ends_with_whitespace {
-            let has_nontext_content = nodes[first..=last]
-                .iter()
-                .any(|n| !matches!(n, FragmentNode::Text(_)));
-
-            // Check if content is in fill mode: expressions separated by space-only text
-            let is_fill_mode = nodes[first..=last].windows(2).any(|w| {
-                !matches!(w[0], FragmentNode::Text(_))
-                    && matches!(&w[1], FragmentNode::Text(t) if !t.raw.is_empty() && t.raw.bytes().all(|b| b == b' '))
-            });
-
-            if has_nontext_content && !is_fill_mode {
-                return true;
-            }
-        }
-
-        if first >= last {
-            return false;
-        }
-
-        // Check for newlines in content between first and last non-whitespace nodes
-        nodes[first..=last].iter().enumerate().any(|(i, n)| {
-            let FragmentNode::Text(t) = n else {
-                return false;
-            };
-
-            if kind.preserves_boundary_breaks() {
-                // Block/component: any newline triggers source break
-                t.raw.contains('\n')
-            } else if t.raw.trim().is_empty() {
-                // Inline, whitespace-only: newlines are separators
-                t.raw.contains('\n')
-            } else {
-                // Inline, text with content: exclude boundary whitespace
-                let is_first_content = i == 0;
-                let is_last_content = i == last - first;
-                let check_str = match (is_first_content, is_last_content) {
-                    (true, true) => t.raw.trim(),
-                    (true, false) => t.raw.trim_start(),
-                    (false, true) => t.raw.trim_end(),
-                    (false, false) => &t.raw,
-                };
-                check_str.contains('\n')
-            }
-        })
-    }
-
-    /// Analyze an element to compute all formatting-relevant properties
-    fn analyze_element(&self, element: &internal::Element, attr_docs: &[DocId]) -> ElementContext {
-        let tag_name = self.resolve_symbol(element.name);
-        let is_void = tsv_html::is_void_element(&tag_name);
-        let is_foreign = tsv_html::is_foreign_element(&tag_name);
-
-        // Determine element kind
-        // Matches prettier-plugin-svelte: isInlineElement = !isBlockElement
-        // Elements NOT in the block list (including table cells) use inline formatting.
-        let kind = if tag_name.starts_with(|c: char| c.is_ascii_uppercase())
-            || tag_name.contains(':')
-            || tag_name.contains('.')
-        {
-            ElementKind::Component
-        } else if tsv_html::is_block_element(&tag_name) {
-            ElementKind::Block
-        } else {
-            ElementKind::Inline
-        };
-
-        // Check if self-closing
-        let is_self_closing = (kind.is_component() || is_foreign)
-            && element.fragment.nodes.is_empty()
-            && self.span_was_self_closing(element.span);
-
-        // Check if empty
-        let is_empty = element.fragment.nodes.is_empty()
-            || element
-                .fragment
-                .nodes
-                .iter()
-                .all(FragmentNode::is_whitespace_only_text);
-
-        // Source boundary breaks
-        let source_has_leading_break = element
-            .fragment
-            .nodes
-            .first()
-            .is_some_and(FragmentNode::is_boundary_break);
-        let source_has_trailing_break = source_has_leading_break
-            && element
-                .fragment
-                .nodes
-                .last()
-                .is_some_and(FragmentNode::is_boundary_break);
-
-        // Hug modes
-        let hug_start = self.should_hug_start(element, kind.is_block());
-        let hug_end = self.should_hug_end(element, kind.is_block());
-
-        // Block flow children → whether they force multiline. Computed once here (a non-trivial
-        // traversal) and cached, since `will_go_multiline`, `compute_needs_multiline`, and the
-        // hug-both `force` all read exactly this combination.
-        let has_block_flow_children = element
-            .fragment
-            .nodes
-            .iter()
-            .any(super::helpers::is_control_flow_block);
-        let block_flow_multiline =
-            has_block_flow_children && self.block_flow_forces_multiline(element);
-
-        // Any attribute doc that will_break (forces attr group break + trim_boundaries)
-        let has_multiline_attr = attr_docs.iter().any(|&doc| self.d().will_break(doc));
-
-        // Check if all content children are text nodes (no elements, expressions, blocks)
-        let only_text_content = !is_empty
-            && element
-                .fragment
-                .nodes
-                .iter()
-                .all(|n| matches!(n, FragmentNode::Text(_)));
-
-        // Compute needs_multiline
-        let needs_multiline = self.compute_needs_multiline(
-            element,
-            MultilineInputs {
-                kind,
-                is_empty,
-                hug_end,
-                source_has_leading_break,
-                source_has_trailing_break,
-                block_flow_multiline,
-                only_text_content,
-            },
-        );
-
-        // Compute trim_boundaries
-        let will_go_multiline = element.attributes.len() > 1
-            || block_flow_multiline
-            || super::helpers::has_nested_block_flow(&element.fragment.nodes)
-            || has_multiline_attr;
-        let trim_boundaries = !kind.is_inline() || will_go_multiline;
-
-        ElementContext {
-            kind,
-            is_void,
-            is_self_closing,
-            is_empty,
-            source_has_leading_break,
-            source_has_trailing_break,
-            hug_start,
-            hug_end,
-            needs_multiline,
-            block_flow_multiline,
-            trim_boundaries,
-            has_multiline_attr,
-            only_text_content,
-        }
-    }
-
-    /// Compute whether children need multiline formatting
-    fn compute_needs_multiline(
-        &self,
-        element: &internal::Element,
-        inputs: MultilineInputs,
-    ) -> bool {
-        let MultilineInputs {
-            kind,
-            is_empty,
-            hug_end,
-            source_has_leading_break,
-            source_has_trailing_break,
-            block_flow_multiline,
-            only_text_content,
-        } = inputs;
-
-        if is_empty {
-            return false;
-        }
-
-        // Multiple block children
-        let block_child_count = element
-            .fragment
-            .nodes
-            .iter()
-            .filter(|n| self.is_block_element_child(n))
-            .count();
-        if block_child_count > 1 {
-            return true;
-        }
-
-        // Mixed content (block + non-block children)
-        let has_block_children = block_child_count > 0;
-        if has_block_children {
-            let has_non_block = element.fragment.nodes.iter().any(|n| match n {
-                FragmentNode::Text(t) => !t.raw.is_whitespace_only(),
-                FragmentNode::Element(e) => !self.is_block_element(e),
-                FragmentNode::ExpressionTag(_) => true,
-                FragmentNode::HtmlTag(_)
-                | FragmentNode::ConstTag(_)
-                | FragmentNode::DeclarationTag(_)
-                | FragmentNode::DebugTag(_)
-                | FragmentNode::RenderTag(_) => true,
-                _ => !super::helpers::is_control_flow_block(n),
-            });
-            if has_non_block {
-                return true;
-            }
-        }
-
-        // Source breaks in content
-        // Skip for block elements with text-only content — whitespace newlines between
-        // text words collapse to spaces, so the group mechanism should decide layout
-        // based on whether the joined text fits inline.
-        if !only_text_content
-            && self.has_source_breaks_in_content(
-                &element.fragment.nodes,
-                kind,
-                source_has_leading_break,
-                source_has_trailing_break,
-            )
-        {
-            return true;
-        }
-
-        // Expression splitting forces an element multiline when authored with a leading break,
-        // a non-hugged trailing boundary, and 2+ spaced `{expr}` siblings — a multiline-*entry*
-        // trigger (distinct from sibling separation, which `build_nodes_doc_multiline` handles).
-        // Load-bearing for the component case (`components/multi_expressions_multiline`): without
-        // it such a `<Comp>` would stay inline. The only remaining use of
-        // `should_split_expressions_in_nodes` now that the sibling-break caller is retired.
-        let should_split = self.should_split_expressions_in_nodes(&element.fragment.nodes);
-        let has_trailing_ws = !hug_end;
-        if source_has_leading_break && has_trailing_ws && should_split {
-            return true;
-        }
-
-        // Elements with expanding blocks (if/each/key, or those inside await) always expand to
-        // block-style multiline — inline elements too, not just block. The expanding block forces
-        // block-style layout in `build_hug_both_doc` regardless; matching `needs_multiline` here so
-        // the children are *built* multiline (one node per line) keeps the expanding block from
-        // overshooting printWidth when authored compactly (it would otherwise flow inline).
-        // Note: await blocks alone do NOT force expansion.
-        if super::helpers::has_any_expanding_blocks(&element.fragment.nodes) {
-            return true;
-        }
-
-        // await/snippet (which don't force-expand on their own) still go multiline when they
-        // follow a sibling, so their body-drop matches if/each (via the multiline path) and
-        // the sibling-`>` dangle / block-on-own-line separation resolves in one pass.
-        if kind.is_block()
-            && super::helpers::has_control_flow_after_sibling(&element.fragment.nodes)
-        {
-            return true;
-        }
-
-        // Block flow forces multiline
-        if block_flow_multiline {
-            return true;
-        }
-
-        // Text with internal newlines
-        // Skip for text-only content — newlines between words are just whitespace
-        if !only_text_content && self.text_has_internal_newlines(element, source_has_leading_break)
-        {
-            return true;
-        }
-
-        false
-    }
-
-    /// Check if block flow children force parent to multiline
-    fn block_flow_forces_multiline(&self, element: &internal::Element) -> bool {
-        // Check if any block has non-inline content
-        let has_non_inline_block = element.fragment.nodes.iter().any(|n| match n {
-            FragmentNode::IfBlock(b) => !self.is_inline_fragment(&b.consequent),
-            FragmentNode::EachBlock(b) => !self.is_inline_fragment(&b.body),
-            FragmentNode::AwaitBlock(b) => {
-                b.pending
-                    .as_ref()
-                    .is_some_and(|f| !self.is_inline_fragment(f))
-                    || b.then.as_ref().is_some_and(|f| !self.is_inline_fragment(f))
-                    || b.catch
-                        .as_ref()
-                        .is_some_and(|f| !self.is_inline_fragment(f))
-            }
-            FragmentNode::KeyBlock(b) => !self.is_inline_fragment(&b.fragment),
-            FragmentNode::SnippetBlock(b) => !self.is_inline_fragment(&b.body),
-            _ => false,
-        });
-
-        // Check if there's whitespace around EXPANDING block flow children (if/each/key)
-        // Await and snippet blocks don't force multiline when surrounded by whitespace
-        let has_expanding_blocks = element
-            .fragment
-            .nodes
-            .iter()
-            .any(super::helpers::is_expanding_control_flow_block);
-        let has_ws_around_blocks = has_expanding_blocks
-            && element.fragment.nodes.iter().any(|n| {
-                matches!(n, FragmentNode::Text(t) if t.raw.is_whitespace_only() && !t.raw.is_empty())
-            });
-
-        has_non_inline_block || has_ws_around_blocks
-    }
-
-    /// Check if text content has internal newlines
-    fn text_has_internal_newlines(
-        &self,
-        element: &internal::Element,
-        source_has_leading_break: bool,
-    ) -> bool {
-        let has_leading_content_break = element.fragment.nodes.first().is_some_and(|n| {
-            matches!(n, FragmentNode::Text(t) if t.raw.starts_with('\n') && !t.raw.is_whitespace_only())
-        });
-
-        (source_has_leading_break || has_leading_content_break)
-            && element
-                .fragment
-                .nodes
-                .iter()
-                .any(|n| matches!(n, FragmentNode::Text(t) if t.raw.trim().contains('\n')))
-    }
-
-    /// Compute element layout from analyzed context
-    fn compute_element_layout(&self, ctx: &ElementContext) -> ElementLayout {
-        if ctx.is_void || ctx.is_self_closing {
-            return if ctx.is_void {
-                ElementLayout::Void
-            } else {
-                ElementLayout::SelfClosing
-            };
-        }
-
-        if ctx.is_empty {
-            return ElementLayout::Empty;
-        }
-
-        // Determine boundary modes
-        // Text-only block content uses soft boundaries so the group can collapse to
-        // inline when content fits (e.g., `<p>text1 text2</p>` instead of multiline).
-        let preserve_breaks = ctx.kind.preserves_boundary_breaks() && !ctx.only_text_content;
-        let start_mode = if ctx.hug_start {
-            BoundaryMode::Hug
-        } else if ctx.needs_multiline || (preserve_breaks && ctx.source_has_leading_break) {
-            BoundaryMode::Hard
-        } else {
-            BoundaryMode::Soft
-        };
-
-        let end_mode = if ctx.hug_end {
-            BoundaryMode::Hug
-        } else if ctx.needs_multiline || (preserve_breaks && ctx.source_has_trailing_break) {
-            BoundaryMode::Hard
-        } else {
-            BoundaryMode::Soft
-        };
-
-        ElementLayout::WithContent {
-            start: start_mode,
-            end: end_mode,
-            multiline_children: ctx.needs_multiline,
-        }
     }
 }
