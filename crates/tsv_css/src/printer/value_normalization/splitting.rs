@@ -187,6 +187,30 @@ pub(crate) fn extract_function_args<'a>(source: &'a str, func_name: &str) -> Opt
 /// Used for space-separated values like `var(--b) color-mix(...)`.
 /// Returns individual values that can be wrapped independently.
 pub(crate) fn split_by_space_preserving_parens(content: &str) -> Vec<&str> {
+    split_top_level(content, |b| b == b' ' || b == b'\t', true)
+}
+
+/// Split function arguments by top-level commas, preserving nested parens, quotes, and comments
+///
+/// Used when extracting function arguments from source while preserving comments.
+/// Handles nested parentheses correctly so `func(a, b)` inside an arg isn't split.
+/// Skips over block comments so commas inside `/* a, b */` aren't treated as separators.
+/// Skips over quoted strings so commas inside `"a, b"` aren't treated as separators.
+pub(crate) fn split_args_by_comma(content: &str) -> Vec<&str> {
+    split_top_level(content, |b| b == b',', false)
+}
+
+/// Split `content` at top-level bytes matching `is_sep`, preserving content inside
+/// parentheses, quotes (`'`/`"`), and block comments (`/* */`).
+///
+/// The shared scanner behind `split_by_space_preserving_parens` and
+/// `split_args_by_comma`: a byte state machine tracking paren depth, quote state,
+/// and comment state, splitting only on a separator byte found at depth 0 outside
+/// quotes/comments. `is_sep` selects the separator(s); `trim` selects the emit
+/// policy via `push_segment` — `true` trims each segment and drops empties
+/// (whitespace-value splitting), `false` keeps segments raw including empties
+/// (comma-arg splitting).
+fn split_top_level(content: &str, is_sep: impl Fn(u8) -> bool, trim: bool) -> Vec<&str> {
     let mut parts = Vec::new();
     let mut depth: u32 = 0;
     let mut start = 0;
@@ -239,11 +263,8 @@ pub(crate) fn split_by_space_preserving_parens(content: &str) -> Vec<&str> {
         match bytes[i] {
             b'(' => depth += 1,
             b')' => depth = depth.saturating_sub(1),
-            b' ' | b'\t' if depth == 0 => {
-                let part = &content[start..i];
-                if !part.trim().is_empty() {
-                    parts.push(part.trim());
-                }
+            b if depth == 0 && is_sep(b) => {
+                push_segment(&mut parts, &content[start..i], trim);
                 start = i + 1;
             }
             _ => {}
@@ -253,92 +274,23 @@ pub(crate) fn split_by_space_preserving_parens(content: &str) -> Vec<&str> {
 
     // Don't forget the last part
     if start < content.len() {
-        let part = &content[start..];
-        if !part.trim().is_empty() {
-            parts.push(part.trim());
-        }
+        push_segment(&mut parts, &content[start..], trim);
     }
 
     parts
 }
 
-/// Split function arguments by top-level commas, preserving nested parens, quotes, and comments
-///
-/// Used when extracting function arguments from source while preserving comments.
-/// Handles nested parentheses correctly so `func(a, b)` inside an arg isn't split.
-/// Skips over block comments so commas inside `/* a, b */` aren't treated as separators.
-/// Skips over quoted strings so commas inside `"a, b"` aren't treated as separators.
-pub(crate) fn split_args_by_comma(content: &str) -> Vec<&str> {
-    let mut args = Vec::new();
-    let mut depth: u32 = 0;
-    let mut start = 0;
-    let mut in_comment = false;
-    let mut in_quote = false;
-    let mut quote_char = b'\0';
-    let bytes = content.as_bytes();
-
-    let mut i = 0;
-    while i < bytes.len() {
-        // Check for comment start (outside quotes)
-        if !in_quote
-            && !in_comment
-            && i + 1 < bytes.len()
-            && bytes[i] == b'/'
-            && bytes[i + 1] == b'*'
-        {
-            in_comment = true;
-            i += 2;
-            continue;
+/// Emit one segment under the active policy: when `trim`, trim it and skip if empty;
+/// otherwise push it verbatim (including empty segments).
+fn push_segment<'a>(parts: &mut Vec<&'a str>, segment: &'a str, trim: bool) {
+    if trim {
+        let trimmed = segment.trim();
+        if !trimmed.is_empty() {
+            parts.push(trimmed);
         }
-
-        // Check for comment end
-        if in_comment && i + 1 < bytes.len() && bytes[i] == b'*' && bytes[i + 1] == b'/' {
-            in_comment = false;
-            i += 2;
-            continue;
-        }
-
-        // Skip content inside comments
-        if in_comment {
-            i += 1;
-            continue;
-        }
-
-        // Handle quotes
-        if !in_quote && (bytes[i] == b'\'' || bytes[i] == b'"') {
-            in_quote = true;
-            quote_char = bytes[i];
-            i += 1;
-            continue;
-        }
-        if in_quote && bytes[i] == quote_char {
-            in_quote = false;
-            i += 1;
-            continue;
-        }
-        if in_quote {
-            i += 1;
-            continue;
-        }
-
-        match bytes[i] {
-            b'(' => depth += 1,
-            b')' => depth = depth.saturating_sub(1),
-            b',' if depth == 0 => {
-                args.push(&content[start..i]);
-                start = i + 1;
-            }
-            _ => {}
-        }
-        i += 1;
+    } else {
+        parts.push(segment);
     }
-
-    // Don't forget the last argument
-    if start < content.len() {
-        args.push(&content[start..]);
-    }
-
-    args
 }
 
 #[cfg(test)]
@@ -377,6 +329,15 @@ mod tests {
         assert_eq!(split_args_by_comma("--a"), vec!["--a"]);
         // Empty
         assert_eq!(split_args_by_comma(""), Vec::<&str>::new());
+        // Empty segments are KEPT (raw policy, unlike the space splitter): a
+        // doubled separator yields an empty segment, a leading separator yields
+        // a leading empty, and a lone separator yields one empty segment.
+        assert_eq!(split_args_by_comma("a,,b"), vec!["a", "", "b"]);
+        assert_eq!(split_args_by_comma(",a"), vec!["", "a"]);
+        assert_eq!(split_args_by_comma(","), vec![""]);
+        // A trailing separator does NOT produce a trailing empty (the
+        // `start < content.len()` final-segment guard).
+        assert_eq!(split_args_by_comma("a,b,"), vec!["a", "b"]);
         // Commas inside comments are NOT separators
         assert_eq!(
             split_args_by_comma("--a, /* with, comma */ red"),
@@ -394,6 +355,38 @@ mod tests {
         assert_eq!(
             split_args_by_comma(r"'a, b', 'c, d'"),
             vec!["'a, b'", " 'c, d'"]
+        );
+    }
+
+    #[test]
+    fn test_split_by_space_preserving_parens() {
+        assert_eq!(
+            split_by_space_preserving_parens("var(--b) color-mix(in srgb, red, blue)"),
+            vec!["var(--b)", "color-mix(in srgb, red, blue)"]
+        );
+        // Each segment is trimmed and empties are DROPPED (unlike the comma
+        // splitter): consecutive/leading/trailing whitespace collapses away.
+        assert_eq!(split_by_space_preserving_parens("a  b"), vec!["a", "b"]);
+        assert_eq!(split_by_space_preserving_parens("  a  "), vec!["a"]);
+        // Tabs are separators too.
+        assert_eq!(split_by_space_preserving_parens("a\tb"), vec!["a", "b"]);
+        // Single token, and all-whitespace yields nothing.
+        assert_eq!(split_by_space_preserving_parens("solid"), vec!["solid"]);
+        assert_eq!(split_by_space_preserving_parens("   "), Vec::<&str>::new());
+        // Spaces inside parens are NOT separators.
+        assert_eq!(
+            split_by_space_preserving_parens("calc(1px + 2px) red"),
+            vec!["calc(1px + 2px)", "red"]
+        );
+        // Spaces inside comments are NOT separators (comment stays one atom).
+        assert_eq!(
+            split_by_space_preserving_parens("a /* x y */ b"),
+            vec!["a", "/* x y */", "b"]
+        );
+        // Spaces inside quotes are NOT separators.
+        assert_eq!(
+            split_by_space_preserving_parens(r"'Font Name' serif"),
+            vec!["'Font Name'", "serif"]
         );
     }
 }
