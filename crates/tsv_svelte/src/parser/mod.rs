@@ -5,6 +5,7 @@ use std::rc::Rc;
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
+use tsv_lang::source_scan::{TriviaProfile, skip_trivia};
 use tsv_lang::{ParseError, PeekData, Span};
 
 // Module declarations
@@ -303,4 +304,81 @@ pub(crate) fn subslice_offset(outer: &str, inner: &str) -> usize {
         "inner is not a subslice of outer"
     );
     (inner.as_ptr() as usize) - (outer.as_ptr() as usize)
+}
+
+/// Find the first `target` byte in `bytes[start..end]` that sits at bracket depth 0
+/// (outside `()`/`[]`/`{}`) and outside trivia (comments + strings per `profile`),
+/// returning its byte offset or `None`.
+///
+/// The trivia-aware replacement for the hand-rolled top-level scans over Svelte
+/// binding/declaration strings (`{@const}` declarator `=`/`,`, snippet param `,`):
+/// a `target` glyph inside a comment or string can't mis-anchor the scan. `target`
+/// must not itself be a bracket or a trivia-introducing byte (`/`, `'`, `"`, `` ` ``).
+pub(crate) fn find_top_level_delim(
+    bytes: &[u8],
+    start: usize,
+    end: usize,
+    target: u8,
+    profile: TriviaProfile,
+) -> Option<usize> {
+    let mut depth: i32 = 0;
+    let mut i = start;
+    while i < end {
+        if let Some(past) = skip_trivia(bytes, i, end, profile) {
+            i = past;
+            continue;
+        }
+        match bytes[i] {
+            b'(' | b'[' | b'{' => depth += 1,
+            b')' | b']' | b'}' => depth = depth.saturating_sub(1),
+            b if b == target && depth == 0 => return Some(i),
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Find the byte offset of the bracket matching the `open` byte at `bytes[open_pos]`,
+/// scanning forward past nested `open`/`close` pairs and skipping trivia (comments +
+/// strings per `profile`). Returns the matching `close` offset, or `None` if the
+/// brackets never balance before `end`.
+///
+/// The trivia-aware core shared by the Svelte binding bracket matchers
+/// (`{ }`/`[ ]` destructuring patterns, `< >` snippet generics, `( )` snippet
+/// params) — a `close` inside a comment or string can't end the match early, and
+/// the cursor's escape-correct string handling fixes the former `ends_with('\\')`
+/// escape bug.
+pub(crate) fn match_bracket(
+    bytes: &[u8],
+    open_pos: usize,
+    end: usize,
+    open: u8,
+    close: u8,
+    profile: TriviaProfile,
+) -> Option<usize> {
+    debug_assert_eq!(
+        bytes.get(open_pos),
+        Some(&open),
+        "match_bracket must start at the opening bracket"
+    );
+    let mut depth: u32 = 1;
+    let mut i = open_pos + 1;
+    while i < end {
+        if let Some(past) = skip_trivia(bytes, i, end, profile) {
+            i = past;
+            continue;
+        }
+        let b = bytes[i];
+        if b == open {
+            depth += 1;
+        } else if b == close {
+            depth -= 1;
+            if depth == 0 {
+                return Some(i);
+            }
+        }
+        i += 1;
+    }
+    None
 }

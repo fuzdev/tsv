@@ -4,47 +4,10 @@
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
+use tsv_lang::source_scan::TriviaProfile;
 use tsv_lang::{ParseError, Span};
 
 use super::parser_impl::SvelteParser;
-
-/// Iterate the `(byte_offset, char)` of the chars in a declaration string that sit
-/// at bracket depth 0 and outside string literals — the structurally "top-level"
-/// positions where a declarator `,` separator or a binding/init `=` appears.
-/// Brackets (`()`/`[]`/`{}`) with their contents, and string literals, are skipped.
-///
-/// NOTE: escape handling is simplified — a `\` before a closing quote isn't treated
-/// as an escaped backslash (`"a\\"` would misparse). Unlikely in real declarations.
-fn top_level_chars(s: &str) -> impl Iterator<Item = (usize, char)> + '_ {
-    let mut depth: i32 = 0;
-    let mut in_string = false;
-    let mut string_char = '"';
-    s.char_indices().filter(move |&(i, c)| {
-        if in_string {
-            if c == string_char && !s[..i].ends_with('\\') {
-                in_string = false;
-            }
-            false
-        } else {
-            match c {
-                '"' | '\'' | '`' => {
-                    in_string = true;
-                    string_char = c;
-                    false
-                }
-                '(' | '[' | '{' => {
-                    depth += 1;
-                    false
-                }
-                ')' | ']' | '}' => {
-                    depth -= 1;
-                    false
-                }
-                _ => depth == 0,
-            }
-        }
-    })
-}
 
 impl<'a> SvelteParser<'a> {
     /// Parse a template tag starting with {@
@@ -108,8 +71,17 @@ impl<'a> SvelteParser<'a> {
         let decl_offset = tag_content_start + super::subslice_offset(tag_content, decl_str);
 
         // `{@const}` must be a single declarator (unlike the bare `{const}`/`{let}`
-        // tags) — Svelte rejects `{@const a = 1, b = 2}`.
-        if top_level_chars(decl_str).any(|(_, c)| c == ',') {
+        // tags) — Svelte rejects `{@const a = 1, b = 2}`. A top-level `,` is the
+        // multi-declarator signal; a `,` inside a comment or string is not.
+        if super::find_top_level_delim(
+            decl_str.as_bytes(),
+            0,
+            decl_str.len(),
+            b',',
+            TriviaProfile::JS,
+        )
+        .is_some()
+        {
             return Err(self.error_msg_at(
                 "{@const ...} must consist of a single variable declaration",
                 decl_offset,
@@ -233,17 +205,16 @@ impl<'a> SvelteParser<'a> {
         Ok((id, init))
     }
 
-    /// Find the top-level `=` in a declaration string (not inside brackets/braces
-    /// or strings) — the one separating the binding from its initializer.
+    /// Find the top-level `=` in a declaration string (not inside brackets/braces,
+    /// strings, or comments) — the one separating the binding from its initializer.
     fn find_top_level_equals(&self, s: &str) -> Result<usize, ParseError> {
-        top_level_chars(s)
-            .find(|&(_, c)| c == '=')
-            .map(|(i, _)| i)
-            .ok_or_else(|| ParseError::InvalidSyntax {
+        super::find_top_level_delim(s.as_bytes(), 0, s.len(), b'=', TriviaProfile::JS).ok_or_else(
+            || ParseError::InvalidSyntax {
                 message: "Expected '=' in declaration".to_string(),
                 position: 0,
                 context: None,
-            })
+            },
+        )
     }
 
     /// Parse a debug tag: {@debug} or {@debug x, y, z}
