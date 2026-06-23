@@ -13,7 +13,6 @@ use crate::printer::Printer;
 use crate::printer::expressions::literals::format_string_literal_from_ast;
 use crate::printer::expressions::literals::is_valid_js_identifier;
 use crate::printer::layout::hang_after_operator;
-use tsv_lang::Comment;
 use tsv_lang::SymbolResolver;
 use tsv_lang::TAB_WIDTH;
 use tsv_lang::comments_in_range;
@@ -187,57 +186,22 @@ impl<'a> Printer<'a> {
                 };
                 parts.push(prop_doc);
 
-                // Handle trailing inline comments on same line after property
-                // Only comments BEFORE comma are trailing - comments AFTER comma are leading on next property
+                // Trailing comments around the separator comma — block comments
+                // before the comma, the comma, an after-comma block on the last
+                // property preserved in place (`trailingComma: 'none'`), then line
+                // comments as a suffix. Shared with the destructuring-pattern
+                // builders via `collect_trailing_comments` /
+                // `push_element_comma_trailing`.
                 let prop_end = prop.value_end();
                 let upper_bound = obj
                     .properties
                     .get(i + 1)
                     .map_or(obj.span.end, |next| next.span().start);
 
-                let comma_pos = self.find_comma_after(prop_end);
                 let is_last = i == obj.properties.len() - 1;
-
-                // Collect same-line trailing comments.
-                // Line comments: always trailing if on same line (they extend to end of line).
-                // Block comments: before the comma are trailing here; after the comma normally
-                // belong to the next property as leading — except on the LAST property, where
-                // there is no next property and we preserve them after the comma (prettier
-                // relocates before — see conformance_prettier.md §Comment relocation).
-                let trailing: Vec<_> = comments_in_range(self.comments, prop_end, upper_bound)
-                    .filter(|c| {
-                        self.is_same_line(prop_end, c.span.start)
-                            && (!c.is_block
-                                || is_last
-                                || comma_pos.is_none_or(|pos| c.span.start < pos))
-                    })
-                    .collect();
-
-                let is_after_comma =
-                    |c: &Comment| c.is_block && comma_pos.is_some_and(|pos| c.span.start > pos);
-
-                // Block comments before the comma go before it
-                for comment in trailing.iter().filter(|c| c.is_block && !is_after_comma(c)) {
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
-                }
-
-                // Add separator comma between properties; no trailing comma on the
-                // last property under `trailingComma: 'none'`.
-                if i < obj.properties.len() - 1 {
-                    parts.push(d.text(","));
-                }
-
-                // Block comments after the comma (last property): preserve position
-                for comment in trailing.iter().filter(|c| is_after_comma(c)) {
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
-                }
-
-                // Line comments go after comma (excluded from width calculations)
-                for comment in trailing.iter().filter(|c| !c.is_block) {
-                    parts.push(self.build_trailing_line_comment_doc(comment));
-                }
+                let trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
+                let comma = if is_last { d.empty() } else { d.text(",") };
+                self.push_element_comma_trailing(&mut parts, &trailing, comma);
 
                 prev_end = prop.value_end();
             }
