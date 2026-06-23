@@ -11,12 +11,16 @@
 // - **blocks_doc.rs** - Doc-based formatting for control flow blocks ({#if}, {#each}, etc.)
 // - **tags_doc.rs** - Doc-based formatting for template tags ({@html}, {@const}, etc.)
 // - **element_doc.rs** - Doc-based formatting for regular HTML/component elements
+// - **element_analysis.rs** - Element analysis/classification predicates (layout, multiline, boundary modes)
+// - **element_ws_sensitive_doc.rs** - Doc-based formatting for whitespace-sensitive elements (pre, textarea)
 // - **special_doc.rs** - Doc-based formatting for svelte:* special elements
 // - **helpers.rs** - Shared utilities (node classification, pattern/expression doc builders, source position tracking)
 
 mod blocks_doc;
 mod element;
+mod element_analysis;
 mod element_doc;
+mod element_ws_sensitive_doc;
 mod fragment_doc;
 mod helpers;
 mod special_doc;

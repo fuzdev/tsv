@@ -16,9 +16,7 @@ mod type_declarations;
 mod variable;
 
 // Re-export for submodules to use `super::Printer` instead of `super::super::Printer`
-pub(super) use super::{
-    Printer, build_entity_name_doc, should_hug_union_type, unwrap_parenthesized,
-};
+pub(super) use super::{Printer, build_entity_name_doc, should_hug_union_type};
 
 use super::expressions::literals::format_directive;
 use super::needs_parens::leftmost_no_lookahead;
