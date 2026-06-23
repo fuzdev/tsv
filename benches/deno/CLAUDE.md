@@ -322,7 +322,8 @@ Things the published numbers measure that aren't quite what they look like:
   numbers are per-file single-core latency/throughput, not multi-core batch
   throughput. Per-file compute is single-threaded for every impl: tsv (FFI +
   WASM) pulls in no threading crate (`rayon`/`num_cpus`/`threadpool`/`crossbeam`
-  absent from every `Cargo.toml`); prettier, `svelte/compiler`, and
+  absent from every `Cargo.toml`, and the workspace's `tokio` is dev/debug-only —
+  not in the shipped `tsv_ffi`/`tsv_wasm` chain); prettier, `svelte/compiler`, and
   `oxc-parser.parseSync` are single-threaded JS. The lone nuance is `oxfmt`,
   whose async API bundles `tinypool` and may run a call on a worker thread —
   still one thread of compute per file, and each call is fully awaited before
@@ -511,6 +512,7 @@ benches/deno/
 │       ├── mod.ts         # Main exports
 │       ├── safety.ts      # Safety check (differential char-frequency vs prettier)
 │       ├── patterns.ts    # Known divergence pattern detectors (with traceability)
+│       ├── expected_errors.ts  # Expected-error fixtures (parse-rejection cases)
 │       └── validation.ts  # Audit: cross-ref patterns vs conformance_prettier.md
 ```
 
@@ -562,13 +564,11 @@ deliberately: edit `deno.json` and `sidecar.ts` in lockstep, run
 
 ### Canonical (JS baseline)
 
-| Package                    | Purpose                           |
-| -------------------------- | --------------------------------- |
-| svelte                     | Svelte parser (`svelte/compiler`) |
-| acorn                      | JS parser base                    |
-| @sveltejs/acorn-typescript | TypeScript extension for acorn    |
-| prettier                   | Code formatter                    |
-| prettier-plugin-svelte     | Svelte formatting support         |
+- svelte — Svelte parser (`svelte/compiler`)
+- acorn — JS parser base
+- @sveltejs/acorn-typescript — TypeScript extension for acorn
+- prettier — Code formatter
+- prettier-plugin-svelte — Svelte formatting support
 
 `canonical.ts` formats with a `filepath` hint (`file.ts` / `file.svelte` /
 `file.css`) so prettier applies the same extension-specific heuristics a real
@@ -580,11 +580,9 @@ corpus divergences against `@ryanatkn` code that tsv was formatting correctly.
 
 ### Alternative Implementations
 
-| Package    | Binding | Purpose                | Languages                                  |
-| ---------- | ------- | ---------------------- | ------------------------------------------ |
-| oxc-parser | NAPI    | Fast TypeScript parser | TypeScript, JS                             |
-| oxfmt      | NAPI    | Fast formatter         | TypeScript, JS, CSS, Svelte (experimental) |
-| biome      | WASM    | Formatter/linter       | Svelte, TypeScript, JS, CSS                |
+- oxc-parser (NAPI) — Fast TypeScript parser; languages: TypeScript, JS
+- oxfmt (NAPI) — Fast formatter; languages: TypeScript, JS, CSS, Svelte (experimental)
+- biome (WASM) — Formatter/linter; languages: Svelte, TypeScript, JS, CSS
 
 ### OXC Package Details
 

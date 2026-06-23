@@ -193,10 +193,8 @@ See ./docs/fixture_workflow.md. Use `--prettier-only` with `fixtures:validate` d
 
 Two binding crates for different use cases:
 
-| Crate      | Technology   | Target                       | Output                                                            |
-| ---------- | ------------ | ---------------------------- | ----------------------------------------------------------------- |
-| `tsv_ffi`  | C ABI        | Any FFI (Deno, Python, etc.) | `libtsv_ffi.so` / `.dylib` / `.dll`                               |
-| `tsv_wasm` | wasm-bindgen | Browser, Deno, Node          | `.wasm` module (format / parse / all variants via cargo features) |
+- `tsv_ffi` (C ABI) — target: Any FFI (Deno, Python, etc.); output: `libtsv_ffi.so` / `.dylib` / `.dll`
+- `tsv_wasm` (wasm-bindgen) — target: Browser, Deno, Node; output: `.wasm` module (format / parse / all variants via cargo features)
 
 N-API is a maybe — the decision is deferred; there is currently no `tsv_napi` crate.
 
@@ -338,14 +336,12 @@ Outside a repo, `.gitignore` and `.prettierignore` are **not read** (matching gi
 
 When a `.gitignore` is in scope it is authoritative and the built-in **heuristic is off**; with no `.gitignore` (outside a repo, or a repo without one) the heuristic — hidden directories plus `dist`/`build`/`target` — is the fallback "not source" guess, except that an explicit tsv-layer `!` re-include overrides it. This is *only* about which files are reformatted, never how any file is formatted; it does not reopen style configuration. An explicitly named file argument is always formatted (the ignore files govern directory discovery). The matcher lives in the `tsv_ignore` crate (`IgnoreStack`); the per-directory prune *decision* layered on it (build-output heuristic, safety nets, the heuristic-shadow warning) lives in the `tsv_discover` crate. Both are shared with the JS CLI and the VS Code extension via the `IgnoreStack` WASM export (the matcher as the class, the policy as its `classify_dir`/`should_format_file`/`heuristic_shadow_warning` methods, plus `is_path_pruned` — a per-file form of the prune verdict for the extension, which has no top-down walk) — so all three surfaces agree by construction, not by hand-mirrored logic.
 
-The table lists the settings that diverge from Prettier's defaults; everything else (e.g. tabWidth=2) matches Prettier.
+The list below covers the settings that diverge from Prettier's defaults; everything else (e.g. tabWidth=2) matches Prettier.
 
-| Setting         | Value  | Notes                                                                  |
-| --------------- | ------ | ---------------------------------------------------------------------- |
-| `printWidth`    | 100    | Wider than Prettier's default of 80                                    |
-| `useTabs`       | true   | Tabs, not spaces (Prettier defaults to off)                            |
-| `singleQuote`   | true   | Single quotes, not double (Prettier off)                               |
-| `trailingComma` | 'none' | No trailing comma on multiline lists; differs from Prettier's `'all'` |
+- `printWidth` (100) — Wider than Prettier's default of 80
+- `useTabs` (true) — Tabs, not spaces (Prettier defaults to off)
+- `singleQuote` (true) — Single quotes, not double (Prettier off)
+- `trailingComma` ('none') — No trailing comma on multiline lists; differs from Prettier's `'all'`
 
 `trailingComma: 'none'`: no trailing comma is emitted even when a list breaks across lines. With `useTabs` and `singleQuote`, this matches the Svelte project's own Prettier config (`.prettierrc`).
 
@@ -817,25 +813,21 @@ Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/
 
 ### Rust Crates (minimal deps)
 
-| Crate                  | Purpose                                             |
-| ---------------------- | --------------------------------------------------- |
-| `serde`, `serde_json`  | Public AST serialization                            |
-| `smallvec`             | Stack-allocated vectors                             |
-| `string-interner`      | String interning for AST symbols                    |
-| `thiserror`            | Error type derivation                               |
-| `phf`                  | Compile-time perfect hash maps (keywords, entities) |
-| `unicode-ident`        | Unicode XID_Start/XID_Continue for identifiers      |
-| `unicode-segmentation` | Grapheme clustering for visual width measurement    |
-| `unicode-width`        | Character display width (CJK, zero-width)           |
+- `serde`, `serde_json` — Public AST serialization
+- `smallvec` — Stack-allocated vectors
+- `string-interner` — String interning for AST symbols
+- `thiserror` — Error type derivation
+- `phf` — Compile-time perfect hash maps (keywords, entities)
+- `unicode-ident` — Unicode XID_Start/XID_Continue for identifiers
+- `unicode-segmentation` — Grapheme clustering for visual width measurement
+- `unicode-width` — Character display width (CJK, zero-width)
 
 ## Canonical References
 
 **Implementations** (versions pinned in `crates/tsv_debug/src/deno/sidecar.ts`):
 
-| Implementation  | Local          | Purpose                                             |
-| --------------- | -------------- | --------------------------------------------------- |
-| Prettier        | `../prettier/` | Formatting reference — read source for layout logic |
-| Svelte compiler | `../svelte/`   | Parsing reference                                   |
+- Prettier (`../prettier/`) — Formatting reference — read source for layout logic
+- Svelte compiler (`../svelte/`) — Parsing reference
 
 **IMPORTANT**: Read `../prettier/` source code instead of searching the web when investigating
 formatting behavior. Key files: `src/language-js/print/assignment.js` (assignment layout),
@@ -844,14 +836,12 @@ formatting behavior. Key files: `src/language-js/print/assignment.js` (assignmen
 
 **Specs** — consult BEFORE implementing CSS/HTML/JS features (don't search the web):
 
-| Spec       | Local              |
-| ---------- | ------------------ |
-| CSS        | `../csswg-drafts/` |
-| HTML       | `../html/`         |
-| DOM        | `../dom/`          |
-| ECMAScript | `../ecma262/`      |
-| test262    | `../test262/`      |
-| Web data   | `../webref/`       |
+- CSS — `../csswg-drafts/`
+- HTML — `../html/`
+- DOM — `../dom/`
+- ECMAScript — `../ecma262/`
+- test262 — `../test262/`
+- Web data — `../webref/`
 
 **Workflow**: Read local spec → `canonical_parse` to test behavior → `compare` to check formatting.
 

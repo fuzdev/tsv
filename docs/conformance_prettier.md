@@ -10,19 +10,17 @@ Prettier was tsv's initial guide, and the formatter still tracks it for the comm
 
 ## Reasons tsv Differs
 
-| Reason                    | Description                                             | tsv action                            |
-| ------------------------- | ------------------------------------------------------- | ------------------------------------- |
-| **Spec violation**        | Prettier violates CSS/HTML/JS spec                      | tsv follows the spec                  |
-| **Stable quirk**          | Prettier preserves multiple forms without normalizing   | tsv normalizes consistently           |
-| **Prettier bug**          | Prettier is non-idempotent or emits invalid output      | tsv produces stable, valid output     |
-| **Parser compat**         | Prettier's output breaks Svelte's parser                | tsv produces Svelte-compatible output |
-| **Print width**           | Prettier allows lines to exceed printWidth              | tsv breaks to stay within limit       |
-| **Tabs-only indent**      | Prettier mixes tabs and spaces under --use-tabs         | tsv uses whole tabs only              |
-| **BOM stripping**         | Prettier preserves byte-order marks                     | tsv strips them                       |
-| **Semantic preservation** | Prettier changes meaning (strips parens)                | tsv preserves original semantics      |
-| **Comment preservation**  | Prettier moves comments to different syntactic position | tsv preserves comment position        |
-| **Content preservation**  | Prettier silently drops user comments                   | tsv preserves all comments            |
-| **Design choice**         | Other deliberate behavior differences                   | Documented rationale in fixture       |
+- Spec violation — Prettier violates CSS/HTML/JS spec. tsv action: tsv follows the spec
+- Stable quirk — Prettier preserves multiple forms without normalizing. tsv action: tsv normalizes consistently
+- Prettier bug — Prettier is non-idempotent or emits invalid output. tsv action: tsv produces stable, valid output
+- Parser compat — Prettier's output breaks Svelte's parser. tsv action: tsv produces Svelte-compatible output
+- Print width — Prettier allows lines to exceed printWidth. tsv action: tsv breaks to stay within limit
+- Tabs-only indent — Prettier mixes tabs and spaces under --use-tabs. tsv action: tsv uses whole tabs only
+- BOM stripping — Prettier preserves byte-order marks. tsv action: tsv strips them
+- Semantic preservation — Prettier changes meaning (strips parens). tsv action: tsv preserves original semantics
+- Comment preservation — Prettier moves comments to different syntactic position. tsv action: tsv preserves comment position
+- Content preservation — Prettier silently drops user comments. tsv action: tsv preserves all comments
+- Design choice — Other deliberate behavior differences. tsv action: Documented rationale in fixture
 
 > Most `Comment preservation` and `Content preservation` divergences live in the prose-form [TypeScript: Comments](#typescript-comments) and [CSS: Comments](#css-comments) catalogs, not the Reason-tagged catalog lists — they're the largest divergence category but don't fit a one-word Reason tag.
 

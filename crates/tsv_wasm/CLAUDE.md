@@ -119,15 +119,13 @@ require dual updates.
 
 ## Files
 
-| File                 | Purpose                                                                                                                                       |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/lib.rs`         | WASM bindings (`lang_bindings!` macro + typed extern types)                                                                                   |
-| `types/tsv_ast.d.ts` | Hand-maintained TS types, bundled into the parse-capable packages                                                                             |
-| `npm/cli.js`         | The `tsv` bin shipped in `@fuzdev/tsv_wasm` — mirrors `tsv_cli`'s contract (flags, exit codes, traversal); `node:util` `parseArgs`, zero deps |
-| `README_format.md`   | Shipped as `README.md` in `@fuzdev/tsv_format_wasm` (copied by `patch_npm_package.ts`)                                                        |
-| `README_parse.md`    | Shipped as `README.md` in `@fuzdev/tsv_parse_wasm` (copied by `patch_npm_package.ts`)                                                         |
-| `README_all.md`      | Shipped as `README.md` in `@fuzdev/tsv_wasm` (copied by `patch_npm_package.ts`)                                                               |
-| `pkg/`               | Build output (gitignored), `pkg/<variant>/<target>/`                                                                                          |
+- `src/lib.rs` — WASM bindings (`lang_bindings!` macro + typed extern types)
+- `types/tsv_ast.d.ts` — Hand-maintained TS types, bundled into the parse-capable packages
+- `npm/cli.js` — The `tsv` bin shipped in `@fuzdev/tsv_wasm` — mirrors `tsv_cli`'s contract (flags, exit codes, traversal); `node:util` `parseArgs`, zero deps
+- `README_format.md` — Shipped as `README.md` in `@fuzdev/tsv_format_wasm` (copied by `patch_npm_package.ts`)
+- `README_parse.md` — Shipped as `README.md` in `@fuzdev/tsv_parse_wasm` (copied by `patch_npm_package.ts`)
+- `README_all.md` — Shipped as `README.md` in `@fuzdev/tsv_wasm` (copied by `patch_npm_package.ts`)
+- `pkg/` — Build output (gitignored), `pkg/<variant>/<target>/`
 
 ## Build Targets
 

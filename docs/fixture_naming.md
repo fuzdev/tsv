@@ -691,12 +691,10 @@ All inline at ≤100 effective width; at >100 effective:
 
 Test at multiple indent levels to verify indent-aware wrapping:
 
-| Indent Level | Tabs | Visual Width | Content to hit 101 |
-| ------------ | ---- | ------------ | ------------------ |
-| 0            | 0    | 0            | 101 chars          |
-| 1            | 1    | 2            | 99 chars           |
-| 2            | 2    | 4            | 97 chars           |
-| 3            | 3    | 6            | 95 chars           |
+- Indent Level 0 — Tabs 0, Visual Width 0, Content to hit 101: 101 chars
+- Indent Level 1 — Tabs 1, Visual Width 2, Content to hit 101: 99 chars
+- Indent Level 2 — Tabs 2, Visual Width 4, Content to hit 101: 97 chars
+- Indent Level 3 — Tabs 3, Visual Width 6, Content to hit 101: 95 chars
 
 **Verification:**
 
