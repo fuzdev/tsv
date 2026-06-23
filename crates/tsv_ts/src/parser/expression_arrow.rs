@@ -1,0 +1,226 @@
+// Arrow function parsing: predicate scans (`x =>`, `(...) =>`, `<T>() =>`) and
+// the builders for parenthesized, single-param, generic, and async arrows. The
+// Pratt kernel in `expression.rs` calls into these; they never call back into it.
+
+use crate::ast::internal::{ArrowFunctionBody, ArrowFunctionExpression, Expression, Identifier};
+use crate::lexer::TokenKind;
+use tsv_lang::{ParseError, Span};
+
+use super::Parser;
+use super::expression_lookahead::{
+    scan_angle_brackets, scan_identifier_then_arrow, scan_parens_then_arrow,
+};
+use super::scan::skip_whitespace_and_comments;
+
+impl<'a> Parser<'a> {
+    /// Check if current position starts an arrow function
+    ///
+    /// Scans ahead looking for pattern: `(` ... `)` `=>`
+    pub(super) fn is_arrow_function_start(&self) -> bool {
+        scan_parens_then_arrow(self.source.as_bytes(), self.current_start)
+    }
+
+    /// Check if current position starts a single-param arrow function: `x =>`
+    ///
+    /// Scans ahead looking for pattern: `identifier` `=>`
+    pub(super) fn is_single_param_arrow_start(&self) -> bool {
+        scan_identifier_then_arrow(self.source.as_bytes(), self.current_start)
+    }
+
+    /// Check if current position starts a generic arrow function: `<T>() =>`
+    ///
+    /// Scans ahead looking for pattern: `<` ... `>` `(` ... `)` `=>`
+    pub(super) fn is_generic_arrow_function_start(&self) -> bool {
+        let bytes = self.source.as_bytes();
+        let start = self.current_start;
+
+        // Must start with '<'
+        if start >= bytes.len() || bytes[start] != b'<' {
+            return false;
+        }
+
+        // Scan through type parameters: <T, U extends V, ...>
+        let pos = scan_angle_brackets(bytes, start);
+        if pos == 0 {
+            return false;
+        }
+
+        // After '>', check for `(...) =>` (allow comments: `<T> /* comment */ () =>`)
+        let pos = skip_whitespace_and_comments(bytes, pos);
+        scan_parens_then_arrow(bytes, pos)
+    }
+
+    /// Parse generic arrow function: `<T>() => ...`, `<T, U extends V>() => ...`
+    pub(super) fn parse_generic_arrow_function(&mut self) -> Result<Expression, ParseError> {
+        let (start, _) = self.current_pos();
+
+        // Parse type parameters: <T, U extends V, ...>
+        let type_parameters = self.parse_type_parameters()?;
+
+        // Capture paren position before parsing params
+        let (params_start, _) = self.current_pos();
+
+        // Parse parameter list
+        let params = self.parse_parameter_list()?;
+
+        // Check for return type annotation: <T>(): type => ... or type predicate
+        let return_type = self.parse_optional_return_type()?;
+
+        self.expect(&TokenKind::Arrow)?; // consume '=>'
+
+        let body = self.parse_arrow_body()?;
+        let end = self.prev_token_end() as u32;
+
+        Ok(Expression::ArrowFunctionExpression(
+            ArrowFunctionExpression {
+                type_parameters: Some(type_parameters),
+                params,
+                body,
+                return_type,
+                r#async: false,
+                params_start: Some(params_start as u32),
+                span: Span::new(start as u32, end),
+            },
+        ))
+    }
+
+    /// Parse arrow function body: expression or block statement
+    fn parse_arrow_body(&mut self) -> Result<ArrowFunctionBody, ParseError> {
+        if self.check(&TokenKind::BraceOpen) {
+            let block = self.parse_function_body()?;
+            Ok(ArrowFunctionBody::BlockStatement(block))
+        } else {
+            // Use assignment_expression so comma doesn't consume next object property
+            let expr = self.parse_assignment_expression()?;
+            Ok(ArrowFunctionBody::Expression(Box::new(expr)))
+        }
+    }
+
+    /// Parse arrow function with parentheses: `() => expr` or `(x, y) => expr` or `() => { ... }`
+    ///
+    /// Supports:
+    /// - No parameters: `() => expr`
+    /// - Single parameter: `(x) => expr`
+    /// - Multiple parameters: `(x, y) => expr`
+    /// - Destructuring parameters: `([a, b]) => ...`, `({x, y}) => ...`
+    /// - Default values: `(a = 1) => ...`
+    /// - Expression body: `() => expr`
+    /// - Block body: `() => { ... }`
+    ///
+    /// Note: Single parameter without parens (`x => expr`) is handled by
+    /// `parse_single_param_arrow_function()`.
+    pub(super) fn parse_arrow_function(&mut self) -> Result<Expression, ParseError> {
+        let (start, _) = self.current_pos();
+
+        // Capture paren position before parsing params
+        let (params_start, _) = self.current_pos();
+
+        // Parse parameter list (reuse shared method)
+        let params = self.parse_parameter_list()?;
+
+        // Check for return type annotation: (): type => ... or type predicate
+        let return_type = self.parse_optional_return_type()?;
+
+        self.expect(&TokenKind::Arrow)?; // consume '=>'
+
+        let body = self.parse_arrow_body()?;
+        let end = self.prev_token_end() as u32;
+
+        Ok(Expression::ArrowFunctionExpression(
+            ArrowFunctionExpression {
+                type_parameters: None, // Generic arrows like <T>() => {} are handled by parse_generic_arrow_function()
+                params,
+                body,
+                return_type,
+                r#async: false, // Non-async arrow function; async ones are parsed via parse_async_arrow_function
+                params_start: Some(params_start as u32),
+                span: Span::new(start as u32, end),
+            },
+        ))
+    }
+
+    /// Parse single-parameter arrow function without parentheses: `x => expr`
+    pub(super) fn parse_single_param_arrow_function(&mut self) -> Result<Expression, ParseError> {
+        let (start, _) = self.current_pos();
+
+        // Parse the single identifier parameter
+        debug_assert!(matches!(self.current_kind(), TokenKind::Identifier));
+        let (id_start, id_end) = self.current_pos();
+        let symbol = self.intern_identifier();
+        self.advance()?;
+
+        let params = vec![Expression::Identifier(Identifier::simple(
+            symbol,
+            Span::new(id_start as u32, id_end as u32),
+        ))];
+
+        self.expect(&TokenKind::Arrow)?; // consume '=>'
+
+        let body = self.parse_arrow_body()?;
+        let end = self.prev_token_end() as u32;
+
+        Ok(Expression::ArrowFunctionExpression(
+            ArrowFunctionExpression {
+                type_parameters: None,
+                params,
+                body,
+                return_type: None, // Single-param without parens can't have return type
+                r#async: false,
+                params_start: None, // No parens for single-param arrows
+                span: Span::new(start as u32, end),
+            },
+        ))
+    }
+
+    /// Parse async arrow function after 'async' has been consumed: `() => ...`, `x => ...`, or `<T>() => ...`
+    pub(super) fn parse_async_arrow_function_after_async(
+        &mut self,
+        start: usize,
+    ) -> Result<Expression, ParseError> {
+        // Check for type parameters: `async <T>() => ...`
+        let type_parameters = self.parse_optional_type_parameters()?;
+
+        // Parse parameter list or single parameter
+        // Note: with type parameters, must have parentheses
+        let (params, params_start) = if self.check(&TokenKind::ParenOpen) {
+            let (paren_pos, _) = self.current_pos();
+            (self.parse_parameter_list()?, Some(paren_pos as u32))
+        } else if type_parameters.is_none() && matches!(self.current_kind(), TokenKind::Identifier)
+        {
+            // Single parameter without parens: `async x => ...`
+            // (Not allowed with type parameters)
+            let (id_start, id_end) = self.current_pos();
+            let symbol = self.intern_identifier();
+            self.advance()?;
+            (
+                vec![Expression::Identifier(Identifier::simple(
+                    symbol,
+                    Span::new(id_start as u32, id_end as u32),
+                ))],
+                None,
+            )
+        } else {
+            return Err(self.error_expected_after("'(' or identifier", "async"));
+        };
+
+        // Check for return type annotation or type predicate
+        let return_type = self.parse_optional_return_type()?;
+
+        self.expect(&TokenKind::Arrow)?; // consume '=>'
+
+        let body = self.parse_arrow_body()?;
+        let end = self.prev_token_end() as u32;
+
+        Ok(Expression::ArrowFunctionExpression(
+            ArrowFunctionExpression {
+                type_parameters,
+                params,
+                body,
+                return_type,
+                r#async: true,
+                params_start,
+                span: Span::new(start as u32, end),
+            },
+        ))
+    }
+}
