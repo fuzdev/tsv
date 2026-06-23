@@ -12,14 +12,12 @@ Use test262 to validate that tsv's parser correctly:
 ## Current Results
 
 Regenerate with `cargo run -p tsv_debug test262` (expects a test262 checkout
-at `../test262`); refresh this table when the parser or the test262 snapshot
+at `../test262`); refresh this list when the parser or the test262 snapshot
 changes — at minimum per release. Counts below are from a snapshot of ~49k
 discovered tests (46,545 graded after skips).
 
-| Tests                    | Passed | Failed |
-| ------------------------ | ------ | ------ |
-| Positive (should parse)  | 41,827 | 287    |
-| Negative (should reject) | 1,354  | 3,077  |
+- Positive (should parse) — 41,827 passed, 287 failed
+- Negative (should reject) — 1,354 passed, 3,077 failed
 
 - **Overall**: 43,181/46,545 (92.8%)
 - **Positive pass rate**: 99.3% — valid syntax tsv accepts

@@ -10,7 +10,7 @@ All strict-mode ECMAScript 2024 and TypeScript 5.x syntax features are supported
 
 - ECMAScript spec: `../../ecma262/spec.html` (see [CLAUDE.md](../../ecma262/CLAUDE.md))
 - Test262 suite: `../../test262/test/` (see [CLAUDE.md](../../test262/CLAUDE.md))
-- Test262 features: `../../test262/features.txt` (275 feature flags)
+- Test262 features: `../../test262/features.txt` (the upstream feature-flag list)
 
 ---
 
@@ -428,8 +428,9 @@ ES2015 module syntax with ES2024 additions.
 - Property decorators
 - Accessor decorators
 - Decorator factories (`@decorator()`)
+- Parameter decorators (`fn(@dec x: T)`)
 
-Note: Parameter decorators are not supported (legacy TypeScript only, not ES2023 standard).
+Note: Parameter decorators are legacy-TypeScript syntax (not part of the ES2023 decorator standard), but tsv parses them — the parser attaches them to the parameter's `decorators`, covered by `tests/fixtures/typescript/typescript_specific/decorators/parameter/`.
 
 **Other Features**:
 
@@ -700,7 +701,7 @@ Parse output matches acorn-typescript (the parser Svelte uses for `<script lang=
 
 **`<const T>` in classes**: The tsv parser supports const type parameters on classes (`class Foo<const T>`), but acorn-typescript doesn't. See `typescript/generics/const_type_param_class_svelte_divergence/`.
 
-**Parameter decorators**: Not supported (legacy TypeScript only, not part of ES2023 decorator standard). tsv only supports standard decorator positions: class, method, field, accessor, auto-accessor.
+**Parameter decorators**: Parsed as syntax (legacy-TypeScript, predating the ES2023 decorator standard) and attached to the parameter's `decorators` — see `tests/fixtures/typescript/typescript_specific/decorators/parameter/`. tsv accepts all decorator positions: class, method, field, accessor, auto-accessor, and parameter.
 
 ---
 
@@ -708,48 +709,46 @@ Parse output matches acorn-typescript (the parser Svelte uses for `<script lang=
 
 Key test262 features relevant to parser/formatter:
 
-| test262 Feature                   | Category     | Spec    |
-| --------------------------------- | ------------ | ------- |
-| `arrow-function`                  | Expressions  | ES2015  |
-| `async-functions`                 | Functions    | ES2017  |
-| `async-iteration`                 | Iteration    | ES2018  |
-| `BigInt`                          | Literals     | ES2020  |
-| `class`                           | Declarations | ES2015  |
-| `class-fields-private`            | Classes      | ES2022  |
-| `class-fields-public`             | Classes      | ES2022  |
-| `class-methods-private`           | Classes      | ES2022  |
-| `class-static-block`              | Classes      | ES2022  |
-| `class-static-fields-private`     | Classes      | ES2022  |
-| `computed-property-names`         | Objects      | ES2015  |
-| `const`                           | Declarations | ES2015  |
-| `decorators`                      | Classes      | ES2023  |
-| `default-parameters`              | Functions    | ES2015  |
-| `destructuring-assignment`        | Patterns     | ES2015  |
-| `destructuring-binding`           | Patterns     | ES2015  |
-| `dynamic-import`                  | Modules      | ES2020  |
-| `exponentiation`                  | Operators    | ES2016  |
-| `for-of`                          | Statements   | ES2015  |
-| `generators`                      | Functions    | ES2015  |
-| `hashbang`                        | Comments     | ES2023  |
-| `import-attributes`               | Modules      | ES2024  |
-| `import.meta`                     | Modules      | ES2020  |
-| `let`                             | Declarations | ES2015  |
-| `logical-assignment-operators`    | Operators    | ES2021  |
-| `new.target`                      | Expressions  | ES2015  |
-| `numeric-separator-literal`       | Literals     | ES2021  |
-| `object-rest`                     | Patterns     | ES2018  |
-| `object-spread`                   | Objects      | ES2018  |
-| `optional-catch-binding`          | Statements   | ES2019  |
-| `optional-chaining`               | Expressions  | ES2020  |
-| `regexp-dotall`                   | RegExp       | ES2018  |
-| `regexp-lookbehind`               | RegExp       | ES2018  |
-| `regexp-match-indices`            | RegExp       | ES2022  |
-| `regexp-named-groups`             | RegExp       | ES2018  |
-| `regexp-unicode-property-escapes` | RegExp       | ES2018  |
-| `regexp-v-flag`                   | RegExp       | ES2024  |
-| `rest-parameters`                 | Functions    | ES2015  |
-| `super`                           | Classes      | ES2015  |
-| `Symbol`                          | Primitives   | ES2015  |
-| `template`                        | Literals     | ES2015  |
-| `top-level-await`                 | Modules      | ES2022  |
-| `explicit-resource-management`    | Statements   | Stage 3 |
+- `arrow-function` — Expressions; ES2015
+- `async-functions` — Functions; ES2017
+- `async-iteration` — Iteration; ES2018
+- `BigInt` — Literals; ES2020
+- `class` — Declarations; ES2015
+- `class-fields-private` — Classes; ES2022
+- `class-fields-public` — Classes; ES2022
+- `class-methods-private` — Classes; ES2022
+- `class-static-block` — Classes; ES2022
+- `class-static-fields-private` — Classes; ES2022
+- `computed-property-names` — Objects; ES2015
+- `const` — Declarations; ES2015
+- `decorators` — Classes; ES2023
+- `default-parameters` — Functions; ES2015
+- `destructuring-assignment` — Patterns; ES2015
+- `destructuring-binding` — Patterns; ES2015
+- `dynamic-import` — Modules; ES2020
+- `exponentiation` — Operators; ES2016
+- `for-of` — Statements; ES2015
+- `generators` — Functions; ES2015
+- `hashbang` — Comments; ES2023
+- `import-attributes` — Modules; ES2024
+- `import.meta` — Modules; ES2020
+- `let` — Declarations; ES2015
+- `logical-assignment-operators` — Operators; ES2021
+- `new.target` — Expressions; ES2015
+- `numeric-separator-literal` — Literals; ES2021
+- `object-rest` — Patterns; ES2018
+- `object-spread` — Objects; ES2018
+- `optional-catch-binding` — Statements; ES2019
+- `optional-chaining` — Expressions; ES2020
+- `regexp-dotall` — RegExp; ES2018
+- `regexp-lookbehind` — RegExp; ES2018
+- `regexp-match-indices` — RegExp; ES2022
+- `regexp-named-groups` — RegExp; ES2018
+- `regexp-unicode-property-escapes` — RegExp; ES2018
+- `regexp-v-flag` — RegExp; ES2024
+- `rest-parameters` — Functions; ES2015
+- `super` — Classes; ES2015
+- `Symbol` — Primitives; ES2015
+- `template` — Literals; ES2015
+- `top-level-await` — Modules; ES2022
+- `explicit-resource-management` — Statements; Stage 3

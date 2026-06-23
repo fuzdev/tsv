@@ -12,10 +12,8 @@ Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-
 
 Mirrors `tsv_wasm`'s split so the bench can size scope-matched native artifacts:
 
-| Feature  | Default | Enables                                                                                  |
-| -------- | ------- | ---------------------------------------------------------------------------------------- |
-| `format` | yes     | `tsv_format_<lang>` exports                                                               |
-| `parse`  | yes     | `tsv_parse_<lang>` + `tsv_parse_internal_<lang>` exports, and the `convert` layer on each language crate |
+- `format` (default) — `tsv_format_<lang>` exports
+- `parse` (default) — `tsv_parse_<lang>` + `tsv_parse_internal_<lang>` exports, and the `convert` layer on each language crate
 
 The default both-features build is the full `libtsv_ffi` the bench perf rows load and any FFI host links. The size table also reports two subset builds, each into its own target dir so they don't clobber the full lib: `--no-default-features --features format` (the native mirror of `@fuzdev/tsv_format_wasm`, no convert layer, scope-matched to oxfmt) and `--no-default-features --features parse` (the mirror of `@fuzdev/tsv_parse_wasm`, printers dropped, scope-matched to oxc-parser). See `deno task build:ffi:format` / `build:ffi:parse`.
 
@@ -23,11 +21,9 @@ The default both-features build is the full `libtsv_ffi` the bench perf rows loa
 
 The `lang_bindings!` macro generates three `extern "C"` functions per language (svelte, typescript, css) — the full default build; the `format`/`parse` features gate which are emitted (see [Features](#features) above):
 
-| Function                    | Returns                                                                                                            |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `tsv_parse_<lang>`          | JSON AST (public, converted)                                                                                       |
-| `tsv_parse_internal_<lang>` | Empty string (benchmark-only; AST is built but not converted/serialized — `std::hint::black_box` prevents elision) |
-| `tsv_format_<lang>`         | Formatted source                                                                                                   |
+- `tsv_parse_<lang>` — JSON AST (public, converted)
+- `tsv_parse_internal_<lang>` — Empty string (benchmark-only; AST is built but not converted/serialized — `std::hint::black_box` prevents elision)
+- `tsv_format_<lang>` — Formatted source
 
 Plus `tsv_free(ptr, len)` for deallocation.
 
@@ -43,10 +39,8 @@ All return-pointer functions share the signature `(source_ptr: *const u8, source
 
 ## Files
 
-| File         | Purpose                                                                                                            |
-| ------------ | ----------------------------------------------------------------------------------------------------------------- |
-| `src/lib.rs` | All bindings: `lang_bindings!` macro, source-extraction helpers, `tsv_free`, and a `#[cfg(test)]` module           |
-| `Cargo.toml` | `crate-type = ["cdylib"]`; `unsafe_code = "allow"` (FFI requires it)                                               |
+- `src/lib.rs` — All bindings: `lang_bindings!` macro, source-extraction helpers, `tsv_free`, and a `#[cfg(test)]` module
+- `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "allow"` (FFI requires it)
 
 The in-crate test module drives every entry point in-process (real
 alloc → write `out_len` → `tsv_free` round-trip), covering the happy path per

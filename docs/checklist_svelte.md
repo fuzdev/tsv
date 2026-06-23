@@ -566,7 +566,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 **Basic Script**:
 
 - Instance script (`<script>`)
-- Module script (`<script context="module">`)
+- Module script (`<script module>`, and the legacy `<script context="module">`)
 - TypeScript script (`<script lang="ts">`)
 - Generics (`<script lang="ts" generics="T">`)
 

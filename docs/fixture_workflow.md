@@ -94,7 +94,7 @@ EOF
 cargo run -p tsv_debug fixture_init tests/fixtures/.../name   # reformat existing input
 ```
 
-Options: `--parser typescript|css|svelte-ts` (default: svelte), `--force` (overwrite existing).
+Options: `--parser typescript|css|svelte-ts` (default: svelte; `ts` and `svelte.ts` are accepted aliases), `--force` (overwrite existing).
 
 After running, **read the generated `input.svelte`** to verify structure. For `long` fixtures, **check the line widths in the output** — do not estimate widths manually.
 

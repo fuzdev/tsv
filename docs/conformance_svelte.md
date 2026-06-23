@@ -10,10 +10,8 @@ The tsv parser aims for **exact AST compatibility** with Svelte's parser. This d
 
 ## Classification
 
-| Category            | Description                             | tsv action                        |
-| ------------------- | --------------------------------------- | --------------------------------- |
-| **Compat behavior** | Svelte has quirky but harmless behavior | tsv replicates it in AST output   |
-| **Correction**      | Svelte violates spec or lacks features  | tsv produces correct/complete AST |
+- Compat behavior — Svelte has quirky but harmless behavior. tsv action: tsv replicates it in AST output
+- Correction — Svelte violates spec or lacks features. tsv action: tsv produces correct/complete AST
 
 **Critical distinction**: Compat behaviors apply ONLY to **AST/JSON output** for tool compatibility. The tsv **formatter** always produces clean, standards-compliant code.
 

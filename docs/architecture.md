@@ -10,7 +10,7 @@ This inverts the typical approach where JSON compatibility drives AST design.
 
 **Optimal artifacts (invariant).** Runtime speed _and_ compiled code size are first-class, non-negotiable goals for **every** shipped artifact. The format-only `@fuzdev/tsv_format_wasm` is the current yardstick—it's the most-developed and first-shipped artifact—but it holds no long-term primacy; `@fuzdev/tsv_parse_wasm`, the CLI, and future bindings count just as much as they mature. The architecture serves this directly: concrete types end-to-end (no `dyn` dispatch), per-language crates that WASM tree-shakes independently, and unneeded layers excluded at the link level — the printers from parse-only builds, the convert layer from format-only builds (see §"Closed Scope, Open Convention"). Heavier infrastructure for future tools—incremental reparse, red-green/CST layers for LSP—must be added as later, feature-gated layers that don't regress this, not as weight in the initial artifacts (see §"Red-Green Trees (Deferred)").
 
-**Safety constraint**: `unsafe_code = "forbid"` at the workspace level — no unsafe Rust in core crates. The `tsv_ffi` crate overrides to `"allow"` for the C ABI boundary. Combined with a single-digit external dependency set (authoritative list: `[workspace.dependencies]` in the root `Cargo.toml`; purpose table in [CLAUDE.md § Rust Crates](../CLAUDE.md#rust-crates-minimal-deps)), the attack surface and audit burden stay minimal.
+**Safety constraint**: `unsafe_code = "forbid"` at the workspace level — no unsafe Rust in core crates. The `tsv_ffi` crate overrides to `"allow"` for the C ABI boundary. Combined with a single-digit core-library dependency set (authoritative list: `[workspace.dependencies]` in the root `Cargo.toml`, whose externals are the nine library crates plus the CLI/debug-only `argh`/`tokio`/`futures-util`; purpose table in [CLAUDE.md § Rust Crates](../CLAUDE.md#rust-crates-minimal-deps)), the attack surface and audit burden stay minimal.
 
 ## Two-AST Design
 
@@ -85,20 +85,20 @@ dispatch), so it doesn't bear on the closed-scope/open-convention stance below.
 ### Dependency Graph
 
 ```
-                   tsv_lang (foundation)
-                        ↑
-       ┌────────────────┼────────────────┐
-       │                │                │
-    tsv_html         tsv_ts           tsv_css
-       │                │                │
-       └────────────────┼────────────────┘
-                        ↓
-                   tsv_svelte
-                        ↑
-    ┌───────────┬───────┼───────┬───────────┐
- tsv_cli     tsv_debug  │    tsv_ffi     tsv_wasm
-(production) (dev)      │    (C FFI)    (browser/Node/Deno)
-                     (Deno)
+   tsv_lang (foundation)          tsv_html          tsv_ignore
+        ↑                       (zero-dep leaf)    (zero-dep leaf)
+   ┌────┴────┐                       │                  ↑
+ tsv_ts   tsv_css                    │             tsv_discover
+   │         │                       │             (policy layer)
+   └────┬────┴───────────────────────┘
+        ↓
+   tsv_svelte   (depends on tsv_lang, tsv_ts, tsv_css, tsv_html)
+        ↑
+   ┌───────────┬──────────────┬───────────┬───────────────────┐
+ tsv_cli     tsv_debug      tsv_ffi     tsv_wasm
+(production) (dev, Deno)    (C FFI)    (browser/Node/Deno)
+
+   tsv_cli and tsv_wasm also consume tsv_discover (→ tsv_ignore).
 ```
 
 ### Design Rationale
@@ -231,7 +231,7 @@ Language-agnostic primitives shared across all implementations:
 - `escapes` — Escape sequence handling
 - `interner` — String interner utilities (`SymbolResolver` trait)
 - `parser` — Shared parser utilities (`PeekData`)
-- `source_scan` — Comment-skipping source scanning (used by AST conversion)
+- `source_scan` — Comment-skipping source scanning (used by AST conversion and printers)
 
 See [crates/tsv_lang/CLAUDE.md](../crates/tsv_lang/CLAUDE.md) for detailed module documentation.
 
@@ -249,21 +249,19 @@ Use `cargo run -p tsv_debug metrics` to measure the current shared vs language-s
 
 What's shared through tsv_lang vs reimplemented per language, and why:
 
-| Layer             | Shared? | Should it be? | Notes                                                                            |
-| ----------------- | ------- | ------------- | -------------------------------------------------------------------------------- |
-| Lexer             | No      | No            | Different token sets, hot path — mode switching adds branches on every character |
-| Parser            | No      | No            | Different grammars, precedence, context sensitivity                              |
-| AST types         | No      | No            | Different semantics (TypeScript's expression grammar dwarfs CSS's node set)      |
-| AST conversion    | No      | No            | Language-specific JSON quirks (Svelte compatibility, etc.)                       |
-| Escape handling   | No      | No            | JS has 7 escape formats, CSS has hex escapes with Svelte quirks                  |
-| Doc builder       | **Yes** | Yes           | Core formatting engine — the largest tsv_lang module, single renderer everywhere |
-| Comment model     | **Yes** | Yes           | Detached model with O(log n) lookup, classification, batch helpers               |
-| String interning  | **Yes** | Yes           | Traits + shared interner across TS/Svelte in same file                           |
-| Width / indent    | **Yes** | Yes           | Hardcoded as `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts in `tsv_lang::config` |
-| EmbedContext      | **Yes** | Yes           | Embedding knobs (base_indent_offset, first_line_offset, suffix_width, mode)      |
-| String formatting | **Yes** | Yes           | Quote selection, escape swapping, visual width                                   |
-| Error types       | **Yes** | Yes           | ParseError with context enrichment                                               |
-| Position tracking | **Yes** | Yes           | Span (u32), LocationTracker                                                      |
+- Lexer (shared: No, should-be: No) — Different token sets, hot path — mode switching adds branches on every character
+- Parser (shared: No, should-be: No) — Different grammars, precedence, context sensitivity
+- AST types (shared: No, should-be: No) — Different semantics (TypeScript's expression grammar dwarfs CSS's node set)
+- AST conversion (shared: No, should-be: No) — Language-specific JSON quirks (Svelte compatibility, etc.)
+- Escape handling (shared: No, should-be: No) — JS has 7 escape formats, CSS has hex escapes with Svelte quirks
+- Doc builder (shared: Yes, should-be: Yes) — Core formatting engine — the largest tsv_lang module, single renderer everywhere
+- Comment model (shared: Yes, should-be: Yes) — Detached model with O(log n) lookup, classification, batch helpers
+- String interning (shared: Yes, should-be: Yes) — Traits + shared interner across TS/Svelte in same file
+- Width / indent (shared: Yes, should-be: Yes) — Hardcoded as `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts in `tsv_lang::config`
+- EmbedContext (shared: Yes, should-be: Yes) — Embedding knobs (base_indent_offset, first_line_offset, suffix_width, mode)
+- String formatting (shared: Yes, should-be: Yes) — Quote selection, escape swapping, visual width
+- Error types (shared: Yes, should-be: Yes) — ParseError with context enrichment
+- Position tracking (shared: Yes, should-be: Yes) — Span (u32), LocationTracker
 
 **Code distribution** (from `cargo run -p tsv_debug metrics`):
 
@@ -353,8 +351,8 @@ statement/           — Statement parsing (variable, function, class, control f
 ```rust
 BP_COMMA: 0          // Sequence (lowest)
 BP_ASSIGNMENT: 1     // =, +=, ternary
+BP_YIELD: 1          // yield — same as assignment (yield takes AssignmentExpression per spec)
 BP_TS_TYPE_ASSERTION: 2  // as, satisfies
-BP_YIELD: 3
 // ... binary operators 5-28 ...
 BP_UNARY: 29         // -, !, typeof (highest)
 ```
@@ -457,9 +455,7 @@ value_normalization.rs  # Semantic value normalization (numbers, colors, whitesp
 
 ```
 mod.rs              # Printer struct, entry points
-blocks.rs           # Control flow blocks ({#if}, {#each}, etc.)
 attributes.rs       # Attribute formatting
-tags.rs             # Special tags (@html, @debug, @const, @render, {const}/{let})
 text.rs             # Text node handling
 script_style.rs     # <script>/<style> formatting
 helpers.rs          # Shared utilities
@@ -572,8 +568,8 @@ The `tsv_lang::comment` module provides O(log n) lookup via binary search:
 - `classify_comment_fast()` — Same, using precomputed line breaks (faster)
 - `ClassifiedComments::from_range()` — Batch classify all categories in one pass
 - `has_comments_in_range()` — Quick existence check
-- `leading_comments()` — Comments before a node (excludes trailing)
-- `trailing_comments()` — Comments on same line as previous node
+- `comments_after()` — Iterate comments at or after a position (O(log n))
+- `find_first_comment_from()` — Binary-search index of first comment with `span.start >= pos`
 
 ### Printer Strategy
 
@@ -638,7 +634,7 @@ pub fn is_mathml_element(name: &str) -> bool;
 
 // Whitespace and entities
 pub fn preserves_whitespace(name: &str) -> bool;
-pub fn decode_character_references(s: &str) -> String;
+pub fn decode_character_references(html: &str, is_attribute_value: bool) -> String;
 ```
 
 Inline-ness is derived by negation in consumers (`!is_block_element(...)`) — no positive inline list is exported.
