@@ -14,7 +14,7 @@ use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 
 use self::preludes::{
-    parse_container_prelude, parse_import_prelude, parse_scope_prelude, parse_supports_prelude,
+    parse_condition_query, parse_container_prelude, parse_import_prelude, parse_scope_prelude,
 };
 use self::raw::parse_raw_prelude_content;
 
@@ -77,7 +77,7 @@ pub(crate) fn parse_atrule(
         PreludeValue::Selectors { root, limit, span }
     } else if name == "supports" {
         // Parse @supports prelude as structured conditions (for line-width wrapping)
-        let (condition, span) = parse_supports_prelude(parser)?;
+        let (condition, span) = parse_condition_query(parser)?;
         PreludeValue::Supports { condition, span }
     } else if name == "container" {
         // Parse @container prelude as structured conditions (for line-width wrapping)
