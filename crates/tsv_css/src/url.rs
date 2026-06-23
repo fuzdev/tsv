@@ -5,7 +5,7 @@
 //! whitespace just inside the parens trimmed. This single rule is needed in two places
 //! that can't depend on each other: the printer's declaration-value path
 //! (`printer/values.rs`) and the parser's raw at-rule prelude
-//! (`parser/atrules.rs`, e.g. `@namespace url(http://…)`), so it lives here at the
+//! (`parser/atrules/raw.rs`, e.g. `@namespace url(http://…)`), so it lives here at the
 //! crate root rather than in either sibling module.
 
 /// Trim a raw `url(...)` token to prettier's canonical form: strip only the whitespace

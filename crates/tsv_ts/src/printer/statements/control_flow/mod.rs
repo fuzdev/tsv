@@ -5,7 +5,7 @@
 // condition-group builders used across the statement families).
 //
 // - if_else.rs: if/else statements and else-clause layout
-// - loops.rs: for / for-in / for-of headers and bodies, while, do-while
+// - loops/: for / for-in / for-of headers and bodies (for_loop.rs), while, do-while (while_loop.rs)
 // - switch.rs: switch statements and case bodies
 // - try_jump.rs: try/catch/finally, throw, break/continue, labeled statements
 

@@ -1,0 +1,166 @@
+// Color formatting: semantic color rendering and source-preserving color syntax.
+
+use crate::ast::internal::{Color, ColorChannel};
+use tsv_lang::Span;
+
+/// Format a color value semantically
+///
+/// Converts a Color AST node to its string representation.
+/// Hex colors are normalized to lowercase to match prettier's behavior.
+///
+/// # Example
+/// ```ignore
+/// let color = Color::Named("red".to_string());
+/// assert_eq!(format_color_value(&color), "red");
+///
+/// let color = Color::Hex("#FF0000".to_string());
+/// assert_eq!(format_color_value(&color), "#ff0000");
+/// ```
+pub(crate) fn format_color_value(color: &Color) -> String {
+    match color {
+        Color::Named(name) => name.clone(),
+        Color::Hex(hex) => hex.to_lowercase(),
+        Color::Rgb { r, g, b, alpha } => {
+            let r_str = format_color_channel(r);
+            let g_str = format_color_channel(g);
+            let b_str = format_color_channel(b);
+
+            if let Some(a) = alpha {
+                let a_str = format_color_channel(a);
+                format!("rgba({r_str}, {g_str}, {b_str}, {a_str})")
+            } else {
+                format!("rgb({r_str}, {g_str}, {b_str})")
+            }
+        }
+        Color::Hsl {
+            hue,
+            hue_unit,
+            saturation,
+            lightness,
+            alpha,
+        } => {
+            // Format hue with optional unit
+            let hue_str = if let Some(unit) = hue_unit {
+                format!("{}{}", format_color_channel(hue), unit.as_str())
+            } else {
+                format_color_channel(hue)
+            };
+            let sat_str = format_color_channel(saturation);
+            let light_str = format_color_channel(lightness);
+
+            if let Some(a) = alpha {
+                let a_str = format_color_channel(a);
+                format!("hsla({hue_str}, {sat_str}, {light_str}, {a_str})")
+            } else {
+                format!("hsl({hue_str}, {sat_str}, {light_str})")
+            }
+        }
+    }
+}
+
+/// Format a computed `f64` for CSS output: a whole number drops its fraction
+/// (`1.0` → `1`), otherwise the default float rendering. (Distinct from
+/// `normalize_css_number`, which canonicalizes a number's *source text*.)
+fn format_css_f64(v: f64) -> String {
+    if v.fract() == 0.0 {
+        (v as i64).to_string()
+    } else {
+        v.to_string()
+    }
+}
+
+/// Format a ColorChannel value
+fn format_color_channel(channel: &ColorChannel) -> String {
+    match channel {
+        ColorChannel::Number(n) => format_css_f64(*n),
+        ColorChannel::Percentage(p) => format!("{}%", format_css_f64(*p)),
+        ColorChannel::None => "none".to_string(),
+    }
+}
+
+/// Format a color value with syntax preservation
+///
+/// Extracts the original syntax from source and reformats with proper spacing
+/// while preserving the syntax choice (rgb vs rgba, comma vs space, / vs not).
+///
+/// # Arguments
+/// * `color` - The parsed color
+/// * `source` - The original source code
+/// * `span` - The span of the color in source
+pub(crate) fn format_color_from_source(color: &Color, source: &str, span: Span) -> String {
+    // Named and hex colors don't need syntax detection
+    match color {
+        Color::Named(name) => return name.clone(),
+        Color::Hex(hex) => return hex.to_lowercase(),
+        _ => {}
+    }
+
+    // Extract raw text to detect syntax
+    let raw = span.extract(source);
+
+    // Detect function name and syntax
+    if let Some(open_paren) = raw.find('(') {
+        let func_name = &raw[..open_paren];
+        let has_slash = raw.contains('/');
+        let has_comma = raw.contains(',');
+
+        match color {
+            Color::Rgb { r, g, b, alpha } => {
+                let r_str = format_color_channel(r);
+                let g_str = format_color_channel(g);
+                let b_str = format_color_channel(b);
+
+                if let Some(a) = alpha {
+                    let a_str = format_color_channel(a);
+                    if has_slash {
+                        // Preserve original function name with slash syntax
+                        format!("{func_name}({r_str} {g_str} {b_str} / {a_str})")
+                    } else {
+                        // Preserve original function name with comma syntax
+                        format!("{func_name}({r_str}, {g_str}, {b_str}, {a_str})")
+                    }
+                } else if has_comma {
+                    format!("{func_name}({r_str}, {g_str}, {b_str})")
+                } else {
+                    format!("{func_name}({r_str} {g_str} {b_str})")
+                }
+            }
+            Color::Hsl {
+                hue,
+                hue_unit,
+                saturation,
+                lightness,
+                alpha,
+            } => {
+                // Format hue with optional unit
+                let hue_str = if let Some(unit) = hue_unit {
+                    format!("{}{}", format_color_channel(hue), unit.as_str())
+                } else {
+                    format_color_channel(hue)
+                };
+                let sat_str = format_color_channel(saturation);
+                let light_str = format_color_channel(lightness);
+
+                if let Some(a) = alpha {
+                    let a_str = format_color_channel(a);
+                    if has_slash {
+                        // Preserve original function name with slash syntax
+                        format!("{func_name}({hue_str} {sat_str} {light_str} / {a_str})")
+                    } else {
+                        // Preserve original function name with comma syntax
+                        format!("{func_name}({hue_str}, {sat_str}, {light_str}, {a_str})")
+                    }
+                } else if has_comma {
+                    format!("{func_name}({hue_str}, {sat_str}, {light_str})")
+                } else {
+                    format!("{func_name}({hue_str} {sat_str} {light_str})")
+                }
+            }
+            // Fallback for any other color types (future-proofing)
+            _ => format_color_value(color),
+        }
+    } else {
+        // Fallback to basic formatting
+        format_color_value(color)
+    }
+}

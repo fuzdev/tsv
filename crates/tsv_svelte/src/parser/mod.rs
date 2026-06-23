@@ -16,6 +16,7 @@ mod fragment;
 mod parser_impl;
 mod script;
 mod style;
+mod tag;
 
 // Re-export parser implementation
 use parser_impl::SvelteParser;

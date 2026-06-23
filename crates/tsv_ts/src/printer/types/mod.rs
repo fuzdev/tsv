@@ -9,6 +9,7 @@
 // - helpers.rs: Standalone helper functions (parenthesization, unwrapping)
 // - type_params.rs: Type parameter declarations and instantiation
 // - type_annotation.rs: Type annotations (`: Type`)
+// - type_arguments.rs: Type-argument instantiation (`<T, U>`) rendering
 // - type_members.rs: Type literal members (PropertySignature, MethodSignature, etc.)
 // - type_literal.rs: Type literals (`{ a: T }`) and object alignment
 // - function_types.rs: Function types, constructor types, signature params
@@ -21,6 +22,7 @@ pub(in crate::printer) mod function_types;
 pub(crate) mod helpers;
 mod literal_types;
 mod type_annotation;
+mod type_arguments;
 mod type_literal;
 mod type_members;
 mod type_params;
