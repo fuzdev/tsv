@@ -7,6 +7,7 @@ use std::rc::Rc;
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
+use tsv_lang::source_scan::{TriviaProfile, find_char, skip_trivia};
 use tsv_lang::{ParseError, Span};
 
 use super::expression_tag::scan_to_matching_brace;
@@ -15,7 +16,8 @@ use super::parser_impl::SvelteParser;
 /// Find the position of the LAST top-level ` as ` keyword in a string.
 ///
 /// "Top-level" means not inside `()`, `[]`, `{}`, or `<>` brackets, and not inside string
-/// literals. Returns the byte offset of the space before `as`, or None if not found.
+/// literals or comments (skipped via the shared cursor). Returns the byte offset of the
+/// space before `as`, or None if not found.
 ///
 /// Used to detect TypeScript type assertions in `{#each}` expressions:
 /// `{#each items as A[] as item}` → binding_str is `A[] as item`, this finds ` as ` after `A[]`.
@@ -27,23 +29,16 @@ fn find_last_top_level_as(s: &str) -> Option<usize> {
     let mut i = 0;
 
     while i < len {
+        // Skip comments + strings via the shared cursor, so a ` as ` (or a bracket)
+        // inside trivia can't mis-anchor the split — and string escapes are handled
+        // in one escape-correct place.
+        if let Some(past) = skip_trivia(bytes, i, len, TriviaProfile::JS) {
+            i = past;
+            continue;
+        }
         match bytes[i] {
             b'(' | b'[' | b'{' | b'<' => depth += 1,
-            b')' | b']' | b'}' | b'>' => {
-                if depth > 0 {
-                    depth -= 1;
-                }
-            }
-            b'\'' | b'"' | b'`' => {
-                let quote = bytes[i];
-                i += 1;
-                while i < len && bytes[i] != quote {
-                    if bytes[i] == b'\\' {
-                        i += 1;
-                    }
-                    i += 1;
-                }
-            }
+            b')' | b']' | b'}' | b'>' => depth = depth.saturating_sub(1),
             b' ' if depth == 0 && i + 3 <= len => {
                 // Check for " as " or " as" at end of string
                 if bytes[i + 1] == b'a'
@@ -404,11 +399,14 @@ impl<'a> SvelteParser<'a> {
         }
     }
 
-    /// Find the matching closing bracket for a string starting with { or [
+    /// Find the matching closing bracket for a string starting with `{` or `[`,
+    /// returning the byte offset just past the close (so `&input[..end]` is the whole
+    /// bracketed run). Comment- and string-aware via the shared cursor.
     fn find_matching_bracket(&self, input: &str) -> Result<usize, ParseError> {
-        let (open, close) = match input.chars().next() {
-            Some('{') => ('{', '}'),
-            Some('[') => ('[', ']'),
+        let bytes = input.as_bytes();
+        let (open, close) = match bytes.first() {
+            Some(b'{') => (b'{', b'}'),
+            Some(b'[') => (b'[', b']'),
             _ => {
                 return Err(ParseError::InvalidSyntax {
                     message: "Expected { or [".to_string(),
@@ -418,38 +416,13 @@ impl<'a> SvelteParser<'a> {
             }
         };
 
-        let mut depth = 0;
-        let mut in_string = false;
-        let mut string_char = '"';
-
-        for (i, c) in input.char_indices() {
-            if in_string {
-                if c == string_char && !input[..i].ends_with('\\') {
-                    in_string = false;
-                }
-            } else {
-                match c {
-                    '"' | '\'' | '`' => {
-                        in_string = true;
-                        string_char = c;
-                    }
-                    c if c == open => depth += 1,
-                    c if c == close => {
-                        depth -= 1;
-                        if depth == 0 {
-                            return Ok(i + 1); // Include closing bracket
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        Err(ParseError::InvalidSyntax {
-            message: "Unmatched bracket".to_string(),
-            position: 0,
-            context: None,
-        })
+        super::match_bracket(bytes, 0, bytes.len(), open, close, TriviaProfile::JS)
+            .map(|close_pos| close_pos + 1) // include the closing bracket
+            .ok_or_else(|| ParseError::InvalidSyntax {
+                message: "Unmatched bracket".to_string(),
+                position: 0,
+                context: None,
+            })
     }
 
     /// Parse ", index" and/or "(key)" after the context pattern
@@ -906,9 +879,12 @@ impl<'a> SvelteParser<'a> {
             .trim();
 
         // Find the name (identifier before < or ()
-        // Need to handle: fn, fn<T>, fn<T, U>
-        let generic_pos = content.find('<');
-        let paren_pos = content.find('(').unwrap_or(content.len());
+        // Need to handle: fn, fn<T>, fn<T, U>. Trivia-aware so a `<`/`(` inside a
+        // string/comment (e.g. a param default) can't be mistaken for the boundary.
+        let content_bytes = content.as_bytes();
+        let generic_pos = find_char(content_bytes, 0, content.len(), b'<', TriviaProfile::JS);
+        let paren_pos = find_char(content_bytes, 0, content.len(), b'(', TriviaProfile::JS)
+            .unwrap_or(content.len());
 
         // Extract type parameters if present (like Svelte's parser)
         let (name_end, type_parameters) = if let Some(gpos) = generic_pos {
@@ -940,7 +916,17 @@ impl<'a> SvelteParser<'a> {
         let mut parameters = Vec::new();
         let mut raw_parameters = None;
         if paren_pos < content.len() {
-            let close_paren = content.rfind(')').unwrap_or(content.len());
+            // The `)` matching the opening `(` — depth- and trivia-aware, so a `)`
+            // inside a string/comment in a param default can't end the list early.
+            let close_paren = super::match_bracket(
+                content_bytes,
+                paren_pos,
+                content.len(),
+                b'(',
+                b')',
+                TriviaProfile::JS,
+            )
+            .unwrap_or(content.len());
             let params_str = &content[paren_pos + 1..close_paren];
             if !params_str.trim().is_empty() {
                 // Compute params_offset (shared by both branches)
@@ -992,6 +978,10 @@ impl<'a> SvelteParser<'a> {
     }
 
     /// Parse snippet parameters (comma-separated patterns with optional defaults)
+    // TODO: comments in the param list aren't threaded — a comment leading/trailing a
+    // bare identifier param (`a /* c */`) rejects, and a post-default comment
+    // (`a = 1 /* c */`) is dropped. Unlike `{@const}`/`{#each}`, these patterns don't
+    // ride the comment-collecting `tsv_ts` bridges. Collect into `Root.comments` + emit.
     fn parse_snippet_parameters(
         &mut self,
         params: &str,
@@ -1020,10 +1010,17 @@ impl<'a> SvelteParser<'a> {
 
             if after_param_trimmed.starts_with('=') {
                 // Has default value - parse full parameter as a pattern
-                // (e.g., `{a, b} = defaultObj` becomes AssignmentPattern)
-                let next_comma = after_param_trimmed
-                    .find(',')
-                    .unwrap_or(after_param_trimmed.len());
+                // (e.g., `{a, b} = defaultObj` becomes AssignmentPattern). The
+                // param-separating `,` is the top-level one — a `,` inside the
+                // default's own brackets, a string, or a comment is not.
+                let next_comma = super::find_top_level_delim(
+                    after_param_trimmed.as_bytes(),
+                    0,
+                    after_param_trimmed.len(),
+                    b',',
+                    TriviaProfile::JS,
+                )
+                .unwrap_or(after_param_trimmed.len());
                 let full_param = &params[current_pos
                     ..param_end - base_offset + after_param.len() - after_param_trimmed.len()
                         + next_comma];
@@ -1038,71 +1035,49 @@ impl<'a> SvelteParser<'a> {
                 current_pos = param_end - base_offset;
             }
 
-            // Skip comma if present
-            let after = &params[current_pos..];
-            let after_trimmed = after.trim_start();
-            if after_trimmed.starts_with(',') {
-                current_pos += after.len() - after_trimmed.len() + 1;
+            // Skip the separator comma if present. Trivia-aware: a comment may sit
+            // between the parameter and the comma (`a /* c */, b`), so step over
+            // whitespace and comments before testing for the comma — without jumping
+            // past a non-trivia token to a later comma.
+            let bytes = params.as_bytes();
+            let mut j = current_pos;
+            while j < params.len() {
+                if bytes[j].is_ascii_whitespace() {
+                    j += 1;
+                } else if let Some(past) = skip_trivia(bytes, j, params.len(), TriviaProfile::JS) {
+                    j = past;
+                } else {
+                    break;
+                }
+            }
+            if j < params.len() && bytes[j] == b',' {
+                current_pos = j + 1;
             }
         }
 
         Ok(parameters)
     }
 
-    /// Find the matching closing angle bracket for generics like `<T>`.
-    /// Used for TypeScript generics in snippet declarations.
-    /// Similar to Svelte's match_bracket utility.
+    /// Find the matching closing angle bracket for generics like `<T>` (the byte
+    /// offset of the `>`). Used for TypeScript generics in snippet declarations.
+    /// Comment- and string-aware via the shared cursor.
     fn find_matching_angle_bracket(
         &self,
         content: &str,
         open_pos: usize,
     ) -> Result<usize, ParseError> {
-        let bytes = content.as_bytes();
-        let mut depth = 1;
-        let mut i = open_pos + 1;
-        let mut in_string = false;
-        let mut string_char = 0u8;
-        let mut escape_next = false;
-
-        while i < bytes.len() && depth > 0 {
-            let ch = bytes[i];
-
-            if escape_next {
-                escape_next = false;
-                i += 1;
-                continue;
-            }
-
-            if in_string {
-                if ch == b'\\' {
-                    escape_next = true;
-                } else if ch == string_char {
-                    in_string = false;
-                }
-                i += 1;
-                continue;
-            }
-
-            match ch {
-                b'"' | b'\'' | b'`' => {
-                    in_string = true;
-                    string_char = ch;
-                }
-                b'<' => depth += 1,
-                b'>' => depth -= 1,
-                _ => {}
-            }
-            i += 1;
-        }
-
-        if depth == 0 {
-            Ok(i - 1) // Position of closing bracket
-        } else {
-            Err(ParseError::UnexpectedEof {
-                position: content.len(),
-                context: None,
-            })
-        }
+        super::match_bracket(
+            content.as_bytes(),
+            open_pos,
+            content.len(),
+            b'<',
+            b'>',
+            TriviaProfile::JS,
+        )
+        .ok_or(ParseError::UnexpectedEof {
+            position: content.len(),
+            context: None,
+        })
     }
 
     /// Scan source from a position until we find the closing } of a block tag
