@@ -59,10 +59,7 @@ fn build_rest_expanded_docs<'a, P: ChainPrinter>(
 }
 
 /// Build flat docs for groups
-fn build_groups_flat_docs<'a, P: ChainPrinter>(
-    groups: &[ChainGroup<'a>],
-    printer: &P,
-) -> DocBuf {
+fn build_groups_flat_docs<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> DocBuf {
     groups.iter().map(|g| print_group(g, printer)).collect()
 }
 
