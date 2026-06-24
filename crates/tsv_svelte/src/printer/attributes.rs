@@ -882,7 +882,7 @@ impl<'a> Printer<'a> {
     ) -> bool {
         use tsv_ts::ast::internal::Expression;
         if let Expression::Identifier(id) = expr {
-            self.resolve_symbol(id.name) == name
+            self.with_resolved_symbol(id.name, |s| s == name)
         } else {
             false
         }

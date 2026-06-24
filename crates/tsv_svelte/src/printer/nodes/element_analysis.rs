@@ -233,23 +233,28 @@ impl<'a> Printer<'a> {
         element: &internal::Element,
         attr_docs: &[DocId],
     ) -> ElementContext {
-        let tag_name = self.resolve_symbol(element.name);
-        let is_void = tsv_html::is_void_element(&tag_name);
-        let is_foreign = tsv_html::is_foreign_element(&tag_name);
+        // Resolve the tag once inside the borrow and derive everything that needs
+        // it there — avoids allocating a `String` per element on the hot path.
+        let (is_void, is_foreign, kind) = self.with_resolved_symbol(element.name, |tag_name| {
+            let is_void = tsv_html::is_void_element(tag_name);
+            let is_foreign = tsv_html::is_foreign_element(tag_name);
 
-        // Determine element kind
-        // Matches prettier-plugin-svelte: isInlineElement = !isBlockElement
-        // Elements NOT in the block list (including table cells) use inline formatting.
-        let kind = if tag_name.starts_with(|c: char| c.is_ascii_uppercase())
-            || tag_name.contains(':')
-            || tag_name.contains('.')
-        {
-            ElementKind::Component
-        } else if tsv_html::is_block_element(&tag_name) {
-            ElementKind::Block
-        } else {
-            ElementKind::Inline
-        };
+            // Determine element kind
+            // Matches prettier-plugin-svelte: isInlineElement = !isBlockElement
+            // Elements NOT in the block list (including table cells) use inline formatting.
+            let kind = if tag_name.starts_with(|c: char| c.is_ascii_uppercase())
+                || tag_name.contains(':')
+                || tag_name.contains('.')
+            {
+                ElementKind::Component
+            } else if tsv_html::is_block_element(tag_name) {
+                ElementKind::Block
+            } else {
+                ElementKind::Inline
+            };
+
+            (is_void, is_foreign, kind)
+        });
 
         // Check if self-closing
         let is_self_closing = (kind.is_component() || is_foreign)
