@@ -402,8 +402,26 @@ pub fn build_function_params_doc_with_comments(
     inputs: &PrinterInputs<'_>,
     embed: &EmbedContext,
 ) -> DocId {
-    let printer = make_printer(arena, inputs, *embed);
+    let printer = make_doc_printer(arena, inputs, *embed);
     printer.build_params_doc_with_comments(params, params_start, trailing_comments_end)
+}
+
+/// Build a DocId for a type-parameter declaration (`<…>`) with comments, in the caller's arena.
+///
+/// Routes the generics through the same comment-aware, width-wrapping type-parameter printer a
+/// real function/class signature uses, so constraints (`<T extends X>`), defaults (`<T = X>`),
+/// modifiers (`<const T>`), interior comments (`<T /* c */>`), and per-param wrapping of a long
+/// generic list all match a standalone declaration. The emitted doc includes its own group and
+/// the surrounding `<` / `>`, breaking independently of the parameter list. Used by `tsv_svelte`
+/// for `{#snippet}` generics.
+pub fn build_type_parameters_doc_with_comments(
+    arena: &DocArena,
+    type_parameters: &TSTypeParameterDeclaration,
+    inputs: &PrinterInputs<'_>,
+    embed: &EmbedContext,
+) -> DocId {
+    let printer = make_doc_printer(arena, inputs, *embed);
+    printer.build_type_parameter_declaration_doc_wrapping(type_parameters)
 }
 
 /// Build a DocId for a TypeScript program in the caller's arena.
@@ -438,5 +456,5 @@ pub use printer::{conditional_should_break_after_op, should_inline_logical_expre
 // types remain accessible through the full `tsv_ts::ast::internal::Foo` path.
 pub use ast::internal::{
     Expression, ObjectPatternProperty, ObjectProperty, Program, Statement, TSTypeAnnotation,
-    VariableDeclaration,
+    TSTypeParameterDeclaration, VariableDeclaration,
 };

@@ -150,6 +150,6 @@ pub(super) fn convert_snippet_block(
         expression,
         parameters,
         body: convert_fragment(&block.body, source, loc, interner),
-        type_params: block.type_parameters.clone(),
+        type_params: block.type_params_raw.clone(),
     }
 }

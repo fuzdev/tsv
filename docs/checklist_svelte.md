@@ -230,7 +230,10 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 
 ### TypeScript Snippets
 
-- Generic type parameters (`{#snippet name<T>(x: T)}`)
+- Generic type parameters (`{#snippet name<T>(x: T)}`) — parsed into nodes and routed through
+  `tsv_ts`'s type-parameter printer (constraints `<T extends X>`, defaults `<T = X>`, modifiers
+  `<const T>`, interior comments `<T /* c */>`, and width-based wrapping of a long generic list,
+  which breaks independently of the parameter list)
 - Typed parameters (`{#snippet fn(a: string, b: number)}`)
 - Typed parameter comments (`{#snippet fn(a: T /* c */, b: U)}`)
 

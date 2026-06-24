@@ -1,0 +1,553 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 759,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 117,
+				"end": 119,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 119,
+				"end": 197,
+				"data": " generics fit (head exactly 100 chars) - stay inline, block body drops "
+			},
+			{
+				"type": "Text",
+				"start": 197,
+				"end": 198,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 198,
+				"end": 323,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn1",
+					"start": 208,
+					"end": 211,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 10,
+							"character": 208
+						},
+						"end": {
+							"line": 8,
+							"column": 13,
+							"character": 211
+						}
+					}
+				},
+				"typeParams": "Taaaaaaaaa extends Aaaaaaaa, Ubbbbbbbbb extends Bbbbbbbb, Vccccccccccccccccccccccc",
+				"parameters": [],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 298,
+							"end": 300,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 300,
+							"end": 312,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 9,
+									"column": 2,
+									"character": 301
+								},
+								"end": {
+									"line": 9,
+									"column": 5,
+									"character": 304
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 305,
+										"end": 306,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 312,
+							"end": 313,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 323,
+				"end": 325,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 325,
+				"end": 405,
+				"data": " generics overflow (head 101 chars) - each generic wraps to its own line "
+			},
+			{
+				"type": "Text",
+				"start": 405,
+				"end": 406,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 406,
+				"end": 537,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn2",
+					"start": 416,
+					"end": 419,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 10,
+							"character": 416
+						},
+						"end": {
+							"line": 13,
+							"column": 13,
+							"character": 419
+						}
+					}
+				},
+				"typeParams": "\n\tTaaaaaaaaaa extends Aaaaaaaa,\n\tUbbbbbbbbb extends Bbbbbbbb,\n\tVccccccccccccccccccccccc\n",
+				"parameters": [],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 512,
+							"end": 514,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 514,
+							"end": 526,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 18,
+									"column": 2,
+									"character": 515
+								},
+								"end": {
+									"line": 18,
+									"column": 5,
+									"character": 518
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 519,
+										"end": 520,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 526,
+							"end": 527,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 537,
+				"end": 539,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 539,
+				"end": 610,
+				"data": " generics wrap, params stay inline on the closing `>(...)` line "
+			},
+			{
+				"type": "Text",
+				"start": 610,
+				"end": 611,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 611,
+				"end": 758,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn3",
+					"start": 621,
+					"end": 624,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 10,
+							"character": 621
+						},
+						"end": {
+							"line": 22,
+							"column": 13,
+							"character": 624
+						}
+					}
+				},
+				"typeParams": "\n\tTaaaaaaaaaa extends Aaaaaaaaaaaaaaaaaaaaaa,\n\tUbbbbbbbbbb extends Aaaaaaaaaaaaaaaaaaaaaa\n",
+				"parameters": [
+					{
+						"type": "Identifier",
+						"start": 717,
+						"end": 731,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 2
+							},
+							"end": {
+								"line": 25,
+								"column": 16
+							}
+						},
+						"name": "a",
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 718,
+							"end": 731,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 3
+								},
+								"end": {
+									"line": 25,
+									"column": 16
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 720,
+								"end": 731,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 5
+									},
+									"end": {
+										"line": 25,
+										"column": 16
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 720,
+									"end": 731,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 5
+										},
+										"end": {
+											"line": 25,
+											"column": 16
+										}
+									},
+									"name": "Taaaaaaaaaa"
+								}
+							}
+						}
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 733,
+							"end": 735,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 735,
+							"end": 747,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 26,
+									"column": 2,
+									"character": 736
+								},
+								"end": {
+									"line": 26,
+									"column": 5,
+									"character": 739
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 740,
+										"end": 741,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 747,
+							"end": 748,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 117,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 108,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 20,
+					"end": 43,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 24
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 25,
+						"end": 33,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 6
+							},
+							"end": {
+								"line": 2,
+								"column": 14
+							}
+						},
+						"name": "Aaaaaaaa"
+					},
+					"typeAnnotation": {
+						"type": "TSStringKeyword",
+						"start": 36,
+						"end": 42,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 17
+							},
+							"end": {
+								"line": 2,
+								"column": 23
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 45,
+					"end": 68,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 24
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 50,
+						"end": 58,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 14
+							}
+						},
+						"name": "Bbbbbbbb"
+					},
+					"typeAnnotation": {
+						"type": "TSNumberKeyword",
+						"start": 61,
+						"end": 67,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 17
+							},
+							"end": {
+								"line": 3,
+								"column": 23
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 70,
+					"end": 107,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 38
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 75,
+						"end": 97,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 6
+							},
+							"end": {
+								"line": 4,
+								"column": 28
+							}
+						},
+						"name": "Aaaaaaaaaaaaaaaaaaaaaa"
+					},
+					"typeAnnotation": {
+						"type": "TSStringKeyword",
+						"start": 100,
+						"end": 106,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 31
+							},
+							"end": {
+								"line": 4,
+								"column": 37
+							}
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

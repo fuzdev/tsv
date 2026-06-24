@@ -886,14 +886,17 @@ impl<'a> SvelteParser<'a> {
         let paren_pos = find_char(content_bytes, 0, content.len(), b'(', TriviaProfile::JS)
             .unwrap_or(content.len());
 
-        // Extract type parameters if present (like Svelte's parser)
-        let (name_end, type_parameters) = if let Some(gpos) = generic_pos {
+        // Extract type parameters if present (like Svelte's parser). `type_params_raw` is
+        // the raw inner text (feeds the public AST's `typeParams` string and the
+        // parse-failure fallback). `name_end` doubles as the start of the parseable
+        // signature head (`<…>(…)`) — the name ends exactly where the head begins (`<` when
+        // generic, else `(`) — so the wrapper below spans the head from there.
+        let (name_end, type_params_raw) = if let Some(gpos) = generic_pos {
             if gpos < paren_pos {
                 // Found '<' before '(' - this is a generic type parameter
                 // Find the matching '>'
                 let close_pos = self.find_matching_angle_bracket(content, gpos)?;
-                let type_params = content[gpos + 1..close_pos].to_string();
-                (gpos, Some(type_params))
+                (gpos, Some(content[gpos + 1..close_pos].to_string()))
             } else {
                 // '<' is after '(' - not a generic, probably a comparison in default value
                 (paren_pos, None)
@@ -912,7 +915,8 @@ impl<'a> SvelteParser<'a> {
             end: content_start as u32,
         };
 
-        // Parse parameters (between parentheses)
+        // Parse type parameters + parameters (between parentheses)
+        let mut type_parameters = None;
         let mut parameters = Vec::new();
         let mut raw_parameters = None;
         let mut params_paren = None;
@@ -936,33 +940,45 @@ impl<'a> SvelteParser<'a> {
                 end: (content_offset + close_paren) as u32,
             });
             let params_str = &content[paren_pos + 1..close_paren];
-            if !params_str.trim().is_empty() {
-                let params_offset =
-                    tag_content_start + super::subslice_offset(tag_content, params_str);
 
-                // Parse the parameter list as a function signature (`function f(PARAMS) {}`)
-                // so every parameter position — typed, destructured, with comments anywhere
-                // (interior, boundary, leading, dangling) — goes through the canonical
-                // comment-collecting parser. Collected comments are merged into the root
-                // buffer (the printer locates them by position). Falls back to the raw
-                // source on parse failure (e.g. a form acorn-typescript rejects).
-                const WRAPPER_PREFIX: &str = "function f(";
-                let wrapper = format!("{WRAPPER_PREFIX}{params_str}) {{}}");
-                let base = params_offset.saturating_sub(WRAPPER_PREFIX.len());
+            // Parse the signature head `<TP>(PARAMS)` as `function f<TP>(PARAMS) {}` so
+            // every position — type parameters (constraints/defaults/modifiers/comments),
+            // typed/destructured params, comments anywhere — goes through the canonical
+            // comment-collecting parser. Wrapping a *contiguous* source slice (from the
+            // `<` or `(` through the matching `)`) keeps the single `base` offset valid
+            // across both `<…>` and `(…)`. Collected comments merge into the root buffer
+            // (the printer locates them by position). Falls back to raw text on parse
+            // failure (e.g. a form acorn-typescript rejects); the generics are already
+            // captured in `type_params_raw`.
+            let parsed = if close_paren < content.len()
+                && (type_params_raw.is_some() || !params_str.trim().is_empty())
+            {
+                // The head runs from where the name ends (`<` or `(`) through the `)`.
+                let head_slice = &content[name_end..=close_paren];
+                const WRAPPER_PREFIX: &str = "function f";
+                let wrapper = format!("{WRAPPER_PREFIX}{head_slice} {{}}");
+                let base = (content_offset + name_end).saturating_sub(WRAPPER_PREFIX.len());
                 match tsv_ts::parse_with_interner(&wrapper, base, Rc::clone(&self.interner)) {
                     Ok(mut program) => {
                         self.expression_comments.append(&mut program.comments);
                         if let Some(tsv_ts::Statement::FunctionDeclaration(func)) =
                             program.body.into_iter().next()
                         {
+                            type_parameters = func.type_parameters;
                             parameters = func.params;
                         }
+                        true
                     }
-                    Err(_) => {
-                        // Fall back to raw string if parsing fails
-                        raw_parameters = Some(params_str.trim().to_string());
-                    }
+                    Err(_) => false,
                 }
+            } else {
+                false
+            };
+
+            // On parse failure (or a malformed head with no closing `)`), keep the raw
+            // parameter text so nothing is dropped.
+            if !parsed && !params_str.trim().is_empty() {
+                raw_parameters = Some(params_str.trim().to_string());
             }
         }
 
@@ -975,6 +991,7 @@ impl<'a> SvelteParser<'a> {
         Ok(FragmentNode::SnippetBlock(SnippetBlock {
             expression,
             type_parameters,
+            type_params_raw,
             parameters,
             raw_parameters,
             params_paren,
@@ -990,6 +1007,14 @@ impl<'a> SvelteParser<'a> {
     /// Find the matching closing angle bracket for generics like `<T>` (the byte
     /// offset of the `>`). Used for TypeScript generics in snippet declarations.
     /// Comment- and string-aware via the shared cursor.
+    ///
+    // TODO: the raw `<`/`>` depth count miscounts a `>` that is part of `=>`
+    // (or the param `(` that `paren_pos` finds first lands *inside* the generics),
+    // so a snippet generic containing a function type — `<T extends () => void>`,
+    // `<T = () => void>` — is mis-sliced and corrupts on format. Svelte itself
+    // rejects those forms, so no valid input is affected; closing the gap means
+    // matching Svelte's rejection (a parser-strictness concern, deferred to the
+    // diagnostics layer per CLAUDE.md §Strict Mode Only), not just a smarter scan.
     fn find_matching_angle_bracket(
         &self,
         content: &str,

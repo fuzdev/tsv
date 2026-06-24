@@ -1332,16 +1332,23 @@ impl<'a> Printer<'a> {
         let force_break = self.fragment_should_force_break_content(&block.body.nodes);
         let is_inline = !has_leading && !has_trailing && !force_break;
 
-        // Type parameters (generics)
-        let type_params_part = block.type_parameters.as_ref().map_or_else(
-            || d.empty(),
-            |tp| d.concat(&[d.text("<"), d.text_owned(tp.clone()), d.text(">")]),
-        );
+        // Type parameters (generics). Parsed nodes route through tsv_ts's type-parameter
+        // printer (constraints, defaults, modifiers, interior comments, width-based
+        // wrapping of a long generic list — its own group, so it breaks independently of
+        // the parameter list). The raw-text fallback (parse failure) emits the source
+        // verbatim between `<` and `>`.
+        let type_params_part = if let Some(decl) = &block.type_parameters {
+            tsv_ts::build_type_parameters_doc_with_comments(d, decl, &self.ts_inputs(), &self.embed)
+        } else if let Some(raw) = &block.type_params_raw {
+            d.concat(&[d.text("<"), d.text_owned(raw.clone()), d.text(">")])
+        } else {
+            d.empty()
+        };
 
         // Parameter list `(…)`. The parens fold so that when they wrap, `)` dedents to
         // base and `}` hugs it (`)}`) — no dangle (no trailing comma; trailingComma:
         // 'none').
-        let params_doc = if let Some(raw) = &block.raw_parameters {
+        let params_inner = if let Some(raw) = &block.raw_parameters {
             // Parse-failure fallback: emit the raw parameter source (comments preserved
             // verbatim), split at top-level commas so a long list still wraps one-per-line.
             let params_docs: DocBuf = split_raw_params_at_commas(raw)
@@ -1368,7 +1375,7 @@ impl<'a> Printer<'a> {
             // interior comments (`{ a = /* c */ 1 }`), boundary comments (`a /* c */, b`),
             // the single-pattern hug, and nesting-depth expansion all match a standalone
             // parameter list. `build_function_params_doc_with_comments` emits the `(…)`
-            // (with no group of its own) — the `BlockHead` group below drives the wrap.
+            // with no group of its own — the `group` below drives the wrap.
             match block.params_paren {
                 Some(paren) => tsv_ts::build_function_params_doc_with_comments(
                     d,
@@ -1381,6 +1388,12 @@ impl<'a> Printer<'a> {
                 None => d.text("()"),
             }
         };
+        // The parameter list gets its OWN group so it breaks independently of the
+        // type-parameter group (mirroring a real function signature, where `<…>` and
+        // `(…)` are sibling groups): a long generic list can wrap while short params stay
+        // inline on the closing `>(…)}` line, and vice-versa. The outer `BlockHead` group
+        // still governs the head as a whole.
+        let params_doc = d.group(params_inner);
 
         // Opening tag `{#snippet name<T>(params)}`. Key the group to `BlockHead` so the
         // body can expand when the params wrap (below).
