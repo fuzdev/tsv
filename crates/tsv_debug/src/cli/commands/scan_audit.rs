@@ -1,24 +1,30 @@
 use argh::FromArgs;
 use std::path::{Path, PathBuf};
 
-/// Guard against new raw `str::find` / `str::rfind` delimiter scans over source.
+/// Guard against new raw `str` position-anchoring substring scans over source.
 ///
 /// The "Comment-Aware Delimiter Scans" effort consolidated source re-scanning
 /// onto one trivia-aware cursor (`tsv_lang::source_scan`), because a raw
 /// `self.source[..].find(delim)` can match the glyph **inside an enclosed comment
 /// or string** — mis-anchoring the scan and dropping comments (silent data loss).
 /// The class kept recurring because the easy path (`str::find`) is the wrong path.
-/// This audit removes the easy wrong path: it flags every `str::find` / `str::rfind`
-/// call (with a non-closure pattern) in the language crates, and fails on any that
-/// isn't in the reviewed allow-list below.
+/// This audit removes the easy wrong path: it flags every position-anchoring
+/// substring scan — `str::find` / `str::rfind` and `str::match_indices` /
+/// `str::rmatch_indices` (the latter pair added after a comment-blind
+/// `rmatch_indices` in `find_keyword_end` dropped comments on `from`/`type`/`with`
+/// re-exports) — with a non-closure pattern, in the language crates, and fails on
+/// any that isn't in the reviewed allow-list below.
 ///
 /// A flagged site must either move onto the cursor
-/// (`find_char` / `find_top_level_delim` / `match_bracket` / `skip_trivia`) or be
-/// added to `ALLOW` with a category — a conscious, reviewed decision rather than a
-/// silent reintroduction. Iterator/predicate `.find(|…|)` (a closure pattern, not a
-/// delimiter literal) is excluded — it isn't a `str::find`-over-source scan. Hand
-/// byte-loops are out of automated scope (undetectable by a line scan, and far
-/// rarer to write accidentally than `.find`); the cursor is their sanctioned home.
+/// (`find_char` / `find_keyword` / `find_top_level_delim` / `match_bracket` /
+/// `skip_trivia`) or be added to `ALLOW` with a category — a conscious, reviewed
+/// decision rather than a silent reintroduction. Deliberately **out of scope**:
+/// closure patterns (`.find(|…|)` / `.match_indices(|…|)` — iterator/predicate, not
+/// a delimiter literal); *counting* (`.matches(c).count()`) and *existence*
+/// (`contains` / `starts_with`) checks, which don't anchor a position; and `split`
+/// over already-extracted safe substrings — none are the position-anchoring class.
+/// Hand byte-loops are also out of automated scope (undetectable by a line scan,
+/// and far rarer to write accidentally); the cursor is their sanctioned home.
 ///
 /// One category is a hard **failure**, not a pass: `delimiter-deferred-bug` marks a
 /// real comment-vulnerable scan that drops/mangles comments on specific inputs. The
@@ -77,8 +83,6 @@ const DEFERRED_BUG: &str = "delimiter-deferred-bug";
 /// - `attr-name` — Svelte attribute-name `:` split (directive prefix).
 /// - `template-marker` — `${` of a template-literal type.
 /// - `jsdoc-tag` — scans a value/comment string for `@type`/`@satisfies` cast tags.
-/// - `keyword-comment-aware` — keyword scan that already hand-rolls a comment skip
-///   (the `from` finder; cleanup-pending cursor migration, not a live bug).
 ///
 /// Tracked delimiter-over-source scans (the real class, on the books in the lore's
 /// "Comment-Aware Delimiter Scans" stage-4 inventory):
@@ -126,6 +130,16 @@ const ALLOW: &[Allow] = &[
     (
         "tsv_css/src/printer/atrules.rs",
         ".or_else(|| range_lower.find(connector_keyword));",
+        "at-rule-range",
+    ),
+    (
+        "tsv_css/src/printer/atrules.rs",
+        "for (idx, _) in content.match_indices(\" and \") {",
+        "at-rule-range",
+    ),
+    (
+        "tsv_css/src/printer/atrules.rs",
+        "for (idx, _) in content.match_indices(\" or \") {",
         "at-rule-range",
     ),
     (
@@ -208,11 +222,6 @@ const ALLOW: &[Allow] = &[
     ),
     // ── tsv_ts ───────────────────────────────────────────────────────────────
     (
-        "tsv_ts/src/ast/convert/statements.rs",
-        ".find(\"export\")",
-        "delimiter-latent",
-    ),
-    (
         "tsv_ts/src/parser/expression.rs",
         "while let Some(rel) = value[from..].find(tag) {",
         "jsdoc-tag",
@@ -248,44 +257,14 @@ const ALLOW: &[Allow] = &[
         "newline",
     ),
     (
-        "tsv_ts/src/printer/mod.rs",
-        ".find(keyword)",
-        "delimiter-latent",
-    ),
-    (
-        "tsv_ts/src/printer/mod.rs",
-        "pos += search[pos..].find('\\n').unwrap_or(search.len() - pos);",
-        "newline",
-    ),
-    (
-        "tsv_ts/src/printer/mod.rs",
-        ".find(\"*/\")",
-        "comment-marker",
-    ),
-    (
         "tsv_ts/src/printer/statements/control_flow/try_jump.rs",
         ".rfind(\"finally\")",
         "delimiter-latent",
     ),
     (
-        "tsv_ts/src/printer/statements/mod.rs",
-        ".find(';')",
-        "delimiter-latent",
-    ),
-    (
-        "tsv_ts/src/printer/statements/modules/specifier_list.rs",
-        "match text[search_offset..].find(\"from\") {",
-        "keyword-comment-aware",
-    ),
-    (
         "tsv_ts/src/printer/types/literal_types.rs",
         ".rfind(\"${\")",
         "template-marker",
-    ),
-    (
-        "tsv_ts/src/printer/types/type_literal.rs",
-        "let semi_offset = source_slice.find(';');",
-        "delimiter-latent",
     ),
 ];
 
@@ -323,7 +302,7 @@ impl ScanAuditCommand {
             for s in &sites {
                 println!("{}:{}: {}", s.path, s.line_no, s.code);
             }
-            eprintln!("\n{} find/rfind site(s)", sites.len());
+            eprintln!("\n{} find/rfind/match_indices site(s)", sites.len());
             return;
         }
 
@@ -429,23 +408,25 @@ fn scan_file(rel: &str, text: &str, out: &mut Vec<Site>) {
     }
 }
 
-/// If `line` carries at least one real delimiter-scan candidate — a `.find(` /
-/// `.rfind(` call that is NOT inside a `//` comment and NOT a closure pattern
-/// (`.find(|…|)`, i.e. an iterator/predicate find) — return the trimmed line (one
-/// entry per source line; the trimmed text is the allow-list key). Else `None`.
+/// If `line` carries at least one real scan candidate — a `.find(` / `.rfind(` /
+/// `.match_indices(` / `.rmatch_indices(` call that is NOT inside a `//` comment
+/// and NOT a closure pattern (`.find(|…|)` etc., i.e. an iterator/predicate form) —
+/// return the trimmed line (one entry per source line; the trimmed text is the
+/// allow-list key). Else `None`.
 fn qualifying_find_line(line: &str) -> Option<String> {
+    // `.find(` is not a substring of `.rfind(`, nor `.match_indices(` of
+    // `.rmatch_indices(`, so the four are counted independently with no overlap.
+    const METHODS: [&str; 4] = [".find(", ".rfind(", ".match_indices(", ".rmatch_indices("];
     let comment = line.find("//");
     let bytes = line.as_bytes();
-    // Open-paren index of every `.find(` / `.rfind(` occurrence on the line.
-    let opens = line
-        .match_indices(".find(")
-        .map(|(i, m)| i + m.len() - 1)
-        .chain(line.match_indices(".rfind(").map(|(i, m)| i + m.len() - 1));
-    for open in opens {
-        let in_comment = comment.is_some_and(|c| open >= c);
-        let is_closure = bytes.get(open + 1) == Some(&b'|');
-        if !in_comment && !is_closure {
-            return Some(line.trim().to_string());
+    for method in METHODS {
+        for (i, m) in line.match_indices(method) {
+            let open = i + m.len() - 1; // index of the `(`
+            let in_comment = comment.is_some_and(|c| open >= c);
+            let is_closure = bytes.get(open + 1) == Some(&b'|');
+            if !in_comment && !is_closure {
+                return Some(line.trim().to_string());
+            }
         }
     }
     None
@@ -465,12 +446,12 @@ fn brace_delta(line: &str) -> i32 {
 
 fn print_human(violations: &[&Site], stale: &[&Allow], deferred: &[&Allow]) {
     if violations.is_empty() && stale.is_empty() && deferred.is_empty() {
-        println!("✓ no un-allow-listed raw find/rfind scans in the language crates");
+        println!("✓ no un-allow-listed raw substring scans in the language crates");
         return;
     }
     if !violations.is_empty() {
         eprintln!(
-            "✗ {} raw find/rfind site(s) not in the scan_audit allow-list:\n",
+            "✗ {} raw find/rfind/match_indices site(s) not in the scan_audit allow-list:\n",
             violations.len()
         );
         for v in violations {
@@ -546,6 +527,25 @@ mod tests {
     }
 
     #[test]
+    fn detects_match_indices_and_rmatch_indices() {
+        // The position-anchoring `(r)match_indices` forms are the same class as
+        // find/rfind (this is what `find_keyword_end` used to drop comments).
+        assert_eq!(
+            qualifying_find_line("for (i, _) in s.match_indices(\" and \") {").as_deref(),
+            Some("for (i, _) in s.match_indices(\" and \") {")
+        );
+        assert_eq!(
+            qualifying_find_line("src.rmatch_indices(\"from\")").as_deref(),
+            Some("src.rmatch_indices(\"from\")")
+        );
+        // `.match_indices(` must not match inside `.rmatch_indices(`.
+        assert_eq!(
+            qualifying_find_line("x.rmatch_indices(';')").as_deref(),
+            Some("x.rmatch_indices(';')")
+        );
+    }
+
+    #[test]
     fn excludes_closure_patterns() {
         // Iterator / str-predicate finds take a closure, not a delimiter literal.
         assert_eq!(qualifying_find_line("xs.find(|&b| b == 0)"), None);
@@ -554,6 +554,8 @@ mod tests {
             None
         );
         assert_eq!(qualifying_find_line("(a..b).find(|&j| ok(j))"), None);
+        // …including the closure form of match_indices.
+        assert_eq!(qualifying_find_line("s.match_indices(|c| c == ',')"), None);
     }
 
     #[test]

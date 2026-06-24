@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 388,
+	"end": 488,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -76,9 +76,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " line comment between export and type keyword",
+			"value": " block comment whose text contains the `type` keyword",
 			"start": 202,
-			"end": 249,
+			"end": 257,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -86,6 +86,38 @@
 				},
 				"end": {
 					"line": 8,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " type ",
+			"start": 271,
+			"end": 281,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 13
+				},
+				"end": {
+					"line": 9,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment between export and type keyword",
+			"start": 302,
+			"end": 349,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
 					"column": 48
 				}
 			}
@@ -93,15 +125,15 @@
 		{
 			"type": "Line",
 			"value": " c3",
-			"start": 258,
-			"end": 263,
+			"start": 358,
+			"end": 363,
 			"loc": {
 				"start": {
-					"line": 9,
+					"line": 12,
 					"column": 8
 				},
 				"end": {
-					"line": 9,
+					"line": 12,
 					"column": 13
 				}
 			}
@@ -109,15 +141,15 @@
 		{
 			"type": "Line",
 			"value": " line comment between type keyword and braces",
-			"start": 291,
-			"end": 338,
+			"start": 391,
+			"end": 438,
 			"loc": {
 				"start": {
-					"line": 12,
+					"line": 15,
 					"column": 1
 				},
 				"end": {
-					"line": 12,
+					"line": 15,
 					"column": 48
 				}
 			}
@@ -125,15 +157,15 @@
 		{
 			"type": "Line",
 			"value": " c4",
-			"start": 352,
-			"end": 357,
+			"start": 452,
+			"end": 457,
 			"loc": {
 				"start": {
-					"line": 13,
+					"line": 16,
 					"column": 13
 				},
 				"end": {
-					"line": 13,
+					"line": 16,
 					"column": 18
 				}
 			}
@@ -142,19 +174,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 387,
+		"end": 487,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 378,
+			"end": 478,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 15,
+					"line": 18,
 					"column": 9
 				}
 			},
@@ -361,15 +393,115 @@
 				},
 				{
 					"type": "ExportNamedDeclaration",
-					"start": 251,
-					"end": 288,
+					"start": 259,
+					"end": 299,
 					"loc": {
 						"start": {
 							"line": 9,
 							"column": 1
 						},
 						"end": {
-							"line": 10,
+							"line": 9,
+							"column": 41
+						}
+					},
+					"exportKind": "type",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 284,
+							"end": 285,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 26
+								},
+								"end": {
+									"line": 9,
+									"column": 27
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 284,
+								"end": 285,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 26
+									},
+									"end": {
+										"line": 9,
+										"column": 27
+									}
+								},
+								"name": "E"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 284,
+								"end": 285,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 26
+									},
+									"end": {
+										"line": 9,
+										"column": 27
+									}
+								},
+								"name": "E"
+							},
+							"exportKind": "value",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " type ",
+									"start": 271,
+									"end": 281
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 293,
+						"end": 298,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 35
+							},
+							"end": {
+								"line": 9,
+								"column": 40
+							}
+						},
+						"value": "./e",
+						"raw": "'./e'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment whose text contains the `type` keyword",
+							"start": 202,
+							"end": 257
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 351,
+					"end": 388,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
 							"column": 24
 						}
 					},
@@ -378,29 +510,29 @@
 					"specifiers": [
 						{
 							"type": "ExportSpecifier",
-							"start": 273,
-							"end": 274,
+							"start": 373,
+							"end": 374,
 							"loc": {
 								"start": {
-									"line": 10,
+									"line": 13,
 									"column": 9
 								},
 								"end": {
-									"line": 10,
+									"line": 13,
 									"column": 10
 								}
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 273,
-								"end": 274,
+								"start": 373,
+								"end": 374,
 								"loc": {
 									"start": {
-										"line": 10,
+										"line": 13,
 										"column": 9
 									},
 									"end": {
-										"line": 10,
+										"line": 13,
 										"column": 10
 									}
 								},
@@ -408,15 +540,15 @@
 							},
 							"exported": {
 								"type": "Identifier",
-								"start": 273,
-								"end": 274,
+								"start": 373,
+								"end": 374,
 								"loc": {
 									"start": {
-										"line": 10,
+										"line": 13,
 										"column": 9
 									},
 									"end": {
-										"line": 10,
+										"line": 13,
 										"column": 10
 									}
 								},
@@ -427,23 +559,23 @@
 								{
 									"type": "Line",
 									"value": " c3",
-									"start": 258,
-									"end": 263
+									"start": 358,
+									"end": 363
 								}
 							]
 						}
 					],
 					"source": {
 						"type": "Literal",
-						"start": 282,
-						"end": 287,
+						"start": 382,
+						"end": 387,
 						"loc": {
 							"start": {
-								"line": 10,
+								"line": 13,
 								"column": 18
 							},
 							"end": {
-								"line": 10,
+								"line": 13,
 								"column": 23
 							}
 						},
@@ -454,22 +586,22 @@
 						{
 							"type": "Line",
 							"value": " line comment between export and type keyword",
-							"start": 202,
-							"end": 249
+							"start": 302,
+							"end": 349
 						}
 					]
 				},
 				{
 					"type": "ExportNamedDeclaration",
-					"start": 340,
-					"end": 377,
+					"start": 440,
+					"end": 477,
 					"loc": {
 						"start": {
-							"line": 13,
+							"line": 16,
 							"column": 1
 						},
 						"end": {
-							"line": 14,
+							"line": 17,
 							"column": 19
 						}
 					},
@@ -478,29 +610,29 @@
 					"specifiers": [
 						{
 							"type": "ExportSpecifier",
-							"start": 362,
-							"end": 363,
+							"start": 462,
+							"end": 463,
 							"loc": {
 								"start": {
-									"line": 14,
+									"line": 17,
 									"column": 4
 								},
 								"end": {
-									"line": 14,
+									"line": 17,
 									"column": 5
 								}
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 362,
-								"end": 363,
+								"start": 462,
+								"end": 463,
 								"loc": {
 									"start": {
-										"line": 14,
+										"line": 17,
 										"column": 4
 									},
 									"end": {
-										"line": 14,
+										"line": 17,
 										"column": 5
 									}
 								},
@@ -508,15 +640,15 @@
 							},
 							"exported": {
 								"type": "Identifier",
-								"start": 362,
-								"end": 363,
+								"start": 462,
+								"end": 463,
 								"loc": {
 									"start": {
-										"line": 14,
+										"line": 17,
 										"column": 4
 									},
 									"end": {
-										"line": 14,
+										"line": 17,
 										"column": 5
 									}
 								},
@@ -527,23 +659,23 @@
 								{
 									"type": "Line",
 									"value": " c4",
-									"start": 352,
-									"end": 357
+									"start": 452,
+									"end": 457
 								}
 							]
 						}
 					],
 					"source": {
 						"type": "Literal",
-						"start": 371,
-						"end": 376,
+						"start": 471,
+						"end": 476,
 						"loc": {
 							"start": {
-								"line": 14,
+								"line": 17,
 								"column": 13
 							},
 							"end": {
-								"line": 14,
+								"line": 17,
 								"column": 18
 							}
 						},
@@ -554,8 +686,8 @@
 						{
 							"type": "Line",
 							"value": " line comment between type keyword and braces",
-							"start": 291,
-							"end": 338
+							"start": 391,
+							"end": 438
 						}
 					]
 				}

@@ -5,6 +5,9 @@
 	// block comment between type keyword and braces
 	export type /* c2 */ { B } from './b';
 
+	// block comment whose text contains the `type` keyword
+	export type /* type */ { E } from './e';
+
 	// line comment between export and type keyword
 	export // c3
 		type { C } from './c';

@@ -8,10 +8,8 @@
 //
 // All functions operate on byte slices for performance (no tokenization needed).
 
-use super::scan::{
-    is_identifier_start, skip_block_comment, skip_identifier, skip_line_comment,
-    skip_string_literal, skip_whitespace_and_comments,
-};
+use super::scan::{is_identifier_start, skip_identifier, skip_whitespace_and_comments};
+use tsv_lang::source_scan::{TriviaProfile, is_regex_start, skip_regex_literal, skip_trivia};
 
 /// `<` at `pos` is `<=` comparison operator, not an angle bracket open
 #[inline]
@@ -42,37 +40,35 @@ fn is_greater_equal_op(bytes: &[u8], pos: usize) -> bool {
 /// - Optional type annotation after `)`: `)` or `): type`
 ///
 /// Returns `true` if the pattern `(...) =>` or `(...): type =>` is found.
-pub(super) fn scan_parens_then_arrow(bytes: &[u8], mut pos: usize) -> bool {
-    if pos >= bytes.len() || bytes[pos] != b'(' {
+pub(super) fn scan_parens_then_arrow(bytes: &[u8], start: usize) -> bool {
+    if start >= bytes.len() || bytes[start] != b'(' {
         return false;
     }
 
+    let end = bytes.len();
+    let mut pos = start;
     let mut depth = 0;
-    while pos < bytes.len() {
+    while pos < end {
+        // Strings, templates, and comments are opaque — a `(`/`)` inside one is
+        // not a real delimiter. The shared cursor skips all three in one place
+        // (including backtick templates, which this scan historically missed).
+        if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
+            pos = past;
+            continue;
+        }
+        // Regex literals are the one trivia kind the cursor leaves significant
+        // (it needs backward token lookback). Skip a real regex so a `)`/`(`
+        // inside its pattern isn't counted — e.g. a param default `(a = /\)/)`.
+        if bytes[pos] == b'/' && is_regex_start(bytes, pos, start) {
+            pos = skip_regex_literal(bytes, pos, end);
+            continue;
+        }
         match bytes[pos] {
             b'(' => depth += 1,
             b')' => {
                 depth -= 1;
                 if depth == 0 {
                     return check_arrow_after_paren(bytes, pos + 1);
-                }
-            }
-            b'"' | b'\'' => {
-                pos = skip_string_literal(bytes, pos);
-                continue; // Don't increment pos again
-            }
-            b'/' if pos + 1 < bytes.len() => {
-                // Handle comments
-                match bytes[pos + 1] {
-                    b'/' => {
-                        pos = skip_line_comment(bytes, pos);
-                        continue; // Don't increment pos again
-                    }
-                    b'*' => {
-                        pos = skip_block_comment(bytes, pos);
-                        continue; // Don't increment pos again
-                    }
-                    _ => {}
                 }
             }
             _ => {}
@@ -113,6 +109,16 @@ fn scan_for_arrow(bytes: &[u8], mut pos: usize) -> bool {
         pos = skip_whitespace_and_comments(bytes, pos);
         if pos >= bytes.len() {
             break;
+        }
+
+        // Strings/templates are opaque (comments were already consumed above); a
+        // delimiter inside one isn't significant. No regex skip is needed here
+        // (unlike `scan_parens_then_arrow`): this walks type syntax after a `:` /
+        // `)`, where a `/…/` regex literal can't appear, so a stray `/` is just an
+        // insignificant byte.
+        if let Some(past) = skip_trivia(bytes, pos, bytes.len(), TriviaProfile::JS) {
+            pos = past;
+            continue;
         }
 
         // Check if we're at the outermost nesting level (no open brackets/braces/parens/angles)
@@ -161,12 +167,6 @@ fn scan_for_arrow(bytes: &[u8], mut pos: usize) -> bool {
                 pos += 1;
             }
 
-            // Skip string literals to avoid matching delimiters inside them
-            b'"' | b'\'' | b'`' => {
-                pos = skip_string_literal(bytes, pos);
-                continue; // Don't increment pos again
-            }
-
             _ => {}
         }
         pos += 1;
@@ -198,34 +198,25 @@ pub(super) fn scan_angle_brackets(bytes: &[u8], pos: usize) -> usize {
         return 0;
     }
 
+    let end = bytes.len();
     let mut pos = pos + 1;
     let mut depth = 1;
 
-    while pos < bytes.len() && depth > 0 {
+    while pos < end && depth > 0 {
+        // Strings, templates, and comments are opaque (the shared cursor skips
+        // all three); an angle inside one isn't significant. No regex skip is
+        // needed (unlike `scan_parens_then_arrow`): this scans type-argument
+        // syntax `<…>`, where a `/…/` regex literal can't appear.
+        if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
+            pos = past;
+            continue;
+        }
         match bytes[pos] {
             b'<' if is_less_equal_op(bytes, pos) => pos += 1,
             b'<' => depth += 1,
             b'>' if is_arrow_close(bytes, pos) => {}
             b'>' if is_greater_equal_op(bytes, pos) => pos += 1,
             b'>' => depth -= 1,
-            b'"' | b'\'' | b'`' => {
-                pos = skip_string_literal(bytes, pos);
-                continue; // Don't increment pos again
-            }
-            b'/' if pos + 1 < bytes.len() => {
-                // Handle comments
-                match bytes[pos + 1] {
-                    b'/' => {
-                        pos = skip_line_comment(bytes, pos);
-                        continue;
-                    }
-                    b'*' => {
-                        pos = skip_block_comment(bytes, pos);
-                        continue;
-                    }
-                    _ => {}
-                }
-            }
             _ => {}
         }
         pos += 1;
@@ -304,8 +295,17 @@ pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], mut pos: usize) -> bo
     let mut paren_depth: i32 = 0;
     let mut bracket_depth: i32 = 0;
     let mut brace_depth: i32 = 0;
+    let end = bytes.len();
 
-    while pos < bytes.len() {
+    while pos < end {
+        // Strings, templates, and comments are opaque (the shared cursor skips
+        // all three); a `<`/`>`/`;` inside one isn't significant. No regex skip is
+        // needed (unlike `scan_parens_then_arrow`): this verifies a type-argument
+        // sequence `<…>`, where a `/…/` regex literal can't appear.
+        if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
+            pos = past;
+            continue;
+        }
         match bytes[pos] {
             b'<' if is_less_equal_op(bytes, pos) => pos += 1,
             // Angle depth only tracks at delimiter depth 0 — `<`/`>` inside a
@@ -367,23 +367,6 @@ pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], mut pos: usize) -> bo
             // Statement end — but only at the top level. Inside a balanced `{…}` a `;`
             // is an object-type member separator (`<{ a: number; b: string }>`).
             b';' if paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 => return false,
-            // Skip comments to avoid false matches on `>` inside them
-            b'/' if pos + 1 < bytes.len() => match bytes[pos + 1] {
-                b'/' => {
-                    pos = skip_line_comment(bytes, pos);
-                    continue;
-                }
-                b'*' => {
-                    pos = skip_block_comment(bytes, pos);
-                    continue;
-                }
-                _ => {}
-            },
-            // Skip string literals to avoid false matches on `>` inside them
-            b'"' | b'\'' | b'`' => {
-                pos = skip_string_literal(bytes, pos);
-                continue;
-            }
             _ => {}
         }
         pos += 1;

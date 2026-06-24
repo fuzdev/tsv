@@ -757,7 +757,7 @@ impl<'a> Printer<'a> {
         let open_paren = self.find_open_paren_after(stmt_start);
         let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
         let (for_await_comments, await_paren_comments) = if is_await {
-            let await_pos = self.find_keyword_in_source(for_keyword_end, left_start, "await");
+            let await_pos = self.find_keyword_in_range(for_keyword_end, left_start, "await");
             let for_await_c = await_pos
                 .and_then(|ap| self.build_inline_comments_between_doc_opt(for_keyword_end, ap));
             let await_paren_c = await_pos

@@ -31,6 +31,12 @@ rule). Per Comment Position Philosophy. When the c4 line comment forces the
 statement spanning lines). Sibling of the import `from_comment`
 divergence (the gap one token earlier).
 
+The `import e from './e' with /* with */ { type: 'json' }` case sits in the same
+`with`→`{` position as c3, but its comment **text is the `with` keyword itself**
+(scan robustness): tsv finds the *real* `with`, not the copy inside the comment, so
+the comment is preserved rather than dropped — a naive reverse keyword search would
+match the comment's `with` and mislocate the gap.
+
 The **line comment between the source and `with`** (the c2 form) is a different
 beast — prettier's `typescript` parser *throws* on it, so it has no
 `output_prettier` oracle and lives in the sibling

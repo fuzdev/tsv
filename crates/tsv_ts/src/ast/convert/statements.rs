@@ -44,9 +44,16 @@ fn convert_attributes(
 /// `export`, not at the decorator.
 fn find_export_start(source: &str, span_start: u32, offset: usize) -> u32 {
     let src_start = span_start as usize - offset;
-    source[src_start..]
-        .find("export")
-        .map_or(span_start, |pos| (src_start + pos + offset) as u32)
+    // Skip comments so an `export` inside one (`@dec /* export */ export …`)
+    // isn't mistaken for the keyword, which would mislocate the node's start.
+    tsv_lang::source_scan::find_keyword(
+        source.as_bytes(),
+        src_start,
+        source.len(),
+        b"export",
+        tsv_lang::source_scan::TriviaProfile::JS,
+    )
+    .map_or(span_start, |pos| (pos + offset) as u32)
 }
 
 /// Main statement conversion dispatcher

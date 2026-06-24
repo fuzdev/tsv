@@ -175,7 +175,7 @@ deno task fixtures:update:parsed     # regenerate expected.json only (run when p
 deno task fixtures:update:formatted  # regenerate output_prettier.svelte only
 deno task fixtures:audit             # audit _prettier_divergence fixtures (diagnostic; --all for every fixture)
 deno task conformance:audit          # verify every divergence fixture is linked in its conformance doc (prettier + svelte; gated in `deno task check`)
-deno task scan:audit                 # guard against new raw str::find/rfind delimiter scans over source (gated in `deno task check`); see Debug Tooling
+deno task scan:audit                 # guard against new raw find/rfind/match_indices substring scans over source (gated in `deno task check`); see Debug Tooling
 ```
 
 For direct `cargo run -p tsv_debug` usage, see [Debug Tooling](#debug-tooling).
@@ -681,21 +681,23 @@ cargo run -p tsv_debug swallow_audit ~/dev/zzz/src   # audit a real codebase
 **Raw-Find Scan Audit (delimiter-scan regression guard):**
 
 ```bash
-# scan_audit - guard against new raw `str::find`/`rfind` delimiter scans over
+# scan_audit - guard against new raw position-anchoring substring scans over
 # source. A raw `self.source[..].find(delim)` can match the glyph inside an
 # enclosed comment/string and drop content (the "Comment-Aware Delimiter Scans"
 # bug class); the fix is the trivia-aware cursor (`tsv_lang::source_scan`).
-# This audit flags every find/rfind (non-closure pattern) in the four language
-# crates and fails on any not in the reviewed in-code allow-list (ALLOW, each
-# entry categorized: comment-marker / newline / css-value / delimiter-latent /
-# delimiter-deferred-bug / …). A new scan must move onto the cursor or be
-# consciously allow-listed; a migrated/reformatted scan must drop its now-stale
-# entry (the list mirrors the live sites exactly). Pure Rust, no Deno.
+# This audit flags every `find`/`rfind`/`match_indices`/`rmatch_indices`
+# (non-closure pattern) in the four language crates and fails on any not in the
+# reviewed in-code allow-list (ALLOW, each entry categorized: comment-marker /
+# newline / css-value / at-rule-range / delimiter-latent / delimiter-deferred-bug
+# / …). A new scan must move onto the cursor or be consciously allow-listed; a
+# migrated/reformatted scan must drop its now-stale entry (the list mirrors the
+# live sites exactly). Pure Rust, no Deno.
 cargo run -p tsv_debug scan_audit            # audit (exit 1 on any violation/stale)
-cargo run -p tsv_debug scan_audit --list     # enumerate every find/rfind site
-# Also: --json. Gated in `deno task check` via the `scan:audit` task. Closure
-# `.find(|…|)` (iterator/predicate) is excluded; hand byte-loops are out of
-# automated scope (the cursor is their sanctioned home).
+cargo run -p tsv_debug scan_audit --list     # enumerate every scan site
+# Also: --json. Gated in `deno task check` via the `scan:audit` task. Out of
+# scope: closure `.find(|…|)`/`.match_indices(|…|)` (iterator/predicate), counting
+# (`.matches(c).count()`) and existence (`contains`/`starts_with`) checks, and
+# hand byte-loops (the cursor is their sanctioned home).
 ```
 
 **Authoring-Independence Audit (Svelte boundary whitespace):**

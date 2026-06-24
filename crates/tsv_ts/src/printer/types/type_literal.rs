@@ -107,15 +107,13 @@ impl<'a> Printer<'a> {
         upper_bound: u32,
     ) -> Vec<DocId> {
         let d = self.d();
-        let source_slice = &self.source[member_end as usize..upper_bound as usize];
-        let semi_offset = source_slice.find(';');
+        // Comment-aware so a `;` inside a comment in this gap isn't taken for the
+        // member separator (which would partition the comments incorrectly).
+        let semi_pos = self.find_char_outside_comments(member_end, upper_bound, b';');
 
         let (before_semi, after_semi): (Vec<_>, Vec<_>) =
-            comments.iter().partition(|c| match semi_offset {
-                Some(offset) => {
-                    let semi_pos = member_end + offset as u32;
-                    c.span.start < semi_pos
-                }
+            comments.iter().partition(|c| match semi_pos {
+                Some(pos) => c.span.start < pos,
                 None => true, // No semicolon in source, all comments are "before"
             });
 

@@ -111,7 +111,7 @@ impl<'a> Printer<'a> {
         }
 
         // Find "function" in source after cursor, skipping comments
-        let function_pos = self.find_keyword_in_source(cursor, search_end, "function");
+        let function_pos = self.find_keyword_in_range(cursor, search_end, "function");
         if let Some(fp) = function_pos {
             if let Some(c) = self.build_inline_comments_between_doc_opt(cursor, fp) {
                 parts.push(c);

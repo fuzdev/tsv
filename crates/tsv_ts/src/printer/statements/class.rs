@@ -122,7 +122,7 @@ impl<'a> Printer<'a> {
         }
         if decl.r#abstract {
             // Find "abstract" in source after cursor, skipping comments
-            let abstract_pos = self.find_keyword_in_source(cursor, search_end, "abstract");
+            let abstract_pos = self.find_keyword_in_range(cursor, search_end, "abstract");
             if let Some(ap) = abstract_pos {
                 if let Some(c) = self.build_inline_comments_between_doc_opt(cursor, ap) {
                     parts.push(c);
@@ -135,7 +135,7 @@ impl<'a> Printer<'a> {
             }
         }
         // Find "class" in source after cursor, skipping comments
-        let class_pos = self.find_keyword_in_source(cursor, search_end, "class");
+        let class_pos = self.find_keyword_in_range(cursor, search_end, "class");
         if let Some(cp) = class_pos {
             if let Some(c) = self.build_inline_comments_between_doc_opt(cursor, cp) {
                 parts.push(c);
