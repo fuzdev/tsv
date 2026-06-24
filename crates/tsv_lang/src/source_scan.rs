@@ -497,8 +497,14 @@ mod tests {
         );
         // `$` is an identifier byte, so a keyword flanked by it is not a word
         // (`$from`/`from$` are identifiers, not the `from` keyword).
-        assert_eq!(find_keyword(b"$from x", 0, 7, b"from", TriviaProfile::JS), None);
-        assert_eq!(find_keyword(b"from$ x", 0, 7, b"from", TriviaProfile::JS), None);
+        assert_eq!(
+            find_keyword(b"$from x", 0, 7, b"from", TriviaProfile::JS),
+            None
+        );
+        assert_eq!(
+            find_keyword(b"from$ x", 0, 7, b"from", TriviaProfile::JS),
+            None
+        );
         // Plain match at a boundary.
         assert_eq!(
             find_keyword(b"a class C", 0, 9, b"class", TriviaProfile::JS),
