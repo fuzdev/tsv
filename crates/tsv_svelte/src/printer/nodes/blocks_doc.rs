@@ -8,10 +8,10 @@
 #![allow(clippy::literal_string_with_formatting_args)]
 
 use crate::ast::internal::{self, Fragment, FragmentNode};
-use crate::printer::{DocBuf, Printer};
+use crate::printer::Printer;
 use smallvec::smallvec;
-use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::{DocBuf, GroupId};
 
 use super::helpers::indent_body;
 

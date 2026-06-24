@@ -6,10 +6,13 @@
 // - ChainPrinter trait: Interface for the printer
 
 use super::analysis::SymbolLookup;
-use super::types::{ChainGroup, ChainNode, DocBuf};
+use super::types::{ChainGroup, ChainNode};
 use crate::ast::internal::{self, Expression};
 use string_interner::DefaultSymbol;
-use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::doc::{
+    DocBuf,
+    arena::{DocArena, DocId},
+};
 use tsv_lang::printing::has_blank_line_between_strict;
 use tsv_lang::{ClassifiedComments, Span, SymbolToU32};
 
