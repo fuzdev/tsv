@@ -1338,42 +1338,17 @@ impl<'a> Printer<'a> {
             |tp| d.concat(&[d.text("<"), d.text_owned(tp.clone()), d.text(">")]),
         );
 
-        // Parameters: use raw_parameters if available (preserves TypeScript types),
-        // otherwise format individual params.
-        // Split raw_parameters at top-level commas so each param gets its own
-        // line when the group breaks (matching prettier's per-param wrapping).
-        let params_docs: DocBuf = if let Some(raw) = &block.raw_parameters {
-            split_raw_params_at_commas(raw)
+        // Parameter list `(…)`. The parens fold so that when they wrap, `)` dedents to
+        // base and `}` hugs it (`)}`) — no dangle (no trailing comma; trailingComma:
+        // 'none').
+        let params_doc = if let Some(raw) = &block.raw_parameters {
+            // Parse-failure fallback: emit the raw parameter source (comments preserved
+            // verbatim), split at top-level commas so a long list still wraps one-per-line.
+            let params_docs: DocBuf = split_raw_params_at_commas(raw)
                 .iter()
                 .map(|s| d.text_owned(s.to_string()))
-                .collect()
-        } else {
-            block
-                .parameters
-                .iter()
-                .map(|p| {
-                    // Format parameter through TypeScript formatter for proper normalization
-                    self.build_ts_expression_doc_no_comments(p)
-                })
-                .collect()
-        };
-
-        // Build opening tag with group for parameter wrapping
-        // When fits: {#snippet name(a, b, c)}
-        // When wraps: {#snippet name(\n\ta,\n\tb,\n\tc,\n)}
-        // Empty params: {#snippet name()} - no wrapping structure
-        let opening_doc = if params_docs.is_empty() {
-            // No params - simple structure that won't break incorrectly
-            d.concat(&[
-                d.text("{#snippet "),
-                d.text_owned(name.to_string()),
-                type_params_part,
-                d.text("()}"),
-            ])
-        } else {
-            // Build params doc with line() separators for wrapping
-            // Pre-allocate: each param + separator (except first)
-            let mut parts: DocBuf = DocBuf::with_capacity(params_docs.len() * 3);
+                .collect();
+            let mut parts: DocBuf = DocBuf::with_capacity(params_docs.len() * 2);
             for (i, param_doc) in params_docs.into_iter().enumerate() {
                 if i > 0 {
                     parts.push(d.text(","));
@@ -1381,25 +1356,46 @@ impl<'a> Printer<'a> {
                 }
                 parts.push(param_doc);
             }
-            let params_doc = d.concat(&parts);
+            d.concat(&[
+                d.text("("),
+                d.indent_softline(d.concat(&parts)),
+                d.softline(),
+                d.text(")"),
+            ])
+        } else {
+            // Parsed parameters route through the same comment-aware,
+            // `FunctionParameter`-context printer a real function signature uses, so
+            // interior comments (`{ a = /* c */ 1 }`), boundary comments (`a /* c */, b`),
+            // the single-pattern hug, and nesting-depth expansion all match a standalone
+            // parameter list. `build_function_params_doc_with_comments` emits the `(…)`
+            // (with no group of its own) — the `BlockHead` group below drives the wrap.
+            match block.params_paren {
+                Some(paren) => tsv_ts::build_function_params_doc_with_comments(
+                    d,
+                    &block.parameters,
+                    Some(paren.start),
+                    Some(paren.end),
+                    &self.ts_inputs(),
+                    &self.embed,
+                ),
+                None => d.text("()"),
+            }
+        };
 
-            let indent_sl = d.indent_softline(params_doc);
-            let softline = d.softline();
-            // The params are a call-like `(…)`: when they wrap, `)` dedents to base,
-            // so `}` hugs it (`)}`) — no dangle (no trailing comma; trailingComma:
-            // 'none'). Key the opening group to `BlockHead` so the body can expand when
-            // the params wrap (below).
-            let inner = d.concat(&[
+        // Opening tag `{#snippet name<T>(params)}`. Key the group to `BlockHead` so the
+        // body can expand when the params wrap (below).
+        //   When fits: {#snippet name(a, b, c)}
+        //   When wraps: {#snippet name(\n\ta,\n\tb,\n\tc\n)}
+        let opening_doc = d.group_with_id(
+            d.concat(&[
                 d.text("{#snippet "),
                 d.text_owned(name.to_string()),
                 type_params_part,
-                d.text("("),
-                indent_sl,
-                softline,
-                d.text(")}"),
-            ]);
-            d.group_with_id(inner, GroupId::BlockHead)
-        };
+                params_doc,
+                d.text("}"),
+            ]),
+            GroupId::BlockHead,
+        );
 
         // Body: inline hugs directly, multiline uses hardlines
         let body_doc = if is_inline {

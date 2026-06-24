@@ -147,6 +147,10 @@ pub struct SnippetBlock {
     pub type_parameters: Option<String>, // Generic type params, e.g., "T" for <T>
     pub parameters: Vec<Expression>, // Function parameters (patterns) - may be empty if raw_parameters is set
     pub raw_parameters: Option<String>, // Raw parameter string for TypeScript (when type annotations present)
+    /// Source span of the parameter parens: `start` is the `(`, `end` is the `)`
+    /// (for leading / dangling / trailing comment lookup when printing parameters).
+    /// `None` only if no `(` was found (malformed).
+    pub params_paren: Option<Span>,
     pub body: Fragment,
     pub span: Span,
     /// Span of the opening tag `{#snippet ... }` for comment lookup

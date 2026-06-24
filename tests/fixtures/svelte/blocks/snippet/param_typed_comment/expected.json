@@ -1,0 +1,1141 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 590,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 64,
+				"end": 66,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 66,
+				"end": 109,
+				"data": " comment before the type annotation "
+			},
+			{
+				"type": "Text",
+				"start": 109,
+				"end": 110,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 110,
+				"end": 162,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn1",
+					"start": 120,
+					"end": 123,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 10,
+							"character": 120
+						},
+						"end": {
+							"line": 7,
+							"column": 13,
+							"character": 123
+						}
+					}
+				},
+				"parameters": [
+					{
+						"type": "Identifier",
+						"start": 124,
+						"end": 136,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 14
+							},
+							"end": {
+								"line": 7,
+								"column": 26
+							}
+						},
+						"name": "a",
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 125,
+							"end": 136,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 15
+								},
+								"end": {
+									"line": 7,
+									"column": 26
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 135,
+								"end": 136,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 25
+									},
+									"end": {
+										"line": 7,
+										"column": 26
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 135,
+									"end": 136,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 25
+										},
+										"end": {
+											"line": 7,
+											"column": 26
+										}
+									},
+									"name": "T"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 127,
+										"end": 134
+									}
+								]
+							}
+						}
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 138,
+							"end": 152,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 7,
+									"column": 29,
+									"character": 139
+								},
+								"end": {
+									"line": 7,
+									"column": 33,
+									"character": 143
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 144,
+										"end": 145,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 162,
+				"end": 164,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 164,
+				"end": 197,
+				"data": " comment before the colon "
+			},
+			{
+				"type": "Text",
+				"start": 197,
+				"end": 198,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 198,
+				"end": 251,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn2",
+					"start": 208,
+					"end": 211,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 10,
+							"character": 208
+						},
+						"end": {
+							"line": 10,
+							"column": 13,
+							"character": 211
+						}
+					}
+				},
+				"parameters": [
+					{
+						"type": "Identifier",
+						"start": 212,
+						"end": 225,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 14
+							},
+							"end": {
+								"line": 10,
+								"column": 27
+							}
+						},
+						"name": "a",
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 222,
+							"end": 225,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 24
+								},
+								"end": {
+									"line": 10,
+									"column": 27
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 224,
+								"end": 225,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 26
+									},
+									"end": {
+										"line": 10,
+										"column": 27
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 224,
+									"end": 225,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 26
+										},
+										"end": {
+											"line": 10,
+											"column": 27
+										}
+									},
+									"name": "T"
+								}
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 214,
+									"end": 221
+								}
+							]
+						}
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 227,
+							"end": 241,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 10,
+									"column": 30,
+									"character": 228
+								},
+								"end": {
+									"line": 10,
+									"column": 34,
+									"character": 232
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 233,
+										"end": 234,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 251,
+				"end": 253,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 253,
+				"end": 310,
+				"data": " comment trailing a typed param, before the comma "
+			},
+			{
+				"type": "Text",
+				"start": 310,
+				"end": 311,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 311,
+				"end": 369,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn3",
+					"start": 321,
+					"end": 324,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 10,
+							"character": 321
+						},
+						"end": {
+							"line": 13,
+							"column": 13,
+							"character": 324
+						}
+					}
+				},
+				"parameters": [
+					{
+						"type": "Identifier",
+						"start": 325,
+						"end": 329,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 14
+							},
+							"end": {
+								"line": 13,
+								"column": 18
+							}
+						},
+						"name": "a",
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 326,
+							"end": 329,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 15
+								},
+								"end": {
+									"line": 13,
+									"column": 18
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 328,
+								"end": 329,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 17
+									},
+									"end": {
+										"line": 13,
+										"column": 18
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 328,
+									"end": 329,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 17
+										},
+										"end": {
+											"line": 13,
+											"column": 18
+										}
+									},
+									"name": "T"
+								}
+							}
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 330,
+								"end": 337
+							}
+						]
+					},
+					{
+						"type": "Identifier",
+						"start": 339,
+						"end": 343,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 28
+							},
+							"end": {
+								"line": 13,
+								"column": 32
+							}
+						},
+						"name": "b",
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 340,
+							"end": 343,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 29
+								},
+								"end": {
+									"line": 13,
+									"column": 32
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 342,
+								"end": 343,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 31
+									},
+									"end": {
+										"line": 13,
+										"column": 32
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 342,
+									"end": 343,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 31
+										},
+										"end": {
+											"line": 13,
+											"column": 32
+										}
+									},
+									"name": "U"
+								}
+							}
+						}
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 345,
+							"end": 359,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 13,
+									"column": 35,
+									"character": 346
+								},
+								"end": {
+									"line": 13,
+									"column": 39,
+									"character": 350
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 351,
+										"end": 352,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 369,
+				"end": 371,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 371,
+				"end": 420,
+				"data": " comment after the `=` of a typed default "
+			},
+			{
+				"type": "Text",
+				"start": 420,
+				"end": 421,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 421,
+				"end": 477,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn4",
+					"start": 431,
+					"end": 434,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 10,
+							"character": 431
+						},
+						"end": {
+							"line": 16,
+							"column": 13,
+							"character": 434
+						}
+					}
+				},
+				"parameters": [
+					{
+						"type": "AssignmentPattern",
+						"start": 435,
+						"end": 451,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 14
+							},
+							"end": {
+								"line": 16,
+								"column": 30
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 435,
+							"end": 439,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 14
+								},
+								"end": {
+									"line": 16,
+									"column": 18
+								}
+							},
+							"name": "a",
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 436,
+								"end": 439,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 15
+									},
+									"end": {
+										"line": 16,
+										"column": 18
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 438,
+									"end": 439,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 17
+										},
+										"end": {
+											"line": 16,
+											"column": 18
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 438,
+										"end": 439,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 17
+											},
+											"end": {
+												"line": 16,
+												"column": 18
+											}
+										},
+										"name": "T"
+									}
+								}
+							}
+						},
+						"right": {
+							"type": "Literal",
+							"start": 450,
+							"end": 451,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 29
+								},
+								"end": {
+									"line": 16,
+									"column": 30
+								}
+							},
+							"value": 1,
+							"raw": "1",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 442,
+									"end": 449
+								}
+							]
+						}
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 453,
+							"end": 467,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 16,
+									"column": 33,
+									"character": 454
+								},
+								"end": {
+									"line": 16,
+									"column": 37,
+									"character": 458
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 459,
+										"end": 460,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 477,
+				"end": 479,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 479,
+				"end": 532,
+				"data": " comment trailing a typed destructuring param "
+			},
+			{
+				"type": "Text",
+				"start": 532,
+				"end": 533,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 533,
+				"end": 589,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn5",
+					"start": 543,
+					"end": 546,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 10,
+							"character": 543
+						},
+						"end": {
+							"line": 19,
+							"column": 13,
+							"character": 546
+						}
+					}
+				},
+				"parameters": [
+					{
+						"type": "ObjectPattern",
+						"start": 547,
+						"end": 555,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 14
+							},
+							"end": {
+								"line": 19,
+								"column": 22
+							}
+						},
+						"properties": [
+							{
+								"type": "Property",
+								"start": 549,
+								"end": 550,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 16
+									},
+									"end": {
+										"line": 19,
+										"column": 17
+									}
+								},
+								"method": false,
+								"shorthand": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 549,
+									"end": 550,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 16
+										},
+										"end": {
+											"line": 19,
+											"column": 17
+										}
+									},
+									"name": "a"
+								},
+								"value": {
+									"type": "Identifier",
+									"start": 549,
+									"end": 550,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 16
+										},
+										"end": {
+											"line": 19,
+											"column": 17
+										}
+									},
+									"name": "a"
+								},
+								"kind": "init"
+							}
+						],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 552,
+							"end": 555,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 19
+								},
+								"end": {
+									"line": 19,
+									"column": 22
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 554,
+								"end": 555,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 21
+									},
+									"end": {
+										"line": 19,
+										"column": 22
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 554,
+									"end": 555,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 21
+										},
+										"end": {
+											"line": 19,
+											"column": 22
+										}
+									},
+									"name": "T"
+								}
+							}
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 556,
+								"end": 563
+							}
+						]
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 565,
+							"end": 579,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 19,
+									"column": 33,
+									"character": 566
+								},
+								"end": {
+									"line": 19,
+									"column": 37,
+									"character": 570
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 571,
+										"end": 572,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 127,
+			"end": 134,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 17
+				},
+				"end": {
+					"line": 7,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 214,
+			"end": 221,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 16
+				},
+				"end": {
+					"line": 10,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 330,
+			"end": 337,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 19
+				},
+				"end": {
+					"line": 13,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 442,
+			"end": 449,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 21
+				},
+				"end": {
+					"line": 16,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 556,
+			"end": 563,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 23
+				},
+				"end": {
+					"line": 19,
+					"column": 30
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 64,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 55,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 20,
+					"end": 36,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 17
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 25,
+						"end": 26,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 6
+							},
+							"end": {
+								"line": 2,
+								"column": 7
+							}
+						},
+						"name": "T"
+					},
+					"typeAnnotation": {
+						"type": "TSNumberKeyword",
+						"start": 29,
+						"end": 35,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 10
+							},
+							"end": {
+								"line": 2,
+								"column": 16
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 38,
+					"end": 54,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 17
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 43,
+						"end": 44,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "U"
+					},
+					"typeAnnotation": {
+						"type": "TSStringKeyword",
+						"start": 47,
+						"end": 53,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 3,
+								"column": 16
+							}
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

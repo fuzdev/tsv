@@ -1,0 +1,208 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 133,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 80,
+				"data": " depth-2 nested object pattern stays inline (function-parameter context) "
+			},
+			{
+				"type": "Text",
+				"start": 80,
+				"end": 81,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 81,
+				"end": 132,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn",
+					"start": 91,
+					"end": 93,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 10,
+							"character": 91
+						},
+						"end": {
+							"line": 2,
+							"column": 12,
+							"character": 93
+						}
+					}
+				},
+				"parameters": [
+					{
+						"type": "ObjectPattern",
+						"start": 94,
+						"end": 106,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 13
+							},
+							"end": {
+								"line": 2,
+								"column": 25
+							}
+						},
+						"properties": [
+							{
+								"type": "Property",
+								"start": 96,
+								"end": 104,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 15
+									},
+									"end": {
+										"line": 2,
+										"column": 23
+									}
+								},
+								"method": false,
+								"shorthand": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 96,
+									"end": 97,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 15
+										},
+										"end": {
+											"line": 2,
+											"column": 16
+										}
+									},
+									"name": "a"
+								},
+								"value": {
+									"type": "ObjectPattern",
+									"start": 99,
+									"end": 104,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 18
+										},
+										"end": {
+											"line": 2,
+											"column": 23
+										}
+									},
+									"properties": [
+										{
+											"type": "Property",
+											"start": 101,
+											"end": 102,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 20
+												},
+												"end": {
+													"line": 2,
+													"column": 21
+												}
+											},
+											"method": false,
+											"shorthand": true,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 101,
+												"end": 102,
+												"loc": {
+													"start": {
+														"line": 2,
+														"column": 20
+													},
+													"end": {
+														"line": 2,
+														"column": 21
+													}
+												},
+												"name": "b"
+											},
+											"value": {
+												"type": "Identifier",
+												"start": 101,
+												"end": 102,
+												"loc": {
+													"start": {
+														"line": 2,
+														"column": 20
+													},
+													"end": {
+														"line": 2,
+														"column": 21
+													}
+												},
+												"name": "b"
+											},
+											"kind": "init"
+										}
+									]
+								},
+								"kind": "init"
+							}
+						]
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 108,
+							"end": 122,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 28,
+									"character": 109
+								},
+								"end": {
+									"line": 2,
+									"column": 32,
+									"character": 113
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 114,
+										"end": 115,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

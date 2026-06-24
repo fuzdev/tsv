@@ -224,6 +224,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - With parameters (`{#snippet name(a, b)}`)
 - With default parameters
 - With destructuring
+- Parameter comments — interior (`{ a = /* c */ 1 }`), boundary (`a /* c */, b`), dangling (`(/* c */)`)
 - Nested snippets
 - Recursive snippets
 
@@ -231,6 +232,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 
 - Generic type parameters (`{#snippet name<T>(x: T)}`)
 - Typed parameters (`{#snippet fn(a: string, b: number)}`)
+- Typed parameter comments (`{#snippet fn(a: T /* c */, b: U)}`)
 
 ### Snippet Scope
 

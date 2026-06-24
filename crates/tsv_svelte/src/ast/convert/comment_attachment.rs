@@ -621,14 +621,24 @@ fn walk_and_attach_expressions(
                             );
                         }
                         if let Some(serde_json::Value::Array(params)) = map.get_mut("parameters") {
+                            // Walk the parameters in order, advancing a cursor past each
+                            // param and its trailing comments so windows don't overlap —
+                            // an inter-parameter comment is claimed once (as the preceding
+                            // param's trailing) rather than attached to both adjacent
+                            // params. Matches Svelte's single acorn parse of the list.
+                            let mut cursor = c_start;
                             for param in params.iter_mut() {
+                                let p_end = node_end(param);
                                 try_attach_comments_to_node(
                                     param,
                                     template_comments,
                                     source,
-                                    c_start,
+                                    cursor,
                                     range_end,
                                 );
+                                if let Some(e) = p_end {
+                                    cursor = scan_past_trailing_comments(source, e, range_end);
+                                }
                             }
                         }
                     }
