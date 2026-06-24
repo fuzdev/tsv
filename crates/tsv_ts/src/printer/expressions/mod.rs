@@ -30,6 +30,8 @@ mod template_literal;
 use crate::ast::internal::{BinaryExpression, BinaryOperator, Expression, TSType};
 use crate::printer::comments::{CommentFilter, CommentSpacing};
 use crate::printer::{ParenContext, PatternContext, Printer, chain, needs_parens};
+use smallvec::smallvec;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -180,7 +182,7 @@ impl<'a> Printer<'a> {
         // otherwise `(// c <inner>)` runs the inner and the `)` into the comment
         // (silent content loss). Mirrors `build_expression_doc_keep_paren_comments`.
         if self.has_line_comments_between(open + 1, inner_start) {
-            let mut parts = vec![d.hardline()];
+            let mut parts: DocBuf = smallvec![d.hardline()];
             for comment in tsv_lang::comments_in_range(self.comments, open + 1, inner_start) {
                 parts.push(self.build_comment_doc(comment));
                 // A line comment runs to end-of-line, so it must break; a block
@@ -618,7 +620,7 @@ impl<'a> Printer<'a> {
         inst_expr: &crate::ast::internal::TSInstantiationExpression,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts: DocBuf = DocBuf::new();
         let needs_parens =
             needs_parens(&inst_expr.expression, ParenContext::InstantiationExpression);
         if needs_parens {
@@ -787,7 +789,7 @@ impl<'a> Printer<'a> {
         // object/array on the right, keep operator and RHS on the same line.
         // Prettier ref: binaryish.js:275, 361
         let should_inline_last = assignment::should_inline_logical_expression(binary);
-        let mut parts = Vec::new();
+        let mut parts: DocBuf = DocBuf::new();
 
         for (i, operand) in operands.iter().enumerate() {
             let is_last = i == operands.len() - 1;
@@ -916,7 +918,7 @@ impl<'a> Printer<'a> {
 
         // For 3+ operand chains, use line breaks between operands:
         // operand1 " /", line, operand2 " /", line, operand3
-        let mut parts = Vec::new();
+        let mut parts: DocBuf = DocBuf::new();
 
         for (i, operand) in operands.iter().enumerate() {
             if i == 0 {
@@ -944,7 +946,7 @@ impl<'a> Printer<'a> {
         param_prop: &crate::ast::internal::TSParameterProperty,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts: DocBuf = DocBuf::new();
 
         // Print modifiers in canonical TS order: accessibility, override, readonly
         if let Some(acc) = &param_prop.accessibility {
