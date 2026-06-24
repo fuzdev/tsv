@@ -771,7 +771,8 @@ CWD-relative).
   …/tsv_wasm.js`) with the ../../docs/performance.md §5 paired discipline:
   interleaved pairs, the A/A noise floor measured in the same run, `net = A/B ÷
   floor`, and a corpus byte-identity gate that aborts if the builds format
-  differently. See the module doc for the full workflow.
+  differently. Omit `--baseline` for an A/A-only run (floor + current-build
+  baseline number, no comparison). See the module doc for the full workflow.
 - **wasm-opt**: runs with explicit feature flags in `crates/tsv_wasm/Cargo.toml` — Rust 2024's bulk-memory and nontrapping-float-to-int ops are passed by name to wasm-opt v117, giving ~−2% gzipped on the WASM bundle.
 - **oxfmt × Deno timer interaction (workaround in place)**: once `oxfmt.format` runs once,
   Deno's timer wheel processes exactly one further `setTimeout` callback and then stalls all
