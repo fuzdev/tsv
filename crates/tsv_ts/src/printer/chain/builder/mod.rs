@@ -32,11 +32,11 @@ use super::printing::{
     ChainPrinter, has_inside_bracket_comments, print_group, print_group_expanded,
     print_group_standard_expanded, print_node,
 };
-use super::types::{ChainGroup, ChainNode, ChainNodeRefVec, DocBuf};
+use super::types::{ChainGroup, ChainNode, ChainNodeRefVec};
 use crate::ast::internal::{ArrowFunctionBody, Expression};
 use crate::printer::calls::arg_predicates::contains_call_expression;
 use smallvec::smallvec;
-use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::{DocBuf, arena::DocId};
 
 /// Cutoff for short chains when groups should NOT be merged
 const SHORT_CHAIN_CUTOFF: usize = 2;

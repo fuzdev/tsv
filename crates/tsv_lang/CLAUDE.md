@@ -30,6 +30,7 @@ The doc builder is the core of the formatting architecture. Language printers bu
 
 - **`DocArena`** — Contiguous storage for all doc nodes. Heuristic capacity: ~4 nodes per source byte.
 - **`DocId`** (`u32`) — Lightweight, `Copy` handle into the arena. No cloning, no recursive Drop.
+- **`DocBuf`** (`SmallVec<[DocId; 8]>`) — Shared stack buffer for assembling a node's doc parts before `concat()` / `fill()`. Most nodes have only a handful of parts, so the common case stays off the heap; larger nodes spill. Used by all language printers (the TS chain / binary-operator printers, the Svelte template printer) as the single canonical doc-parts buffer type.
 - **`DocNode`** — Node variants: `Text`, `Line`, `Indent`, `Dedent`, `Group`, `IfBreak`, `Concat`, `Fill`, etc.
 - **`DocText`** — Three variants: `Static(&'static str)` (punctuation/keywords), `Owned(String)` (dynamic), `Symbol(u32)` (deferred resolution via interner).
 - **`LineKind`** — `Normal` (space in flat, newline in break), `Soft` (nothing in flat), `Hard` (always newline), `Literal` (newline without indent).

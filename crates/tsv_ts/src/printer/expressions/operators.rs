@@ -9,7 +9,7 @@ use crate::printer::comments::CommentSpacing;
 use crate::printer::{ParenContext, Printer, needs_parens};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
-use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::{DocBuf, arena::DocId};
 
 /// Holds information about an operand in a binary expression chain
 /// Used to track position information for comment placement
@@ -17,12 +17,6 @@ struct ChainOperand {
     doc: DocId,
     span: Span,
 }
-
-/// Stack buffer for binary-chain doc parts (head / continuation), mirroring the
-/// member-chain `chain::types::DocBuf`. Binary chains are short (`a && b && c`),
-/// so the common case assembles on the stack; longer chains spill to the heap.
-/// `DocId` is `Copy` and 4 bytes, so the inline buffer is 32 bytes.
-type DocBuf = SmallVec<[DocId; 8]>;
 
 /// Stack buffers for a flattened binary chain's operands / operators, collected
 /// once per binary expression. The common 2–3 operand chain stays inline

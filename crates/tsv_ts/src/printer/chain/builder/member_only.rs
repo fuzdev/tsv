@@ -4,11 +4,11 @@
 // fill() for greedy packing of segments.
 
 use super::super::printing::{ChainPrinter, print_node, print_node_inner};
-use super::super::types::{ChainGroup, ChainNode, ChainNodeRefVec, DocBuf};
+use super::super::types::{ChainGroup, ChainNode, ChainNodeRefVec};
 use super::helpers::push_gap_comments_and_break;
 use crate::ast::internal::Expression;
 use smallvec::smallvec;
-use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::{DocBuf, arena::DocId};
 
 /// True if a member-only chain has a line comment in any inter-member gap.
 ///
