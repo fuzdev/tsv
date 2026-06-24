@@ -10,7 +10,8 @@
 // Uses Doc IR for all formatting - build_*_doc methods are the canonical implementations.
 
 use crate::ast::internal;
-use crate::printer::Printer;
+use crate::printer::{DocBuf, Printer};
+use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::{SymbolResolver, SymbolToU32};
 
@@ -199,7 +200,7 @@ impl<'a> Printer<'a> {
 
             // General path: a multi-part value is always a quoted string (a pure
             // `{expr}` value is single-part and handled by the fast path above).
-            let mut parts = vec![d.symbol(name_sym), d.text("=\"")];
+            let mut parts: DocBuf = smallvec![d.symbol(name_sym), d.text("=\"")];
             let last_idx = value_parts.len().saturating_sub(1);
             for (i, part) in value_parts.iter().enumerate() {
                 if normalize_class {
@@ -301,7 +302,7 @@ impl<'a> Printer<'a> {
         span_end: u32,
     ) -> DocId {
         let d = self.d();
-        let mut parts = vec![d.text(prefix)];
+        let mut parts: DocBuf = smallvec![d.text(prefix)];
 
         // The expression begins exactly `prefix.len()` bytes past the span start,
         // so the comment-scan anchor derives from the emitted prefix — the two
@@ -345,7 +346,7 @@ impl<'a> Printer<'a> {
         expression_tag_span: Option<tsv_lang::Span>,
     ) -> DocId {
         let d = self.d();
-        let mut parts = vec![prefix, d.text_owned(name.to_string())];
+        let mut parts: DocBuf = smallvec![prefix, d.text_owned(name.to_string())];
         parts.extend(self.build_modifiers_doc(modifiers));
         if let Some(expr) = expression {
             parts.extend(self.build_expression_doc_parts_with_span(expr, expression_tag_span));
@@ -367,7 +368,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for bind:prop directive
     fn build_bind_directive_doc(&self, dir: &internal::BindDirective) -> DocId {
         let d = self.d();
-        let mut parts = vec![d.text("bind:"), d.text_owned(dir.name.clone())];
+        let mut parts: DocBuf = smallvec![d.text("bind:"), d.text_owned(dir.name.clone())];
         parts.extend(self.build_modifiers_doc(&dir.modifiers));
         // Only include expression if not shorthand
         if !self.is_identifier_with_name(&dir.expression, &dir.name) {
@@ -383,7 +384,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for class:name directive
     fn build_class_directive_doc(&self, dir: &internal::ClassDirective) -> DocId {
         let d = self.d();
-        let mut parts = vec![d.text("class:"), d.text_owned(dir.name.clone())];
+        let mut parts: DocBuf = smallvec![d.text("class:"), d.text_owned(dir.name.clone())];
         parts.extend(self.build_modifiers_doc(&dir.modifiers));
         // Only include expression if not shorthand
         if !self.is_identifier_with_name(&dir.expression, &dir.name) {
@@ -397,7 +398,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for style:prop directive
     fn build_style_directive_doc(&self, dir: &internal::StyleDirective) -> DocId {
         let d = self.d();
-        let mut parts = vec![d.text("style:"), d.text_owned(dir.name.clone())];
+        let mut parts: DocBuf = smallvec![d.text("style:"), d.text_owned(dir.name.clone())];
         parts.extend(self.build_modifiers_doc(&dir.modifiers));
         match &dir.value {
             internal::StyleDirectiveValue::True => {}
@@ -455,7 +456,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for let:name directive
     fn build_let_directive_doc(&self, dir: &internal::LetDirective) -> DocId {
         let d = self.d();
-        let mut parts = vec![d.text("let:"), d.text_owned(dir.name.clone())];
+        let mut parts: DocBuf = smallvec![d.text("let:"), d.text_owned(dir.name.clone())];
         parts.extend(self.build_modifiers_doc(&dir.modifiers));
         // Only include expression if not shorthand (let:foo={foo} → let:foo)
         if let Some(expr) = &dir.expression
@@ -828,7 +829,7 @@ impl<'a> Printer<'a> {
     /// ```
     pub(super) fn build_expression_tag_doc(&self, tag: &internal::ExpressionTag) -> DocId {
         let d = self.d();
-        let mut parts = vec![d.text("{")];
+        let mut parts: DocBuf = smallvec![d.text("{")];
 
         // Add leading comments between { and expression (block inline, line + hardline)
         let expr_start = tag.expression.span().start;

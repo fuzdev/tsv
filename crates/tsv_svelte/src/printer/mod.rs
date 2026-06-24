@@ -27,6 +27,7 @@ mod text;
 
 use self::text::TextAnalysis;
 use crate::ast::internal::{self, FragmentNode};
+use smallvec::SmallVec;
 use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -35,6 +36,15 @@ use tsv_lang::{
     Comment, EmbedContext, INDENT, OutputBuffer, SharedInterner, SymbolResolver, TAB_WIDTH,
     is_format_ignore_directive, is_format_ignore_range_end, is_format_ignore_range_start,
 };
+
+/// Stack buffer for assembling a Svelte node's doc parts before handing them to
+/// `concat`/`fill`. The template printer builds one such `Vec<DocId>` per fragment
+/// node and per attribute — collectively a top format-phase allocation source — yet
+/// most nodes have only a handful of parts (`{`, expr, `}`; a few words; a `<tag>`'s
+/// children), so the common case stays on the stack and only larger fragments spill.
+/// Mirrors the TS member-chain `DocBuf`; `DocId` is `Copy` and 4 bytes → 32-byte
+/// inline buffer.
+pub(crate) type DocBuf = SmallVec<[DocId; 8]>;
 
 /// Which section a fragment comment should travel with during canonical reordering.
 /// Comments attach to the nearest section that follows them in source order.

@@ -7,6 +7,7 @@
 use crate::ast::internal::{self, BinaryOperator, Expression};
 use crate::printer::comments::CommentSpacing;
 use crate::printer::{ParenContext, Printer, needs_parens};
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 
@@ -16,6 +17,18 @@ struct ChainOperand {
     doc: DocId,
     span: Span,
 }
+
+/// Stack buffer for binary-chain doc parts (head / continuation), mirroring the
+/// member-chain `chain::types::DocBuf`. Binary chains are short (`a && b && c`),
+/// so the common case assembles on the stack; longer chains spill to the heap.
+/// `DocId` is `Copy` and 4 bytes, so the inline buffer is 32 bytes.
+type DocBuf = SmallVec<[DocId; 8]>;
+
+/// Stack buffers for a flattened binary chain's operands / operators, collected
+/// once per binary expression. The common 2–3 operand chain stays inline
+/// (`ChainOperand` is 12 bytes, `BinaryOperator` 1 byte); longer chains spill.
+type OperandBuf = SmallVec<[ChainOperand; 8]>;
+type OperatorBuf = SmallVec<[BinaryOperator; 8]>;
 
 /// Style for building binary expression chain docs
 #[derive(Clone, Copy)]
@@ -312,8 +325,8 @@ impl<'a> Printer<'a> {
         binary: &internal::BinaryExpression,
     ) -> DocId {
         // Collect all operands (with spans) and operators in the chain
-        let mut operands: Vec<ChainOperand> = Vec::new();
-        let mut operators = Vec::new();
+        let mut operands: OperandBuf = OperandBuf::new();
+        let mut operators: OperatorBuf = OperatorBuf::new();
         self.collect_binary_chain_with_spans(binary, &mut operands, &mut operators);
 
         if operands.len() <= 1 {
@@ -344,8 +357,8 @@ impl<'a> Printer<'a> {
         style: BinaryChainStyle,
     ) -> DocId {
         // Collect all operands (with spans) and operators in the chain
-        let mut operands: Vec<ChainOperand> = Vec::new();
-        let mut operators = Vec::new();
+        let mut operands: OperandBuf = OperandBuf::new();
+        let mut operators: OperatorBuf = OperatorBuf::new();
         self.collect_binary_chain_with_spans(binary, &mut operands, &mut operators);
 
         if operands.len() <= 1 {
@@ -486,15 +499,15 @@ impl<'a> Printer<'a> {
         operands: &[ChainOperand],
         operators: &[BinaryOperator],
         should_inline_last: bool,
-    ) -> (Vec<DocId>, Vec<DocId>) {
+    ) -> (DocBuf, DocBuf) {
         let d = self.d();
         if operands.is_empty() || operands.len() == 1 {
             // Edge cases handled by callers
-            return (Vec::new(), Vec::new());
+            return (DocBuf::new(), DocBuf::new());
         }
 
         // First operand + first operator (stays at base indent)
-        let mut head_parts = vec![operands[0].doc];
+        let mut head_parts: DocBuf = smallvec![operands[0].doc];
 
         let first_op = operators[0];
         let first_op_str = first_op.as_str();
@@ -510,7 +523,7 @@ impl<'a> Printer<'a> {
         head_parts.push(d.text(first_op_str));
 
         // Build continuation parts
-        let mut continuation_parts = Vec::new();
+        let mut continuation_parts: DocBuf = DocBuf::new();
 
         for i in 1..operands.len() {
             let operand = &operands[i];
@@ -676,7 +689,7 @@ impl<'a> Printer<'a> {
     /// - `a && // comment1\n// comment2\nb` keeps each comment on its own line
     fn append_post_operator_parts(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         op_end: u32,
         _prev_operand_end: u32,
         operand: &ChainOperand,
@@ -791,8 +804,8 @@ impl<'a> Printer<'a> {
     fn collect_binary_chain_with_spans(
         &self,
         expr: &internal::BinaryExpression,
-        operands: &mut Vec<ChainOperand>,
-        operators: &mut Vec<BinaryOperator>,
+        operands: &mut OperandBuf,
+        operators: &mut OperatorBuf,
     ) {
         // Recursively flatten left side if it can be chained with current operator
         if let Expression::BinaryExpression(left_binary) = &*expr.left {
