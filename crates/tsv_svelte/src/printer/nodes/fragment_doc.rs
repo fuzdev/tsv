@@ -13,8 +13,9 @@
 #![allow(clippy::literal_string_with_formatting_args)]
 
 use crate::ast::internal::{self, Fragment, FragmentNode};
-use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
+use crate::printer::{DocBuf, Printer};
+use smallvec::SmallVec;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::is_format_ignore_directive;
 
@@ -101,7 +102,7 @@ impl<'a> Printer<'a> {
         nodes: &[FragmentNode],
         trim_text: bool,
     ) -> DocId {
-        let mut docs: Vec<DocId> = Vec::new();
+        let mut docs: DocBuf = DocBuf::new();
         let mut format_ignore_next = false;
         for (i, node) in nodes.iter().enumerate() {
             // format-ignore: skip whitespace, emit raw source for ignored node
@@ -233,7 +234,7 @@ impl<'a> Printer<'a> {
         // - Each text node → fill([word, line, word, ...])
         // - Inline elements → wrapped with group([line, element]) or group([element, line])
         //   depending on surrounding whitespace
-        let mut child_docs: Vec<DocId> = Vec::new();
+        let mut child_docs: DocBuf = DocBuf::new();
         let mut handle_whitespace_of_prev_text = false;
 
         // forceBreakContent (prettier-plugin-svelte): a fragment that mixes a block element
@@ -430,7 +431,7 @@ impl<'a> Printer<'a> {
         trim_boundaries: bool,
         breakable_exprs: bool,
         multiline: bool,
-        child_docs: &mut Vec<DocId>,
+        child_docs: &mut DocBuf,
         handle_whitespace_of_prev_text: &mut bool,
     ) {
         let FragmentNode::Text(text) = &trimmed_nodes[i] else {
@@ -808,7 +809,7 @@ impl<'a> Printer<'a> {
     fn handle_inline_child(
         &self,
         node: &FragmentNode,
-        child_docs: &mut Vec<DocId>,
+        child_docs: &mut DocBuf,
         handle_whitespace_of_prev_text: &mut bool,
     ) {
         let d = self.d();
@@ -858,7 +859,7 @@ impl<'a> Printer<'a> {
         trimmed_nodes: &[FragmentNode],
         i: usize,
         force_break: bool,
-        child_docs: &mut Vec<DocId>,
+        child_docs: &mut DocBuf,
         handle_whitespace_of_prev_text: &mut bool,
     ) {
         let d = self.d();
@@ -1208,9 +1209,9 @@ impl<'a> Printer<'a> {
     /// matching `build_text_fill_doc_trimmed`'s word split, so non-breaking spaces stay
     /// attached). Used by the inline-element fold so the words after a folded element pack
     /// greedily into the surrounding fill rather than moving as one nested unit.
-    fn word_fill_parts(&self, s: &str) -> Vec<DocId> {
+    fn word_fill_parts(&self, s: &str) -> DocBuf {
         let d = self.d();
-        let mut parts: Vec<DocId> = Vec::new();
+        let mut parts: DocBuf = DocBuf::new();
         for word in s.split_ascii_whitespace() {
             if !parts.is_empty() {
                 parts.push(d.line());
@@ -1244,7 +1245,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let words = self.word_fill_parts(raw);
-        let mut parts: Vec<DocId> = Vec::with_capacity(3 + words.len());
+        let mut parts: DocBuf = SmallVec::with_capacity(3 + words.len());
         parts.push(prev);
         parts.push(d.line());
         parts.extend(words);
@@ -1330,7 +1331,7 @@ impl<'a> Printer<'a> {
         // (U+00A0) and narrow non-breaking spaces (U+202F) stay attached to their
         // words — they are not break points and are preserved verbatim. Rust's
         // `split_whitespace` is Unicode-aware and would split (and thus drop) them.
-        let words: Vec<&str> = raw.split_ascii_whitespace().collect();
+        let words: SmallVec<[&str; 8]> = raw.split_ascii_whitespace().collect();
         if words.is_empty() {
             return None;
         }
@@ -1363,7 +1364,7 @@ impl<'a> Printer<'a> {
         // both: [line, word, line, ..., word, line]
         let prepend_space = !leading_line && !trim_leading && has_leading_ws;
         let append_space = !trim_trailing && has_trailing_ws && !trailing_line;
-        let mut parts = Vec::with_capacity(words.len() * 2 + 2);
+        let mut parts: DocBuf = SmallVec::with_capacity(words.len() * 2 + 2);
 
         if leading_line {
             parts.push(d.line());
