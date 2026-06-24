@@ -30,4 +30,4 @@ comment (`x as /* c */ A`) stays inline in both formatters and is not a
 divergence (see the regular
 [as_satisfies_keyword_comment](../as_satisfies_keyword_comment/) fixture).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.

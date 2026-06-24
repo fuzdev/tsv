@@ -10,3 +10,5 @@ comment position philosophy.
 Same principle as `type_members/signature_paren_in_comment_prettier_divergence`.
 
 Both positions are dual-stable under our formatter (`variant_inside_parens.svelte`).
+
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

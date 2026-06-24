@@ -15,3 +15,5 @@ type T = import('module', { with: { type: 'json' } }).Foo;
 ## References
 
 - [Prettier PR #17798](https://github.com/prettier/prettier/pull/17798)
+
+See [conformance_svelte.md](../../../../../../docs/conformance_svelte.md) §TypeScript Corrections.

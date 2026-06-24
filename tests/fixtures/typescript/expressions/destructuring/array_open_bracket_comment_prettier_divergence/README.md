@@ -35,4 +35,4 @@ removes that inconsistency. Shares the `Printer::delimiter_line_comment_prefix`
 helper with the literal, object, block, type-parameter `<`, and
 function/constructor-type `(` cases.
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

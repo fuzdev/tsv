@@ -7,4 +7,6 @@ Prettier: treats `<menu>` as inline (hugs content)
 
 ## Reason
 
-The HTML spec defines `menu` with `display: block` and the same CSS rules as `ul`/`ol`. The prose describes it as "simply a semantic alternative to `ul`." This is a bug in prettier-plugin-svelte's `blockElements` array.
+**Spec violation.** The HTML spec defines `menu` with `display: block` and the same CSS rules as `ul`/`ol` (`padding-inline-start: 40px`, `counter-reset: list-item`), and the prose describes it as "simply a semantic alternative to `ul`." prettier-plugin-svelte's `blockElements` list omits `menu`, so it formats against the spec; tsv includes it.
+
+See [conformance_prettier.md §Svelte: Elements](../../../../../docs/conformance_prettier.md#svelte-elements).

@@ -1,4 +1,4 @@
-use crate::fixtures::{self, validation};
+use crate::fixtures::validation;
 use argh::FromArgs;
 use futures_util::stream::{self, StreamExt};
 
@@ -30,37 +30,7 @@ impl FixturesValidateCommand {
     }
 
     async fn run_async(self) {
-        let fixtures_dir = std::path::Path::new("tests/fixtures");
-
-        if !fixtures_dir.exists() {
-            eprintln!("Error: fixtures directory not found: tests/fixtures");
-            std::process::exit(1);
-        }
-
-        let all_fixtures = match fixtures::walk_fixtures(fixtures_dir) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error walking fixtures: {e}");
-                std::process::exit(1);
-            }
-        };
-
-        let total_count = all_fixtures.len();
-
-        // Apply filters
-        let fixture_list: Vec<_> = all_fixtures
-            .into_iter()
-            .filter(|f| f.matches_filters(&self.filters))
-            .collect();
-
-        if fixture_list.is_empty() {
-            if self.filters.is_empty() {
-                eprintln!("No fixtures found");
-            } else {
-                eprintln!("No fixtures found matching: {}", self.filters.join(" "));
-            }
-            std::process::exit(1);
-        }
+        let (fixture_list, total_count) = super::walk_and_filter(&self.filters);
 
         if self.list {
             println!("Found fixtures:");

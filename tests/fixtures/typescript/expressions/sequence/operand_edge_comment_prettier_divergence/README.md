@@ -30,5 +30,6 @@ Unlike an interior operand comment (between two operands, e.g.
 `(x /* c */, /* c */ y)`), which is stable inline without parens and matches
 prettier — see [operand_comments](../operand_comments/).
 
-Reason: comment preservation + reaching prettier's fixed point. See
-conformance_prettier.md §Comment Position Philosophy.
+Reason: comment normalization (stable quirk) — tsv reaches prettier's fixed
+point in one pass where prettier needs two. See
+[conformance_prettier.md §Comment normalization (stable quirks)](../../../../../../docs/conformance_prettier.md#comment-normalization-stable-quirks).

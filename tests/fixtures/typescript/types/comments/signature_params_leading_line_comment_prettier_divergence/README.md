@@ -43,4 +43,4 @@ unchanged and match Prettier; only a line comment trailing `(` diverges.
 Before this, the comment swallowed the following tokens (`(// c p: T): void` —
 invalid and non-idempotent); now it is preserved.
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

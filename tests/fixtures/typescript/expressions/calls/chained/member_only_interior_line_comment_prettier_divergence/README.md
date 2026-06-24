@@ -16,6 +16,9 @@ A `//` must end its line, so a member-only chain with an interior line comment
 cannot stay inline without either relocating the comment (prettier) or fusing it
 into the line below (the historical tsv bug: `foo.bar.baz; // c2 // c1`). tsv
 breaks the chain instead, applying the [comment-position
-philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy)
+philosophy](../../../../../../../docs/conformance_prettier.md#comment-position-philosophy)
 — comments stay where the author placed them. Block-only comments don't force
 this (they format inline on the fill path), so only line comments route here.
+
+Reason: Comment relocation. See
+[conformance_prettier.md §Comment relocation](../../../../../../../docs/conformance_prettier.md#comment-relocation).

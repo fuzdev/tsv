@@ -36,4 +36,4 @@ non-idempotent content loss); keeping it on the keyword line via `line_suffix`
 with the type on the next line fixes the loss and preserves the user's
 placement.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).

@@ -1,4 +1,4 @@
-# type_literal_open_brace_comment_prettier_divergence
+# type_literal_open_brace_comment_svelte_prettier_divergence
 
 A comment trailing a type literal's opening `{` on the same line (e.g.
 `type A = { // c` or `type A = { /* c */`) is preserved on the `{` line.
@@ -25,10 +25,11 @@ relocation is its own canonical form). When the author instead writes the
 comment on its own line, both formatters keep it there — the two positions are
 dual-stable. An inline block comment that hugs content in a literal that stays
 inline (`type B = {/* c */ a: number}`) and an own-line block comment are
-unchanged and match Prettier (see the non-divergent sibling
-[type_literal_open_brace_comment](../type_literal_open_brace_comment/)); only
-the expanding line-comment cases (a line comment after `{`, or own-line content
-forcing a break) diverge.
+unchanged and match Prettier (those formatter-non-divergent block cases live in
+the parser-only sibling
+[type_literal_open_brace_comment_svelte_divergence](../type_literal_open_brace_comment_svelte_divergence/));
+only the expanding line-comment cases (a line comment after `{`, or own-line
+content forcing a break) diverge.
 
 This is the type-literal member of the open-delimiter family. Type-literal
 members are printed in their own multiline path (`build_type_literal_doc_inner`

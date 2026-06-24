@@ -18,4 +18,4 @@ Same principle as
 `interfaces/construct_signature_paren_in_comment_prettier_divergence` (the
 construct-signature form of the same gap).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation (`new` to `(`).
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation) (`new` to `(`).

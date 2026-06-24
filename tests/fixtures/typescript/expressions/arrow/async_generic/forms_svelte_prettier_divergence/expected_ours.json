@@ -1,0 +1,1181 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 970,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Async generic arrow forms that each exercise a path beyond the canonical",
+			"start": 20,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " stacked case (see stacked_svelte_prettier_divergence). Every single",
+			"start": 97,
+			"end": 167,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " unconstrained `<T>` stays bare under tsv; prettier forces `<T,>` (output_prettier).",
+			"start": 169,
+			"end": 255,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Optional param — the acorn-typescript param-drop hits `x?` too, a distinct",
+			"start": 258,
+			"end": 335,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " param node from the plain/rest forms. tsv keeps it (expected_ours); Svelte",
+			"start": 337,
+			"end": 414,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " drops it (expected_svelte). Single `<T>` also takes prettier's `<T,>`.",
+			"start": 416,
+			"end": 489,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Object-literal body with `as` assertion — no params, so nothing to drop;",
+			"start": 561,
+			"end": 636,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " only the `<T,>` formatter divergence applies.",
+			"start": 638,
+			"end": 686,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 49
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Typed binding — the annotation `<T>` is a type position and stays bare in",
+			"start": 747,
+			"end": 823,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " BOTH tools; only the initializer `<T>` (value position) takes `<T,>`.",
+			"start": 825,
+			"end": 897,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 73
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 969,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 960,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 18,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 491,
+					"end": 558,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 68
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 497,
+							"end": 557,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 67
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 497,
+								"end": 509,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 19
+									}
+								},
+								"name": "withOptional"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 512,
+								"end": 557,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 22
+									},
+									"end": {
+										"line": 9,
+										"column": 67
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": true,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 522,
+										"end": 527,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 32
+											},
+											"end": {
+												"line": 9,
+												"column": 37
+											}
+										},
+										"name": "x",
+										"optional": true,
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 524,
+											"end": 527,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 34
+												},
+												"end": {
+													"line": 9,
+													"column": 37
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 526,
+												"end": 527,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 36
+													},
+													"end": {
+														"line": 9,
+														"column": 37
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 526,
+													"end": 527,
+													"loc": {
+														"start": {
+															"line": 9,
+															"column": 36
+														},
+														"end": {
+															"line": 9,
+															"column": 37
+														}
+													},
+													"name": "T"
+												}
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 556,
+									"end": 557,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 66
+										},
+										"end": {
+											"line": 9,
+											"column": 67
+										}
+									},
+									"name": "x"
+								},
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 518,
+									"end": 521,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 28
+										},
+										"end": {
+											"line": 9,
+											"column": 31
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 519,
+											"end": 520,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 29
+												},
+												"end": {
+													"line": 9,
+													"column": 30
+												}
+											},
+											"name": "T"
+										}
+									]
+								},
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 528,
+									"end": 552,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 38
+										},
+										"end": {
+											"line": 9,
+											"column": 62
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 530,
+										"end": 552,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 40
+											},
+											"end": {
+												"line": 9,
+												"column": 62
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 530,
+											"end": 537,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 40
+												},
+												"end": {
+													"line": 9,
+													"column": 47
+												}
+											},
+											"name": "Promise"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 537,
+											"end": 552,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 47
+												},
+												"end": {
+													"line": 9,
+													"column": 62
+												}
+											},
+											"params": [
+												{
+													"type": "TSUnionType",
+													"start": 538,
+													"end": 551,
+													"loc": {
+														"start": {
+															"line": 9,
+															"column": 48
+														},
+														"end": {
+															"line": 9,
+															"column": 61
+														}
+													},
+													"types": [
+														{
+															"type": "TSTypeReference",
+															"start": 538,
+															"end": 539,
+															"loc": {
+																"start": {
+																	"line": 9,
+																	"column": 48
+																},
+																"end": {
+																	"line": 9,
+																	"column": 49
+																}
+															},
+															"typeName": {
+																"type": "Identifier",
+																"start": 538,
+																"end": 539,
+																"loc": {
+																	"start": {
+																		"line": 9,
+																		"column": 48
+																	},
+																	"end": {
+																		"line": 9,
+																		"column": 49
+																	}
+																},
+																"name": "T"
+															}
+														},
+														{
+															"type": "TSUndefinedKeyword",
+															"start": 542,
+															"end": 551,
+															"loc": {
+																"start": {
+																	"line": 9,
+																	"column": 52
+																},
+																"end": {
+																	"line": 9,
+																	"column": 61
+																}
+															}
+														}
+													]
+												}
+											]
+										}
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Async generic arrow forms that each exercise a path beyond the canonical",
+							"start": 20,
+							"end": 95
+						},
+						{
+							"type": "Line",
+							"value": " stacked case (see stacked_svelte_prettier_divergence). Every single",
+							"start": 97,
+							"end": 167
+						},
+						{
+							"type": "Line",
+							"value": " unconstrained `<T>` stays bare under tsv; prettier forces `<T,>` (output_prettier).",
+							"start": 169,
+							"end": 255
+						},
+						{
+							"type": "Line",
+							"value": " Optional param — the acorn-typescript param-drop hits `x?` too, a distinct",
+							"start": 258,
+							"end": 335
+						},
+						{
+							"type": "Line",
+							"value": " param node from the plain/rest forms. tsv keeps it (expected_ours); Svelte",
+							"start": 337,
+							"end": 414
+						},
+						{
+							"type": "Line",
+							"value": " drops it (expected_svelte). Single `<T>` also takes prettier's `<T,>`.",
+							"start": 416,
+							"end": 489
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 688,
+					"end": 744,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 57
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 694,
+							"end": 743,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 56
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 694,
+								"end": 704,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 17
+									}
+								},
+								"name": "objectBody"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 707,
+								"end": 743,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 20
+									},
+									"end": {
+										"line": 13,
+										"column": 56
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": true,
+								"params": [],
+								"body": {
+									"type": "TSAsExpression",
+									"start": 734,
+									"end": 743,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 47
+										},
+										"end": {
+											"line": 13,
+											"column": 56
+										}
+									},
+									"expression": {
+										"type": "ObjectExpression",
+										"start": 735,
+										"end": 737,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 48
+											},
+											"end": {
+												"line": 13,
+												"column": 50
+											}
+										},
+										"properties": []
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 742,
+										"end": 743,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 55
+											},
+											"end": {
+												"line": 13,
+												"column": 56
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 742,
+											"end": 743,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 55
+												},
+												"end": {
+													"line": 13,
+													"column": 56
+												}
+											},
+											"name": "T"
+										}
+									}
+								},
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 713,
+									"end": 716,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 26
+										},
+										"end": {
+											"line": 13,
+											"column": 29
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 714,
+											"end": 715,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 27
+												},
+												"end": {
+													"line": 13,
+													"column": 28
+												}
+											},
+											"name": "T"
+										}
+									]
+								},
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 718,
+									"end": 730,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 31
+										},
+										"end": {
+											"line": 13,
+											"column": 43
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 720,
+										"end": 730,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 33
+											},
+											"end": {
+												"line": 13,
+												"column": 43
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 720,
+											"end": 727,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 33
+												},
+												"end": {
+													"line": 13,
+													"column": 40
+												}
+											},
+											"name": "Promise"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 727,
+											"end": 730,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 40
+												},
+												"end": {
+													"line": 13,
+													"column": 43
+												}
+											},
+											"params": [
+												{
+													"type": "TSTypeReference",
+													"start": 728,
+													"end": 729,
+													"loc": {
+														"start": {
+															"line": 13,
+															"column": 41
+														},
+														"end": {
+															"line": 13,
+															"column": 42
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 728,
+														"end": 729,
+														"loc": {
+															"start": {
+																"line": 13,
+																"column": 41
+															},
+															"end": {
+																"line": 13,
+																"column": 42
+															}
+														},
+														"name": "T"
+													}
+												}
+											]
+										}
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Object-literal body with `as` assertion — no params, so nothing to drop;",
+							"start": 561,
+							"end": 636
+						},
+						{
+							"type": "Line",
+							"value": " only the `<T,>` formatter divergence applies.",
+							"start": 638,
+							"end": 686
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 899,
+					"end": 959,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 61
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 905,
+							"end": 958,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 7
+								},
+								"end": {
+									"line": 17,
+									"column": 60
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 905,
+								"end": 931,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 7
+									},
+									"end": {
+										"line": 17,
+										"column": 33
+									}
+								},
+								"name": "typed",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 910,
+									"end": 931,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 12
+										},
+										"end": {
+											"line": 17,
+											"column": 33
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSFunctionType",
+										"start": 912,
+										"end": 931,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 14
+											},
+											"end": {
+												"line": 17,
+												"column": 33
+											}
+										},
+										"typeParameters": {
+											"type": "TSTypeParameterDeclaration",
+											"start": 912,
+											"end": 915,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 14
+												},
+												"end": {
+													"line": 17,
+													"column": 17
+												}
+											},
+											"params": [
+												{
+													"type": "TSTypeParameter",
+													"start": 913,
+													"end": 914,
+													"loc": {
+														"start": {
+															"line": 17,
+															"column": 15
+														},
+														"end": {
+															"line": 17,
+															"column": 16
+														}
+													},
+													"name": "T"
+												}
+											]
+										},
+										"parameters": [],
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 918,
+											"end": 931,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 20
+												},
+												"end": {
+													"line": 17,
+													"column": 33
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 921,
+												"end": 931,
+												"loc": {
+													"start": {
+														"line": 17,
+														"column": 23
+													},
+													"end": {
+														"line": 17,
+														"column": 33
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 921,
+													"end": 928,
+													"loc": {
+														"start": {
+															"line": 17,
+															"column": 23
+														},
+														"end": {
+															"line": 17,
+															"column": 30
+														}
+													},
+													"name": "Promise"
+												},
+												"typeArguments": {
+													"type": "TSTypeParameterInstantiation",
+													"start": 928,
+													"end": 931,
+													"loc": {
+														"start": {
+															"line": 17,
+															"column": 30
+														},
+														"end": {
+															"line": 17,
+															"column": 33
+														}
+													},
+													"params": [
+														{
+															"type": "TSTypeReference",
+															"start": 929,
+															"end": 930,
+															"loc": {
+																"start": {
+																	"line": 17,
+																	"column": 31
+																},
+																"end": {
+																	"line": 17,
+																	"column": 32
+																}
+															},
+															"typeName": {
+																"type": "Identifier",
+																"start": 929,
+																"end": 930,
+																"loc": {
+																	"start": {
+																		"line": 17,
+																		"column": 31
+																	},
+																	"end": {
+																		"line": 17,
+																		"column": 32
+																	}
+																},
+																"name": "T"
+															}
+														}
+													]
+												}
+											}
+										}
+									}
+								}
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 934,
+								"end": 958,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 36
+									},
+									"end": {
+										"line": 17,
+										"column": 60
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": true,
+								"params": [],
+								"body": {
+									"type": "TSAsExpression",
+									"start": 949,
+									"end": 958,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 51
+										},
+										"end": {
+											"line": 17,
+											"column": 60
+										}
+									},
+									"expression": {
+										"type": "ObjectExpression",
+										"start": 950,
+										"end": 952,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 52
+											},
+											"end": {
+												"line": 17,
+												"column": 54
+											}
+										},
+										"properties": []
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 957,
+										"end": 958,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 59
+											},
+											"end": {
+												"line": 17,
+												"column": 60
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 957,
+											"end": 958,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 59
+												},
+												"end": {
+													"line": 17,
+													"column": 60
+												}
+											},
+											"name": "T"
+										}
+									}
+								},
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 940,
+									"end": 943,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 42
+										},
+										"end": {
+											"line": 17,
+											"column": 45
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 941,
+											"end": 942,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 43
+												},
+												"end": {
+													"line": 17,
+													"column": 44
+												}
+											},
+											"name": "T"
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Typed binding — the annotation `<T>` is a type position and stays bare in",
+							"start": 747,
+							"end": 823
+						},
+						{
+							"type": "Line",
+							"value": " BOTH tools; only the initializer `<T>` (value position) takes `<T,>`.",
+							"start": 825,
+							"end": 897
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

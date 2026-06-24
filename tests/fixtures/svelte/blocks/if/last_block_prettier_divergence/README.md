@@ -10,3 +10,5 @@ A single block alone appears to stay inline, but only because it's last — not 
 ## Reason
 
 tsv expands blocks consistently. Position in the file should not affect formatting output.
+
+See [conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks) ("Last block not expanded").

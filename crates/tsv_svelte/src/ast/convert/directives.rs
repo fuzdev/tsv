@@ -1,9 +1,9 @@
 // Svelte directive conversions
 //
 // Converts internal directive nodes to public format.
-// All directive types include a `modifiers` field in the public AST.
-// OnDirective, TransitionDirective, and StyleDirective populate modifiers from internal data;
-// the remaining types always emit an empty vec.
+// All directive types carry a `modifiers` field populated from internal data.
+// The five types without official modifier support (use/bind/class/animate/let)
+// still preserve any `|mod` text verbatim, matching Svelte's permissive parser.
 
 use crate::ast::{internal, public};
 use string_interner::DefaultStringInterner;
@@ -54,7 +54,7 @@ pub(super) fn convert_bind_directive(
         name: d.name.clone(),
         name_loc: span_to_name_loc(d.name_span, loc),
         expression,
-        modifiers: vec![],
+        modifiers: d.modifiers.clone(),
     }
 }
 
@@ -79,7 +79,7 @@ pub(super) fn convert_class_directive(
         name: d.name.clone(),
         name_loc: span_to_name_loc(d.name_span, loc),
         expression,
-        modifiers: vec![],
+        modifiers: d.modifiers.clone(),
     }
 }
 
@@ -147,7 +147,7 @@ pub(super) fn convert_use_directive(
         name: d.name.clone(),
         name_loc: span_to_name_loc(d.name_span, loc),
         expression,
-        modifiers: vec![],
+        modifiers: d.modifiers.clone(),
     }
 }
 
@@ -193,7 +193,7 @@ pub(super) fn convert_animate_directive(
         name: d.name.clone(),
         name_loc: span_to_name_loc(d.name_span, loc),
         expression,
-        modifiers: vec![],
+        modifiers: d.modifiers.clone(),
     }
 }
 
@@ -215,7 +215,7 @@ pub(super) fn convert_let_directive(
         name: d.name.clone(),
         name_loc: span_to_name_loc(d.name_span, loc),
         expression,
-        modifiers: vec![],
+        modifiers: d.modifiers.clone(),
     }
 }
 

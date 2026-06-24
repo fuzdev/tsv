@@ -9,4 +9,4 @@ Prettier: relocates comments inside the else block body
 
 tsv treats user comment placement as intentional. Consistent with tsv's handling of own-line comments before `else` ([else_block_own_line_comment](../else_block_own_line_comment_prettier_divergence/)) and across other control flow statements (try/catch, while, do-while, switch).
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

@@ -14,3 +14,7 @@ tsv treats user comment placement as intentional. Consistent with tsv's handling
 - `try // comment {}` → Prettier absorbs into try block
 - `catch (e) // comment {}` → Prettier absorbs into catch parens (`catch (\n\te\n\t// comment\n)`)
 - `finally // comment {}` → Prettier absorbs into finally block
+
+The absorbed form (`variant_absorbed.svelte`) is dual-stable: both formatters keep it as-is, so it is a `variant_*`, not the canonical input.
+
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

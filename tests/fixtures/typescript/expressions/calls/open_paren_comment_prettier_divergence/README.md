@@ -31,4 +31,4 @@ do-while `(`/`)` comments
 ([open_paren_comment](../../../statements/do_while/open_paren_comment_prettier_divergence/)),
 and first-argument leading comments across call chains.
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

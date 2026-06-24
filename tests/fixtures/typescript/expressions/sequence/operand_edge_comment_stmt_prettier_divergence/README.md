@@ -21,5 +21,6 @@ Keeping a trailing comment before the terminating `;` is consistent with tsv's
 broader before-semicolon comment handling. In the call-expression context there
 is no `;` at the edge, so there both formatters agree on `(x, y) /* c */`.
 
-Reason: comment position preservation (trailing comment stays before `;`). See
-conformance_prettier.md §Comment Position Philosophy.
+Reason: comment relocation — the trailing comment stays before `;` (prettier
+floats it past). See
+[conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

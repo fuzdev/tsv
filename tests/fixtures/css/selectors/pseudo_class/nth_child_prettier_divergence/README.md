@@ -7,4 +7,4 @@ Prettier: `li:nth-child(3n-2)` (minus not normalized)
 
 ## Reason
 
-Per CSS Syntax Module Level 3, whitespace between An+B tokens is valid and ignored — both forms are semantically identical. tsv normalizes both operators consistently.
+Stable quirk. Per CSS Syntax Module Level 3, whitespace between An+B tokens is valid and ignored — both forms are semantically identical. tsv normalizes both operators consistently. See [conformance_prettier.md §CSS: Selectors](../../../../../../docs/conformance_prettier.md#css-selectors).

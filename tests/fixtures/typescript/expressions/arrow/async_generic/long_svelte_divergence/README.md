@@ -18,3 +18,5 @@ because the missing params corrupt the AST semantics (tools would think the func
 takes zero arguments).
 
 **Upstream**: acorn-typescript — the bug is in async arrow parsing when type parameters are present.
+
+See [conformance_svelte.md](../../../../../../../docs/conformance_svelte.md) §TypeScript Corrections.

@@ -7,7 +7,7 @@ Prettier: preserves the input spacing, and for the no-space (compact) form with 
 
 ## Reason
 
-tsv normalizes comment spacing consistently across all CSS contexts. Same quirk as the single-comment case; the compact `{`-on-its-own-line form is specific to multiple pre-brace comments.
+Stable quirk. tsv normalizes comment spacing consistently across the CSS contexts whose grammar it parses. Same quirk as the single-comment case; the compact `{`-on-its-own-line form is specific to multiple pre-brace comments. See [conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments).
 
 ## Related
 

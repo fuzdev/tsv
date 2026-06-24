@@ -15,3 +15,5 @@ Applies to both `:nth-child()` and `:nth-last-child()`. Does not apply to `:nth-
 
 - `expected_ours.json` — tsv's spec-compliant output (source of truth)
 - `expected_svelte.json` — documents Svelte's incorrect output
+
+See [conformance_svelte.md §CSS Corrections](../../../../../../docs/conformance_svelte.md#css-corrections).

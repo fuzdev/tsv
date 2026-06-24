@@ -11,7 +11,9 @@ See `template_literal_type_long/` for matching cases at the 100-char boundary.
 
 ## Reason
 
-tsv applies the same printWidth rules after `=` breaks — consistent with template literal value handling.
+Print width. tsv applies the same printWidth rules after `=` breaks — consistent with template literal value handling.
+
+See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §TypeScript: Template Literals.
 
 ## Related
 

@@ -10,4 +10,4 @@ Both `[x /* c */]` forms are dual-stable (variant_inside_brackets).
 
 Affects: property (`:` next), method (`()` next), async, generator, getter, setter.
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

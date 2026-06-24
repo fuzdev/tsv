@@ -7,7 +7,7 @@ Prettier: allows lines to exceed printWidth (101+ chars)
 
 ## Reason
 
-tsv treats printWidth as a hard limit. This appears to be a limitation in prettier-plugin-svelte's CSS handling rather than an intentional design choice.
+Print width. tsv treats printWidth as a hard limit and breaks a space-separated value that exceeds 100 chars; Prettier leaves it on one line. See [conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values) ("Space-separated value wrap").
 
 ## Related
 

@@ -35,9 +35,9 @@ once again a usable oracle.
 
 User comments are valuable and shouldn't be silently removed. The comments are
 syntactically valid in these positions. See
-[conformance_prettier.md §Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy).
+[conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy).
 
 ## Related
 
 - [expr_trailing](./../expr_trailing_prettier_divergence/) — same divergence for block comments (inline, single-line)
-- [debug_comment](../../tags/debug/debug_comment_prettier_divergence/) — same pattern for `{@debug}`
+- [debug_comment](../../../tags/debug/debug_comment_prettier_divergence/) — same pattern for `{@debug}`

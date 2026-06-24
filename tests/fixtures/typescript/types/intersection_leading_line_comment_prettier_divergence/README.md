@@ -11,4 +11,8 @@ Both formatters produce identical stable output. The divergence is only in norma
 
 ## Reason
 
-tsv normalizes consistently. Prettier's intermediate form is a "stable quirk" — it takes multiple passes to converge.
+Comment normalization (stable quirk). tsv normalizes consistently. Prettier's
+intermediate form is a stable quirk — it takes multiple passes to converge, while
+tsv reaches the same fixed point in one pass.
+
+See [conformance_prettier.md §Comment normalization (stable quirks)](../../../../../docs/conformance_prettier.md#comment-normalization-stable-quirks).

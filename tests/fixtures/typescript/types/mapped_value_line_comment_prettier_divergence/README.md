@@ -34,4 +34,4 @@ Previously tsv emitted the comment inline and **swallowed the value type**
 loss); keeping it on the `:` line via `line_suffix` with the value on the next
 line fixes the loss and preserves the user's placement.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).

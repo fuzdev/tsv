@@ -36,4 +36,4 @@ routes through the shared `Printer::delimiter_line_comment_prefix` helper used
 by the object/array literal, destructuring, block-body, `namespace`/`module`,
 class/interface/enum body, and type literal cases.
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

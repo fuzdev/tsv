@@ -10,8 +10,9 @@ Prettier relocates comments after `?` in interface members:
 - Prettier: `b?(/* c */ x): void;` (inside parens)
 - Ours: `b? /* c */(x): void;` (preserves between `?` and `(`)
 
-Both positions are dual-stable in our formatter. Per comment placement policy,
-we preserve the user's original comment position.
+Both positions are dual-stable in our formatter (prettier's relocated form is
+pinned by `variant_before_modifier.svelte`, byte-identical to `output_prettier`).
+Per comment placement policy, we preserve the user's original comment position.
 
 Note: class properties with the same pattern (`d? /* c */: T = 1;`) are NOT
 relocated by prettier — they match our output with a space before `:`.

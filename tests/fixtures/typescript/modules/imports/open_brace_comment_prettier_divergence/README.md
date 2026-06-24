@@ -35,4 +35,4 @@ by the object/array literal, destructuring, block-body, `namespace`/`module`,
 class/interface/enum body, and type literal cases. The `with {…}` import-
 attribute brace is a separate, rarer delimiter and keeps relocating for now.
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

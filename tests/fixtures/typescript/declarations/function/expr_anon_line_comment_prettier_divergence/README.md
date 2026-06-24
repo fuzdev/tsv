@@ -19,3 +19,5 @@ moves comments to different syntactic positions.
 
 `output_prettier.svelte` is prettier's first-pass output. `variant_in_body.svelte`
 is the stable form (both formatters keep idempotent).
+
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

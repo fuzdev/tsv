@@ -10,4 +10,7 @@ Prettier strips the parens and relocates the comment:
 - Curried: `(a) => (b) => z /* c */;` (strips parens, comment trails)
 - Line/block: `() =>\n  x; // c` (strips parens, different structure)
 
-Reason: comment preservation. See conformance_prettier.md §Comment Position Philosophy.
+Reason: comment preservation. See
+[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+§Comment relocation (Arrow body stripped parens) and §Comment Position
+Philosophy.

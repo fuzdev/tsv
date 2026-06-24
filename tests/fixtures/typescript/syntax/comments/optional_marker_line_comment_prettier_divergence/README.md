@@ -32,4 +32,4 @@ counterpart (which stays inline) is documented per context in
 `types/type_members/modifier_after_comment_prettier_divergence`, and
 `declarations/class/optional_marker_comment_prettier_divergence`.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

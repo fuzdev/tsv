@@ -14,3 +14,6 @@ ternary branch — including the form a redundant grouping paren strips to
 (`const a = (x /* c */)` → `const a = x /* c */;`), which both formatters strip
 (see the regular fixture `expressions/parenthesized/stripped_paren_comment`);
 only the `;` position then differs.
+
+Reason: Comment relocation (comment position). See
+[conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

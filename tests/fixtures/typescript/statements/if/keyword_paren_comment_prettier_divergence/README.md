@@ -15,3 +15,5 @@ The second case (`/* (note) */`) additionally guards open-paren detection: a
 tsv treats user comment placement as intentional. Consistent with tsv's
 handling across if/else, try/catch, switch, for, while, do-while, labeled
 statements, and call chains. `while` and `switch` behave identically.
+
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
