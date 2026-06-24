@@ -6,12 +6,13 @@ The tsv parser aims for **exact AST compatibility** with Svelte's parser. This d
 
 **Matched**: tsv produces identical AST to Svelte (the goal). This includes replicating Svelte's quirky behaviors for tool compatibility.
 
-**Unmatched**: tsv produces different AST. The suffix `_svelte_divergence` marks these fixtures. tsv only differs when Svelte violates spec or lacks features.
+**Unmatched**: tsv produces different AST. The suffix `_svelte_divergence` marks these fixtures. tsv differs when Svelte or acorn-typescript is wrong — a spec violation, a missing feature, or a bug tsv corrects (e.g. acorn's double-fired `onComment` duplicating comments). One exception isn't a correction: a lone UTF-16 surrogate can't survive tsv's UTF-8 strings (→ U+FFFD), so tsv differs there despite acorn being right.
 
 ## Classification
 
 - Compat behavior — Svelte has quirky but harmless behavior. tsv action: tsv replicates it in AST output
-- Correction — Svelte violates spec or lacks features. tsv action: tsv produces correct/complete AST
+- Correction — Svelte/acorn violates spec, lacks a feature, or has a bug (e.g. acorn's duplicate `onComment` firing). tsv action: tsv produces correct/complete AST
+- Representation limit — a value acorn keeps can't round-trip tsv's UTF-8 strings (lone surrogate → U+FFFD; `raw` unaffected). Rare, not a correction
 
 **Critical distinction**: Compat behaviors apply ONLY to **AST/JSON output** for tool compatibility. The tsv **formatter** always produces clean, standards-compliant code.
 
@@ -159,9 +160,9 @@ Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
 
 **Async generic arrow params**: acorn-typescript drops all function parameters from `async` arrow functions that have type parameters (`async <T,>(x: T) => x` → `params: []`). Non-async generic arrows are unaffected. This is semantic corruption — tools consuming the AST would see zero-argument functions. **Upstream candidate**: acorn-typescript async arrow parsing.
 
-Fixtures: [async_generic/stacked](../tests/fixtures/typescript/expressions/arrow/async_generic/stacked_svelte_prettier_divergence/), [async_generic/basic_ts](../tests/fixtures/typescript/expressions/arrow/async_generic/basic_ts_svelte_divergence/), [async_generic/long](../tests/fixtures/typescript/expressions/arrow/async_generic/long_svelte_divergence/), [curried_typed_callback](../tests/fixtures/typescript/expressions/arrow/curried_typed_callback_svelte_prettier_divergence/), [indexed_access/basic](../tests/fixtures/typescript/types/indexed_access/basic_svelte_divergence/)
+Fixtures: [async_generic/stacked](../tests/fixtures/typescript/expressions/arrow/async_generic/stacked_svelte_prettier_divergence/), [async_generic/forms](../tests/fixtures/typescript/expressions/arrow/async_generic/forms_svelte_prettier_divergence/), [async_generic/basic_ts](../tests/fixtures/typescript/expressions/arrow/async_generic/basic_ts_svelte_divergence/), [async_generic/long](../tests/fixtures/typescript/expressions/arrow/async_generic/long_svelte_divergence/), [curried_typed_callback](../tests/fixtures/typescript/expressions/arrow/curried_typed_callback_svelte_prettier_divergence/), [indexed_access/basic](../tests/fixtures/typescript/types/indexed_access/basic_svelte_divergence/). `async_generic/forms` adds the optional-param (`x?`) drop, distinct from the plain param (`stacked`) and rest param (`long`).
 
-The `async_generic/stacked` and `curried_typed_callback` fixtures carry a second,
+The `async_generic/stacked`, `async_generic/forms`, and `curried_typed_callback` fixtures carry a second,
 independent divergence — prettier's forced `<T,>` trailing comma on single-unconstrained
 arrow type params (hence the `_svelte_prettier_divergence` suffix). See
 [conformance_prettier.md](./conformance_prettier.md) §TypeScript.
@@ -336,9 +337,13 @@ Beyond acorn-typescript's per-parse duplication, **Svelte's own comment glue dup
 
 ### Known Acorn-TypeScript Bugs (Not Corrections)
 
-These are bugs in standalone acorn-typescript that **don't affect Svelte users** (Svelte's wrapper handles them):
+These are bugs in **upstream/standalone `acorn-typescript`** — the non-fork npm
+package, distinct from the `@sveltejs/acorn-typescript@1.0.10` fork this project
+pins (`crates/tsv_debug/src/deno/sidecar.ts`) and that every other
+"acorn-typescript" mention in this doc refers to. They **don't affect Svelte
+users** (Svelte's fork handles them):
 
-**Abstract methods break namespace export scope tracking** (acorn-typescript@1.4.13): Abstract methods inside abstract classes corrupt the module scope, causing subsequent namespace imports to fail. Raw `.ts` parsing fails but `.svelte` files work fine. No fixture needed.
+**Abstract methods break namespace export scope tracking** (upstream `acorn-typescript`, reported at 1.4.13): Abstract methods inside abstract classes corrupt the module scope, causing subsequent namespace imports to fail. Raw `.ts` parsing fails but `.svelte` files work fine. No fixture needed.
 
 ---
 
@@ -422,7 +427,7 @@ Svelte's parser accepts `|modifier` syntax on all directive types (permissive pa
 
 Directives without official modifiers: `AnimateDirective`, `BindDirective`, `ClassDirective`, `LetDirective`, `UseDirective`.
 
-**tsv behavior**: Every directive carries a `modifiers` array (matching Svelte's runtime AST, even for the five types whose published `.d.ts` declares none). For the three officially-supporting types tsv preserves the modifier text verbatim — including unofficial ones, exactly as Svelte's permissive parser does (`on:click|preventDefault|bogus` → `['preventDefault', 'bogus']`). For the five types without official support, tsv drops any `|mod` to an empty array, where Svelte's parser instead retains the text (`use:foo|bar` → tsv `[]`, Svelte `['bar']`) — a deliberate parser-AST divergence from Svelte. On format, the unofficial `|mod` text is then dropped from the output, matching Prettier.
+**tsv behavior**: Every directive carries a `modifiers` array, and tsv preserves the modifier text **verbatim for all eight directive types** — matching Svelte's permissive runtime parser exactly, including unofficial modifiers on the five types whose published `.d.ts` declares none (`use:foo|bar` → `['bar']`, `on:click|preventDefault|bogus` → `['preventDefault', 'bogus']`, in both parsers). So this is **not** a `_svelte_divergence` — tsv's parser AST matches Svelte's. On **format**, the two formatters diverge for the five types without official support: prettier-plugin-svelte silently drops the `|mod` text, while tsv preserves it — a `_prettier_divergence` (content preservation), pinned by [modifier_preservation](../tests/fixtures/svelte/directives/modifier_preservation_prettier_divergence/). See [conformance_prettier.md §Svelte: Attributes](./conformance_prettier.md#svelte-attributes).
 
 **Reference**: `svelte/packages/svelte/src/compiler/types/template.d.ts`
 

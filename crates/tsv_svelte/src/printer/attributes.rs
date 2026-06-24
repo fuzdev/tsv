@@ -332,10 +332,10 @@ impl<'a> Printer<'a> {
     //
 
     /// Build a Doc for a directive with no shorthand suppression: `prefix` + name +
-    /// optional modifiers + optional `={expr}`. Backs the `on:` / `use:` / `animate:` /
-    /// transition (`transition:`/`in:`/`out:`) builders, which differ only in the prefix
-    /// and whether they carry modifiers (pass `&[]` for none). Directives with shorthand
-    /// suppression (`bind`/`class`/`let`) or non-expression values (`style`) keep their own.
+    /// modifiers + optional `={expr}`. Backs the `on:` / `use:` / `animate:` / transition
+    /// (`transition:`/`in:`/`out:`) builders, which differ only in the prefix; each passes
+    /// its own `modifiers`. Directives with shorthand suppression (`bind`/`class`/`let`) or
+    /// non-expression values (`style`) keep their own builders (they also emit modifiers).
     fn build_simple_directive_doc(
         &self,
         prefix: DocId,
@@ -368,6 +368,7 @@ impl<'a> Printer<'a> {
     fn build_bind_directive_doc(&self, dir: &internal::BindDirective) -> DocId {
         let d = self.d();
         let mut parts = vec![d.text("bind:"), d.text_owned(dir.name.clone())];
+        parts.extend(self.build_modifiers_doc(&dir.modifiers));
         // Only include expression if not shorthand
         if !self.is_identifier_with_name(&dir.expression, &dir.name) {
             // bind: uses {getter, setter} syntax where SequenceExpression is bare (no parens)
@@ -383,6 +384,7 @@ impl<'a> Printer<'a> {
     fn build_class_directive_doc(&self, dir: &internal::ClassDirective) -> DocId {
         let d = self.d();
         let mut parts = vec![d.text("class:"), d.text_owned(dir.name.clone())];
+        parts.extend(self.build_modifiers_doc(&dir.modifiers));
         // Only include expression if not shorthand
         if !self.is_identifier_with_name(&dir.expression, &dir.name) {
             parts.extend(
@@ -422,7 +424,7 @@ impl<'a> Printer<'a> {
         self.build_simple_directive_doc(
             self.d().text("use:"),
             &dir.name,
-            &[],
+            &dir.modifiers,
             dir.expression.as_ref(),
             dir.expression_tag_span,
         )
@@ -444,7 +446,7 @@ impl<'a> Printer<'a> {
         self.build_simple_directive_doc(
             self.d().text("animate:"),
             &dir.name,
-            &[],
+            &dir.modifiers,
             dir.expression.as_ref(),
             dir.expression_tag_span,
         )
@@ -454,6 +456,7 @@ impl<'a> Printer<'a> {
     fn build_let_directive_doc(&self, dir: &internal::LetDirective) -> DocId {
         let d = self.d();
         let mut parts = vec![d.text("let:"), d.text_owned(dir.name.clone())];
+        parts.extend(self.build_modifiers_doc(&dir.modifiers));
         // Only include expression if not shorthand (let:foo={foo} → let:foo)
         if let Some(expr) = &dir.expression
             && !self.is_identifier_with_name(expr, &dir.name)

@@ -37,6 +37,7 @@ Reason: **Design choice** (formatter). See
 
 ## Per-axis coverage (siblings)
 
+- `forms_svelte_prettier_divergence/` — additional forms beyond this one construct: optional-param (`x?`) drop, object-`as`-literal body, and a type-vs-value-position `<T,>` contrast.
 - `basic_ts_svelte_divergence/` — the param-drop on the standalone `.ts` (acorn-typescript) path.
 - `long_svelte_divergence/` — the param-drop in Svelte context plus type-param width wrapping.
 - `../../generic/single_type_param_prettier_divergence/` — the `<T,>` trailing-comma divergence (single + default-only, `<script>` and template).

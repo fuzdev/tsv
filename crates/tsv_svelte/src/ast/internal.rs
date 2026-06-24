@@ -249,6 +249,7 @@ pub struct OnDirective {
 pub struct BindDirective {
     pub name: String,           // Property name: "value", "checked", "this", etc.
     pub expression: Expression, // Binding target (always present - auto-generated for shorthand)
+    pub modifiers: Vec<String>, // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub name_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None for shorthand bindings)
@@ -263,6 +264,7 @@ pub struct BindDirective {
 pub struct ClassDirective {
     pub name: String,           // Class name: "class1", "class2", etc.
     pub expression: Expression, // Condition (always present - auto-generated for shorthand)
+    pub modifiers: Vec<String>, // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub name_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None for shorthand)
@@ -301,6 +303,7 @@ pub enum StyleDirectiveValue {
 pub struct UseDirective {
     pub name: String,                   // Action name: "action", "tooltip", etc.
     pub expression: Option<Expression>, // Parameters passed to the action
+    pub modifiers: Vec<String>, // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub name_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
@@ -375,6 +378,7 @@ pub struct TransitionDirective {
 pub struct AnimateDirective {
     pub name: String,                   // Animation name: "flip", etc.
     pub expression: Option<Expression>, // Animation parameters
+    pub modifiers: Vec<String>, // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub name_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
@@ -388,6 +392,7 @@ pub struct AnimateDirective {
 pub struct LetDirective {
     pub name: String,                   // Slot prop name: "item", "index", etc.
     pub expression: Option<Expression>, // Local binding pattern (Identifier, ArrayPattern, ObjectPattern)
+    pub modifiers: Vec<String>, // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub name_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
