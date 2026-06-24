@@ -13,7 +13,7 @@ use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
 
-use super::helpers::indent_body;
+use super::helpers::{each_expr_comment_end, indent_body};
 
 // Opening-tag literals for control-flow blocks. Every offset that locates the
 // embedded expression past the opening tag derives from `.len()` of these, so
@@ -254,6 +254,38 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The shared block-head tail every block builder ends with: detect whether the
+    /// head expression's trailing comments (over `[expr.end, comment_end)`) end with a
+    /// line comment, then build the head doc via [`Printer::build_block_head_doc`].
+    ///
+    /// `expr` is the head expression — used for its span and the `clause_hugs_expr`
+    /// classification; `expr_doc` is the already-built expression doc (the `{#each}`
+    /// degenerate index/key form passes a concat of the expression plus its tail here,
+    /// so the two are distinct). `clause` is the optional ` as …` / ` then …` / ` catch …`
+    /// tail (without leading space), and `comment_end` bounds the trailing-comment scan
+    /// (the head end for `{#if}`/`{:else if}`/`{#key}`, or the pattern-start-narrowed
+    /// end for `{#each}`/`{#await}`). `can_wrap` stays caller-computed — its sources
+    /// differ across builders and several reuse it afterward for the body-drop.
+    fn build_block_head(
+        &self,
+        open: &'static str,
+        expr: &tsv_ts::Expression,
+        expr_doc: DocId,
+        clause: Option<DocId>,
+        comment_end: u32,
+        can_wrap: bool,
+    ) -> DocId {
+        let elc = self.head_trailing_line_comment(expr.span().end, comment_end);
+        self.build_block_head_doc(
+            open,
+            expr_doc,
+            clause,
+            can_wrap,
+            clause_hugs_expr(expr),
+            elc,
+        )
+    }
+
     /// Build a **section-free** block (key, plain each/if/await, snippet) whose body
     /// is inline-authored, expanding the body + `{/tag}` onto their own lines when the
     /// head goes multiline.
@@ -399,17 +431,13 @@ impl<'a> Printer<'a> {
             // Build the else-if head with wrapping enabled so it can dangle within the
             // expanded form; in the inline form `BlockHead` resolves flat (no dangle).
             let expr_doc = self.build_else_if_expr_doc(else_if, true);
-            let comment = self.head_trailing_line_comment(
-                else_if.test.span().end,
-                else_if.opening_tag_span.end - 1,
-            );
-            let head_doc = self.build_block_head_doc(
+            let head_doc = self.build_block_head(
                 ELSE_IF_BLOCK_OPEN,
+                &else_if.test,
                 expr_doc,
                 None,
+                else_if.opening_tag_span.end - 1,
                 self.block_dangle_allowed(),
-                clause_hugs_expr(&else_if.test),
-                comment,
             );
             if multiline {
                 parts.push(d.hardline());
@@ -451,11 +479,11 @@ impl<'a> Printer<'a> {
         // Use remove_lines only if there's preceding breakable content (so it breaks first).
         // Otherwise, allow natural wrapping to respect print_width.
         let allow_wrapping = !has_preceding_breakable;
-        let expr_doc = self.build_expression_doc_for_block(
+        let expr_doc = self.build_block_head_expr(
+            IF_BLOCK_OPEN,
+            block.opening_tag_span,
             &block.test,
-            block.opening_tag_span.start + IF_BLOCK_OPEN.len() as u32,
             block.opening_tag_span.end - 1,
-            IF_BLOCK_OPEN.len(),
             allow_wrapping || in_multiline_context,
         );
 
@@ -481,15 +509,13 @@ impl<'a> Printer<'a> {
         let indented_body = indent_body(self, body_doc, has_leading);
 
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
-        let expr_ends_with_line_comment =
-            self.head_trailing_line_comment(block.test.span().end, block.opening_tag_span.end - 1);
-        let head_doc = self.build_block_head_doc(
+        let head_doc = self.build_block_head(
             IF_BLOCK_OPEN,
+            &block.test,
             expr_doc,
             None,
+            block.opening_tag_span.end - 1,
             can_wrap,
-            clause_hugs_expr(&block.test),
-            expr_ends_with_line_comment,
         );
 
         // Inline-authored block (consequent + every alternate branch): expand the
@@ -580,11 +606,11 @@ impl<'a> Printer<'a> {
         else_if: &internal::IfBlock,
         in_multiline_context: bool,
     ) -> DocId {
-        self.build_expression_doc_for_block(
+        self.build_block_head_expr(
+            ELSE_IF_BLOCK_OPEN,
+            else_if.opening_tag_span,
             &else_if.test,
-            else_if.opening_tag_span.start + ELSE_IF_BLOCK_OPEN.len() as u32,
             else_if.opening_tag_span.end - 1,
-            ELSE_IF_BLOCK_OPEN.len(),
             in_multiline_context,
         )
     }
@@ -631,17 +657,13 @@ impl<'a> Printer<'a> {
 
             // `build_else_if_expr_doc` builds the condition with `in_multiline_context`
             // as its wrapping flag, so the dangle keys on the same condition.
-            let expr_ends_with_line_comment = self.head_trailing_line_comment(
-                else_if.test.span().end,
-                else_if.opening_tag_span.end - 1,
-            );
-            let head_doc = self.build_block_head_doc(
+            let head_doc = self.build_block_head(
                 ELSE_IF_BLOCK_OPEN,
+                &else_if.test,
                 expr_doc,
                 None,
+                else_if.opening_tag_span.end - 1,
                 in_multiline_context && self.block_dangle_allowed(),
-                clause_hugs_expr(&else_if.test),
-                expr_ends_with_line_comment,
             );
             let mut parts: DocBuf = smallvec![head_doc, indented_body];
 
@@ -753,17 +775,13 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         // Build expression doc with context-dependent behavior
-        // Comment range: after "{#each " to before "as" keyword (or end if no context)
         let allow_wrapping = !has_preceding_breakable;
-        let expr_comment_end = block
-            .context
-            .as_ref()
-            .map_or(block.opening_tag_span.end - 1, |c| c.span().start);
-        let expr_doc = self.build_expression_doc_for_block(
+        let expr_comment_end = each_expr_comment_end(block);
+        let expr_doc = self.build_block_head_expr(
+            EACH_BLOCK_OPEN,
+            block.opening_tag_span,
             &block.expression,
-            block.opening_tag_span.start + EACH_BLOCK_OPEN.len() as u32,
             expr_comment_end,
-            EACH_BLOCK_OPEN.len(),
             allow_wrapping || in_multiline_context,
         );
 
@@ -836,15 +854,13 @@ impl<'a> Printer<'a> {
         let indented_body = indent_body(self, body_doc, has_leading);
 
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
-        let expr_ends_with_line_comment =
-            self.head_trailing_line_comment(block.expression.span().end, expr_comment_end);
-        let head_doc = self.build_block_head_doc(
+        let head_doc = self.build_block_head(
             EACH_BLOCK_OPEN,
+            &block.expression,
             head_expr,
             clause,
+            expr_comment_end,
             can_wrap,
-            clause_hugs_expr(&block.expression),
-            expr_ends_with_line_comment,
         );
 
         // Inline-authored block (body + `{:else}` fallback): expand the body,
@@ -1121,20 +1137,15 @@ impl<'a> Printer<'a> {
             AwaitShorthand::Catch => block.error.as_ref().map_or(head_end, |e| e.span().start),
             AwaitShorthand::None => head_end,
         };
-        let expr_doc = self.build_expression_doc_for_block(
+        let expr_doc = self.build_block_head_expr(
+            AWAIT_BLOCK_OPEN,
+            block.opening_tag_span,
             &block.expression,
-            block.opening_tag_span.start + AWAIT_BLOCK_OPEN.len() as u32,
             expr_comment_end,
-            AWAIT_BLOCK_OPEN.len(),
             allow_wrapping || in_multiline_context,
         );
 
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
-        // Bound at `expr_comment_end` (not the head end) so a line comment *inside* a
-        // shorthand pattern isn't mistaken for a trailing line comment on the awaited
-        // expression — that would drop the space before the `then`/`catch` clause.
-        let expr_ends_with_line_comment =
-            self.head_trailing_line_comment(block.expression.span().end, expr_comment_end);
 
         // Fast path: every present section is inline-authored → body-expand like the
         // other blocks. The head carries the `then v` / `catch e` clause; the section
@@ -1173,13 +1184,17 @@ impl<'a> Printer<'a> {
             }),
             AwaitShorthand::None => None,
         };
-        let head_doc = self.build_block_head_doc(
+        // `comment_end` is bound at `expr_comment_end` (not the head end) so a line
+        // comment *inside* a shorthand pattern isn't mistaken for a trailing line comment
+        // on the awaited expression — that would drop the space before the `then`/`catch`
+        // clause.
+        let head_doc = self.build_block_head(
             AWAIT_BLOCK_OPEN,
+            &block.expression,
             expr_doc,
             clause,
+            expr_comment_end,
             can_wrap,
-            clause_hugs_expr(&block.expression),
-            expr_ends_with_line_comment,
         );
 
         // Fast path: every present section is inline-authored → body-expand like the other
@@ -1232,11 +1247,11 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // Build expression doc with context-dependent behavior
         let allow_wrapping = !has_preceding_breakable;
-        let expr_doc = self.build_expression_doc_for_block(
+        let expr_doc = self.build_block_head_expr(
+            KEY_BLOCK_OPEN,
+            block.opening_tag_span,
             &block.expression,
-            block.opening_tag_span.start + KEY_BLOCK_OPEN.len() as u32,
             block.opening_tag_span.end - 1,
-            KEY_BLOCK_OPEN.len(),
             allow_wrapping || in_multiline_context,
         );
 
@@ -1258,17 +1273,13 @@ impl<'a> Printer<'a> {
         let indented_body = indent_body(self, body_doc, has_leading);
 
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
-        let expr_ends_with_line_comment = self.head_trailing_line_comment(
-            block.expression.span().end,
-            block.opening_tag_span.end - 1,
-        );
-        let head_doc = self.build_block_head_doc(
+        let head_doc = self.build_block_head(
             KEY_BLOCK_OPEN,
+            &block.expression,
             expr_doc,
             None,
+            block.opening_tag_span.end - 1,
             can_wrap,
-            clause_hugs_expr(&block.expression),
-            expr_ends_with_line_comment,
         );
         let close = d.text("{/key}");
         if is_inline && can_wrap {

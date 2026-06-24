@@ -10,6 +10,7 @@
 #![allow(clippy::literal_string_with_formatting_args)]
 
 use super::blocks_doc::{EACH_BLOCK_OPEN, ELSE_IF_BLOCK_OPEN, IF_BLOCK_OPEN};
+use super::helpers::each_expr_comment_end;
 use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
 use tsv_lang::doc::arena::DocId;
@@ -385,11 +386,11 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // Pass false for in_multiline_context: inside whitespace-sensitive elements,
         // block expressions must not wrap (adding line breaks changes visible content)
-        let expr_doc = self.build_expression_doc_for_block(
+        let expr_doc = self.build_block_head_expr(
+            IF_BLOCK_OPEN,
+            block.opening_tag_span,
             &block.test,
-            block.opening_tag_span.start + IF_BLOCK_OPEN.len() as u32,
             block.opening_tag_span.end - 1,
-            IF_BLOCK_OPEN.len(),
             false,
         );
 
@@ -437,16 +438,13 @@ impl<'a> Printer<'a> {
     /// formatted with whitespace-sensitive content formatting.
     fn build_ws_sensitive_each_block_doc(&self, block: &internal::EachBlock) -> DocId {
         let d = self.d();
-        let expr_comment_end = block
-            .context
-            .as_ref()
-            .map_or(block.opening_tag_span.end - 1, |c| c.span().start);
+        let expr_comment_end = each_expr_comment_end(block);
         // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
-        let expr_doc = self.build_expression_doc_for_block(
+        let expr_doc = self.build_block_head_expr(
+            EACH_BLOCK_OPEN,
+            block.opening_tag_span,
             &block.expression,
-            block.opening_tag_span.start + EACH_BLOCK_OPEN.len() as u32,
             expr_comment_end,
-            EACH_BLOCK_OPEN.len(),
             false,
         );
 
