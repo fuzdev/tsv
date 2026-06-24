@@ -222,7 +222,20 @@ impl<'a> Printer<'a> {
         let mut parts = Vec::new();
 
         if c.abstract_ {
-            parts.push(d.text("abstract "));
+            // Preserve a comment in the `abstract`→`new` keyword gap
+            // (`abstract /* c */ new`). Prettier relocates it after `new`; per
+            // Comment Position Philosophy we keep it in place (block inline, line
+            // comment floated via `line_suffix` — same treatment as the `new`→`(`
+            // gap below). Without this it was dropped (content loss).
+            let abstract_end = self
+                .find_keyword_in_range(c.span.start, c.return_type.span.start, "abstract")
+                .map_or(c.span.start, |p| p + "abstract".len() as u32);
+            let new_start = self
+                .find_keyword_in_range(abstract_end, c.return_type.span.start, "new")
+                .unwrap_or(abstract_end);
+            parts.push(d.text("abstract"));
+            self.append_type_params_to_paren_comments(&mut parts, abstract_end, new_start);
+            parts.push(d.text(" "));
         }
 
         // Comments between `new` and the type params / `(` (e.g. `new /* c */ ()`).
