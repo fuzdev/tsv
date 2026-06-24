@@ -483,8 +483,9 @@ impl<'a> Printer<'a> {
             return self.build_type_parameter_instantiation_doc_with_line_comments(inst);
         }
 
-        // Special case: single curly-brace type argument hugs the opening bracket
-        // Prettier keeps `<{` together when there's a single multiline object/mapped type
+        // Special case: single curly-brace type argument hugs the opening bracket.
+        // Prettier keeps `<{` together for a single object/mapped type; the type
+        // carries its own group so it breaks block-style when too wide.
         if inst.params.len() == 1
             && let Some(type_doc) = self.try_build_hugging_curly_type_doc(&inst.params[0])
         {
@@ -635,15 +636,21 @@ impl<'a> Printer<'a> {
     /// Returns `Some(doc)` if the type is a curly-brace type that should hug `<{`,
     /// `None` otherwise. Used for single type arguments where Prettier keeps
     /// the opening angle bracket hugged with the opening curly brace.
+    ///
+    /// The object/mapped type carries its own width-aware group, so an inline
+    /// `<{ ... }>` that overflows breaks block-style (members on their own lines)
+    /// rather than spilling an inner union/intersection — matching the type-reference
+    /// type-argument path (`build_type_arguments_doc_wrapping`).
     fn try_build_hugging_curly_type_doc(&self, ty: &TSType) -> Option<DocId> {
         match ty {
             // Object type literal: { a: number; b: string } or { /* comment */ }
-            // Hug if it has members OR comments inside (will be multiline)
+            // Hug if it has members OR comments inside. Standard (not hugging) mode
+            // so the object breaks block-style on width, the same as elsewhere.
             TSType::TypeLiteral(type_lit)
                 if !type_lit.members.is_empty()
                     || self.has_comments_between(type_lit.span.start, type_lit.span.end) =>
             {
-                Some(self.build_type_literal_doc_hugging(type_lit))
+                Some(self.build_type_literal_doc(type_lit))
             }
             // Mapped type: { [K in keyof T]: V }
             TSType::Mapped(mapped) => Some(self.build_mapped_type_doc(mapped)),
