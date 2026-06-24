@@ -41,6 +41,7 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 use tsv_svelte::ast::internal::FragmentNode;
 
+use crate::cli::CliError;
 use crate::deno::{PrettierParser, run_prettier};
 
 use super::profile::resolve_files;
@@ -378,7 +379,7 @@ fn interesting(b: Bucket) -> bool {
 }
 
 impl AuthoringAuditCommand {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         let paths = if self.paths.is_empty() {
             vec!["tests/fixtures".to_string()]
         } else {
@@ -388,7 +389,7 @@ impl AuthoringAuditCommand {
             Ok(f) => f.into_iter().filter(|p| is_svelte(p)).collect::<Vec<_>>(),
             Err(e) => {
                 eprintln!("Error: {e}");
-                std::process::exit(1);
+                return Err(CliError::Failed);
             }
         };
 
@@ -409,7 +410,9 @@ impl AuthoringAuditCommand {
         // an (a) bug). (c)/(b)/untriaged divergences are not gate failures here.
         let hard = report.count(Bucket::BugA) + report.count(Bucket::NonIdempotent);
         if hard > 0 {
-            std::process::exit(1);
+            Err(CliError::Failed)
+        } else {
+            Ok(())
         }
     }
 

@@ -2,6 +2,7 @@ use argh::FromArgs;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use crate::cli::CliError;
 use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::doc::swallow::{self, SwallowReport};
@@ -33,7 +34,7 @@ struct Violation {
 }
 
 impl SwallowAuditCommand {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         let paths = if self.paths.is_empty() {
             vec!["tests/fixtures".to_string()]
         } else {
@@ -43,7 +44,7 @@ impl SwallowAuditCommand {
             Ok(f) => f,
             Err(e) => {
                 eprintln!("Error: {e}");
-                std::process::exit(1);
+                return Err(CliError::Failed);
             }
         };
 
@@ -92,8 +93,10 @@ impl SwallowAuditCommand {
             print_report(&violations, formatted, parse_errors);
         }
 
-        if !violations.is_empty() {
-            std::process::exit(1);
+        if violations.is_empty() {
+            Ok(())
+        } else {
+            Err(CliError::Failed)
         }
     }
 }

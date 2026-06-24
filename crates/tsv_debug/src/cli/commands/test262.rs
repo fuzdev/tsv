@@ -1,5 +1,6 @@
 //! test262 command - run ECMAScript conformance tests against our parser.
 
+use crate::cli::CliError;
 use crate::test262::{DiscoveryOptions, TestSummary, discover_tests, format_failure, run_test};
 use argh::FromArgs;
 use std::path::PathBuf;
@@ -37,7 +38,7 @@ pub struct Test262Command {
 }
 
 impl Test262Command {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         println!("test262 validation");
         println!("==================");
         println!("Path: {}", self.path.display());
@@ -55,7 +56,7 @@ impl Test262Command {
             eprintln!();
             eprintln!("Or specify a custom path:");
             eprintln!("  cargo run -p tsv_debug test262 --path /path/to/test262");
-            std::process::exit(1);
+            return Err(CliError::Failed);
         }
 
         // Discover tests
@@ -64,7 +65,7 @@ impl Test262Command {
             Ok(tests) => tests,
             Err(e) => {
                 eprintln!("Error discovering tests: {e}");
-                std::process::exit(1);
+                return Err(CliError::Failed);
             }
         };
 
@@ -83,7 +84,7 @@ impl Test262Command {
             } else {
                 eprintln!("No tests found matching: {}", self.filters.join(" "));
             }
-            std::process::exit(1);
+            return Err(CliError::Failed);
         }
 
         if !self.filters.is_empty() {
@@ -102,7 +103,7 @@ impl Test262Command {
                 println!("  {}", test.relative_path);
             }
             println!("\nTotal: {}", filtered_tests.len());
-            return;
+            return Ok(());
         }
 
         // Run tests
@@ -200,9 +201,9 @@ impl Test262Command {
 
         // Exit with appropriate code
         if summary.all_passed() {
-            std::process::exit(0);
+            Ok(())
         } else {
-            std::process::exit(1);
+            Err(CliError::Failed)
         }
     }
 }

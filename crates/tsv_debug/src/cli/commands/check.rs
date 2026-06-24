@@ -1,5 +1,6 @@
 //! check command - verify Deno sidecar is available
 
+use crate::cli::CliError;
 use argh::FromArgs;
 
 /// Verify Deno sidecar is available and show version info.
@@ -8,7 +9,7 @@ use argh::FromArgs;
 pub struct CheckCommand {}
 
 impl CheckCommand {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         let rt = super::create_runtime();
         match rt.block_on(crate::deno::check()) {
             Ok(info) => {
@@ -24,6 +25,7 @@ impl CheckCommand {
                 println!("  svelte:                {}", info.svelte);
                 println!("  acorn:                 {}", info.acorn);
                 println!("  acorn-typescript:      {}", info.acorn_typescript);
+                Ok(())
             }
             Err(e) => {
                 eprintln!("Deno sidecar: error");
@@ -33,7 +35,7 @@ impl CheckCommand {
                 if !hint.is_empty() {
                     eprintln!("Hint: {hint}");
                 }
-                std::process::exit(1);
+                Err(CliError::Failed)
             }
         }
     }

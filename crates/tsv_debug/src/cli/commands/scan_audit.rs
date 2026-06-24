@@ -1,3 +1,4 @@
+use crate::cli::CliError;
 use argh::FromArgs;
 use std::path::{Path, PathBuf};
 
@@ -276,15 +277,15 @@ struct Site {
 }
 
 impl ScanAuditCommand {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         let mut files: Vec<PathBuf> = Vec::new();
         for root in CRATE_ROOTS {
             let dir = Path::new(root);
             if !dir.exists() {
                 eprintln!("Error: crate root not found: {root} (run from the repo root)");
-                std::process::exit(1);
+                return Err(CliError::Failed);
             }
-            collect_rs_files(dir, &mut files);
+            super::collect_rs_files(dir, &mut files);
         }
         files.sort();
 
@@ -303,7 +304,7 @@ impl ScanAuditCommand {
                 println!("{}:{}: {}", s.path, s.line_no, s.code);
             }
             eprintln!("\n{} find/rfind/match_indices site(s)", sites.len());
-            return;
+            return Ok(());
         }
 
         let violations: Vec<&Site> = sites.iter().filter(|s| !is_allowed(s)).collect();
@@ -328,9 +329,11 @@ impl ScanAuditCommand {
             print_human(&violations, &stale, &deferred);
         }
 
-        std::process::exit(i32::from(
-            !violations.is_empty() || !stale.is_empty() || !deferred.is_empty(),
-        ));
+        if violations.is_empty() && stale.is_empty() && deferred.is_empty() {
+            Ok(())
+        } else {
+            Err(CliError::Failed)
+        }
     }
 }
 
@@ -347,21 +350,6 @@ fn is_allowed(site: &Site) -> bool {
 /// fails has one.
 fn entry_has_live_site(entry: &Allow, sites: &[Site]) -> bool {
     sites.iter().any(|s| s.path == entry.0 && s.code == entry.1)
-}
-
-/// Recursively collect `*.rs` files under `dir`.
-fn collect_rs_files(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            collect_rs_files(&path, out);
-        } else if path.extension().is_some_and(|e| e == "rs") {
-            out.push(path);
-        }
-    }
 }
 
 /// Crate-relative path: `crates/tsv_ts/src/foo.rs` → `tsv_ts/src/foo.rs`.

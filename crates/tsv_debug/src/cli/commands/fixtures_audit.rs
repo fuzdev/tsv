@@ -1,7 +1,8 @@
+use crate::cli::CliError;
 use crate::deno::run_prettier;
 use crate::fixtures::{self, AuditSignature, Fixture, FixtureFiles, read_file};
 use argh::FromArgs;
-use futures_util::stream::{self, StreamExt};
+use futures_util::StreamExt;
 use std::collections::HashMap;
 
 /// Investigate fixture normalization graphs (diagnostic; --all for every fixture).
@@ -26,13 +27,13 @@ pub struct FixturesAuditCommand {
 }
 
 impl FixturesAuditCommand {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         let rt = crate::cli::commands::create_runtime();
-        rt.block_on(self.run_async());
+        rt.block_on(self.run_async())
     }
 
-    async fn run_async(self) {
-        let all_fixtures = super::walk_or_exit();
+    async fn run_async(self) -> Result<(), CliError> {
+        let all_fixtures = super::walk_fixtures_or_fail()?;
 
         // Apply filters, then scope to divergence fixtures by default
         let fixture_list: Vec<_> = all_fixtures
@@ -53,29 +54,19 @@ impl FixturesAuditCommand {
             } else {
                 eprintln!("No fixtures found matching: {}", self.filters.join(" "));
             }
-            std::process::exit(1);
+            return Err(CliError::Failed);
         }
 
-        // Audit fixtures in parallel — tokio::spawn per fixture so the
-        // CPU-bound Rust work runs on all runtime workers (buffer_unordered
-        // alone only interleaves at await points on the stream-driving task),
-        // with a small sidecar pool for the JS side
-        let concurrency = crate::deno::init_bulk_pool();
-
-        let joined: Vec<_> = stream::iter(fixture_list)
-            .map(|fixture| tokio::spawn(async move { audit_fixture(&fixture).await }))
-            .buffer_unordered(concurrency)
-            .collect()
-            .await;
-        let mut results = Vec::with_capacity(joined.len());
-        for handle in joined {
-            match handle {
-                Ok(r) => results.push(r),
-                Err(e) => {
-                    eprintln!("fixture audit task panicked: {e}");
-                    std::process::exit(2);
-                }
-            }
+        // Audit fixtures in parallel on the bulk sidecar pool. Order doesn't
+        // matter — results are collected and printed afterward.
+        let mut tasks = super::spawn_fixture_stream(
+            fixture_list,
+            super::ResultOrder::Completion,
+            |fixture| async move { audit_fixture(&fixture).await },
+        );
+        let mut results = Vec::new();
+        while let Some(joined) = tasks.next().await {
+            results.push(super::task_result(joined, "audit")?);
         }
 
         if self.json {
@@ -83,6 +74,8 @@ impl FixturesAuditCommand {
         } else {
             self.print_human(&results);
         }
+
+        Ok(())
     }
 
     fn print_json(&self, results: &[FixtureAudit]) {

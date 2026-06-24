@@ -1,3 +1,4 @@
+use crate::cli::CliError;
 use argh::FromArgs;
 use tsv_cli::cli::input::Input;
 use tsv_lang::printing::visual_width;
@@ -29,7 +30,7 @@ pub struct LineWidthCommand {
 }
 
 impl LineWidthCommand {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         let input = if let Some(content) = self.content {
             Input::from_content(content)
         } else if self.stdin {
@@ -37,7 +38,7 @@ impl LineWidthCommand {
                 Ok(i) => i,
                 Err(e) => {
                     eprintln!("Error: {e}");
-                    std::process::exit(1);
+                    return Err(CliError::Failed);
                 }
             }
         } else if let Some(path) = self.file {
@@ -45,12 +46,12 @@ impl LineWidthCommand {
                 Ok(i) => i,
                 Err(e) => {
                     eprintln!("Error: {e}");
-                    std::process::exit(1);
+                    return Err(CliError::Failed);
                 }
             }
         } else {
             eprintln!("Error: No input provided. Use a file path, --content, or --stdin");
-            std::process::exit(1);
+            return Err(CliError::Failed);
         };
 
         let content = input.content();
@@ -62,7 +63,7 @@ impl LineWidthCommand {
             } else {
                 println!("No lines to measure");
             }
-            return;
+            return Ok(());
         }
 
         // Check if specific line exists
@@ -74,7 +75,7 @@ impl LineWidthCommand {
                 line_num,
                 lines.len()
             );
-            std::process::exit(1);
+            return Err(CliError::Failed);
         }
 
         let mut exceeds_count = 0;
@@ -148,5 +149,7 @@ impl LineWidthCommand {
             let json_str = serde_json::to_string_pretty(&output).unwrap();
             println!("{json_str}");
         }
+
+        Ok(())
     }
 }
