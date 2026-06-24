@@ -9,7 +9,7 @@
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
-use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::{DocBuf, arena::DocId};
 
 impl<'a> Printer<'a> {
     /// Build a doc for a special element (svelte:component, svelte:element, etc.)
@@ -389,7 +389,7 @@ impl<'a> Printer<'a> {
         &self,
         element: &internal::SpecialElement,
         separator: DocId,
-    ) -> Vec<DocId> {
+    ) -> DocBuf {
         // Pre-allocate: 2 docs per attr (separator + attr), plus potential this={} attr
         let has_this = matches!(
             element.kind,
@@ -397,7 +397,7 @@ impl<'a> Printer<'a> {
                 | internal::SpecialElementKind::SvelteElement { .. }
         );
         let capacity = (element.attributes.len() + usize::from(has_this)) * 2;
-        let mut docs = Vec::with_capacity(capacity);
+        let mut docs: DocBuf = DocBuf::with_capacity(capacity);
 
         // Add this={...} for component/element
         match &element.kind {
