@@ -197,8 +197,8 @@ impl Translator<'_> {
                 }
                 for spec in &mut n.specifiers {
                     span!(self, spec);
-                    self.identifier(&mut spec.local);
-                    self.identifier(&mut spec.exported);
+                    self.module_export_name(&mut spec.local);
+                    self.module_export_name(&mut spec.exported);
                 }
                 if let Some(source) = &mut n.source {
                     span!(self, source);
@@ -217,7 +217,7 @@ impl Translator<'_> {
             Statement::ExportAllDeclaration(n) => {
                 span!(self, n);
                 if let Some(exported) = &mut n.exported {
-                    self.identifier(exported);
+                    self.module_export_name(exported);
                 }
                 span!(self, n.source);
                 self.import_attributes_opt(n.attributes.as_mut());
@@ -236,7 +236,7 @@ impl Translator<'_> {
                         }
                         ImportSpecifier::Named(s) => {
                             span!(self, s);
-                            self.identifier(&mut s.imported);
+                            self.module_export_name(&mut s.imported);
                             self.identifier(&mut s.local);
                         }
                         ImportSpecifier::Namespace(s) => {
@@ -481,6 +481,13 @@ impl Translator<'_> {
                 self.expression(&mut i.expression);
                 self.type_parameter_instantiation_opt(i.type_parameters.as_mut());
             }
+        }
+    }
+
+    fn module_export_name(&self, name: &mut ModuleExportName) {
+        match name {
+            ModuleExportName::Identifier(id) => self.identifier(id),
+            ModuleExportName::Literal(lit) => span!(self, lit),
         }
     }
 

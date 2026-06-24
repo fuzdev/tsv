@@ -83,6 +83,20 @@ const samples: Sample[] = [
 		type: 'Program',
 	},
 	{
+		// String module specifiers (ES2022 `ModuleExportName : IdentifierName |
+		// StringLiteral`): a string `imported`/`local`/`exported`, and the
+		// `export * as 'str'` namespace name — the `ModuleExportName` union.
+		name: 'ts_string_module_specifiers',
+		source: [
+			'import { "str a" as b } from "./a";',
+			'export { c as "str c" } from "./c";',
+			'export { "str d" as "str e" } from "./d";',
+			'export * as "str f" from "./f";',
+		].join('\n'),
+		parser: 'typescript',
+		type: 'Program',
+	},
+	{
 		name: 'css_rule_at_media',
 		source: '.foo { color: red; }\n@media (min-width: 600px) {\n\t.bar { padding: 1em 2em; }\n}',
 		parser: 'css',

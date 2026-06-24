@@ -65,8 +65,9 @@ pub struct ExportAllDeclaration {
     /// Omitted in Svelte (non-lang="ts") context when "value"; always present in TypeScript context
     #[serde(rename = "exportKind", skip_serializing_if = "Option::is_none")]
     pub export_kind: Option<String>,
-    /// For `export * as ns from "y"`, the namespace binding name, or null
-    pub exported: Option<Identifier>,
+    /// For `export * as ns from "y"`, the namespace binding name, or null.
+    /// A `Literal` for a string name (`export * as 'str' from "y"`).
+    pub exported: Option<ModuleExportName>,
     /// Module source
     pub source: Literal,
     /// Import attributes: present in Svelte non-lang="ts" context; omitted in TypeScript context when empty
@@ -94,9 +95,9 @@ pub struct ExportSpecifier {
     pub end: u32,
     pub loc: SourceLocation,
     /// Local name (what's exported from this module)
-    pub local: Identifier,
+    pub local: ModuleExportName,
     /// Exported name (what it's called externally)
-    pub exported: Identifier,
+    pub exported: ModuleExportName,
     /// Omitted in Svelte (non-lang="ts") context when "value"; always present in TypeScript context
     #[serde(rename = "exportKind", skip_serializing_if = "Option::is_none")]
     pub export_kind: Option<String>,
@@ -148,7 +149,7 @@ pub struct ImportNamedSpecifier {
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    pub imported: Identifier,
+    pub imported: ModuleExportName,
     pub local: Identifier,
     /// Omitted in Svelte (non-lang="ts") context when "value"; always present in TypeScript context
     #[serde(rename = "importKind", skip_serializing_if = "Option::is_none")]
@@ -184,6 +185,16 @@ pub struct ImportAttribute {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ImportAttributeKey {
+    Identifier(Identifier),
+    Literal(Literal),
+}
+
+/// Module export name: a bare `Identifier` or a `Literal` string. Acorn emits
+/// whichever the source used; serialized untagged (each variant carries its own
+/// `type` discriminator). Per ecma262 `ModuleExportName : IdentifierName | StringLiteral`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ModuleExportName {
     Identifier(Identifier),
     Literal(Literal),
 }
