@@ -518,6 +518,7 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Anon func keyword to `(` (line) → After `)` or inside parens — [expr_anon_line_comment](../tests/fixtures/typescript/declarations/function/expr_anon_line_comment_prettier_divergence/)
 - Anon class keyword to `{` (line) → Into class body — [expr_anon_line_comment](../tests/fixtures/typescript/declarations/class/expr_anon_line_comment_prettier_divergence/)
 - Constructor type `new` to `(` → After `)`, before param, or place — [constructor_type_new_comment](../tests/fixtures/typescript/types/constructor_type_new_comment_prettier_divergence/)
+- Constructor type `abstract` to `new` → After `new` (mirrors the `new`-to-params relocation; was dropped — content loss) — [constructor_type_abstract_comment](../tests/fixtures/typescript/types/constructor_type_abstract_comment_prettier_divergence/)
 - Name to type params (line) → End of declaration line — [name_type_params_line_comment](../tests/fixtures/typescript/declarations/class/name_type_params_line_comment_prettier_divergence/)
 - Method name to type params (line) → End of method line — [method_name_type_params_line_comment](../tests/fixtures/typescript/declarations/class/method_name_type_params_line_comment_prettier_divergence/)
 - Heritage last item before `{` → Into class/interface body — [heritage_last_item_line_comment](../tests/fixtures/typescript/declarations/class/heritage/heritage_last_item_line_comment_prettier_divergence/)
