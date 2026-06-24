@@ -25,11 +25,11 @@ impl<'a> Printer<'a> {
 
         // Preserve comments between ) and { in place:
         //   switch(x)/* c */{} → switch (x) /* c */ {}
-        let body_open_brace = close_paren.and_then(|close| {
-            self.source[close as usize + 1..stmt.span.end as usize]
-                .find('{')
-                .map(|p| close + 1 + p as u32)
-        });
+        // Scan for the body `{` outside comments — a naive find('{') matches a `{`
+        // inside the gap comment (`switch (x) /* { */ {`), mis-anchoring the body
+        // brace and dropping the comment.
+        let body_open_brace = close_paren
+            .and_then(|close| self.find_char_outside_comments(close + 1, stmt.span.end, b'{'));
         let paren_brace_comments = match (close_paren, body_open_brace) {
             (Some(close), Some(brace)) if self.has_comments_between(close + 1, brace) => {
                 self.build_inline_comments_between_doc_opt(close + 1, brace)
