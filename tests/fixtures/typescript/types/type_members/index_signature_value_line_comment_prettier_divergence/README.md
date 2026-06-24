@@ -27,4 +27,4 @@ both formatters and is not a divergence — only a line comment (which runs to E
 forcing the type onto its own line) differs. Same rule across every `: Type`
 annotation context — see
 [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
-§Uniform forced-continuation indent and §Comment Position Philosophy.
+§Uniform Forced-Continuation Indent and §Comment Position Philosophy.

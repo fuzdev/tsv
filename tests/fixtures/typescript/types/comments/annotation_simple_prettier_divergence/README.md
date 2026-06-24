@@ -53,5 +53,5 @@ shares the same continuation layout via `build_type_annotation_doc`: the comment
 stays after `:`, the type indents one level. Prettier's behavior splits by
 context (relocate here, flush elsewhere, indent for unions), but tsv keeps one
 layout everywhere. See
-[conformance_prettier.md](../../../../../docs/conformance_prettier.md)
-§Uniform forced-continuation indent.
+[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+§Uniform Forced-Continuation Indent and §Comment normalization (stable quirks).

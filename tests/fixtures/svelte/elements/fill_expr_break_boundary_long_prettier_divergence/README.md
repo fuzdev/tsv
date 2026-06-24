@@ -9,4 +9,6 @@ Prettier (101 chars): `'ssss'} aaaa bbbb ... pppp qqqq rrrr`
 
 Strict print width. Prettier's fill algorithm allows the continuation line after a multiline fill element to exceed printWidth by 1 char. tsv enforces printWidth as a hard limit, breaking the last word to the next fill line.
 
+See [conformance_prettier.md §Print Width Philosophy](../../../../../docs/conformance_prettier.md#print-width-philosophy).
+
 See also: `fill_expr_break_continuation_long/` for matching behavior when continuation stays under 100.

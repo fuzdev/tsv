@@ -1,19 +1,25 @@
 # return_type_generic_union_long_prettier_divergence
 
-Prettier has inconsistent special-casing for `null` and `void` in union types within generic return types at the printWidth boundary.
+**Reason: Print width.** Prettier special-cases `null`/`void` as the second
+member of a union type inside a generic return type, treating printWidth as a
+soft target there; tsv treats printWidth as a hard limit and breaks consistently
+once the line exceeds 100 chars, regardless of the type keyword.
 
-tsv: breaks consistently at 101+ chars inside the return type generic
-Prettier: function declarations and class methods exceed printWidth; arrow functions use assignment break instead
+tsv: breaks inside the return type generic at the 101-char boundary
+Prettier: keeps the form it special-cases, varying by declaration kind:
 
-Prettier's behavior varies by declaration kind:
-- Function declarations with `null`/`void`: allows line to exceed printWidth
-- Arrow functions with `null`/`void`: breaks at `=` instead of in the return type
-- Class methods with `null`/`void`: allows line to exceed printWidth
+- Function declarations with `null`/`void`: allows the line to exceed printWidth
+- Class methods with `null`/`void`: allows the line to exceed printWidth
+- Arrow functions with `null`/`void`: breaks at the assignment `=` instead of
+  inside the return type
 
-## Reason
-
-tsv breaks inside the return type generic based on line width, not type keyword. Consistent across function declarations, arrow functions, and class methods.
+Each case has a 100-char control that stays inline in both formatters and a
+101-char case where the divergence appears.
 
 ## Related
 
-- `return_type_generic_union_long/` — non-diverging cases (with `B` instead of `null`)
+- `return_type_generic_union_long/` — non-diverging cases (with `B` instead of
+  `null`, so prettier's `null`/`void` special-case doesn't fire)
+
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+§TypeScript (Return type generic union) and §Print Width Philosophy.

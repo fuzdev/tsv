@@ -23,6 +23,8 @@ This is a **limitation in acorn-typescript**, not the tsv parser. TypeScript 5.0
 - **tsv parser**: Successfully parses `class Container<const T> {}` (see `expected_ours.json`)
 - **Svelte/acorn**: Fails to parse (see `expected_svelte.json` with `{"error": "failed to parse"}`)
 
+See [conformance_svelte.md](../../../../../../docs/conformance_svelte.md) §TypeScript Corrections.
+
 ## Reference
 
 - [TypeScript 5.0 Release Notes - const Type Parameters](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-0.html#const-type-parameters)

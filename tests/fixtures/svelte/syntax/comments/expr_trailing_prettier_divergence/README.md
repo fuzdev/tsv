@@ -13,7 +13,9 @@ unmatched paren — `{@const x = value) /* c */}`; 4.x drops the comment cleanly
 
 ## Reason
 
-User comments are valuable and shouldn't be silently removed. The comments are syntactically valid in these positions.
+User comments are valuable and shouldn't be silently removed. The comments are syntactically valid
+in these positions. See
+[conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy).
 
 ## Related
 

@@ -2,7 +2,7 @@
 
 Regression coverage for line-comment handling in angle-bracket type assertions
 beyond the four core positions
-([`../type_assertion_line_comment_svelte_divergence`](../type_assertion_line_comment_svelte_prettier_divergence/)).
+([`../type_assertion_line_comment_svelte_prettier_divergence`](../type_assertion_line_comment_svelte_prettier_divergence/)).
 
 - **`a` — generic cast type with a nested `>`** (`<Map<string, number> // c⏎>x`):
   the cast's closing `>` is found by scanning from the type's *end*, so the type's

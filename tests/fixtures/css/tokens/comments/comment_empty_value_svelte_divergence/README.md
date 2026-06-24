@@ -11,3 +11,5 @@ Svelte: parse error — `Declaration cannot be empty` (https://svelte.dev/e/css_
 
 - `expected_ours.json` — tsv AST with empty value after comment stripping
 - `expected_svelte.json` — `{"error": "failed to parse"}` (Svelte parse failure, expected)
+
+See [conformance_svelte.md §CSS Corrections](../../../../../../docs/conformance_svelte.md#css-corrections).

@@ -11,4 +11,4 @@ case confirms brace-like glyphs inside the comment don't confuse brace detection
 The matching block-comment case (`export /* c */ {}`) stays flat in both
 formatters and lives in the regular [keyword_comment](../keyword_comment/) fixture.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

@@ -8,3 +8,5 @@ Prettier: relocates comments inside the next block
 ## Reason
 
 tsv treats user comment placement as intentional. Consistent with tsv's handling across if/else, try/catch, switch, for, while, do-while, labeled statements, and call chains.
+
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

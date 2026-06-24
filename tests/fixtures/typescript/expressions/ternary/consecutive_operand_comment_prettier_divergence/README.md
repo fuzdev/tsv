@@ -23,3 +23,5 @@ principle 1: "comments between an operator and its operand stay there." It is
 also the ternary face of prettier's information-destructive comment motion
 documented for property signatures (two leading line comments `merge and
 reverse`); tsv preserves each comment as its own node.
+
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

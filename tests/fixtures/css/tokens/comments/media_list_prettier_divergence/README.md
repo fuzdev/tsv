@@ -7,4 +7,4 @@ Prettier: `screen/* c */and`, `not/* c */screen`, `(min-width: /* c */500px)`
 
 ## Reason
 
-tsv normalizes comment spacing consistently across all CSS contexts. This covers comments between boolean operators, before commas, and inside media features.
+Stable quirk. tsv normalizes comment spacing consistently across all CSS contexts. This covers comments between boolean operators, before commas, and inside media features. See [conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments).

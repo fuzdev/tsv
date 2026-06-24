@@ -159,9 +159,9 @@ Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
 
 **Async generic arrow params**: acorn-typescript drops all function parameters from `async` arrow functions that have type parameters (`async <T,>(x: T) => x` → `params: []`). Non-async generic arrows are unaffected. This is semantic corruption — tools consuming the AST would see zero-argument functions. **Upstream candidate**: acorn-typescript async arrow parsing.
 
-Fixtures: [async_generic/basic](../tests/fixtures/typescript/expressions/arrow/async_generic/basic_svelte_prettier_divergence/), [async_generic/basic_ts](../tests/fixtures/typescript/expressions/arrow/async_generic/basic_ts_svelte_divergence/), [async_generic/long](../tests/fixtures/typescript/expressions/arrow/async_generic/long_svelte_divergence/), [curried_typed_callback](../tests/fixtures/typescript/expressions/arrow/curried_typed_callback_svelte_prettier_divergence/), [indexed_access/basic](../tests/fixtures/typescript/types/indexed_access/basic_svelte_divergence/)
+Fixtures: [async_generic/stacked](../tests/fixtures/typescript/expressions/arrow/async_generic/stacked_svelte_prettier_divergence/), [async_generic/basic_ts](../tests/fixtures/typescript/expressions/arrow/async_generic/basic_ts_svelte_divergence/), [async_generic/long](../tests/fixtures/typescript/expressions/arrow/async_generic/long_svelte_divergence/), [curried_typed_callback](../tests/fixtures/typescript/expressions/arrow/curried_typed_callback_svelte_prettier_divergence/), [indexed_access/basic](../tests/fixtures/typescript/types/indexed_access/basic_svelte_divergence/)
 
-The `async_generic/basic` and `curried_typed_callback` fixtures carry a second,
+The `async_generic/stacked` and `curried_typed_callback` fixtures carry a second,
 independent divergence — prettier's forced `<T,>` trailing comma on single-unconstrained
 arrow type params (hence the `_svelte_prettier_divergence` suffix). See
 [conformance_prettier.md](./conformance_prettier.md) §TypeScript.
@@ -249,6 +249,7 @@ All corrections exist because of upstream bugs. If fixed upstream, tsv would rem
 - Attribute namespaces — `[ns\|attr]` not supported
 - No-namespace selectors — `\|element` not supported
 - Empty-after-comment decl — Rejects `prop: /* c */;` after stripping comments (5.55.x) — Prettier still formats it
+- Block-valued custom properties — Rejects `--x: { … }` (`css_expected_identifier`) — Prettier still formats it
 - Stray `;;` garbage declaration — `border-box;;` yields `{property: ";"}` swallowing the next declaration (spec: drop empty declarations)
 - Comment-touching-property garbage — `color/* c */:` yields `property: "color/*"` (`read_until` scans to the whitespace inside the comment)
 
@@ -276,6 +277,8 @@ The constructs acorn re-parses (root `comments` duplication tsv corrects):
   - [type_literal_line_before_block_svelte_divergence](../tests/fixtures/typescript/types/comments/type_literal_line_before_block_svelte_divergence/)
   - [union_hug_object_interior_comment_svelte_divergence](../tests/fixtures/typescript/types/union_hug_object_interior_comment_svelte_divergence/)
   - [union_nonhug_object_interior_comment_svelte_divergence](../tests/fixtures/typescript/types/union_nonhug_object_interior_comment_svelte_divergence/)
+  - [index_signature_union_intersection_value_svelte_divergence](../tests/fixtures/typescript/types/type_members/index_signature_union_intersection_value_svelte_divergence/) — index-signature value formatting; the divergence is the first label comment after `{`
+  - [call_type_arg_empty_comment_svelte_divergence](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_empty_comment_svelte_divergence/) — empty object type literal as a call type argument (`fn<{ /* … */ }>()`); the comment is inside the empty `{ }` body
   - [prettier_ignore_members_svelte_divergence](../tests/fixtures/typescript/syntax/comments/prettier_ignore_members_svelte_divergence/)
 
 - **Mapped type `{ [K in … ] }` header — a comment from `{` up to `in`:**
@@ -288,9 +291,8 @@ The constructs acorn re-parses (root `comments` duplication tsv corrects):
   - [typed_param_comment_positions_svelte_divergence](../tests/fixtures/typescript/types/function_type/typed_param_comment_positions_svelte_divergence/)
   - [function_type_param_trailing_svelte_divergence](../tests/fixtures/typescript/types/comments/function_type_param_trailing_svelte_divergence/)
 
-- **Index signature `[k: T]` — a comment before the colon (type-member and class):**
+- **Index signature `[k: T]` — a comment inside the brackets, before the key or after the key (type-member and class):**
   - [index_signature_comment_svelte_divergence](../tests/fixtures/typescript/types/type_members/index_signature_comment_svelte_divergence/)
-  - [index_signature_union_intersection_value_svelte_divergence](../tests/fixtures/typescript/types/type_members/index_signature_union_intersection_value_svelte_divergence/)
   - [index_signature_bracket_comment_positions_svelte_divergence](../tests/fixtures/typescript/types/type_members/index_signature_bracket_comment_positions_svelte_divergence/)
   - [index_signature_key_colon_line_comment_svelte_prettier_divergence](../tests/fixtures/typescript/types/type_members/index_signature_key_colon_line_comment_svelte_prettier_divergence/)
   - [index_signature_key_type_line_comments_svelte_prettier_divergence](../tests/fixtures/typescript/types/type_members/index_signature_key_type_line_comments_svelte_prettier_divergence/)
@@ -313,10 +315,8 @@ The constructs acorn re-parses (root `comments` duplication tsv corrects):
   - [after_return_type_comment_svelte_divergence](../tests/fixtures/typescript/expressions/arrow/after_return_type_comment_svelte_divergence/)
   - [return_type_untyped_param_comment_svelte_divergence](../tests/fixtures/typescript/expressions/arrow/return_type_untyped_param_comment_svelte_divergence/)
 
-- **Empty call type-argument list `<>` — a comment inside the brackets:**
-  - [call_type_arg_empty_comment_svelte_divergence](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_empty_comment_svelte_divergence/)
-
-Attachment-only duplication (`trailingComments` on the type annotation, not the root array) — a return type immediately followed by `;`:
+A comment on a return/property type annotation immediately followed by `;` (the
+member-type reparse) — root `comments` duplication, same mechanism as above:
 
 - [method_trailing_semicolon_comment_svelte_prettier_divergence](../tests/fixtures/typescript/declarations/class/method_trailing_semicolon_comment_svelte_prettier_divergence/)
 - [trailing_semicolon_comment_svelte_divergence](../tests/fixtures/typescript/types/type_members/trailing_semicolon_comment_svelte_divergence/)
@@ -404,7 +404,7 @@ The same backslash: source `\\` (2 bytes) → Svelte value `\\\\` (4 bytes) → 
 ### Svelte Source References
 
 - `node_modules/svelte/src/compiler/phases/1-parse/read/style.js`
-  - `read_value()` (lines 502-536) — backslash doubling
+  - `read_value()` (the `value += '\\' + char` escape branch) — backslash doubling
 
 ---
 
@@ -422,7 +422,7 @@ Svelte's parser accepts `|modifier` syntax on all directive types (permissive pa
 
 Directives without official modifiers: `AnimateDirective`, `BindDirective`, `ClassDirective`, `LetDirective`, `UseDirective`.
 
-**tsv behavior**: Match Prettier—only output `modifiers` field for directives that officially support them.
+**tsv behavior**: Every directive carries a `modifiers` array (matching Svelte's runtime AST, even for the five types whose published `.d.ts` declares none). For the three officially-supporting types tsv preserves the modifier text verbatim — including unofficial ones, exactly as Svelte's permissive parser does (`on:click|preventDefault|bogus` → `['preventDefault', 'bogus']`). For the five types without official support, tsv drops any `|mod` to an empty array, where Svelte's parser instead retains the text (`use:foo|bar` → tsv `[]`, Svelte `['bar']`) — a deliberate parser-AST divergence from Svelte. On format, the unofficial `|mod` text is then dropped from the output, matching Prettier.
 
 **Reference**: `svelte/packages/svelte/src/compiler/types/template.d.ts`
 

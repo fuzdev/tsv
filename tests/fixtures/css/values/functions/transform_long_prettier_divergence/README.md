@@ -9,7 +9,7 @@ This affects all space-separated CSS value lists — `transform`, `filter`, `box
 
 ## Reason
 
-tsv enforces consistent wrapping at 100 chars for all CSS value lists. Prettier's off-by-one creates inconsistency with other constructs.
+Print width. tsv treats printWidth as a hard limit and wraps all CSS space-separated value lists at 100 chars; Prettier's off-by-one tolerates the overage. See [conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values) ("Transform list wrap").
 
 ## Related
 

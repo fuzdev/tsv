@@ -15,7 +15,7 @@ line2`                          line2`
 );                              );
 ```
 
-See the plain-call sibling
+Reason: Comment relocation. See the plain-call sibling
 ([nonlast_arg_after_comma_block_then_line](../nonlast_arg_after_comma_block_then_line_prettier_divergence/))
 for the full rationale, and
-[conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+[conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

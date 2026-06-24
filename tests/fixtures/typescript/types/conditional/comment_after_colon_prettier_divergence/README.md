@@ -15,4 +15,4 @@ we normalize it to after `:`.
 Note: when multiple line comments appear on their own lines after `:`, prettier
 also keeps them after `:`. The divergence only affects single-line cases.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

@@ -1,15 +1,15 @@
 # media_boolean_spacing_prettier_divergence
 
-Prettier bug: fails to add required spaces after `and`, `or`, `not` keywords before `(` in `@media` queries.
+Spec violation: Prettier preserves a compact `@media` prelude where a boolean keyword (`and`, `or`, `not`) is jammed against `(`. tsv inserts the spec-required space.
 
 tsv: `@media screen and (min-width: 768px)` (spec-compliant)
 Prettier: `@media screen and(min-width:768px)` (preserves compact form)
 
-CSS Media Queries Level 4 requires whitespace between boolean keywords and `(` — without it, `and(...)` parses as a function token.
+CSS Media Queries Level 4 §3 requires whitespace between a boolean keyword and `(` — without it, `and(...)` tokenizes as a `<function-token>` (CSS Syntax 3 §4.3.4). Prettier's preserved form is valid stable output but non-normalized; tsv normalizes per the spec.
 
 ## Reason
 
-Prettier correctly normalizes this for `@supports` but not `@media`:
+See [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules) for the spec basis. Prettier normalizes this for `@supports` but not `@media`:
 
 | At-rule      | `and(...)` input      | Prettier output       |
 | ------------ | --------------------- | --------------------- |

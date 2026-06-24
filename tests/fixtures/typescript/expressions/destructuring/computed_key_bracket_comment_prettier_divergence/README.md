@@ -10,4 +10,4 @@ Both `[x /* c */]` forms are dual-stable (variant_inside_brackets).
 
 Affects: object destructuring assignment and function parameter destructuring.
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

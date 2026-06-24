@@ -1,4 +1,4 @@
-# empty_param_line_comment_prettier_divergence
+# empty_param_line_comment_svelte_prettier_divergence
 
 A line comment inside an **empty** function-type or constructor-type parameter
 list, trailing the opening `(` on the same line (`type F = (// c`), is preserved

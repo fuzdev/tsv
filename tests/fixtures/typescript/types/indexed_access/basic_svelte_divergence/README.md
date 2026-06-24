@@ -17,3 +17,5 @@ The non-async generic arrow (`fn`) in the same fixture parses correctly — only
 **tsv** correctly includes the parameters.
 
 **Upstream**: acorn-typescript — bug in async arrow parsing when type parameters are present.
+
+See [conformance_svelte.md](../../../../../../docs/conformance_svelte.md) §TypeScript Corrections.

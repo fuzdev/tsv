@@ -31,4 +31,4 @@ the joined-args path
 and member-callee chains
 ([chained/nonlast_arg_after_comma_block_then_line](../chained/nonlast_arg_after_comma_block_then_line_prettier_divergence/)).
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

@@ -33,4 +33,4 @@ is documented in `syntax/comments/optional_marker_line_comment_prettier_divergen
 Both positions are dual-stable in our formatter. Per the comment-position
 policy, we preserve the user's original comment position.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

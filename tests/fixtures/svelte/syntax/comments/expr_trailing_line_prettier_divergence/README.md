@@ -35,7 +35,7 @@ once again a usable oracle.
 
 User comments are valuable and shouldn't be silently removed. The comments are
 syntactically valid in these positions. See
-[conformance_prettier.md §Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy).
+[conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy).
 
 ## Related
 

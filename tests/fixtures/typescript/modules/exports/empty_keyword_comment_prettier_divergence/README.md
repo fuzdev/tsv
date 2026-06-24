@@ -8,4 +8,6 @@ to after `from` in re-exports. tsv preserves comments where the user placed them
 
 Same pattern as `imports/empty_keyword_comment_prettier_divergence`.
 
-Reason: Comment preservation (see conformance_prettier.md §Comment Position Philosophy).
+Reason: Comment preservation — the user's chosen position is preserved.
+
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

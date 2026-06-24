@@ -24,4 +24,4 @@ Per Comment Position Philosophy (and the before-semicolon divergence), the user'
 chosen position is preserved. The block case is dual-stable; only the line comment
 diverges. Same mechanism as `imports/source_trailing_comment_prettier_divergence`.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

@@ -1,5 +1,10 @@
 # inline_parent_blocks_prettier_divergence
 
+An **HTML inline element** parent (`<span>`) with compact-authored block children
+(`<div>block1</div><div>block2</div>`) — the inline-element counterpart to the component cases
+(`compact_block_children`), proving the block-style layout is keyed on inline classification, not on
+being a component.
+
 tsv lays out this inline element's wrapping content **block-style** — both tags stay intact and the
 content moves to its own indented line(s), collapsing to `<tag>content</tag>` when it fits. Prettier
 instead dangles the tag delimiters (`<tag⏎\t>content</tag⏎>`). Content-boundary whitespace is

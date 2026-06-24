@@ -9,4 +9,6 @@ At 100 chars both formatters match — see `inline_element_fill_100/`.
 
 ## Reason
 
-prettier-plugin-svelte structures docs with separate fills per text node and `group([line, element])` wrappers around inline elements. This creates an emergent behavior where lines can exceed printWidth by 1 char. tsv's fill strictly respects printWidth=100.
+Print width. prettier-plugin-svelte structures docs with separate fills per text node and `group([line, element])` wrappers around inline elements. This creates an emergent behavior where lines can exceed printWidth by 1 char. tsv's fill strictly respects printWidth=100.
+
+See [conformance_prettier.md §Svelte: Elements (Fill boundary)](../../../../../docs/conformance_prettier.md#svelte-elements).

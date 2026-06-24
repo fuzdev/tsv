@@ -17,5 +17,5 @@ differs (whole tabs vs tabs-then-spaces).
 tsv renders all indentation as whole tabs and never mixes tabs with alignment
 spaces — Prettier's sub-tab alignment is rounded up to a tab. This keeps
 indentation tab-width-agnostic. See
-[docs/conformance_prettier.md](../../../../docs/conformance_prettier.md) §Tabs-only
+[docs/conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Tabs-only
 alignment (no sub-tab spaces).

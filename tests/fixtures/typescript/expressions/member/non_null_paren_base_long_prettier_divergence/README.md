@@ -12,10 +12,10 @@ Prettier: hangs the parens without `!`, but hugs the inner call with `!` (`(awai
 
 ## Reason
 
-tsv lays out a parenthesized base the same way regardless of a trailing non-null assertion, so the two forms stay visually consistent. Content is identical (the ASTs match); only the parenthesized-base layout differs, and only in the `!` form.
+Design choice. tsv lays out a parenthesized base the same way regardless of a trailing non-null assertion, so the two forms stay visually consistent. Content is identical (the ASTs match); only the parenthesized-base layout differs, and only in the `!` form.
 
 ## Related
 
 - `member/paren_base_trailing_long/` — the no-`!` form, where tsv matches Prettier (single trailing member hugs the closing `)`).
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §TypeScript.
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §TypeScript.

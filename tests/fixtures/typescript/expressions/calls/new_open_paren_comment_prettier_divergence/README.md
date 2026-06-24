@@ -27,4 +27,4 @@ applied to the `new` path. This also fixes content loss: a line comment trailing
 comment on its own line, both formatters keep it there — the two positions are
 dual-stable.
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation (Call open paren `(`).
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation (Call open paren `(`).

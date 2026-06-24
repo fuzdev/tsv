@@ -31,4 +31,4 @@ export * from 'e' with { type: 'json' } /* c5 */;
 The source→`with` block comment (c1) is dual-stable. The `with`→`{` (c2, c4) and
 after-`}` (c3, c5) comments diverge. Per Comment Position Philosophy.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

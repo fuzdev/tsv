@@ -24,3 +24,5 @@ Both passes break the chain at the same point; only comment-adjacent spacing dif
 Stable quirk. Prettier's babel/typescript parser strips the grouping parens and repositions
 the comment mid-chain. The first-pass output has different spacing than the final stable
 form. tsv normalizes directly to the stable form from the original parens source.
+
+See [conformance_prettier.md §Comment normalization (stable quirks)](../../../../../../../docs/conformance_prettier.md#comment-normalization-stable-quirks).
