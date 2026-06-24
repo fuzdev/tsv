@@ -474,40 +474,42 @@ impl<'a> Printer<'a> {
             from_content_end = Some(ns_spec.span.end);
         }
 
-        // Build named specifiers with group wrapping (or empty braces if source had them)
-        if !named_specs.is_empty() || has_empty_braces {
-            if has_default || namespace_spec.is_some() {
+        // Build named specifiers with group wrapping (or empty braces if source had them).
+        //
+        // An empty named group *after a default/namespace binding* (`import a, {}
+        // from 'x'`) carries no specifiers, so it's dropped to match prettier
+        // (`import a from 'x'`): the binding→`from` gap — and any comment in it — is
+        // then handled exactly like a plain default import (a plain match, and
+        // idempotent; emitting `, {}` here instead duplicated the gap comment on each
+        // reformat). A *bare* empty group (`import {} from 'x'`, no binding) is kept.
+        // A leading `default` / `* as ns` binding (as opposed to the named group).
+        let has_binding = has_default || namespace_spec.is_some();
+        let drop_empty_after_binding = has_empty_braces && named_specs.is_empty() && has_binding;
+
+        if !named_specs.is_empty() || (has_empty_braces && !drop_empty_after_binding) {
+            if has_binding {
                 // For named imports after default: prettier moves all comments between
-                // default end and `{` to before the comma: `import x /* c */, {a}`
+                // default end and `{` to before the comma: `import x /* c */, {a}`.
+                // The `{` is found outside comments so a `{` glyph in a comment isn't
+                // mistaken for it. (Empty braces after a binding were dropped above,
+                // so `named_specs` is non-empty here.)
                 let prev_end = namespace_spec.map_or(default_spec_end, |ns| ns.span.end);
-                let brace_or_source = if named_specs.is_empty() {
-                    // Empty braces: find `{` before source.
-                    // TODO: this naive find('{') matches a `{` inside a comment, and the
-                    // surrounding default+empty-braces comment path has a separate
-                    // comment-duplication bug — both deferred (harden together).
-                    self.source[prev_end as usize..decl.source.span.start as usize]
-                        .find('{')
-                        .map_or(decl.source.span.start, |p| prev_end + p as u32)
-                } else {
-                    self.find_char_outside_comments(prev_end, named_specs[0].span.start, b'{')
-                        .unwrap_or(named_specs[0].span.start)
-                };
-                parts.push(self.build_inline_comments_between_doc(prev_end, brace_or_source));
+                let brace_pos = self
+                    .find_char_outside_comments(prev_end, named_specs[0].span.start, b'{')
+                    .unwrap_or(named_specs[0].span.start);
+                parts.push(self.build_inline_comments_between_doc(prev_end, brace_pos));
                 parts.push(d.text(", "));
             }
 
             if named_specs.is_empty() {
-                // Empty braces case: `import {} from 'x'`. Preserve the keyword→`{`
-                // (or `type`→`{`) comment in place — prettier relocates it after
-                // `from`; a line comment indents the `{}` continuation one level (the
-                // leading space comes from the `import `/`type ` token). Without this,
-                // `import /* c */ {} from 'x'` silently drops the comment. Skip when a
-                // default/namespace specifier exists — the handler above already
-                // collects comments between the specifier and `{`.
-                let braces_doc = if !has_default
-                    && namespace_spec.is_none()
-                    && let Some(brace_pos) =
-                        self.find_char_outside_comments(header_end, decl.source.span.start, b'{')
+                // Bare empty braces: `import {} from 'x'` (no binding — the binding
+                // case was dropped above). Preserve the keyword→`{` (or `type`→`{`)
+                // comment in place — prettier relocates it after `from`; a line
+                // comment indents the `{}` continuation one level (the leading space
+                // comes from the `import `/`type ` token). Without this,
+                // `import /* c */ {} from 'x'` silently drops the comment.
+                let braces_doc = if let Some(brace_pos) =
+                    self.find_char_outside_comments(header_end, decl.source.span.start, b'{')
                 {
                     self.gap_comment_continuation_tail(header_end, brace_pos, d.text("{}"))
                 } else {
@@ -522,7 +524,7 @@ impl<'a> Printer<'a> {
                 // follows the header; with a default/namespace binding its own→`{`
                 // comments are handled above (line builds `x, {…}`), so capturing
                 // here too would double-emit them.
-                let capture_keyword_comment = !has_default && namespace_spec.is_none();
+                let capture_keyword_comment = !has_binding;
                 from_content_end = Some(self.push_braced_specifier_list(
                     &mut parts,
                     &named_specs,
@@ -537,11 +539,15 @@ impl<'a> Printer<'a> {
 
         // Add "from" and source, extracting comments between keywords and source literal
         if !decl.specifiers.is_empty() || has_empty_braces {
-            let empty_brace_start = if has_empty_braces && named_specs.is_empty() {
-                Some(decl.span.start)
-            } else {
-                None
-            };
+            // Only a *bare* empty group relocates its inside-braces comment after
+            // `from`; a dropped empty group (after a binding) carries no braces, so
+            // its gap comment stays in place via `from_content_end` (plain-default path).
+            let empty_brace_start =
+                if has_empty_braces && named_specs.is_empty() && !drop_empty_after_binding {
+                    Some(decl.span.start)
+                } else {
+                    None
+                };
             parts.push(self.build_from_source_doc(
                 decl.span.start,
                 &decl.source,

@@ -20,6 +20,12 @@ use std::path::{Path, PathBuf};
 /// byte-loops are out of automated scope (undetectable by a line scan, and far
 /// rarer to write accidentally than `.find`); the cursor is their sanctioned home.
 ///
+/// One category is a hard **failure**, not a pass: `delimiter-deferred-bug` marks a
+/// real comment-vulnerable scan that drops/mangles comments on specific inputs. The
+/// audit flags it (naming the class) so it gets fixed fixtures-first and its entry
+/// removed, rather than living on the allow-list forever — removing the last one
+/// leaves the audit green.
+///
 /// Pure Rust — no Deno. Part of `deno task check` (via `deno task scan:audit`).
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "scan_audit")]
@@ -49,6 +55,12 @@ const CRATE_ROOTS: &[&str] = &[
 /// re-review (intended).
 type Allow = (&'static str, &'static str, &'static str);
 
+/// The one allow-list category the audit treats as a **failure**: a tracked,
+/// comment-vulnerable scan that's a known bug. While its site is live, the audit
+/// reports it (so it gets fixed fixtures-first, not deferred forever); once fixed,
+/// the entry is removed and the audit is green again.
+const DEFERRED_BUG: &str = "delimiter-deferred-bug";
+
 /// The reviewed allow-list. Generated from `scan_audit --list`, each entry
 /// classified. Categories (the triage signal):
 ///
@@ -68,10 +80,12 @@ type Allow = (&'static str, &'static str, &'static str);
 /// - `keyword-comment-aware` — keyword scan that already hand-rolls a comment skip
 ///   (the `from` finder; cleanup-pending cursor migration, not a live bug).
 ///
-/// Tracked delimiter-over-source scans (real class, allow-listed but on the books in
-/// the lore's "Comment-Aware Delimiter Scans" stage-4 inventory):
-/// - `delimiter-deferred-bug` — a real comment-vulnerable scan tracked as a deferred
-///   bug (switch `)`→`{`; default+empty-import). Allow-listed, NOT fixed here.
+/// Tracked delimiter-over-source scans (the real class, on the books in the lore's
+/// "Comment-Aware Delimiter Scans" stage-4 inventory):
+/// - `delimiter-deferred-bug` — a real comment-vulnerable scan that drops/mangles
+///   comments on specific inputs. The audit **fails** on these (see [`DEFERRED_BUG`]):
+///   a deferred bug must be fixed fixtures-first and its entry removed, not
+///   allow-listed indefinitely. The category stays so the failure can name the class.
 /// - `delimiter-latent` — byte-correct today but comment-blind; migrate-or-keep
 ///   tracked in the lore.
 ///
@@ -249,11 +263,6 @@ const ALLOW: &[Allow] = &[
         "comment-marker",
     ),
     (
-        "tsv_ts/src/printer/statements/control_flow/switch.rs",
-        ".find('{')",
-        "delimiter-deferred-bug",
-    ),
-    (
         "tsv_ts/src/printer/statements/control_flow/try_jump.rs",
         ".rfind(\"finally\")",
         "delimiter-latent",
@@ -262,11 +271,6 @@ const ALLOW: &[Allow] = &[
         "tsv_ts/src/printer/statements/mod.rs",
         ".find(';')",
         "delimiter-latent",
-    ),
-    (
-        "tsv_ts/src/printer/statements/modules/mod.rs",
-        ".find('{')",
-        "delimiter-deferred-bug",
     ),
     (
         "tsv_ts/src/printer/statements/modules/specifier_list.rs",
@@ -329,16 +333,25 @@ impl ScanAuditCommand {
         // live sites exactly, so a dead entry fails too — prompting its removal.
         let stale: Vec<&Allow> = ALLOW
             .iter()
-            .filter(|(path, line, _)| !sites.iter().any(|s| s.path == *path && s.code == *line))
+            .filter(|entry| !entry_has_live_site(entry, &sites))
+            .collect();
+        // Deferred-bug entries with a live site: tracked known bugs the audit fails
+        // on (see DEFERRED_BUG). Filtered to live sites so a fixed-and-removed one
+        // doesn't also surface as stale — fixing the bug clears it from both lists.
+        let deferred: Vec<&Allow> = ALLOW
+            .iter()
+            .filter(|entry| entry.2 == DEFERRED_BUG && entry_has_live_site(entry, &sites))
             .collect();
 
         if self.json {
-            print_json(&sites, &violations, &stale);
+            print_json(&sites, &violations, &stale, &deferred);
         } else {
-            print_human(&violations, &stale);
+            print_human(&violations, &stale, &deferred);
         }
 
-        std::process::exit(i32::from(!violations.is_empty() || !stale.is_empty()));
+        std::process::exit(i32::from(
+            !violations.is_empty() || !stale.is_empty() || !deferred.is_empty(),
+        ));
     }
 }
 
@@ -347,6 +360,14 @@ fn is_allowed(site: &Site) -> bool {
     ALLOW
         .iter()
         .any(|(path, line, _)| *path == site.path && *line == site.code)
+}
+
+/// Whether some scanned `Site` matches this allow-list entry's path and exact
+/// trimmed code — i.e. the entry still describes a live source line (the inverse
+/// direction of [`is_allowed`]). A stale entry has none; a deferred-bug entry that
+/// fails has one.
+fn entry_has_live_site(entry: &Allow, sites: &[Site]) -> bool {
+    sites.iter().any(|s| s.path == entry.0 && s.code == entry.1)
 }
 
 /// Recursively collect `*.rs` files under `dir`.
@@ -442,8 +463,8 @@ fn brace_delta(line: &str) -> i32 {
     opens - closes
 }
 
-fn print_human(violations: &[&Site], stale: &[&Allow]) {
-    if violations.is_empty() && stale.is_empty() {
+fn print_human(violations: &[&Site], stale: &[&Allow], deferred: &[&Allow]) {
+    if violations.is_empty() && stale.is_empty() && deferred.is_empty() {
         println!("✓ no un-allow-listed raw find/rfind scans in the language crates");
         return;
     }
@@ -473,20 +494,34 @@ fn print_human(violations: &[&Site], stale: &[&Allow]) {
             eprintln!("  [{category}] {path}: {line}");
         }
     }
+    if !deferred.is_empty() {
+        eprintln!(
+            "✗ {} known deferred-bug scan(s) still present — a comment-vulnerable\n\
+             delimiter scan that drops/mangles comments. Fix it fixtures-first (move\n\
+             it onto the trivia-aware cursor or otherwise make it comment-aware) and\n\
+             remove its ALLOW entry; don't defer it indefinitely:\n",
+            deferred.len()
+        );
+        for (path, line, category) in deferred {
+            eprintln!("  [{category}] {path}: {line}");
+        }
+    }
 }
 
-fn print_json(sites: &[Site], violations: &[&Site], stale: &[&Allow]) {
+fn print_json(sites: &[Site], violations: &[&Site], stale: &[&Allow], deferred: &[&Allow]) {
     let to_json =
         |s: &Site| serde_json::json!({ "path": s.path, "line": s.line_no, "code": s.code });
+    let entry_json =
+        |(p, l, c): &&Allow| serde_json::json!({ "path": p, "line": l, "category": c });
     let report = serde_json::json!({
         "total": sites.len(),
         "allowed": sites.len() - violations.len(),
         "violation_count": violations.len(),
         "violations": violations.iter().map(|s| to_json(s)).collect::<Vec<_>>(),
         "stale_count": stale.len(),
-        "stale": stale.iter().map(|(p, l, c)| {
-            serde_json::json!({ "path": p, "line": l, "category": c })
-        }).collect::<Vec<_>>(),
+        "stale": stale.iter().map(entry_json).collect::<Vec<_>>(),
+        "deferred_count": deferred.len(),
+        "deferred": deferred.iter().map(entry_json).collect::<Vec<_>>(),
     });
     println!(
         "{}",
