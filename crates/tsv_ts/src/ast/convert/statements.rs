@@ -6,9 +6,10 @@ use super::{
     convert_do_while_statement, convert_export_default_value, convert_export_specifier,
     convert_expression, convert_for_in_statement, convert_for_of_statement, convert_for_statement,
     convert_function_declaration, convert_if_statement, convert_import_attribute,
-    convert_import_specifier, convert_labeled_statement, convert_literal, convert_switch_statement,
-    convert_throw_statement, convert_try_statement, convert_type_alias_declaration,
-    convert_while_statement, create_location, types::convert_entity_name,
+    convert_import_specifier, convert_labeled_statement, convert_literal,
+    convert_module_export_name, convert_switch_statement, convert_throw_statement,
+    convert_try_statement, convert_type_alias_declaration, convert_while_statement,
+    create_location, types::convert_entity_name,
 };
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker, Span};
@@ -166,7 +167,7 @@ pub(in crate::ast) fn convert_statement(
                 specifiers: export_decl
                     .specifiers
                     .iter()
-                    .map(|s| convert_export_specifier(s, loc, interner, offset, schema))
+                    .map(|s| convert_export_specifier(s, source, loc, interner, offset, schema))
                     .collect(),
                 // TODO: Consider whether source should be stored differently
                 // (e.g., just the module name string vs full Literal node)
@@ -239,7 +240,7 @@ pub(in crate::ast) fn convert_statement(
                 exported: export_decl
                     .exported
                     .as_ref()
-                    .map(|id| convert_identifier(id, loc, interner, offset)),
+                    .map(|name| convert_module_export_name(name, source, loc, interner, offset)),
                 source: convert_literal(&export_decl.source, source, loc, offset),
                 attributes,
             })
@@ -287,7 +288,7 @@ pub(in crate::ast) fn convert_statement(
                 specifiers: import_decl
                     .specifiers
                     .iter()
-                    .map(|s| convert_import_specifier(s, loc, interner, offset, schema))
+                    .map(|s| convert_import_specifier(s, source, loc, interner, offset, schema))
                     .collect(),
                 source: convert_literal(&import_decl.source, source, loc, offset),
                 attributes,

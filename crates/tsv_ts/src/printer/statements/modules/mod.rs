@@ -306,7 +306,7 @@ impl<'a> Printer<'a> {
         let star_limit = decl
             .exported
             .as_ref()
-            .map_or(decl.source.span.start, |e| e.span.start);
+            .map_or(decl.source.span.start, |e| e.span().start);
         let star_pos = self
             .find_char_outside_comments(export_end, star_limit, b'*')
             .unwrap_or(export_end);
@@ -341,7 +341,7 @@ impl<'a> Printer<'a> {
         // block comment trails inline (`* /* c */ from`), a line comment indents the
         // `from …` continuation; prettier relocates it after `from`. Handled by
         // `build_from_source_doc`'s binding→`from` gap (the end of `*`/`as ns`).
-        let prev_end = decl.exported.as_ref().map_or(star_end, |e| e.span.end);
+        let prev_end = decl.exported.as_ref().map_or(star_end, |e| e.span().end);
         parts.push(self.build_from_source_doc(decl.span.start, &decl.source, None, Some(prev_end)));
         // Import attributes: `export * from "y" with { type: "json" }`.
         // Returns the offset past the attribute `}` (or source) for the trailing
@@ -470,7 +470,10 @@ impl<'a> Printer<'a> {
             // `* as ns` binding; preserves the `*`→`as` comment in place (mirrors the
             // export-all side).
             let star_end = ns_spec.span.start + 1;
-            self.append_namespace_as_binding(&mut parts, star_end, &ns_spec.local);
+            // An import namespace binding is always an identifier; wrap it to share
+            // the `ModuleExportName`-based renderer with the export-all side.
+            let binding = internal::ModuleExportName::Identifier(ns_spec.local.clone());
+            self.append_namespace_as_binding(&mut parts, star_end, &binding);
             from_content_end = Some(ns_spec.span.end);
         }
 

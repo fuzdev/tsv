@@ -1029,6 +1029,14 @@ export type ExportDefaultValue =
 	| TSDeclareFunction
 	| ClassDeclaration;
 
+/**
+ * A module export name: a bare `Identifier` or a string `Literal`. Per ecma262
+ * `ModuleExportName : IdentifierName | StringLiteral` (ES2022 arbitrary module
+ * namespace names) — e.g. `import { 'str' as b }`, `export { x as 'str' }`,
+ * `export * as 'str' from`.
+ */
+export type ModuleExportName = Identifier | Literal;
+
 export interface ExportAllDeclaration {
 	type: 'ExportAllDeclaration';
 	start: number;
@@ -1036,7 +1044,7 @@ export interface ExportAllDeclaration {
 	loc: SourceLocation;
 	/** Omitted in Svelte non-`lang="ts"` context when `"value"`. */
 	exportKind?: string;
-	exported: Identifier | null;
+	exported: ModuleExportName | null;
 	source: Literal;
 	/** Present in Svelte non-`lang="ts"` context; omitted in TS context when empty. */
 	attributes?: ImportAttribute[];
@@ -1056,8 +1064,8 @@ export interface ExportSpecifier {
 	start: number;
 	end: number;
 	loc: SourceLocation;
-	local: Identifier;
-	exported: Identifier;
+	local: ModuleExportName;
+	exported: ModuleExportName;
 	/** Omitted in Svelte non-`lang="ts"` context when `"value"`. */
 	exportKind?: string;
 }
@@ -1094,7 +1102,7 @@ export interface ImportNamedSpecifier {
 	start: number;
 	end: number;
 	loc: SourceLocation;
-	imported: Identifier;
+	imported: ModuleExportName;
 	local: Identifier;
 	/** Omitted in Svelte non-`lang="ts"` context when `"value"`. */
 	importKind?: string;

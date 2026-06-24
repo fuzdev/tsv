@@ -8,10 +8,11 @@ use super::{
     convert_type_parameter_declaration, create_location, json_number_from_f64,
 };
 use string_interner::DefaultStringInterner;
-use tsv_lang::{InfallibleResolve, LocationTracker};
+use tsv_lang::LocationTracker;
 
 pub(in crate::ast) fn convert_import_specifier(
     spec: &internal::ImportSpecifier,
+    source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
@@ -24,18 +25,7 @@ pub(in crate::ast) fn convert_import_specifier(
                 start: default_spec.span.start,
                 end: default_spec.span.end,
                 loc: create_location(default_spec.span, loc, offset),
-                local: public::Identifier {
-                    node_type: "Identifier".to_string(),
-                    start: default_spec.local.span.start,
-                    end: default_spec.local.span.end,
-                    loc: create_location(default_spec.local.span, loc, offset),
-                    name: interner
-                        .resolve_infallible(default_spec.local.name)
-                        .to_string(),
-                    optional: false,
-                    type_annotation: None,
-                    decorators: Vec::new(),
-                },
+                local: convert_identifier(&default_spec.local, loc, interner, offset),
             })
         }
         internal::ImportSpecifier::Named(named_spec) => {
@@ -54,30 +44,14 @@ pub(in crate::ast) fn convert_import_specifier(
                 start: named_spec.span.start,
                 end: named_spec.span.end,
                 loc: create_location(named_spec.span, loc, offset),
-                imported: public::Identifier {
-                    node_type: "Identifier".to_string(),
-                    start: named_spec.imported.span.start,
-                    end: named_spec.imported.span.end,
-                    loc: create_location(named_spec.imported.span, loc, offset),
-                    name: interner
-                        .resolve_infallible(named_spec.imported.name)
-                        .to_string(),
-                    optional: false,
-                    type_annotation: None,
-                    decorators: Vec::new(),
-                },
-                local: public::Identifier {
-                    node_type: "Identifier".to_string(),
-                    start: named_spec.local.span.start,
-                    end: named_spec.local.span.end,
-                    loc: create_location(named_spec.local.span, loc, offset),
-                    name: interner
-                        .resolve_infallible(named_spec.local.name)
-                        .to_string(),
-                    optional: false,
-                    type_annotation: None,
-                    decorators: Vec::new(),
-                },
+                imported: convert_module_export_name(
+                    &named_spec.imported,
+                    source,
+                    loc,
+                    interner,
+                    offset,
+                ),
+                local: convert_identifier(&named_spec.local, loc, interner, offset),
                 import_kind,
             })
         }
@@ -87,16 +61,7 @@ pub(in crate::ast) fn convert_import_specifier(
                 start: ns_spec.span.start,
                 end: ns_spec.span.end,
                 loc: create_location(ns_spec.span, loc, offset),
-                local: public::Identifier {
-                    node_type: "Identifier".to_string(),
-                    start: ns_spec.local.span.start,
-                    end: ns_spec.local.span.end,
-                    loc: create_location(ns_spec.local.span, loc, offset),
-                    name: interner.resolve_infallible(ns_spec.local.name).to_string(),
-                    optional: false,
-                    type_annotation: None,
-                    decorators: Vec::new(),
-                },
+                local: convert_identifier(&ns_spec.local, loc, interner, offset),
             })
         }
     }
@@ -111,16 +76,7 @@ pub(in crate::ast) fn convert_import_attribute(
 ) -> public::ImportAttribute {
     let key = match &attr.key {
         internal::ImportAttributeKey::Identifier(id) => {
-            public::ImportAttributeKey::Identifier(public::Identifier {
-                node_type: "Identifier".to_string(),
-                start: id.span.start,
-                end: id.span.end,
-                loc: create_location(id.span, loc, offset),
-                name: interner.resolve_infallible(id.name).to_string(),
-                optional: false,
-                type_annotation: None,
-                decorators: Vec::new(),
-            })
+            public::ImportAttributeKey::Identifier(convert_identifier(id, loc, interner, offset))
         }
         internal::ImportAttributeKey::Literal(lit) => {
             public::ImportAttributeKey::Literal(convert_literal(lit, source, loc, offset))
@@ -138,6 +94,7 @@ pub(in crate::ast) fn convert_import_attribute(
 
 pub(in crate::ast) fn convert_export_specifier(
     spec: &internal::ExportSpecifier,
+    source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
@@ -158,27 +115,29 @@ pub(in crate::ast) fn convert_export_specifier(
         start: spec.span.start,
         end: spec.span.end,
         loc: create_location(spec.span, loc, offset),
-        local: public::Identifier {
-            node_type: "Identifier".to_string(),
-            start: spec.local.span.start,
-            end: spec.local.span.end,
-            loc: create_location(spec.local.span, loc, offset),
-            name: interner.resolve_infallible(spec.local.name).to_string(),
-            optional: false,
-            type_annotation: None,
-            decorators: Vec::new(),
-        },
-        exported: public::Identifier {
-            node_type: "Identifier".to_string(),
-            start: spec.exported.span.start,
-            end: spec.exported.span.end,
-            loc: create_location(spec.exported.span, loc, offset),
-            name: interner.resolve_infallible(spec.exported.name).to_string(),
-            optional: false,
-            type_annotation: None,
-            decorators: Vec::new(),
-        },
+        local: convert_module_export_name(&spec.local, source, loc, interner, offset),
+        exported: convert_module_export_name(&spec.exported, source, loc, interner, offset),
         export_kind,
+    }
+}
+
+/// Convert a `ModuleExportName` (import/export specifier name, or `export * as`
+/// namespace name): an identifier emits an `Identifier` node, a string a
+/// `Literal` node — mirroring acorn (`ModuleExportName : IdentifierName | StringLiteral`).
+pub(in crate::ast) fn convert_module_export_name(
+    name: &internal::ModuleExportName,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::ModuleExportName {
+    match name {
+        internal::ModuleExportName::Identifier(id) => {
+            public::ModuleExportName::Identifier(convert_identifier(id, loc, interner, offset))
+        }
+        internal::ModuleExportName::Literal(lit) => {
+            public::ModuleExportName::Literal(convert_literal(lit, source, loc, offset))
+        }
     }
 }
 

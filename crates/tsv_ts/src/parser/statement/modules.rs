@@ -263,21 +263,23 @@ impl<'a> Parser<'a> {
         debug_assert!(matches!(self.current_kind(), TokenKind::Star));
         self.advance()?;
 
-        // Check for `as ns`
+        // Check for `as ns` — a `ModuleExportName` (identifier or string).
         let exported = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::As)) {
             self.advance()?; // consume 'as'
 
-            if !matches!(self.current_kind(), TokenKind::Identifier) {
+            if matches!(self.current_kind(), TokenKind::String) {
+                Some(ModuleExportName::Literal(self.parse_string_literal()?))
+            } else if matches!(self.current_kind(), TokenKind::Identifier) {
+                let (id_start, id_end) = self.current_pos();
+                let name = self.intern_identifier();
+                self.advance()?;
+                Some(ModuleExportName::Identifier(Identifier::simple(
+                    name,
+                    Span::new(id_start as u32, id_end as u32),
+                )))
+            } else {
                 return Err(self.error_expected_after("identifier", "as"));
             }
-            let (id_start, id_end) = self.current_pos();
-            let name = self.intern_identifier();
-            self.advance()?;
-
-            Some(Identifier::simple(
-                name,
-                Span::new(id_start as u32, id_end as u32),
-            ))
         } else {
             None
         };
@@ -399,46 +401,58 @@ impl<'a> Parser<'a> {
     /// Accepts contextual keywords as local names and any keyword as exported names.
     fn parse_export_specifier_names(
         &mut self,
-    ) -> Result<(Identifier, Identifier, u32), ParseError> {
-        // Parse local name: identifier, contextual keyword, or 'default'
-        let (local_start, local_end) = self.current_pos();
-        let local_name = if matches!(
-            self.current_kind(),
-            TokenKind::Keyword(KeywordKind::Default)
-        ) {
-            self.intern(KeywordKind::Default.as_str())
+    ) -> Result<(ModuleExportName, ModuleExportName, u32), ParseError> {
+        // Parse local name: a `ModuleExportName` — string (re-export, e.g.
+        // `export { 'str' } from`), identifier, contextual keyword, or 'default'.
+        let local = if matches!(self.current_kind(), TokenKind::String) {
+            ModuleExportName::Literal(self.parse_string_literal()?)
         } else {
-            match self.try_intern_identifier_or_keyword() {
-                Some(sym) => sym,
-                None => {
-                    return Err(self.error_expected("identifier in export specifier"));
+            let (local_start, local_end) = self.current_pos();
+            let local_name = if matches!(
+                self.current_kind(),
+                TokenKind::Keyword(KeywordKind::Default)
+            ) {
+                self.intern(KeywordKind::Default.as_str())
+            } else {
+                match self.try_intern_identifier_or_keyword() {
+                    Some(sym) => sym,
+                    None => {
+                        return Err(self.error_expected("identifier in export specifier"));
+                    }
                 }
-            }
+            };
+            self.advance()?;
+            ModuleExportName::Identifier(Identifier::simple(
+                local_name,
+                Span::new(local_start as u32, local_end as u32),
+            ))
         };
-        self.advance()?;
-
-        let local = Identifier::simple(local_name, Span::new(local_start as u32, local_end as u32));
 
         // Check for 'as exported_name'
         // ES spec: exported name is a ModuleExportName (any IdentifierName or string)
-        let (exported, spec_end) =
-            if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::As)) {
-                self.advance()?; // consume 'as'
+        let exported = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::As)) {
+            self.advance()?; // consume 'as'
 
+            if matches!(self.current_kind(), TokenKind::String) {
+                ModuleExportName::Literal(self.parse_string_literal()?)
+            } else {
                 let (exp_start, exp_end) = self.current_pos();
                 let Some(exported_name) = self.try_intern_identifier_name() else {
                     return Err(self.error_expected_after("identifier", "as"));
                 };
                 self.advance()?;
+                ModuleExportName::Identifier(Identifier::simple(
+                    exported_name,
+                    Span::new(exp_start as u32, exp_end as u32),
+                ))
+            }
+        } else {
+            local.clone()
+        };
 
-                (
-                    Identifier::simple(exported_name, Span::new(exp_start as u32, exp_end as u32)),
-                    exp_end as u32,
-                )
-            } else {
-                (local.clone(), local_end as u32)
-            };
-
+        // Each name carries its own end via its span; the specifier ends at the
+        // exported name (which is the local name when there's no `as`).
+        let spec_end = exported.span().end;
         Ok((local, exported, spec_end))
     }
 
@@ -583,19 +597,23 @@ impl<'a> Parser<'a> {
                     ImportKind::Value
                 };
 
-                // Parse imported name (keywords can be specifier names: `import { object }`)
+                // Parse imported name: a `ModuleExportName` — a string (arbitrary
+                // module namespace name) or an identifier/keyword (`import { object }`).
                 let (imp_start, imp_end) = self.current_pos();
-                let Some(imported_symbol) = self.try_intern_identifier_or_keyword() else {
-                    return Err(self.error_expected("identifier in import specifier"));
+                let imported = if matches!(self.current_kind(), TokenKind::String) {
+                    ModuleExportName::Literal(self.parse_string_literal()?)
+                } else {
+                    let Some(imported_symbol) = self.try_intern_identifier_or_keyword() else {
+                        return Err(self.error_expected("identifier in import specifier"));
+                    };
+                    self.advance()?;
+                    ModuleExportName::Identifier(Identifier::simple(
+                        imported_symbol,
+                        Span::new(imp_start as u32, imp_end as u32),
+                    ))
                 };
-                self.advance()?;
 
-                let imported = Identifier::simple(
-                    imported_symbol,
-                    Span::new(imp_start as u32, imp_end as u32),
-                );
-
-                // Check for 'as' rename
+                // Check for 'as' rename → local binding (always an identifier)
                 let (local, spec_end) =
                     if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::As)) {
                         self.advance()?;
@@ -614,8 +632,15 @@ impl<'a> Parser<'a> {
                             local_end,
                         )
                     } else {
-                        // local is same as imported
-                        (imported.clone(), imp_end)
+                        // No `as`: the local binding is the imported identifier itself.
+                        // A string imported name has no valid binding without `as` —
+                        // reject (matches acorn).
+                        match &imported {
+                            ModuleExportName::Identifier(id) => (id.clone(), imp_end),
+                            ModuleExportName::Literal(_) => {
+                                return Err(self.error_expected_after("'as'", "string import name"));
+                            }
+                        }
                     };
 
                 specifiers.push(ImportSpecifier::Named(ImportNamedSpecifier {

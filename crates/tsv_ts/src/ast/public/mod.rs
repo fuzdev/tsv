@@ -43,7 +43,8 @@ pub use modules::{
     ExportAllDeclaration, ExportDefaultDeclaration, ExportDefaultValue, ExportNamedDeclaration,
     ExportSpecifier, ImportAttribute, ImportAttributeKey, ImportDeclaration,
     ImportDefaultSpecifier, ImportNamedSpecifier, ImportNamespaceSpecifier, ImportSpecifier,
-    TSExportAssignment, TSExternalModuleReference, TSImportEqualsDeclaration, TSModuleReference,
+    ModuleExportName, TSExportAssignment, TSExternalModuleReference, TSImportEqualsDeclaration,
+    TSModuleReference,
 };
 
 // Classes
