@@ -15,6 +15,7 @@ use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSIntersectionType, TSParenthesizedType, TSType, TSUnionType};
 use crate::printer::analysis::{has_newline_after_position, has_newline_before_position};
 use crate::printer::layout::hang_after_operator;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 /// Member-parens predicate for a union/intersection with `member_count` members.
@@ -62,7 +63,7 @@ impl<'a> Printer<'a> {
     /// member), handled by the hardcoded-space path in `build_union_type_doc`.
     fn build_member_leading_block_comments(&self, start: u32, end: u32) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         for comment in comments_in_range(self.comments, start, end) {
             if !comment.is_block {
                 continue;
@@ -154,7 +155,7 @@ impl<'a> Printer<'a> {
         // node, not the member, so it must not block the hug — the member's own
         // doc renders it.
         if !self.union_has_comments_between_members(union) && should_hug_union_type(union) {
-            let mut parts = Vec::new();
+            let mut parts = DocBuf::new();
             // Extract leading block comments before the first type
             // (e.g., `| /* c */ A` — comment between leading `|` and first member)
             if let Some(first) = union.types.first() {
@@ -197,7 +198,7 @@ impl<'a> Printer<'a> {
         // Break: | T1
         //        | T2
         //        | T3
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         for (i, t) in union.types.iter().enumerate() {
             let type_start = t.span().start;
@@ -335,7 +336,7 @@ impl<'a> Printer<'a> {
     /// ```
     fn build_union_type_doc_with_line_comments(&self, union: &TSUnionType) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         let member_parens = union_member_parens(union.types.len());
 
         for (i, t) in union.types.iter().enumerate() {
@@ -563,7 +564,7 @@ impl<'a> Printer<'a> {
                     intersection,
                     first_paren,
                 );
-                let mut parts = Vec::new();
+                let mut parts = DocBuf::new();
                 for comment in &first_paren_leading {
                     parts.push(self.build_comment_doc(comment));
                     parts.push(d.hardline());
@@ -613,7 +614,7 @@ impl<'a> Printer<'a> {
             intersection.types.len() == 2 && (last_is_huggable || first_is_expanding);
 
         // Build first type separately (not indented)
-        let mut first_parts = Vec::new();
+        let mut first_parts = DocBuf::new();
         let first_type = &intersection.types[0];
         let first_type_start = first_type.span().start;
         let first_type_end = first_type.span().end;
@@ -689,7 +690,7 @@ impl<'a> Printer<'a> {
         }
 
         // Build continuation types (indented when breaking)
-        let mut continuation_parts = Vec::new();
+        let mut continuation_parts = DocBuf::new();
 
         for (i, _) in intersection.types.iter().enumerate().skip(1) {
             let is_last = i == last_idx;
@@ -756,7 +757,7 @@ impl<'a> Printer<'a> {
         intersection: &TSIntersectionType,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         let member_parens = union_member_parens(intersection.types.len());
 
         for (i, t) in intersection.types.iter().enumerate() {
@@ -887,12 +888,12 @@ impl<'a> Printer<'a> {
         &self,
         intersection: &TSIntersectionType,
         i: usize,
-    ) -> Vec<DocId> {
+    ) -> DocBuf {
         let t = &intersection.types[i];
         let type_start = t.span().start;
         let type_end = t.span().end;
         let is_last = i == intersection.types.len() - 1;
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         // Leading block comments (after the `&` separator)
         let prev_type_end = intersection.types[i - 1].span().end;

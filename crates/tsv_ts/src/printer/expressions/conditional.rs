@@ -4,7 +4,9 @@
 
 use crate::ast::internal;
 use crate::printer::{Printer, template_literal_has_newlines};
+use smallvec::smallvec;
 use tsv_lang::INDENT;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 /// Check if an expression is a nullish coalescing expression (`??`)
@@ -303,13 +305,13 @@ impl<'a> Printer<'a> {
         let question_pos = self.find_char_outside_comments(test_end, consequent_start, b'?');
         let colon_pos = self.find_char_outside_comments(consequent_end, alternate_start, b':');
 
-        let mut parts = vec![test];
+        let mut parts = smallvec![test];
 
         // Comments between test and ? (see split_pre_operator_comments): same-line
         // comments trail the test, later-line comments precede the `?` on their own
         // lines.
         let comments_before_q_end = question_pos.unwrap_or(consequent_start);
-        let mut pre_question_own_line = Vec::new();
+        let mut pre_question_own_line = DocBuf::new();
         self.split_pre_operator_comments(
             test_end,
             comments_before_q_end,
@@ -376,7 +378,7 @@ impl<'a> Printer<'a> {
         // comments precede the `:` on their own lines — both flow into q_parts in
         // source order (trailing run first, then own-line run).
         let comments_before_colon_end = colon_pos.unwrap_or(alternate_start);
-        let mut colon_own_line = Vec::new();
+        let mut colon_own_line = DocBuf::new();
         self.split_pre_operator_comments(
             consequent_end,
             comments_before_colon_end,
@@ -462,8 +464,8 @@ impl<'a> Printer<'a> {
         &self,
         operand_end: u32,
         gap_end: u32,
-        trailing: &mut Vec<DocId>,
-        own_line: &mut Vec<DocId>,
+        trailing: &mut DocBuf,
+        own_line: &mut DocBuf,
     ) {
         let d = self.d();
         // Same shared same-line/later-line classification as the call-argument

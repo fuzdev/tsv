@@ -16,6 +16,7 @@ use super::Printer;
 use smallvec::SmallVec;
 use tsv_lang::Comment;
 use tsv_lang::comments_in_range;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 /// Trailing comments collected for a list element (property or array element)
@@ -84,7 +85,7 @@ impl<'a> Printer<'a> {
     /// Build docs for block comments (go before comma)
     fn build_block_comments_doc(&self, comments: &[&Comment]) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         for comment in comments {
             parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
@@ -95,7 +96,7 @@ impl<'a> Printer<'a> {
     /// Build docs for line comments (go after comma, excluded from width)
     fn build_line_comments_suffix_doc(&self, comments: &[&Comment]) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         for comment in comments {
             parts.push(self.build_trailing_line_comment_doc(comment));
         }
@@ -110,7 +111,7 @@ impl<'a> Printer<'a> {
     /// can't drift between them.
     pub(in crate::printer) fn push_element_comma_trailing(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         trailing: &TrailingComments<'_>,
         comma: DocId,
     ) {

@@ -5,6 +5,8 @@ use super::{Printer, build_entity_name_doc, should_hug_union_type};
 use crate::ast::internal::{self, TSType};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentFilter, CommentSpacing};
+use smallvec::smallvec;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, SymbolToU32, comments_in_range};
@@ -76,7 +78,7 @@ impl<'a> Printer<'a> {
         decl: &internal::TSTypeAliasDeclaration,
     ) -> DocId {
         let d = self.d();
-        let mut parts = vec![];
+        let mut parts: DocBuf = smallvec![];
         if decl.declare {
             parts.push(d.text("declare "));
         }
@@ -131,7 +133,7 @@ impl<'a> Printer<'a> {
         let pre_eq_forces_own_line = self.comments_force_own_line_between(header_end, eq_pos);
 
         if pre_eq_forces_own_line {
-            let mut indent_parts = vec![d.hardline()];
+            let mut indent_parts: DocBuf = smallvec![d.hardline()];
             for comment in comments_in_range(self.comments, header_end, eq_pos) {
                 indent_parts.push(self.build_comment_doc(comment));
                 indent_parts.push(d.hardline());
@@ -168,7 +170,7 @@ impl<'a> Printer<'a> {
         // (`type A = B; // c`) since a line comment can't precede `;` on the same
         // line. These were previously dropped entirely (content loss).
         let value_end = decl.type_annotation.span().end;
-        let mut trailing_line_parts = Vec::new();
+        let mut trailing_line_parts = DocBuf::new();
         for comment in comments_in_range(self.comments, value_end, decl.span.end) {
             if comment.is_block {
                 parts.push(d.text(" "));
@@ -218,7 +220,7 @@ impl<'a> Printer<'a> {
         lead_space: bool,
     ) -> DocId {
         let d = self.d();
-        let mut parts = vec![d.text(if lead_space { " =" } else { "=" })];
+        let mut parts: DocBuf = smallvec![d.text(if lead_space { " =" } else { "=" })];
 
         let force_break = self.comments_force_own_line_between(eq_pos + 1, type_start);
 
@@ -227,8 +229,8 @@ impl<'a> Printer<'a> {
             // Line comments stay on `=` line; multiline blocks go into the indent.
             // Example: `type A = // comment\n  B;`
             // Example: `type J =\n  /* comment\n   */\n  K | L;`
-            let mut inline_parts = Vec::new();
-            let mut indent_comment_parts = Vec::new();
+            let mut inline_parts = DocBuf::new();
+            let mut indent_comment_parts = DocBuf::new();
 
             // Only the first single-line comment hugs the `=` line; multiline
             // blocks (any position) and every subsequent comment go on their own
@@ -252,7 +254,7 @@ impl<'a> Printer<'a> {
             // Type uses its own group (via build_type_doc) so unions/intersections
             // can independently decide whether to break
             let type_doc = self.build_type_doc(&decl.type_annotation);
-            let mut indent_content = vec![d.hardline()];
+            let mut indent_content: DocBuf = smallvec![d.hardline()];
             indent_content.extend(indent_comment_parts);
             indent_content.push(type_doc);
             parts.push(d.indent(d.concat(&indent_content)));
@@ -369,7 +371,7 @@ impl<'a> Printer<'a> {
         // Group mode: multiple extends items OR heritage comments
         let group_mode = decl.extends.len() > 1 || has_heritage_comments;
 
-        let mut header_parts = vec![];
+        let mut header_parts: DocBuf = smallvec![];
         if decl.declare {
             header_parts.push(d.text("declare "));
         }
@@ -466,7 +468,7 @@ impl<'a> Printer<'a> {
         // Shared with the class printer: each comment is kept on its own line (a
         // line comment doesn't absorb a following one), and a line comment forces
         // the brace onto the next line. See heritage_last_item_line_comment.
-        let mut parts = vec![
+        let mut parts: DocBuf = smallvec![
             header_doc,
             self.build_header_pre_body_doc(true, header_end, body_start),
         ];
@@ -500,7 +502,7 @@ impl<'a> Printer<'a> {
     /// Build doc for declare function with wrapping support for type parameters
     pub(super) fn build_declare_function_doc(&self, decl: &internal::TSDeclareFunction) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         // Handle async keyword
         if decl.r#async {
@@ -536,7 +538,7 @@ impl<'a> Printer<'a> {
         // Everything after the `function`→name gap is collected into `tail` (the
         // continuation), so a *line* comment in that gap indents the whole
         // signature one level (uniform declaration-header rule).
-        let mut tail = vec![d.symbol(decl.id.name.to_u32())];
+        let mut tail = smallvec![d.symbol(decl.id.name.to_u32())];
 
         // Comments between name and type params/parens: `declare function fn1/* c */ <T>()` or `fn1 /* c */()`
         // Line comments get a hardline to prevent absorbing type params as comment text
@@ -608,7 +610,7 @@ impl<'a> Printer<'a> {
         delimiter_pull_pos: Option<u32>,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         let mut prev_end = body_start + 1; // after opening brace
 
         for (i, member) in members.iter().enumerate() {
@@ -742,7 +744,7 @@ impl<'a> Printer<'a> {
     /// ```
     pub(super) fn build_enum_declaration_doc(&self, decl: &internal::TSEnumDeclaration) -> DocId {
         let d = self.d();
-        let mut prefix = Vec::new();
+        let mut prefix = DocBuf::new();
 
         // `declare` prefix if ambient declaration
         if decl.declare {
@@ -759,7 +761,7 @@ impl<'a> Printer<'a> {
         // Everything after the `enum`→name gap is collected into `parts` (the
         // continuation), so a *line* comment in that gap indents the whole
         // declaration one level (uniform declaration-header rule).
-        let mut parts = vec![d.symbol(decl.id.name.to_u32())];
+        let mut parts: DocBuf = smallvec![d.symbol(decl.id.name.to_u32())];
 
         // Handle comments between name and body: enum C /* comment */ {
         // Use comment-aware search to skip `{` inside comments.
@@ -793,7 +795,7 @@ impl<'a> Printer<'a> {
             parts.push(d.text("{"));
             parts.push(d.concat(&brace_line_prefix));
             // Build member docs with comment handling
-            let mut member_parts = Vec::new();
+            let mut member_parts = DocBuf::new();
             let mut prev_end = body_start;
 
             for (i, member) in decl.members.iter().enumerate() {
@@ -990,7 +992,7 @@ impl<'a> Printer<'a> {
         is_root: bool,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         // Only print keywords for root declaration
         if is_root {
@@ -1080,7 +1082,7 @@ impl<'a> Printer<'a> {
                             &block.body,
                             body_start,
                             body_end,
-                            Vec::new(),
+                            DocBuf::new(),
                             delimiter_pull_pos,
                         );
 

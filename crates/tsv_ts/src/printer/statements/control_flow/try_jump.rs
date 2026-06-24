@@ -2,7 +2,9 @@
 
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
+use smallvec::smallvec;
 use tsv_lang::SymbolToU32;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
@@ -10,12 +12,7 @@ impl<'a> Printer<'a> {
     /// Append a space (or comments + space/hardline) between a keyword/token end and body start.
     ///
     /// Used for `try /* c */ {`, `catch (e) /* c */ {`, `catch /* c */ {`, `finally /* c */ {`.
-    fn append_keyword_to_body_comments(
-        &self,
-        parts: &mut Vec<DocId>,
-        token_end: u32,
-        body_start: u32,
-    ) {
+    fn append_keyword_to_body_comments(&self, parts: &mut DocBuf, token_end: u32, body_start: u32) {
         let d = self.d();
         if self.has_comments_between(token_end, body_start) {
             let has_line = self.has_line_comments_between(token_end, body_start);
@@ -39,7 +36,7 @@ impl<'a> Printer<'a> {
         // try keyword to block: `try /* comment */ {`
         let try_keyword_end = stmt.span.start + "try".len() as u32;
         let block_start = stmt.block.span.start;
-        let mut parts = vec![d.text("try")];
+        let mut parts = smallvec![d.text("try")];
         self.append_keyword_to_body_comments(&mut parts, try_keyword_end, block_start);
         // Try block expands empty: `try {\n}` not `try {}`
         parts.push(self.build_block_statement_expand_empty_doc(&stmt.block));
@@ -184,7 +181,7 @@ impl<'a> Printer<'a> {
             let post_label_comment =
                 self.build_inline_comments_between_doc_opt(label.span.end, span.end);
 
-            let mut parts = Vec::new();
+            let mut parts = DocBuf::new();
             parts.push(d.text(keyword));
             if let Some(comment_doc) = pre_label_comment {
                 parts.push(comment_doc);
@@ -226,7 +223,7 @@ impl<'a> Printer<'a> {
         .unwrap_or(label_end as usize);
         let colon_end = colon_pos as u32 + 1;
 
-        let mut parts = vec![d.symbol(stmt.label.name.to_u32())];
+        let mut parts: DocBuf = smallvec![d.symbol(stmt.label.name.to_u32())];
 
         // Comments between label name and colon: `label /* c */:`
         parts.push(self.build_inline_comments_between_doc(label_end, colon_pos as u32));

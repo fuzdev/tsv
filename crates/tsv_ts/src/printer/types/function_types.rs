@@ -12,6 +12,7 @@ use super::{CommentSpacing, Printer};
 use crate::ast::internal::{self, TSConstructorType, TSFunctionType, TSType};
 use crate::printer::layout::hang_after_operator;
 use tsv_lang::SymbolToU32;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::source_scan::find_char_skipping_comments;
 
@@ -168,7 +169,7 @@ impl<'a> Printer<'a> {
     /// their own group so they stay flat when the outer group breaks.
     pub(super) fn build_function_type_doc(&self, f: &TSFunctionType) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         self.append_type_params_and_signature(
             &mut parts,
             f.type_parameters.as_ref(),
@@ -184,7 +185,7 @@ impl<'a> Printer<'a> {
     /// ` => ReturnType`. `span_start` locates the `(` when there are no type params.
     fn append_type_params_and_signature(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         type_parameters: Option<&internal::TSTypeParameterDeclaration>,
         params: &[internal::Expression],
         return_type: &internal::TSTypeAnnotation,
@@ -219,7 +220,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a constructor type: `new () => T` or `abstract new <T>() => T`
     pub(super) fn build_constructor_type_doc(&self, c: &TSConstructorType) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         if c.abstract_ {
             // Preserve a comment in the `abstract`→`new` keyword gap
@@ -359,7 +360,7 @@ impl<'a> Printer<'a> {
                 let mut parts = vec![d.text("(")];
                 parts.extend(prefix);
                 // Comments not pulled onto the `(` line (own-line) keep their lines.
-                let mut inner = Vec::new();
+                let mut inner = DocBuf::new();
                 for comment in comments_in_range(self.comments, paren_pos + 1, close_pos) {
                     if pull_pos.is_some_and(|p| self.comment_on_delimiter_line(p, comment)) {
                         continue;
@@ -491,7 +492,7 @@ impl<'a> Printer<'a> {
 
         if has_forcing_comments {
             // Multiline path with hardlines (same as build_function_params_doc_with_line_comments)
-            let mut inner_parts = Vec::new();
+            let mut inner_parts = DocBuf::new();
             let open_paren = paren_pos.unwrap_or(0);
             let mut prev_end = open_paren + 1;
 
@@ -501,7 +502,7 @@ impl<'a> Printer<'a> {
             // applies the open-delimiter rule uniformly. Same mechanism as the
             // function/constructor-type params path.
             let (paren_prefix, paren_pull_pos) = paren_pos.map_or_else(
-                || (Vec::new(), None),
+                || (DocBuf::new(), None),
                 |open| self.delimiter_line_comment_prefix(open, params[0].span().start),
             );
 
@@ -541,7 +542,7 @@ impl<'a> Printer<'a> {
         }
 
         // Build params with width-based breaking
-        let mut param_parts = Vec::new();
+        let mut param_parts = DocBuf::new();
 
         // Handle comments before first param (e.g., `(/* comment */ a: T)`)
         if let Some(paren_pos) = paren_pos {
@@ -622,9 +623,9 @@ impl<'a> Printer<'a> {
         &self,
         params: &[internal::Expression],
         paren_search_start: u32,
-    ) -> Vec<DocId> {
+    ) -> DocBuf {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         // Find paren position for comment handling (skip comments to avoid matching `(` inside them)
         let paren_pos = find_char_skipping_comments(
@@ -734,11 +735,11 @@ impl<'a> Printer<'a> {
 
                 parts.push(d.text(")"));
             } else {
-                let mut param_parts = Vec::new();
+                let mut param_parts = DocBuf::new();
                 // Block comment trailing the last param after its source comma — preserved
                 // past where the comma was (no trailing comma; prettier relocates before;
                 // see conformance_prettier.md §Comment relocation).
-                let mut last_after_comma = Vec::new();
+                let mut last_after_comma = DocBuf::new();
                 let mut prev_end = paren_pos.map_or(0, |p| p + 1); // After `(`
                 for (i, p) in params.iter().enumerate() {
                     if i > 0 {
@@ -795,10 +796,10 @@ impl<'a> Printer<'a> {
         &self,
         params: &[internal::Expression],
         paren_pos: Option<u32>,
-    ) -> Vec<DocId> {
+    ) -> DocBuf {
         let d = self.d();
-        let mut parts = Vec::new();
-        let mut inner_parts = Vec::new();
+        let mut parts = DocBuf::new();
+        let mut inner_parts = DocBuf::new();
 
         let open_paren = paren_pos.unwrap_or(0);
         let mut prev_end = open_paren + 1; // After `(`
@@ -809,7 +810,7 @@ impl<'a> Printer<'a> {
         // (Function/constructor-type `(` trailing). Same mechanism as the call-`(`
         // and object/array/block open-delimiter family.
         let (paren_prefix, paren_pull_pos) = paren_pos.map_or_else(
-            || (Vec::new(), None),
+            || (DocBuf::new(), None),
             |open| self.delimiter_line_comment_prefix(open, params[0].span().start),
         );
 

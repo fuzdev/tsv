@@ -11,7 +11,9 @@
 use crate::ast::internal::{self, LiteralValue};
 use crate::printer::Printer;
 use crate::printer::analysis;
+use smallvec::smallvec;
 use tsv_lang::SymbolToU32;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::format_string_literal;
 
@@ -281,7 +283,7 @@ impl<'a> Printer<'a> {
             return d.symbol(id.name.to_u32());
         }
 
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         // Handle decorators (for parameter decorators)
         if let Some(decorators) = &id.decorators {
@@ -364,7 +366,7 @@ impl<'a> Printer<'a> {
         let has_trailing_comments = self.has_comments_between(argument_end, spread.span.end);
 
         let prefix = if needs_parens { "...(" } else { "..." };
-        let mut parts = vec![d.text(prefix)];
+        let mut parts = smallvec![d.text(prefix)];
         if let Some(c) = comment_doc {
             parts.push(c);
         }

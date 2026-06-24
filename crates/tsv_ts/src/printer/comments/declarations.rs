@@ -8,7 +8,9 @@
 use super::layout::hang_after_operator;
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal;
+use smallvec::smallvec;
 use tsv_lang::comments_in_range;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comments};
 
@@ -23,7 +25,7 @@ impl<'a> Printer<'a> {
     /// the final `(cursor, name_start)` range.
     pub(crate) fn push_member_keyword_doc(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         kind_text: &'static str,
         cursor: &mut u32,
         bound: u32,
@@ -43,7 +45,7 @@ impl<'a> Printer<'a> {
     /// comments a hardline.
     pub(crate) fn push_pre_name_comments_doc(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         cursor: u32,
         name_start: u32,
     ) {
@@ -59,7 +61,7 @@ impl<'a> Printer<'a> {
     /// [`Self::push_pre_name_comments_doc`]; `search_from` is the member's start.
     pub(crate) fn push_accessor_keyword_doc(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         kind_text: &'static str,
         search_from: u32,
         key_start: u32,
@@ -81,7 +83,7 @@ impl<'a> Printer<'a> {
     /// (`let a! = x`, `interface I { a? }`), which is how past panics happened.
     pub(crate) fn push_modifier_marker_doc(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         after: u32,
         marker: u8,
     ) -> u32 {
@@ -325,7 +327,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let first_idx = tsv_lang::find_first_comment_from(self.comments, start);
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         // After a line comment's hardline the next comment starts a fresh (indented)
         // line, so it must not get a leading space — otherwise a 2nd+ own-line comment
         // renders as `\t // c` (stray leading space).
@@ -394,10 +396,10 @@ impl<'a> Printer<'a> {
         &self,
         start: u32,
         end: u32,
-    ) -> (Vec<DocId>, Vec<DocId>) {
+    ) -> (DocBuf, DocBuf) {
         let d = self.d();
-        let mut inline_parts = Vec::new();
-        let mut indent_parts = Vec::new();
+        let mut inline_parts = DocBuf::new();
+        let mut indent_parts = DocBuf::new();
         let mut saw_line_comment = false;
         for comment in comments_in_range(self.comments, start, end) {
             if saw_line_comment {
@@ -444,7 +446,8 @@ impl<'a> Printer<'a> {
             .iter()
             .enumerate()
             .map(|(i, heritage)| {
-                let mut h_parts = vec![self.build_entity_name_doc(&heritage.expression)];
+                let mut h_parts: DocBuf =
+                    smallvec![self.build_entity_name_doc(&heritage.expression)];
                 if let Some(type_args) = &heritage.type_arguments {
                     // Preserve comments: `implements Foo/* c */ <T>`
                     let gap_start = heritage.expression.span().end;
@@ -525,7 +528,7 @@ impl<'a> Printer<'a> {
             let kw_end = kw_start + keyword.len() as u32;
             if self.has_line_comments_between(kw_end, items[0].span.start) {
                 let value_doc = d.join(item_docs, ", ");
-                let mut parts = vec![d.text(keyword)];
+                let mut parts = smallvec![d.text(keyword)];
                 self.append_keyword_value_line_comments(
                     &mut parts,
                     kw_end,
@@ -542,7 +545,7 @@ impl<'a> Printer<'a> {
                 // commas baked in; others get commas from the separator.
                 let comma_hardline = d.concat(&[d.text(","), d.hardline()]);
                 let hardline = d.hardline();
-                let mut joined_parts = vec![item_docs[0]];
+                let mut joined_parts: DocBuf = smallvec![item_docs[0]];
                 for (idx, &item_doc) in item_docs.iter().enumerate().skip(1) {
                     // Previous item had baked-in comma + line comment → just hardline
                     // Otherwise → comma + hardline
@@ -581,7 +584,7 @@ impl<'a> Printer<'a> {
     /// (avoids corruption where `// c` would swallow `(x: T)`).
     pub(crate) fn append_type_params_to_paren_comments(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         type_params_end: u32,
         paren_pos: u32,
     ) {
@@ -600,7 +603,7 @@ impl<'a> Printer<'a> {
     /// This pushes the `*` itself — call it instead of pushing `d.text("*")`.
     pub(crate) fn push_generator_star_doc(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         search_start: u32,
         key_start: u32,
     ) {
@@ -646,13 +649,13 @@ impl<'a> Printer<'a> {
     /// values (`= `/`extends`) and class-property initializers (`= `).
     pub(crate) fn append_keyword_value_line_comments(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         keyword_end: u32,
         value_start: u32,
         value_doc: DocId,
     ) {
         let d = self.d();
-        let mut value_block = vec![d.hardline()];
+        let mut value_block: DocBuf = smallvec![d.hardline()];
         let mut on_own_line = false;
         for comment in comments_in_range(self.comments, keyword_end, value_start) {
             let same_line = !on_own_line && self.is_same_line(keyword_end, comment.span.start);

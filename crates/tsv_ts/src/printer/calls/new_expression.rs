@@ -24,6 +24,7 @@ use crate::printer::calls::{
     wrap_call_with_will_break_guard,
 };
 use crate::printer::{ParenContext, Printer, has_multiline_content, needs_parens};
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -374,7 +375,7 @@ impl<'a> Printer<'a> {
         // otherwise trailing comments on the last arg cause it to be hugged incorrectly.
         // e.g., new Class(arg1, // comment\n  arg2)
         if has_trailing_line_comments_slice(&new_expr.arguments, new_expr.span.end, self) {
-            let mut arg_parts = Vec::new();
+            let mut arg_parts = DocBuf::new();
 
             for (i, arg) in new_expr.arguments.iter().enumerate() {
                 // Leading comments before the first argument (e.g. `new Foo(/* c */ a, // t)`).
@@ -447,7 +448,7 @@ impl<'a> Printer<'a> {
         if has_trailing_block_only {
             // Build args with trailing block comment
             let last_idx = new_expr.arguments.len() - 1;
-            let mut arg_docs: Vec<DocId> = new_expr
+            let mut arg_docs: DocBuf = new_expr
                 .arguments
                 .iter()
                 .map(|arg| self.build_arg_expression_doc(arg))
@@ -456,7 +457,7 @@ impl<'a> Printer<'a> {
             // Prepend leading comments before the first arg (e.g. `new Foo(/* c */ a /* t */)`);
             // this path otherwise emits only trailing comments, dropping the leading one.
             if let Some(first_arg) = new_expr.arguments.first() {
-                let mut lead = Vec::new();
+                let mut lead = DocBuf::new();
                 emit_first_arg_leading_comments(
                     self,
                     &mut lead,
@@ -516,7 +517,7 @@ impl<'a> Printer<'a> {
                 // No line comments reach this block-only path.
                 let comma_pos = find_comma_pos(self.source, effective_arg_end, new_expr.span.end);
                 let mut last_with_comment = vec![last_doc];
-                let mut after_comma = Vec::new();
+                let mut after_comma = DocBuf::new();
                 for comment in &pc.trailing_block {
                     if comma_pos.is_some_and(|cp| is_comment_after_comma(comment, cp)) {
                         after_comma.push(d.text(" "));
@@ -702,10 +703,10 @@ impl<'a> Printer<'a> {
             if has_paren_line
                 && should_force_expansion_for_comments(self, paren_open, first_arg_start)
             {
-                let mut paren_line_prefix = Vec::new();
+                let mut paren_line_prefix = DocBuf::new();
                 gap_pc.emit_trailing_comments(&mut paren_line_prefix, self);
 
-                let mut inner = Vec::new();
+                let mut inner = DocBuf::new();
                 for comment in &gap_pc.leading {
                     inner.push(self.build_comment_doc(comment));
                     inner.push(d.hardline());

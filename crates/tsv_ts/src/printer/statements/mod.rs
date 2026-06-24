@@ -22,6 +22,8 @@ use super::expressions::literals::format_directive;
 use super::needs_parens::leftmost_no_lookahead;
 use super::{ParenContext, needs_parens};
 use crate::ast::internal::{self, Expression, LiteralValue, Statement};
+use smallvec::smallvec;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -77,7 +79,7 @@ impl<'a> Printer<'a> {
     fn build_expression_statement_doc(&self, stmt: &internal::ExpressionStatement) -> DocId {
         let d = self.d();
 
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         if stmt.is_directive {
             // Directives are exact code-unit sequences; `format_directive` mirrors
@@ -242,7 +244,7 @@ impl<'a> Printer<'a> {
             expr_doc
         };
 
-        let mut result_parts = vec![d.text(keyword), d.text(" "), rhs_doc];
+        let mut result_parts = smallvec![d.text(keyword), d.text(" "), rhs_doc];
         if has_trailing_comments {
             self.append_trailing_paren_comments(&mut result_parts, argument_end, span_end);
         }
