@@ -357,6 +357,7 @@ ES2015 module syntax with ES2024 additions.
 - Namespace import (`import * as ns from 'mod'`)
 - Combined (`import x, {a} from 'mod'`)
 - Renamed imports (`import {a as b} from 'mod'`)
+- String import name (`import {'str' as b} from 'mod'`) - ES2022
 - Side-effect import (`import 'mod'`)
 - Import attributes (`import x from 'y' with {}`) - ES2024
 
@@ -369,8 +370,9 @@ ES2015 module syntax with ES2024 additions.
 - Default function (`export default function() {}`)
 - Default class (`export default class {}`)
 - Re-exports (`export {a} from 'mod'`)
+- String export name (`export {a as 'str'}`, `export {'str'} from 'mod'`) - ES2022
 - Re-export all (`export * from 'mod'`)
-- Re-export as namespace (`export * as ns from 'mod'`)
+- Re-export as namespace (`export * as ns from 'mod'`, `export * as 'str' from 'mod'`)
 
 ---
 

@@ -343,10 +343,12 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Intern the current token as a module export name, accepting ANY keyword.
+    /// Intern the current token as the `IdentifierName` half of a module export
+    /// name, accepting ANY keyword (e.g. `export { x as if }`).
     ///
-    /// ES spec: ModuleExportName is IdentifierName | StringLiteral.
-    /// IdentifierName includes all reserved words (e.g., `export { x as if }`).
+    /// ES spec: `ModuleExportName : IdentifierName | StringLiteral`. This handles
+    /// only the `IdentifierName` arm; callers test for `TokenKind::String` first
+    /// and build a `ModuleExportName::Literal` for the `StringLiteral` arm.
     pub(super) fn try_intern_identifier_name(&self) -> Option<DefaultSymbol> {
         match self.current_kind() {
             TokenKind::Identifier => Some(self.intern_identifier()),

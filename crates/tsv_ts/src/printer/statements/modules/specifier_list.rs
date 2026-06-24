@@ -259,32 +259,43 @@ impl<'a> Printer<'a> {
         &self,
         declaration_is_type_only: bool,
         specifier_is_type: bool,
-        left: &internal::Identifier,
-        right: &internal::Identifier,
+        left: &internal::ModuleExportName,
+        right: &internal::ModuleExportName,
     ) -> DocId {
         let d = self.d();
         let mut parts = Vec::new();
         if !declaration_is_type_only && specifier_is_type {
             parts.push(d.text("type "));
         }
-        parts.push(d.symbol(left.name.to_u32()));
-        // Compare spans, not symbols: `{a}` has one span, `{a as a}` has two.
-        if left.span != right.span {
+        parts.push(self.build_module_export_name_doc(left));
+        let (left_span, right_span) = (left.span(), right.span());
+        // Compare spans, not values: `{a}` has one span, `{a as a}` has two.
+        if left_span != right_span {
             // Split comments at the `as` keyword: before-as and after-as.
-            if let Some(as_pos) = self.find_keyword_in_range(left.span.end, right.span.start, "as")
+            if let Some(as_pos) = self.find_keyword_in_range(left_span.end, right_span.start, "as")
             {
-                parts.push(self.build_inline_comments_between_doc(left.span.end, as_pos));
+                parts.push(self.build_inline_comments_between_doc(left_span.end, as_pos));
                 parts.push(d.text(" as "));
                 let as_end = as_pos + "as".len() as u32;
                 parts.push(
-                    self.build_inline_comments_between_doc_trailing_space(as_end, right.span.start),
+                    self.build_inline_comments_between_doc_trailing_space(as_end, right_span.start),
                 );
             } else {
                 parts.push(d.text(" as "));
             }
-            parts.push(d.symbol(right.name.to_u32()));
+            parts.push(self.build_module_export_name_doc(right));
         }
         d.concat(&parts)
+    }
+
+    /// Build a doc for a `ModuleExportName`: a bare identifier emits its symbol;
+    /// a string name (`'str'`) emits a quote-normalized string literal (preserved
+    /// as a string — prettier keeps the form, never stripping to a bare identifier).
+    pub(super) fn build_module_export_name_doc(&self, name: &internal::ModuleExportName) -> DocId {
+        match name {
+            internal::ModuleExportName::Identifier(id) => self.d().symbol(id.name.to_u32()),
+            internal::ModuleExportName::Literal(lit) => self.build_literal_doc(lit),
+        }
     }
 
     /// Build a doc for a single import specifier
@@ -293,11 +304,14 @@ impl<'a> Printer<'a> {
         named_spec: &internal::ImportNamedSpecifier,
         is_type_import: bool,
     ) -> DocId {
+        // The local binding is always an identifier; wrap it so it shares the
+        // `ModuleExportName`-based renamed-specifier renderer with the imported name.
+        let local = internal::ModuleExportName::Identifier(named_spec.local.clone());
         self.build_renamed_specifier_doc(
             is_type_import,
             named_spec.import_kind == internal::ImportKind::Type,
             &named_spec.imported,
-            &named_spec.local,
+            &local,
         )
     }
 

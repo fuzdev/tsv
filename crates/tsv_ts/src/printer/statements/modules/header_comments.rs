@@ -4,7 +4,6 @@
 
 use super::Printer;
 use crate::ast::internal;
-use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::DocId;
 
 /// Check if a string contains only whitespace and/or comments.
@@ -44,7 +43,8 @@ impl<'a> Printer<'a> {
     /// Emit the ` as <binding>` tail of a namespace binding (`* as ns`), starting
     /// just past the `*`. Preserves a comment in the `*`→`as` gap and the `as`→binding
     /// gap in place. `star_end` is the position just past `*`; `binding` is the
-    /// namespace identifier (`exported` for a re-export, `local` for an import).
+    /// namespace name (`exported` for a re-export — which may be a string,
+    /// `export * as 'str' from` — or `local` for an import, always an identifier).
     ///
     /// Both gaps route through the shared header-gap helper, so a *line* comment in
     /// either indents its continuation one level and a block comment trails inline.
@@ -58,24 +58,25 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut Vec<DocId>,
         star_end: u32,
-        binding: &internal::Identifier,
+        binding: &internal::ModuleExportName,
     ) {
         let d = self.d();
-        let as_pos = self.find_keyword_in_range(star_end, binding.span.start, "as");
+        let binding_start = binding.span().start;
+        let as_pos = self.find_keyword_in_range(star_end, binding_start, "as");
         // `as` + the `as`→binding gap (line comment indents the binding, block trails
         // inline) + the binding name. The `as ` token supplies the leading space.
-        let as_end = as_pos.map_or(binding.span.start, |p| p + "as".len() as u32);
+        let as_end = as_pos.map_or(binding_start, |p| p + "as".len() as u32);
         let as_clause = d.concat(&[
             d.text("as "),
             self.gap_comment_continuation_tail(
                 as_end,
-                binding.span.start,
-                d.symbol(binding.name.to_u32()),
+                binding_start,
+                self.build_module_export_name_doc(binding),
             ),
         ]);
         // `*`→`as` gap, preserved in place; the leading space comes from the helper
         // (the preceding `*` has no trailing space).
-        let gap_end = as_pos.unwrap_or(binding.span.start);
+        let gap_end = as_pos.unwrap_or(binding_start);
         parts.push(self.gap_comment_indented_continuation(star_end, gap_end, as_clause));
     }
 

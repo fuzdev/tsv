@@ -72,8 +72,10 @@ pub enum ExportDefaultValue {
 /// Also handles type-only: `export type * from "y"`
 #[derive(Debug, Clone)]
 pub struct ExportAllDeclaration {
-    /// For `export * as ns from "y"`, the namespace binding name
-    pub exported: Option<Identifier>,
+    /// For `export * as ns from "y"`, the namespace binding name. Per ecma262
+    /// `ModuleExportName : IdentifierName | StringLiteral`, so `export * as 'str' from`
+    /// is also valid.
+    pub exported: Option<ModuleExportName>,
     /// Module source
     pub source: Literal,
     /// Import attributes: `export * from "y" with { type: "json" }`.
@@ -95,10 +97,11 @@ pub struct TSExportAssignment {
 /// Export specifier: `export { x }` or `export { x as y }` or `export { type x }`
 #[derive(Debug, Clone)]
 pub struct ExportSpecifier {
-    /// Local name (what's exported from this module)
-    pub local: Identifier,
+    /// Local name (what's exported from this module). A string in a re-export,
+    /// e.g. `export { 'str' } from 'y'`.
+    pub local: ModuleExportName,
     /// Exported name (what it's called externally, may be same as local)
-    pub exported: Identifier,
+    pub exported: ModuleExportName,
     /// Export kind for inline type modifier: `export { type A, b }`
     pub export_kind: ExportKind,
     pub span: Span,
@@ -149,9 +152,11 @@ pub struct ImportDefaultSpecifier {
 /// Named import specifier: `import { a } from "y"` or `import { a as b } from "y"`
 #[derive(Debug, Clone)]
 pub struct ImportNamedSpecifier {
-    /// Imported name (the name in the module)
-    pub imported: Identifier,
-    /// Local binding name (may be same as imported, or different for `as` renames)
+    /// Imported name (the name in the module). A string for arbitrary module
+    /// namespace names, e.g. `import { 'str' as b } from 'y'`.
+    pub imported: ModuleExportName,
+    /// Local binding name (may be same as imported, or different for `as` renames).
+    /// Always an identifier — a string imported name requires an `as` binding.
     pub local: Identifier,
     /// Import kind for inline type modifier: `import { type A, B } from "y"`
     pub import_kind: ImportKind,
@@ -187,6 +192,25 @@ impl ImportAttributeKey {
         match self {
             ImportAttributeKey::Identifier(id) => id.span,
             ImportAttributeKey::Literal(lit) => lit.span,
+        }
+    }
+}
+
+/// Module export name: a bare identifier (`x`) or a string literal (`'str'`).
+/// Per ecma262 `ModuleExportName : IdentifierName | StringLiteral` (ES2022
+/// arbitrary module namespace names). Used for import/export specifier names
+/// and the `export * as` namespace name. Mirrors `ImportAttributeKey`.
+#[derive(Debug, Clone)]
+pub enum ModuleExportName {
+    Identifier(Identifier),
+    Literal(Literal),
+}
+
+impl ModuleExportName {
+    pub fn span(&self) -> Span {
+        match self {
+            ModuleExportName::Identifier(id) => id.span,
+            ModuleExportName::Literal(lit) => lit.span,
         }
     }
 }
