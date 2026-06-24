@@ -426,10 +426,10 @@ pub(super) fn arena_fits_multi<R: TextResolver + ?Sized>(
 /// shape scanned the bytes three times (`rfind('\n')` + `visual_width`'s own
 /// `is_ascii` + tab count). The fast path below folds the newline reset, tab
 /// expansion, and width accumulation into a single forward byte pass, so no
-/// backward `memchr` scan runs. Any non-ASCII byte bails to the grapheme-correct
-/// path unchanged — the partial `col` is discarded and the whole string is
-/// re-measured, which keeps combining marks (which can attach to an ASCII base)
-/// correct. Byte-identical to the prior implementation by construction.
+/// backward `memchr` scan runs. The first non-ASCII byte hands off to
+/// `update_pos_for_text_unicode` (cold-outlined to keep this fast path lean and
+/// inlinable, mirroring `skip_trivia` / `skip_trivia_scan`). Byte-identical to
+/// the prior implementation by construction.
 #[inline]
 pub(super) fn update_pos_for_text(pos: &mut usize, s: &str) {
     let mut col = *pos;
@@ -438,17 +438,23 @@ pub(super) fn update_pos_for_text(pos: &mut usize, s: &str) {
             b'\n' => col = 0,
             b'\t' => col += TAB_WIDTH,
             0..=0x7f => col += 1,
-            _ => {
-                // Non-ASCII present: fall back to the grapheme-aware measure over
-                // the entire string (the accumulated `col` is intentionally dropped).
-                if let Some(last_newline_pos) = s.rfind('\n') {
-                    *pos = visual_width(&s[last_newline_pos + 1..], TAB_WIDTH);
-                } else {
-                    *pos += visual_width(s, TAB_WIDTH);
-                }
-                return;
-            }
+            _ => return update_pos_for_text_unicode(pos, s),
         }
     }
     *pos = col;
+}
+
+/// Grapheme-aware fallback for `update_pos_for_text` when the text contains a
+/// non-ASCII byte. Re-measures the whole string from scratch (the fast path's
+/// partial `col` is intentionally dropped) so a combining mark attaching to an
+/// ASCII base char is never split mid-grapheme — the original pre-fusion logic,
+/// verbatim. Cold: non-ASCII text is rare in the render stream.
+#[cold]
+#[inline(never)]
+fn update_pos_for_text_unicode(pos: &mut usize, s: &str) {
+    if let Some(last_newline_pos) = s.rfind('\n') {
+        *pos = visual_width(&s[last_newline_pos + 1..], TAB_WIDTH);
+    } else {
+        *pos += visual_width(s, TAB_WIDTH);
+    }
 }
