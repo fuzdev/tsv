@@ -6,7 +6,7 @@
 // - ChainPrinter trait: Interface for the printer
 
 use super::analysis::SymbolLookup;
-use super::types::{ChainGroup, ChainNode};
+use super::types::{ChainGroup, ChainNode, DocBuf};
 use crate::ast::internal::{self, Expression};
 use string_interner::DefaultSymbol;
 use tsv_lang::doc::arena::{DocArena, DocId};
@@ -337,7 +337,7 @@ pub(crate) fn print_group_standard_expanded<'a, P: ChainPrinter>(
     printer: &P,
 ) -> DocId {
     let d = printer.arena();
-    let docs: Vec<DocId> = group
+    let docs: DocBuf = group
         .nodes
         .iter()
         .map(|n| match n {
@@ -377,7 +377,7 @@ fn print_group_inner<'a, P: ChainPrinter>(
     skip_first_comments: bool,
 ) -> DocId {
     let d = printer.arena();
-    let docs: Vec<DocId> = group
+    let docs: DocBuf = group
         .nodes
         .iter()
         .enumerate()

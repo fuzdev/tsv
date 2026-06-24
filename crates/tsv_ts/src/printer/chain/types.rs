@@ -8,10 +8,32 @@
 use crate::ast::internal::{self, LiteralValue};
 use smallvec::SmallVec;
 use string_interner::DefaultSymbol;
+use tsv_lang::doc::arena::DocId;
 
 /// Buffer for a linearized chain — chains are measured-short, so small chains
 /// (the common case) stay on the stack. `ChainNode` is `Copy` and ~24 bytes.
 pub type ChainNodeVec<'a> = SmallVec<[ChainNode<'a>; 8]>;
+
+/// Stack-friendly buffer for assembling chain doc parts before `concat`/`fill`/
+/// `conditional_group`. Chains are measured-short, so the common case stays on
+/// the stack — these intermediate `Vec<DocId>` builds were the chain printer's
+/// dominant allocation source (~20% of all format-phase allocations). `DocId` is
+/// `Copy` and 4 bytes, so the inline buffer is 32 bytes; longer chains spill to
+/// the heap (still correct, just the rare case).
+pub type DocBuf = SmallVec<[DocId; 8]>;
+
+/// Stack-friendly buffer for the grouped chain — `group_chain_nodes` builds this
+/// once per chain. `ChainGroup` is ~112 bytes (it embeds an inline `ChainNodeVec`),
+/// so the inline capacity is kept small at `2`: it covers the common short chain
+/// (member-only chains and short call chains are 1–2 groups) on the stack, while
+/// longer chains — which break anyway — spill to the heap.
+pub type ChainGroupVec<'a> = SmallVec<[ChainGroup<'a>; 2]>;
+
+/// Stack-friendly buffer of chain-node references — for the member-only and
+/// base-call flatten passes that collect `&ChainNode` before printing. `8` covers
+/// the common short chain inline; longer chains spill. `'n` is the (short) borrow
+/// of the `ChainGroup` slice; `'a` is the AST lifetime the nodes point into.
+pub type ChainNodeRefVec<'n, 'a> = SmallVec<[&'n ChainNode<'a>; 8]>;
 
 /// A node in a linearized chain
 ///
