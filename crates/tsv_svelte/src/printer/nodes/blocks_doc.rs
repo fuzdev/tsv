@@ -8,7 +8,8 @@
 #![allow(clippy::literal_string_with_formatting_args)]
 
 use crate::ast::internal::{self, Fragment, FragmentNode};
-use crate::printer::Printer;
+use crate::printer::{DocBuf, Printer};
+use smallvec::smallvec;
 use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
 
@@ -375,7 +376,7 @@ impl<'a> Printer<'a> {
     /// so a long else-if head still wraps within the expanded form.
     fn build_if_tail(&self, block: &internal::IfBlock, multiline: bool) -> DocId {
         let d = self.d();
-        let mut parts: Vec<DocId> = Vec::new();
+        let mut parts: DocBuf = DocBuf::new();
         let cons = self.build_fragment_doc(&block.consequent);
         parts.push(self.indent_body_expand(cons, multiline));
         if let Some(alt) = &block.alternate {
@@ -393,7 +394,7 @@ impl<'a> Printer<'a> {
     /// `build_if_tail`).
     fn build_if_alternate_tail(&self, alt: &Fragment, multiline: bool) -> DocId {
         let d = self.d();
-        let mut parts: Vec<DocId> = Vec::new();
+        let mut parts: DocBuf = DocBuf::new();
         if let Some(else_if) = Self::get_flattenable_else_if(alt) {
             // Build the else-if head with wrapping enabled so it can dangle within the
             // expanded form; in the inline form `BlockHead` resolves flat (no dangle).
@@ -505,7 +506,7 @@ impl<'a> Printer<'a> {
             );
         }
 
-        let mut parts = vec![head_doc, indented_body];
+        let mut parts: DocBuf = smallvec![head_doc, indented_body];
 
         // Handle alternate (else/else-if) and determine final trailing status
         let final_has_trailing = if let Some(alt) = &block.alternate {
@@ -642,7 +643,7 @@ impl<'a> Printer<'a> {
                 clause_hugs_expr(&else_if.test),
                 expr_ends_with_line_comment,
             );
-            let mut parts = vec![head_doc, indented_body];
+            let mut parts: DocBuf = smallvec![head_doc, indented_body];
 
             // Handle nested alternate or trailing
             if let Some(nested_alt) = &else_if.alternate {
@@ -722,7 +723,7 @@ impl<'a> Printer<'a> {
     /// inline or expanded form, for `build_expanding_construct`.
     fn build_each_tail(&self, block: &internal::EachBlock, multiline: bool) -> DocId {
         let d = self.d();
-        let mut parts: Vec<DocId> = Vec::new();
+        let mut parts: DocBuf = DocBuf::new();
         let body = self.build_fragment_doc(&block.body);
         parts.push(self.indent_body_expand(body, multiline));
         if let Some(fallback) = &block.fallback {
@@ -789,7 +790,7 @@ impl<'a> Printer<'a> {
         // `build_block_head_doc`); the degenerate index/key-without-`as` cases (not
         // valid Svelte) keep hugging the expression unchanged.
         let (head_expr, clause) = if let Some(context) = &block.context {
-            let mut clause_parts = vec![d.text("as ")];
+            let mut clause_parts: DocBuf = smallvec![d.text("as ")];
             clause_parts.push(self.build_pattern_doc(context));
             if let Some(index) = &block.index {
                 clause_parts.push(d.text(", "));
@@ -803,7 +804,7 @@ impl<'a> Printer<'a> {
             (expr_doc, Some(d.concat(&clause_parts)))
         } else {
             // No `as`: any index/key is degenerate — keep it hugging the expression.
-            let mut e = vec![expr_doc];
+            let mut e: DocBuf = smallvec![expr_doc];
             if let Some(index) = &block.index {
                 e.push(d.text(", "));
                 e.push(d.text_owned(index.clone()));
@@ -860,7 +861,7 @@ impl<'a> Printer<'a> {
             );
         }
 
-        let mut parts = vec![head_doc, indented_body];
+        let mut parts: DocBuf = smallvec![head_doc, indented_body];
 
         // Determine final trailing status (from body or fallback if present)
         let final_has_trailing = if let Some(fallback) = &block.fallback {
@@ -977,7 +978,7 @@ impl<'a> Printer<'a> {
     fn build_await_tail(&self, block: &internal::AwaitBlock, multiline: bool) -> DocId {
         let d = self.d();
         let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
-        let mut parts: Vec<DocId> = Vec::new();
+        let mut parts: DocBuf = DocBuf::new();
         if let Some(pending) = &block.pending {
             parts.push(self.await_section_body_expand(pending, multiline));
         }
@@ -1014,7 +1015,7 @@ impl<'a> Printer<'a> {
     fn build_await_tail_space_only(&self, block: &internal::AwaitBlock) -> DocId {
         let d = self.d();
         let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
-        let mut parts: Vec<DocId> = Vec::new();
+        let mut parts: DocBuf = DocBuf::new();
         if let Some(pending) = &block.pending {
             let body = self.build_nodes_doc_multiline(&pending.nodes);
             parts.push(indent_body_soft(self, body));
@@ -1049,7 +1050,7 @@ impl<'a> Printer<'a> {
     fn build_await_tail_newline(&self, block: &internal::AwaitBlock) -> DocId {
         let d = self.d();
         let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
-        let mut parts: Vec<DocId> = Vec::new();
+        let mut parts: DocBuf = DocBuf::new();
         let mut prev_has_trailing = false;
         if let Some(pending) = &block.pending {
             let (body, has_trailing) = build_await_section_body(self, pending);
@@ -1261,7 +1262,7 @@ impl<'a> Printer<'a> {
             return self.build_expanding_block(head_doc, body_doc, close, gt_prefix);
         }
 
-        let mut parts = vec![head_doc, indented_body];
+        let mut parts: DocBuf = smallvec![head_doc, indented_body];
 
         // Add endline before {/key} only if trailing whitespace exists
         if has_trailing {
@@ -1316,7 +1317,7 @@ impl<'a> Printer<'a> {
         // otherwise format individual params.
         // Split raw_parameters at top-level commas so each param gets its own
         // line when the group breaks (matching prettier's per-param wrapping).
-        let params_docs: Vec<DocId> = if let Some(raw) = &block.raw_parameters {
+        let params_docs: DocBuf = if let Some(raw) = &block.raw_parameters {
             split_raw_params_at_commas(raw)
                 .iter()
                 .map(|s| d.text_owned(s.to_string()))
@@ -1347,7 +1348,7 @@ impl<'a> Printer<'a> {
         } else {
             // Build params doc with line() separators for wrapping
             // Pre-allocate: each param + separator (except first)
-            let mut parts = Vec::with_capacity(params_docs.len() * 3);
+            let mut parts: DocBuf = DocBuf::with_capacity(params_docs.len() * 3);
             for (i, param_doc) in params_docs.into_iter().enumerate() {
                 if i > 0 {
                     parts.push(d.text(","));
@@ -1390,7 +1391,7 @@ impl<'a> Printer<'a> {
             return self.build_expanding_block(opening_doc, body_doc, close, gt_prefix);
         }
 
-        let mut parts = vec![opening_doc];
+        let mut parts: DocBuf = smallvec![opening_doc];
         parts.push(indent_body(self, body_doc, has_leading));
 
         // Add endline before {/snippet} only if trailing whitespace exists
