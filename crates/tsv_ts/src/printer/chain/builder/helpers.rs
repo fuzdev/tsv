@@ -7,7 +7,7 @@ use super::super::printing::{
     ChainPrinter, build_chain_line_break, print_group, print_group_expanded,
     print_group_expanded_skip_first_comments, print_group_skip_first_comments,
 };
-use super::super::types::ChainGroup;
+use super::super::types::{ChainGroup, DocBuf};
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::has_blank_line_between_strict;
 
@@ -31,7 +31,7 @@ use tsv_lang::printing::has_blank_line_between_strict;
 // emission differs per shape — dot (here) / operator / comma — which is intentional
 // (this dot path also owns blank-line preservation around the leading run).
 pub(crate) fn push_gap_comments_and_break<P: ChainPrinter>(
-    parts: &mut Vec<DocId>,
+    parts: &mut DocBuf,
     printer: &P,
     object_end: u32,
     property_start: u32,
@@ -98,7 +98,7 @@ pub(crate) fn push_gap_comments_and_break<P: ChainPrinter>(
 /// Encapsulates the logic for interleaving comments, line breaks, and groups
 /// when building the rest of a chain (everything after the first group).
 pub(crate) struct ChainPartsBuilder<'a, P: ChainPrinter> {
-    parts: Vec<DocId>,
+    parts: DocBuf,
     printer: &'a P,
     use_hardline: bool,
     use_expanded: bool,
@@ -114,7 +114,7 @@ impl<'a, P: ChainPrinter> ChainPartsBuilder<'a, P> {
         Self {
             // Each group produces ~5 docs: trailing comments, line break, block comments,
             // leading comments, and the group doc itself
-            parts: Vec::with_capacity(group_count * 5),
+            parts: DocBuf::with_capacity(group_count * 5),
             printer,
             use_hardline,
             use_expanded,
@@ -205,7 +205,7 @@ impl<'a, P: ChainPrinter> ChainPartsBuilder<'a, P> {
         });
     }
 
-    pub(crate) fn build(self) -> Vec<DocId> {
+    pub(crate) fn build(self) -> DocBuf {
         self.parts
     }
 }
@@ -218,7 +218,7 @@ pub(crate) fn build_rest_parts_with_comments<'a, P: ChainPrinter>(
     printer: &P,
     use_hardline: bool,
     use_expanded: bool,
-) -> Vec<DocId> {
+) -> DocBuf {
     // Check if last group is a simple member (no calls) - it should stay on same line as `})`
     // e.g., `.filter().map({...})).length` - `.length` stays on same line as `})`
     let last_is_simple_member = rest_groups.last().is_some_and(|g| {
@@ -273,7 +273,7 @@ pub(super) fn build_expanded_chain_doc<'a, P: ChainPrinter>(
     let (first_groups, rest) = groups.split_at(split_at.min(groups.len()));
 
     // Print first group(s) inline
-    let first_docs: Vec<DocId> = first_groups
+    let first_docs: DocBuf = first_groups
         .iter()
         .map(|g| print_group(g, printer))
         .collect();
@@ -305,7 +305,7 @@ pub(super) fn build_first_groups_doc<'a, P: ChainPrinter>(
     printer: &P,
 ) -> DocId {
     let d = printer.arena();
-    let first_docs: Vec<DocId> = first_groups
+    let first_docs: DocBuf = first_groups
         .iter()
         .map(|g| print_group(g, printer))
         .collect();
@@ -318,7 +318,7 @@ pub(super) fn build_first_groups_expanded_doc<'a, P: ChainPrinter>(
     printer: &P,
 ) -> DocId {
     let d = printer.arena();
-    let first_docs: Vec<DocId> = first_groups
+    let first_docs: DocBuf = first_groups
         .iter()
         .map(|g| print_group_expanded(g, printer))
         .collect();
