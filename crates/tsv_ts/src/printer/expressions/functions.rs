@@ -1182,7 +1182,7 @@ impl<'a> Printer<'a> {
     /// Shared implementation for building params doc with comment handling
     ///
     /// Used by arrow functions, function expressions, function declarations, and class methods.
-    pub(in crate::printer) fn build_params_doc_with_comments(
+    pub(crate) fn build_params_doc_with_comments(
         &self,
         params: &[internal::Expression],
         params_start: Option<u32>,

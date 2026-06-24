@@ -372,6 +372,27 @@ pub fn build_expression_doc_with_comments(
     printer.build_expression_doc(expression)
 }
 
+/// Build a DocId for a function parameter list (`(…)`) with comments, in the caller's arena.
+///
+/// Routes each parameter through the same comment-aware, `FunctionParameter`-context
+/// printer a real function signature uses, so interior comments (`{ a = /* c */ 1 }`),
+/// boundary comments (`a /* c */, b`), the single-pattern hug, and nesting-depth
+/// expansion all match a standalone parameter list. `params_start` / `trailing_comments_end`
+/// are the source positions of the `(` and `)` (for leading / dangling / trailing comment
+/// lookup). Emits no group of its own — the caller's surrounding group controls breaking.
+/// Used by `tsv_svelte` for `{#snippet}` parameters.
+pub fn build_function_params_doc_with_comments(
+    arena: &DocArena,
+    params: &[Expression],
+    params_start: Option<u32>,
+    trailing_comments_end: Option<u32>,
+    inputs: &PrinterInputs<'_>,
+    embed: &EmbedContext,
+) -> DocId {
+    let printer = make_printer(arena, inputs, *embed);
+    printer.build_params_doc_with_comments(params, params_start, trailing_comments_end)
+}
+
 /// Build a DocId for a TypeScript program in the caller's arena.
 ///
 /// Returns a DocId that can be rendered with the arena.
