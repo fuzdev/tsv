@@ -30,17 +30,19 @@ impl<'a> Printer<'a> {
             return false;
         }
 
-        let tag_name = self.resolve_symbol(element.name);
+        // Borrow the interned tag rather than allocating a `String` per check:
+        // this predicate runs once per element on the hot Svelte format path.
+        self.with_resolved_symbol(element.name, |tag_name| {
+            // <script>/<style> are block only when they carry real content, which
+            // formats on its own lines. An empty <script></script> / <style></style>
+            // stays inline (prettier parity). The raw-text parser always emits one
+            // (possibly empty) Text node, so node-presence alone is not "has content".
+            if (tag_name == "script" || tag_name == "style") && has_raw_content(element) {
+                return true;
+            }
 
-        // <script>/<style> are block only when they carry real content, which
-        // formats on its own lines. An empty <script></script> / <style></style>
-        // stays inline (prettier parity). The raw-text parser always emits one
-        // (possibly empty) Text node, so node-presence alone is not "has content".
-        if (tag_name == "script" || tag_name == "style") && has_raw_content(element) {
-            return true;
-        }
-
-        html::is_block_element(&tag_name)
+            html::is_block_element(tag_name)
+        })
     }
 }
 
