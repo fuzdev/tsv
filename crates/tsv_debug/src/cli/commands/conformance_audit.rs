@@ -31,7 +31,6 @@ pub struct ConformanceAuditCommand {
     json: bool,
 }
 
-const FIXTURES_DIR: &str = "tests/fixtures";
 const CONFORMANCE_PRETTIER: &str = "docs/conformance_prettier.md";
 const CONFORMANCE_SVELTE: &str = "docs/conformance_svelte.md";
 
@@ -58,19 +57,7 @@ const ALLOWED_NONDIVERGENCE_READMES: &[&str] = &[
 
 impl ConformanceAuditCommand {
     pub fn run(self) {
-        let fixtures_dir = Path::new(FIXTURES_DIR);
-        if !fixtures_dir.exists() {
-            eprintln!("Error: fixtures directory not found: {FIXTURES_DIR}");
-            std::process::exit(1);
-        }
-
-        let all = match fixtures::walk_fixtures(fixtures_dir) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error walking fixtures: {e}");
-                std::process::exit(1);
-            }
-        };
+        let all = super::walk_or_exit();
 
         // Read each conformance doc once; reuse its content for the orphan scan and
         // the link/heading parse (primed into the cache so anchors resolve for free).
@@ -180,21 +167,33 @@ fn normalize_fixture_path(rel: &str) -> String {
 /// Extract every `tests/fixtures/<path>` reference in a doc, normalized to `<path>`.
 ///
 /// Captures any link or prose form — a path ends at the first `)`, `]`, backtick,
-/// `|`, or whitespace — since the orphan check only needs set membership.
+/// `|`, or whitespace — since the orphan check only needs set membership. Fenced
+/// code blocks are skipped (a fixture path in an example doesn't sanction it);
+/// inline-code mentions still count (a catalog entry may be `` `tests/fixtures/…` ``).
 fn extract_linked_fixtures(doc: &str) -> BTreeSet<String> {
     const MARKER: &str = "tests/fixtures/";
     let mut set = BTreeSet::new();
-    let mut rest = doc;
-    while let Some(idx) = rest.find(MARKER) {
-        let after = &rest[idx + MARKER.len()..];
-        let end = after
-            .find(|c: char| c == ')' || c == ']' || c == '`' || c == '|' || c.is_whitespace())
-            .unwrap_or(after.len());
-        let path = after[..end].trim_end_matches('/');
-        if !path.is_empty() {
-            set.insert(path.to_string());
+    let mut in_fence = false;
+    for line in doc.lines() {
+        if is_fence_marker(line.trim_start()) {
+            in_fence = !in_fence;
+            continue;
         }
-        rest = &after[end..];
+        if in_fence {
+            continue;
+        }
+        let mut rest = line;
+        while let Some(idx) = rest.find(MARKER) {
+            let after = &rest[idx + MARKER.len()..];
+            let end = after
+                .find(|c: char| c == ')' || c == ']' || c == '`' || c == '|' || c.is_whitespace())
+                .unwrap_or(after.len());
+            let path = after[..end].trim_end_matches('/');
+            if !path.is_empty() {
+                set.insert(path.to_string());
+            }
+            rest = &after[end..];
+        }
     }
     set
 }
@@ -329,7 +328,7 @@ fn parse_markdown(content: &str) -> MarkdownDoc {
 
     for (i, line) in content.lines().enumerate() {
         let trimmed = line.trim_start();
-        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+        if is_fence_marker(trimmed) {
             in_fence = !in_fence;
             continue;
         }
@@ -352,6 +351,12 @@ fn parse_markdown(content: &str) -> MarkdownDoc {
     }
 
     MarkdownDoc { headings, links }
+}
+
+/// True for a fenced-code-block delimiter line (```` ``` ```` or `~~~`), given the
+/// already-`trim_start`ed line. Toggles in/out of a code block.
+fn is_fence_marker(trimmed: &str) -> bool {
+    trimmed.starts_with("```") || trimmed.starts_with("~~~")
 }
 
 /// The text of an ATX heading (`#`..`######` + space), or `None` for non-headings.
@@ -563,6 +568,19 @@ mod tests {
             .map(String::from)
             .collect();
         assert_eq!(set, expected);
+    }
+
+    #[test]
+    fn extract_linked_fixtures_skips_fenced_blocks_but_keeps_inline_code() {
+        let doc = "catalog `tests/fixtures/real/one`\n\
+                   ```\ntests/fixtures/example/in_fence\n```\n\
+                   prose tests/fixtures/real/two\n";
+        let set = extract_linked_fixtures(doc);
+        let expected: BTreeSet<String> = ["real/one", "real/two"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        assert_eq!(set, expected, "fence example excluded; inline + prose kept");
     }
 
     #[test]
