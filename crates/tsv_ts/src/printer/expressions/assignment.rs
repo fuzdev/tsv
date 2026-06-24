@@ -328,14 +328,27 @@ fn unwrap_expression(expr: &Expression) -> &Expression {
 /// Check if a call expression has complex type arguments that provide internal break points.
 ///
 /// Returns `true` (has complex type args) when:
-/// - More than 1 type argument
-/// - Single type argument is an object/type literal, mapped type, union, or intersection
+/// - More than 1 type argument, or
+/// - The single type argument is an object/type literal, union, or intersection
+///   (always), or a mapped type that force-breaks (see below).
 ///
 /// These cases are NOT poorly breakable — the type arguments themselves can break,
 /// so we should not break at the assignment operator.
 ///
-/// Matches Prettier's `isCallExpressionWithComplexTypeArguments` (assignment.js:421)
-fn is_call_with_complex_type_arguments(call: &internal::CallExpression) -> bool {
+/// Matches Prettier's `isCallExpressionWithComplexTypeArguments` (assignment.js:422),
+/// which lists object/union/intersection unconditionally, then falls back to
+/// `willBreak(print("typeArguments"))`. tsv covers the unconditional list directly;
+/// for a single mapped type-arg — which prettier treats as complex only via that
+/// `willBreak` fallback (mapped is absent from its explicit list) — it approximates
+/// the fallback with a sound static check: the mapped's source span contains a
+/// newline. A newline-free single-line mapped type-arg cannot force-break (its only
+/// breaks are width-driven `line`s), so it is poorly-breakable and the assignment
+/// breaks after `=` like prettier; every force-break — object-style `shouldBreak`
+/// from an authored newline, a forcing comment, or a nested forced break — leaves a
+/// newline in the span, so a newline is a sound stand-in for the printed doc's
+/// `willBreak` (and keeps the `is_poorly_breakable_chain` debug_assert sound: a
+/// force-breaking mapped type-arg is never classified poorly-breakable).
+fn is_call_with_complex_type_arguments(call: &internal::CallExpression, source: &str) -> bool {
     use internal::TSType;
     let Some(type_args) = &call.type_arguments else {
         return false;
@@ -343,13 +356,10 @@ fn is_call_with_complex_type_arguments(call: &internal::CallExpression) -> bool 
     if type_args.params.len() > 1 {
         return true;
     }
-    if let Some(first) = type_args.params.first() {
-        matches!(
-            first,
-            TSType::TypeLiteral(_) | TSType::Mapped(_) | TSType::Union(_) | TSType::Intersection(_)
-        )
-    } else {
-        false
+    match type_args.params.first() {
+        Some(TSType::TypeLiteral(_) | TSType::Union(_) | TSType::Intersection(_)) => true,
+        Some(TSType::Mapped(m)) => m.span.extract(source).contains('\n'),
+        _ => false,
     }
 }
 
@@ -436,8 +446,8 @@ fn is_poorly_breakable_chain_recursive(
             // Calls with complex type arguments (object/mapped/union/intersection types,
             // or multiple type args) are NOT poorly breakable - they have internal break
             // points via the type arguments.
-            // Matches Prettier's `isCallExpressionWithComplexTypeArguments` (assignment.js:421)
-            if is_call_with_complex_type_arguments(call) {
+            // Matches Prettier's `isCallExpressionWithComplexTypeArguments` (assignment.js:422)
+            if is_call_with_complex_type_arguments(call, source) {
                 return false;
             }
 
