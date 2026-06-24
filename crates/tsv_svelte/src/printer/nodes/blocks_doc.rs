@@ -1107,19 +1107,33 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // Build expression doc with context-dependent behavior
         let allow_wrapping = !has_preceding_breakable;
+        // When a `then`/`catch` shorthand carries its binding pattern in the head, bound
+        // the awaited expression's trailing-comment range at the pattern start (mirroring
+        // `{#each}`'s `context.span().start`) so a comment *inside* the pattern isn't
+        // relocated out to trail the expression (`{#await p /* c */ then …}`); the
+        // comment-aware `build_pattern_doc` preserves it in place instead. The full form
+        // carries its patterns in `{:then}`/`{:catch}` outside the head, so it keeps the
+        // head end.
+        let head_end = block.opening_tag_span.end - 1;
+        let expr_comment_end = match await_shorthand(block) {
+            AwaitShorthand::Then => block.value.as_ref().map_or(head_end, |v| v.span().start),
+            AwaitShorthand::Catch => block.error.as_ref().map_or(head_end, |e| e.span().start),
+            AwaitShorthand::None => head_end,
+        };
         let expr_doc = self.build_expression_doc_for_block(
             &block.expression,
             block.opening_tag_span.start + AWAIT_BLOCK_OPEN.len() as u32,
-            block.opening_tag_span.end - 1,
+            expr_comment_end,
             AWAIT_BLOCK_OPEN.len(),
             allow_wrapping || in_multiline_context,
         );
 
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
-        let expr_ends_with_line_comment = self.head_trailing_line_comment(
-            block.expression.span().end,
-            block.opening_tag_span.end - 1,
-        );
+        // Bound at `expr_comment_end` (not the head end) so a line comment *inside* a
+        // shorthand pattern isn't mistaken for a trailing line comment on the awaited
+        // expression — that would drop the space before the `then`/`catch` clause.
+        let expr_ends_with_line_comment =
+            self.head_trailing_line_comment(block.expression.span().end, expr_comment_end);
 
         // Fast path: every present section is inline-authored → body-expand like the
         // other blocks. The head carries the `then v` / `catch e` clause; the section

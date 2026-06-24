@@ -157,7 +157,232 @@ impl<'a> Printer<'a> {
         &self.source[start..end]
     }
 
-    /// Build a doc for a pattern (destructuring context)
+    /// Emit every comment in `[start, end)` in **leading** style: a block comment as
+    /// `/* … */ ` (inline, trailing space); a line comment as `// …` + `hardline` (a `//`
+    /// runs to end of line, so the following token drops to the next line to avoid
+    /// swallowing it). Empty doc when the range holds no comments.
+    fn build_pattern_leading_comments(&self, start: u32, end: u32) -> DocId {
+        let docs: Vec<DocId> = tsv_lang::comments_in_range(self.comments, start, end)
+            .map(|c| self.build_leading_js_comment_doc(c))
+            .collect();
+        self.d().concat(&docs)
+    }
+
+    /// Emit every comment in `[start, end)` in **trailing** style: a block comment as
+    /// ` /* … */` (inline, leading space); a line comment as ` // …` + `hardline`. Empty
+    /// doc when the range holds no comments.
+    fn build_pattern_trailing_comments(&self, start: u32, end: u32) -> DocId {
+        let docs: Vec<DocId> = tsv_lang::comments_in_range(self.comments, start, end)
+            .map(|c| self.build_trailing_js_comment_doc(c))
+            .collect();
+        self.d().concat(&docs)
+    }
+
+    /// Build a two-sided delimiter gap (`,` / `:` / `=`) between two pattern pieces,
+    /// keeping each comment on the side of the delimiter the author wrote it: comments
+    /// before `delim` trail the left piece, comments after lead the right piece — so an
+    /// association like `a /* c */ = 1` (comment on the binding) is never flipped onto the
+    /// value. `delim_text` is the rendered separator (`", "`, `": "`, `" = "`). Falls back
+    /// to the bare separator when the delimiter isn't found (defensive — the parser
+    /// guarantees one in every gap this is called on).
+    fn build_pattern_delim_gap(
+        &self,
+        left_end: u32,
+        right_start: u32,
+        delim: u8,
+        delim_text: &'static str,
+    ) -> DocId {
+        let d = self.d();
+        match tsv_lang::source_scan::find_char_skipping_comments(
+            self.source.as_bytes(),
+            left_end as usize,
+            right_start as usize,
+            delim,
+        ) {
+            Some(pos) => {
+                let pos = pos as u32;
+                let before = self.build_pattern_trailing_comments(left_end, pos);
+                let after = self.build_pattern_leading_comments(pos + 1, right_start);
+                d.concat(&[before, d.text(delim_text), after])
+            }
+            None => d.text(delim_text),
+        }
+    }
+
+    /// Build a `...rest` binding, threading any comment in the `...`→binding gap
+    /// (`.../* c */ rest`). Shared by the array-pattern and object-pattern rest arms.
+    fn build_rest_pattern_doc(&self, rest_span_start: u32, argument: &tsv_ts::Expression) -> DocId {
+        let d = self.d();
+        let dots_end = rest_span_start + 3; // past "..."
+        let lead = self.build_pattern_leading_comments(dots_end, argument.span().start);
+        d.concat(&[d.text("..."), lead, self.build_pattern_doc(argument)])
+    }
+
+    /// Build a property key for a non-shorthand object-pattern property, returning
+    /// `(doc, key_region_end)` where `key_region_end` is the source position just past the
+    /// key (after `]` for a computed key) — the lower bound for the following colon gap. A
+    /// computed key threads comments inside its `[ … ]` brackets.
+    fn build_pattern_key_doc(
+        &self,
+        computed: bool,
+        key: &tsv_ts::Expression,
+        prop_start: u32,
+        value_start: u32,
+    ) -> (DocId, u32) {
+        let d = self.d();
+        if computed {
+            let key_start = key.span().start;
+            let key_end = key.span().end;
+            let close = tsv_lang::source_scan::find_char_skipping_comments(
+                self.source.as_bytes(),
+                key_end as usize,
+                value_start as usize,
+                b']',
+            )
+            .map_or(key_end, |p| p as u32);
+            let lead = self.build_pattern_leading_comments(prop_start + 1, key_start);
+            let key_doc = self.build_ts_expression_doc_no_comments(key);
+            let trail = self.build_pattern_trailing_comments(key_end, close);
+            let doc = d.concat(&[d.text("["), lead, key_doc, trail, d.text("]")]);
+            (doc, close + 1)
+        } else {
+            (
+                self.build_ts_expression_doc_no_comments(key),
+                key.span().end,
+            )
+        }
+    }
+
+    /// Build a single object property (`key: value` / shorthand `key`), threading comments
+    /// through the computed-key brackets and the `key`→`value` colon gap. A shorthand
+    /// property routes its value (an `AssignmentPattern` for a default) back through
+    /// `build_pattern_doc`, whose arms carry any interior comments. Shared by the binding
+    /// (`ObjectPattern`) and the default-value (`ObjectExpression`) property dispatchers,
+    /// which differ only in their enum types — both wrap the same `Property` fields.
+    fn build_pattern_property_kv(
+        &self,
+        shorthand: bool,
+        computed: bool,
+        key: &tsv_ts::Expression,
+        value: &tsv_ts::Expression,
+        prop_start: u32,
+    ) -> DocId {
+        let d = self.d();
+        if shorthand {
+            self.build_pattern_doc(value)
+        } else {
+            let value_start = value.span().start;
+            let (key_doc, key_region_end) =
+                self.build_pattern_key_doc(computed, key, prop_start, value_start);
+            let colon_gap = self.build_pattern_delim_gap(key_region_end, value_start, b':', ": ");
+            d.concat(&[key_doc, colon_gap, self.build_pattern_doc(value)])
+        }
+    }
+
+    /// Property dispatcher for a binding `ObjectPattern`.
+    fn build_object_pattern_property_doc(&self, prop: &tsv_ts::ObjectPatternProperty) -> DocId {
+        match prop {
+            tsv_ts::ObjectPatternProperty::Property(p) => self.build_pattern_property_kv(
+                p.shorthand,
+                p.computed,
+                &p.key,
+                &p.value,
+                p.span.start,
+            ),
+            tsv_ts::ObjectPatternProperty::RestElement(r) => {
+                self.build_rest_pattern_doc(r.span.start, &r.argument)
+            }
+        }
+    }
+
+    /// Property dispatcher for an `ObjectExpression` reached as an assignment-pattern
+    /// **default value** (`{ a = { b: /* c */ 1 } }`). Same shape as the binding
+    /// dispatcher; only the enum (`ObjectProperty` / `SpreadElement`) differs.
+    fn build_object_expr_property_doc(&self, prop: &tsv_ts::ObjectProperty) -> DocId {
+        match prop {
+            tsv_ts::ObjectProperty::Property(p) => self.build_pattern_property_kv(
+                p.shorthand,
+                p.computed,
+                &p.key,
+                &p.value,
+                p.span.start,
+            ),
+            tsv_ts::ObjectProperty::SpreadElement(s) => {
+                self.build_rest_pattern_doc(s.span.start, &s.argument)
+            }
+        }
+    }
+
+    /// Build comment-aware object braces (`{ … }`) from pre-built property entries
+    /// `(span_start, span_end, doc)`. `bracketSpacing: true` pads non-empty braces;
+    /// comments thread through every gap (after `{`, around each `,`, before `}`) and a
+    /// dangling comment in an empty pattern is preserved. Shared by the `ObjectPattern`
+    /// (binding) and `ObjectExpression` (default-value) arms.
+    fn build_object_braces(
+        &self,
+        span_start: u32,
+        span_end: u32,
+        entries: &[(u32, u32, DocId)],
+    ) -> DocId {
+        let d = self.d();
+        let mut parts = vec![d.text("{")];
+        if entries.is_empty() {
+            // Empty pattern stays tight (`{}`), but preserve a dangling comment.
+            parts.push(self.build_pattern_leading_comments(span_start + 1, span_end - 1));
+        } else {
+            parts.push(d.text(" "));
+            let mut prev_end = span_start + 1; // past `{`
+            for (i, &(estart, eend, edoc)) in entries.iter().enumerate() {
+                if i == 0 {
+                    parts.push(self.build_pattern_leading_comments(prev_end, estart));
+                } else {
+                    parts.push(self.build_pattern_delim_gap(prev_end, estart, b',', ", "));
+                }
+                parts.push(edoc);
+                prev_end = eend;
+            }
+            parts.push(self.build_pattern_trailing_comments(prev_end, span_end - 1));
+            parts.push(d.text(" "));
+        }
+        parts.push(d.text("}"));
+        d.concat(&parts)
+    }
+
+    /// Build comment-aware array brackets (`[ … ]`) — no bracket spacing in either
+    /// formatter. Comments thread through every gap (after `[`, around each `,`, before
+    /// `]`); a hole (`[a, , b]`) has no element span to anchor against, so its separator
+    /// stays a bare comma. Shared by the `ArrayPattern` (binding) and `ArrayExpression`
+    /// (default-value) arms, which carry identical `Vec<Option<Expression>>` elements.
+    fn build_array_brackets(
+        &self,
+        elements: &[Option<tsv_ts::Expression>],
+        span_start: u32,
+        span_end: u32,
+    ) -> DocId {
+        let d = self.d();
+        let mut parts = vec![d.text("[")];
+        let mut prev_end = span_start + 1; // past `[`
+        for (i, elem) in elements.iter().enumerate() {
+            if i == 0 {
+                if let Some(e) = elem {
+                    parts.push(self.build_pattern_leading_comments(prev_end, e.span().start));
+                }
+            } else if let Some(e) = elem {
+                parts.push(self.build_pattern_delim_gap(prev_end, e.span().start, b',', ", "));
+            } else {
+                parts.push(d.text(", "));
+            }
+            if let Some(e) = elem {
+                parts.push(self.build_pattern_doc(e));
+                prev_end = e.span().end;
+            }
+        }
+        parts.push(self.build_pattern_trailing_comments(prev_end, span_end - 1));
+        parts.push(d.text("]"));
+        d.concat(&parts)
+    }
+
+    /// Build a doc for a pattern (destructuring context).
     ///
     /// Patterns use specific whitespace rules:
     /// - Object patterns: `{ a, b }` (inner-padded braces, `bracketSpacing: true`)
@@ -169,145 +394,82 @@ impl<'a> Printer<'a> {
     /// braces carry an inner space (`{ a, b }`) under the project-wide
     /// `bracketSpacing: true`, consistent with every other object tsv emits and
     /// matching prettier-plugin-svelte; an empty `{}` stays tight.
+    ///
+    /// **Comments are preserved in place.** A comment in any pattern position (after a
+    /// brace/bracket, around a `,` / `:` / `=`, inside a property, before the close) is
+    /// threaded through via `comments_in_range` and kept where the author wrote it —
+    /// block comments inline, line comments line-safely (`//` + `hardline`, so the tail
+    /// drops to the next line without swallow). prettier-plugin-svelte prints these
+    /// patterns from a comment-blind path and drops them, so this is a
+    /// `_svelte_prettier_divergence` (see conformance_prettier.md §Svelte: destructuring
+    /// binding-pattern comments).
+    ///
     /// Literal **default values** normalize through the TS printer (string quotes +
     /// numeric form), where prettier-plugin-svelte preserves the author's source
-    /// token — a deliberate divergence (see conformance_prettier.md §Svelte:
+    /// token — a separate deliberate divergence (see conformance_prettier.md §Svelte:
     /// destructuring literal normalization).
-    /// Build a doc for a non-shorthand object-pattern property key.
-    ///
-    /// A **computed** key (`{[expr]: v}`) keeps its `[ ]` brackets so it reads the
-    /// same property — dropping them would change semantics (and a non-identifier
-    /// key like a template literal would become invalid syntax). Mirrors the
-    /// TypeScript pattern printer's computed-key handling
-    /// (`tsv_ts`'s `build_object_pattern_property_doc`); this path is comment-free,
-    /// so the bracket wrapping is plain text rather than the comment-aware
-    /// `build_computed_key_bracket_doc`.
-    fn build_pattern_property_key_doc(&self, computed: bool, key: &tsv_ts::Expression) -> DocId {
-        let d = self.d();
-        let key_doc = self.build_ts_expression_doc_no_comments(key);
-        if computed {
-            d.brackets(key_doc)
-        } else {
-            key_doc
-        }
-    }
-
     pub(super) fn build_pattern_doc(&self, expr: &tsv_ts::Expression) -> DocId {
         let d = self.d();
         match expr {
+            // Comments thread through every gap so a comment in any pattern position is
+            // preserved in place — a `_svelte_prettier_divergence` from prettier-plugin-svelte,
+            // which drops it. The `*Expression` variants are reached as assignment-pattern
+            // **default values** (`{ a = { … } }` / `{ a = [ … ] }`), which prettier likewise
+            // keeps inline (so they share the always-inline binding shape, not the breakable
+            // expression printer); they just need the same comment-awareness.
             tsv_ts::Expression::ObjectPattern(obj) => {
-                // `bracketSpacing: true`: pad non-empty object-pattern braces with an
-                // inner space (`{ a, b }`); empty `{}` stays tight.
-                let has_props = !obj.properties.is_empty();
-                let mut parts = vec![d.text("{")];
-                if has_props {
-                    parts.push(d.text(" "));
-                }
-                for (i, prop) in obj.properties.iter().enumerate() {
-                    if i > 0 {
-                        parts.push(d.text(", "));
-                    }
-                    match prop {
-                        tsv_ts::ObjectPatternProperty::Property(p) => {
-                            if p.shorthand {
-                                // Shorthand: `{ k }` or `{ k = 1 }`
-                                // Use build_pattern_doc for the value to handle
-                                // AssignmentPattern (defaults) and preserve quotes
-                                parts.push(self.build_pattern_doc(&p.value));
-                            } else {
-                                parts.push(self.build_pattern_property_key_doc(p.computed, &p.key));
-                                parts.push(d.text(": "));
-                                parts.push(self.build_pattern_doc(&p.value));
-                            }
-                        }
-                        tsv_ts::ObjectPatternProperty::RestElement(r) => {
-                            parts.push(d.text("..."));
-                            parts.push(self.build_pattern_doc(&r.argument));
-                        }
-                    }
-                }
-                if has_props {
-                    parts.push(d.text(" "));
-                }
-                parts.push(d.text("}"));
-                d.concat(&parts)
+                let entries: Vec<(u32, u32, DocId)> = obj
+                    .properties
+                    .iter()
+                    .map(|p| {
+                        let s = p.span();
+                        (s.start, s.end, self.build_object_pattern_property_doc(p))
+                    })
+                    .collect();
+                self.build_object_braces(obj.span.start, obj.span.end, &entries)
             }
             tsv_ts::Expression::ObjectExpression(obj) => {
-                // Legacy AST - treat same as ObjectPattern
-                let has_props = !obj.properties.is_empty();
-                let mut parts = vec![d.text("{")];
-                if has_props {
-                    parts.push(d.text(" "));
-                }
-                for (i, prop) in obj.properties.iter().enumerate() {
-                    if i > 0 {
-                        parts.push(d.text(", "));
-                    }
-                    match prop {
-                        tsv_ts::ObjectProperty::Property(p) => {
-                            if p.shorthand {
-                                // Shorthand: `{ k }` or `{ k = 1 }`
-                                parts.push(self.build_pattern_doc(&p.value));
-                            } else {
-                                parts.push(self.build_pattern_property_key_doc(p.computed, &p.key));
-                                parts.push(d.text(": "));
-                                parts.push(self.build_pattern_doc(&p.value));
-                            }
-                        }
-                        tsv_ts::ObjectProperty::SpreadElement(s) => {
-                            parts.push(d.text("..."));
-                            parts.push(self.build_pattern_doc(&s.argument));
-                        }
-                    }
-                }
-                if has_props {
-                    parts.push(d.text(" "));
-                }
-                parts.push(d.text("}"));
-                d.concat(&parts)
+                let entries: Vec<(u32, u32, DocId)> = obj
+                    .properties
+                    .iter()
+                    .map(|p| {
+                        let s = p.span();
+                        (s.start, s.end, self.build_object_expr_property_doc(p))
+                    })
+                    .collect();
+                self.build_object_braces(obj.span.start, obj.span.end, &entries)
             }
             tsv_ts::Expression::ArrayPattern(arr) => {
-                let mut parts = vec![d.text("[")];
-                for (i, elem) in arr.elements.iter().enumerate() {
-                    if i > 0 {
-                        parts.push(d.text(", "));
-                    }
-                    if let Some(e) = elem {
-                        parts.push(self.build_pattern_doc(e));
-                    }
-                }
-                parts.push(d.text("]"));
-                d.concat(&parts)
+                self.build_array_brackets(&arr.elements, arr.span.start, arr.span.end)
             }
             tsv_ts::Expression::ArrayExpression(arr) => {
-                // Legacy AST - treat same as ArrayPattern
-                let mut parts = vec![d.text("[")];
-                for (i, elem) in arr.elements.iter().enumerate() {
-                    if i > 0 {
-                        parts.push(d.text(", "));
-                    }
-                    if let Some(e) = elem {
-                        parts.push(self.build_pattern_doc(e));
-                    }
-                }
-                parts.push(d.text("]"));
-                d.concat(&parts)
+                self.build_array_brackets(&arr.elements, arr.span.start, arr.span.end)
             }
             tsv_ts::Expression::RestElement(rest) => {
-                let dots = d.text("...");
-                let arg = self.build_pattern_doc(&rest.argument);
-                d.concat(&[dots, arg])
+                self.build_rest_pattern_doc(rest.span.start, &rest.argument)
             }
+            // Comments around the `=` stay on the side the author wrote them
+            // (`a /* c */ = 1` vs `a = /* c */ 1`). The `Expression` variant is the
+            // default-value form of the same `=`.
             tsv_ts::Expression::AssignmentPattern(assign) => {
                 let left = self.build_pattern_doc(&assign.left);
-                let eq = d.text(" = ");
+                let eq = self.build_pattern_delim_gap(
+                    assign.left.span().end,
+                    assign.right.span().start,
+                    b'=',
+                    " = ",
+                );
                 let right = self.build_pattern_doc(&assign.right);
                 d.concat(&[left, eq, right])
             }
             tsv_ts::Expression::AssignmentExpression(assign) => {
-                // Legacy AST - treat same as AssignmentPattern
                 let left = self.build_pattern_doc(&assign.left);
-                let eq = d.text(" = ");
+                let eq = self.build_pattern_delim_gap(
+                    assign.left.span().end,
+                    assign.right.span().start,
+                    b'=',
+                    " = ",
+                );
                 let right = self.build_pattern_doc(&assign.right);
                 d.concat(&[left, eq, right])
             }
