@@ -230,21 +230,22 @@ impl<'a> Printer<'a> {
         &self,
         element: &internal::Element,
     ) -> Option<DocId> {
-        let tag_name = self.resolve_symbol(element.name);
         // Special-content elements (raw `<script>`/`<style>`, foreign `<template>`,
         // whitespace-sensitive `<pre>`/`<textarea>`) never participate — their closing
-        // tags aren't the simple hug-both shape.
-        if tag_name == "style" || tag_name == "script" {
-            return None;
-        }
-        if tag_name == "template"
-            && self
-                .get_lang_attribute(&element.attributes)
-                .is_some_and(|lang| lang != "html")
+        // tags aren't the simple hug-both shape. Resolve once inside the borrow to
+        // skip a per-call `String` alloc.
+        let (always_skip, is_template) = self.with_resolved_symbol(element.name, |t| {
+            (
+                t == "style" || t == "script" || tsv_html::preserves_whitespace(t),
+                t == "template",
+            )
+        });
+        if always_skip
+            || (is_template
+                && self
+                    .get_lang_attribute(&element.attributes)
+                    .is_some_and(|lang| lang != "html"))
         {
-            return None;
-        }
-        if tsv_html::preserves_whitespace(&tag_name) {
             return None;
         }
         let is_html = element.kind == internal::ElementKind::Html;
