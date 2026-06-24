@@ -6,7 +6,7 @@
 // - svelte:fragment, svelte:boundary
 // - slot, title
 
-use crate::ast::internal::{self, FragmentNode};
+use crate::ast::internal::{self, FragmentNode, SpecialElementKind};
 use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -22,7 +22,6 @@ impl<'a> Printer<'a> {
     /// - Full multiline: attrs wrapped, children on new lines
     pub(crate) fn build_special_element_doc(&self, element: &internal::SpecialElement) -> DocId {
         let d = self.d();
-        use internal::SpecialElementKind;
 
         let tag_name = element.kind.tag_name();
 
@@ -393,19 +392,18 @@ impl<'a> Printer<'a> {
         // Pre-allocate: 2 docs per attr (separator + attr), plus potential this={} attr
         let has_this = matches!(
             element.kind,
-            internal::SpecialElementKind::SvelteComponent { .. }
-                | internal::SpecialElementKind::SvelteElement { .. }
+            SpecialElementKind::SvelteComponent { .. } | SpecialElementKind::SvelteElement { .. }
         );
         let capacity = (element.attributes.len() + usize::from(has_this)) * 2;
         let mut docs: DocBuf = DocBuf::with_capacity(capacity);
 
         // Add this={...} for component/element
         match &element.kind {
-            internal::SpecialElementKind::SvelteComponent { expression } => {
+            SpecialElementKind::SvelteComponent { expression } => {
                 docs.push(separator);
                 docs.push(self.build_this_attr_doc_for_inline(expression));
             }
-            internal::SpecialElementKind::SvelteElement { tag } => {
+            SpecialElementKind::SvelteElement { tag } => {
                 docs.push(separator);
                 docs.push(self.build_this_attr_doc_for_inline(tag));
             }
@@ -413,10 +411,7 @@ impl<'a> Printer<'a> {
         }
 
         // svelte:element renders as HTML, so normalize class attribute whitespace
-        let normalize_class = matches!(
-            element.kind,
-            internal::SpecialElementKind::SvelteElement { .. }
-        );
+        let normalize_class = matches!(element.kind, SpecialElementKind::SvelteElement { .. });
         self.push_attrs_with_comments(
             &mut docs,
             &element.attributes,
