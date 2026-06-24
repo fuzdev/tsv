@@ -915,6 +915,7 @@ impl<'a> SvelteParser<'a> {
         // Parse parameters (between parentheses)
         let mut parameters = Vec::new();
         let mut raw_parameters = None;
+        let mut params_paren = None;
         if paren_pos < content.len() {
             // The `)` matching the opening `(` — depth- and trivia-aware, so a `)`
             // inside a string/comment in a param default can't end the list early.
@@ -927,32 +928,40 @@ impl<'a> SvelteParser<'a> {
                 TriviaProfile::JS,
             )
             .unwrap_or(content.len());
+            // Absolute source span of the parens (`start` = `(`, `end` = `)`), for
+            // comment lookup when printing the parameter list.
+            let content_offset = tag_content_start + super::subslice_offset(tag_content, content);
+            params_paren = Some(Span {
+                start: (content_offset + paren_pos) as u32,
+                end: (content_offset + close_paren) as u32,
+            });
             let params_str = &content[paren_pos + 1..close_paren];
             if !params_str.trim().is_empty() {
-                // Compute params_offset (shared by both branches)
                 let params_offset =
                     tag_content_start + super::subslice_offset(tag_content, params_str);
 
-                if params_str.contains(':') {
-                    // Parse typed parameters by wrapping as a function signature
-                    const WRAPPER_PREFIX: &str = "function f(";
-                    let wrapper = format!("{WRAPPER_PREFIX}{params_str}) {{}}");
-                    let base = params_offset.saturating_sub(WRAPPER_PREFIX.len());
-                    match tsv_ts::parse_with_interner(&wrapper, base, Rc::clone(&self.interner)) {
-                        Ok(program) => {
-                            if let Some(tsv_ts::Statement::FunctionDeclaration(func)) =
-                                program.body.into_iter().next()
-                            {
-                                parameters = func.params;
-                            }
-                        }
-                        Err(_) => {
-                            // Fall back to raw string if parsing fails
-                            raw_parameters = Some(params_str.trim().to_string());
+                // Parse the parameter list as a function signature (`function f(PARAMS) {}`)
+                // so every parameter position — typed, destructured, with comments anywhere
+                // (interior, boundary, leading, dangling) — goes through the canonical
+                // comment-collecting parser. Collected comments are merged into the root
+                // buffer (the printer locates them by position). Falls back to the raw
+                // source on parse failure (e.g. a form acorn-typescript rejects).
+                const WRAPPER_PREFIX: &str = "function f(";
+                let wrapper = format!("{WRAPPER_PREFIX}{params_str}) {{}}");
+                let base = params_offset.saturating_sub(WRAPPER_PREFIX.len());
+                match tsv_ts::parse_with_interner(&wrapper, base, Rc::clone(&self.interner)) {
+                    Ok(mut program) => {
+                        self.expression_comments.append(&mut program.comments);
+                        if let Some(tsv_ts::Statement::FunctionDeclaration(func)) =
+                            program.body.into_iter().next()
+                        {
+                            parameters = func.params;
                         }
                     }
-                } else {
-                    parameters = self.parse_snippet_parameters(params_str, params_offset)?;
+                    Err(_) => {
+                        // Fall back to raw string if parsing fails
+                        raw_parameters = Some(params_str.trim().to_string());
+                    }
                 }
             }
         }
@@ -968,6 +977,7 @@ impl<'a> SvelteParser<'a> {
             type_parameters,
             parameters,
             raw_parameters,
+            params_paren,
             body,
             span: Span {
                 start: start as u32,
@@ -975,87 +985,6 @@ impl<'a> SvelteParser<'a> {
             },
             opening_tag_span,
         }))
-    }
-
-    /// Parse snippet parameters (comma-separated patterns with optional defaults)
-    // TODO: comments in the param list aren't threaded — a comment leading/trailing a
-    // bare identifier param (`a /* c */`) rejects, and a post-default comment
-    // (`a = 1 /* c */`) is dropped. Unlike `{@const}`/`{#each}`, these patterns don't
-    // ride the comment-collecting `tsv_ts` bridges. Collect into `Root.comments` + emit.
-    fn parse_snippet_parameters(
-        &mut self,
-        params: &str,
-        base_offset: usize,
-    ) -> Result<Vec<tsv_ts::Expression>, ParseError> {
-        let mut parameters = Vec::new();
-        let mut current_pos = 0;
-
-        // Work with original params string to keep positions correct
-        while current_pos < params.len() {
-            let remaining = &params[current_pos..];
-            let ws_len = remaining.len() - remaining.trim_start().len();
-            let offset = base_offset + current_pos + ws_len;
-            let remaining_trimmed = remaining.trim_start();
-
-            if remaining_trimmed.is_empty() {
-                break;
-            }
-
-            // Parse one parameter (pattern potentially with default value)
-            let (param, param_end) = self.parse_context_pattern(remaining_trimmed, offset)?;
-
-            // Check for default value: = expr
-            let after_param = &params[param_end - base_offset..];
-            let after_param_trimmed = after_param.trim_start();
-
-            if after_param_trimmed.starts_with('=') {
-                // Has default value - parse full parameter as a pattern
-                // (e.g., `{a, b} = defaultObj` becomes AssignmentPattern). The
-                // param-separating `,` is the top-level one — a `,` inside the
-                // default's own brackets, a string, or a comment is not.
-                let next_comma = super::find_top_level_delim(
-                    after_param_trimmed.as_bytes(),
-                    0,
-                    after_param_trimmed.len(),
-                    b',',
-                    TriviaProfile::JS,
-                )
-                .unwrap_or(after_param_trimmed.len());
-                let full_param = &params[current_pos
-                    ..param_end - base_offset + after_param.len() - after_param_trimmed.len()
-                        + next_comma];
-                let full_param_expr =
-                    self.parse_ts_pattern(full_param.trim(), base_offset + current_pos + ws_len)?;
-                parameters.push(full_param_expr);
-                current_pos = param_end - base_offset + after_param.len()
-                    - after_param_trimmed.len()
-                    + next_comma;
-            } else {
-                parameters.push(param);
-                current_pos = param_end - base_offset;
-            }
-
-            // Skip the separator comma if present. Trivia-aware: a comment may sit
-            // between the parameter and the comma (`a /* c */, b`), so step over
-            // whitespace and comments before testing for the comma — without jumping
-            // past a non-trivia token to a later comma.
-            let bytes = params.as_bytes();
-            let mut j = current_pos;
-            while j < params.len() {
-                if bytes[j].is_ascii_whitespace() {
-                    j += 1;
-                } else if let Some(past) = skip_trivia(bytes, j, params.len(), TriviaProfile::JS) {
-                    j = past;
-                } else {
-                    break;
-                }
-            }
-            if j < params.len() && bytes[j] == b',' {
-                current_pos = j + 1;
-            }
-        }
-
-        Ok(parameters)
     }
 
     /// Find the matching closing angle bracket for generics like `<T>` (the byte
