@@ -4,10 +4,24 @@
 // builders shared by the block and tag builders, and source position tracking
 // used in inline run grouping and multiline formatting decisions.
 
-use crate::ast::internal::FragmentNode;
+use crate::ast::internal::{EachBlock, FragmentNode};
 use crate::printer::Printer;
 use tsv_lang::TAB_WIDTH;
 use tsv_lang::doc::arena::DocId;
+
+/// Trailing-comment range end for an `{#each}` head expression: the `as`-pattern
+/// start when present, else the head end (`{#each ` … `}` minus the closing `}`).
+///
+/// Narrowing to the pattern start keeps a comment authored inside the pattern
+/// (`{#each items /* c */ as item}`) in place rather than relocating it to trail
+/// the collection expression. Shared by the standard and whitespace-sensitive each
+/// builders so the two can't drift.
+pub(crate) fn each_expr_comment_end(block: &EachBlock) -> u32 {
+    block
+        .context
+        .as_ref()
+        .map_or(block.opening_tag_span.end - 1, |c| c.span().start)
+}
 
 /// Check if a fragment node is a control flow block (if/each/await/key/snippet).
 ///
@@ -613,6 +627,34 @@ impl<'a> Printer<'a> {
                 .collect();
 
         self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs)
+    }
+
+    /// Build a block head's expression doc, deriving both the comment-scan start offset
+    /// and the width-estimation `opening_offset` from the opening literal `open` — so the
+    /// two can't drift from the emitted text (the same invariant the `*_BLOCK_OPEN` const
+    /// comment guards). `comment_end` bounds the leading/trailing-comment scan (the head
+    /// end for `{#if}`/`{:else if}`/`{#key}`, or the pattern-start-narrowed end for
+    /// `{#each}`/`{#await}` via `each_expr_comment_end` / the await shorthand). `wrapping`
+    /// is `in_multiline_context` (always false inside a whitespace-sensitive element).
+    ///
+    /// Wraps [`Printer::build_expression_doc_for_block`] for the standard block heads; the
+    /// parenthesized `{#each (key)}` offset is derived from `key_span`, not `open`, so those
+    /// call `build_expression_doc_for_block` directly.
+    pub(super) fn build_block_head_expr(
+        &self,
+        open: &'static str,
+        opening_tag_span: tsv_lang::Span,
+        expr: &tsv_ts::Expression,
+        comment_end: u32,
+        wrapping: bool,
+    ) -> DocId {
+        self.build_expression_doc_for_block(
+            expr,
+            opening_tag_span.start + open.len() as u32,
+            comment_end,
+            open.len(),
+            wrapping,
+        )
     }
 
     /// Assemble `[leading…, expr, trailing…]` into one doc, returning `expr` unchanged
