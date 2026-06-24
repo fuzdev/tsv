@@ -269,6 +269,16 @@ Defaults to `../zzz/src/lib` (the corpus the native profiling tools use, for
 comparability); pass a directory to override, or `--lang`, `--pairs`, `--warmup`,
 `--control` (a separate identical-code copy for a two-instance floor).
 
+Omit `--baseline` for an **A/A-only run**: no comparison, just the current
+build's per-language wall time and the noise floor (`floor` ≈ 1.00). It's the
+cheapest way to sanity-check the floor and capture a fresh baseline number
+before starting an A/B.
+
+```bash
+deno run --allow-read --allow-env --allow-net --allow-sys \
+  benches/deno/diagnostics/wasm_format_probe.ts
+```
+
 ## Measurement Process
 
 ### Before an optimization

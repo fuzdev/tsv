@@ -75,8 +75,33 @@ impl TriviaProfile {
 /// Callers must ensure `i < end <= bytes.len()`.
 #[inline]
 pub fn skip_trivia(bytes: &[u8], i: usize, end: usize, profile: TriviaProfile) -> Option<usize> {
+    // Hot path: almost every byte is significant, so reject anything that can't
+    // open trivia with a cheap compare and keep this small enough to inline into
+    // the per-byte finder loops. Only the four openers (`"` `'` `` ` `` `/`) can
+    // begin a string/comment; their scans live in the `#[cold]`
+    // `skip_trivia_scan` below, kept out of line so the rare branch can't bloat
+    // the callers — the scan loops made the old single function too big to
+    // inline, leaving its call/return overhead the bulk of its `perf` self-time.
     let b = bytes[i];
+    if b != b'"' && b != b'\'' && b != b'`' && b != b'/' {
+        return None;
+    }
+    skip_trivia_scan(bytes, i, end, profile, b)
+}
 
+/// Cold tail of [`skip_trivia`]: `bytes[i]` (passed as `b`) is one of the four
+/// trivia openers. Scan past the string/comment it begins, or return `None` if
+/// the active `profile` doesn't treat it as trivia (a `/` that isn't `//`/`/*`,
+/// or a quote with `strings` disabled).
+#[cold]
+#[inline(never)]
+fn skip_trivia_scan(
+    bytes: &[u8],
+    i: usize,
+    end: usize,
+    profile: TriviaProfile,
+    b: u8,
+) -> Option<usize> {
     // Strings / templates (braces, commas, etc. inside are not significant).
     if profile.strings && (b == b'"' || b == b'\'' || b == b'`') {
         let quote = b;
