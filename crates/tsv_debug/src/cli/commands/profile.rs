@@ -2,6 +2,7 @@ use argh::FromArgs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use crate::cli::CliError;
 use tsv_cli::cli::input::ParserType;
 
 /// Profile parse + format timing on files or directories.
@@ -22,8 +23,8 @@ pub struct ProfileCommand {
 }
 
 impl ProfileCommand {
-    pub fn run(self) {
-        let (files, skipped) = resolve_profile_files(&self.paths, |_| false);
+    pub(crate) fn run(self) -> Result<(), CliError> {
+        let (files, skipped) = resolve_profile_files(&self.paths, |_| false)?;
 
         let mut results = Vec::new();
 
@@ -38,7 +39,7 @@ impl ProfileCommand {
 
         if results.is_empty() {
             eprintln!("No files profiled successfully.");
-            return;
+            return Ok(());
         }
 
         // Sort by total time descending — slowest files first
@@ -53,6 +54,8 @@ impl ProfileCommand {
         } else {
             print_table(&results, self.iterations, skipped);
         }
+
+        Ok(())
     }
 }
 
@@ -436,30 +439,35 @@ fn display_path(path: &Path) -> String {
     format!(".../{}", last_3.display())
 }
 
-/// Resolve CLI path args to profileable files, exiting with a user-facing
-/// message when nothing matches. `excluded` files are dropped after
-/// resolution; `input_invalid_*` fixtures (expected to fail parsing) are
-/// filtered out and returned as a skip count. Shared preamble of the
-/// `profile` and `json_profile` commands.
+/// Resolve CLI path args to profileable files, returning [`CliError::Failed`]
+/// (after a user-facing message) when nothing matches. `excluded` files are
+/// dropped after resolution; `input_invalid_*` fixtures (expected to fail
+/// parsing) are filtered out and returned as a skip count. Shared preamble of
+/// the `profile` and `json_profile` commands.
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] when no paths are given, path resolution fails,
+/// or no supported files remain after filtering.
 pub(crate) fn resolve_profile_files(
     paths: &[String],
     excluded: impl Fn(&Path) -> bool,
-) -> (Vec<PathBuf>, usize) {
+) -> Result<(Vec<PathBuf>, usize), CliError> {
     if paths.is_empty() {
         eprintln!("Error: No files provided. Use file paths, directories, or glob patterns.");
-        std::process::exit(1);
+        return Err(CliError::Failed);
     }
     let mut files = match resolve_files(paths) {
         Ok(f) => f,
         Err(e) => {
             eprintln!("Error: {e}");
-            std::process::exit(1);
+            return Err(CliError::Failed);
         }
     };
     files.retain(|p| !excluded(p));
     if files.is_empty() {
         eprintln!("Error: No supported files found (.ts, .svelte, .css)");
-        std::process::exit(1);
+        return Err(CliError::Failed);
     }
     let total = files.len();
     files.retain(|p| {
@@ -468,7 +476,7 @@ pub(crate) fn resolve_profile_files(
             .is_some_and(|n| n.starts_with("input_invalid"))
     });
     let skipped = total - files.len();
-    (files, skipped)
+    Ok((files, skipped))
 }
 
 /// Resolve paths to files, expanding directories
@@ -562,4 +570,18 @@ fn glob_files(pattern: &str) -> Vec<PathBuf> {
     }
 
     files
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_profile_files_no_paths_fails() {
+        // The missing-arg path: no positionals → the "No files provided" failure.
+        assert_eq!(
+            resolve_profile_files(&[], |_| false).err(),
+            Some(CliError::Failed)
+        );
+    }
 }

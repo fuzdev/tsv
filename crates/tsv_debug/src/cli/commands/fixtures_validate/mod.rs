@@ -1,6 +1,7 @@
+use crate::cli::CliError;
 use crate::fixtures::validation;
 use argh::FromArgs;
-use futures_util::stream::{self, StreamExt};
+use futures_util::StreamExt;
 
 /// Validate all fixture files (CI).
 #[derive(FromArgs, Debug)]
@@ -24,60 +25,33 @@ pub struct FixturesValidateCommand {
 }
 
 impl FixturesValidateCommand {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         let rt = crate::cli::commands::create_runtime();
-        rt.block_on(self.run_async());
+        rt.block_on(self.run_async())
     }
 
-    async fn run_async(self) {
-        let (fixture_list, total_count) = super::walk_and_filter(&self.filters);
+    async fn run_async(self) -> Result<(), CliError> {
+        let (fixture_list, total_count) = super::walk_and_filter(&self.filters)?;
 
         if self.list {
-            println!("Found fixtures:");
-            for fixture in &fixture_list {
-                println!("  {} ({})", fixture.relative_path, fixture.input_file);
-            }
-            if self.filters.is_empty() {
-                println!("\nTotal: {}", fixture_list.len());
-            } else {
-                println!(
-                    "\nMatched: {} of {} fixtures",
-                    fixture_list.len(),
-                    total_count
-                );
-            }
-            return;
+            super::print_fixture_list(&fixture_list, &self.filters, total_count);
+            return Ok(());
         }
 
-        // Validate fixtures concurrently using tokio streams. Bulk workload:
-        // spread the JS work (prettier/parsers) across a small sidecar pool.
-        let concurrency = crate::deno::init_bulk_pool();
+        // Validate fixtures concurrently on the bulk sidecar pool, in completion
+        // order — each fixture's failure diffs are buffered into its result, so
+        // phases never print directly and concurrent fixtures can't interleave
+        // output (each fixture's diffs stay contiguous).
         let prettier_only = self.prettier_only;
+        let mut results = super::spawn_fixture_stream(
+            fixture_list,
+            super::ResultOrder::Completion,
+            move |fixture| async move { validation::validate_fixture(&fixture, prettier_only).await },
+        );
 
-        // tokio::spawn per fixture: buffer_unordered alone only interleaves at
-        // await points on the single stream-driving task — the CPU-bound Rust
-        // work (parse, format, serde, diff) would serialize on one core.
-        // Spawned tasks run on all runtime workers.
-        let mut results = stream::iter(fixture_list)
-            .map(|fixture| {
-                tokio::spawn(
-                    async move { validation::validate_fixture(&fixture, prettier_only).await },
-                )
-            })
-            .buffer_unordered(concurrency);
-
-        // Aggregate results, printing each fixture's buffered failure diffs as it
-        // completes — phases never print directly, so concurrent fixtures can't
-        // interleave output (each fixture's diffs stay contiguous, in completion order)
         let mut summary = validation::ValidationSummary::new();
         while let Some(joined) = results.next().await {
-            let result = match joined {
-                Ok(r) => r,
-                Err(e) => {
-                    eprintln!("fixture validation task panicked: {e}");
-                    std::process::exit(2);
-                }
-            };
+            let result = super::task_result(joined, "validation")?;
             if !result.diff_output.is_empty() {
                 eprint!("{}", result.diff_output);
             }
@@ -94,9 +68,9 @@ impl FixturesValidateCommand {
 
         // Exit with appropriate code
         if summary.is_valid() {
-            std::process::exit(0);
+            Ok(())
         } else {
-            std::process::exit(1);
+            Err(CliError::Failed)
         }
     }
 }

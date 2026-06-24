@@ -1,8 +1,9 @@
+use crate::cli::CliError;
 use crate::deno::{parse_css, parse_svelte, parse_typescript};
 use crate::fixtures;
 use crate::fixtures::InputType;
 use argh::FromArgs;
-use futures_util::stream::{self, StreamExt};
+use futures_util::StreamExt;
 use tsv_cli::json_utils::to_json_with_tabs;
 
 /// Regenerate expected.json (or expected_ours.json + expected_svelte.json) files.
@@ -19,30 +20,18 @@ pub struct FixturesUpdateParsedCommand {
 }
 
 impl FixturesUpdateParsedCommand {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         let rt = super::create_runtime();
-        rt.block_on(run(self.list, &self.filters));
+        rt.block_on(run(self.list, &self.filters))
     }
 }
 
-async fn run(list_only: bool, filters: &[String]) {
-    let (fixture_list, total_count) = super::walk_and_filter(filters);
+async fn run(list_only: bool, filters: &[String]) -> Result<(), CliError> {
+    let (fixture_list, total_count) = super::walk_and_filter(filters)?;
 
     if list_only {
-        println!("Found fixtures:");
-        for fixture in &fixture_list {
-            println!("  {} ({})", fixture.relative_path, fixture.input_file);
-        }
-        if filters.is_empty() {
-            println!("\nTotal: {}", fixture_list.len());
-        } else {
-            println!(
-                "\nMatched: {} of {} fixtures",
-                fixture_list.len(),
-                total_count
-            );
-        }
-        return;
+        super::print_fixture_list(&fixture_list, filters, total_count);
+        return Ok(());
     }
 
     let mut created = 0;
@@ -52,31 +41,18 @@ async fn run(list_only: bool, filters: &[String]) {
 
     let matched_count = fixture_list.len();
 
-    // Bulk workload: spread the JS work (parsers) across a small sidecar pool —
-    // a single sidecar is one single-threaded process and becomes the wall-clock bound.
-    let concurrency = crate::deno::init_bulk_pool();
-
-    // tokio::spawn per fixture so the CPU-bound Rust work runs on all runtime
-    // workers (buffer_unordered alone only interleaves at await points on the
-    // stream-driving task). `buffered` (not `buffer_unordered`) so progress
-    // lines print in fixture order — deterministic output, work still parallel.
-    let mut results = stream::iter(fixture_list)
-        .map(|fixture| {
-            tokio::spawn(async move {
-                let result = generate_expected_fixture(&fixture).await;
-                (fixture, result)
-            })
-        })
-        .buffered(concurrency);
+    // Fixture order (`ResultOrder::Fixture`) so progress lines print deterministically.
+    let mut results = super::spawn_fixture_stream(
+        fixture_list,
+        super::ResultOrder::Fixture,
+        |fixture| async move {
+            let result = generate_expected_fixture(&fixture).await;
+            (fixture, result)
+        },
+    );
 
     while let Some(joined) = results.next().await {
-        let (fixture, result) = match joined {
-            Ok(pair) => pair,
-            Err(e) => {
-                eprintln!("fixture update task panicked: {e}");
-                std::process::exit(2);
-            }
-        };
+        let (fixture, result) = super::task_result(joined, "update")?;
         match result {
             FixtureResult::Created => {
                 if fixture.has_expected_ours() {
@@ -133,7 +109,9 @@ async fn run(list_only: bool, filters: &[String]) {
     }
 
     if failed > 0 {
-        std::process::exit(1);
+        Err(CliError::Failed)
+    } else {
+        Ok(())
     }
 }
 

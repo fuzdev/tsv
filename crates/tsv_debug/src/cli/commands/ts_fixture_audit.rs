@@ -1,3 +1,4 @@
+use crate::cli::CliError;
 use crate::deno::{PrettierParser, parse_svelte, run_prettier};
 use crate::diff::{ColorChoice, DiffOptions, print_diff_with_options};
 use crate::fixtures::{self, InputType};
@@ -38,9 +39,9 @@ pub struct TsFixtureAuditCommand {
 }
 
 impl TsFixtureAuditCommand {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         let rt = super::create_runtime();
-        rt.block_on(run(self.verbose, &self.filters));
+        rt.block_on(run(self.verbose, &self.filters))
     }
 }
 
@@ -104,18 +105,18 @@ enum Verdict {
 
 // Deliberately serial (no spawn-per-fixture / sidecar pool like the other bulk
 // fixtures commands): only ~19 input.ts fixtures exist, a full run is ~0.4s.
-async fn run(verbose: bool, filters: &[String]) {
+async fn run(verbose: bool, filters: &[String]) -> Result<(), CliError> {
     let fixtures_dir = Path::new("tests/fixtures");
     if !fixtures_dir.exists() {
         eprintln!("Error: fixtures directory not found: tests/fixtures");
-        std::process::exit(1);
+        return Err(CliError::Failed);
     }
 
     let all = match fixtures::walk_fixtures(fixtures_dir) {
         Ok(f) => f,
         Err(e) => {
             eprintln!("Error walking fixtures: {e}");
-            std::process::exit(1);
+            return Err(CliError::Failed);
         }
     };
 
@@ -127,7 +128,7 @@ async fn run(verbose: bool, filters: &[String]) {
 
     if ts_fixtures.is_empty() {
         eprintln!("No input.ts fixtures matched.");
-        std::process::exit(1);
+        return Err(CliError::Failed);
     }
 
     let mut convertible = Vec::new();
@@ -202,6 +203,8 @@ async fn run(verbose: bool, filters: &[String]) {
             );
         }
     }
+
+    Ok(())
 }
 
 /// Classify a fixture by checking EVERY `.ts` file in its directory (input.ts and

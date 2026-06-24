@@ -1,3 +1,4 @@
+use crate::cli::CliError;
 use crate::deno;
 use crate::diff::{Color, ColorChoice, DiffOptions, diff_to_string};
 use crate::error;
@@ -46,7 +47,7 @@ pub struct CompareCommand {
 }
 
 impl CompareCommand {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         let input_args = InputArgs {
             content: self.content,
             stdin: self.stdin,
@@ -57,22 +58,19 @@ impl CompareCommand {
             Ok(pair) => pair,
             Err(e) => {
                 eprintln!("Error: {e}");
-                std::process::exit(1);
+                return Err(CliError::Failed);
             }
         };
 
         let rt = super::create_runtime();
-        let exit_code = rt.block_on(run(
+        rt.block_on(run(
             &input,
             parser_type,
             self.quiet,
             self.verbose,
             self.json,
             self.color,
-        ));
-        if exit_code != 0 {
-            std::process::exit(exit_code);
-        }
+        ))
     }
 }
 
@@ -84,7 +82,7 @@ async fn run(
     verbose: bool,
     json_output: bool,
     color_choice: Option<ColorChoice>,
-) -> i32 {
+) -> Result<(), CliError> {
     let content = input.content();
 
     if verbose {
@@ -111,7 +109,7 @@ async fn run(
             if verbose {
                 println!();
             }
-            return 1;
+            return Err(CliError::Failed);
         }
     };
 
@@ -137,7 +135,7 @@ async fn run(
             if verbose {
                 println!();
             }
-            return 1;
+            return Err(CliError::Failed);
         }
     };
 
@@ -160,7 +158,11 @@ async fn run(
                 "{}",
                 serde_json::to_string_pretty(&result).expect("JSON serialization failed")
             );
-            return if outputs_match { 0 } else { 1 };
+            return if outputs_match {
+                Ok(())
+            } else {
+                Err(CliError::Failed)
+            };
         }
 
         let mut options = DiffOptions::compare();
@@ -177,9 +179,9 @@ async fn run(
                     &prettier,
                     &options,
                 );
-                return 1;
+                return Err(CliError::Failed);
             }
-            return 0;
+            return Ok(());
         }
 
         // Default mode: always show the comparison result (diff only)
@@ -199,10 +201,14 @@ async fn run(
             println!("=== Diff: Input vs Formatted ===");
             print!("{}", diff_to_string(&our, content, &idem_options));
         }
-        return if outputs_match { 0 } else { 1 };
+        return if outputs_match {
+            Ok(())
+        } else {
+            Err(CliError::Failed)
+        };
     }
 
-    1
+    Err(CliError::Failed)
 }
 
 /// Print the match/differ verdict line, plus the diff when outputs differ.

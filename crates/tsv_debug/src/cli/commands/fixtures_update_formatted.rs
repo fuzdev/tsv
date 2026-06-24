@@ -1,6 +1,7 @@
+use crate::cli::CliError;
 use crate::fixtures::{self, AUDIT_SIGNATURE_FILENAME, AuditSignature, FixtureFiles};
 use argh::FromArgs;
-use futures_util::stream::{self, StreamExt};
+use futures_util::StreamExt;
 
 /// Regenerate output_prettier.*, prettier_intermediate_*, and audit_signature.txt.
 #[derive(FromArgs, Debug)]
@@ -12,14 +13,14 @@ pub struct FixturesUpdateFormattedCommand {
 }
 
 impl FixturesUpdateFormattedCommand {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         let rt = super::create_runtime();
-        rt.block_on(run(&self.filters));
+        rt.block_on(run(&self.filters))
     }
 }
 
-async fn run(filters: &[String]) {
-    let (fixture_list, total_count) = super::walk_and_filter(filters);
+async fn run(filters: &[String]) -> Result<(), CliError> {
+    let (fixture_list, total_count) = super::walk_and_filter(filters)?;
 
     let mut created = 0;
     let mut updated = 0;
@@ -41,32 +42,19 @@ async fn run(filters: &[String]) {
 
     let matched_count = fixture_list.len();
 
-    // Bulk workload: spread the JS work (prettier) across a small sidecar pool —
-    // a single sidecar is one single-threaded process and becomes the wall-clock bound.
-    let concurrency = crate::deno::init_bulk_pool();
-
-    // tokio::spawn per fixture so the CPU-bound Rust work runs on all runtime
-    // workers (buffer_unordered alone only interleaves at await points on the
-    // stream-driving task). `buffered` (not `buffer_unordered`) so progress
-    // lines print in fixture order — deterministic output, work still parallel.
-    // Tasks never print; all output happens here in the driver, per fixture.
-    let mut results = stream::iter(fixture_list)
-        .map(|fixture| {
-            tokio::spawn(async move {
-                let outcome = process_fixture(&fixture).await;
-                (fixture, outcome)
-            })
-        })
-        .buffered(concurrency);
+    // Fixture order (`ResultOrder::Fixture`) so progress lines print deterministically;
+    // tasks never print — all output happens here in the driver, per fixture.
+    let mut results = super::spawn_fixture_stream(
+        fixture_list,
+        super::ResultOrder::Fixture,
+        |fixture| async move {
+            let outcome = process_fixture(&fixture).await;
+            (fixture, outcome)
+        },
+    );
 
     while let Some(joined) = results.next().await {
-        let (fixture, outcome) = match joined {
-            Ok(pair) => pair,
-            Err(e) => {
-                eprintln!("fixture update task panicked: {e}");
-                std::process::exit(2);
-            }
-        };
+        let (fixture, outcome) = super::task_result(joined, "update")?;
 
         let FixtureOutcome::Processed {
             formatted,
@@ -240,7 +228,9 @@ async fn run(filters: &[String]) {
     }
 
     if failed > 0 {
-        std::process::exit(1);
+        Err(CliError::Failed)
+    } else {
+        Ok(())
     }
 }
 

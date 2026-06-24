@@ -1,3 +1,4 @@
+use crate::cli::CliError;
 use crate::fixtures;
 use argh::FromArgs;
 use std::collections::{BTreeSet, HashMap};
@@ -56,14 +57,14 @@ const ALLOWED_NONDIVERGENCE_READMES: &[&str] = &[
 ];
 
 impl ConformanceAuditCommand {
-    pub fn run(self) {
-        let all = super::walk_or_exit();
+    pub(crate) fn run(self) -> Result<(), CliError> {
+        let all = super::walk_fixtures_or_fail()?;
 
         // Read each conformance doc once; reuse its content for the orphan scan and
         // the link/heading parse (primed into the cache so anchors resolve for free).
         let mut cache = DocCache::new();
-        let prettier_src = read_doc(CONFORMANCE_PRETTIER);
-        let svelte_src = read_doc(CONFORMANCE_SVELTE);
+        let prettier_src = read_doc(CONFORMANCE_PRETTIER)?;
+        let svelte_src = read_doc(CONFORMANCE_SVELTE)?;
         cache.prime(CONFORMANCE_PRETTIER, &prettier_src);
         cache.prime(CONFORMANCE_SVELTE, &svelte_src);
 
@@ -108,14 +109,19 @@ impl ConformanceAuditCommand {
             report.print_human();
         }
 
-        std::process::exit(if report.is_clean() { 0 } else { 1 });
+        if report.is_clean() {
+            Ok(())
+        } else {
+            Err(CliError::Failed)
+        }
     }
 }
 
-fn read_doc(path: &str) -> String {
-    std::fs::read_to_string(path).unwrap_or_else(|e| {
+/// Read a doc file, returning [`CliError::Failed`] (after a message) on failure.
+fn read_doc(path: &str) -> Result<String, CliError> {
+    std::fs::read_to_string(path).map_err(|e| {
         eprintln!("Error reading {path}: {e}");
-        std::process::exit(1);
+        CliError::Failed
     })
 }
 

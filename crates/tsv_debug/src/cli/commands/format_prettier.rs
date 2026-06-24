@@ -1,3 +1,4 @@
+use crate::cli::CliError;
 use crate::deno::{PrettierParser, run_prettier};
 use crate::diff::{digit_width, expand_tabs};
 use argh::FromArgs;
@@ -30,7 +31,7 @@ pub struct FormatPrettierCommand {
 }
 
 impl FormatPrettierCommand {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         let show_line_widths = !self.no_line_widths;
         let input_args = InputArgs {
             content: self.content,
@@ -42,16 +43,20 @@ impl FormatPrettierCommand {
             Ok(pair) => pair,
             Err(e) => {
                 eprintln!("Error: {e}");
-                std::process::exit(1);
+                return Err(CliError::Failed);
             }
         };
 
         let rt = super::create_runtime();
-        rt.block_on(run(&input, parser_type, show_line_widths));
+        rt.block_on(run(&input, parser_type, show_line_widths))
     }
 }
 
-async fn run(input: &Input, parser_type: ParserType, show_line_widths: bool) {
+async fn run(
+    input: &Input,
+    parser_type: ParserType,
+    show_line_widths: bool,
+) -> Result<(), CliError> {
     let content = input.content();
     let parser = match parser_type {
         ParserType::Svelte => PrettierParser::Parser("svelte"),
@@ -66,10 +71,11 @@ async fn run(input: &Input, parser_type: ParserType, show_line_widths: bool) {
             } else {
                 print!("{formatted}");
             }
+            Ok(())
         }
         Err(err) => {
             eprintln!("Error formatting with prettier: {err}");
-            std::process::exit(1);
+            Err(CliError::Failed)
         }
     }
 }
