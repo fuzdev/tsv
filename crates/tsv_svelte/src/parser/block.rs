@@ -7,7 +7,7 @@ use std::rc::Rc;
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
-use tsv_lang::source_scan::{TriviaProfile, find_char, skip_trivia};
+use tsv_lang::source_scan::{TriviaProfile, skip_trivia};
 use tsv_lang::{ParseError, Span};
 
 use super::expression_tag::scan_to_matching_brace;
@@ -877,37 +877,56 @@ impl<'a> SvelteParser<'a> {
         let content = self
             .strip_block_keyword(tag_content, "snippet", tag_content_start)?
             .trim();
-
-        // Find the name (identifier before < or ()
-        // Need to handle: fn, fn<T>, fn<T, U>. Trivia-aware so a `<`/`(` inside a
-        // string/comment (e.g. a param default) can't be mistaken for the boundary.
         let content_bytes = content.as_bytes();
-        let generic_pos = find_char(content_bytes, 0, content.len(), b'<', TriviaProfile::JS);
-        let paren_pos = find_char(content_bytes, 0, content.len(), b'(', TriviaProfile::JS)
-            .unwrap_or(content.len());
+        // Absolute offset of `content[0]` (the name's first byte) in the source, the
+        // base for every span and error position below.
+        let content_offset = tag_content_start + super::subslice_offset(tag_content, content);
 
-        // Extract type parameters if present (like Svelte's parser). `type_params_raw` is
-        // the raw inner text (feeds the public AST's `typeParams` string and the
-        // parse-failure fallback). `name_end` doubles as the start of the parseable
-        // signature head (`<…>(…)`) — the name ends exactly where the head begins (`<` when
-        // generic, else `(`) — so the wrapper below spans the head from there.
-        let (name_end, type_params_raw) = if let Some(gpos) = generic_pos {
-            if gpos < paren_pos {
-                // Found '<' before '(' - this is a generic type parameter
-                // Find the matching '>'
-                let close_pos = self.find_matching_angle_bracket(content, gpos)?;
-                (gpos, Some(content[gpos + 1..close_pos].to_string()))
-            } else {
-                // '<' is after '(' - not a generic, probably a comparison in default value
-                (paren_pos, None)
-            }
+        // Mirror Svelte's snippet-head grammar (`1-parse/state/tag.js`): read the name,
+        // then an optional `<…>` generic via the naive `<`/`>` matcher, then REQUIRE a
+        // `(`. Svelte's generic matcher tracks only angle depth (never parens), so a `>`
+        // from a `=>` / `>=` / `>>` closes the generic early and the required `(` can't be
+        // found — Svelte rejects, and we reject in lockstep. A function type (or any stray
+        // `>`) in a snippet generic is invalid Svelte, so corrupting it on format would be
+        // worse than a parse error. See `find_matching_angle_bracket`.
+
+        // Name: the leading identifier run, like Svelte's `read_identifier`. `content` is
+        // trimmed, so it starts at the name.
+        let name_len = content
+            .find(|c: char| !c.is_alphanumeric() && c != '_' && c != '$')
+            .unwrap_or(content.len());
+        if name_len == 0 {
+            return Err(self.error_expected_at("snippet name", content_offset));
+        }
+        let name_str = &content[..name_len];
+        let expression = self.parse_ts_expression(name_str, content_offset)?;
+
+        // Optional `<…>` generic. `head_start` is the `<` (or, with no generic, the `(`)
+        // where the parseable signature head begins — the wrapper slice below spans from
+        // there through the matching `)`.
+        let after_name = content[name_len..].trim_start();
+        let head_start = content.len() - after_name.len();
+        let (after_generic, type_params_raw) = if after_name.starts_with('<') {
+            // `type_params_raw` is the raw inner text — feeds the public AST's `typeParams`
+            // string (Svelte stores it raw too) and the parse-failure fallback.
+            let close_pos = self.find_matching_angle_bracket(content, head_start)?;
+            (
+                close_pos + 1,
+                Some(content[head_start + 1..close_pos].to_string()),
+            )
         } else {
-            (paren_pos, None)
+            (head_start, None)
         };
 
-        let name_str = content[..name_end].trim();
-        let name_offset = tag_content_start + super::subslice_offset(tag_content, name_str);
-        let expression = self.parse_ts_expression(name_str, name_offset)?;
+        // Require `(` after only whitespace — Svelte's `allow_whitespace` then
+        // `eat('(', true)`. Crucially this skips whitespace but NOT comments, so
+        // `<T> /* c */ (…)` is rejected exactly as Svelte rejects it.
+        let after_generic_str = &content[after_generic..];
+        let paren_pos =
+            after_generic + (after_generic_str.len() - after_generic_str.trim_start().len());
+        if !content[paren_pos..].starts_with('(') {
+            return Err(self.error_expected_at("'('", content_offset + paren_pos));
+        }
 
         // Opening tag span is from start to content_start (includes the closing })
         let opening_tag_span = Span {
@@ -915,70 +934,68 @@ impl<'a> SvelteParser<'a> {
             end: content_start as u32,
         };
 
-        // Parse type parameters + parameters (between parentheses)
+        // The `)` matching the opening `(` — depth- and trivia-aware, so a `)` inside a
+        // string/comment in a param default can't end the list early. Svelte requires the
+        // close (`eat(')', true)`); an unmatched `(` is rejected.
+        let close_paren = super::match_bracket(
+            content_bytes,
+            paren_pos,
+            content.len(),
+            b'(',
+            b')',
+            TriviaProfile::JS,
+        )
+        .ok_or_else(|| self.error_expected_at("')'", content_offset + content.len()))?;
+
+        // Only whitespace may follow `)` before the closing `}` — Svelte's
+        // `allow_whitespace` then `eat('}', true)`. `{#snippet fn() junk}` is rejected.
+        let trailing = content[close_paren + 1..].trim_start();
+        if !trailing.is_empty() {
+            let trailing_start = content_offset + (content.len() - trailing.len());
+            return Err(self.error_expected_at("'}'", trailing_start));
+        }
+
+        // Absolute source span of the parens (`start` = `(`, `end` = `)`), for comment
+        // lookup when printing the parameter list.
+        let params_paren = Some(Span {
+            start: (content_offset + paren_pos) as u32,
+            end: (content_offset + close_paren) as u32,
+        });
+        let params_str = &content[paren_pos + 1..close_paren];
+
+        // Parse the signature head `<TP>(PARAMS)` as `function f<TP>(PARAMS) {}` so every
+        // position — type parameters (constraints/defaults/modifiers/comments),
+        // typed/destructured params, comments anywhere — goes through the canonical
+        // comment-collecting parser. Wrapping a *contiguous* source slice (from the `<` or
+        // `(` through the matching `)`) keeps the single `base` offset valid across both
+        // `<…>` and `(…)`. Collected comments merge into the root buffer (the printer
+        // locates them by position). Falls back to raw text on parse failure (e.g. a form
+        // acorn-typescript rejects); the generics are already captured in `type_params_raw`.
         let mut type_parameters = None;
         let mut parameters = Vec::new();
         let mut raw_parameters = None;
-        let mut params_paren = None;
-        if paren_pos < content.len() {
-            // The `)` matching the opening `(` — depth- and trivia-aware, so a `)`
-            // inside a string/comment in a param default can't end the list early.
-            let close_paren = super::match_bracket(
-                content_bytes,
-                paren_pos,
-                content.len(),
-                b'(',
-                b')',
-                TriviaProfile::JS,
-            )
-            .unwrap_or(content.len());
-            // Absolute source span of the parens (`start` = `(`, `end` = `)`), for
-            // comment lookup when printing the parameter list.
-            let content_offset = tag_content_start + super::subslice_offset(tag_content, content);
-            params_paren = Some(Span {
-                start: (content_offset + paren_pos) as u32,
-                end: (content_offset + close_paren) as u32,
-            });
-            let params_str = &content[paren_pos + 1..close_paren];
-
-            // Parse the signature head `<TP>(PARAMS)` as `function f<TP>(PARAMS) {}` so
-            // every position — type parameters (constraints/defaults/modifiers/comments),
-            // typed/destructured params, comments anywhere — goes through the canonical
-            // comment-collecting parser. Wrapping a *contiguous* source slice (from the
-            // `<` or `(` through the matching `)`) keeps the single `base` offset valid
-            // across both `<…>` and `(…)`. Collected comments merge into the root buffer
-            // (the printer locates them by position). Falls back to raw text on parse
-            // failure (e.g. a form acorn-typescript rejects); the generics are already
-            // captured in `type_params_raw`.
-            let parsed = if close_paren < content.len()
-                && (type_params_raw.is_some() || !params_str.trim().is_empty())
-            {
-                // The head runs from where the name ends (`<` or `(`) through the `)`.
-                let head_slice = &content[name_end..=close_paren];
-                const WRAPPER_PREFIX: &str = "function f";
-                let wrapper = format!("{WRAPPER_PREFIX}{head_slice} {{}}");
-                let base = (content_offset + name_end).saturating_sub(WRAPPER_PREFIX.len());
-                match tsv_ts::parse_with_interner(&wrapper, base, Rc::clone(&self.interner)) {
-                    Ok(mut program) => {
-                        self.expression_comments.append(&mut program.comments);
-                        if let Some(tsv_ts::Statement::FunctionDeclaration(func)) =
-                            program.body.into_iter().next()
-                        {
-                            type_parameters = func.type_parameters;
-                            parameters = func.params;
-                        }
-                        true
+        if type_params_raw.is_some() || !params_str.trim().is_empty() {
+            // The head runs from where the signature begins (`<` or `(`) through the `)`.
+            let head_slice = &content[head_start..=close_paren];
+            const WRAPPER_PREFIX: &str = "function f";
+            let wrapper = format!("{WRAPPER_PREFIX}{head_slice} {{}}");
+            let base = (content_offset + head_start).saturating_sub(WRAPPER_PREFIX.len());
+            match tsv_ts::parse_with_interner(&wrapper, base, Rc::clone(&self.interner)) {
+                Ok(mut program) => {
+                    self.expression_comments.append(&mut program.comments);
+                    if let Some(tsv_ts::Statement::FunctionDeclaration(func)) =
+                        program.body.into_iter().next()
+                    {
+                        type_parameters = func.type_parameters;
+                        parameters = func.params;
                     }
-                    Err(_) => false,
                 }
-            } else {
-                false
-            };
-
-            // On parse failure (or a malformed head with no closing `)`), keep the raw
-            // parameter text so nothing is dropped.
-            if !parsed && !params_str.trim().is_empty() {
-                raw_parameters = Some(params_str.trim().to_string());
+                // Keep the raw parameter text so nothing is dropped.
+                Err(_) => {
+                    if !params_str.trim().is_empty() {
+                        raw_parameters = Some(params_str.trim().to_string());
+                    }
+                }
             }
         }
 
@@ -1008,13 +1025,12 @@ impl<'a> SvelteParser<'a> {
     /// offset of the `>`). Used for TypeScript generics in snippet declarations.
     /// Comment- and string-aware via the shared cursor.
     ///
-    // TODO: the raw `<`/`>` depth count miscounts a `>` that is part of `=>`
-    // (or the param `(` that `paren_pos` finds first lands *inside* the generics),
-    // so a snippet generic containing a function type — `<T extends () => void>`,
-    // `<T = () => void>` — is mis-sliced and corrupts on format. Svelte itself
-    // rejects those forms, so no valid input is affected; closing the gap means
-    // matching Svelte's rejection (a parser-strictness concern, deferred to the
-    // diagnostics layer per CLAUDE.md §Strict Mode Only), not just a smarter scan.
+    /// Deliberately a naive `<`/`>` depth count, mirroring Svelte's own snippet-generic
+    /// scanner (`match_bracket` with `pointy_bois`): a `>` from a `=>` / `>=` / `>>`
+    /// decrements depth and closes the generic early. `parse_snippet_block` then requires
+    /// a `(` immediately after, so such a head (a function type — `<T extends () => void>`,
+    /// `<T = () => void>` — or any stray `>`) is rejected exactly as Svelte rejects it,
+    /// rather than mis-sliced and corrupted on format.
     fn find_matching_angle_bracket(
         &self,
         content: &str,
