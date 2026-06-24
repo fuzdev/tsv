@@ -19,7 +19,7 @@ use tsv_lang::SymbolResolver;
 /// This appears to be a specific quirk, treating Boolean() like !!() for type coercion.
 pub(super) fn is_boolean_call(call: &internal::CallExpression, printer: &Printer<'_>) -> bool {
     if let internal::Expression::Identifier(id) = call.callee.as_ref() {
-        return printer.resolve_symbol(id.name) == "Boolean";
+        return printer.with_resolved_symbol(id.name, |s| s == "Boolean");
     }
     false
 }
@@ -42,9 +42,9 @@ pub(super) fn is_module_path_no_break(
         && !member.computed
         && !member.optional
         && let internal::Expression::Identifier(resolve_id) = member.property.as_ref()
-        && printer.resolve_symbol(resolve_id.name) == "resolve"
+        && printer.with_resolved_symbol(resolve_id.name, |s| s == "resolve")
         && let internal::Expression::Identifier(require_id) = member.object.as_ref()
-        && printer.resolve_symbol(require_id.name) == "require"
+        && printer.with_resolved_symbol(require_id.name, |s| s == "require")
     {
         return true;
     }
@@ -80,30 +80,29 @@ pub(super) fn get_module_path_chain_break<'a>(
         return None;
     };
 
-    let method_str = printer.resolve_symbol(method_name.name);
+    let (is_paths, is_resolve) =
+        printer.with_resolved_symbol(method_name.name, |m| (m == "paths", m == "resolve"));
 
     // Check for `require.resolve.paths()`
-    if method_str == "paths" {
+    if is_paths {
         // Object should be `require.resolve`
         if let internal::Expression::MemberExpression(obj_member) = member.object.as_ref()
             && !obj_member.computed
             && !obj_member.optional
             && let internal::Expression::Identifier(resolve_id) = obj_member.property.as_ref()
-            && printer.resolve_symbol(resolve_id.name) == "resolve"
+            && printer.with_resolved_symbol(resolve_id.name, |s| s == "resolve")
             && let internal::Expression::Identifier(require_id) = obj_member.object.as_ref()
-            && printer.resolve_symbol(require_id.name) == "require"
+            && printer.with_resolved_symbol(require_id.name, |s| s == "require")
         {
             return Some((&member.object, method_name));
         }
     }
 
     // Check for `import.meta.resolve()`
-    if method_str == "resolve"
-        && let internal::Expression::MetaProperty(meta) = member.object.as_ref()
-    {
-        let meta_name = printer.resolve_symbol(meta.meta.name);
-        let prop_name = printer.resolve_symbol(meta.property.name);
-        if meta_name == "import" && prop_name == "meta" {
+    if is_resolve && let internal::Expression::MetaProperty(meta) = member.object.as_ref() {
+        let is_import_meta = printer.with_resolved_symbol(meta.meta.name, |m| m == "import")
+            && printer.with_resolved_symbol(meta.property.name, |p| p == "meta");
+        if is_import_meta {
             return Some((&member.object, method_name));
         }
     }

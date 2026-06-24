@@ -641,7 +641,9 @@ impl<'a> Printer<'a> {
 
         let base_width = match key {
             // Prettier: cleanDoc reduces identifier keys to their name string
-            Expression::Identifier(id) => visual_width(&self.resolve_symbol(id.name), TAB_WIDTH),
+            Expression::Identifier(id) => {
+                self.with_resolved_symbol(id.name, |s| visual_width(s, TAB_WIDTH))
+            }
             Expression::Literal(lit) => match &lit.value {
                 LiteralValue::String { content, .. } => {
                     // For computed keys, quotes are always preserved: ["x"] prints as ['x']
