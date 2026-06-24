@@ -13,10 +13,10 @@
 #![allow(clippy::literal_string_with_formatting_args)]
 
 use crate::ast::internal::{self, Fragment, FragmentNode};
+use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
-use crate::printer::{DocBuf, Printer};
 use smallvec::SmallVec;
-use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::is_format_ignore_directive;
 
 /// Position of a text node relative to its siblings.

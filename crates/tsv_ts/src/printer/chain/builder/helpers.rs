@@ -7,8 +7,8 @@ use super::super::printing::{
     ChainPrinter, build_chain_line_break, print_group, print_group_expanded,
     print_group_expanded_skip_first_comments, print_group_skip_first_comments,
 };
-use super::super::types::{ChainGroup, DocBuf};
-use tsv_lang::doc::arena::DocId;
+use super::super::types::ChainGroup;
+use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::printing::has_blank_line_between_strict;
 
 /// Emit a chain gap's comments and the line break into `parts`, for the gap

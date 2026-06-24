@@ -10,9 +10,9 @@
 // Uses Doc IR for all formatting - build_*_doc methods are the canonical implementations.
 
 use crate::ast::internal;
-use crate::printer::{DocBuf, Printer};
+use crate::printer::Printer;
 use smallvec::smallvec;
-use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::{SymbolResolver, SymbolToU32};
 
 // Opening prefixes for brace-wrapped attribute expressions. `build_braced_expression_doc`

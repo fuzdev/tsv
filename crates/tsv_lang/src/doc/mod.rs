@@ -32,6 +32,14 @@ mod types;
 // Types
 pub use types::{DocContext, DocText, GroupId, LineKind, Mode, TextResolver};
 
+/// Stack buffer for assembling a node's doc parts before handing them to
+/// `DocArena::concat` / `fill`. Language printers build one such `Vec<DocId>` per
+/// AST node — collectively a top format-phase allocation source — yet most nodes
+/// have only a handful of parts, so the common case stays on the stack and only
+/// larger nodes spill. Shared by the TS chain / binary-operator printers and the
+/// Svelte template printer; `DocId` is `Copy` and 4 bytes → 32-byte inline buffer.
+pub type DocBuf = smallvec::SmallVec<[arena::DocId; 8]>;
+
 // Diagnostic: line-comment swallow check (opt-in, render-time; `swallow_check` feature)
 #[cfg(feature = "swallow_check")]
 pub use swallow::{SwallowReport, set_swallow_check, swallow_check_enabled, take_swallow_reports};
