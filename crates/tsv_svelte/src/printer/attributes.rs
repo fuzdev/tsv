@@ -14,6 +14,7 @@ use crate::printer::Printer;
 use smallvec::smallvec;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::{SymbolResolver, SymbolToU32};
+use tsv_ts::ast::internal::Expression;
 
 // Opening prefixes for brace-wrapped attribute expressions. `build_braced_expression_doc`
 // emits the prefix and derives the expression offset from its `.len()`, so these are the
@@ -304,7 +305,7 @@ impl<'a> Printer<'a> {
     fn build_braced_expression_doc(
         &self,
         prefix: &'static str,
-        expr: &tsv_ts::ast::internal::Expression,
+        expr: &Expression,
         span_start: u32,
         span_end: u32,
     ) -> DocId {
@@ -349,7 +350,7 @@ impl<'a> Printer<'a> {
         prefix: DocId,
         name: &str,
         modifiers: &[String],
-        expression: Option<&tsv_ts::ast::internal::Expression>,
+        expression: Option<&Expression>,
         expression_tag_span: Option<tsv_lang::Span>,
     ) -> DocId {
         let d = self.d();
@@ -490,10 +491,7 @@ impl<'a> Printer<'a> {
     ///
     /// Sets `LayoutMode::Embedded` so binary expressions use ContinuationIndent style.
     /// Assignment expressions get wrapped in parens: `prop={(a = b)}`.
-    fn build_expression_doc_for_attribute(
-        &self,
-        expr: &tsv_ts::ast::internal::Expression,
-    ) -> DocId {
+    fn build_expression_doc_for_attribute(&self, expr: &Expression) -> DocId {
         let d = self.d();
         let embedded = tsv_lang::EmbedContext {
             mode: tsv_lang::LayoutMode::Embedded,
@@ -501,7 +499,7 @@ impl<'a> Printer<'a> {
         };
 
         // Assignment expressions need parens in attribute values: prop={(a = b)}
-        if let tsv_ts::ast::internal::Expression::AssignmentExpression(_) = expr {
+        if let Expression::AssignmentExpression(_) = expr {
             let inner =
                 tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embedded);
             return d.parens(inner);
@@ -521,7 +519,7 @@ impl<'a> Printer<'a> {
     /// - Broken: `={\n\t\ta &&\n\t\t\tb &&\n\t\t\tc\n\t}`
     fn build_expression_doc_parts_with_span(
         &self,
-        expr: &tsv_ts::ast::internal::Expression,
+        expr: &Expression,
         tag_span: Option<tsv_lang::Span>,
     ) -> Vec<DocId> {
         let expr_content = self.build_expression_content_with_comments(expr, tag_span);
@@ -551,14 +549,14 @@ impl<'a> Printer<'a> {
         //   Broken: ={\n\t\texpr\n\t}
         let is_hugged = matches!(
             expr,
-            tsv_ts::ast::internal::Expression::ArrowFunctionExpression(_)
-                | tsv_ts::ast::internal::Expression::FunctionExpression(_)
-                | tsv_ts::ast::internal::Expression::ObjectExpression(_)
-                | tsv_ts::ast::internal::Expression::ConditionalExpression(_)
-                | tsv_ts::ast::internal::Expression::CallExpression(_)
-                | tsv_ts::ast::internal::Expression::NewExpression(_)
-                | tsv_ts::ast::internal::Expression::ArrayExpression(_)
-                | tsv_ts::ast::internal::Expression::BinaryExpression(_)
+            Expression::ArrowFunctionExpression(_)
+                | Expression::FunctionExpression(_)
+                | Expression::ObjectExpression(_)
+                | Expression::ConditionalExpression(_)
+                | Expression::CallExpression(_)
+                | Expression::NewExpression(_)
+                | Expression::ArrayExpression(_)
+                | Expression::BinaryExpression(_)
         );
 
         // A trailing line comment already forces `}` onto its own line (its doc ends
@@ -586,7 +584,7 @@ impl<'a> Printer<'a> {
     /// Returns a Vec<DocId> containing: leading comments + expression doc + trailing comments
     fn build_expression_content_with_comments(
         &self,
-        expr: &tsv_ts::ast::internal::Expression,
+        expr: &Expression,
         tag_span: Option<tsv_lang::Span>,
     ) -> Vec<DocId> {
         // Collect leading comments
@@ -648,12 +646,12 @@ impl<'a> Printer<'a> {
     /// ```
     fn build_expression_doc_parts_with_span_for_bind(
         &self,
-        expr: &tsv_ts::ast::internal::Expression,
+        expr: &Expression,
         tag_span: Option<tsv_lang::Span>,
     ) -> Vec<DocId> {
         let d = self.d();
         // For SequenceExpression, use the bare (no parens) version for getter/setter syntax
-        if let tsv_ts::ast::internal::Expression::SequenceExpression(seq) = expr {
+        if let Expression::SequenceExpression(seq) = expr {
             // The per-operand path below is comment-blind, so a leading or interior
             // comment prettier preserves (`{// c\n get, set}`, `{get, /* c */ set}`)
             // was silently dropped — real content loss. Route those through the
@@ -698,7 +696,7 @@ impl<'a> Printer<'a> {
 
         // For bind: directives, BinaryExpression should use block structure (not hugging).
         // This matches Prettier's behavior where bind: uses `={\n\texpr\n}` format.
-        if let tsv_ts::ast::internal::Expression::BinaryExpression(_) = expr {
+        if let Expression::BinaryExpression(_) = expr {
             return self.build_expression_doc_parts_with_span_block_structure(expr, tag_span);
         }
 
@@ -815,7 +813,7 @@ impl<'a> Printer<'a> {
     /// Used for bind: directive expressions where Prettier always uses this format.
     fn build_expression_doc_parts_with_span_block_structure(
         &self,
-        expr: &tsv_ts::ast::internal::Expression,
+        expr: &Expression,
         tag_span: Option<tsv_lang::Span>,
     ) -> Vec<DocId> {
         let expr_content = self.build_expression_content_with_comments(expr, tag_span);
@@ -874,7 +872,7 @@ impl<'a> Printer<'a> {
         };
 
         // Must contain an Identifier expression
-        let tsv_ts::ast::internal::Expression::Identifier(ident) = &expr_tag.expression else {
+        let Expression::Identifier(ident) = &expr_tag.expression else {
             return false;
         };
 
@@ -883,12 +881,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if expression is an identifier with the given name
-    fn is_identifier_with_name(
-        &self,
-        expr: &tsv_ts::ast::internal::Expression,
-        name: &str,
-    ) -> bool {
-        use tsv_ts::ast::internal::Expression;
+    fn is_identifier_with_name(&self, expr: &Expression, name: &str) -> bool {
         if let Expression::Identifier(id) = expr {
             self.with_resolved_symbol(id.name, |s| s == name)
         } else {

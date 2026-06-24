@@ -11,6 +11,7 @@ use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
 use tsv_lang::SymbolResolver;
 use tsv_lang::doc::arena::DocId;
+use tsv_ts::ast::internal::Expression;
 
 use super::element_doc::{BoundaryMode, ElementContext, ElementKind, ElementLayout};
 
@@ -46,8 +47,7 @@ impl<'a> Printer<'a> {
     /// When true, the expression can break internally before the containing element
     /// needs to break its tags. This enables the "hug mode" divergence where we keep
     /// `<tag>` together and let expressions break, reducing indentation drift.
-    pub(super) fn expression_has_break_points(expr: &tsv_ts::ast::internal::Expression) -> bool {
-        use tsv_ts::ast::internal::Expression;
+    pub(super) fn expression_has_break_points(expr: &Expression) -> bool {
         match expr {
             // Ternary always has break points
             Expression::ConditionalExpression(_) => true,

@@ -471,10 +471,7 @@ impl<'a> SvelteParser<'a> {
             // Span includes the parentheses: from '(' to after ')'
             let span_start = (rest_offset + key_ws) as u32;
             let span_end = (rest_offset + key_ws + rest_trimmed.len()) as u32;
-            (
-                Some(key_expr),
-                Some(tsv_lang::Span::new(span_start, span_end)),
-            )
+            (Some(key_expr), Some(Span::new(span_start, span_end)))
         } else {
             (None, None)
         };
