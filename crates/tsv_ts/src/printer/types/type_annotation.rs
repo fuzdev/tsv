@@ -14,6 +14,8 @@ use super::helpers::{
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType};
 use crate::printer::layout::hang_after_operator;
+use smallvec::smallvec;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -81,7 +83,7 @@ impl<'a> Printer<'a> {
                 }
                 _ => {
                     // Block comments stay inline: `: /* comment */ Type`
-                    let mut parts = vec![d.text(": ")];
+                    let mut parts: DocBuf = smallvec![d.text(": ")];
                     parts.push(self.build_comments_between(
                         colon_end,
                         type_start,
@@ -293,7 +295,7 @@ impl<'a> Printer<'a> {
         let first_type_start = first_type.span().start;
         let comments_doc =
             self.build_comments_between(colon_end, first_type_start, CommentSpacing::Trailing);
-        let mut first_parts = vec![d.text(": "), comments_doc, first_type_doc];
+        let mut first_parts: DocBuf = smallvec![d.text(": "), comments_doc, first_type_doc];
 
         // Add trailing block comments after first type (before the `&`)
         let first_type_end = first_type.span().end;
@@ -311,7 +313,7 @@ impl<'a> Printer<'a> {
         first_parts.push(d.text(" &"));
 
         // Build continuation types (indented when breaking)
-        let mut continuation_parts = Vec::new();
+        let mut continuation_parts: DocBuf = DocBuf::new();
         for (i, t) in intersection.types.iter().enumerate().skip(1) {
             let type_start = t.span().start;
             let type_end = t.span().end;

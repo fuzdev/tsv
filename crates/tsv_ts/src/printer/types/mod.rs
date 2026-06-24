@@ -40,8 +40,10 @@ use crate::printer::layout::hang_after_operator;
 use helpers::type_needs_parens_for_indexed_access_object;
 use helpers::type_needs_parens_for_optional_element;
 use helpers::type_needs_parens_for_prefix_operator;
+use smallvec::smallvec;
 use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
@@ -246,7 +248,8 @@ impl<'a> Printer<'a> {
                 // A line comment after `typeof` stays trailing it, with the
                 // expression on the next line (matches prettier).
                 if self.has_line_comments_between(typeof_end, expr_start) {
-                    let mut value_parts = vec![self.build_type_query_expr_name_doc(&q.expr_name)];
+                    let mut value_parts: DocBuf =
+                        smallvec![self.build_type_query_expr_name_doc(&q.expr_name)];
                     if let Some(type_args) = &q.type_arguments {
                         let gap_start = q.expr_name.span().end;
                         if let Some(doc) = self.build_name_to_type_params_comments_opt(
@@ -458,7 +461,7 @@ impl<'a> Printer<'a> {
             .find_char_outside_comments(after_args, i.span.end, b')')
             .unwrap_or(after_args);
 
-        let mut parts = vec![self.build_import_type_call_doc(i, paren_close)];
+        let mut parts: DocBuf = smallvec![self.build_import_type_call_doc(i, paren_close)];
         if let Some(qualifier) = &i.qualifier {
             // Comments between `)` and qualifier (e.g. `import('a') /* c */ .Foo`)
             let dot_area_start = paren_close + 1;
@@ -602,7 +605,7 @@ impl<'a> Printer<'a> {
             return self.build_type_doc(&p.type_annotation);
         }
 
-        let mut parts = Vec::new();
+        let mut parts: DocBuf = DocBuf::new();
         let mut needs_break = false;
 
         // Leading comments: between `(` and inner type

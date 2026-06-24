@@ -14,8 +14,8 @@ use crate::printer::{
 };
 use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
-use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::{INDENT, PRINT_WIDTH};
 
 /// Wrap a doc in parentheses if the expression needs them for variable init context
@@ -114,7 +114,7 @@ impl<'a> Printer<'a> {
         emit_semicolon: bool,
     ) -> DocId {
         let d = self.d();
-        let mut prefix = Vec::new();
+        let mut prefix: DocBuf = DocBuf::new();
 
         // Declare modifier
         if decl.declare {
