@@ -524,6 +524,7 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Between keyword and `(` → Inside parens — [keyword_paren_comment](../tests/fixtures/typescript/syntax/comments/keyword_paren_comment_prettier_divergence/)
 - `for await` keyword gaps → Inside parens — [for_await_keyword_comment](../tests/fixtures/typescript/statements/for/for_await_keyword_comment_prettier_divergence/)
 - Between `)` and `{` (switch) → Inside condition parens — [condition_absorbed_comment](../tests/fixtures/typescript/syntax/comments/condition_absorbed_comment_prettier_divergence/)
+- Between `)` and `{` (switch), comment contains a `{` (scan robustness) → Inside condition parens — [condition_absorbed_brace_in_comment](../tests/fixtures/typescript/syntax/comments/condition_absorbed_brace_in_comment_prettier_divergence/)
 - Before `;` in declarations → After `;` — [around_semicolons](../tests/fixtures/typescript/syntax/comments/around_semicolons_prettier_divergence/)
 - Abstract method return type to `;` → After `;` (abstract methods only; declare method/property and abstract property keep it before) — [method_trailing_semicolon_comment](../tests/fixtures/typescript/declarations/class/method_trailing_semicolon_comment_svelte_prettier_divergence/)
 - Between modifier keywords → Before declaration name — [declaration_keyword_name](../tests/fixtures/typescript/syntax/comments/declaration_keyword_name_prettier_divergence/)
