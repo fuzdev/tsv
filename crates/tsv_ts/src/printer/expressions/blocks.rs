@@ -14,6 +14,7 @@ use smallvec::SmallVec;
 
 use crate::ast::internal;
 use crate::printer::Printer;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -61,17 +62,17 @@ impl<'a> Printer<'a> {
         block: &internal::BlockStatement,
         expand_empty: bool,
     ) -> DocId {
-        self.build_block_body_doc(block, expand_empty, Vec::new())
+        self.build_block_body_doc(block, expand_empty, DocBuf::new())
     }
 
     /// Build inner comments doc for empty block
-    fn build_inner_comments_for_empty_block(&self, block: &internal::BlockStatement) -> Vec<DocId> {
+    fn build_inner_comments_for_empty_block(&self, block: &internal::BlockStatement) -> DocBuf {
         let d = self.d();
         let block_start = block.span.start + 1; // After '{'
         let block_end = block.span.end - 1; // Before '}'
         let comments: Vec<_> =
             tsv_lang::comments_in_range(self.comments, block_start, block_end).collect();
-        let mut comment_parts = Vec::new();
+        let mut comment_parts = DocBuf::new();
         for (i, comment) in comments.iter().enumerate() {
             comment_parts.push(self.build_comment_doc(comment));
             // Add hardline after line comments, except for the last one
@@ -91,7 +92,7 @@ impl<'a> Printer<'a> {
         &self,
         block: &internal::BlockStatement,
         expand_empty: bool,
-        leading_content: Vec<DocId>,
+        leading_content: DocBuf,
     ) -> DocId {
         let d = self.d();
         let has_leading = !leading_content.is_empty();
@@ -134,7 +135,7 @@ impl<'a> Printer<'a> {
         // See conformance_prettier.md §Comment relocation (Block body `{`).
         let first_stmt_start = block.body[0].span().start;
         let (brace_line_prefix, delimiter_pull_pos) = if has_leading {
-            (Vec::new(), None)
+            (DocBuf::new(), None)
         } else {
             self.delimiter_line_comment_prefix(block.span.start, first_stmt_start)
         };
@@ -203,9 +204,9 @@ impl<'a> Printer<'a> {
         body: &[internal::Statement],
         body_start: u32,
         body_end: u32,
-        leading_content: Vec<DocId>,
+        leading_content: DocBuf,
         delimiter_pull_pos: Option<u32>,
-    ) -> (Vec<DocId>, u32, Option<u32>) {
+    ) -> (DocBuf, u32, Option<u32>) {
         let d = self.d();
         let has_leading = !leading_content.is_empty();
         let mut body_parts = leading_content;
@@ -298,7 +299,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_block_statement_with_outer_comments_doc(
         &self,
         block: &internal::BlockStatement,
-        outer_comments: Vec<DocId>,
+        outer_comments: DocBuf,
     ) -> DocId {
         if outer_comments.is_empty() {
             return self.build_block_statement_doc(block);
@@ -306,7 +307,7 @@ impl<'a> Printer<'a> {
 
         let d = self.d();
         // Build outer comments as leading content
-        let mut leading_content = Vec::new();
+        let mut leading_content = DocBuf::new();
         for (i, comment_doc) in outer_comments.into_iter().enumerate() {
             if i > 0 {
                 leading_content.push(d.hardline());

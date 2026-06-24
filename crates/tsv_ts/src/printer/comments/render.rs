@@ -6,6 +6,7 @@
 
 use super::Printer;
 use crate::ast::internal;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing;
 
@@ -41,9 +42,9 @@ impl<'a> Printer<'a> {
     /// Frame a multi-line block comment's continuation docs (`inner`) with the
     /// `/*<first_line>` opener and the `*/` closer. `first_line` is the content
     /// of the line right after `/*` (trailing whitespace trimmed).
-    fn frame_block_comment_doc(&self, first_line: &str, inner: Vec<DocId>) -> DocId {
+    fn frame_block_comment_doc(&self, first_line: &str, inner: DocBuf) -> DocId {
         let d = self.d();
-        let mut docs = Vec::with_capacity(inner.len() + 2);
+        let mut docs = DocBuf::with_capacity(inner.len() + 2);
         docs.push(d.text_owned(format!("/*{}", first_line.trim_end())));
         docs.extend(inner);
         docs.push(d.text("*/"));
@@ -64,7 +65,7 @@ impl<'a> Printer<'a> {
             unreachable!("multi-line comment");
         };
 
-        let mut inner = Vec::with_capacity((middle.len() + 1) * 2);
+        let mut inner = DocBuf::with_capacity((middle.len() + 1) * 2);
         for line in middle {
             inner.push(d.hardline());
             inner.push(d.text_owned(format!(" {}", line.trim())));
@@ -100,7 +101,7 @@ impl<'a> Printer<'a> {
             unreachable!("multi-line comment");
         };
 
-        let mut inner = Vec::with_capacity((middle.len() + 1) * 2);
+        let mut inner = DocBuf::with_capacity((middle.len() + 1) * 2);
         for line in middle {
             // Blank lines stay truly empty (column 0); otherwise apply context
             // indent. Trailing whitespace is trimmed (matches prettier).

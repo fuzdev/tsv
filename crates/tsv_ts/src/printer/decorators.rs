@@ -5,6 +5,7 @@
 // between decorators and the decorated member.
 
 use crate::ast::internal;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::{CommentPosition, classify_comment, comments_in_range, doc::arena::DocId};
 
 use super::Printer;
@@ -45,7 +46,7 @@ impl<'a> Printer<'a> {
             return None;
         }
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         for (i, decorator) in decorators.iter().enumerate() {
             parts.push(d.text("@"));
             parts.push(self.build_decorator_expression_doc(decorator));
@@ -112,8 +113,8 @@ impl<'a> Printer<'a> {
         // Build items for join(line, items).
         // Each item is a decorator doc (possibly with trailing/leading inline comments).
         // Own-line comments become separate items.
-        let mut items: Vec<DocId> = Vec::new();
-        let mut pending_leading: Vec<DocId> = Vec::new();
+        let mut items: DocBuf = DocBuf::new();
+        let mut pending_leading: DocBuf = DocBuf::new();
 
         for (i, decorator) in decorators.iter().enumerate() {
             let boundary = decorators
@@ -121,7 +122,7 @@ impl<'a> Printer<'a> {
                 .map_or(next_token_start, |next| next.span.start);
 
             // Build decorator doc with any pending leading inline comments
-            let mut dec_parts: Vec<DocId> = Vec::new();
+            let mut dec_parts: DocBuf = DocBuf::new();
             for leading in std::mem::take(&mut pending_leading) {
                 dec_parts.push(leading);
                 dec_parts.push(d.text(" "));
@@ -136,7 +137,7 @@ impl<'a> Printer<'a> {
             // Comments between the last decorator and the member: use classify_comment
             // to determine position (trailing stays inline, own-line gets own line).
             let is_last = i == decorators.len() - 1;
-            let mut own_line_comments: Vec<DocId> = Vec::new();
+            let mut own_line_comments: DocBuf = DocBuf::new();
             for comment in comments_in_range(self.comments, decorator.span.end, boundary) {
                 if !comment.is_block {
                     has_line_comment = true;
@@ -180,7 +181,7 @@ impl<'a> Printer<'a> {
 
         // Handle remaining leading inline comments (leading on the member)
         if !pending_leading.is_empty() {
-            let mut parts: Vec<DocId> = Vec::new();
+            let mut parts: DocBuf = DocBuf::new();
             for (j, leading) in pending_leading.into_iter().enumerate() {
                 if j > 0 {
                     parts.push(d.text(" "));

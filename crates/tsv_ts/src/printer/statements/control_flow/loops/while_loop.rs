@@ -5,6 +5,8 @@
 
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
+use smallvec::smallvec;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -34,7 +36,7 @@ impl<'a> Printer<'a> {
             // Block body: while (cond) { ... }
             // Uses append_close_paren_with_comments for consistency with if/for-in/for-of:
             // block comments stay inline, line comments become trailing.
-            let mut parts = vec![d.text("while")];
+            let mut parts = smallvec![d.text("while")];
             if let Some(kc) = &keyword_comments {
                 parts.push(*kc);
             }
@@ -49,7 +51,7 @@ impl<'a> Printer<'a> {
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             let empty_start = stmt.body.span().start;
 
-            let mut empty_parts = vec![d.text("while")];
+            let mut empty_parts = smallvec![d.text("while")];
             if let Some(kc) = &keyword_comments {
                 empty_parts.push(*kc);
             }
@@ -70,7 +72,7 @@ impl<'a> Printer<'a> {
             let body_start = stmt.body.span().start;
             let body_doc = self.build_statement_doc(&stmt.body);
 
-            let mut head_parts = vec![d.text("while")];
+            let mut head_parts: DocBuf = smallvec![d.text("while")];
             if let Some(kc) = &keyword_comments {
                 head_parts.push(*kc);
             }
@@ -103,7 +105,7 @@ impl<'a> Printer<'a> {
             let comment_doc =
                 self.build_inline_comments_between_doc_no_leading_space(do_end, body_start);
             let body_doc = self.build_statement_doc(&stmt.body);
-            let mut p = vec![d.text("do")];
+            let mut p = smallvec![d.text("do")];
             if has_line && !is_block {
                 // Line comment with non-block body: indent comment + body
                 // do\n\t// c\n\texpr;
@@ -124,9 +126,9 @@ impl<'a> Printer<'a> {
         } else if matches!(stmt.body.as_ref(), Statement::EmptyStatement(_)) {
             // Prettier's `adjustClause` returns `";"` directly for an empty body
             // → `do;`, not `do ;`.
-            vec![d.text("do"), self.build_statement_doc(&stmt.body)]
+            smallvec![d.text("do"), self.build_statement_doc(&stmt.body)]
         } else {
-            vec![d.text("do "), self.build_statement_doc(&stmt.body)]
+            smallvec![d.text("do "), self.build_statement_doc(&stmt.body)]
         };
 
         // Find the while keyword position for comment handling

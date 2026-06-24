@@ -12,7 +12,9 @@ use crate::printer::CommentSpacing;
 use crate::printer::{
     ParenContext, PatternContext, Printer, needs_parens, object_pattern_should_expand,
 };
+use smallvec::smallvec;
 use tsv_lang::comments_in_range;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 /// Context for assignment expression printing (chain detection)
@@ -51,7 +53,7 @@ fn build_chain_doc(
     is_tail: bool,
     is_arrow_chain: bool,
 ) -> DocId {
-    let mut parts = vec![d.group(left_doc), d.text(operator)];
+    let mut parts: DocBuf = smallvec![d.group(left_doc), d.text(operator)];
 
     if is_tail {
         if is_arrow_chain {
@@ -232,7 +234,7 @@ impl<'a> Printer<'a> {
             } else {
                 // Use group with line breaks for width-based expansion
                 // Include type annotation in the group so its width is considered
-                let mut parts = Vec::new();
+                let mut parts = DocBuf::new();
 
                 // Track previous end for comment detection (start after `{`)
                 let mut prev_end = obj.span.start + 1;
@@ -278,7 +280,7 @@ impl<'a> Printer<'a> {
 
                 // Build group contents: { + properties + } with bracketSpacing
                 // boundaries (space when flat `{ a }`, newline when broken).
-                let mut group_parts = vec![
+                let mut group_parts: DocBuf = smallvec![
                     d.text("{"),
                     d.indent_line(d.concat(&parts)),
                     d.line(),
@@ -313,7 +315,7 @@ impl<'a> Printer<'a> {
 
             // Only collect comments that are NOT on the same line as the property
             // Same-line comments are handled in the property loop
-            let mut parts = Vec::new();
+            let mut parts = DocBuf::new();
             for comment in comments_in_range(self.comments, prop_end, boundary) {
                 if !self.is_same_line(prop_end, comment.span.start) {
                     parts.push(d.text(" "));
@@ -338,7 +340,7 @@ impl<'a> Printer<'a> {
     /// line.
     fn build_pattern_trailing_dangling_comments(&self, prev_end: u32, boundary: u32) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         let mut last_pos = prev_end;
         for comment in comments_in_range(self.comments, prev_end, boundary) {
             if self.is_same_line(prev_end, comment.span.start) {
@@ -465,7 +467,7 @@ impl<'a> Printer<'a> {
         // Track previous end for comment detection (start after `{`)
         let mut prev_end = obj.span.start + 1;
 
-        let mut prop_parts = Vec::new();
+        let mut prop_parts = DocBuf::new();
         for (i, prop) in obj.properties.iter().enumerate() {
             // Handle leading comments before this property (with blank line preservation)
             let prop_start = prop.span().start;
@@ -537,7 +539,7 @@ impl<'a> Printer<'a> {
         prop_parts.push(self.build_pattern_trailing_dangling_comments(prev_end, boundary));
 
         // Structure: { + brace-line prefix + indent(hardline + props) + hardline + } + type_annotation
-        let mut result_parts = vec![
+        let mut result_parts: DocBuf = smallvec![
             d.text("{"),
             d.concat(&brace_line_prefix),
             d.indent(d.concat(&[d.hardline(), d.concat(&prop_parts)])),
@@ -574,7 +576,7 @@ impl<'a> Printer<'a> {
                         let key_end = p.key.span().end;
                         let rhs_start = rhs.span().start;
                         let eq_pos = self.find_equals_position(key_end, rhs_start);
-                        let mut parts = vec![self.build_expression_doc(&p.key)];
+                        let mut parts: DocBuf = smallvec![self.build_expression_doc(&p.key)];
                         // Comments before `=` stay before `=`
                         if self.has_comments_between(key_end, eq_pos) {
                             parts.push(self.build_inline_comments_between_doc(key_end, eq_pos));
@@ -621,7 +623,7 @@ impl<'a> Printer<'a> {
                         as u32;
                     let pre_colon_comments =
                         self.build_inline_comments_between_doc(key_region_end, colon_pos);
-                    let mut parts = vec![key_doc, pre_colon_comments];
+                    let mut parts: DocBuf = smallvec![key_doc, pre_colon_comments];
                     parts.push(d.text(": "));
                     // Comments after `:`
                     let after_colon_comments = self
@@ -709,7 +711,7 @@ impl<'a> Printer<'a> {
     /// Build grouped array pattern doc (width-based expansion)
     fn build_grouped_array_pattern_doc(&self, arr: &internal::ArrayPattern) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         let mut prev_end = arr.span.start + 1;
 
         for (i, elem) in arr.elements.iter().enumerate() {
@@ -756,7 +758,7 @@ impl<'a> Printer<'a> {
         // Build group for the array pattern brackets only
         // Type annotation is OUTSIDE the group so it breaks independently.
         // This ensures `[a, b]: [long_tuple]` breaks the tuple type, not the pattern.
-        let group_parts = vec![
+        let group_parts: DocBuf = smallvec![
             d.text("["),
             d.indent_softline(d.concat(&parts)),
             d.softline(),
@@ -776,7 +778,7 @@ impl<'a> Printer<'a> {
     /// Build expanded array pattern doc (always multiline)
     fn build_expanded_array_pattern_doc(&self, arr: &internal::ArrayPattern) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         let mut prev_end = arr.span.start + 1;
 
         // A comment trailing the opening `[` on its own line is kept on the `[`
@@ -790,7 +792,7 @@ impl<'a> Printer<'a> {
                 Some(first) => {
                     self.delimiter_line_comment_prefix(arr.span.start, first.span().start)
                 }
-                None => (Vec::new(), None),
+                None => (DocBuf::new(), None),
             };
 
         for (i, elem) in arr.elements.iter().enumerate() {
@@ -865,7 +867,7 @@ impl<'a> Printer<'a> {
         parts.push(self.build_pattern_trailing_dangling_comments(prev_end, boundary));
 
         // Structure: [ + bracket-line prefix + indent(hardline + elements) + hardline + ] + type_annotation
-        let mut result_parts = vec![
+        let mut result_parts: DocBuf = smallvec![
             d.text("["),
             d.concat(&bracket_line_prefix),
             d.indent(d.concat(&[d.hardline(), d.concat(&parts)])),
@@ -893,7 +895,7 @@ impl<'a> Printer<'a> {
         let eq_pos = self.find_equals_position(left_end, rhs_start);
 
         // Comments before `=` stay before `=` (e.g., `{a /* c */ = 1}`)
-        let mut parts = vec![left_doc];
+        let mut parts: DocBuf = smallvec![left_doc];
         if self.has_comments_between(left_end, eq_pos) {
             parts.push(self.build_inline_comments_between_doc(left_end, eq_pos));
         }
@@ -926,7 +928,7 @@ impl<'a> Printer<'a> {
         let arg_start = rest.argument.span().start;
         let comments_doc =
             self.build_comments_between(dots_end, arg_start, CommentSpacing::Trailing);
-        let mut parts = vec![
+        let mut parts: DocBuf = smallvec![
             d.text("..."),
             comments_doc,
             self.build_expression_doc(&rest.argument),

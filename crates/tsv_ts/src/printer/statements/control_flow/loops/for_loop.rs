@@ -5,6 +5,7 @@
 
 use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::Printer;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char, skip_comment};
 
@@ -31,7 +32,7 @@ impl<'a> Printer<'a> {
     /// on the same line (which would absorb them into the line comment text).
     fn append_close_paren_with_non_block_body(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         paren_end: u32,
         body: &Statement,
     ) {
@@ -87,7 +88,7 @@ impl<'a> Printer<'a> {
             // Block comments only: adjustClause — `) /* a */ body` stays flat but the
             // comment(s) + body drop to their own indented line when the enclosing
             // for-in/for-of group breaks (overflow). Matches Prettier.
-            let mut inner = Vec::new();
+            let mut inner = DocBuf::new();
             for comment in inline_prev
                 .iter()
                 .chain(own_line.iter())
@@ -183,7 +184,7 @@ impl<'a> Printer<'a> {
         let (first_semi, second_semi) = self.find_for_semicolons(open_paren);
 
         let mut parts = vec![d.text("for (")];
-        let mut inner_parts = Vec::new();
+        let mut inner_parts = DocBuf::new();
 
         // First semicolon line: ; // inline comment
         inner_parts.push(d.hardline());
@@ -303,7 +304,7 @@ impl<'a> Printer<'a> {
         let update_start = spans.update_start;
         let close_paren = spans.close_paren;
 
-        let mut inner_parts = Vec::new();
+        let mut inner_parts = DocBuf::new();
 
         // Leading comments before init (after open paren)
         // Handles both own-line comments (with hardlines) and inline block comments
@@ -449,9 +450,9 @@ impl<'a> Printer<'a> {
         search_start: u32,
         clause_start: u32,
         prev_expr_end: Option<u32>,
-    ) -> Vec<DocId> {
+    ) -> DocBuf {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         for comment in tsv_lang::comments_in_range(self.comments, search_start, clause_start) {
             // Only include comments that are:
             // 1. NOT on the same line as the next clause
@@ -471,7 +472,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build leading comments for a for clause (comments on their own line before the clause)
-    fn build_for_clause_leading_comments(&self, start: u32, clause_start: u32) -> Vec<DocId> {
+    fn build_for_clause_leading_comments(&self, start: u32, clause_start: u32) -> DocBuf {
         self.build_for_clause_leading_comments_with_prev(start, clause_start, None)
     }
 
@@ -516,7 +517,7 @@ impl<'a> Printer<'a> {
     /// after it (`a; // c`) — so the caller picks the kind and the insertion point.
     fn push_for_clause_trailing_comments(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         start: Option<u32>,
         end: Option<u32>,
         want_block: bool,
@@ -589,7 +590,7 @@ impl<'a> Printer<'a> {
     /// line with the clause end.
     fn push_for_clause_same_line_comments(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         range_start: u32,
         boundary: u32,
         end: u32,
@@ -608,7 +609,7 @@ impl<'a> Printer<'a> {
     /// comment on the same line just before the clause.
     fn push_for_clause_leading_section(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         search_start: u32,
         clause_start: u32,
         prev_end: Option<u32>,
@@ -785,7 +786,7 @@ impl<'a> Printer<'a> {
         // Build the `for ... (` opening once — shared by both the inline and the
         // breaking (line-comment) layouts, so each preserves any `for`-to-`(`
         // comment and emits `await` from the AST.
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         self.push_for_open_paren(
             &mut parts,
             keyword_comments,
@@ -868,7 +869,7 @@ impl<'a> Printer<'a> {
         close_paren: Option<u32>,
         // The `for ... (` opening, prebuilt by the caller (comments preserved,
         // `await` from the AST) — shared with the inline layout.
-        mut parts: Vec<DocId>,
+        mut parts: DocBuf,
     ) -> DocId {
         let d = self.d();
         let left_start = self.get_for_in_of_left_start(left);
@@ -878,7 +879,7 @@ impl<'a> Printer<'a> {
         let keyword_end = keyword_pos + keyword.len() as u32;
 
         // Inner content with hardline breaks
-        let mut inner = Vec::new();
+        let mut inner = DocBuf::new();
 
         // Comments before left (after open paren)
         if let Some(open) = open_paren {
@@ -946,7 +947,7 @@ impl<'a> Printer<'a> {
     /// stays a comment, never promoted to a `for await` keyword.
     fn push_for_open_paren(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         keyword_comments: Option<DocId>,
         for_await_comments: Option<DocId>,
         await_paren_comments: Option<DocId>,
@@ -978,7 +979,7 @@ impl<'a> Printer<'a> {
     /// Prettier's `adjustClause` indentation.
     fn push_for_close_paren_and_body(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         body: &Statement,
         right_end: u32,
         close_paren: Option<u32>,
@@ -1013,12 +1014,7 @@ impl<'a> Printer<'a> {
     /// Own-line comments normalize to inline. Line comments are skipped (handled by
     /// the breaking layout path).
     /// Returns true if any comments were added.
-    fn append_for_in_of_block_comments(
-        &self,
-        parts: &mut Vec<DocId>,
-        start: u32,
-        end: u32,
-    ) -> bool {
+    fn append_for_in_of_block_comments(&self, parts: &mut DocBuf, start: u32, end: u32) -> bool {
         let d = self.d();
         let mut added = false;
         for comment in tsv_lang::comments_in_range(self.comments, start, end) {
@@ -1036,7 +1032,7 @@ impl<'a> Printer<'a> {
 
     /// Append trailing block comments for for-in/for-of statements.
     /// Own-line comments normalize to inline. No trailing space.
-    fn append_for_in_of_trailing_comments(&self, parts: &mut Vec<DocId>, start: u32, end: u32) {
+    fn append_for_in_of_trailing_comments(&self, parts: &mut DocBuf, start: u32, end: u32) {
         let d = self.d();
         for comment in tsv_lang::comments_in_range(self.comments, start, end) {
             if comment.is_block {
@@ -1086,7 +1082,7 @@ impl<'a> Printer<'a> {
                     // indented line, then the body — break-safe so a `//` can't
                     // swallow the next comment or the body (matches Prettier's
                     // adjustClause; multiple comments previously collapsed inline).
-                    let mut inner = Vec::new();
+                    let mut inner = DocBuf::new();
                     let mut prev = header_end;
                     for comment in
                         tsv_lang::comments_in_range(self.comments, header_end, body_start)
@@ -1120,7 +1116,7 @@ impl<'a> Printer<'a> {
                             own_line_lines.push(comment);
                         }
                     }
-                    let mut tail = Vec::new();
+                    let mut tail = DocBuf::new();
                     let effective_prev_end = inline_prev.last().map_or(header_end, |c| c.span.end);
                     self.build_comments_between_parts(
                         &mut tail,

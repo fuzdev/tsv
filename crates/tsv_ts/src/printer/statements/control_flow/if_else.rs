@@ -5,6 +5,8 @@
 
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
+use smallvec::smallvec;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::skip_comment;
 
@@ -40,7 +42,7 @@ impl<'a> Printer<'a> {
     /// indented (Prettier's adjustClause behavior).
     fn append_else_body_doc(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         alternate: &Statement,
         comment_forced: bool,
     ) {
@@ -58,7 +60,7 @@ impl<'a> Printer<'a> {
     ///
     /// Handles EmptyStatement alternate (`else;`), inline alternate (`else expr;`),
     /// block alternate (`else { ... }`), and non-inline alternate (indented).
-    fn append_newline_else_clause(&self, parts: &mut Vec<DocId>, alternate: &Statement) {
+    fn append_newline_else_clause(&self, parts: &mut DocBuf, alternate: &Statement) {
         let d = self.d();
         parts.push(d.hardline());
         if matches!(alternate, Statement::EmptyStatement(_)) {
@@ -84,7 +86,7 @@ impl<'a> Printer<'a> {
     /// and line comments forcing a break before the body.
     fn build_head_body_else_clause(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         alternate: &Statement,
         consequent_end: u32,
     ) {
@@ -196,7 +198,7 @@ impl<'a> Printer<'a> {
         if let Statement::BlockStatement(block) = stmt.consequent.as_ref() {
             // Block consequent: group(["if (" + condition + ") " + block])
             // Outer group controls whether the whole if statement breaks
-            let mut parts = vec![d.text("if")];
+            let mut parts = smallvec![d.text("if")];
             if let Some(kc) = keyword_comments {
                 parts.push(kc);
             }
@@ -221,7 +223,7 @@ impl<'a> Printer<'a> {
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             let empty_start = stmt.consequent.span().start;
 
-            let mut empty_parts = vec![d.text("if")];
+            let mut empty_parts = smallvec![d.text("if")];
             if let Some(kc) = keyword_comments {
                 empty_parts.push(kc);
             }
@@ -248,7 +250,7 @@ impl<'a> Printer<'a> {
             let body_start = stmt.consequent.span().start;
             let consequent_doc = self.build_statement_doc(&stmt.consequent);
 
-            let mut head_parts = vec![d.text("if")];
+            let mut head_parts: DocBuf = smallvec![d.text("if")];
             if let Some(kc) = keyword_comments {
                 head_parts.push(kc);
             }
@@ -261,7 +263,7 @@ impl<'a> Printer<'a> {
                 consequent_doc,
             );
 
-            let mut parts = vec![head_and_body];
+            let mut parts = smallvec![head_and_body];
 
             // Handle else clause for non-block consequent
             if let Some(alternate) = &stmt.alternate {
@@ -306,7 +308,7 @@ impl<'a> Printer<'a> {
             self.build_condition_group(&stmt.test)
         };
 
-        let mut parts = vec![d.text("if")];
+        let mut parts = smallvec![d.text("if")];
         if let Some(kc) = keyword_comments {
             parts.push(kc);
         }

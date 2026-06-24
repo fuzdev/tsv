@@ -109,7 +109,7 @@ impl<'a> Printer<'a> {
             };
             if needs_multiline {
                 // Multiline layout: !(\n  /* c */\n  expr\n) or !(\n  expr // c\n)
-                let mut indent_parts = vec![d.hardline()];
+                let mut indent_parts: DocBuf = smallvec![d.hardline()];
                 // Add leading comments — use hardline if the comment and argument
                 // are on different lines, space if they're on the same line.
                 for comment in
@@ -147,7 +147,7 @@ impl<'a> Printer<'a> {
                 ])
             } else {
                 // Inline layout: !(/* c */ expr) or !(expr /* c */)
-                let mut parts = Vec::new();
+                let mut parts = DocBuf::new();
                 parts.push(d.text("("));
                 if let Some(leading) = leading_comments_opt {
                     parts.push(leading);
@@ -440,7 +440,7 @@ impl<'a> Printer<'a> {
         if rightmost_end >= binary.span.end {
             return with_leading;
         }
-        let mut parts = vec![with_leading];
+        let mut parts = smallvec![with_leading];
         self.append_trailing_paren_comments(&mut parts, rightmost_end, binary.span.end);
         if parts.len() == 1 {
             with_leading
@@ -927,7 +927,7 @@ impl<'a> Printer<'a> {
 
         let argument_doc = if comments_opt.is_some() || has_trailing_comments {
             let inner = self.build_expression_doc(&await_expr.argument);
-            let mut parts = Vec::new();
+            let mut parts = DocBuf::new();
             if let Some(comments) = comments_opt {
                 parts.push(comments);
             }
@@ -953,7 +953,7 @@ impl<'a> Printer<'a> {
         yield_expr: &internal::YieldExpression,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         if yield_expr.delegate {
             parts.push(d.text("yield*"));
@@ -1029,7 +1029,7 @@ impl<'a> Printer<'a> {
 
         let d = self.d();
         let n = seq.expressions.len();
-        let mut parts = Vec::with_capacity(n * 3 + 4);
+        let mut parts = DocBuf::with_capacity(n * 3 + 4);
 
         // First operand's leading-edge comments float OUT, before the opening `(`.
         let first_start = seq.expressions[0].span().start;
@@ -1091,12 +1091,7 @@ impl<'a> Printer<'a> {
     /// following comment, else the operand at `operand_start`). On re-parse these
     /// land in the enclosing context's leading-comment domain, which emits the
     /// same own-line/inline treatment — so the float is idempotent.
-    fn append_floated_leading_comments(
-        &self,
-        parts: &mut Vec<DocId>,
-        start: u32,
-        operand_start: u32,
-    ) {
+    fn append_floated_leading_comments(&self, parts: &mut DocBuf, start: u32, operand_start: u32) {
         let d = self.d();
         let comments: Vec<_> =
             tsv_lang::comments_in_range(self.comments, start, operand_start).collect();
@@ -1128,18 +1123,18 @@ impl<'a> Printer<'a> {
         let n = seq.expressions.len();
 
         // First operand's leading-edge comments float OUT, before the opening `(`.
-        let mut outer = Vec::new();
+        let mut outer = DocBuf::new();
         let first_start = seq.expressions[0].span().start;
         self.append_floated_leading_comments(&mut outer, seq.span.start, first_start);
 
         // Build per-operand docs (own-line leading + core + same-line trailing),
         // joined by `,` + line inside a group forced to break.
-        let mut inner = vec![d.break_parent()];
+        let mut inner: DocBuf = smallvec![d.break_parent()];
         for (i, expr) in seq.expressions.iter().enumerate() {
             let is_last = i + 1 == n;
             let expr_start = expr.span().start;
             let expr_end = expr.span().end;
-            let mut od = Vec::new();
+            let mut od = DocBuf::new();
 
             // Own-line comments from the previous comma gap lead this operand.
             // The same-line prefix of that gap trails the previous operand (emitted

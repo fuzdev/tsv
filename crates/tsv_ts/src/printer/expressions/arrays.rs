@@ -9,6 +9,8 @@
 use crate::ast::internal::{self, Expression, LiteralValue};
 use crate::printer::calls::skip_stripped_open_paren;
 use crate::printer::{Printer, has_multiline_content};
+use smallvec::smallvec;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::{comments_in_range, has_multiline_block_comments_in_range};
 
@@ -155,7 +157,7 @@ impl<'a> Printer<'a> {
         &self,
         search_start: u32,
         elem_start: u32,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
     ) {
         for comment in comments_in_range(self.comments, search_start, elem_start) {
             if comment.is_block {
@@ -187,7 +189,7 @@ impl<'a> Printer<'a> {
         arr: &internal::ArrayExpression,
         elem_end: u32,
         current_index: usize,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
     ) {
         let next_boundary = self.next_element_boundary(arr, current_index);
         let comma_pos = self.find_comma_after(elem_end);
@@ -280,7 +282,7 @@ impl<'a> Printer<'a> {
     /// Uses binary search to find comments: O(log n + k)
     fn build_array_fill_doc(&self, arr: &internal::ArrayExpression) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         for (i, elem) in arr.elements.iter().enumerate() {
             // Handle comments and element (skip comment collection for elisions)
@@ -316,7 +318,7 @@ impl<'a> Printer<'a> {
     /// Note: Arrays with expanding comments use build_array_doc_with_expanding_comments instead.
     fn build_array_group_doc(&self, arr: &internal::ArrayExpression) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         // Check if last element is an elision (requires mandatory trailing comma)
         let has_trailing_elision = arr.elements.last().is_some_and(Option::is_none);
@@ -431,7 +433,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        let mut inner_parts = vec![d.softline(), d.concat(&parts)];
+        let mut inner_parts: DocBuf = smallvec![d.softline(), d.concat(&parts)];
         for comment in &trailing_same_line_after_comma {
             inner_parts.push(d.text(" "));
             inner_parts.push(self.build_comment_doc(comment));
@@ -465,7 +467,7 @@ impl<'a> Printer<'a> {
     /// Build group doc for arrays with multiline content (forced expansion with hardlines)
     fn build_array_group_doc_forced(&self, arr: &internal::ArrayExpression) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         for (i, elem) in arr.elements.iter().enumerate() {
             if i > 0 {
@@ -526,7 +528,7 @@ impl<'a> Printer<'a> {
     /// block comments (hardlines must propagate). Always expands to multiline.
     fn build_array_doc_with_expanding_comments(&self, arr: &internal::ArrayExpression) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         // A comment trailing the opening `[` on its own line is kept on the `[`
         // line (divergence from prettier, which relocates it to its own line as the
@@ -797,7 +799,7 @@ impl<'a> Printer<'a> {
             return d.text("[]");
         }
 
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         for (i, elem) in arr.elements.iter().enumerate() {
             // Elements are Option<Expression> where None = hole/elision
             if let Some(expr) = elem {

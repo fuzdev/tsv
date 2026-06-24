@@ -191,7 +191,7 @@ impl<'a> Printer<'a> {
         }
 
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         // Calculate signature end position (after `)` or return type).
         // This is where comments BEFORE `=>` start.
@@ -270,7 +270,7 @@ impl<'a> Printer<'a> {
     /// prettier's `shouldPutBodyOnSameLine` / `shouldAddParensIfNotBreak` cascade.
     fn build_arrow_expression_body(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         expr: &internal::Expression,
         arrow: &internal::ArrowFunctionExpression,
         arrow_end: u32,
@@ -457,7 +457,7 @@ impl<'a> Printer<'a> {
     /// terminates any curried-arrow chain.
     fn build_arrow_block_body(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         block: &internal::BlockStatement,
         arrow_end: u32,
     ) {
@@ -796,7 +796,7 @@ impl<'a> Printer<'a> {
         arrow: &internal::ArrowFunctionExpression,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         // Async keyword if present
         if arrow.r#async {
@@ -1034,7 +1034,7 @@ impl<'a> Printer<'a> {
         func: &internal::FunctionExpression,
     ) -> DocId {
         let d = self.d();
-        let mut sig_parts = Vec::new();
+        let mut sig_parts = DocBuf::new();
 
         // Type parameters (TypeScript generics): <T, U>
         // Use _wrapping version for width-based line breaking
@@ -1088,7 +1088,7 @@ impl<'a> Printer<'a> {
             func.body.span.start,
         );
 
-        let mut parts = vec![sig_doc];
+        let mut parts: DocBuf = smallvec![sig_doc];
         self.append_body_with_sig_comments(&mut parts, sig_end, &func.body);
         d.concat(&parts)
     }
@@ -1543,7 +1543,7 @@ impl<'a> Printer<'a> {
                     && self.has_line_comments_between(ext_end, class_expr.implements[0].span.start)
             });
 
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         // 'class' keyword
         parts.push(d.text("class"));

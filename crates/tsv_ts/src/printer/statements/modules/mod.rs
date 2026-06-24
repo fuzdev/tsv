@@ -17,8 +17,10 @@ mod specifier_list;
 pub(super) use super::{Printer, build_entity_name_doc};
 
 use crate::ast::internal;
+use smallvec::smallvec;
 use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
@@ -37,7 +39,7 @@ impl<'a> Printer<'a> {
         let argument_end = decl.expression.span().end;
         let has_trailing_comments = self.has_comments_between(argument_end, decl.span.end);
         if has_trailing_comments {
-            let mut parts = vec![d.text("export = "), expr_doc];
+            let mut parts = smallvec![d.text("export = "), expr_doc];
             self.append_trailing_paren_comments(&mut parts, argument_end, decl.span.end);
             parts.push(d.text(";"));
             d.concat(&parts)
@@ -113,12 +115,12 @@ impl<'a> Printer<'a> {
                 let type_start = self
                     .find_keyword_in_range(kw_end, search_end, "type")
                     .unwrap_or(kw_end);
-                vec![
+                smallvec![
                     d.text("export "),
                     self.gap_comment_continuation_tail(kw_end, type_start, d.text("type ")),
                 ]
             } else {
-                vec![d.text("export ")]
+                smallvec![d.text("export ")]
             };
 
             // Position just past the specifier list's closing `}` (no-source case);
@@ -257,7 +259,7 @@ impl<'a> Printer<'a> {
                 let argument_end = expr.span().end;
                 let has_trailing_comments = self.has_comments_between(argument_end, decl.span.end);
                 if has_trailing_comments {
-                    let mut parts = vec![expr_doc];
+                    let mut parts = smallvec![expr_doc];
                     self.append_trailing_paren_comments(&mut parts, argument_end, decl.span.end);
                     parts.push(d.text(";"));
                     d.concat(&parts)
@@ -316,7 +318,7 @@ impl<'a> Printer<'a> {
         // in any header gap indents the continuation one level (statement
         // continuation); the `*` is emitted via the tail helper so an `export`→`*`
         // or `type`→`*` line comment carries it onto the indented line.
-        let mut parts = vec![d.text("export ")];
+        let mut parts = smallvec![d.text("export ")];
         if is_type {
             // `export`→`type` gap, then `type`→`*` gap.
             let type_start = self
@@ -393,7 +395,7 @@ impl<'a> Printer<'a> {
         }
 
         // Build the full import statement
-        let mut parts = vec![d.text("import ")];
+        let mut parts = smallvec![d.text("import ")];
 
         // Add 'type' keyword for type-only imports
         if is_type_import {
@@ -593,7 +595,7 @@ impl<'a> Printer<'a> {
         decl: &internal::TSImportEqualsDeclaration,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         // Export prefix if present
         if decl.is_export {
@@ -627,7 +629,7 @@ impl<'a> Printer<'a> {
                 if has_comments {
                     // Multi-line format with comments
                     // Build comments doc: each comment on its own line
-                    let mut comment_parts = Vec::new();
+                    let mut comment_parts = DocBuf::new();
                     for comment in comments_in_range(self.comments, require_open_end, literal_start)
                     {
                         comment_parts.push(self.build_comment_doc(comment));

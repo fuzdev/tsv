@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 
 use super::super::Printer;
 use crate::ast::internal;
-use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::DocBuf;
 
 impl<'a> Printer<'a> {
     /// Open a non-last argument gap that may carry comments and emit its head into
@@ -28,7 +28,7 @@ impl<'a> Printer<'a> {
     /// at the call site.
     pub(super) fn open_inter_arg_gap(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         arg_end: u32,
         next_arg_start: u32,
     ) -> PartitionedComments<'a> {
@@ -431,7 +431,7 @@ pub(crate) fn has_trailing_line_comments_slice(
 /// arg's leading comment must be emitted explicitly or it's dropped.
 pub(crate) fn emit_first_arg_leading_comments(
     printer: &Printer<'_>,
-    parts: &mut Vec<DocId>,
+    parts: &mut DocBuf,
     paren_open: u32,
     first_arg_start: u32,
 ) {
@@ -620,7 +620,7 @@ impl<'a> PartitionedComments<'a> {
     /// Line comments go through `line_suffix` (zero width) so they never count against
     /// the argument's own group — flushing at the caller's following hardline (every
     /// caller is a forced-multiline context). Prettier's `lineSuffix`.
-    pub fn emit_trailing_comments(&self, parts: &mut Vec<DocId>, printer: &Printer<'_>) {
+    pub fn emit_trailing_comments(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
         let d = printer.d();
         for comment in &self.trailing_block {
             parts.push(d.text(" "));
@@ -643,7 +643,7 @@ impl<'a> PartitionedComments<'a> {
     /// can't drift — both used to relocate the block past the comma.
     pub fn emit_trailing_comments_around_comma(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         printer: &Printer<'_>,
         arg_end: u32,
         next_arg_start: u32,
@@ -686,7 +686,7 @@ impl<'a> PartitionedComments<'a> {
     /// member-chain and `new` last-arg paths so the split rule lives in one place.
     pub fn emit_last_arg_trailing_around_comma(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         printer: &Printer<'_>,
         arg_end: u32,
         boundary: u32,
@@ -717,7 +717,7 @@ impl<'a> PartitionedComments<'a> {
     /// path (no trailing comma precedes them — trailingComma: 'none') and by comma-less
     /// shapes (dynamic `import()`). Without it, own-line comments before the closing paren
     /// are dropped (content loss).
-    pub fn emit_dangling_comments(&self, parts: &mut Vec<DocId>, printer: &Printer<'_>) {
+    pub fn emit_dangling_comments(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
         let d = printer.d();
         for comment in &self.leading {
             parts.push(d.hardline());
@@ -737,7 +737,7 @@ impl<'a> PartitionedComments<'a> {
     /// only `emit_dangling_comments` directly.)
     pub fn emit_last_arg_comments(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         printer: &Printer<'_>,
         arg_end: u32,
         boundary: u32,
@@ -759,7 +759,7 @@ impl<'a> PartitionedComments<'a> {
     /// Both should stay inline: `/** @type {A} */ /** @type {B} */ expr`.
     pub fn emit_leading_comments_inline_aware(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         printer: &Printer<'_>,
         next_pos: u32,
     ) {

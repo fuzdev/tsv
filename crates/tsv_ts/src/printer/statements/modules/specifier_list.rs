@@ -6,6 +6,7 @@
 use super::header_comments::is_only_whitespace_and_comments;
 use super::{MODULE_KW_LEN, MODULE_TYPE_KW_LEN, Printer};
 use crate::ast::internal;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{SymbolToU32, comments_in_range};
@@ -119,7 +120,7 @@ impl<'a> Printer<'a> {
     /// and import-equals, which have no wrapping group.
     pub(super) fn finish_with_pre_semi(
         &self,
-        mut parts: Vec<DocId>,
+        mut parts: DocBuf,
         content_end: u32,
         decl_end: u32,
         grouped: bool,
@@ -132,7 +133,7 @@ impl<'a> Printer<'a> {
             parts.push(d.text(";"));
             return d.concat(&parts);
         }
-        let mut trailing = Vec::new();
+        let mut trailing = DocBuf::new();
         let broke = self.append_pre_semi_comments(&mut trailing, content_end, decl_end);
         if trailing.is_empty() {
             parts.push(d.text(";"));
@@ -179,7 +180,7 @@ impl<'a> Printer<'a> {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn push_braced_specifier_list<T>(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         specifiers: &[T],
         kw_end: u32,
         bound: u32,
@@ -263,7 +264,7 @@ impl<'a> Printer<'a> {
         right: &internal::ModuleExportName,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         if !declaration_is_type_only && specifier_is_type {
             parts.push(d.text("type "));
         }
@@ -340,13 +341,13 @@ impl<'a> Printer<'a> {
         build_item_doc: impl Fn(&T) -> DocId,
     ) -> DocId {
         let d = self.d();
-        let mut inner_parts = Vec::new();
+        let mut inner_parts = DocBuf::new();
         let mut prev_end = brace_start + 1; // After opening `{`
         // Block comment trailing the LAST item after its source comma — preserved past
         // where the comma was (no trailing comma; trailingComma: 'none') rather than
         // relocated before it (prettier relocates before; see conformance_prettier.md
         // §Comment relocation).
-        let mut last_after_comma = Vec::new();
+        let mut last_after_comma = DocBuf::new();
 
         for (i, item) in items.iter().enumerate() {
             let span = get_span(item);
@@ -354,7 +355,7 @@ impl<'a> Printer<'a> {
             let item_end = span.end;
             let is_last = i == items.len() - 1;
 
-            let mut item_parts = Vec::new();
+            let mut item_parts = DocBuf::new();
 
             // Leading block comments before this item (after prev comma or `{`)
             for comment in comments_in_range(self.comments, prev_end, item_start) {
@@ -418,7 +419,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let (brace_line_prefix, delimiter_pull_pos) = match brace_comment_first {
             Some(first) => self.delimiter_line_comment_prefix(brace_start, first),
-            None => (Vec::new(), None),
+            None => (DocBuf::new(), None),
         };
         let inner_doc = self.build_hardline_comma_list(
             items,
@@ -449,7 +450,7 @@ impl<'a> Printer<'a> {
         build_item_doc: impl Fn(&T) -> DocId,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         let mut prev_end: u32 = brace_start + 1; // After opening brace
 
         for (i, item) in items.iter().enumerate() {

@@ -9,6 +9,7 @@
 use super::{CommentSpacing, Printer};
 use crate::ast::internal;
 use tsv_lang::comments_in_range;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -37,7 +38,7 @@ impl<'a> Printer<'a> {
 
         let doc = if force_break {
             // Each comment on its own line inside the broken parens.
-            let mut parts = Vec::new();
+            let mut parts = DocBuf::new();
             for comment in comments_in_range(self.comments, open_paren_end, value_start) {
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.hardline());
@@ -65,7 +66,7 @@ impl<'a> Printer<'a> {
     /// Used by await, yield, return, throw, and export default.
     pub(crate) fn append_trailing_paren_comments(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         argument_end: u32,
         span_end: u32,
     ) {
@@ -99,7 +100,7 @@ impl<'a> Printer<'a> {
     /// so the break doesn't expand the specifier braces).
     pub(crate) fn append_pre_semi_comments(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         start: u32,
         end: u32,
     ) -> bool {
@@ -140,7 +141,7 @@ impl<'a> Printer<'a> {
     /// them up via `spread_own_line_block_comments()`.
     pub(crate) fn append_spread_trailing_paren_comments(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         argument_end: u32,
         span_end: u32,
     ) {
@@ -331,7 +332,7 @@ impl<'a> Printer<'a> {
         let op_pos = self.find_operator_in_source(start, end, operator)?;
 
         // Collect block comments that appear before the operator
-        let mut promoted_parts = Vec::new();
+        let mut promoted_parts = DocBuf::new();
         let mut last_promoted_end = start;
         for comment in comments_in_range(self.comments, start, op_pos) {
             if comment.is_block {

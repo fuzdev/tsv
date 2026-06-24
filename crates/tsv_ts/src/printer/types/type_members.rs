@@ -12,7 +12,9 @@ use super::CommentSpacing;
 use super::Printer;
 use crate::ast::internal::{self, TSTypeElement};
 use crate::printer::analysis::skip_identifier_at;
+use smallvec::smallvec;
 use tsv_lang::SymbolToU32;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
@@ -32,7 +34,7 @@ impl<'a> Printer<'a> {
         prop: &internal::TSPropertySignature,
     ) -> DocId {
         let d = self.d();
-        let mut parts = vec![];
+        let mut parts = smallvec![];
         if prop.readonly {
             // Preserve comments after the keyword (e.g., `readonly /* c */ a`);
             // bounded at `[` for computed keys (inner comments are the
@@ -133,7 +135,7 @@ impl<'a> Printer<'a> {
         method: &internal::TSMethodSignature,
     ) -> DocId {
         let d = self.d();
-        let mut parts = vec![];
+        let mut parts = smallvec![];
         // Print accessor keyword for get/set signatures, preserving comments
         // between keyword and name.
         match method.kind {
@@ -272,7 +274,7 @@ impl<'a> Printer<'a> {
         new_keyword_end: Option<u32>,
     ) -> DocId {
         let d = self.d();
-        let mut parts = vec![];
+        let mut parts = smallvec![];
 
         // `new ` prefix + its comment handling (construct signatures only).
         if let Some(new_end) = new_keyword_end {
@@ -382,7 +384,7 @@ impl<'a> Printer<'a> {
         idx: &internal::TSIndexSignature,
     ) -> DocId {
         let d = self.d();
-        let mut parts = vec![];
+        let mut parts = smallvec![];
 
         // Locate the opening `[`, skipping comments so a `[` inside one (e.g.
         // `readonly /* [ */ [k]`) isn't matched. Bounded at the first parameter so
@@ -418,7 +420,7 @@ impl<'a> Printer<'a> {
             .parameters
             .iter()
             .map(|param| {
-                let mut param_parts = vec![d.symbol(param.name.to_u32())];
+                let mut param_parts: DocBuf = smallvec![d.symbol(param.name.to_u32())];
                 if let Some(type_ann) = &param.type_annotation {
                     // The `: keyType` annotation, handling a before-`:` comment between
                     // the key name and `:` — line → indented continuation (the hardline
@@ -456,7 +458,7 @@ impl<'a> Printer<'a> {
         // the param→`]` gap (`[key: string /* c */]`) trails the contents.
         let (bracket_line_prefix, bracket_pull_pos) = match (bracket_open_pos, first_param_start) {
             (Some(open), Some(key_start)) => self.delimiter_line_comment_prefix(open, key_start),
-            _ => (Vec::new(), None),
+            _ => (DocBuf::new(), None),
         };
         // Own-line leading comments stay inside the brackets; a comment pulled onto
         // the `[` line above (same source line as `[`) is emitted by the prefix, so
@@ -466,7 +468,7 @@ impl<'a> Printer<'a> {
         // guard is needed here (unlike `trailing_comment` below, which has no such net).
         let lead_comment = match (bracket_open_pos, first_param_start) {
             (Some(open), Some(key_start)) => {
-                let mut lead_parts = Vec::new();
+                let mut lead_parts = DocBuf::new();
                 for comment in comments_in_range(self.comments, open + 1, key_start) {
                     if let Some(dpos) = bracket_pull_pos
                         && self.comment_on_delimiter_line(dpos, comment)
@@ -493,7 +495,7 @@ impl<'a> Printer<'a> {
         // the `]` would otherwise be content loss.
         let (trailing_comment, trailing_has_line) = match bracket_close_pos {
             Some(cp) if self.has_comments_between(search_start, cp) => {
-                let mut tparts = Vec::new();
+                let mut tparts = DocBuf::new();
                 let mut has_line = false;
                 let mut prev = search_start;
                 for comment in comments_in_range(self.comments, search_start, cp) {
@@ -510,7 +512,7 @@ impl<'a> Printer<'a> {
             }
             _ => (None, false),
         };
-        let mut inner_parts = Vec::new();
+        let mut inner_parts = DocBuf::new();
         inner_parts.extend(lead_comment);
         inner_parts.push(d.join(param_docs, ", "));
         inner_parts.extend(trailing_comment);

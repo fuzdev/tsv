@@ -4,6 +4,7 @@
 
 use super::Printer;
 use crate::ast::internal;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 /// Check if a string contains only whitespace and/or comments.
@@ -56,7 +57,7 @@ impl<'a> Printer<'a> {
     /// conformance_prettier.md §Comment relocation.
     pub(super) fn append_namespace_as_binding(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         star_end: u32,
         binding: &internal::ModuleExportName,
     ) {

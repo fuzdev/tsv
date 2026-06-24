@@ -18,6 +18,7 @@ use smallvec::SmallVec;
 
 use crate::ast::internal::Expression;
 use crate::printer::Printer;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
@@ -80,7 +81,7 @@ impl<'a> Printer<'a> {
     /// Returns the end position after the last comment (for tracking).
     fn build_comments_between_parts(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         inline_prev: &[&tsv_lang::Comment],
         own_line: &[&tsv_lang::Comment],
         prev_end: u32,
@@ -116,7 +117,7 @@ impl<'a> Printer<'a> {
     /// - No comments: `if (a);`
     fn append_close_paren_empty_stmt_with_comments(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         paren_end: u32,
         empty_start: u32,
     ) {
@@ -151,7 +152,7 @@ impl<'a> Printer<'a> {
     /// blank line preservation). Line comments force a hardline before the body.
     fn append_close_paren_with_comments(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         paren_end: u32,
         body_start: u32,
     ) {
@@ -317,7 +318,7 @@ impl<'a> Printer<'a> {
 
         // Build with comments
         let test_doc = self.build_condition_doc(test_expr);
-        let mut inner_parts = Vec::new();
+        let mut inner_parts = DocBuf::new();
 
         // Collect leading comments
         // Classification based on position relative to open paren AND condition:

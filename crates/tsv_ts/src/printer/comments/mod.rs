@@ -35,6 +35,7 @@ mod scan;
 pub(super) use super::{Printer, calls, layout};
 
 use tsv_lang::comments_in_range;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 /// Spacing style for comments in doc building
@@ -123,7 +124,7 @@ impl<'a> Printer<'a> {
         }
 
         // Build docs for matching comments
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         for comment in self.comments[first_idx..]
             .iter()
             .take_while(|c| c.span.end <= end)
@@ -165,7 +166,7 @@ impl<'a> Printer<'a> {
     /// line comment (e.g., `=> // leading\nT`, `: // leading\nT`).
     pub(crate) fn build_trailing_comments_break_for_line(&self, start: u32, end: u32) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         for comment in comments_in_range(self.comments, start, end) {
             parts.push(self.build_comment_doc(comment));
             if comment.is_block {
@@ -250,7 +251,7 @@ impl<'a> Printer<'a> {
     /// after keywords like `return`/`await`, after operators like `!`/`...`, etc.).
     pub(crate) fn build_rhs_comments_opt(&self, start: u32, end: u32) -> Option<DocId> {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         for comment in comments_in_range(self.comments, start, end) {
             parts.push(self.build_comment_doc(comment));
             if comment.is_block {

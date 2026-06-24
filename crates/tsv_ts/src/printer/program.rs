@@ -4,6 +4,7 @@
 // leading/trailing comment placement, and format-ignore raw emission.
 
 use crate::ast::internal;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::{
     CommentPosition, classify_comment_fast, comments_after, comments_in_range, doc::arena::DocId,
 };
@@ -35,7 +36,7 @@ impl<'a> Printer<'a> {
     /// - Program trailing comments after the last statement
     pub(crate) fn build_program_doc(&self, program: &internal::Program) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         let mut prev_end = 0u32;
         let mut has_output = false;
 
@@ -168,7 +169,7 @@ impl<'a> Printer<'a> {
         force_non_inline: bool,
     ) -> Option<DocId> {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         let mut last_comment_end = prev_end;
         let mut printed_any = false;
         let mut last_was_inline = false;
@@ -276,9 +277,9 @@ impl<'a> Printer<'a> {
     /// Build docs for trailing comments at the end of the program
     ///
     /// Handles comments that appear after all statements but before end of file.
-    fn build_program_trailing_comments_doc(&self, prev_end: u32) -> Vec<DocId> {
+    fn build_program_trailing_comments_doc(&self, prev_end: u32) -> DocBuf {
         let d = self.d();
-        let mut docs = Vec::new();
+        let mut docs = DocBuf::new();
         let mut last_comment_end = prev_end;
         let mut is_first_comment = true;
 

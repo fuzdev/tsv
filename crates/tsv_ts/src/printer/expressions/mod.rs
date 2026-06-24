@@ -473,7 +473,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let needs_parens = needs_parens(expression, ParenContext::TypeAssertion);
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         if needs_parens {
             parts.push(d.text("("));
         }
@@ -679,7 +679,7 @@ impl<'a> Printer<'a> {
             let has_trailing_comments =
                 self.has_comments_between(argument_end, non_null_expr.span.end);
             if has_trailing_comments {
-                let mut parts = vec![inner_doc];
+                let mut parts: DocBuf = smallvec![inner_doc];
                 self.append_trailing_paren_comments(
                     &mut parts,
                     argument_end,
@@ -761,7 +761,7 @@ impl<'a> Printer<'a> {
         }
 
         // Collect all operands and operators in the chain
-        let mut operands = Vec::new();
+        let mut operands = DocBuf::new();
         let mut operators = Vec::new();
         self.collect_binary_operands_for_indent(binary, &mut operands, &mut operators);
 
@@ -850,7 +850,7 @@ impl<'a> Printer<'a> {
     fn collect_binary_operands_for_indent(
         &self,
         expr: &BinaryExpression,
-        operands: &mut Vec<DocId>,
+        operands: &mut DocBuf,
         operators: &mut Vec<BinaryOperator>,
     ) {
         // Recursively flatten left side if it can be chained with current operator
@@ -891,7 +891,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_binary_chain_for_parens(&self, binary: &BinaryExpression) -> DocId {
         let d = self.d();
         // Collect all operands and operators in the chain
-        let mut operands = Vec::new();
+        let mut operands = DocBuf::new();
         let mut operators = Vec::new();
         self.collect_binary_operands_for_indent(binary, &mut operands, &mut operators);
 

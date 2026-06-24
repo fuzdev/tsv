@@ -71,7 +71,7 @@ impl<'a> Printer<'a> {
             // Comment-aware path
             // Use hardlines when must_break, use line() when only has_comments
             // This allows inline objects with block comments to stay inline if they fit
-            let mut parts = Vec::new();
+            let mut parts = DocBuf::new();
             let mut prev_end = obj.span.start + 1; // After opening brace
 
             // A comment trailing the opening `{` on its own line is kept on the `{`
@@ -266,7 +266,7 @@ impl<'a> Printer<'a> {
             }
         } else {
             // No comments, no forced multiline: use width-based wrapping with soft lines
-            let mut parts = Vec::new();
+            let mut parts = DocBuf::new();
 
             for (i, prop) in obj.properties.iter().enumerate() {
                 // Check for blank line before this property (preserved in multiline).
@@ -408,7 +408,7 @@ impl<'a> Printer<'a> {
                 } else {
                     "set "
                 };
-                let mut kw_parts = Vec::new();
+                let mut kw_parts = DocBuf::new();
                 self.push_accessor_keyword_doc(
                     &mut kw_parts,
                     kind_text,
@@ -448,7 +448,7 @@ impl<'a> Printer<'a> {
                 // Build prefix: async? + *?, preserving comments after `async`
                 // (e.g., `async /* c */ m()`)
                 let key_start = prop.key.span().start;
-                let mut parts = Vec::new();
+                let mut parts = DocBuf::new();
                 let mut cursor = prop.span.start;
                 if func.r#async {
                     self.push_member_keyword_doc(&mut parts, "async ", &mut cursor, key_start);

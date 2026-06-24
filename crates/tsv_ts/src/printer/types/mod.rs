@@ -79,7 +79,7 @@ impl<'a> Printer<'a> {
             TSType::Union(u) => self.build_union_type_doc(u, true),
             TSType::Intersection(i) => self.build_intersection_type_doc(i, true),
             TSType::TypeReference(r) => {
-                let mut parts = vec![self.build_entity_name_doc(&r.type_name)];
+                let mut parts: DocBuf = smallvec![self.build_entity_name_doc(&r.type_name)];
                 if let Some(type_args) = &r.type_arguments {
                     // Preserve comments before type args: `Map/* c */ <string, number>`
                     if let Some(doc) = self.build_name_to_type_params_comments_opt(
@@ -106,7 +106,7 @@ impl<'a> Printer<'a> {
             // needed based on the inner type.
             TSType::Parenthesized(p) => self.build_parenthesized_type_unwrap_doc(p),
             TSType::TypePredicate(p) => {
-                let mut parts = vec![];
+                let mut parts = smallvec![];
                 if p.asserts {
                     // Comments between `asserts` and parameter name
                     let asserts_end = p.span.start + "asserts".len() as u32;
@@ -207,7 +207,7 @@ impl<'a> Printer<'a> {
                     } else {
                         operand_doc
                     };
-                    let mut parts = vec![d.text(o.operator.as_str())];
+                    let mut parts = smallvec![d.text(o.operator.as_str())];
                     self.append_keyword_value_line_comments(
                         &mut parts,
                         keyword_end,
@@ -262,13 +262,13 @@ impl<'a> Printer<'a> {
                         value_parts.push(self.build_type_arguments_doc(type_args));
                     }
                     let value_doc = d.concat(&value_parts);
-                    let mut parts = vec![d.text("typeof")];
+                    let mut parts = smallvec![d.text("typeof")];
                     self.append_keyword_value_line_comments(
                         &mut parts, typeof_end, expr_start, value_doc,
                     );
                     return d.concat(&parts);
                 }
-                let mut parts = vec![d.text("typeof ")];
+                let mut parts: DocBuf = smallvec![d.text("typeof ")];
                 parts.push(self.build_comments_between(
                     typeof_end,
                     expr_start,
@@ -308,10 +308,10 @@ impl<'a> Printer<'a> {
                     self.build_comments_between(bp + 1, index_type_start, CommentSpacing::Trailing)
                 });
                 let index_doc = self.build_type_doc(&i.index_type);
-                let mut parts = if needs_parens {
-                    vec![d.text("("), object_doc, d.text(")")]
+                let mut parts: DocBuf = if needs_parens {
+                    smallvec![d.text("("), object_doc, d.text(")")]
                 } else {
-                    vec![object_doc]
+                    smallvec![object_doc]
                 };
                 if let Some(c) = object_comments {
                     parts.push(c);
@@ -343,7 +343,7 @@ impl<'a> Printer<'a> {
                 d.concat(&[inner, d.text("?")])
             }
             TSType::NamedTupleMember(n) => {
-                let mut parts = vec![d.symbol(n.label.name.to_u32())];
+                let mut parts = smallvec![d.symbol(n.label.name.to_u32())];
                 let label_end = n.label.span.end;
                 let type_start = n.element_type.span().start;
                 // Comments between label and `?` (e.g., `[a /* c */?: T]`)
@@ -532,7 +532,7 @@ impl<'a> Printer<'a> {
         let has_trailing = self.has_comments_between(arg_end, paren_close);
         let has_trailing_line = self.has_line_comments_between(arg_end, paren_close);
 
-        let mut inner = vec![arg_doc];
+        let mut inner = smallvec![arg_doc];
         if has_trailing {
             let pc =
                 PartitionedComments::new(self.comments, self.line_breaks, arg_end, paren_close);

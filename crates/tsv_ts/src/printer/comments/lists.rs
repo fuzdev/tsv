@@ -9,6 +9,7 @@
 use super::Printer;
 use crate::ast::internal;
 use tsv_lang::comments_in_range;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -25,7 +26,7 @@ impl<'a> Printer<'a> {
     /// separator itself (`hardline` for a line comment, space/`line` otherwise).
     pub(crate) fn build_pre_body_comments_doc(&self, start: u32, end: u32) -> Option<DocId> {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         let mut prev_is_line = false;
         for comment in comments_in_range(self.comments, start, end) {
             if prev_is_line {
@@ -51,7 +52,7 @@ impl<'a> Printer<'a> {
     /// - Line comments: `//content` + hardline (always on own line)
     ///
     /// Used when expanding comments force multiline formatting (unions, tuples, etc.)
-    pub(crate) fn build_leading_comments_multiline(&self, start: u32, end: u32) -> Vec<DocId> {
+    pub(crate) fn build_leading_comments_multiline(&self, start: u32, end: u32) -> DocBuf {
         self.build_leading_comments_multiline_opt(start, end, None)
     }
 
@@ -66,9 +67,9 @@ impl<'a> Printer<'a> {
         start: u32,
         end: u32,
         skip_delim: Option<u32>,
-    ) -> Vec<DocId> {
+    ) -> DocBuf {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         for comment in comments_in_range(self.comments, start, end) {
             if skip_delim.is_some_and(|pos| self.comment_on_delimiter_line(pos, comment)) {
                 continue; // pulled onto the delimiter line
@@ -89,7 +90,7 @@ impl<'a> Printer<'a> {
     /// Own-line comments: hardline + comment (on their own line)
     ///
     /// Used when line comments force multiline formatting (unions, tuples, etc.)
-    pub(crate) fn build_trailing_comments_multiline(&self, start: u32, end: u32) -> Vec<DocId> {
+    pub(crate) fn build_trailing_comments_multiline(&self, start: u32, end: u32) -> DocBuf {
         self.build_trailing_comments_multiline_ext(start, end, false)
     }
 
@@ -105,9 +106,9 @@ impl<'a> Printer<'a> {
         start: u32,
         end: u32,
         suffix_same_line_lines: bool,
-    ) -> Vec<DocId> {
+    ) -> DocBuf {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         for comment in comments_in_range(self.comments, start, end) {
             if self.is_same_line(start, comment.span.start) {
                 if suffix_same_line_lines {
@@ -226,9 +227,9 @@ impl<'a> Printer<'a> {
         &self,
         after_pos: u32,
         upper_bound: u32,
-    ) -> Vec<DocId> {
+    ) -> DocBuf {
         let d = self.d();
-        let mut docs = Vec::new();
+        let mut docs = DocBuf::new();
         // Track line reference — follows multi-line block comments to their
         // closing */ line (same logic as build_trailing_same_line_comments_doc in mod.rs)
         let mut line_ref = after_pos;
@@ -264,9 +265,9 @@ impl<'a> Printer<'a> {
         &self,
         comments: &[&internal::Comment],
         target_start: u32,
-    ) -> Vec<DocId> {
+    ) -> DocBuf {
         if comments.is_empty() {
-            return Vec::new();
+            return DocBuf::new();
         }
 
         let d = self.d();
@@ -276,7 +277,7 @@ impl<'a> Printer<'a> {
             .last()
             .is_some_and(|c| self.has_blank_line_between(c.span.end, target_start));
 
-        let mut docs = Vec::new();
+        let mut docs = DocBuf::new();
         let mut last_pos = comments[0].span.start;
 
         for (j, comment) in comments.iter().enumerate() {
@@ -344,21 +345,17 @@ impl<'a> Printer<'a> {
     /// with blank line preservation between them. Returns a Vec of docs to append.
     ///
     /// Used by: class body, interface body, enum body, type literal, namespace body.
-    pub(crate) fn build_trailing_body_comments_doc(
-        &self,
-        prev_end: u32,
-        body_end: u32,
-    ) -> Vec<DocId> {
+    pub(crate) fn build_trailing_body_comments_doc(&self, prev_end: u32, body_end: u32) -> DocBuf {
         let trailing_comments: Vec<_> = comments_in_range(self.comments, prev_end, body_end)
             .filter(|c| !self.is_same_line(prev_end, c.span.start))
             .collect();
 
         if trailing_comments.is_empty() {
-            return Vec::new();
+            return DocBuf::new();
         }
 
         let d = self.d();
-        let mut docs = Vec::new();
+        let mut docs = DocBuf::new();
 
         // Check for blank line before the first trailing comment
         let first_comment = trailing_comments[0];
@@ -419,7 +416,7 @@ impl<'a> Printer<'a> {
         &self,
         delim_pos: u32,
         first_elem_start: u32,
-    ) -> (Vec<DocId>, Option<u32>) {
+    ) -> (DocBuf, Option<u32>) {
         let pc = super::calls::PartitionedComments::new(
             self.comments,
             self.line_breaks,
@@ -428,7 +425,7 @@ impl<'a> Printer<'a> {
         );
         let pull = (!pc.trailing_block.is_empty() || !pc.trailing_line.is_empty())
             && super::calls::should_force_expansion_for_comments(self, delim_pos, first_elem_start);
-        let mut prefix = Vec::new();
+        let mut prefix = DocBuf::new();
         if pull {
             pc.emit_trailing_comments(&mut prefix, self);
         }
@@ -491,7 +488,7 @@ impl<'a> Printer<'a> {
         let first = self.comments.get(first_idx).filter(|c| c.span.end <= end)?;
 
         // Build parts starting from found comment
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         for comment in std::iter::once(first).chain(
             self.comments[first_idx + 1..]
                 .iter()
@@ -571,7 +568,7 @@ impl<'a> Printer<'a> {
         if comments.is_empty() {
             return d.text_owned(format!("{open}{close}"));
         }
-        let mut comment_parts = Vec::new();
+        let mut comment_parts = DocBuf::new();
 
         for (i, comment) in comments.iter().enumerate() {
             comment_parts.push(self.build_comment_doc(comment));
@@ -596,14 +593,14 @@ impl<'a> Printer<'a> {
     /// Line comments get absorbed into the block body as leading content.
     pub(crate) fn append_body_with_sig_comments(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         sig_end: u32,
         body: &internal::BlockStatement,
     ) {
         let d = self.d();
         let body_start = body.span.start;
         if self.has_comments_between(sig_end, body_start) {
-            let mut absorbed = Vec::new();
+            let mut absorbed = DocBuf::new();
             for comment in comments_in_range(self.comments, sig_end, body_start) {
                 if comment.is_block {
                     parts.push(d.text(" "));
@@ -628,7 +625,7 @@ impl<'a> Printer<'a> {
     /// literals, abstract/overload class methods, and declare functions.
     pub(crate) fn append_signature_end_comments(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         return_type: Option<&internal::TSTypeAnnotation>,
         paren_pos: Option<u32>,
         span_end: u32,
@@ -654,12 +651,7 @@ impl<'a> Printer<'a> {
     /// (`build_property_signature_member_doc`) and the signature arms
     /// (`append_signature_end_comments`) so every `TSTypeElement` trailing emission
     /// uses the one break-safe path.
-    pub(crate) fn append_trailing_member_comments(
-        &self,
-        parts: &mut Vec<DocId>,
-        start: u32,
-        end: u32,
-    ) {
+    pub(crate) fn append_trailing_member_comments(&self, parts: &mut DocBuf, start: u32, end: u32) {
         for comment in comments_in_range(self.comments, start, end) {
             parts.push(self.build_trailing_comment_doc(comment));
         }
@@ -672,7 +664,7 @@ impl<'a> Printer<'a> {
     /// [`Self::append_trailing_inline_block_comments`].
     pub(crate) fn append_leading_inline_block_comments(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         start: u32,
         end: u32,
     ) {
@@ -690,7 +682,7 @@ impl<'a> Printer<'a> {
     /// detected earlier and routed to the multiline path).
     pub(crate) fn append_trailing_inline_block_comments(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         start: u32,
         end: u32,
     ) {
@@ -709,8 +701,8 @@ impl<'a> Printer<'a> {
     /// rather than relocated before (see conformance_prettier.md §Comment relocation).
     pub(crate) fn append_last_trailing_block_comments_split(
         &self,
-        before: &mut Vec<DocId>,
-        after: &mut Vec<DocId>,
+        before: &mut DocBuf,
+        after: &mut DocBuf,
         elem_end: u32,
         end_boundary: u32,
     ) {
@@ -737,7 +729,7 @@ impl<'a> Printer<'a> {
     /// Returns the new `prev_end` position.
     pub(crate) fn emit_multiline_comma_with_comments(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         elem_end: u32,
         next_start: u32,
     ) -> u32 {
