@@ -222,6 +222,19 @@ Notes:
   `Vec` growth / `String` / `Box`. With `--profile profiling` many small
   allocations inline the plumbing entirely, so a first-party leaf usually
   means an inlined `Vec`/`Box` alloc.
+- **Caveat — the `-F` leaf over-credits pure dispatchers.** The folded leaf is
+  the *symbol owning the allocation address*, so when the compiler inlines a
+  small allocating callee into its caller the leaf moves up to that caller. A
+  `match` dispatcher with no own buffer (e.g. `build_fragment_node_doc_impl`,
+  `build_chain_doc`) then absorbs its inlined delegates' allocations and reads
+  as the hot site when the real owner is a callee (one such delegate inlining a
+  per-element `Vec` makes the dispatcher look like a `String`-content cluster
+  when it is element-structure scratch). Before trusting a dispatcher leaf,
+  cross-check it against the `-a` source-line backtraces
+  (`heaptrack_print … -a1 --filter-bt-function <fn>`): `-a` expands inline
+  frames with `file:line`, dis-aggregating the inlined delegates back to their
+  own functions and the exact arm/line — so the apparent owner and its true
+  callees separate. Leaf-attribute *then* `-a`-confirm before scoping a fix.
 
 **Bounding an allocator swap without adding the dependency**: `LD_PRELOAD`
 an alternative allocator and A/B it against glibc with paired interleaved
