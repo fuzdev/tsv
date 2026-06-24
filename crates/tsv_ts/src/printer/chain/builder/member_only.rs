@@ -4,9 +4,10 @@
 // fill() for greedy packing of segments.
 
 use super::super::printing::{ChainPrinter, print_node, print_node_inner};
-use super::super::types::{ChainGroup, ChainNode};
+use super::super::types::{ChainGroup, ChainNode, ChainNodeRefVec, DocBuf};
 use super::helpers::push_gap_comments_and_break;
 use crate::ast::internal::Expression;
+use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
 
 /// True if a member-only chain has a line comment in any inter-member gap.
@@ -49,7 +50,7 @@ pub(super) fn build_member_only_chain_with_comments_doc<'a, P: ChainPrinter>(
     printer: &P,
 ) -> DocId {
     let d = printer.arena();
-    let all_nodes: Vec<&ChainNode<'a>> = groups.iter().flat_map(|g| g.nodes.iter()).collect();
+    let all_nodes: ChainNodeRefVec<'_, 'a> = groups.iter().flat_map(|g| g.nodes.iter()).collect();
 
     // first_doc = base + any leading non-member nodes (e.g. a non-null on the base).
     let first_doc_end = all_nodes
@@ -57,7 +58,7 @@ pub(super) fn build_member_only_chain_with_comments_doc<'a, P: ChainPrinter>(
         .take_while(|n| !n.is_member())
         .count()
         .max(1);
-    let first_doc_nodes: Vec<DocId> = all_nodes
+    let first_doc_nodes: DocBuf = all_nodes
         .iter()
         .take(first_doc_end)
         .map(|n| print_node(n, printer))
@@ -67,7 +68,7 @@ pub(super) fn build_member_only_chain_with_comments_doc<'a, P: ChainPrinter>(
     // Each remaining node breaks onto its own line. When its gap carries comments,
     // emit them in place (trailing on the previous line, leading on their own) and
     // print the node skipping its own comments; otherwise just break before it.
-    let mut rest = Vec::new();
+    let mut rest = DocBuf::new();
     for node in &all_nodes[first_doc_end..] {
         match node.comment_range() {
             Some((obj_end, prop_start)) if printer.has_comments_between(obj_end, prop_start) => {
@@ -112,7 +113,7 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
     // layout naturally handles them (suffix appears at end of line).
 
     // Flatten all nodes into individual segments
-    let all_nodes: Vec<&ChainNode<'a>> = groups.iter().flat_map(|g| g.nodes.iter()).collect();
+    let all_nodes: ChainNodeRefVec<'_, 'a> = groups.iter().flat_map(|g| g.nodes.iter()).collect();
 
     if all_nodes.is_empty() {
         return d.empty();
@@ -140,7 +141,7 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
     }
 
     // Build first_doc from base + any trailing non-null assertions
-    let first_doc_nodes: Vec<DocId> = all_nodes
+    let first_doc_nodes: DocBuf = all_nodes
         .iter()
         .take(first_doc_end)
         .map(|n| print_node(n, printer))
@@ -171,8 +172,8 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
     // Each segment includes everything up to and including a member (+ trailing non-null)
     // Note: Block comments are handled by print_node for member nodes
     let remaining_nodes = &all_nodes[first_doc_end..];
-    let mut segments: Vec<DocId> = Vec::new();
-    let mut current_segment: Vec<DocId> = Vec::new();
+    let mut segments: DocBuf = DocBuf::new();
+    let mut current_segment: DocBuf = DocBuf::new();
     let mut seen_member = false;
 
     for (i, node) in remaining_nodes.iter().enumerate() {
@@ -239,7 +240,7 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
     // Note: on_line does NOT need trailing_reserve because fits_with_lookahead
     // already sees trailing content (comma, etc.) in rest_commands with the
     // correct mode (Break → "," is counted).
-    let mut on_line_parts = vec![first_doc];
+    let mut on_line_parts: DocBuf = smallvec![first_doc];
     for &segment in &segments {
         on_line_parts.push(segment);
     }
@@ -256,7 +257,7 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
         //   short segments together: `...labeled\n\t.right.start`
         // - Short base + long last segment: fill packs first segment with base,
         //   breaks before long segment: `ssss.data\n\t.fallbackBBBB...`
-        let mut fill_with_base_parts = vec![first_doc];
+        let mut fill_with_base_parts: DocBuf = smallvec![first_doc];
         for &segment in &segments {
             fill_with_base_parts.push(d.softline());
             fill_with_base_parts.push(segment);
@@ -266,7 +267,7 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
         d.conditional_group(&[on_line, expanded])
     } else {
         // Long chain (3+ segments): fill-based greedy packing after base
-        let mut fill_parts = Vec::new();
+        let mut fill_parts = DocBuf::new();
         for &segment in &segments {
             if !fill_parts.is_empty() {
                 fill_parts.push(d.softline());

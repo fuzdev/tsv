@@ -7,7 +7,7 @@
 // - SymbolLookup trait for identifier resolution
 
 use super::printing::ChainPrinter;
-use super::types::{ChainGroup, ChainNode, ChainNodeVec};
+use super::types::{ChainGroup, ChainGroupVec, ChainNode, ChainNodeVec};
 use crate::ast::internal::{self, Expression};
 use crate::printer::{ParenContext, needs_parens};
 use string_interner::DefaultSymbol;
@@ -372,15 +372,14 @@ fn linearize_member_node<'a>(
 /// Follows prettier's grouping algorithm:
 /// 1. First group: base + calls + non-null + numeric accessors + consecutive members
 /// 2. Remaining groups: members* + calls*, break when seeing memberish after call
-pub fn group_chain_nodes<'a>(nodes: &[ChainNode<'a>]) -> Vec<ChainGroup<'a>> {
+pub fn group_chain_nodes<'a>(nodes: &[ChainNode<'a>]) -> ChainGroupVec<'a> {
     if nodes.is_empty() {
-        return vec![];
+        return ChainGroupVec::new();
     }
 
-    // TODO: this Vec grows from empty per chain and is the cluster's remaining
-    // allocation site (~33k on the zzz corpus); a SmallVec<[ChainGroup; N]> or
-    // with_capacity estimate would collapse it, at ~112 inline bytes per group
-    let mut groups: Vec<ChainGroup<'a>> = Vec::new();
+    // The grouped chain is built on the stack (`ChainGroupVec`): short chains —
+    // the common case — never touch the heap; longer chains spill.
+    let mut groups: ChainGroupVec<'a> = ChainGroupVec::new();
     let mut current = ChainGroup::new();
     let mut i = 0;
 

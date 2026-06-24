@@ -32,9 +32,10 @@ use super::printing::{
     ChainPrinter, has_inside_bracket_comments, print_group, print_group_expanded,
     print_group_standard_expanded, print_node,
 };
-use super::types::{ChainGroup, ChainNode};
+use super::types::{ChainGroup, ChainNode, ChainNodeRefVec, DocBuf};
 use crate::ast::internal::{ArrowFunctionBody, Expression};
 use crate::printer::calls::arg_predicates::contains_call_expression;
+use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
 
 /// Cutoff for short chains when groups should NOT be merged
@@ -50,7 +51,7 @@ const SHORT_CHAIN_CUTOFF_MERGED: usize = 3;
 fn build_rest_expanded_docs<'a, P: ChainPrinter>(
     rest_groups: &[ChainGroup<'a>],
     printer: &P,
-) -> Vec<DocId> {
+) -> DocBuf {
     rest_groups
         .iter()
         .map(|g| print_group_expanded(g, printer))
@@ -58,10 +59,7 @@ fn build_rest_expanded_docs<'a, P: ChainPrinter>(
 }
 
 /// Build flat docs for groups
-fn build_groups_flat_docs<'a, P: ChainPrinter>(
-    groups: &[ChainGroup<'a>],
-    printer: &P,
-) -> Vec<DocId> {
+fn build_groups_flat_docs<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> DocBuf {
     groups.iter().map(|g| print_group(g, printer)).collect()
 }
 
@@ -296,11 +294,11 @@ fn build_short_chain_doc<'a, P: ChainPrinter>(
 
     // For short chains, prettier just concatenates groups directly WITHOUT softlines.
     // This ensures hardlines inside groups don't cause breaks between groups.
-    let rest_docs: Vec<DocId> = rest_groups
+    let rest_docs: DocBuf = rest_groups
         .iter()
         .map(|g| print_group(g, printer))
         .collect();
-    let mut on_line_parts = vec![first_doc];
+    let mut on_line_parts: DocBuf = smallvec![first_doc];
     on_line_parts.extend(rest_docs.iter().copied());
     let on_line = d.concat(&on_line_parts);
 
@@ -329,7 +327,7 @@ fn build_short_chain_doc<'a, P: ChainPrinter>(
     // first groups' call args over breaking the chain.
     if first_has_calls && chain_ends_with_member {
         let first_expanded_doc = build_first_groups_expanded_doc(first_groups, printer);
-        let mut state_first_expanded_parts = vec![first_expanded_doc];
+        let mut state_first_expanded_parts: DocBuf = smallvec![first_expanded_doc];
         state_first_expanded_parts.extend(rest_docs.iter().copied());
         let state_first_expanded = d.concat(&state_first_expanded_parts);
         return d.conditional_group(&[on_line, state_first_expanded]);
@@ -355,7 +353,7 @@ fn build_short_chain_doc<'a, P: ChainPrinter>(
                 return d.concat(&[first_doc, member]);
             }
             // Multiple trailing members: expand with hardlines between ALL groups.
-            let mut rest_parts = Vec::with_capacity(rest_docs.len() * 2);
+            let mut rest_parts: DocBuf = DocBuf::with_capacity(rest_docs.len() * 2);
             for &rest_doc in &rest_docs {
                 rest_parts.push(d.hardline());
                 rest_parts.push(rest_doc);
@@ -382,12 +380,12 @@ fn build_short_chain_doc<'a, P: ChainPrinter>(
 
     // When first call's arg contains calls, try both expansion directions
     let rest_expanded = build_rest_expanded_docs(rest_groups, printer);
-    let mut state_last_expanded_parts = vec![first_doc];
+    let mut state_last_expanded_parts: DocBuf = smallvec![first_doc];
     state_last_expanded_parts.extend(rest_expanded);
     let state_last_expanded = d.concat(&state_last_expanded_parts);
 
     let first_expanded_doc = build_first_groups_expanded_doc(first_groups, printer);
-    let mut state_first_expanded_parts = vec![first_expanded_doc];
+    let mut state_first_expanded_parts: DocBuf = smallvec![first_expanded_doc];
     state_first_expanded_parts.extend(rest_docs.iter().copied());
     let state_first_expanded = d.concat(&state_first_expanded_parts);
 
@@ -404,11 +402,9 @@ fn is_base_call_then_only_members<'a, P: ChainPrinter>(
     rest_groups: &[ChainGroup<'a>],
     printer: &P,
 ) -> bool {
-    // TODO: this collect (and the twin in build_base_call_then_members_doc) runs on
-    // every short chain with rest groups — same materialized-Vec shape the
-    // call_nodes collect in build_chain_doc avoided; could iterate lazily or share
-    // one SmallVec between predicate and builder
-    let all_nodes: Vec<&ChainNode<'a>> = first_groups
+    // Runs on every short chain with rest groups — kept off the heap via the
+    // stack-friendly `ChainNodeRefVec` (the common short chain stays inline).
+    let all_nodes: ChainNodeRefVec<'_, 'a> = first_groups
         .iter()
         .chain(rest_groups.iter())
         .flat_map(|g| g.nodes.iter())
@@ -457,18 +453,18 @@ fn build_base_call_then_members_doc<'a, P: ChainPrinter>(
     printer: &P,
 ) -> DocId {
     let d = printer.arena();
-    let all_nodes: Vec<&ChainNode<'a>> = first_groups
+    let all_nodes: ChainNodeRefVec<'_, 'a> = first_groups
         .iter()
         .chain(rest_groups.iter())
         .flat_map(|g| g.nodes.iter())
         .collect();
     // The leading non-member nodes are the base call; the rest are trailing members.
     let first_member_idx = all_nodes.iter().take_while(|n| !n.is_member()).count();
-    let prefix_docs: Vec<DocId> = all_nodes[..first_member_idx]
+    let prefix_docs: DocBuf = all_nodes[..first_member_idx]
         .iter()
         .map(|n| print_node(n, printer))
         .collect();
-    let mut parts = vec![d.concat(&prefix_docs)];
+    let mut parts: DocBuf = smallvec![d.concat(&prefix_docs)];
     for node in &all_nodes[first_member_idx..] {
         let member = print_node(node, printer);
         parts.push(d.group(d.indent(d.concat(&[d.softline(), member]))));
@@ -489,23 +485,23 @@ fn build_multiarg_short_chain_doc<'a, P: ChainPrinter>(
     // State: First args inline, rest groups with arrow-hugging expanded call args
     // `(sig =>\n  body,\n)` — more compact (fewer lines) but longer first line
     let rest_expanded = build_rest_expanded_docs(rest_groups, printer);
-    let mut state_last_hugged_parts = vec![first_doc];
+    let mut state_last_hugged_parts: DocBuf = smallvec![first_doc];
     state_last_hugged_parts.extend(rest_expanded);
     let state_last_hugged = d.concat(&state_last_hugged_parts);
 
     // State: First args inline, rest groups with standard expanded call args
     // `(\n  args,\n)` — shorter first line, used when arrow-hugging doesn't fit
-    let rest_standard_expanded: Vec<DocId> = rest_groups
+    let rest_standard_expanded: DocBuf = rest_groups
         .iter()
         .map(|g| print_group_standard_expanded(g, printer))
         .collect();
-    let mut state_last_standard_parts = vec![first_doc];
+    let mut state_last_standard_parts: DocBuf = smallvec![first_doc];
     state_last_standard_parts.extend(rest_standard_expanded);
     let state_last_standard = d.concat(&state_last_standard_parts);
 
     // State: First call's args expanded, rest groups flexible
     let first_expanded_doc = build_first_groups_expanded_doc(first_groups, printer);
-    let mut state_first_expanded_parts = vec![first_expanded_doc];
+    let mut state_first_expanded_parts: DocBuf = smallvec![first_expanded_doc];
     state_first_expanded_parts.extend(rest_docs.iter().copied());
     let state_first_expanded = d.concat(&state_first_expanded_parts);
 
@@ -563,7 +559,7 @@ fn build_long_chain_doc<'a, P: ChainPrinter>(
     }
 
     // Print all groups inline (for oneLine variant)
-    let on_line: Vec<DocId> = groups.iter().map(|g| print_group(g, printer)).collect();
+    let on_line: DocBuf = groups.iter().map(|g| print_group(g, printer)).collect();
     let on_line_doc = d.concat(&on_line);
 
     // Handle chains ending with member access with exactly one call in rest
