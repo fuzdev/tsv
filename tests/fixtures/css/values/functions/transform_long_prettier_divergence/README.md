@@ -13,5 +13,5 @@ Print width. tsv treats printWidth as a hard limit and wraps all CSS space-separ
 
 ## Related
 
-- [supports_long](../../at_rules/supports_long_prettier_divergence/) — similar off-by-two
-- [space_separated_long_wrap](../../values/lists/space_separated_long_wrap_prettier_divergence/) — single value variant
+- [supports_long](../../../at_rules/supports_long_prettier_divergence/) — similar off-by-two
+- [space_separated_long_wrap](../../lists/space_separated_long_wrap_prettier_divergence/) — single value variant

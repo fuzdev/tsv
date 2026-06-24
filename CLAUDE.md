@@ -174,7 +174,7 @@ deno task fixtures:update            # regenerate expected.json + output_prettie
 deno task fixtures:update:parsed     # regenerate expected.json only (run when parser changes)
 deno task fixtures:update:formatted  # regenerate output_prettier.svelte only
 deno task fixtures:audit             # audit _prettier_divergence fixtures (diagnostic; --all for every fixture)
-deno task conformance:audit          # verify every divergence fixture is linked in its conformance doc (prettier + svelte; gated in `deno task check`)
+deno task conformance:audit          # doc/fixture integrity: divergence fixtures cataloged + every doc/README link resolves + no stray READMEs on matching fixtures (gated in `deno task check`)
 deno task scan:audit                 # guard against new raw str::find/rfind delimiter scans over source (gated in `deno task check`); see Debug Tooling
 ```
 
@@ -614,14 +614,20 @@ cargo run -p tsv_debug fixtures_audit [pattern...]
 cargo run -p tsv_debug ts_fixture_audit [pattern...]
 # Also: --verbose (show the TS-vs-Svelte diff on 'formats differently' fixtures)
 
-# conformance_audit - verify every divergence-suffixed fixture is linked in its conformance
-# doc: _prettier_divergence → docs/conformance_prettier.md, _svelte_divergence →
-# docs/conformance_svelte.md (_svelte_prettier_divergence must appear in both). The suffix
-# asserts a deliberate difference from the canonical tool; that claim must be cataloged so
-# the divergence is sanctioned and discoverable.
-# Pure Rust (no Deno). Exits non-zero on any unlinked fixture. Gated in `deno task check`.
+# conformance_audit - doc/fixture integrity in one fixture walk (reads each file once):
+#  (1) Orphans - every divergence-suffixed fixture linked in its conformance doc:
+#      _prettier_divergence → docs/conformance_prettier.md, _svelte_divergence →
+#      docs/conformance_svelte.md (_svelte_prettier_divergence in both). The suffix asserts a
+#      deliberate difference; that claim must be cataloged so it's sanctioned and discoverable.
+#  (2) Dead links - every Markdown link (relative path + #anchor) in both conformance docs and
+#      every fixture README resolves on disk. The reverse direction of (1): a link to a
+#      renamed/demoted/deleted fixture, or a back-link with the wrong ../ depth or stale anchor,
+#      is otherwise invisible (the orphan check only proves live-fixture → mentioned-in-doc).
+#  (3) Stray READMEs - a non-divergence fixture (matches both tools) shouldn't carry a README;
+#      deliberate exceptions live in the in-code ALLOWED_NONDIVERGENCE_READMES allowlist.
+# Pure Rust (no Deno). Exits non-zero on any finding. Gated in `deno task check`.
 cargo run -p tsv_debug conformance_audit
-# Also: --json (machine-readable: per-doc array of {doc, suffix, total, unlinked_count, unlinked})
+# Also: --json (machine-readable: {orphans, dead_links, stray_readmes})
 ```
 
 > **Troubleshooting:** See ./docs/fixture_overview.md#quick-decision-tree

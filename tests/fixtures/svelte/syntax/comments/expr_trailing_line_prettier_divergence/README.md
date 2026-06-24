@@ -40,4 +40,4 @@ syntactically valid in these positions. See
 ## Related
 
 - [expr_trailing](./../expr_trailing_prettier_divergence/) — same divergence for block comments (inline, single-line)
-- [debug_comment](../../tags/debug/debug_comment_prettier_divergence/) — same pattern for `{@debug}`
+- [debug_comment](../../../tags/debug/debug_comment_prettier_divergence/) — same pattern for `{@debug}`

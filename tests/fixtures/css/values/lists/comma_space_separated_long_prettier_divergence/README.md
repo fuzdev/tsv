@@ -11,5 +11,5 @@ Print width. tsv treats printWidth as a hard limit. At 100 and 102 chars both fo
 
 ## Related
 
-- [comma_separated_greedy_fill](../../comma_separated_greedy_fill_prettier_divergence/) — same fill boundary pattern
+- [comma_separated_greedy_fill](../../../comma_separated_greedy_fill_prettier_divergence/) — same fill boundary pattern
 - [space_separated_long_wrap](../space_separated_long_wrap_prettier_divergence/) — single value variant

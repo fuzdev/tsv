@@ -19,4 +19,4 @@ in these positions. See
 
 ## Related
 
-- [debug_comment](../../tags/debug/debug_comment_prettier_divergence/) — same pattern for `{@debug}`
+- [debug_comment](../../../tags/debug/debug_comment_prettier_divergence/) — same pattern for `{@debug}`
