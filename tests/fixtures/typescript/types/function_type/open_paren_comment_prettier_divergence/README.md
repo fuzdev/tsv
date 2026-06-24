@@ -43,4 +43,4 @@ function-type `(`-leading comment in its `Root.comments` (it lists the same
 span twice), so an embedded `expected.json` can't match without replicating
 that Svelte bug. The formatter behavior is identical in both contexts.
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

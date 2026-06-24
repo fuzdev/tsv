@@ -9,4 +9,6 @@ Same issue with binary: `(a + b)<T>` vs `a + b<T>`.
 
 ## Reason
 
-Without parens, operator precedence changes. `x ? y : z<T>` means instantiate `z` only, not the whole ternary. This is the same principle as `(x ? y : z) as T` vs `x ? y : z as T`. tsv preserves semantics. Both formatters agree on preserving parens for assignment: `(x = y)<T>`.
+**Semantic preservation.** Without parens, operator precedence changes. `x ? y : z<T>` means instantiate `z` only, not the whole ternary. This is the same principle as `(x ? y : z) as T` vs `x ? y : z as T`. tsv preserves semantics. Both formatters agree on preserving parens for assignment: `(x = y)<T>`.
+
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §TypeScript (Instantiation expression parens).

@@ -36,4 +36,4 @@ an object literal's opening `{`
 and an array literal's opening `[`
 ([open_bracket_comment](../../expressions/arrays/open_bracket_comment_prettier_divergence/)).
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.

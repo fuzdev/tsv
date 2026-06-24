@@ -13,5 +13,5 @@ tsv and prettier-plugin-svelte fall back to **standard arg breaking**
 In TS contexts (`.ts`, `<script lang="ts">`) prettier's oxc-ts backend strips the
 parens (and would then use expand-last on the bare call) — that is the JS-vs-TS
 divergence documented for the cast family. See
-[conformance_prettier.md §JSDoc / paren semantics](../../../../../../docs/conformance_prettier.md#jsdoc--paren-semantics)
+[conformance_prettier.md §JSDoc / paren semantics](../../../../../docs/conformance_prettier.md#jsdoc--paren-semantics)
 and the base divergence fixture `jsdoc_type_cast_ts_prettier_divergence`.

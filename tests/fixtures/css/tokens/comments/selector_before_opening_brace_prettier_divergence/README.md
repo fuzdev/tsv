@@ -7,7 +7,7 @@ Prettier: preserves whatever spacing the input has
 
 ## Reason
 
-tsv normalizes comment spacing consistently across all CSS contexts.
+Stable quirk. tsv normalizes comment spacing consistently across the CSS contexts whose grammar it parses (selectors, `@media`/`@supports` preludes, declaration values); prettier preserves whatever spacing the source has. See [conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments).
 
 ## Related
 

@@ -19,8 +19,8 @@ The class, interface, and type-literal index-signature printers share
 `build_index_signature_member_doc`, so this is the class face of the type-member
 fixtures
 ([open_bracket](../../../types/type_members/index_signature_open_bracket_line_comment_svelte_prettier_divergence/),
-[key_colon](../../../types/type_members/index_signature_key_colon_line_comment/),
-[key_type](../../../types/type_members/index_signature_key_type_line_comments_prettier_divergence/),
+[key_colon](../../../types/type_members/index_signature_key_colon_line_comment_svelte_prettier_divergence/),
+[key_type](../../../types/type_members/index_signature_key_type_line_comments_svelte_prettier_divergence/),
 [close_bracket](../../../types/type_members/index_signature_close_bracket_line_comment_prettier_divergence/)).
 
 ## Formatter — prettier divergence

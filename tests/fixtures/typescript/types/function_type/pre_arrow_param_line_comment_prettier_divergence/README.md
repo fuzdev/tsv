@@ -7,12 +7,12 @@ comment **into** the parameter list, trailing the last parameter, and breaks the
 params.
 
 tsv: keeps the comment after `)` (`(a: T) // c\n=> void`)
-Prettier: moves it onto the last param (`(\n\ta: T, // c\n) => void`)
+Prettier: moves it onto the last param (`(\n\ta: T // c\n) => void`)
 
 ```
 // tsv                  // prettier
 type G = (a: T) // c    type G = (
-=> void;                    a: T, // c
+=> void;                    a: T // c
                         ) => void;
 ```
 
@@ -34,4 +34,4 @@ Before this, the comment swallowed the following tokens (`(a: T) // c => void` �
 the `=> void` absorbed into the comment, invalid and non-idempotent); now it is
 preserved. Covers function types and constructor (`new (...)`) types.
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

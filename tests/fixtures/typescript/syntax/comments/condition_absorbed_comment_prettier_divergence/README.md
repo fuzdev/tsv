@@ -8,3 +8,6 @@ in their original position instead of being absorbed into the condition.
 
 Per comment placement policy, the user's chosen position is preserved.
 Both positions are dual-stable in our formatter.
+
+Reason: Comment relocation (comment position). See
+[conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

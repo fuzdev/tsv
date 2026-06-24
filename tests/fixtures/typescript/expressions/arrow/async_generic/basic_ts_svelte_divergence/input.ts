@@ -1,6 +1,6 @@
 // Async generic arrow functions in pure TypeScript (.ts path)
 // Single type params stay bare in both contexts for tsv; only prettier forces `<T,>` in Svelte
-// See basic_svelte_prettier_divergence/input.svelte for full coverage
+// See long_svelte_divergence/ (Svelte context) and stacked_svelte_prettier_divergence/ (stacked case)
 
 // Single type param — bare `<T>` (prettier keeps it bare on the .ts path too)
 const basic = async <T>(x: T): Promise<T> => x;

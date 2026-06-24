@@ -24,4 +24,4 @@ intersection-member counterpart of `union_intersection_retained_paren_comment`
 paren-unwrapping path, this fixture pins the behavior. Both positions are
 dual-stable in our formatter.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).

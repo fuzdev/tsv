@@ -33,3 +33,6 @@ the chain changes the apparent target. tsv preserves the author's intent.
 
 Prettier is also not idempotent on this pattern — the first pass keeps the comment inside
 brackets, the second pass hoists it. tsv is stable in one pass.
+
+Reason: Comment relocation (comment position). See
+[conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

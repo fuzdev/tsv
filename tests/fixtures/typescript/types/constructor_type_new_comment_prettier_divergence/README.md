@@ -14,4 +14,4 @@ was dropped entirely (content loss).
 
 Both positions are dual-stable under our formatter (`variant_after_parens.svelte`).
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).

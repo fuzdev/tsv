@@ -8,3 +8,7 @@ Prettier: relocates comments to the discriminant parens
 ## Reason
 
 tsv treats user comment placement as intentional. A comment in the switch body reads as "this switch is empty because..." — moving it to the discriminant changes the meaning. Consistent with tsv's handling across if/else, try/catch, for, while, do-while, labeled statements, and call chains.
+
+The discriminant form (`variant_compact.svelte`, `switch (\n\tx // comment\n) {}`) is dual-stable: both formatters keep it as-is, so it is a `variant_*`, not the canonical input.
+
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

@@ -26,4 +26,4 @@ Per Comment Position Philosophy, the user's chosen position is preserved. Unlike
 default/namespace import headers (prettier keeps comments near the binding), every
 export-all header comment relocates after `from`.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

@@ -7,4 +7,6 @@ Prettier: `<small\n\t>{expr} text{expr !== 1 ? 's' : ''}` (101 chars, exceeds)
 
 ## Reason
 
-tsv treats printWidth as a hard limit. Breaking ternaries at `?` is more readable than breaking at `!==`, and keeping `<tag>{content}` on one line provides cleaner structure.
+Print width. tsv treats printWidth as a hard limit. Breaking ternaries at `?` is more readable than breaking at `!==`, and keeping `<tag>{content}` on one line provides cleaner structure.
+
+See [conformance_prettier.md §Print Width Philosophy](../../../../../docs/conformance_prettier.md#print-width-philosophy).

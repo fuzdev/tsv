@@ -33,3 +33,7 @@ that same input.
 - `expected_ours.json` — tsv AST with the custom property's value spanning the
   raw `{ ... }` block source
 - `expected_svelte.json` — `{"error": "failed to parse"}` (Svelte parse failure)
+
+See [conformance_svelte.md §CSS Corrections](../../../../../../docs/conformance_svelte.md#css-corrections)
+(parser rejection) and [conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values)
+(formatter difference).

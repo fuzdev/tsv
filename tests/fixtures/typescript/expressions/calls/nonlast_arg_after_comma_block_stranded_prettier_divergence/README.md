@@ -29,4 +29,4 @@ author wrote it — `/* b1 */` before the comma (trailing the arg), `/* s */` af
 two halves compose: the before-comma rule and the stranded rule hold independently.
 
 Covers the plain-call, `new`, and chained-call argument paths. See
-[conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+[conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

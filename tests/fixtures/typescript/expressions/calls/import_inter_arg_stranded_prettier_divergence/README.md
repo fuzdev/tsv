@@ -23,4 +23,5 @@ plain-match sibling [import_inter_arg_comment](../import_inter_arg_comment/). Th
 rule: *a comment hugging the next arg leads it; a stranded comment stays on the comma
 line.*
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+Reason: Comment relocation. See
+[conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

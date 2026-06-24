@@ -7,7 +7,7 @@ Prettier: `@media screen/* comment */ {` (no space before `/*`)
 
 ## Reason
 
-tsv normalizes comment spacing in the contexts whose grammar it parses (`@media`/`@supports` preludes, selectors, declaration values). Prettier adds space after `*/` but not before `/*` in this position, despite normalizing both in other contexts. (Raw at-rule preludes — `@layer`/`@keyframes`/`@namespace`/… — are kept verbatim instead, matching prettier, so they are *not* a divergence.)
+Stable quirk. tsv normalizes comment spacing in the contexts whose grammar it parses (`@media`/`@supports` preludes, selectors, declaration values). Prettier adds space after `*/` but not before `/*` in this position, despite normalizing both in other contexts. (Raw at-rule preludes — `@layer`/`@keyframes`/`@namespace`/… — are kept verbatim instead, matching prettier, so they are *not* a divergence.) See [conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments).
 
 ## Related
 

@@ -13,9 +13,12 @@ form).
 
 ## Reason
 
-Semantic preservation. `new (a?.b)!()` constructs on the asserted result of `a?.b`;
-dropping the parens changes (or breaks) the meaning. Prettier strips the parens off
-**both** forms, and both results fail to re-parse:
+Prettier bug. `new (a?.b)!()` constructs on the asserted result of `a?.b`;
+dropping the parens changes (or breaks) the meaning. Unlike the member-chain
+siblings — where Prettier's paren-drop is a valid-but-semantically-different
+output (Semantic preservation) — here Prettier strips the parens off **both**
+forms and both results are themselves **syntax errors** that fail to re-parse,
+so Prettier's own output is non-idempotent:
 
 - **Member base** `new (a?.b)!()` → `new a?.b!()`, which **fails to re-parse**
   ("Optional chaining cannot appear in the callee of new expressions"). Prettier's

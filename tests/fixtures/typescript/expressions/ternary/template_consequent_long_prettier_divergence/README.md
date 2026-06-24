@@ -7,4 +7,6 @@ Prettier: breaks at `?` and `:`, keeps template inline (101+ chars)
 
 ## Reason
 
-tsv breaks template interpolations to respect printWidth. Consistent with tsv's template literal handling across all contexts.
+Print width. tsv breaks template interpolations to respect printWidth. Consistent with tsv's template literal handling across all contexts.
+
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §TypeScript: Template Literals.

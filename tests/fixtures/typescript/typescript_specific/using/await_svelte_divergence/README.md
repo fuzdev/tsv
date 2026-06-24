@@ -17,6 +17,8 @@ async function process() {
 }
 ```
 
+See [conformance_svelte.md](../../../../../../docs/conformance_svelte.md) §TypeScript Corrections.
+
 ## References
 
 - [TC39 Explicit Resource Management](https://github.com/tc39/proposal-explicit-resource-management)

@@ -14,7 +14,9 @@ Tests function return types and type aliases.
 
 ## Reason
 
-Conditional types have natural break points at `?` and `:` that show the ternary structure clearly, consistent with how conditional types format elsewhere in TypeScript.
+Print width. Conditional types have natural break points at `?` and `:` that show the ternary structure clearly, consistent with how conditional types format elsewhere in TypeScript. Prettier keeps the compact form stable past printWidth (`prettier_variant_compact`); tsv normalizes it to the broken input — so on the broken input both formatters match and the divergence surfaces only via the compact variant.
+
+See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §TypeScript: Template Literals.
 
 ## Related
 

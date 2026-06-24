@@ -3,7 +3,6 @@ use crate::fixtures;
 use crate::fixtures::InputType;
 use argh::FromArgs;
 use futures_util::stream::{self, StreamExt};
-use std::path::Path;
 use tsv_cli::json_utils::to_json_with_tabs;
 
 /// Regenerate expected.json (or expected_ours.json + expected_svelte.json) files.
@@ -27,37 +26,7 @@ impl FixturesUpdateParsedCommand {
 }
 
 async fn run(list_only: bool, filters: &[String]) {
-    let fixtures_dir = Path::new("tests/fixtures");
-
-    if !fixtures_dir.exists() {
-        eprintln!("Error: fixtures directory not found: tests/fixtures");
-        std::process::exit(1);
-    }
-
-    let all_fixtures = match fixtures::walk_fixtures(fixtures_dir) {
-        Ok(f) => f,
-        Err(e) => {
-            eprintln!("Error walking fixtures: {e}");
-            std::process::exit(1);
-        }
-    };
-
-    let total_count = all_fixtures.len();
-
-    // Apply filters
-    let fixture_list: Vec<_> = all_fixtures
-        .into_iter()
-        .filter(|f| f.matches_filters(filters))
-        .collect();
-
-    if fixture_list.is_empty() {
-        if filters.is_empty() {
-            eprintln!("No fixtures found");
-        } else {
-            eprintln!("No fixtures found matching: {}", filters.join(" "));
-        }
-        std::process::exit(1);
-    }
+    let (fixture_list, total_count) = super::walk_and_filter(filters);
 
     if list_only {
         println!("Found fixtures:");

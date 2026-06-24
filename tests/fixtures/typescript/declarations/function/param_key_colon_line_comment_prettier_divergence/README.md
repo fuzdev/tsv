@@ -14,9 +14,9 @@ function fn(                    function fn(
 ```
 
 The parameter face of the cross-construct
-[before-`:` continuation indent](../../../types/type_members/index_signature_key_colon_line_comment_prettier_divergence/)
+[before-`:` continuation indent](../../../types/type_members/index_signature_key_colon_line_comment_svelte_prettier_divergence/)
 (index signatures, property signatures, class properties, variable declarations).
 Shared with general identifier-with-type-annotation positions via
 `build_identifier_doc_inner`. See
 [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
-§Uniform forced-continuation indent and §Comment Position Philosophy.
+§Uniform Forced-Continuation Indent and §Comment Position Philosophy.

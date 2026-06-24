@@ -16,19 +16,22 @@ import type {} from // c4
 ```
 
 **tsv**: preserves them where the user placed them — a block comment trails inline,
-a line comment stays on its own line with `type {}` following:
+a line comment stays on its own line with the continuation indented one level (the
+uniform module-header rule):
 
 ```
 import /* c1 */ type {} from './a';
 import // c2
-type {} from './b';
+	type {} from './b';
 import type /* c3 */ {} from './c';
 import type // c4
-{} from './d';
+	{} from './d';
 ```
 
-Per Comment Position Philosophy, the user's chosen position is preserved. Both
-positions are dual-stable in our formatter. The type-only sibling of
+Per Comment Position Philosophy, the user's chosen position is preserved. The block
+comments (c1, c3) diverge on position; the line comments (c2, c4) diverge on
+indentation (tsv indents the continuation, Prettier keeps it flat). Both positions
+are dual-stable in our formatter. The type-only sibling of
 `empty_keyword_comment_prettier_divergence` (non-type `import {}`).
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

@@ -9,3 +9,5 @@ opening `{` in anonymous class expressions into the class body:
 We preserve the comment in the user's original position between keyword and
 body. Per comment placement policy, user intent is preserved when prettier
 moves comments to different syntactic positions.
+
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

@@ -28,4 +28,4 @@ gap as `do_while/close_paren_comment_prettier_divergence`. Only the no-`from`
 case diverges; with a `from` clause prettier keeps the comment after the source,
 so tsv matches prettier there.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

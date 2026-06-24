@@ -30,5 +30,5 @@ A **block** comment in this gap (`const e: /* c */ X`) stays inline in both
 formatters and is not a divergence — only a line comment (which runs to EOL,
 forcing the type onto its own line) differs. The single underlying rule lives in
 the shared `build_type_annotation_doc`. See
-[conformance_prettier.md](../../../../../docs/conformance_prettier.md)
-§Uniform forced-continuation indent and §Comment Position Philosophy.
+[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+§Uniform Forced-Continuation Indent and §Comment Position Philosophy.

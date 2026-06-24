@@ -40,4 +40,4 @@ break layout for free. The all-match (no `:`→type comment) companion — simpl
 long-union values under a `]`→`:` comment — is the regular fixture
 [index_signature_bracket_colon_union_value](../index_signature_bracket_colon_union_value/).
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
-§Uniform forced-continuation indent and §Comment Position Philosophy.
+§Uniform Forced-Continuation Indent and §Comment Position Philosophy.

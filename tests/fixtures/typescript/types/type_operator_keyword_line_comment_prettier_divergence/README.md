@@ -42,4 +42,5 @@ Previously tsv emitted the comment inline and **swallowed the operand**
 content loss); keeping it on the operator line via `line_suffix` with the
 operand on the next line fixes the loss.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation
+("Prefix type-operator operand hang" — layout, not a relocation).

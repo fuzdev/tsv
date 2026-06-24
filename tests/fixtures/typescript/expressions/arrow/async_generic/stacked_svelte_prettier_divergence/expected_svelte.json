@@ -1,0 +1,347 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 348,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Single async generic arrow that stacks BOTH divergences on one construct:",
+			"start": 20,
+			"end": 96,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": "  - Parser (Svelte): acorn-typescript drops the `x` param (expected_svelte vs expected_ours)",
+			"start": 98,
+			"end": 192,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 95
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": "  - Formatter (Prettier): forces `<T,>` on the single unconstrained type param (output_prettier)",
+			"start": 194,
+			"end": 292,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 99
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 347,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 338,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 294,
+					"end": 337,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 44
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 300,
+							"end": 336,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 43
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 300,
+								"end": 301,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 304,
+								"end": 336,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 43
+									}
+								},
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 310,
+									"end": 313,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 17
+										},
+										"end": {
+											"line": 5,
+											"column": 20
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 311,
+											"end": 312,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 18
+												},
+												"end": {
+													"line": 5,
+													"column": 19
+												}
+											},
+											"name": "T"
+										}
+									]
+								},
+								"params": [],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 319,
+									"end": 331,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 26
+										},
+										"end": {
+											"line": 5,
+											"column": 38
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 321,
+										"end": 331,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 28
+											},
+											"end": {
+												"line": 5,
+												"column": 38
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 321,
+											"end": 328,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 28
+												},
+												"end": {
+													"line": 5,
+													"column": 35
+												}
+											},
+											"name": "Promise"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 328,
+											"end": 331,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 35
+												},
+												"end": {
+													"line": 5,
+													"column": 38
+												}
+											},
+											"params": [
+												{
+													"type": "TSTypeReference",
+													"start": 329,
+													"end": 330,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 36
+														},
+														"end": {
+															"line": 5,
+															"column": 37
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 329,
+														"end": 330,
+														"loc": {
+															"start": {
+																"line": 5,
+																"column": 36
+															},
+															"end": {
+																"line": 5,
+																"column": 37
+															}
+														},
+														"name": "T"
+													}
+												}
+											]
+										}
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": true,
+								"body": {
+									"type": "Identifier",
+									"start": 335,
+									"end": 336,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 42
+										},
+										"end": {
+											"line": 5,
+											"column": 43
+										}
+									},
+									"name": "x"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Single async generic arrow that stacks BOTH divergences on one construct:",
+							"start": 20,
+							"end": 96
+						},
+						{
+							"type": "Line",
+							"value": "  - Parser (Svelte): acorn-typescript drops the `x` param (expected_svelte vs expected_ours)",
+							"start": 98,
+							"end": 192
+						},
+						{
+							"type": "Line",
+							"value": "  - Formatter (Prettier): forces `<T,>` on the single unconstrained type param (output_prettier)",
+							"start": 194,
+							"end": 292
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

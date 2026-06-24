@@ -33,4 +33,4 @@ opening `(`
 ([open_paren_comment](../../calls/open_paren_comment_prettier_divergence/)),
 and first-element leading comments across lists.
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

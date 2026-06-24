@@ -7,4 +7,6 @@ Prettier: never wraps single-specifier imports
 
 ## Reason
 
-tsv wraps consistently — if printWidth=100 is configured, lines should respect it. Multi-specifier imports already wrap at printWidth. The original Prettier decision received 18 thumbs-down vs 0 thumbs-up. Tooling (code review, terminals, side-by-side diffs) relies on line width limits.
+Print width. tsv wraps consistently — if printWidth=100 is configured, lines should respect it. Multi-specifier imports already wrap at printWidth. The original Prettier decision received 18 thumbs-down vs 0 thumbs-up. Tooling (code review, terminals, side-by-side diffs) relies on line width limits.
+
+See [conformance_prettier.md §TypeScript](../../../../../../docs/conformance_prettier.md#typescript) (Single specifier import) and [§Print Width Philosophy](../../../../../../docs/conformance_prettier.md#print-width-philosophy).

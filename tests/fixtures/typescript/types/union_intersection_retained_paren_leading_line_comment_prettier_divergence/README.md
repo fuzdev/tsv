@@ -40,7 +40,7 @@ which likewise keeps a line comment inside the retained parens for the first
 member. The asymmetry shown by the `Mid` case: a leading line comment inside a
 **later** member's parens relocates to trail the previous member (both formatters
 agree — see
-[union_paren_member_long_line_comment](comments/union_paren_member_long_line_comment_prettier_divergence/));
+[union_paren_member_long_line_comment](../comments/union_paren_member_long_line_comment_prettier_divergence/));
 only the first member, with no previous member to relocate onto, keeps the
 comment inside.
 

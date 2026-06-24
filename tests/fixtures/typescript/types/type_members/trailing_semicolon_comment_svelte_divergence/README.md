@@ -1,9 +1,11 @@
 # Parser divergence: comment duplication in root comments array
 
-Acorn-typescript duplicates comments that appear as `trailingComments` on
-type annotations in property signatures, method signatures, call signatures,
-and construct signatures. This is a side effect of acorn's backtrack-and-reparse
-behavior when parsing these constructs.
+Acorn-typescript duplicates a comment on a return/property type annotation that
+is immediately followed by `;`, in the root `comments` array. This is a side
+effect of acorn's backtrack-and-reparse when parsing the member's type. Here the
+method, type-literal method, call-signature, and construct-signature comments
+each duplicate; the bare property-signature comment (`a3: number /* comment */;`)
+does not.
 
 Our parser does not duplicate these comments — each comment appears exactly
 once in the root comments array. The AST structure is semantically equivalent
@@ -12,3 +14,6 @@ array count (our: 10, canonical: 14).
 
 This does not affect formatting — the formatter finds comments by position,
 not by their count in the root array.
+
+See [conformance_svelte.md](../../../../../../docs/conformance_svelte.md) §Comment Attachment
+Differences.

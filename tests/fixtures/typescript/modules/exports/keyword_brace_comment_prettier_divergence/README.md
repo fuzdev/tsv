@@ -16,4 +16,4 @@ bug**: tsv previously *dropped* this comment entirely (`export /* c */ { a }` �
 `export { a }`). Sibling of the import `keyword_brace_comment` divergence and the
 export `from_comment` divergence (the gap one token later).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

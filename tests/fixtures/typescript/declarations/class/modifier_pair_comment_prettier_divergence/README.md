@@ -11,4 +11,4 @@ Single-modifier comments (`static /* c */ p`) are preserved identically by both
 formatters — see `../member_modifier_comment/`. Per comment placement policy,
 we preserve user intent when prettier moves comments to different positions.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

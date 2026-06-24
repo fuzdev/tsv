@@ -16,4 +16,9 @@ This applies only to a single query. A **comma-separated** query list is broken 
 
 ## Reason
 
-tsv enforces printWidth consistently across all CSS at-rules. Prettier never implemented intra-query (`and`/`or`) wrapping for `@media`.
+See [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules) (`@media line wrap`, Print width). tsv enforces printWidth consistently across all CSS at-rules; Prettier never implemented intra-query (`and`/`or`) wrapping for `@media`.
+
+## Related
+
+- [container_long](../container_long_prettier_divergence/) — same: Prettier never wraps a single `@container` query
+- [import_media_query_long](../import_media_query_long_prettier_divergence/) · [supports_long](../supports_long_prettier_divergence/) — off-by-one / off-by-two boundary variants

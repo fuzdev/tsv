@@ -12,7 +12,10 @@ function f(x): x is // c
 }
 ```
 
-**Prettier**: relocates the comment to trail the function body's opening `{`:
+**Prettier**: relocates the comment to trail the function body's opening `{`
+(`output_prettier.svelte`); it is non-idempotent doing so — a second pass moves
+the comment onto its own line inside the body (`audit_signature.txt` pins the
+two-pass chain):
 
 ```
 function f(x): x is T { // c
@@ -36,4 +39,4 @@ non-idempotent content loss); keeping it on the `is` line via `line_suffix` with
 the predicate type on the next line fixes the loss and preserves the user's
 placement.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).

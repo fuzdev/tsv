@@ -20,3 +20,5 @@ tsv correctly parses no-namespace selectors per the CSS spec:
 
 ## Reason for Divergence
 Svelte's CSS parser has incomplete namespace selector support. tsv follows the CSS spec.
+
+See [conformance_svelte.md §CSS Corrections](../../../../../../docs/conformance_svelte.md#css-corrections).

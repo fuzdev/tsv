@@ -39,3 +39,7 @@ Neither choice is information-destructive (the block text and its
 position-relative-to-the-colon are both preserved in either canonical
 form). This divergence is purely about which stable form to favor for
 unstable inputs.
+
+Reason: Comment normalization (stable quirks). See
+[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+§Comment normalization (stable quirks).

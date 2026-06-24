@@ -6,8 +6,8 @@ closing `}` on its own line at the tag's base indent, and expands the body +
 whole head inline past printWidth.
 
 Boundary shapes covered: a head that fits (≤100) stays fully inline; a single call
-whose args wrap hugs `)`` }`; a binary / multi-group member chain drops its
-clause + `}` to base; a 2-group member chain across the fit → middle-zone → wrap
+whose args wrap hugs `)}`; a binary / multi-group member chain drops its
+`}` to base; a 2-group member chain across the fit → middle-zone → wrap
 boundary; a 3+ group member chain always wraps.
 
 ## Reason

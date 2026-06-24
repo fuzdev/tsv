@@ -18,7 +18,7 @@ conditional's `? :` are ambiguous without the parens:
 
 ## Reason
 
-`infer` only appears in a conditional's extends-type, so a trailing token always
+Prettier bug. `infer` only appears in a conditional's extends-type, so a trailing token always
 follows the constraint. When the constraint (or a nested arrow's return) ends in
 a position that abuts the enclosing `? :`, the parens are the only thing keeping
 the parse unambiguous — TypeScript requires them. A bare `<T extends (A extends B
@@ -32,5 +32,5 @@ in **both** formatters — Prettier's single-level rule covers it. It is include
 to show the boundary: Prettier preserves the single-arrow form but drops the
 nested-arrow and conditional-constraint forms.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md)
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
 §TypeScript "Constrained infer extends-operand parens".

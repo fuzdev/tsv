@@ -6,3 +6,5 @@ Prettier relocates line comments from between the method name and type params to
 We preserve the user's comment placement. The line comment forces a break, so type params go to the next line.
 
 Covers: class method, object method, interface method signature.
+
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

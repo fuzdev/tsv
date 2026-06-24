@@ -14,18 +14,23 @@ export type {
 	// c3
 	C
 } from './c';
+export type {
+	// c4
+	D
+} from './d';
 ```
 
 **tsv**: preserves them where the user placed them — a block comment trails inline,
-a line comment stays on its own line with the following token after it:
+a line comment stays on its own line with the following token dropped to a
+continuation line indented one level (the uniform module-header rule):
 
 ```
 export /* c1 */ type { A } from './a';
 export type /* c2 */ { B } from './b';
 export // c3
-type { C } from './c';
+	type { C } from './c';
 export type // c4
-{ D } from './d';
+	{ D } from './d';
 ```
 
 The `export type /* type */ { E }` case sits in the same `type`→braces position as
@@ -38,4 +43,4 @@ Per Comment Position Philosophy, the user's chosen position is preserved. The
 export sibling of `modules/imports/type_keyword_comment_prettier_divergence`, and the
 non-empty counterpart of `empty_type_keyword_comment_prettier_divergence`.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

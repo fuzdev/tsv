@@ -1,4 +1,4 @@
-# optional_marker_comment_prettier_divergence
+# optional_marker_comment_svelte_prettier_divergence
 
 Prettier relocates a block comment written after the optional `?` marker in
 type-literal members; tsv preserves the user's placement (after `?`).

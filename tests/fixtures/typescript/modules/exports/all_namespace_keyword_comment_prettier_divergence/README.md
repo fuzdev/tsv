@@ -33,4 +33,4 @@ Comment Position Philosophy. Sibling of the export-all
 `all_keyword_comment_prettier_divergence` (no binding, where prettier relocates
 after `from`).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

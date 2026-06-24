@@ -18,3 +18,7 @@ hint to re-document the fixture normally.
 
 This is a `.css` fixture because the construct is pure CSS; the embedded path
 is covered by the sibling `.svelte` fixtures.
+
+## Reason
+
+Prettier bug. See [conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values) ("Empty value + `!important`").

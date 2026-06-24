@@ -21,8 +21,8 @@ const o = {                  const o = {
 This is the same preserve-in-place rule tsv applies to every other open
 delimiter (object `{`, array `[`, block `{`, type-param `<`, function-type `(`,
 index-signature `[`, …) via the shared `build_computed_key_bracket_doc`. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
-§Comment relocation ("Object/array/block open-delimiter trailing") and §Comment
+[conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation)
+("Object/array/block open-delimiter trailing") and §Comment
 Position Philosophy. A comment the author wrote on its own line is likewise kept
 in place (on its own line inside the broken bracket), and a block comment hugging
 `[` (`[/* d */ bar]`) stays inline — both unchanged.

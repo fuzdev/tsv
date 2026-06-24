@@ -32,20 +32,7 @@ impl FixturesAuditCommand {
     }
 
     async fn run_async(self) {
-        let fixtures_dir = std::path::Path::new("tests/fixtures");
-
-        if !fixtures_dir.exists() {
-            eprintln!("Error: fixtures directory not found: tests/fixtures");
-            std::process::exit(1);
-        }
-
-        let all_fixtures = match fixtures::walk_fixtures(fixtures_dir) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error walking fixtures: {e}");
-                std::process::exit(1);
-            }
-        };
+        let all_fixtures = super::walk_or_exit();
 
         // Apply filters, then scope to divergence fixtures by default
         let fixture_list: Vec<_> = all_fixtures

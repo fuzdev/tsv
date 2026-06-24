@@ -246,6 +246,7 @@ impl<'a> SvelteParser<'a> {
                 Ok(AttributeNode::BindDirective(BindDirective {
                     name: directive_name,
                     expression: expr,
+                    modifiers,
                     span,
                     name_span,
                     expression_tag_span,
@@ -259,6 +260,7 @@ impl<'a> SvelteParser<'a> {
                 Ok(AttributeNode::ClassDirective(ClassDirective {
                     name: directive_name,
                     expression: expr,
+                    modifiers,
                     span,
                     name_span,
                     expression_tag_span,
@@ -268,6 +270,7 @@ impl<'a> SvelteParser<'a> {
             DirectiveType::Use => Ok(AttributeNode::UseDirective(UseDirective {
                 name: directive_name,
                 expression,
+                modifiers,
                 span,
                 name_span,
                 expression_tag_span,
@@ -304,6 +307,7 @@ impl<'a> SvelteParser<'a> {
             DirectiveType::Animate => Ok(AttributeNode::AnimateDirective(AnimateDirective {
                 name: directive_name,
                 expression,
+                modifiers,
                 span,
                 name_span,
                 expression_tag_span,
@@ -311,6 +315,7 @@ impl<'a> SvelteParser<'a> {
             DirectiveType::Let => Ok(AttributeNode::LetDirective(LetDirective {
                 name: directive_name,
                 expression,
+                modifiers,
                 span,
                 name_span,
                 expression_tag_span,

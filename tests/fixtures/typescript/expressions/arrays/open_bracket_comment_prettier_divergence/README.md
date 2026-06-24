@@ -34,4 +34,4 @@ opening `(`
 and an object literal's opening `{`
 ([open_brace_comment](../../objects/open_brace_comment_prettier_divergence/)).
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

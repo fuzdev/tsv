@@ -1,5 +1,7 @@
 # compact_block_children_prettier_divergence
 
+A component (`<Comp>`) with compact-authored **block children** (`<div>block1</div><div>block2</div>`).
+
 tsv lays out this inline element's wrapping content **block-style** — both tags stay intact and the
 content moves to its own indented line(s), collapsing to `<tag>content</tag>` when it fits. Prettier
 instead dangles the tag delimiters (`<tag⏎\t>content</tag⏎>`). Content-boundary whitespace is

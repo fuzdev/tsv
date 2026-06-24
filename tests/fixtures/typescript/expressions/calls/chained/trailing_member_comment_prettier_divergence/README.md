@@ -19,4 +19,6 @@ is idempotent (input formats to itself).
 
 ## Reason
 
-tsv treats user comment placement as intentional. Consistent with tsv's handling across if/else, try/catch, switch, for, while, do-while, labeled statements, and other chain comment contexts.
+Comment relocation. tsv treats user comment placement as intentional. Consistent with tsv's handling across if/else, try/catch, switch, for, while, do-while, labeled statements, and other chain comment contexts.
+
+See [conformance_prettier.md §Comment relocation](../../../../../../../docs/conformance_prettier.md#comment-relocation).

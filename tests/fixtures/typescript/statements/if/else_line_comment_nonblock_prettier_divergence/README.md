@@ -17,4 +17,4 @@ else expr;
 Per Comment Position Philosophy: preserve user intent when prettier moves a comment.
 Both positions are dual-stable (`variant_comment_before_else.svelte`).
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

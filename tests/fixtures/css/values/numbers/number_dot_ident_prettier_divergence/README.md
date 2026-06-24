@@ -18,4 +18,4 @@ too, since url is a special token.
 
 Spec violation. Both forms only arise in invalid CSS, and preserving the source
 avoids inventing a dimension from a token sequence that isn't one. See
-conformance_prettier.md §CSS: Values.
+[conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values) ("Number dot-ident").

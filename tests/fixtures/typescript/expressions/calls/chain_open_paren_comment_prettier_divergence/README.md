@@ -29,4 +29,6 @@ tsv previously reversed them; it now keeps `/* paren */` on the `(` line and
 on its own line, both formatters keep it there — the two positions are
 dual-stable.
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation (Call open paren `(`).
+Reason: Comment relocation. See
+[conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation)
+(Call open paren `(`).

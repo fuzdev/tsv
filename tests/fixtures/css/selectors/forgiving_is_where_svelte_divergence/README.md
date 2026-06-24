@@ -11,3 +11,5 @@ Pseudo-elements inside `:is()`/`:where()` are kept in the AST (contextually inva
 
 - `expected_ours.json` — tsv AST with syntax errors filtered, pseudo-elements kept
 - `expected_svelte.json` — `{"error": "failed to parse"}` (Svelte parse failure, expected)
+
+See [conformance_svelte.md §CSS Corrections](../../../../../docs/conformance_svelte.md#css-corrections).

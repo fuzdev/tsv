@@ -16,19 +16,20 @@ export type {} from // c4
 ```
 
 **tsv**: preserves them where the user placed them — a block comment trails inline,
-a line comment stays on its own line with `type {}` following:
+a line comment stays on its own line with the following token dropped to a
+continuation line indented one level (the uniform module-header rule):
 
 ```
 export /* c1 */ type {} from './a';
 export // c2
-type {} from './b';
+	type {} from './b';
 export type /* c3 */ {} from './c';
 export type // c4
-{} from './d';
+	{} from './d';
 ```
 
 Per Comment Position Philosophy, the user's chosen position is preserved. Both
 positions are dual-stable in our formatter. The export sibling of
 `modules/imports/empty_type_keyword_comment_prettier_divergence`.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

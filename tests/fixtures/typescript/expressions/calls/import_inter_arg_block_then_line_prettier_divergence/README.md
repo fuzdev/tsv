@@ -18,4 +18,5 @@ This is the dynamic-`import()` instance of the call-argument
 [after-comma block + same-line line comment](../nonlast_arg_after_comma_block_then_line_prettier_divergence/)
 divergence — `import()` shares the same comment-position rules across every argument path.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+Reason: Comment relocation. See
+[conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

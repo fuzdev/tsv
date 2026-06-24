@@ -19,4 +19,4 @@ and after the open paren
 ([open_paren_comment](../open_paren_comment_prettier_divergence/)), and with
 if/else, try/catch, switch, for, while, labeled statements, and call chains.
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

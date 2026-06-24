@@ -13,7 +13,9 @@ Prettier: breaks at `=` only, keeps template inline (exceeds printWidth)
 
 ## Reason
 
-The threshold counts rendered columns, not source bytes: 33 CJK chars are 99 bytes but only 66 columns, so a byte-based threshold would break a template that visually fits. tsv applies the same printWidth rules after `=` breaks — consistent with template literal value handling.
+Print width. The threshold counts rendered columns, not source bytes: 33 CJK chars are 99 bytes but only 66 columns, so a byte-based threshold would break a template that visually fits. tsv applies the same printWidth rules after `=` breaks — consistent with template literal value handling.
+
+See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §TypeScript: Template Literals.
 
 ## Related
 

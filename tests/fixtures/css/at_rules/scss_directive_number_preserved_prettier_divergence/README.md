@@ -23,5 +23,6 @@ byte-for-byte. Prettier maintains an SCSS-directive list (`parser-postcss.js`)
 whose params it re-parses with `parseValue`, then runs `adjustNumbers` over the
 result. tsv applies that same number normalization only to standard-CSS
 contexts — declaration values and `@media`/`@supports` preludes — leaving
-unrecognized directive preludes untouched. See conformance_prettier.md
-§CSS: At-Rules.
+unrecognized directive preludes untouched. See
+[conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules)
+(`SCSS directive numbers`, Design choice).

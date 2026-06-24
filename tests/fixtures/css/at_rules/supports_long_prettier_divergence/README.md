@@ -14,7 +14,7 @@ Prettier: wraps at 103 chars (>102)
 
 ## Reason
 
-Prettier has an off-by-two quirk for `@supports` queries. tsv wraps at exactly 101 chars for consistency with other CSS constructs.
+See [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules) (`@supports line wrap`, Print width). Prettier has an off-by-two quirk for `@supports` queries; tsv wraps at exactly 101 chars for consistency with other CSS constructs.
 
 ## Related
 

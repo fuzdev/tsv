@@ -37,5 +37,5 @@ stays inline in both formatters (covered by
 only line comments differ — a `//` runs to EOL, so the value `:` must drop to its
 own line. See
 [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
-§Comment relocation, §Uniform forced-continuation indent, and §Comment Position
+§Comment relocation, §Uniform Forced-Continuation Indent, and §Comment Position
 Philosophy.

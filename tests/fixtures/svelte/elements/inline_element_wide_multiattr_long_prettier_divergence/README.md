@@ -24,7 +24,7 @@ authoring-dependent split.
 
 ## Reason
 
-tsv treats printWidth as a hard limit and keeps the element intact rather than splitting its
-attributes, so an over-wide element goes to its own line; a dropped inline child owns its line, so
-following text wraps to the next line rather than hugging the dropped element's `>`. See
-[conformance_prettier.md §Inline content hug](../../../../../docs/conformance_prettier.md#svelte-elements).
+Print width. tsv treats printWidth as a hard limit and keeps the element intact rather than
+splitting its attributes, so an over-wide element goes to its own line; a dropped inline child owns
+its line, so following text wraps to the next line rather than hugging the dropped element's `>`. See
+[conformance_prettier.md §Svelte: Elements (Wide inline child own-line)](../../../../../docs/conformance_prettier.md#svelte-elements).

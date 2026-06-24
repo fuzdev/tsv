@@ -14,3 +14,5 @@ call chains.
 
 The body layout itself matches Prettier: an empty body attaches directly (`);`),
 a block body hugs (`) {`), and a non-block body stays inline when the header fits.
+
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation (Keyword-paren comments).

@@ -19,3 +19,5 @@ All six attribute matchers (`=`, `^=`, `$=`, `*=`, `~=`, `\|=`) work with namesp
 
 - `expected_ours.json` — tsv's spec-compliant output (source of truth)
 - No `expected.json` because Svelte's parser fails on this syntax
+
+See [conformance_svelte.md §CSS Corrections](../../../../../../docs/conformance_svelte.md#css-corrections).

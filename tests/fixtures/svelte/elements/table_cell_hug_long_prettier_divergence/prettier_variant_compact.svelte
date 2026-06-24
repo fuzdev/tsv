@@ -22,7 +22,7 @@
 <th><a href="x">xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</a></th
 >
 
-<!-- tr at 101 chars - td inside tr lays out block-style -->
+<!-- tr overflowing - td inside tr lays out block-style -->
 <tr
 	><td
 		><a>xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</a
@@ -30,21 +30,21 @@
 	></tr
 >
 
-<!-- tbody at 101 chars - nested tr/td lay out block-style -->
+<!-- tbody overflowing - nested tr/td lay out block-style -->
 <tbody
 	><tr
 		><td><a>xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</a></td></tr
 	></tbody
 >
 
-<!-- thead at 101 chars -->
+<!-- thead overflowing -->
 <thead
 	><tr
 		><th><a>xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</a></th></tr
 	></thead
 >
 
-<!-- tfoot at 101 chars -->
+<!-- tfoot overflowing -->
 <tfoot
 	><tr
 		><td><a>xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</a></td></tr

@@ -15,4 +15,4 @@ Prettier diverges by shape (tsv preserves each in place + indented):
 The matching block-comment cases stay flat in both formatters and live in the
 regular [keyword_comment](../keyword_comment/) fixture.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

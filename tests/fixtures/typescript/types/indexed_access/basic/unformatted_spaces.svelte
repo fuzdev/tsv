@@ -13,7 +13,7 @@
 	const fn  =  < T ,  K extends keyof T >( obj :  T ,  key :  K ) :  T[ K ]  =>  obj[ key ];
 
 	// In Promise
-	const asyncFn  =  async < T ,  K extends keyof T >( obj :  T ,  key :  K ) :  Promise< T[ K ] >  =>  obj[ key ];
+	const promiseFn  =  < T ,  K extends keyof T >( obj :  T ,  key :  K ) :  Promise< T[ K ] >  =>  obj[ key ];
 
 	// Array access
 	type E  =  T[ number ];

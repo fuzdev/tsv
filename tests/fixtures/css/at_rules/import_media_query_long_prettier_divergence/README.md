@@ -13,7 +13,7 @@ Prettier: wraps at 102 chars (>101)
 
 ## Reason
 
-tsv uses a consistent >100 threshold across all CSS constructs. Prettier has an off-by-one quirk for `@import` media conditions, same pattern as `@media`, `@supports`, and `@container`.
+See [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules) (`@import line wrap`, Print width). tsv uses a consistent >100 threshold across all CSS constructs. Prettier has an off-by-one quirk for `@import` media conditions, same pattern as `@media`, `@supports`, and `@container`.
 
 ## Related
 

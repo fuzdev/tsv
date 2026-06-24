@@ -21,3 +21,5 @@ These are valid ES2024 syntax. Prettier accepts and formats them correctly.
 
 - [TC39 RegExp v flag proposal](https://github.com/tc39/proposal-regexp-v-flag)
 - [MDN: Unicode sets](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Regular_expressions/Unicode_character_class_escape#unicode_sets_mode)
+
+See [conformance_svelte.md](../../../../../../../docs/conformance_svelte.md) §TypeScript Corrections.

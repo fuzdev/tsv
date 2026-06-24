@@ -12,7 +12,7 @@ Same quirk as `atrule_before_opening_brace`, but mid-prelude rather than before 
 
 ## Reason
 
-tsv normalizes comment spacing consistently across all CSS contexts.
+Stable quirk. tsv normalizes comment spacing consistently across all CSS contexts. See [conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments).
 
 ## Related
 

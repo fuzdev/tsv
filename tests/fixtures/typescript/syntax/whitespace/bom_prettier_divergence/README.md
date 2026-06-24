@@ -1,1 +1,1 @@
-See [Svelte BOM fixture](../../../svelte/syntax/whitespace/bom_prettier_divergence/README.md)
+See [Svelte BOM fixture](../../../../svelte/syntax/whitespace/bom_prettier_divergence/README.md) and [conformance_prettier.md §Whitespace: BOM Handling](../../../../../../docs/conformance_prettier.md#whitespace-bom-handling).

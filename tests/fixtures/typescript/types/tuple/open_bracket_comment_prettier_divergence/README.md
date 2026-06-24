@@ -38,4 +38,4 @@ the first element) used by the object/array literal, destructuring, block-body,
 `namespace`/`module`, class/interface/enum body, type literal, and import/export
 specifier cases.
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

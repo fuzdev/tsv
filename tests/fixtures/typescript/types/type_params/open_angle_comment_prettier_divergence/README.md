@@ -39,4 +39,4 @@ via the shared `Printer::delimiter_line_comment_prefix` helper.
 
 Before this, the comment was dropped entirely (a content-loss bug).
 
-See [conformance_prettier.md](../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

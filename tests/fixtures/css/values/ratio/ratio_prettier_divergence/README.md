@@ -9,4 +9,4 @@ Both formatters normalize `aspect-ratio: 16  /  9` to `aspect-ratio: 16 / 9` in 
 
 ## Reason
 
-tsv normalizes whitespace consistently regardless of context (property value vs media query).
+Stable quirk. tsv normalizes whitespace consistently regardless of context (property value vs media query); prettier preserves the extra spaces inside a media-query ratio. See [conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values) ("Ratio in media queries").

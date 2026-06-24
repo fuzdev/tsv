@@ -29,4 +29,4 @@ Per Comment Position Philosophy. The into-braces relocation matches the sibling 
 `close_brace_comment`. When the c2 line comment forces `from` onto its own line, tsv
 indents that continuation one level (a single statement spanning lines).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

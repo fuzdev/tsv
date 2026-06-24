@@ -14,4 +14,10 @@ else;
 ;
 ```
 
-Per Comment Position Philosophy: preserve user intent when prettier moves a comment.
+## Reason
+
+Per the Comment Position Philosophy: preserve user intent when prettier moves a
+comment. The fixture also covers non-block and empty consequents before the
+empty alternate; prettier relocates the comment before `else` in every case.
+
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

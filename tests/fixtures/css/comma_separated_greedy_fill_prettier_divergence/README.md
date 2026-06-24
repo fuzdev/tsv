@@ -9,4 +9,8 @@ The root cause is Prettier's `fill()` packing to exactly the remaining width (`>
 
 ## Reason
 
-tsv treats printWidth as a hard limit. This affects all comma-separated CSS values (`animation-name`, `font-family`, `background-image`, etc.).
+See [conformance_prettier.md §CSS: Layout](../../../../docs/conformance_prettier.md#css-layout) (`Greedy fill overflow`, Print width). tsv treats printWidth as a hard limit. This affects all comma-separated CSS values (`animation-name`, `font-family`, `background-image`, etc.).
+
+## Related
+
+- [comma_space_separated_long](../values/lists/comma_space_separated_long_prettier_divergence/) · [space_separated_long_wrap](../values/lists/space_separated_long_wrap_prettier_divergence/) — sibling fill-boundary print-width divergences

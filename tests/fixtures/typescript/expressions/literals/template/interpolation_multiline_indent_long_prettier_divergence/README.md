@@ -11,4 +11,6 @@ Cases 1-15 test various indent sizes (tabs, spaces, mixed). Case 16 tests deeply
 
 ## Reason
 
-tsv treats printWidth as a hard limit for template interpolations, with correct indentation alignment for multiline templates.
+Print width. tsv treats printWidth as a hard limit for template interpolations, with correct indentation alignment for multiline templates.
+
+See [conformance_prettier.md](../../../../../../../docs/conformance_prettier.md) §TypeScript: Template Literals.

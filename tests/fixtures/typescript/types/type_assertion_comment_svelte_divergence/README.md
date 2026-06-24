@@ -1,9 +1,9 @@
 # Parser divergence: angle-bracket type-assertion comment duplication
 
 A block comment **inside** an angle-bracket type assertion's cast — between the
-opening `<` and the type (`<\/* c *\/ string>x`), after the type before the
-closing `>` (`<string \/* c *\/>y`), or after the `>` before the expression
-(`<string>\/* c *\/ z`) — falls in a region acorn-typescript re-parses: it first
+opening `<` and the type (`</* c */ string>x`), after the type before the
+closing `>` (`<string /* c */>y`), or after the `>` before the expression
+(`<string>/* c */ z`) — falls in a region acorn-typescript re-parses: it first
 reads `<` as a less-than operator, then backtracks and reparses the whole
 assertion, so its `onComment` callback fires twice and each such comment is
 duplicated in the root `comments` array. Our parser keeps a single entry

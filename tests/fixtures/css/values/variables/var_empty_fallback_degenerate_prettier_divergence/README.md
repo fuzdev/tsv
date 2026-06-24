@@ -13,11 +13,14 @@ Prettier: `var(--a,,)` → `var(--a, )` (pass 1) → `var(--a,)` (pass 2)
 
 Prettier is **non-idempotent** here — its first pass leaves a stray space
 (`var(--a, )`) that a second pass removes. tsv normalizes directly to the
-stable form. Not a real-world construct; this pins prettier's intermediate
-form so the fixture audit doesn't flag it as novel.
+stable form. Not a real-world construct; the `prettier_intermediate_collapse`
+file pins prettier's unstable first-pass form so the fixture audit doesn't flag
+it as novel.
 
 ## Reason
 
-tsv normalizes consistently. Prettier's intermediate form is a stable quirk —
-it takes two passes to converge. See the valid empty-fallback round-trip in
-[var_empty_fallback](../var_empty_fallback/).
+**Prettier bug** (non-idempotency). tsv normalizes consistently to the fixed
+point in one pass; prettier needs two. See the valid empty-fallback round-trip
+in [var_empty_fallback](../var_empty_fallback/) and
+[conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values)
+("var() value-less fallback").
