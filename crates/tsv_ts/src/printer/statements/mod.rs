@@ -364,11 +364,18 @@ impl<'a> Printer<'a> {
             raw_expr_doc
         };
 
-        // Find trailing comments between expression end and semicolon
+        // Find trailing comments between expression end and semicolon. The scan
+        // skips comments so a `;` inside one (`a + b /* ; */ /* c */;`) isn't
+        // mistaken for the statement's terminator, which would drop the comments
+        // after it.
         let expr_end = binary.span.end as usize;
-        let semicolon_pos = self.source[expr_end..]
-            .find(';')
-            .map_or(expr_end, |i| expr_end + i);
+        let semicolon_pos = tsv_lang::source_scan::find_char_skipping_comments(
+            self.source.as_bytes(),
+            expr_end,
+            self.source.len(),
+            b';',
+        )
+        .unwrap_or(expr_end);
         let trailing_comments_doc =
             self.build_inline_comments_between_doc(expr_end as u32, semicolon_pos as u32);
 

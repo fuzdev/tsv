@@ -494,15 +494,6 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Check if a source position falls inside any comment span.
-    /// Uses binary search: O(log n).
-    pub(crate) fn is_pos_inside_comment(&self, pos: u32) -> bool {
-        // Binary search: find the first comment with start > pos
-        let idx = self.comments.partition_point(|c| c.span.start <= pos);
-        // The comment at idx-1 (if any) is the last with start <= pos
-        idx > 0 && self.comments[idx - 1].span.end > pos
-    }
-
     /// Find the first occurrence of a byte in source between `start` and `end`
     /// that is NOT inside a comment. Returns absolute position.
     pub(crate) fn find_char_outside_comments(&self, start: u32, end: u32, ch: u8) -> Option<u32> {
@@ -675,27 +666,18 @@ impl<'a> Printer<'a> {
     /// an identifier). Returns the byte position after the last character of the keyword,
     /// or `None` if not found.
     pub(crate) fn find_keyword_end(&self, keyword: &str, start: u32, end: u32) -> Option<u32> {
-        let text = &self.source[start as usize..end as usize];
-        for (i, _) in text.rmatch_indices(keyword) {
-            let abs = start as usize + i;
-            // Check word boundary before keyword
-            if abs > start as usize {
-                let before = self.source.as_bytes()[abs - 1];
-                if before.is_ascii_alphanumeric() || before == b'_' || before == b'$' {
-                    continue;
-                }
-            }
-            // Check word boundary after keyword
-            let after_pos = abs + keyword.len();
-            if after_pos < end as usize {
-                let after = self.source.as_bytes()[after_pos];
-                if after.is_ascii_alphanumeric() || after == b'_' || after == b'$' {
-                    continue;
-                }
-            }
-            return Some((abs + keyword.len()) as u32);
-        }
-        None
+        // The LAST whole-word occurrence that is not inside a comment — so a
+        // keyword buried in a comment (`from /* from */ 'x'`) isn't mistaken for
+        // the real one (which dropped/relocated the comment), while a later real
+        // keyword still wins over an earlier identifier containing it.
+        tsv_lang::source_scan::rfind_keyword(
+            self.source.as_bytes(),
+            start as usize,
+            end as usize,
+            keyword.as_bytes(),
+            TriviaProfile::JS,
+        )
+        .map(|i| (i + keyword.len()) as u32)
     }
 
     /// Find the `=>` token position for an arrow function.
@@ -748,30 +730,15 @@ impl<'a> Printer<'a> {
     /// must not be part of a larger identifier).
     pub(crate) fn find_keyword_in_range(&self, start: u32, end: u32, keyword: &str) -> Option<u32> {
         let source = self.source.as_bytes();
-        let kw_bytes = keyword.as_bytes();
         let end = (end as usize).min(source.len());
-        let kw_len = kw_bytes.len();
-        let mut i = start as usize;
-
-        while i + kw_len <= end {
-            if let Some(past) = skip_trivia(source, i, end, TriviaProfile::JS) {
-                i = past;
-                continue;
-            }
-            // Check for keyword match
-            if &source[i..i + kw_len] == kw_bytes {
-                // Check word boundaries (not part of larger identifier)
-                let before_ok =
-                    i == 0 || !source[i - 1].is_ascii_alphanumeric() && source[i - 1] != b'_';
-                let after_ok = i + kw_len >= source.len()
-                    || !source[i + kw_len].is_ascii_alphanumeric() && source[i + kw_len] != b'_';
-                if before_ok && after_ok {
-                    return Some(i as u32);
-                }
-            }
-            i += 1;
-        }
-        None
+        tsv_lang::source_scan::find_keyword(
+            source,
+            start as usize,
+            end,
+            keyword.as_bytes(),
+            TriviaProfile::JS,
+        )
+        .map(|i| i as u32)
     }
 
     /// Find the position of the first non-whitespace, non-comment token after `start`.
@@ -821,38 +788,12 @@ impl<'a> Printer<'a> {
         decorators
             .and_then(|decs| decs.last())
             .and_then(|last| {
-                let search = last.span.end as usize;
-                self.source[search..]
-                    .find(keyword)
-                    .map(|p| (search + p) as u32)
+                // Comment-aware + word-boundaried, so a keyword inside a comment
+                // between the decorator and the declaration (`@dec /* class */
+                // class C {}`) isn't matched (which would drop the comment).
+                self.find_keyword_in_range(last.span.end, self.source.len() as u32, keyword)
             })
             .unwrap_or(fallback)
-    }
-
-    /// Find a keyword in source between start and end, skipping over comments.
-    /// Returns the byte offset of the keyword if found.
-    pub(crate) fn find_keyword_in_source(
-        &self,
-        start: u32,
-        end: u32,
-        keyword: &str,
-    ) -> Option<u32> {
-        let search = &self.source[start as usize..end as usize];
-        let mut pos = 0;
-        while pos < search.len() {
-            if search[pos..].starts_with("//") {
-                pos += search[pos..].find('\n').unwrap_or(search.len() - pos);
-            } else if search[pos..].starts_with("/*") {
-                pos += search[pos + 2..]
-                    .find("*/")
-                    .map_or(search.len() - pos, |p| p + 4);
-            } else if search[pos..].starts_with(keyword) {
-                return Some(start + pos as u32);
-            } else {
-                pos += 1;
-            }
-        }
-        None
     }
 
     /// Check if any comment in the range is a format-ignore directive.

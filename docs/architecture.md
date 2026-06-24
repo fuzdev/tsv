@@ -231,7 +231,7 @@ Language-agnostic primitives shared across all implementations:
 - `escapes` — Escape sequence handling
 - `interner` — String interner utilities (`SymbolResolver` trait)
 - `parser` — Shared parser utilities (`PeekData`)
-- `source_scan` — Comment-skipping source scanning (used by AST conversion and printers)
+- `source_scan` — Trivia-aware source scanning: the `skip_trivia` cursor + delimiter/keyword/regex finders (used by AST conversion, printers, and the parsers)
 
 See [crates/tsv_lang/CLAUDE.md](../crates/tsv_lang/CLAUDE.md) for detailed module documentation.
 
