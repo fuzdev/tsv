@@ -16,7 +16,8 @@ see the [issues](https://github.com/fuzdev/tsv/issues)
 and [discussions](https://github.com/fuzdev/tsv/discussions).
 
 AI disclosure: this codebase was generated with machine agents and the usual LLM caveats apply.
-The first release took 7 months and ~1800 manual commits of painstaking effort.
+The first release took 7 months and ~1800 manual commits.
+It's a high-effort project that emphasizes quality.
 
 ## Install
 

@@ -17,23 +17,16 @@ impl<'a> Printer<'a> {
     /// `import { /* c */ } from 'x'`, `import { // c\n } from 'x'`.
     pub(super) fn has_empty_named_braces(&self, decl: &internal::ImportDeclaration) -> bool {
         let text = decl.span.extract(self.source);
-        let decl_start = decl.span.start;
-        // Find "from" outside of comments — naive text.find("from") matches inside
-        // comments like `import // {} from\n'a'`, falsely detecting empty braces.
-        let mut search_offset = 0;
-        let from_pos = loop {
-            match text[search_offset..].find("from") {
-                Some(offset) => {
-                    let abs_pos = decl_start + (search_offset + offset) as u32;
-                    if self.is_pos_inside_comment(abs_pos) {
-                        search_offset += offset + "from".len(); // skip past this "from"
-                    } else {
-                        break Some(search_offset + offset);
-                    }
-                }
-                None => break None,
-            }
-        };
+        // Find the `from` keyword, skipping comments and not matching inside an
+        // identifier — so empty-brace detection isn't fooled by a `from` in a
+        // comment (`import // {} from\n'a'`) or a specifier name (`fromage`).
+        let from_pos = tsv_lang::source_scan::find_keyword(
+            text.as_bytes(),
+            0,
+            text.len(),
+            b"from",
+            tsv_lang::source_scan::TriviaProfile::COMMENTS,
+        );
         if let Some(from_pos) = from_pos {
             let before_from = &text[..from_pos];
             // Check for empty braces (with any amount of whitespace/comments inside).

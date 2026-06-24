@@ -20,10 +20,14 @@
 /// strings — a `//` is *not* a comment there (`url(http://…)`), so `line_comments`
 /// is off, which keeps a JS-shaped cursor from mis-reading CSS.
 ///
-/// Regex literals are deliberately **not** a profile option here: only the Svelte
-/// brace matcher needs `/…/` disambiguation (it requires previous-token lookback),
-/// and it carries that logic itself. The inter-node delimiter scans never sit at a
-/// regex boundary in practice, matching the historical `skip_string_or_comment`.
+/// Regex literals are deliberately **not** a profile option here: a `/…/` needs
+/// previous-token lookback to tell it from division, which a stateless forward
+/// `skip_trivia` can't carry as a flag. The disambiguation lives in the separate
+/// [`is_regex_start`] / [`skip_regex_literal`] helpers below, which the
+/// depth-tracking scanners that *do* sit at a regex boundary (the Svelte brace
+/// matcher, the TS arrow-vs-paren lookahead) call alongside `skip_trivia`. A
+/// plain inter-node delimiter scan never sits at a regex boundary in practice,
+/// matching the historical `skip_string_or_comment`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TriviaProfile {
     /// `//` to end of line (the newline is consumed as part of the span).
@@ -89,12 +93,25 @@ pub fn skip_trivia(bytes: &[u8], i: usize, end: usize, profile: TriviaProfile) -
 
     if b == b'/' && i + 1 < end {
         if profile.line_comments && bytes[i + 1] == b'/' {
+            // A line comment ends at any ECMAScript line terminator — LF, CR, or
+            // the UTF-8 line/paragraph separators U+2028/U+2029 (`e2 80 a8`/`a9`)
+            // — matching the lexer (a `\n`-only stop would run the comment past a
+            // `\r`/U+2028 and swallow following code). The terminator is consumed
+            // (it's whitespace for the next scan).
             let mut j = i + 2;
-            while j < end && bytes[j] != b'\n' {
-                j += 1;
+            while j < end {
+                match bytes[j] {
+                    b'\n' | b'\r' => return Some(j + 1),
+                    0xe2 if j + 2 < end
+                        && bytes[j + 1] == 0x80
+                        && (bytes[j + 2] == 0xa8 || bytes[j + 2] == 0xa9) =>
+                    {
+                        return Some(j + 3);
+                    }
+                    _ => j += 1,
+                }
             }
-            // Consume the terminating newline (whitespace) too, when present.
-            return Some((j + 1).min(end));
+            return Some(end);
         }
         if profile.block_comments && bytes[i + 1] == b'*' {
             let mut j = i + 2;
@@ -178,6 +195,160 @@ pub fn find_char_skipping_comments(
     target: u8,
 ) -> Option<usize> {
     find_char(bytes, start, end, target, TriviaProfile::COMMENTS)
+}
+
+/// Whether `keyword` occurs at `i` as a **whole word** — present byte-for-byte
+/// and not flanked by a JS/TS identifier byte (alphanumeric, `_`, or `$`), so
+/// `export` does not match inside `exported` or `$export`. The boundary check is
+/// against the full `bytes`, not any `[start, end)` window. Caller ensures `i +
+/// keyword.len() <= bytes.len()`.
+#[inline]
+fn whole_word_at(bytes: &[u8], i: usize, keyword: &[u8]) -> bool {
+    let kw_len = keyword.len();
+    if &bytes[i..i + kw_len] != keyword {
+        return false;
+    }
+    let before_ok = i == 0 || !is_identifier_byte(bytes[i - 1]);
+    let after_ok = i + kw_len >= bytes.len() || !is_identifier_byte(bytes[i + kw_len]);
+    before_ok && after_ok
+}
+
+/// Whether `b` is an ASCII byte that can appear inside a JS/TS identifier —
+/// alphanumeric, `_`, or `$`. Used for whole-word keyword boundaries.
+#[inline]
+fn is_identifier_byte(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_' || b == b'$'
+}
+
+/// Find the **first** whole-word occurrence of `keyword` in `bytes[start..end]`,
+/// skipping trivia per `profile`. Returns the keyword's start position, or `None`.
+///
+/// The trivia skip is what makes this safe against a keyword that appears inside
+/// a comment or string (e.g. `@dec /* class */ class C {}` finds the real
+/// `class`, not the one in the comment).
+#[inline]
+pub fn find_keyword(
+    bytes: &[u8],
+    start: usize,
+    end: usize,
+    keyword: &[u8],
+    profile: TriviaProfile,
+) -> Option<usize> {
+    let kw_len = keyword.len();
+    let mut i = start;
+    while i + kw_len <= end {
+        if let Some(past) = skip_trivia(bytes, i, end, profile) {
+            i = past;
+            continue;
+        }
+        if whole_word_at(bytes, i, keyword) {
+            return Some(i);
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Find the **last** whole-word occurrence of `keyword` in `bytes[start..end]`,
+/// skipping trivia per `profile`. Returns its start position, or `None`.
+///
+/// The forward scan with skip-trivia gives the rightmost match that is **not**
+/// inside a comment or string, so it both (a) skips a keyword buried in a
+/// comment (`from /* from */ 'x'` finds the real `from`) and (b) prefers a later
+/// real keyword over an earlier identifier that merely contains it (`import
+/// { from } from 'x'` — the specifier `from` loses to the keyword). A plain
+/// reverse `rfind` gets neither right.
+#[inline]
+pub fn rfind_keyword(
+    bytes: &[u8],
+    start: usize,
+    end: usize,
+    keyword: &[u8],
+    profile: TriviaProfile,
+) -> Option<usize> {
+    let kw_len = keyword.len();
+    let mut found = None;
+    let mut i = start;
+    while i + kw_len <= end {
+        if let Some(past) = skip_trivia(bytes, i, end, profile) {
+            i = past;
+            continue;
+        }
+        if whole_word_at(bytes, i, keyword) {
+            found = Some(i);
+        }
+        i += 1;
+    }
+    found
+}
+
+/// Whether the `/` at `slash_pos` starts a regex literal (rather than a division
+/// operator). Decided by the previous significant byte, walking back to
+/// `lower_bound`: a `/` after something that *ends* an expression (identifier
+/// char, `)`, `]`) is division; after anything else (or at the start) it is a
+/// regex.
+///
+/// This is the one piece of `/`-disambiguation the trivia cursor deliberately
+/// leaves out of [`skip_trivia`]/[`TriviaProfile`]: it needs a *backward*
+/// raw-byte walk, which a stateless forward scan can't honor as a flag. So it
+/// lives here as a standalone helper that the depth-tracking scanners
+/// (Svelte's brace matcher, the TS arrow-vs-paren lookahead) call alongside
+/// `skip_trivia`, lower-bounding the walk at their own scan start.
+#[inline]
+pub fn is_regex_start(bytes: &[u8], slash_pos: usize, lower_bound: usize) -> bool {
+    let mut j = slash_pos;
+    while j > lower_bound {
+        j -= 1;
+        let b = bytes[j];
+        if !b.is_ascii_whitespace() {
+            // Bytes that END an expression — a `/` after these is DIVISION.
+            return !(b.is_ascii_alphanumeric() || b == b'_' || b == b')' || b == b']');
+        }
+    }
+    // Nothing significant before it (start of the scanned region) → regex.
+    true
+}
+
+/// Skip past a regex literal whose opening `/` is at `start`, returning the
+/// position just after the closing `/` and any trailing flags (bounded by
+/// `end`). Backslash-escape aware, and aware that a `/` inside a `[…]`
+/// character class is a literal, not the terminator. An unterminated literal
+/// returns `end`.
+///
+/// Pairs with [`is_regex_start`] — the caller confirms the `/` is a regex
+/// before skipping. Caller must ensure `start < end <= bytes.len()`.
+#[inline]
+pub fn skip_regex_literal(bytes: &[u8], start: usize, end: usize) -> usize {
+    let mut i = start + 1; // past the opening `/`
+    while i < end {
+        match bytes[i] {
+            b'\\' if i + 1 < end => i += 2, // escape — skip the next byte
+            b'/' => {
+                // Closing `/`; consume trailing flags (ASCII lowercase).
+                i += 1;
+                while i < end && bytes[i].is_ascii_lowercase() {
+                    i += 1;
+                }
+                return i;
+            }
+            b'[' => {
+                // Character class — a `/` inside is literal; skip to `]`.
+                i += 1;
+                while i < end {
+                    match bytes[i] {
+                        b'\\' if i + 1 < end => i += 2,
+                        b']' => {
+                            i += 1;
+                            break;
+                        }
+                        _ => i += 1,
+                    }
+                }
+            }
+            _ => i += 1,
+        }
+    }
+    end
 }
 
 #[cfg(test)]
@@ -273,6 +444,21 @@ mod tests {
     }
 
     #[test]
+    fn skip_trivia_line_comment_stops_at_all_terminators() {
+        // CR ends a line comment (not just LF) — past the `\r` is index 5.
+        assert_eq!(skip_trivia(b"// x\ry", 0, 6, TriviaProfile::JS), Some(5));
+        // U+2028 (e2 80 a8) ends a line comment — past its 3 bytes.
+        let src = b"// x\xe2\x80\xa8y"; // `// x` + U+2028 + `y`
+        assert_eq!(skip_trivia(src, 0, src.len(), TriviaProfile::JS), Some(7));
+        // A delimiter after a CR-terminated line comment is then found, not
+        // swallowed: the `,` at index 6 follows `// x\r`.
+        assert_eq!(
+            find_char(b"// x\r, y", 0, 8, b',', TriviaProfile::JS),
+            Some(5)
+        );
+    }
+
+    #[test]
     fn skip_comment_keeps_its_distinct_conventions() {
         // Block comment: position PAST the closing `*/` (index 7).
         assert_eq!(skip_comment(b"/* x */ y", 0, 9), Some(7));
@@ -293,5 +479,108 @@ mod tests {
         );
         // ...but a string-borne comma is found (strings are not trivia here).
         assert_eq!(find_char_skipping_comments(b"',',x", 0, 5, b','), Some(1));
+    }
+
+    #[test]
+    fn find_keyword_skips_comments_and_respects_word_boundaries() {
+        // The `export` inside the comment is skipped; the real one is found.
+        let src = b"/* export */ export class C";
+        assert_eq!(
+            find_keyword(src, 0, src.len(), b"export", TriviaProfile::JS),
+            Some(13)
+        );
+        // Whole-word only: `export` inside `exported` is not a match.
+        let src = b"exported = 1";
+        assert_eq!(
+            find_keyword(src, 0, src.len(), b"export", TriviaProfile::JS),
+            None
+        );
+        // `$` is an identifier byte, so a keyword flanked by it is not a word
+        // (`$from`/`from$` are identifiers, not the `from` keyword).
+        assert_eq!(
+            find_keyword(b"$from x", 0, 7, b"from", TriviaProfile::JS),
+            None
+        );
+        assert_eq!(
+            find_keyword(b"from$ x", 0, 7, b"from", TriviaProfile::JS),
+            None
+        );
+        // Plain match at a boundary.
+        assert_eq!(
+            find_keyword(b"a class C", 0, 9, b"class", TriviaProfile::JS),
+            Some(2)
+        );
+        // A keyword inside a string is skipped under JS.
+        let src = b"'class' class C";
+        assert_eq!(
+            find_keyword(src, 0, src.len(), b"class", TriviaProfile::JS),
+            Some(8)
+        );
+    }
+
+    #[test]
+    fn rfind_keyword_skips_comments_and_prefers_the_real_keyword() {
+        // `from /* from */ 'x'` — the real `from` (index 0), not the comment's.
+        let src = b"from /* from */ 'x'";
+        assert_eq!(
+            rfind_keyword(src, 0, src.len(), b"from", TriviaProfile::COMMENTS),
+            Some(0)
+        );
+        // `{ from } from` — the specifier `from` (index 2) loses to the keyword
+        // `from` (index 9); rfind picks the later REAL one.
+        let src = b"{ from } from";
+        assert_eq!(
+            rfind_keyword(src, 0, src.len(), b"from", TriviaProfile::COMMENTS),
+            Some(9)
+        );
+        // A specifier `from`, the real `from`, then a comment `from`: real wins.
+        let src = b"{ from } from /* from */";
+        assert_eq!(
+            rfind_keyword(src, 0, src.len(), b"from", TriviaProfile::COMMENTS),
+            Some(9)
+        );
+        // Whole-word only.
+        assert_eq!(
+            rfind_keyword(b"fromage", 0, 7, b"from", TriviaProfile::COMMENTS),
+            None
+        );
+    }
+
+    #[test]
+    fn is_regex_start_uses_previous_significant_byte() {
+        // `= /re/` — `/` after `=` (and whitespace) is a regex.
+        assert!(is_regex_start(b"a = /re/", 4, 0));
+        // `a / b` — `/` after identifier `a` is division.
+        assert!(!is_regex_start(b"a / b", 2, 0));
+        // `) / b` — `/` after `)` is division; `] / b` likewise.
+        assert!(!is_regex_start(b") / b", 2, 0));
+        assert!(!is_regex_start(b"] / b", 2, 0));
+        // At the lower bound (nothing significant before) → regex.
+        assert!(is_regex_start(b"/re/", 0, 0));
+        // The lower bound is honored: even though `(` precedes, a walk bounded
+        // at the `/` itself sees nothing before it → regex.
+        assert!(is_regex_start(b"(/re/", 1, 1));
+    }
+
+    #[test]
+    fn skip_regex_literal_handles_escapes_classes_and_flags() {
+        // Plain literal: past the closing `/`.
+        let src = b"/re/ x";
+        assert_eq!(skip_regex_literal(src, 0, src.len()), 4);
+        // Trailing flags are consumed.
+        let src = b"/re/gi x";
+        assert_eq!(skip_regex_literal(src, 0, src.len()), 6);
+        // Escaped `/` does not terminate.
+        let src = br"/a\/b/ x";
+        assert_eq!(skip_regex_literal(src, 0, src.len()), 6);
+        // A `/` inside a character class is literal, not the terminator.
+        let src = b"/[/)]/ x";
+        assert_eq!(skip_regex_literal(src, 0, src.len()), 6);
+        // Parens inside are opaque — the returned slice covers the whole literal.
+        let src = br"/\)/ y";
+        assert_eq!(skip_regex_literal(src, 0, src.len()), 4);
+        // Unterminated → end.
+        let src = b"/abc";
+        assert_eq!(skip_regex_literal(src, 0, src.len()), src.len());
     }
 }

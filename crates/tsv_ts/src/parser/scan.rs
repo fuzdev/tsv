@@ -104,22 +104,6 @@ pub(super) fn skip_identifier(bytes: &[u8], mut pos: usize) -> usize {
     pos
 }
 
-/// Skip a string literal (single or double quoted), returning position after closing quote
-/// Assumes `pos` is at the opening quote character
-#[inline]
-pub(super) fn skip_string_literal(bytes: &[u8], mut pos: usize) -> usize {
-    let quote = bytes[pos];
-    pos += 1;
-    while pos < bytes.len() && bytes[pos] != quote {
-        if bytes[pos] == b'\\' && pos + 1 < bytes.len() {
-            pos += 1; // skip escaped char
-        }
-        pos += 1;
-    }
-    // Return position AFTER the closing quote (if found)
-    if pos < bytes.len() { pos + 1 } else { pos }
-}
-
 /// Parse a JS number literal (hex, binary, octal, scientific, BigInt)
 /// Returns f64 (BigInt suffix 'n' is ignored for value, preserved in raw)
 ///
