@@ -133,7 +133,7 @@ impl<'a> Printer<'a> {
         // Search forward from body end, skipping over comments to find the actual keyword
         let body_end = stmt.body.span().end;
         let test_start = stmt.test.span().start;
-        let while_pos = self.find_keyword_in_source(body_end, test_start, "while");
+        let while_pos = self.find_keyword_in_range(body_end, test_start, "while");
 
         // Check for comments between } and while, determine if while stays on same line
         let while_on_same_line = if let Some(while_start) = while_pos

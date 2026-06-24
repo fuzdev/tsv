@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
-use tsv_lang::source_scan::{TriviaProfile, skip_trivia};
+use tsv_lang::source_scan::{TriviaProfile, is_regex_start, skip_regex_literal, skip_trivia};
 use tsv_lang::{ParseError, Span};
 
 use super::parser_impl::SvelteParser;
@@ -100,7 +100,9 @@ impl<'a> SvelteParser<'a> {
 /// (`skip_trivia`, JS profile) — so escape handling is correct in exactly one
 /// place. Regex literals are the one thing the cursor deliberately leaves
 /// significant (disambiguating `/` needs previous-token lookback); this matcher
-/// carries that logic itself via `is_regex_start` / `skip_regex_literal`.
+/// handles them via the shared `source_scan::is_regex_start` /
+/// `skip_regex_literal` helpers (the same ones the TS arrow-vs-paren lookahead
+/// uses).
 pub(crate) fn scan_to_matching_brace(bytes: &[u8], scan_start: usize) -> Option<usize> {
     let end = bytes.len();
     let mut brace_depth: u32 = 1; // the opening `{` before scan_start
@@ -118,7 +120,7 @@ pub(crate) fn scan_to_matching_brace(bytes: &[u8], scan_start: usize) -> Option<
         // never a regex start). `is_regex_start` only fires here because
         // `skip_trivia` already consumed `//` and `/*`.
         if bytes[i] == b'/' && i + 1 < end && is_regex_start(bytes, i, scan_start) {
-            i = skip_regex_literal(bytes, i);
+            i = skip_regex_literal(bytes, i, end);
             continue;
         }
 
@@ -137,71 +139,4 @@ pub(crate) fn scan_to_matching_brace(bytes: &[u8], scan_start: usize) -> Option<
     }
 
     None
-}
-
-/// Determine if `/` at position `slash_pos` is starting a regex literal.
-///
-/// Uses context: if the previous non-whitespace character could end an expression
-/// (identifier, number, `)`, `]`), then `/` is likely division.
-/// Otherwise, it's likely a regex start.
-fn is_regex_start(source: &[u8], slash_pos: usize, expr_start: usize) -> bool {
-    // Find the previous non-whitespace character
-    let mut j = slash_pos;
-    while j > expr_start {
-        j -= 1;
-        let ch = source[j] as char;
-        if !ch.is_ascii_whitespace() {
-            // Characters that END an expression - / after these is DIVISION
-            // Identifier chars (a-z, A-Z, 0-9, _), ), ], numbers
-            if ch.is_ascii_alphanumeric() || ch == '_' || ch == ')' || ch == ']' {
-                return false;
-            }
-            // Characters that could PRECEDE a regex - / after these is REGEX
-            // (, [, {, ,, ;, :, =, !, ~, +, -, *, /, %, <, >, &, |, ^, ?, arrow (>)
-            return true;
-        }
-    }
-    // At start of expression, / is likely regex (e.g., {/pattern/})
-    true
-}
-
-/// Skip past a regex literal starting at `start_pos`, returning position after the regex.
-///
-/// Handles escape sequences, character classes `[...]`, and regex flags.
-fn skip_regex_literal(source: &[u8], start_pos: usize) -> usize {
-    let mut i = start_pos + 1; // Move past opening /
-
-    while i < source.len() {
-        let ch = source[i] as char;
-
-        if ch == '\\' && i + 1 < source.len() {
-            // Escape sequence - skip next char
-            i += 2;
-        } else if ch == '/' {
-            // Found closing / - skip it and any flags
-            i += 1;
-            while i < source.len() && (source[i] as char).is_ascii_lowercase() {
-                i += 1;
-            }
-            return i;
-        } else if ch == '[' {
-            // Character class - skip to closing ]
-            i += 1;
-            while i < source.len() {
-                let class_ch = source[i] as char;
-                if class_ch == '\\' && i + 1 < source.len() {
-                    i += 2;
-                } else if class_ch == ']' {
-                    i += 1;
-                    break;
-                } else {
-                    i += 1;
-                }
-            }
-        } else {
-            i += 1;
-        }
-    }
-
-    i
 }
