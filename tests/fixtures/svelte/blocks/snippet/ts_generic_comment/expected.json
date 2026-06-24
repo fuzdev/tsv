@@ -1,0 +1,296 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 162,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 46,
+				"end": 48,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 48,
+				"end": 104,
+				"data": " block comment inside the generic parameter list "
+			},
+			{
+				"type": "Text",
+				"start": 104,
+				"end": 105,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 105,
+				"end": 161,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn",
+					"start": 115,
+					"end": 117,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 10,
+							"character": 115
+						},
+						"end": {
+							"line": 6,
+							"column": 12,
+							"character": 117
+						}
+					}
+				},
+				"typeParams": "T /* c */",
+				"parameters": [
+					{
+						"type": "Identifier",
+						"start": 129,
+						"end": 133,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 24
+							},
+							"end": {
+								"line": 6,
+								"column": 28
+							}
+						},
+						"name": "a",
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 130,
+							"end": 133,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 25
+								},
+								"end": {
+									"line": 6,
+									"column": 28
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 132,
+								"end": 133,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 27
+									},
+									"end": {
+										"line": 6,
+										"column": 28
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 132,
+									"end": 133,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 27
+										},
+										"end": {
+											"line": 6,
+											"column": 28
+										}
+									},
+									"name": "T"
+								}
+							}
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 120,
+								"end": 127
+							}
+						]
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 135,
+							"end": 151,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 6,
+									"column": 31,
+									"character": 136
+								},
+								"end": {
+									"line": 6,
+									"column": 35,
+									"character": 140
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 141,
+										"end": 144,
+										"expression": {
+											"type": "Identifier",
+											"start": 142,
+											"end": 143,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 37
+												},
+												"end": {
+													"line": 6,
+													"column": 38
+												}
+											},
+											"name": "a"
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 120,
+			"end": 127,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 15
+				},
+				"end": {
+					"line": 6,
+					"column": 22
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 46,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 37,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 20,
+					"end": 36,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 17
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 25,
+						"end": 26,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 6
+							},
+							"end": {
+								"line": 2,
+								"column": 7
+							}
+						},
+						"name": "T"
+					},
+					"typeAnnotation": {
+						"type": "TSNumberKeyword",
+						"start": 29,
+						"end": 35,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 10
+							},
+							"end": {
+								"line": 2,
+								"column": 16
+							}
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

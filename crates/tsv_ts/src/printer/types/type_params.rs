@@ -39,7 +39,7 @@ impl<'a> Printer<'a> {
 
     /// Build doc for type parameter declaration with wrapping support
     /// When the group breaks, each param goes on its own line with trailing comma
-    pub(in crate::printer) fn build_type_parameter_declaration_doc_wrapping(
+    pub(crate) fn build_type_parameter_declaration_doc_wrapping(
         &self,
         decl: &TSTypeParameterDeclaration,
     ) -> DocId {

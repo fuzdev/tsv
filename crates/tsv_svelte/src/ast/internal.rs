@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use string_interner::DefaultSymbol;
 use tsv_css::ast::internal::CssStyleSheet;
 pub use tsv_lang::{Comment, SharedInterner, Span};
-use tsv_ts::ast::internal::{Expression, Program, VariableDeclaration};
+use tsv_ts::ast::internal::{Expression, Program, TSTypeParameterDeclaration, VariableDeclaration};
 
 /// Svelte Root - top-level AST node
 ///
@@ -143,8 +143,17 @@ pub struct KeyBlock {
 /// Defines a reusable chunk of markup that can be rendered with {@render}.
 #[derive(Debug, Clone)]
 pub struct SnippetBlock {
-    pub expression: Expression,          // Snippet name (Identifier)
-    pub type_parameters: Option<String>, // Generic type params, e.g., "T" for <T>
+    pub expression: Expression, // Snippet name (Identifier)
+    /// Parsed generic type parameters (`<T extends X = Y>`), routed through
+    /// `tsv_ts`'s type-parameter printer for constraint/default/modifier
+    /// handling and width-based wrapping. `None` when absent or when the
+    /// signature parse fell back to raw text (see `type_params_raw`).
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    /// Raw inner text of the generics (`T extends X` for `<T extends X>`),
+    /// always set when generics are present. Feeds the public AST's `typeParams`
+    /// string (matching Svelte's parser) and is the formatter fallback when
+    /// `type_parameters` is `None` (parse failure).
+    pub type_params_raw: Option<String>,
     pub parameters: Vec<Expression>, // Function parameters (patterns) - may be empty if raw_parameters is set
     pub raw_parameters: Option<String>, // Raw parameter string for TypeScript (when type annotations present)
     /// Source span of the parameter parens: `start` is the `(`, `end` is the `)`
