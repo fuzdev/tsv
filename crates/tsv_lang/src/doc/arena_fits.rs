@@ -419,12 +419,36 @@ pub(super) fn arena_fits_multi<R: TextResolver + ?Sized>(
 }
 
 /// Update position after rendering a text string, accounting for tab expansion.
+///
+/// The overwhelmingly common input here is short ASCII with no newline — every
+/// interned identifier (`Symbol`) and every static punctuation/keyword token
+/// reaches this via `render_text`'s uncached-width arm. For those the previous
+/// shape scanned the bytes three times (`rfind('\n')` + `visual_width`'s own
+/// `is_ascii` + tab count). The fast path below folds the newline reset, tab
+/// expansion, and width accumulation into a single forward byte pass, so no
+/// backward `memchr` scan runs. Any non-ASCII byte bails to the grapheme-correct
+/// path unchanged — the partial `col` is discarded and the whole string is
+/// re-measured, which keeps combining marks (which can attach to an ASCII base)
+/// correct. Byte-identical to the prior implementation by construction.
 #[inline]
 pub(super) fn update_pos_for_text(pos: &mut usize, s: &str) {
-    if let Some(last_newline_pos) = s.rfind('\n') {
-        let after_newline = &s[last_newline_pos + 1..];
-        *pos = visual_width(after_newline, TAB_WIDTH);
-    } else {
-        *pos += visual_width(s, TAB_WIDTH);
+    let mut col = *pos;
+    for &b in s.as_bytes() {
+        match b {
+            b'\n' => col = 0,
+            b'\t' => col += TAB_WIDTH,
+            0..=0x7f => col += 1,
+            _ => {
+                // Non-ASCII present: fall back to the grapheme-aware measure over
+                // the entire string (the accumulated `col` is intentionally dropped).
+                if let Some(last_newline_pos) = s.rfind('\n') {
+                    *pos = visual_width(&s[last_newline_pos + 1..], TAB_WIDTH);
+                } else {
+                    *pos += visual_width(s, TAB_WIDTH);
+                }
+                return;
+            }
+        }
     }
+    *pos = col;
 }
