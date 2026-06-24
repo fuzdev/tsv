@@ -3,7 +3,8 @@
 // Handles printing of object type literals (`{ a: T; b: U }`) with:
 // - Single-line and multi-line formats
 // - Object alignment for union members and parenthesized intersections
-// - "Hugging" behavior for type arguments
+// - Grouped (`Standard`) vs no-group (`NoGroup`) modes so a parent (function
+//   type / type-argument list) can control breaking
 
 use super::super::comments_in_range;
 use super::Printer;
@@ -15,8 +16,6 @@ use tsv_lang::doc::arena::DocId;
 
 /// Mode for building type literal docs.
 enum TypeLiteralMode {
-    /// Inline `; ` separators, no softlines, no group (for type args)
-    Hugging,
     /// Width-aware with softlines, wrapped in group
     Standard,
     /// Width-aware with softlines, no group (parent controls breaking)
@@ -524,25 +523,14 @@ impl<'a> Printer<'a> {
         self.build_type_literal_doc_inner(t, TypeLiteralMode::Standard)
     }
 
-    /// Build a Doc for a type literal without wrapping in a group ("hugging").
-    ///
-    /// Used for type arguments where the type literal should "hug" and let
-    /// the parent `<...>` group control breaking, matching Prettier's behavior.
-    pub(super) fn build_type_literal_doc_hugging(&self, t: &TSTypeLiteral) -> DocId {
-        self.build_type_literal_doc_inner(t, TypeLiteralMode::Hugging)
-    }
-
     /// Inner implementation for type literal doc building.
     ///
     /// `mode` controls formatting behavior:
-    /// - `Hugging`: Inline `; ` separators, no softlines, no group (for type args)
     /// - `Standard`: Width-aware with softlines, wrapped in group
     /// - `NoGroup`: Width-aware with softlines, no group (parent controls breaking)
     fn build_type_literal_doc_inner(&self, t: &TSTypeLiteral, mode: TypeLiteralMode) -> DocId {
         let d = self.d();
-        use TypeLiteralMode::{Hugging, Standard};
-        let hug = matches!(mode, Hugging);
-        let wrap_in_group = matches!(mode, Standard);
+        let wrap_in_group = matches!(mode, TypeLiteralMode::Standard);
         let force_multiline = self.type_literal_force_multiline(t);
 
         if t.members.is_empty() {
@@ -614,50 +602,6 @@ impl<'a> Printer<'a> {
 
             parts.push(d.indent(d.concat(&member_parts)));
             parts.push(d.hardline());
-        } else if hug {
-            // Hugging mode: inline content with `; ` separators. Under
-            // bracketSpacing the hug stays on one line, so the inner padding is a
-            // literal space (never a breakable boundary): `{ a: T; b: U }`.
-            parts.push(d.text(" "));
-            // Preserve comment position relative to semicolon
-            if let Some(first) = t.members.first() {
-                parts.extend(
-                    self.build_type_literal_leading_comments_inline(
-                        t.span.start,
-                        first.span().start,
-                    ),
-                );
-            }
-            for (i, m) in t.members.iter().enumerate() {
-                let is_last = i == t.members.len() - 1;
-                // Use content_end for comment detection (before trailing separator)
-                let member_content_end = m.content_end(self.source);
-
-                parts.push(self.build_type_member_doc_inner(m));
-
-                let upper_bound = t
-                    .members
-                    .get(i + 1)
-                    .map_or(t.span.end, |next| next.span().start);
-                let trailing: Vec<_> =
-                    comments_in_range(self.comments, member_content_end, upper_bound).collect();
-
-                if !is_last {
-                    parts.extend(self.build_comments_around_semicolon_doc(
-                        &trailing,
-                        member_content_end,
-                        upper_bound,
-                    ));
-                    parts.push(d.text(" "));
-                } else {
-                    // Last member in hugging mode: no semicolon
-                    for comment in &trailing {
-                        parts.push(self.build_trailing_comment_doc(comment));
-                    }
-                }
-            }
-            // Closing bracketSpacing for the hug (literal space — see opening above).
-            parts.push(d.text(" "));
         } else {
             // Width-aware format: stays inline if fits, wraps if too long.
             // The opening bracketSpacing boundary leads (a space when flat `{ a }`,
@@ -735,12 +679,14 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a type expression suitable for use as a type argument.
     ///
-    /// Object type literals are built without groups ("hugging") so the parent
-    /// `<...>` group controls breaking, matching Prettier's behavior.
+    /// An object type literal carries its own width-aware group, so when it
+    /// overflows it breaks block-style (members on their own lines) rather than
+    /// spilling an inner union/intersection — even inside a multi-argument list
+    /// (`Map<K, { ...wide... }>`). Matches Prettier and the single-argument path.
     pub(in crate::printer) fn build_type_doc_for_type_arg(&self, ts_type: &TSType) -> DocId {
         let d = self.d();
         match ts_type {
-            TSType::TypeLiteral(t) => self.build_type_literal_doc_hugging(t),
+            TSType::TypeLiteral(t) => self.build_type_literal_doc(t),
             TSType::Parenthesized(p) => {
                 // Unwrap the parens (redundant in type-argument position — prettier
                 // strips them too) but preserve any comments the user wrote inside
