@@ -226,8 +226,8 @@ console.error(
 );
 for (const lang of langs) {
 	if (by_lang[lang].length === 0) continue;
-	print_row(lang, by_lang[lang].length, kb_of(lang), median(cur_t[primary][lang]), ratios('ab', lang), ratios('aa', lang));
+	print_row(lang, by_lang[lang].length, kb_of(lang), median(cur_t[primary][lang]), baseline ? ratios('ab', lang) : [], ratios('aa', lang));
 }
 const total_cur = median(Array.from({ length: pairs }, (_, p) => langs.reduce((s, l) => s + cur_t[primary][l][p], 0)));
 console.error('');
-print_row('total', ok.length, langs.reduce((s, l) => s + kb_of(l), 0), total_cur, total_ratios('ab'), total_ratios('aa'));
+print_row('total', ok.length, langs.reduce((s, l) => s + kb_of(l), 0), total_cur, baseline ? total_ratios('ab') : [], total_ratios('aa'));
