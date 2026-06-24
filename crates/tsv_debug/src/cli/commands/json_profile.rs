@@ -52,6 +52,7 @@ use tsv_cli::cli::input::ParserType;
 use tsv_lang::{ByteToCharMap, LocationTracker};
 
 use super::profile::{format_duration, format_size, lang_label, median_us, resolve_profile_files};
+use crate::cli::CliError;
 
 /// Bench-corpus exclusions, mirrored from `benches/deno/lib/corpus.ts`:
 /// declaration files and build output add noise without exercising new
@@ -79,8 +80,8 @@ pub struct JsonProfileCommand {
 }
 
 impl JsonProfileCommand {
-    pub fn run(self) {
-        let (files, skipped) = resolve_profile_files(&self.paths, is_bench_corpus_excluded);
+    pub(crate) fn run(self) -> Result<(), CliError> {
+        let (files, skipped) = resolve_profile_files(&self.paths, is_bench_corpus_excluded)?;
 
         let mut results = Vec::new();
         let mut parse_errors = 0usize;
@@ -94,7 +95,7 @@ impl JsonProfileCommand {
 
         if results.is_empty() {
             eprintln!("No files profiled successfully ({parse_errors} parse errors).");
-            return;
+            return Ok(());
         }
 
         let aggregates = aggregate(&results);
@@ -110,6 +111,8 @@ impl JsonProfileCommand {
         } else {
             print_report(&aggregates, self.iterations, parse_errors, skipped);
         }
+
+        Ok(())
     }
 }
 

@@ -1,5 +1,6 @@
+use crate::cli::CliError;
 use argh::FromArgs;
-use std::process::{Command as StdCommand, exit};
+use std::process::Command as StdCommand;
 
 /// Regenerate expected.json + output_prettier.* (runs parsed + formatted in sequence).
 #[derive(FromArgs, Debug)]
@@ -11,7 +12,7 @@ pub struct FixturesUpdateCommand {
 }
 
 impl FixturesUpdateCommand {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         println!("Running fixtures_update_parsed...\n");
 
         // Build command: cargo run -p tsv_debug --quiet fixtures_update_parsed [filters...]
@@ -30,13 +31,13 @@ impl FixturesUpdateCommand {
             Ok(s) => s,
             Err(e) => {
                 eprintln!("Failed to run fixtures_update_parsed: {e}");
-                exit(1);
+                return Err(CliError::Failed);
             }
         };
 
         if !status.success() {
             eprintln!("\nfixtures_update_parsed failed");
-            exit(1);
+            return Err(CliError::Failed);
         }
 
         println!("\n════════════════════\n");
@@ -58,16 +59,17 @@ impl FixturesUpdateCommand {
             Ok(s) => s,
             Err(e) => {
                 eprintln!("Failed to run fixtures_update_formatted: {e}");
-                exit(1);
+                return Err(CliError::Failed);
             }
         };
 
         if !status.success() {
             eprintln!("\nfixtures_update_formatted failed");
-            exit(1);
+            return Err(CliError::Failed);
         }
 
         println!("\n════════════════════\n");
         println!("✓ Both commands completed successfully");
+        Ok(())
     }
 }

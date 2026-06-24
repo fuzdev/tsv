@@ -1,3 +1,4 @@
+use crate::cli::CliError;
 use crate::deno;
 use crate::diff::LINE_WIDTH_THRESHOLD;
 use crate::fixtures::{self, InputType, find_input_file};
@@ -35,16 +36,16 @@ pub struct FixtureInitCommand {
 }
 
 impl FixtureInitCommand {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         let rt = super::create_runtime();
-        rt.block_on(self.run_async());
+        rt.block_on(self.run_async())
     }
 
-    async fn run_async(self) {
+    async fn run_async(self) -> Result<(), CliError> {
         let dir = Path::new(&self.dir);
 
         // Determine input type from --parser flag, existing file, or default
-        let input_type = resolve_input_type(self.parser.as_deref(), dir);
+        let input_type = resolve_input_type(self.parser.as_deref(), dir)?;
 
         // Get content from --content, --stdin, or existing file
         let raw_content = match resolve_content(
@@ -57,14 +58,14 @@ impl FixtureInitCommand {
             Ok(c) => c,
             Err(e) => {
                 eprintln!("Error: {e}");
-                std::process::exit(1);
+                return Err(CliError::Failed);
             }
         };
 
         // Create directory
         if let Err(e) = std::fs::create_dir_all(dir) {
             eprintln!("Error creating directory {dir:?}: {e}");
-            std::process::exit(1);
+            return Err(CliError::Failed);
         }
 
         // Format through prettier
@@ -72,7 +73,7 @@ impl FixtureInitCommand {
             Ok(f) => f,
             Err(e) => {
                 eprintln!("Error: prettier formatting failed: {e}");
-                std::process::exit(1);
+                return Err(CliError::Failed);
             }
         };
 
@@ -82,7 +83,7 @@ impl FixtureInitCommand {
 
         if let Err(e) = fixtures::write_file(&input_path, &formatted) {
             eprintln!("Error writing {input_filename}: {e}");
-            std::process::exit(1);
+            return Err(CliError::Failed);
         }
         println!("✓ {input_filename} (prettier-formatted)");
 
@@ -126,14 +127,19 @@ impl FixtureInitCommand {
         }
 
         println!("\nFixture initialized: {}", self.dir);
+        Ok(())
     }
 }
 
-/// Resolve input type from --parser flag, existing file, or default (svelte)
-fn resolve_input_type(parser: Option<&str>, dir: &Path) -> InputType {
+/// Resolve input type from --parser flag, existing file, or default (svelte).
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] when `--parser` names an unknown type.
+fn resolve_input_type(parser: Option<&str>, dir: &Path) -> Result<InputType, CliError> {
     // --parser flag takes priority
     if let Some(parser) = parser {
-        return match parser {
+        return Ok(match parser {
             "svelte" => InputType::Svelte,
             "typescript" | "ts" => InputType::TypeScript,
             "css" => InputType::Css,
@@ -142,16 +148,16 @@ fn resolve_input_type(parser: Option<&str>, dir: &Path) -> InputType {
                 eprintln!(
                     "Unknown parser type: '{parser}'. Valid: svelte, typescript, css, svelte-ts"
                 );
-                std::process::exit(1);
+                return Err(CliError::Failed);
             }
-        };
+        });
     }
 
     // Auto-detect from existing input file (closed set, so from_filepath
     // always matches; the unwrap_or is the no-file default)
-    find_input_file(dir)
+    Ok(find_input_file(dir)
         .and_then(InputType::from_filepath)
-        .unwrap_or(InputType::Svelte)
+        .unwrap_or(InputType::Svelte))
 }
 
 /// Resolve content from --content, --stdin, or existing input file

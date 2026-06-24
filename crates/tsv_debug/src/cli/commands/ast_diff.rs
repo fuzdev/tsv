@@ -1,3 +1,4 @@
+use crate::cli::CliError;
 use crate::deno;
 use crate::diff::{DiffOptions, diff_to_string};
 use crate::error;
@@ -34,16 +35,16 @@ pub struct AstDiffCommand {
 }
 
 impl AstDiffCommand {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         if self.files.len() > 2 {
             eprintln!("Error: ast_diff accepts at most two file positionals");
-            std::process::exit(1);
+            return Err(CliError::Failed);
         }
 
         let has_content_or_stdin = self.content.is_some() || self.stdin;
         if has_content_or_stdin && !self.files.is_empty() {
             eprintln!("Error: cannot combine --content/--stdin with file positionals");
-            std::process::exit(1);
+            return Err(CliError::Failed);
         }
 
         // Resolve the primary input
@@ -58,13 +59,13 @@ impl AstDiffCommand {
                 Ok(pair) => pair,
                 Err(e) => {
                     eprintln!("Error: {e}");
-                    std::process::exit(1);
+                    return Err(CliError::Failed);
                 }
             }
         } else {
             let Some(first) = self.files.first().cloned() else {
                 eprintln!("Error: No input provided. Use a file path, --content, or --stdin");
-                std::process::exit(1);
+                return Err(CliError::Failed);
             };
             let input_args = InputArgs {
                 content: None,
@@ -76,7 +77,7 @@ impl AstDiffCommand {
                 Ok(pair) => pair,
                 Err(e) => {
                     eprintln!("Error: {e}");
-                    std::process::exit(1);
+                    return Err(CliError::Failed);
                 }
             }
         };
@@ -87,7 +88,7 @@ impl AstDiffCommand {
                 Ok(i) => Some(i),
                 Err(e) => {
                     eprintln!("Error: {e}");
-                    std::process::exit(1);
+                    return Err(CliError::Failed);
                 }
             }
         } else {
@@ -111,14 +112,15 @@ impl AstDiffCommand {
         match result {
             Ok(true) => {
                 println!("✓ ASTs match (semantically equivalent)");
+                Ok(())
             }
             Ok(false) => {
                 println!("✗ ASTs differ (semantic change detected)");
-                std::process::exit(1);
+                Err(CliError::Failed)
             }
             Err(err) => {
                 eprintln!("Error: {err}");
-                std::process::exit(1);
+                Err(CliError::Failed)
             }
         }
     }

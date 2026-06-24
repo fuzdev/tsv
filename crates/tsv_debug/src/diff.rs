@@ -188,7 +188,7 @@ pub struct DiffOptions {
     pub show_header: bool,
     /// Show inline/word-level diffs within changed lines
     pub inline_diff: bool,
-    /// Show JSON paths for changes (e.g., "$.children[0].name")
+    /// Show JSON paths for changes (e.g., `$.children[0].name`)
     pub show_json_paths: bool,
     /// Color choice (auto, always, never)
     pub color_choice: ColorChoice,

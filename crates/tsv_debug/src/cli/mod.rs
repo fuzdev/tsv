@@ -14,6 +14,34 @@ use commands::{
     test262::Test262Command, ts_fixture_audit::TsFixtureAuditCommand,
 };
 
+/// A command failure, carrying the process exit code up to the single exit
+/// point in `main`.
+///
+/// Commands print their own diagnostics where the failure happens; this only
+/// carries the resulting code, so exit policy lives in one place instead of the
+/// scattered `std::process::exit` calls it replaces. The codes are a stable
+/// contract: success is `Ok(())` (exit `0`), `Failed` is exit `1` (a reported
+/// error), and `TaskPanic` is exit `2` (a spawned task panicked while joining —
+/// a distinct failure class).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CliError {
+    /// A failure the command already reported — exit code 1.
+    Failed,
+    /// A spawned task panicked while being joined — exit code 2.
+    TaskPanic,
+}
+
+impl CliError {
+    /// The process exit code for this failure.
+    #[must_use]
+    pub fn exit_code(self) -> u8 {
+        match self {
+            Self::Failed => 1,
+            Self::TaskPanic => 2,
+        }
+    }
+}
+
 /// tsv_debug — internal debugging tools (fixtures, comparisons, conformance).
 #[derive(FromArgs, Debug)]
 pub struct TopLevel {
@@ -48,7 +76,13 @@ pub enum Subcommand {
 }
 
 impl TopLevel {
-    pub fn run(self) {
+    /// Dispatch the selected subcommand, threading its exit decision up to `main`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the subcommand's [`CliError`] when it fails; `main` maps it to the
+    /// process exit code.
+    pub fn run(self) -> Result<(), CliError> {
         match self.nested {
             Subcommand::Check(c) => c.run(),
             Subcommand::AuthoringAudit(c) => c.run(),
@@ -72,5 +106,18 @@ impl TopLevel {
             Subcommand::Test262(c) => c.run(),
             Subcommand::TsFixtureAudit(c) => c.run(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CliError;
+
+    #[test]
+    fn exit_codes_are_stable() {
+        // The exit-code contract `main` maps to a process code: 1 for a reported
+        // failure, 2 for a spawned-task panic. Pinned so the refactor can't drift it.
+        assert_eq!(CliError::Failed.exit_code(), 1);
+        assert_eq!(CliError::TaskPanic.exit_code(), 2);
     }
 }

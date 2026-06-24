@@ -1,3 +1,4 @@
+use crate::cli::CliError;
 use crate::deno;
 use crate::error;
 use argh::FromArgs;
@@ -26,7 +27,7 @@ pub struct CanonicalParseCommand {
 }
 
 impl CanonicalParseCommand {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         let input_args = InputArgs {
             content: self.content,
             stdin: self.stdin,
@@ -37,16 +38,19 @@ impl CanonicalParseCommand {
             Ok(pair) => pair,
             Err(e) => {
                 eprintln!("Error: {e}");
-                std::process::exit(1);
+                return Err(CliError::Failed);
             }
         };
 
         let rt = super::create_runtime();
         match rt.block_on(run(&input, parser_type)) {
-            Ok(json) => print!("{json}"),
+            Ok(json) => {
+                print!("{json}");
+                Ok(())
+            }
             Err(err) => {
                 eprintln!("Error parsing: {err}");
-                std::process::exit(1);
+                Err(CliError::Failed)
             }
         }
     }

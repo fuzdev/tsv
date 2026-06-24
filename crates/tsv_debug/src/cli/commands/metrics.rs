@@ -1,3 +1,4 @@
+use crate::cli::CliError;
 use argh::FromArgs;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -40,17 +41,17 @@ const GROUPS: &[CrateGroup] = &[
 ];
 
 impl MetricsCommand {
-    pub fn run(self) {
+    pub(crate) fn run(self) -> Result<(), CliError> {
         let Some(crates_dir) = find_crates_dir() else {
             eprintln!("Error: Could not find crates/ directory. Run from the workspace root.");
-            std::process::exit(1);
+            return Err(CliError::Failed);
         };
 
         let mut results = Vec::new();
 
         let Ok(entries) = std::fs::read_dir(&crates_dir) else {
             eprintln!("Error: Could not read {}", crates_dir.display());
-            std::process::exit(1);
+            return Err(CliError::Failed);
         };
 
         let mut crate_dirs: Vec<PathBuf> = entries
@@ -78,7 +79,7 @@ impl MetricsCommand {
 
         if results.is_empty() {
             eprintln!("No crates found.");
-            return;
+            return Ok(());
         }
 
         if self.json {
@@ -86,6 +87,8 @@ impl MetricsCommand {
         } else {
             print_table(&results);
         }
+
+        Ok(())
     }
 }
 
@@ -95,7 +98,7 @@ fn measure_crate(crate_name: &str, src_dir: &Path) -> CrateMetrics {
     let mut total = 0;
 
     let mut files = Vec::new();
-    collect_rs_files(src_dir, &mut files);
+    super::collect_rs_files(src_dir, &mut files);
 
     for file_path in &files {
         let lines = count_lines(file_path);
@@ -181,21 +184,6 @@ fn count_lines(path: &Path) -> usize {
     std::fs::read_to_string(path)
         .map(|s| s.lines().count())
         .unwrap_or(0)
-}
-
-/// Recursively collect all .rs files
-fn collect_rs_files(dir: &Path, files: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            collect_rs_files(&path, files);
-        } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
-            files.push(path);
-        }
-    }
 }
 
 /// Find the crates/ directory by walking up from the current directory
