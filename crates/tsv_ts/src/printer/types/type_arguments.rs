@@ -3,6 +3,8 @@
 use super::Printer;
 use super::helpers::{should_hug_union_type, unwrap_parenthesized};
 use crate::ast::internal::{self, TSType};
+use smallvec::smallvec;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::has_comments_in_range;
 
@@ -62,7 +64,7 @@ impl<'a> Printer<'a> {
 
         // Single type argument: inline (matches Prettier's shouldInline for len==1)
         if args.params.len() == 1 {
-            let mut parts = Vec::new();
+            let mut parts = DocBuf::new();
             let prev_end = args.span.start + 1; // After the opening `<`
             let param_start = args.params[0].span().start;
             let param_end = args.params[0].span().end;
@@ -130,7 +132,7 @@ impl<'a> Printer<'a> {
                     && u.types.iter().any(|t| matches!(t, TSType::TypeLiteral(_) | TSType::Mapped(_)))
                 );
             if is_huggable {
-                let mut parts = vec![d.text("<")];
+                let mut parts = smallvec![d.text("<")];
 
                 // Include leading comments: `Array</* comment */ {...}>`
                 let param_start = args.params[0].span().start;
@@ -162,14 +164,14 @@ impl<'a> Printer<'a> {
         args: &internal::TSTypeParameterInstantiation,
     ) -> DocId {
         let d = self.d();
-        let mut inner_parts = Vec::new();
+        let mut inner_parts = DocBuf::new();
         let mut prev_end = args.span.start + 1; // After the opening `<`
 
         for (i, param) in args.params.iter().enumerate() {
             let param_start = param.span().start;
             let is_last = i == args.params.len() - 1;
 
-            let mut arg_parts = Vec::new();
+            let mut arg_parts = DocBuf::new();
 
             // Add leading block comments before this type argument
             self.append_leading_inline_block_comments(&mut arg_parts, prev_end, param_start);
@@ -228,7 +230,7 @@ impl<'a> Printer<'a> {
                 let leading =
                     self.build_leading_comments_multiline(args.span.start + 1, param_start);
                 if !leading.is_empty() {
-                    let mut parts = vec![d.text("<")];
+                    let mut parts: DocBuf = smallvec![d.text("<")];
                     parts.extend(leading);
                     parts.push(self.build_type_arg_doc(param, false));
                     parts.push(d.text(">"));
@@ -247,7 +249,7 @@ impl<'a> Printer<'a> {
         let (angle_line_prefix, delimiter_pull_pos) =
             self.delimiter_line_comment_prefix(args.span.start, first_param_start);
 
-        let mut inner_parts = Vec::new();
+        let mut inner_parts = DocBuf::new();
         let mut prev_end = args.span.start + 1; // After the opening `<`
 
         for (i, param) in args.params.iter().enumerate() {

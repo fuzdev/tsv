@@ -19,7 +19,9 @@ use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
 use crate::printer::layout::hang_after_operator;
+use smallvec::smallvec;
 use tsv_lang::INDENT;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
@@ -283,7 +285,7 @@ impl<'a> Printer<'a> {
                 &c.extends_type,
                 type_needs_parens_for_conditional_extends,
             );
-            let mut parts = vec![];
+            let mut parts = smallvec![];
             self.append_keyword_value_line_comments(
                 &mut parts,
                 extends_kw_end,
@@ -307,7 +309,7 @@ impl<'a> Printer<'a> {
         if let TSType::Parenthesized(p) = c.extends_type.as_ref()
             && self.paren_has_leading_line_comment(p)
         {
-            let mut parts = vec![d.text(" "), comments_after_extends];
+            let mut parts: DocBuf = smallvec![d.text(" "), comments_after_extends];
             parts.push(self.build_type_doc(&p.type_annotation));
             for comment in self.paren_leading_line_comments(p) {
                 parts.push(self.build_trailing_line_comment_doc(comment));
@@ -319,7 +321,7 @@ impl<'a> Printer<'a> {
             if union.types.is_empty() {
                 d.text(" ")
             } else {
-                let mut parts = Vec::new();
+                let mut parts = DocBuf::new();
                 for (i, t) in union.types.iter().enumerate() {
                     if i > 0 {
                         parts.push(d.if_break(d.concat(&[d.line(), d.text("| ")]), d.text(" | ")));
@@ -424,7 +426,7 @@ impl<'a> Printer<'a> {
         // Comments BEFORE the `?` token — emit as trailing on extends_type
         // (before the hardline that ends extends_type's line). Also includes
         // relocated leading line comments from inside true_type's parens.
-        let mut trailing_on_extends_parts: Vec<DocId> = Vec::new();
+        let mut trailing_on_extends_parts: DocBuf = DocBuf::new();
         for comment in comments_in_range(self.comments, extends_type_end, before_q_end) {
             trailing_on_extends_parts.push(self.build_trailing_comment_doc(comment));
         }
@@ -432,7 +434,7 @@ impl<'a> Printer<'a> {
             trailing_on_extends_parts.push(self.build_trailing_line_comment_doc(comment));
         }
 
-        let mut q_parts = Vec::new();
+        let mut q_parts = DocBuf::new();
 
         // ? on new line
         q_parts.push(d.hardline());
@@ -539,7 +541,7 @@ impl<'a> Printer<'a> {
             comments_in_range(self.comments, content_start, param_name_start).collect();
 
         // Build the mapping body (starting from `[`)
-        let mut body_parts = vec![];
+        let mut body_parts = smallvec![];
 
         // readonly modifier: `readonly`, `+readonly`, or `-readonly`
         if let Some(readonly) = m.readonly {
@@ -717,7 +719,7 @@ impl<'a> Printer<'a> {
         if source_is_multiline {
             // Multi-line source: preserve multi-line format with hardlines
             // Comments before mapping go on their own line
-            let mut inner_parts = vec![];
+            let mut inner_parts: DocBuf = smallvec![];
             for comment in &comments_before_mapping {
                 inner_parts.push(d.hardline());
                 inner_parts.push(self.build_comment_doc(comment));
@@ -736,7 +738,7 @@ impl<'a> Printer<'a> {
             // One-line source: width-aware (stays inline if fits, wraps if too long).
             // bracketSpacing boundaries: a space when flat (`{ [K in T]: U }`), a
             // newline when broken.
-            let mut all_parts = vec![d.line()];
+            let mut all_parts: DocBuf = smallvec![d.line()];
             all_parts.extend(body_parts);
             all_parts.push(d.if_break(d.text(";"), d.empty()));
 
@@ -784,12 +786,12 @@ impl<'a> Printer<'a> {
         }
 
         // Build element docs with commas, inline block comments, and line breaks
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         let mut prev_end = t.span.start + 1; // After opening `[`
         // Block comment trailing the last element after its source comma — preserved
         // past where the comma was (no trailing comma; prettier relocates before; see
         // conformance_prettier.md §Comment relocation).
-        let mut last_after_comma = Vec::new();
+        let mut last_after_comma = DocBuf::new();
         for (i, elem) in t.element_types.iter().enumerate() {
             if i > 0 {
                 parts.push(d.text(","));
@@ -841,7 +843,7 @@ impl<'a> Printer<'a> {
         let (bracket_line_prefix, delimiter_pull_pos) =
             self.delimiter_line_comment_prefix(t.span.start, first_elem_start);
 
-        let mut inner_parts = Vec::new();
+        let mut inner_parts = DocBuf::new();
         let mut prev_end = t.span.start + 1; // After the opening `[`
 
         for (i, elem) in t.element_types.iter().enumerate() {

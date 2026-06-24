@@ -24,6 +24,7 @@ use super::arg_wrapping::{
     wrap_huggable_arg,
 };
 use crate::ast::internal::{self, Expression};
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
 /// Prepend optional leading comments to a doc.
@@ -67,7 +68,7 @@ fn build_inline_leading_comments(
     let d = printer.d();
     let pc = PartitionedComments::new(printer.comments, printer.line_breaks, paren_open, arg_start);
 
-    let mut parts = Vec::new();
+    let mut parts = DocBuf::new();
 
     // Block comments on same line as paren
     for comment in &pc.trailing_block {
@@ -111,7 +112,7 @@ fn build_inline_trailing_comments(
         return None;
     }
 
-    let mut parts = Vec::new();
+    let mut parts = DocBuf::new();
     for comment in &pc.trailing_block {
         parts.push(d.text(" "));
         parts.push(printer.build_comment_doc(comment));
@@ -130,7 +131,7 @@ fn build_after_comma_leading_comments(
 ) -> Option<DocId> {
     let d = printer.d();
     let comma_pos = find_comma_pos(printer.source, prev_arg_end, arg_start)?;
-    let mut parts = Vec::new();
+    let mut parts = DocBuf::new();
     for comment in tsv_lang::comments_in_range(printer.comments, prev_arg_end, arg_start) {
         if is_comment_after_comma(comment, comma_pos)
             && comment.is_block
@@ -158,7 +159,7 @@ fn build_before_comma_trailing_comments(
 ) -> Option<DocId> {
     let d = printer.d();
     let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start)?;
-    let mut parts = Vec::new();
+    let mut parts = DocBuf::new();
     for comment in tsv_lang::comments_in_range(printer.comments, arg_end, next_arg_start) {
         if is_comment_before_comma(comment, comma_pos)
             && comment.is_block
@@ -331,7 +332,7 @@ fn build_call_args_doc_for_chain_impl(
         "("
     };
 
-    let mut parts = Vec::new();
+    let mut parts = DocBuf::new();
     if optional && type_args.is_some() {
         parts.push(d.text("?."));
     }
@@ -380,7 +381,7 @@ fn build_chain_args_empty(
     printer: &Printer<'_>,
     call: &internal::CallExpression,
     ctx: ChainArgsContext,
-    mut parts: Vec<DocId>,
+    mut parts: DocBuf,
 ) -> DocId {
     let d = printer.d();
     let ChainArgsContext {
@@ -423,7 +424,7 @@ fn build_chain_args_force_expand(
     printer: &Printer<'_>,
     call: &internal::CallExpression,
     ctx: ChainArgsContext,
-    mut parts: Vec<DocId>,
+    mut parts: DocBuf,
 ) -> DocId {
     let d = printer.d();
     let ChainArgsContext {
@@ -523,11 +524,11 @@ fn build_chain_args_force_expand(
 
     // Forced expansion: use hardlines instead of softlines
     // Build arguments with blank line preservation and full comment handling
-    let mut arg_parts = Vec::new();
+    let mut arg_parts = DocBuf::new();
     // Comments trailing the `(` on its own line, kept on the `(` line
     // (divergence from prettier, which relocates them to their own line).
     // Injected after the `(` in the wrap below.
-    let mut paren_line_prefix_parts: Vec<DocId> = Vec::new();
+    let mut paren_line_prefix_parts: DocBuf = DocBuf::new();
 
     for (i, arg) in call.arguments.iter().enumerate() {
         let arg_start = arg.span().start;
@@ -686,7 +687,7 @@ fn build_chain_args_single(
     printer: &Printer<'_>,
     call: &internal::CallExpression,
     ctx: ChainArgsContext,
-    mut parts: Vec<DocId>,
+    mut parts: DocBuf,
 ) -> DocId {
     let d = printer.d();
     let ChainArgsContext {
@@ -1015,7 +1016,7 @@ fn build_chain_args_multi(
     printer: &Printer<'_>,
     call: &internal::CallExpression,
     ctx: ChainArgsContext,
-    mut parts: Vec<DocId>,
+    mut parts: DocBuf,
 ) -> DocId {
     let d = printer.d();
     let ChainArgsContext {
@@ -1300,7 +1301,7 @@ fn build_chain_args_multi(
     // arg → leads it (`C`); stranded on the comma line → stays there (`A`) — via the same
     // shared emit_* helpers the force-expanded paths use. A comment-free gap takes the
     // cheap `comma_line()` separator (no per-gap comment scan).
-    let mut arg_parts = Vec::new();
+    let mut arg_parts = DocBuf::new();
     for (i, arg) in call.arguments.iter().enumerate() {
         let arg_start = arg.span().start;
         let arg_end = arg.span().end;

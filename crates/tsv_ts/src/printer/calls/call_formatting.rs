@@ -27,6 +27,7 @@ use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_modul
 use super::test_patterns::{callee_chain_string, is_test_call};
 use crate::ast::internal;
 use tsv_lang::SymbolResolver;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 /// Print a call expression: `foo()`, `obj.method(arg1, arg2)`
@@ -255,7 +256,7 @@ pub(super) fn build_call_doc_with_wrapping(
         let first_arg_doc = printer.build_expression_doc(&call.arguments[0]);
 
         // Build tail args (everything after first)
-        let mut tail_parts = Vec::new();
+        let mut tail_parts = DocBuf::new();
         for arg in call.arguments.iter().skip(1) {
             tail_parts.push(d.text(", "));
             tail_parts.push(printer.build_expression_doc(arg));
@@ -442,10 +443,10 @@ fn try_single_arg_comment_paths(
         let gap_pc =
             PartitionedComments::new(printer.comments, printer.line_breaks, paren_open, arg_start);
 
-        let mut paren_line_prefix = Vec::new();
+        let mut paren_line_prefix = DocBuf::new();
         gap_pc.emit_trailing_comments(&mut paren_line_prefix, printer);
 
-        let mut inner = Vec::new();
+        let mut inner = DocBuf::new();
         for comment in &gap_pc.leading {
             inner.push(printer.build_comment_doc(comment));
             inner.push(d.hardline());
@@ -1157,16 +1158,16 @@ fn build_call_with_arg_comments(
     }
 
     // Build arguments with leading and/or inter-argument comments
-    let mut arg_parts = Vec::new();
+    let mut arg_parts = DocBuf::new();
     // Comments trailing the `(` on its own line, kept on the `(` line when the
     // call expands (divergence from prettier, which relocates them to their own
     // line). Injected after `(` in the force-expansion wrap below.
-    let mut paren_line_prefix_parts: Vec<DocId> = Vec::new();
+    let mut paren_line_prefix_parts: DocBuf = DocBuf::new();
     let mut force_expansion = false;
     // Block comment trailing the last arg after its source comma — preserved past
     // where the comma was (no trailing comma; prettier relocates before; see
     // conformance_prettier.md).
-    let mut last_after_comma: Vec<DocId> = Vec::new();
+    let mut last_after_comma: DocBuf = DocBuf::new();
 
     for (i, arg) in call.arguments.iter().enumerate() {
         // Handle leading comments before first argument

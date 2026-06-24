@@ -12,6 +12,8 @@
 use crate::ast::internal;
 use crate::printer::CommentSpacing;
 use crate::printer::Printer;
+use smallvec::smallvec;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 /// Heritage positions computed once and reused for group-mode detection,
@@ -132,7 +134,7 @@ impl<'a> Printer<'a> {
         if let Some(kw_start) = extends_keyword_start {
             let kw_end = kw_start + "extends".len() as u32;
             if self.has_line_comments_between(kw_end, super_class.span().start) {
-                let mut value_parts = vec![self.build_expression_doc(super_class)];
+                let mut value_parts: DocBuf = smallvec![self.build_expression_doc(super_class)];
                 if let Some(type_args) = super_type_parameters {
                     let gap_start = super_class.span().end;
                     if let Some(doc) = self.build_name_to_type_params_comments_opt(
@@ -145,7 +147,7 @@ impl<'a> Printer<'a> {
                     value_parts.push(self.build_type_arguments_doc_wrapping(type_args));
                 }
                 let value_doc = d.concat(&value_parts);
-                let mut ext_parts = vec![d.text("extends")];
+                let mut ext_parts = smallvec![d.text("extends")];
                 self.append_keyword_value_line_comments(
                     &mut ext_parts,
                     kw_end,
@@ -155,7 +157,7 @@ impl<'a> Printer<'a> {
                 return Some(d.concat(&ext_parts));
             }
         }
-        let mut ext_parts = vec![d.text("extends ")];
+        let mut ext_parts: DocBuf = smallvec![d.text("extends ")];
         if let Some(kw_start) = extends_keyword_start {
             let kw_end = kw_start + "extends".len() as u32;
             ext_parts.push(self.build_comments_between(
@@ -248,7 +250,7 @@ impl<'a> Printer<'a> {
     #[allow(clippy::too_many_arguments)]
     pub(in crate::printer) fn build_class_header_doc(
         &self,
-        mut parts: Vec<DocId>,
+        mut parts: DocBuf,
         positions: &ClassHeritagePositions,
         extends_doc: Option<DocId>,
         implements_doc: Option<DocId>,
@@ -282,7 +284,7 @@ impl<'a> Printer<'a> {
 
         // Group mode: one unified group — when it breaks, heritage breaks too.
         // Comments between name/type-params and the first heritage clause.
-        let mut extra_heritage_comments = Vec::new();
+        let mut extra_heritage_comments = DocBuf::new();
         if let Some(heritage_start) = positions.first_heritage_start {
             let (inline, indent) = self
                 .build_heritage_leading_comment_parts(positions.pre_heritage_end, heritage_start);

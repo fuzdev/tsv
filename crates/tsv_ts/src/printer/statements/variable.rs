@@ -12,6 +12,7 @@ use crate::printer::{
     is_single_call_on_member_chain, is_string_literal, is_type_assertion_call, needs_parens,
     should_inline_logical_expression,
 };
+use smallvec::smallvec;
 use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::{DocArena, DocId};
@@ -72,7 +73,7 @@ impl<'a> Printer<'a> {
         wrap_type: bool,
     ) -> DocId {
         let d = self.d();
-        let mut parts = vec![d.symbol(ident.name.to_u32())];
+        let mut parts = smallvec![d.symbol(ident.name.to_u32())];
 
         // Compute name_end for comment extraction
         let search_end = ident
@@ -135,7 +136,7 @@ impl<'a> Printer<'a> {
         let first_decl_start = decl.declarations[0].span.start;
 
         // Everything after the gap is collected into `parts` (the continuation).
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         let is_multi_declarator = decl.declarations.len() > 1;
         let has_any_init = decl.declarations.iter().any(|d| d.init.is_some());
@@ -150,7 +151,7 @@ impl<'a> Printer<'a> {
 
         // Build continuation declarators for the non-break case (no initializers)
         // These get wrapped in indent() so when the group breaks, they get continuation indent
-        let mut rest_parts = Vec::new();
+        let mut rest_parts = DocBuf::new();
 
         // Set top-level assignment flag for chain detection
         // Short 2-segment assignment chains in variable declarations should not use chain formatting
@@ -305,7 +306,7 @@ impl<'a> Printer<'a> {
                 // some rebuild it (break-lhs wrapping type, fluid non-wrapping type).
                 // Comments before `=` are always appended after the LHS.
                 // Promoted comments also go here (between identifier and `=`).
-                let push_lhs = |parts: &mut Vec<DocId>, lhs_doc: DocId| {
+                let push_lhs = |parts: &mut DocBuf, lhs_doc: DocId| {
                     parts.push(lhs_doc);
                     if has_comments_before_eq {
                         parts.push(self.build_inline_comments_between_doc(id_end, equals_pos));
@@ -319,7 +320,7 @@ impl<'a> Printer<'a> {
                     let has_any_before_eq =
                         has_comments_before_eq || promoted_before_eq_doc.is_some();
                     if has_any_before_eq {
-                        let mut lhs_parts = vec![lhs_doc];
+                        let mut lhs_parts: DocBuf = smallvec![lhs_doc];
                         if has_comments_before_eq {
                             lhs_parts
                                 .push(self.build_inline_comments_between_doc(id_end, equals_pos));
@@ -556,7 +557,7 @@ impl<'a> Printer<'a> {
                     if has_comments_after_eq {
                         // Single pass: partition comments into same-line (inline) and
                         // different-line (leading) relative to the `=` sign.
-                        let mut leading_comments = Vec::new();
+                        let mut leading_comments = DocBuf::new();
                         for comment in comments_in_range(self.comments, equals_pos + 1, init_start)
                         {
                             if self.is_same_line(equals_pos, comment.span.start) {

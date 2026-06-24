@@ -4,6 +4,8 @@
 
 use super::Printer;
 use crate::ast::internal;
+use smallvec::smallvec;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{SymbolToU32, comments_in_range};
@@ -24,7 +26,7 @@ impl<'a> Printer<'a> {
     /// attributes across lines when long.
     pub(super) fn push_import_attributes_clause(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         attributes: Option<&[internal::ImportAttribute]>,
         source_end: u32,
         stmt_end: u32,
@@ -57,7 +59,7 @@ impl<'a> Printer<'a> {
             // the braces is kept in place (`with {/* c */}`); prettier instead
             // relocates it before `with` — a comment-position divergence, like the
             // `with`→`{` gap. See attributes_empty_comment_prettier_divergence.
-            let mut inner = vec![d.text("{")];
+            let mut inner: DocBuf = smallvec![d.text("{")];
             let mut last_was_line = false;
             let mut any_comment = false;
             for comment in comments_in_range(self.comments, brace_start + 1, brace_close) {
@@ -170,7 +172,7 @@ impl<'a> Printer<'a> {
         )
         .expect("colon must exist in import attribute") as u32;
 
-        let mut parts = vec![self.build_import_attribute_key_doc(&attr.key)];
+        let mut parts = smallvec![self.build_import_attribute_key_doc(&attr.key)];
 
         // Comments between key and `:`
         self.append_trailing_inline_block_comments(&mut parts, key_end, colon_pos);

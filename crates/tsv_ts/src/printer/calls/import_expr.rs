@@ -10,7 +10,9 @@ use super::arg_comments::{
 };
 use super::arg_predicates::is_expandable_object;
 use crate::ast::internal;
+use smallvec::smallvec;
 use tsv_lang::SymbolResolver;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
 /// Wrap import args in a breakable group: `import(` + softline-indented `inner` +
@@ -74,7 +76,7 @@ pub(super) fn build_import_expression_doc(
             // Trailing region after the arg: same-line block/line comments inline, then
             // own-line comments each on their own line (dangling — import takes no
             // trailing comma). Without the dangling pass, own-line comments are dropped.
-            let mut parts = vec![source_doc];
+            let mut parts = smallvec![source_doc];
             pc.emit_trailing_comments(&mut parts, printer);
             pc.emit_dangling_comments(&mut parts, printer);
             let inner = d.concat(&parts);
@@ -142,7 +144,7 @@ pub(super) fn build_import_expression_doc(
 
         // Source arg + comma: before-comma blocks trail the source; stranded after-comma
         // blocks and line comments follow the comma.
-        let mut head = vec![source_doc];
+        let mut head = smallvec![source_doc];
         inter.emit_trailing_comments_around_comma(&mut head, printer, source_end, options_start);
 
         // Blank line in the gap, comment-aware once routed (so a comment's own newlines
@@ -159,7 +161,7 @@ pub(super) fn build_import_expression_doc(
         // Leading comments (own-line + hugged after-comma) lead the options arg; its
         // trailing region follows: same-line block/line comments inline, then own-line
         // comments each on their own line (dangling — import takes no trailing comma).
-        let mut tail = Vec::new();
+        let mut tail = DocBuf::new();
         inter.emit_leading_comments_inline_aware(&mut tail, printer, options_start);
         tail.push(options_doc);
         let trailing = PartitionedComments::new(

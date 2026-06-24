@@ -8,6 +8,7 @@ use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
 use crate::printer::layout::fluid_after_operator;
 use tsv_lang::SymbolToU32;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -78,7 +79,7 @@ impl<'a> Printer<'a> {
         decl: &TSTypeParameterDeclaration,
     ) -> DocId {
         let d = self.d();
-        let mut inner_parts = Vec::new();
+        let mut inner_parts = DocBuf::new();
         let mut prev_end = decl.span.start + 1; // After the opening `<`
 
         // A line comment trailing the opening `<` is kept on the `<` line (divergence
@@ -166,7 +167,7 @@ impl<'a> Printer<'a> {
     fn build_type_parameter_docs_with_comments(
         &self,
         decl: &TSTypeParameterDeclaration,
-    ) -> (Vec<DocId>, DocId) {
+    ) -> (DocBuf, DocId) {
         let d = self.d();
         let mut prev_end = decl.span.start + 1; // After `<`
         let mut deferred_after = d.empty();
@@ -175,7 +176,7 @@ impl<'a> Printer<'a> {
             .iter()
             .enumerate()
             .map(|(i, param)| {
-                let mut parts = Vec::new();
+                let mut parts = DocBuf::new();
                 // Leading block comments (after previous comma or `<`)
                 parts.push(self.build_comments_between_filtered(
                     prev_end,
@@ -249,7 +250,7 @@ impl<'a> Printer<'a> {
         infer_constraint: bool,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         // Add modifiers in order: const, in, out
         if param.is_const {
@@ -358,7 +359,7 @@ impl<'a> Printer<'a> {
     /// `printTypeParameter` pattern.
     fn append_keyword_value_with_comments(
         &self,
-        parts: &mut Vec<DocId>,
+        parts: &mut DocBuf,
         keyword_end: u32,
         value_start: u32,
         value_type: &TSType,
@@ -495,7 +496,7 @@ impl<'a> Printer<'a> {
         // Build params with commas and line breaks
         // The doc printer's look-ahead (fits_with_lookahead) handles the decision
         // of whether to break based on what follows the type params.
-        let mut param_parts = Vec::new();
+        let mut param_parts = DocBuf::new();
         let mut prev_end = inst.span.start + 1; // After the opening `<`
 
         for (i, param) in inst.params.iter().enumerate() {
@@ -587,7 +588,7 @@ impl<'a> Printer<'a> {
         let (angle_line_prefix, delimiter_pull_pos) =
             self.delimiter_line_comment_prefix(inst.span.start, first_param_start);
 
-        let mut inner_parts = Vec::new();
+        let mut inner_parts = DocBuf::new();
         let mut prev_end = inst.span.start + 1; // After the opening `<`
 
         for (i, param) in inst.params.iter().enumerate() {

@@ -15,6 +15,7 @@ use super::arg_comments::{
 };
 use super::arg_predicates::{is_block_function, is_short_second_arg_for_expand_first};
 use crate::ast::internal;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
 /// Build an inline arrow function signature without break points.
@@ -27,7 +28,7 @@ pub(crate) fn build_arrow_inline_signature(
     arrow: &internal::ArrowFunctionExpression,
 ) -> DocId {
     let d = printer.d();
-    let mut sig_parts = Vec::new();
+    let mut sig_parts = DocBuf::new();
     if arrow.r#async {
         sig_parts.push(d.text("async "));
     }
@@ -411,7 +412,7 @@ pub(crate) fn build_args_split_last(
     arguments: &[internal::Expression],
     printer: &Printer<'_>,
     paren_open: u32,
-) -> (Vec<DocId>, DocId, DocId) {
+) -> (DocBuf, DocId, DocId) {
     let d = printer.d();
     // Build all args (using build_huggable_expression_doc for proper parens on assignments
     // and isolated_group wrapping for templates).
@@ -442,7 +443,7 @@ pub(crate) fn build_args_split_last(
 
     // Build head docs (all but last) with commas and inline block comments
     // Comments are placed relative to the comma based on their source position
-    let mut head_parts = Vec::new();
+    let mut head_parts = DocBuf::new();
     if let Some(lc) = leading_comment_doc {
         head_parts.push(lc);
     }
@@ -478,7 +479,7 @@ pub(crate) fn build_args_split_last(
     let last_arg_doc = arg_docs[arg_docs.len() - 1];
 
     // Build all_args_broken with inline block comments (same comma-aware logic)
-    let mut all_args_parts = Vec::new();
+    let mut all_args_parts = DocBuf::new();
     if let Some(lc) = leading_comment_doc {
         all_args_parts.push(lc);
     }
@@ -563,7 +564,7 @@ pub(super) fn build_chain_expand_all_args(
 pub(crate) fn build_inline_args(
     d: &DocArena,
     callee: DocId,
-    head_parts: Vec<DocId>,
+    head_parts: DocBuf,
     last_arg_doc: DocId,
 ) -> DocId {
     d.concat(&[
@@ -589,7 +590,7 @@ pub(crate) fn build_inline_args(
 pub(crate) fn build_inline_or_expand_all(
     d: &DocArena,
     callee: DocId,
-    head_parts: Vec<DocId>,
+    head_parts: DocBuf,
     last_arg_doc: DocId,
     all_args_broken: DocId,
 ) -> DocId {
@@ -704,7 +705,7 @@ pub(crate) fn build_args_joined_with_comments(
     build_arg: impl Fn(&Printer<'_>, &internal::Expression) -> DocId,
 ) -> DocId {
     let d = printer.d();
-    let mut parts = Vec::new();
+    let mut parts = DocBuf::new();
 
     // Leading comments before first arg (e.g., `fn(/* c */ arg)`)
     let first_arg_start = arguments[0].span().start;
@@ -891,7 +892,7 @@ pub(super) fn build_args_with_blank_lines(
     args: &[internal::Expression],
 ) -> DocId {
     let d = printer.d();
-    let mut arg_parts = Vec::new();
+    let mut arg_parts = DocBuf::new();
     for (i, arg) in args.iter().enumerate() {
         // Check for blank line before this arg (no-comment case only).
         // When comments exist, blank lines are handled in the separator

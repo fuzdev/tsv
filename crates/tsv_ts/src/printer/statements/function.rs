@@ -4,6 +4,7 @@ use super::Printer;
 use crate::ast::internal;
 use crate::printer::CommentSpacing;
 use tsv_lang::SymbolToU32;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::source_scan::find_char_skipping_comments;
 
@@ -98,7 +99,7 @@ impl<'a> Printer<'a> {
         decl: &internal::FunctionDeclaration,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         let search_end = decl
             .id
             .as_ref()
@@ -136,7 +137,7 @@ impl<'a> Printer<'a> {
         // Everything after the keyword→name gap is collected into `tail`, so a
         // *line* comment in that gap can indent the whole continuation one level
         // (uniform declaration-header rule). Block/no-comment cases stay inline.
-        let mut tail: Vec<DocId> = Vec::new();
+        let mut tail: DocBuf = DocBuf::new();
         let name_start = if let Some(id) = &decl.id {
             tail.push(d.symbol(id.name.to_u32()));
 

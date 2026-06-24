@@ -3,6 +3,8 @@
 use super::Printer;
 use crate::ast::internal;
 use crate::printer::CommentSpacing;
+use smallvec::smallvec;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::{SymbolToU32, comments_in_range};
 
@@ -87,7 +89,7 @@ impl<'a> Printer<'a> {
                         && self.has_line_comments_between(ext_end, decl.implements[0].span.start)
                 });
 
-        let mut parts = vec![];
+        let mut parts = smallvec![];
 
         // Decorators, each on its own line
         // Find the first keyword after decorators (declare/abstract/class)
@@ -164,7 +166,7 @@ impl<'a> Printer<'a> {
             // continuation so a *line* comment in the `class`→name gap indents the
             // whole declaration one level (uniform declaration-header rule). Block
             // and no-comment cases stay inline.
-            let mut header_parts = vec![d.symbol(id.name.to_u32())];
+            let mut header_parts = smallvec![d.symbol(id.name.to_u32())];
             // Comments between name and type params: `class A/* c */ <T> {}`
             // Line comments get a hardline to prevent absorbing type params as comment text
             if let Some(type_params) = &decl.type_parameters {
@@ -247,7 +249,7 @@ impl<'a> Printer<'a> {
             self.delimiter_line_comment_prefix(body.span.start, first_member_start);
 
         // Build member docs with comments and blank line preservation
-        let mut member_parts = Vec::new();
+        let mut member_parts = DocBuf::new();
         let mut prev_end = body.span.start + 1; // Start after '{'
 
         for (i, member) in body.body.iter().enumerate() {
@@ -365,7 +367,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a property definition
     fn build_property_definition_doc(&self, prop: &internal::PropertyDefinition) -> DocId {
         let d = self.d();
-        let mut parts = vec![];
+        let mut parts = smallvec![];
 
         // Decorators (inline or own-line depending on original source)
         let next_token_start = prop
@@ -516,7 +518,7 @@ impl<'a> Printer<'a> {
                     } else {
                         self.build_assignment_layout(left_doc, " =", value, false, rhs_comments)
                     };
-                parts = vec![assignment_doc];
+                parts = smallvec![assignment_doc];
             }
         }
 
@@ -540,7 +542,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a method definition
     fn build_method_definition_doc(&self, method: &internal::MethodDefinition) -> DocId {
         let d = self.d();
-        let mut parts = vec![];
+        let mut parts = smallvec![];
 
         // Decorators (inline or own-line depending on original source)
         let next_token_start = method

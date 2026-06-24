@@ -12,6 +12,8 @@ use super::helpers::{immediate_union_paren, unwrap_parenthesized};
 use crate::ast::internal::{
     TSIntersectionType, TSParenthesizedType, TSType, TSTypeElement, TSTypeLiteral, TSUnionType,
 };
+use smallvec::smallvec;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 /// Mode for building type literal docs.
@@ -38,7 +40,7 @@ impl<'a> Printer<'a> {
         member_start: u32,
         is_first: bool,
         delimiter_pull_pos: Option<u32>,
-    ) -> Vec<DocId> {
+    ) -> DocBuf {
         let d = self.d();
         let all_comments: Vec<_> =
             comments_in_range(self.comments, prev_end, member_start).collect();
@@ -61,7 +63,7 @@ impl<'a> Printer<'a> {
             self.has_blank_line_between(prev_end, member_start)
         };
 
-        let mut docs = Vec::with_capacity(3);
+        let mut docs = DocBuf::with_capacity(3);
         if has_blank && !is_first {
             docs.push(d.literalline());
         }
@@ -79,9 +81,9 @@ impl<'a> Printer<'a> {
         &self,
         brace_start: u32,
         first_member_start: u32,
-    ) -> Vec<DocId> {
+    ) -> DocBuf {
         let d = self.d();
-        let mut docs = Vec::new();
+        let mut docs = DocBuf::new();
         for comment in comments_in_range(self.comments, brace_start + 1, first_member_start) {
             docs.push(self.build_comment_doc(comment));
             docs.push(d.text(" "));
@@ -104,7 +106,7 @@ impl<'a> Printer<'a> {
         comments: &[&tsv_lang::Comment],
         member_end: u32,
         upper_bound: u32,
-    ) -> Vec<DocId> {
+    ) -> DocBuf {
         let d = self.d();
         // Comment-aware so a `;` inside a comment in this gap isn't taken for the
         // member separator (which would partition the comments incorrectly).
@@ -116,7 +118,7 @@ impl<'a> Printer<'a> {
                 None => true, // No semicolon in source, all comments are "before"
             });
 
-        let mut docs = Vec::with_capacity(before_semi.len() + after_semi.len() + 1);
+        let mut docs = DocBuf::with_capacity(before_semi.len() + after_semi.len() + 1);
         for comment in before_semi {
             docs.push(self.build_trailing_comment_doc(comment));
         }
@@ -219,7 +221,7 @@ impl<'a> Printer<'a> {
         let union_doc = self.build_union_type_doc(union, false);
 
         let mut needs_break = false;
-        let mut indented = vec![d.softline()];
+        let mut indented: DocBuf = smallvec![d.softline()];
         if let Some(p) = paren {
             // Leading comments between `(` and the union. Block comments stay inline
             // (`(/* c */ a | b)`). A leading *line* comment is normally relocated by
@@ -257,7 +259,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        let mut inner_parts = vec![d.indent(d.concat(&indented)), d.softline()];
+        let mut inner_parts: DocBuf = smallvec![d.indent(d.concat(&indented)), d.softline()];
         if needs_break {
             inner_parts.push(d.break_parent());
         }
@@ -294,7 +296,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         // Build opening: (A & B & {
-        let mut opening_parts = vec![d.text("(")];
+        let mut opening_parts: DocBuf = smallvec![d.text("(")];
 
         // Build intersection types except the last one (the object)
         let types_before_object = &intersection.types[..intersection.types.len() - 1];
@@ -328,7 +330,7 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
-        let mut member_parts = vec![];
+        let mut member_parts: DocBuf = smallvec![];
         let mut prev_end = t.span.start + 1; // after opening brace
 
         // Width-aware: the opening bracketSpacing boundary leads (a space when flat
@@ -543,7 +545,7 @@ impl<'a> Printer<'a> {
             };
         }
 
-        let mut parts = vec![d.text("{")];
+        let mut parts: DocBuf = smallvec![d.text("{")];
         if force_multiline {
             // A comment trailing the opening `{` on its own line is kept on the
             // `{` line (divergence from prettier, which relocates it to its own
@@ -556,7 +558,7 @@ impl<'a> Printer<'a> {
             parts.push(d.concat(&brace_line_prefix));
 
             // Multi-line format (same for both modes)
-            let mut member_parts = vec![];
+            let mut member_parts: DocBuf = smallvec![];
             let mut prev_end = t.span.start + 1; // after opening brace
             for (i, m) in t.members.iter().enumerate() {
                 let is_first = i == 0;
@@ -607,7 +609,7 @@ impl<'a> Printer<'a> {
             // The opening bracketSpacing boundary leads (a space when flat `{ a }`,
             // a newline when broken), THEN any interior leading comments, so the
             // padding sits before the comment (`{ /* c */ a }`, not `{/* c */ a }`).
-            let mut member_parts = vec![d.line()];
+            let mut member_parts: DocBuf = smallvec![d.line()];
             if let Some(first) = t.members.first() {
                 member_parts.extend(
                     self.build_type_literal_leading_comments_inline(
@@ -721,7 +723,7 @@ impl<'a> Printer<'a> {
                     .iter()
                     .chain(&trailing)
                     .any(|comment| !comment.is_block);
-                let mut parts = Vec::new();
+                let mut parts = DocBuf::new();
                 if needs_break {
                     parts.push(d.break_parent());
                 }
