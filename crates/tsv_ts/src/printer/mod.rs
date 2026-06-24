@@ -176,13 +176,18 @@ pub struct Printer<'a> {
 impl<'a> Printer<'a> {
     /// Create a new printer borrowing the given arena, [`PrinterInputs`], and
     /// embedding context.
+    ///
+    /// `buffer_capacity` pre-sizes the output buffer: the source length for the
+    /// rendering path, or `0` for doc-only embedding builds that never write
+    /// output (see `make_printer` / `make_doc_printer` in `lib.rs`).
     pub(crate) fn with_context(
         arena: &'a DocArena,
         inputs: &PrinterInputs<'a>,
         embed: EmbedContext,
+        buffer_capacity: usize,
     ) -> Self {
         Self {
-            buffer: OutputBuffer::with_capacity(inputs.source.len()),
+            buffer: OutputBuffer::with_capacity(buffer_capacity),
             indent_level: 0,
             embed,
             arena,

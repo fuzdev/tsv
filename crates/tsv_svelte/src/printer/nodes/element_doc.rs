@@ -14,7 +14,7 @@
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
-use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::{Span, SymbolResolver, SymbolToU32};
 
 /// How content relates to an element boundary (opening or closing tag)
@@ -282,7 +282,7 @@ impl<'a> Printer<'a> {
     fn build_void_element_doc(
         &self,
         tag_sym: u32,
-        attr_docs: Vec<DocId>,
+        attr_docs: DocBuf,
         is_declaration: bool,
     ) -> DocId {
         let d = self.d();
@@ -776,7 +776,7 @@ impl<'a> Printer<'a> {
         &self,
         tag_name: &str,
         element: &internal::Element,
-        attr_docs: Vec<DocId>,
+        attr_docs: DocBuf,
     ) -> DocId {
         let d = self.d();
         let tag_sym = element.name.to_u32();
@@ -867,8 +867,11 @@ impl<'a> Printer<'a> {
         name_end: u32,
         open_tag_end: u32,
         is_html: bool,
-    ) -> Vec<DocId> {
-        let mut docs = Vec::with_capacity(attrs.len() * 2);
+    ) -> DocBuf {
+        // Most elements have a handful of attributes, so the per-element parts
+        // buffer stays on the stack (`DocBuf`'s inline capacity); attribute-dense
+        // elements spill to the heap as before.
+        let mut docs: DocBuf = DocBuf::with_capacity(attrs.len() * 2);
         self.push_attrs_with_comments(&mut docs, attrs, separator, name_end, open_tag_end, is_html);
         docs
     }
@@ -881,7 +884,7 @@ impl<'a> Printer<'a> {
     /// (bounded by `open_tag_end`).
     pub(super) fn push_attrs_with_comments(
         &self,
-        docs: &mut Vec<DocId>,
+        docs: &mut DocBuf,
         attrs: &[internal::AttributeNode],
         separator: DocId,
         first_range_start: u32,
@@ -935,7 +938,7 @@ impl<'a> Printer<'a> {
     /// token can't share it); the caller uses this to pick that separator.
     pub(super) fn push_attr_comment_docs(
         &self,
-        docs: &mut Vec<DocId>,
+        docs: &mut DocBuf,
         comments: &[&tsv_lang::Comment],
         range_start: u32,
     ) -> bool {

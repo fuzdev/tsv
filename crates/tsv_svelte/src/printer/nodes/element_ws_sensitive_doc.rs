@@ -13,7 +13,7 @@ use super::blocks_doc::{EACH_BLOCK_OPEN, ELSE_IF_BLOCK_OPEN, IF_BLOCK_OPEN};
 use super::helpers::each_expr_comment_end;
 use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
-use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::{SymbolResolver, SymbolToU32};
 
 impl<'a> Printer<'a> {
@@ -35,7 +35,7 @@ impl<'a> Printer<'a> {
         &self,
         tag_name: &str,
         element: &internal::Element,
-        attr_docs: Vec<DocId>,
+        attr_docs: DocBuf,
     ) -> DocId {
         let d = self.d();
         let tag_sym = element.name.to_u32();

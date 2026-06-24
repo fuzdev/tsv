@@ -241,7 +241,14 @@ impl<'a> Printer<'a> {
         match value {
             internal::AttributeValue::Text(text) => {
                 let normalized = normalize_class_text(&text.raw, is_last_part);
-                self.build_attribute_text_doc(&normalized)
+                // `normalized` is freshly owned — move it straight into the doc on the
+                // common single-line path instead of re-cloning through the borrowed
+                // `build_attribute_text_doc` (which would `to_string()` it again).
+                if normalized.contains('\n') {
+                    self.build_attribute_text_doc(&normalized)
+                } else {
+                    self.d().text_owned(normalized)
+                }
             }
             internal::AttributeValue::ExpressionTag(expr_tag) => {
                 self.build_attribute_expression_doc(expr_tag)

@@ -46,16 +46,29 @@ pub struct PrinterInputs<'a> {
     pub line_breaks: &'a [u32],
 }
 
-/// Build a fully-configured printer borrowing the given arena and [`PrinterInputs`].
-///
-/// All `format_*` and `build_*_doc` entry points funnel through this so the
-/// constructor lives in exactly one place.
+/// Build an *output* printer — pre-sizes the output buffer to the source
+/// length for the rendering path. Used by the entry points that write the
+/// buffer and return a `String` (`format`, `format_expression`).
 fn make_printer<'a>(
     arena: &'a DocArena,
     inputs: &PrinterInputs<'a>,
     embed: EmbedContext,
 ) -> printer::Printer<'a> {
-    printer::Printer::with_context(arena, inputs, embed)
+    printer::Printer::with_context(arena, inputs, embed, inputs.source.len())
+}
+
+/// Build a *doc-only* printer for the embedding entry points (`build_*_doc`):
+/// they emit a `DocId` into the caller's arena and never render, so the
+/// source-length output buffer [`make_printer`] reserves would be a pure
+/// per-call allocation (one per template `{expr}` / directive / `<script>`).
+/// A zero-capacity `String` does not allocate, so the buffer stays free unless
+/// something writes to it — which these paths never do.
+fn make_doc_printer<'a>(
+    arena: &'a DocArena,
+    inputs: &PrinterInputs<'a>,
+    embed: EmbedContext,
+) -> printer::Printer<'a> {
+    printer::Printer::with_context(arena, inputs, embed, 0)
 }
 
 /// Parse TypeScript source code into an internal AST
@@ -355,7 +368,7 @@ pub fn build_variable_declaration_doc_with_comments(
     embed: &EmbedContext,
     emit_semicolon: bool,
 ) -> DocId {
-    let printer = make_printer(arena, inputs, *embed);
+    let printer = make_doc_printer(arena, inputs, *embed);
     printer.build_variable_declaration_doc(decl, emit_semicolon)
 }
 
@@ -368,7 +381,7 @@ pub fn build_expression_doc_with_comments(
     inputs: &PrinterInputs<'_>,
     embed: &EmbedContext,
 ) -> DocId {
-    let printer = make_printer(arena, inputs, *embed);
+    let printer = make_doc_printer(arena, inputs, *embed);
     printer.build_expression_doc(expression)
 }
 
@@ -388,7 +401,7 @@ pub fn build_program_doc(
         comments: &program.comments,
         line_breaks: &program.line_breaks,
     };
-    let printer = make_printer(arena, &inputs, embed);
+    let printer = make_doc_printer(arena, &inputs, embed);
     printer.build_program_doc(program)
 }
 
