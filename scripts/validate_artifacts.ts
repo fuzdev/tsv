@@ -55,22 +55,26 @@ function file_size(path: URL): number | null {
 const VARIANTS = ['format', 'parse', 'all'] as const;
 const TARGETS = ['npm', 'deno'] as const;
 
-// Measured 2026-06-18 (gitignore-aware discovery: the format-gated IgnoreStack
-// replaced the single-file IgnoreMatcher): format 2,213,589 B (npm); parse
-// 1,693,043 B; all 2,896,948 B.
+// Measured 2026-06-24 (perf10: the tsv_ts printer's Vec<DocId>→DocBuf
+// (SmallVec) sweep grew the format/printer code via monomorphization): format
+// 2,348,470 B (npm); parse 1,696,075 B; all 3,034,110 B. (Prior 2026-06-18
+// reference: format 2,213,589 B; parse 1,693,043 B; all 2,896,948 B — parse is
+// unchanged by perf10, format/all grew ~+6%/+5%.)
 const BOUNDS = {
-	format: { min: 2_020_000, max: 2_370_000 },
+	format: { min: 2_020_000, max: 2_540_000 },
 	parse: { min: 1_560_000, max: 1_840_000 },
-	all: { min: 2_660_000, max: 3_120_000 },
+	all: { min: 2_660_000, max: 3_280_000 },
 };
 
 // all = format + parse. `all − format` is the parse feature (parser convert +
-// serde path; measured 692,587 B); `all − parse` is the format feature
+// serde path; measured 685,640 B); `all − parse` is the format feature
 // (printers + doc builder, dropped from the parse-only build at link time;
-// measured 1,189,325 B). A delta near zero means a feature gate broke.
+// measured 1,338,035 B — grew from 1,189,325 B via perf10's SmallVec sweep,
+// +12.5%, the concentrated cost of the printer-side monomorphization). A delta
+// near zero means a feature gate broke.
 const DELTAS = {
 	format: { min: 550_000, max: 850_000 }, // all − format
-	parse: { min: 1_050_000, max: 1_300_000 }, // all − parse
+	parse: { min: 1_050_000, max: 1_445_000 }, // all − parse
 };
 
 console.log('=== WASM binary sizes ===');
