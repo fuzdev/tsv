@@ -17,9 +17,10 @@ use crate::printer::{
     ParenContext, Printer, has_newline_before_position, is_multiline_template_expression,
     needs_parens, unwrap_parenthesized,
 };
+use smallvec::smallvec;
 use tsv_lang::comments_in_range;
-use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::source_scan::find_char_skipping_comments;
 
 /// Check if an arrow body should stay on the same line as `=>` (no line break option).
@@ -222,7 +223,7 @@ impl<'a> Printer<'a> {
         // directly — no extra Vec.
         let sig_inner = self.build_arrow_signature_doc(arrow);
         let sig_doc = if self.has_comments_between(sig_end, arrow_pos) {
-            let mut sig_parts = vec![sig_inner];
+            let mut sig_parts: DocBuf = smallvec![sig_inner];
             for comment in comments_in_range(self.comments, sig_end, arrow_pos) {
                 sig_parts.push(d.text(" "));
                 sig_parts.push(self.build_comment_doc(comment));
@@ -472,7 +473,7 @@ impl<'a> Printer<'a> {
 
         if has_post_arrow_comments {
             // Build comments doc
-            let mut comment_parts = Vec::new();
+            let mut comment_parts: DocBuf = DocBuf::new();
             for comment in comments_in_range(self.comments, arrow_end, body_start) {
                 comment_parts.push(d.text(" "));
                 comment_parts.push(self.build_comment_doc(comment));
@@ -548,7 +549,7 @@ impl<'a> Printer<'a> {
 
         // Walk the chain, collecting each arrow's signature, until the terminal
         // (non-arrow) body.
-        let mut sig_docs = Vec::new();
+        let mut sig_docs: DocBuf = DocBuf::new();
         let mut current = head;
         let terminal: &internal::ArrowFunctionBody = loop {
             // Each signature is its own group so its params break independently of
@@ -956,7 +957,7 @@ impl<'a> Printer<'a> {
         body_start: u32,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts: DocBuf = DocBuf::new();
 
         // Print leading comments
         let comments: Vec<_> = comments_in_range(self.comments, sig_end, body_start).collect();
@@ -1011,7 +1012,7 @@ impl<'a> Printer<'a> {
     /// Emits each comment followed by a space: `/* c1 */ /* c2 */ `
     fn build_inline_post_arrow_comments_doc(&self, sig_end: u32, body_start: u32) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts: DocBuf = DocBuf::new();
         for comment in comments_in_range(self.comments, sig_end, body_start) {
             parts.push(self.build_comment_doc(comment));
             parts.push(d.text(" "));
@@ -1107,7 +1108,7 @@ impl<'a> Printer<'a> {
         func: &internal::FunctionExpression,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts: DocBuf = DocBuf::new();
 
         // Async keyword if present
         if func.r#async {
@@ -1268,10 +1269,10 @@ impl<'a> Printer<'a> {
             || has_leading_own_line_comment
             || should_break_for_param_properties;
 
-        let mut inner_parts = Vec::new();
+        let mut inner_parts: DocBuf = DocBuf::new();
         // Block comment trailing the last param after its source comma — emitted past
         // where the comma was, after the loop (no trailing comma; trailingComma: 'none').
-        let mut last_after_comma_docs = Vec::new();
+        let mut last_after_comma_docs: DocBuf = DocBuf::new();
         for (i, param) in params.iter().enumerate() {
             let param_start = param.span().start;
             let is_last = i == params.len() - 1;
@@ -1384,7 +1385,7 @@ impl<'a> Printer<'a> {
         }
 
         // No group - outer signature group controls breaking
-        let mut result = vec![d.text("(")];
+        let mut result: DocBuf = smallvec![d.text("(")];
 
         if force_break {
             // When forcing break (trailing comments or param properties), use hardlines.
@@ -1471,7 +1472,7 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
-        let mut parts = Vec::new();
+        let mut parts: DocBuf = DocBuf::new();
 
         for (i, comment) in comments.iter().enumerate() {
             // Check if comment is on its own line (not same line as previous content)

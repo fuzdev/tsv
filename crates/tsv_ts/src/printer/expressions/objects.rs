@@ -13,9 +13,11 @@ use crate::printer::Printer;
 use crate::printer::expressions::literals::format_string_literal_from_ast;
 use crate::printer::expressions::literals::is_valid_js_identifier;
 use crate::printer::layout::hang_after_operator;
+use smallvec::smallvec;
 use tsv_lang::SymbolResolver;
 use tsv_lang::TAB_WIDTH;
 use tsv_lang::comments_in_range;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
 
@@ -345,7 +347,7 @@ impl<'a> Printer<'a> {
             return d.text("{}");
         }
 
-        let mut parts = Vec::new();
+        let mut parts: DocBuf = DocBuf::new();
         for (i, prop) in obj.properties.iter().enumerate() {
             let prop_doc = self.build_object_property_doc(prop);
             parts.push(prop_doc);
@@ -544,7 +546,7 @@ impl<'a> Printer<'a> {
                 if has_multiline_post_colon {
                     // Line comment or multiline block comment after colon: BreakAfterOperator
                     // Structure: group([group(key + pre_colon), ":", group(indent([line, rhs]))])
-                    let mut lhs_parts = vec![key_doc];
+                    let mut lhs_parts: DocBuf = smallvec![key_doc];
                     for comment in &pre_colon_comments {
                         lhs_parts.push(d.text(" "));
                         lhs_parts.push(self.build_comment_doc(comment));
@@ -559,7 +561,7 @@ impl<'a> Printer<'a> {
                     let comments_doc = self
                         .build_rhs_comments_opt(colon_pos + 1, value_start)
                         .unwrap_or_else(|| d.empty());
-                    let mut value_parts = vec![comments_doc];
+                    let mut value_parts: DocBuf = smallvec![comments_doc];
                     if needs_parens {
                         value_parts.push(d.text("("));
                     }
@@ -582,7 +584,7 @@ impl<'a> Printer<'a> {
                     let lhs_doc = if pre_colon_comments.is_empty() {
                         key_doc
                     } else {
-                        let mut lhs_parts = vec![key_doc];
+                        let mut lhs_parts: DocBuf = smallvec![key_doc];
                         for comment in &pre_colon_comments {
                             lhs_parts.push(d.text(" "));
                             lhs_parts.push(self.build_comment_doc(comment));
@@ -594,7 +596,7 @@ impl<'a> Printer<'a> {
                     let rhs_comments = if post_colon_comments.is_empty() {
                         None
                     } else {
-                        let mut comment_parts = Vec::new();
+                        let mut comment_parts: DocBuf = DocBuf::new();
                         for comment in &post_colon_comments {
                             comment_parts.push(self.build_comment_doc(comment));
                             comment_parts.push(d.text(" "));
@@ -604,7 +606,7 @@ impl<'a> Printer<'a> {
 
                     if needs_parens {
                         // Rare: assignment expression in object value needs parens
-                        let mut parts = vec![lhs_doc, d.text(": ")];
+                        let mut parts: DocBuf = smallvec![lhs_doc, d.text(": ")];
                         if let Some(rc) = rhs_comments {
                             parts.push(rc);
                         }
@@ -804,7 +806,7 @@ impl<'a> Printer<'a> {
         // inline (`[/* d */ foo]`, `[foo /* c */]`), the key never breaks on width.
         // Byte-identical to the pre-divergence behavior.
         if !bracket_line && !after_key_line {
-            let mut parts = vec![d.text("[")];
+            let mut parts: DocBuf = smallvec![d.text("[")];
             for comment in comments_in_range(self.comments, bracket_start + 1, key_start) {
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.text(" "));
