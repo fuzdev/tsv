@@ -116,7 +116,7 @@ impl<'a> Printer<'a> {
     fn should_wrap_value_width_based(&self, value: &CssValue, property: &str) -> (bool, bool) {
         match value {
             CssValue::CommaSeparated { values, .. } => {
-                let doc = self.build_list_doc(values, ", ");
+                let doc = self.build_separated_values_doc(values, ", ");
                 let available = doc::available_width(
                     self.effective_indent(),
                     0,
@@ -132,7 +132,7 @@ impl<'a> Printer<'a> {
                 (exceeds_width, true)
             }
             CssValue::List { values, .. } => {
-                let doc = self.build_list_doc(values, " ");
+                let doc = self.build_separated_values_doc(values, " ");
                 let available = doc::available_width(
                     self.effective_indent(),
                     0,
@@ -149,16 +149,6 @@ impl<'a> Printer<'a> {
             }
             _ => (false, false),
         }
-    }
-
-    /// Build doc representation of a list for width checking
-    ///
-    /// Consolidates comma-separated and space-separated list building.
-    fn build_list_doc(&self, values: &[CssValue], separator: &'static str) -> DocId {
-        self.d().join(
-            values.iter().map(|v| self.build_css_value_doc(v)),
-            separator,
-        )
     }
 
     /// Check if a function should wrap its arguments (with explicit context offset)
@@ -628,7 +618,7 @@ impl<'a> Printer<'a> {
     /// Used to decide whether to use continuation-based fill printing.
     /// `trailing_reserve` accounts for characters after the list (comma, paren, semicolon).
     fn space_list_exceeds_width(&self, values: &[CssValue], trailing_reserve: usize) -> bool {
-        let list_doc = self.build_list_doc(values, " ");
+        let list_doc = self.build_separated_values_doc(values, " ");
         let available = doc::available_width(self.effective_indent(), 0, trailing_reserve);
         !doc::arena_fits::<dyn doc::TextResolver>(
             &self.arena,

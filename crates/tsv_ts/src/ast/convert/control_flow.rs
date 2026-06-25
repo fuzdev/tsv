@@ -6,7 +6,7 @@ use super::{
     convert_variable_declaration, create_location,
 };
 use string_interner::DefaultStringInterner;
-use tsv_lang::{InfallibleResolve, LocationTracker};
+use tsv_lang::LocationTracker;
 
 /// Schema for control flow statement bodies.
 ///
@@ -292,16 +292,10 @@ pub(in crate::ast) fn convert_break_statement(
         start: break_stmt.span.start,
         end: break_stmt.span.end,
         loc: create_location(break_stmt.span, loc, offset),
-        label: break_stmt.label.as_ref().map(|id| public::Identifier {
-            node_type: "Identifier".to_string(),
-            start: id.span.start,
-            end: id.span.end,
-            loc: create_location(id.span, loc, offset),
-            name: interner.resolve_infallible(id.name).to_string(),
-            optional: false,
-            type_annotation: None,
-            decorators: Vec::new(),
-        }),
+        label: break_stmt
+            .label
+            .as_ref()
+            .map(|id| super::convert_identifier(id, loc, interner, offset)),
     }
 }
 
@@ -316,16 +310,10 @@ pub(in crate::ast) fn convert_continue_statement(
         start: continue_stmt.span.start,
         end: continue_stmt.span.end,
         loc: create_location(continue_stmt.span, loc, offset),
-        label: continue_stmt.label.as_ref().map(|id| public::Identifier {
-            node_type: "Identifier".to_string(),
-            start: id.span.start,
-            end: id.span.end,
-            loc: create_location(id.span, loc, offset),
-            name: interner.resolve_infallible(id.name).to_string(),
-            optional: false,
-            type_annotation: None,
-            decorators: Vec::new(),
-        }),
+        label: continue_stmt
+            .label
+            .as_ref()
+            .map(|id| super::convert_identifier(id, loc, interner, offset)),
     }
 }
 
@@ -341,16 +329,7 @@ pub(in crate::ast) fn convert_labeled_statement(
         start: labeled.span.start,
         end: labeled.span.end,
         loc: create_location(labeled.span, loc, offset),
-        label: public::Identifier {
-            node_type: "Identifier".to_string(),
-            start: labeled.label.span.start,
-            end: labeled.label.span.end,
-            loc: create_location(labeled.label.span, loc, offset),
-            name: interner.resolve_infallible(labeled.label.name).to_string(),
-            optional: false,
-            type_annotation: None,
-            decorators: Vec::new(),
-        },
+        label: super::convert_identifier(&labeled.label, loc, interner, offset),
         body: Box::new(convert_statement(
             &labeled.body,
             source,

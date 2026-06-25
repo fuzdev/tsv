@@ -240,7 +240,7 @@ impl<'a> Printer<'a> {
                     prev_end
                 };
 
-                if self.has_blank_line_between_spans(gap_start, node_start) {
+                if self.has_blank_line_between(gap_start, node_start) {
                     self.write("\n\n");
                 } else {
                     self.write("\n");
@@ -318,14 +318,14 @@ impl<'a> Printer<'a> {
                 // Check if this comment is on the same line as the previous comment
                 if self.is_same_line(last_end, comment.span.start) {
                     self.write(" ");
-                } else if self.has_blank_line_between_spans(last_end, comment.span.start) {
+                } else if self.has_blank_line_between(last_end, comment.span.start) {
                     self.write("\n\n");
                 } else {
                     self.write("\n");
                 }
             } else if prev_end > 0 {
                 // First comment after a node
-                if self.has_blank_line_between_spans(last_end, comment.span.start) {
+                if self.has_blank_line_between(last_end, comment.span.start) {
                     self.write("\n\n");
                 } else {
                     self.write("\n");
@@ -404,7 +404,7 @@ impl<'a> Printer<'a> {
 
             // Print with proper spacing (but no leading newline for first content)
             if last_end > 0 {
-                if self.has_blank_line_between_spans(last_end, comment.span.start) {
+                if self.has_blank_line_between(last_end, comment.span.start) {
                     self.write("\n\n");
                 } else {
                     self.write("\n");
@@ -517,11 +517,6 @@ impl<'a> Printer<'a> {
         consumed
     }
 
-    /// Check if there's a blank line between two spans in the source
-    pub(crate) fn has_blank_line_between_spans(&self, prev_end: u32, curr_start: u32) -> bool {
-        self.has_blank_line_between(prev_end, curr_start)
-    }
-
     /// Check if previous sibling is a comment
     pub(crate) fn prev_is_comment(children: &[CssBlockChild], index: usize) -> bool {
         index > 0 && matches!(children.get(index - 1), Some(CssBlockChild::Comment(_)))
@@ -561,7 +556,7 @@ impl<'a> Printer<'a> {
         } else {
             prev_end
         };
-        self.has_blank_line_between_spans(effective_end, curr_start)
+        self.has_blank_line_between(effective_end, curr_start)
     }
 }
 
