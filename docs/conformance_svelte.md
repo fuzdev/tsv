@@ -154,6 +154,7 @@ Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
 - `const` type params in classes — [const_type_param_class](../tests/fixtures/typescript/typescript_specific/generics/const_type_param_class_svelte_divergence/)
 - Import type options — [dynamic_attributes](../tests/fixtures/typescript/modules/imports/dynamic_attributes_svelte_divergence/)
 - ES2024 v-flag regex — [unicode_sets_advanced](../tests/fixtures/typescript/expressions/literals/regex/unicode_sets_advanced_svelte_divergence/)
+- `export default class implements I {}` (anonymous default class, implements-first heritage) — [export_default_implements](../tests/fixtures/typescript/declarations/class/export_default_implements_svelte_divergence/)
 - Async generic arrow params — see fixtures below
 
 **`using` keyword-name comments**: Both acorn and tsv reject comments between `using` and the binding name (`using /* c */ x = fn()`), and between `await` and `using` (`await /* c */ using x = fn()`). Per the ECMAScript spec, comments behave like white space and are discarded between any two tokens (§12.4), so these should be valid. However, since `using` is a contextual keyword requiring lookahead disambiguation, both parsers check the next token before comment processing. tsv matches acorn's behavior here. If acorn adds support, tsv should follow.
@@ -251,6 +252,7 @@ All corrections exist because of upstream bugs. If fixed upstream, tsv would rem
 - `const` type params — `const` modifier on class type params
 - Import type options — `import()` type assertion options
 - Anonymous class-expression `id` — omitted for implements-first heritage
+- `export default class implements I {}` — anonymous default class with implements-first heritage rejected (`implements` read as a reserved-word name)
 
 **acorn** — fix in acorn core:
 
