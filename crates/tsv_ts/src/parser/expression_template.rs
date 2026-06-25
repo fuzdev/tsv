@@ -1,7 +1,7 @@
 // Template literal parsing: `\`hello ${name}\`` (simple and interpolated), plus
 // the raw-content slicers for head/middle/tail/no-substitution template tokens.
 
-use crate::ast::internal::{Expression, TemplateElement, TemplateLiteral};
+use crate::ast::internal::{Expression, TemplateCooked, TemplateElement, TemplateLiteral};
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 
@@ -49,10 +49,10 @@ impl<'a> Parser<'a> {
                 let (elem_start, elem_end) = self.current_pos();
                 let content = extract_template_simple_content(self.current_value());
                 let has_newline = content.contains('\n');
-                let cooked = self.current_decoded().map_or_else(
-                    || Some(content.to_string()),
-                    |decoded| Some(decoded.to_string()),
-                );
+                let cooked = match self.current_decoded() {
+                    Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                    None => TemplateCooked::Verbatim,
+                };
                 // Content span: strip the opening and closing backticks.
                 let raw_span = Span::new(elem_start as u32 + 1, elem_end as u32 - 1);
 
@@ -77,10 +77,10 @@ impl<'a> Parser<'a> {
                 let (elem_start, elem_end) = self.current_pos();
                 let content = extract_template_head_content(self.current_value());
                 let has_newline = content.contains('\n');
-                let cooked = self.current_decoded().map_or_else(
-                    || Some(content.to_string()),
-                    |decoded| Some(decoded.to_string()),
-                );
+                let cooked = match self.current_decoded() {
+                    Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                    None => TemplateCooked::Verbatim,
+                };
                 // Content span: strip the opening backtick and trailing `${`.
                 let raw_span = Span::new(elem_start as u32 + 1, elem_end as u32 - 2);
 
@@ -127,10 +127,10 @@ impl<'a> Parser<'a> {
                             // More interpolations to come: }content${
                             let content = extract_template_head_content(self.current_value());
                             let has_newline = content.contains('\n');
-                            let cooked = self.current_decoded().map_or_else(
-                                || Some(content.to_string()),
-                                |decoded| Some(decoded.to_string()),
-                            );
+                            let cooked = match self.current_decoded() {
+                                Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                                None => TemplateCooked::Verbatim,
+                            };
                             // Content span: strip the leading `}` and trailing `${`.
                             let raw_span = Span::new(elem_start as u32 + 1, elem_end as u32 - 2);
 
@@ -148,10 +148,10 @@ impl<'a> Parser<'a> {
                             // End of template: }content`
                             let content = extract_template_tail_content(self.current_value());
                             let has_newline = content.contains('\n');
-                            let cooked = self.current_decoded().map_or_else(
-                                || Some(content.to_string()),
-                                |decoded| Some(decoded.to_string()),
-                            );
+                            let cooked = match self.current_decoded() {
+                                Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                                None => TemplateCooked::Verbatim,
+                            };
                             // Content span: strip the leading `}` and trailing backtick.
                             let raw_span = Span::new(elem_start as u32 + 1, elem_end as u32 - 1);
 

@@ -1285,10 +1285,9 @@ impl<'a> Parser<'a> {
                 let has_newline = content.contains('\n');
 
                 // Decode escapes for cooked value
-                let cooked = if let Some(decoded) = self.current_decoded() {
-                    Some(decoded.to_string())
-                } else {
-                    Some(content.to_string())
+                let cooked = match self.current_decoded() {
+                    Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                    None => TemplateCooked::Verbatim,
                 };
 
                 self.advance()?;
@@ -1323,10 +1322,9 @@ impl<'a> Parser<'a> {
                 };
                 let has_newline = content.contains('\n');
 
-                let cooked = if let Some(decoded) = self.current_decoded() {
-                    Some(decoded.to_string())
-                } else {
-                    Some(content.to_string())
+                let cooked = match self.current_decoded() {
+                    Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                    None => TemplateCooked::Verbatim,
                 };
 
                 self.advance()?;
@@ -1376,10 +1374,9 @@ impl<'a> Parser<'a> {
                             };
                             let has_newline = tail_content.contains('\n');
 
-                            let tail_cooked = if let Some(decoded) = self.current_decoded() {
-                                Some(decoded.to_string())
-                            } else {
-                                Some(tail_content.to_string())
+                            let tail_cooked = match self.current_decoded() {
+                                Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                                None => TemplateCooked::Verbatim,
                             };
 
                             self.advance()?;
@@ -1416,10 +1413,9 @@ impl<'a> Parser<'a> {
                             };
                             let has_newline = mid_content.contains('\n');
 
-                            let mid_cooked = if let Some(decoded) = self.current_decoded() {
-                                Some(decoded.to_string())
-                            } else {
-                                Some(mid_content.to_string())
+                            let mid_cooked = match self.current_decoded() {
+                                Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                                None => TemplateCooked::Verbatim,
                             };
 
                             self.advance()?;

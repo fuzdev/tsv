@@ -612,11 +612,27 @@ pub struct TemplateLiteral {
     pub span: Span,
 }
 
+/// The decoded ("cooked") value of a template element.
+///
+/// The common no-escape case (`Verbatim`) carries no allocation: the cooked
+/// text equals the raw source slice, recovered via the element's `raw_span`.
+/// Only genuinely decoded values (escapes present) own a `String`.
+#[derive(Debug, Clone)]
+pub enum TemplateCooked {
+    /// Cooked value == the raw source slice (no escapes to decode).
+    Verbatim,
+    /// Escapes were decoded into a value distinct from the raw text.
+    Decoded(String),
+    /// No cooked value — an invalid escape in a tagged template (acorn emits
+    /// `null`). Reserved for that feature; not produced today.
+    Invalid,
+}
+
 /// Template element - a static string part of a template literal
 ///
 /// Each quasi has:
 /// - raw_span: Span of the literal source text (escapes preserved); text via `raw(source)`
-/// - cooked: The decoded value (escapes interpreted), None if contains invalid escape
+/// - cooked: The decoded value (escapes interpreted); text via `cooked(source)`
 /// - tail: true for the last element in the template
 #[derive(Debug, Clone)]
 pub struct TemplateElement {
@@ -626,9 +642,9 @@ pub struct TemplateElement {
     /// owning a `String`. Distinct from `span` (the full token span, which for
     /// middle/tail type quasis starts at the prior `}` brace, not the content).
     pub raw_span: Span,
-    /// The decoded value (escape sequences interpreted)
-    /// None for tagged templates with invalid escapes
-    pub cooked: Option<String>,
+    /// The decoded value. `Verbatim` (the common no-escape case) costs no
+    /// allocation — its text equals `raw(source)`; recover via `cooked(source)`.
+    pub cooked: TemplateCooked,
     /// Whether the raw text contains a newline (precomputed so newline checks
     /// stay O(1) and source-free, matching `Comment::multiline`).
     pub has_newline: bool,
@@ -643,6 +659,19 @@ impl TemplateElement {
     #[inline]
     pub fn raw<'s>(&self, source: &'s str) -> &'s str {
         self.raw_span.extract(source)
+    }
+
+    /// The decoded ("cooked") value as text, or `None` for an invalid escape.
+    /// The no-escape case borrows the raw source slice (no owned string); the
+    /// returned slice borrows from either `self` (`Decoded`) or `source`
+    /// (`Verbatim`), so both share the lifetime `'a`.
+    #[inline]
+    pub fn cooked<'a>(&'a self, source: &'a str) -> Option<&'a str> {
+        match &self.cooked {
+            TemplateCooked::Verbatim => Some(self.raw(source)),
+            TemplateCooked::Decoded(decoded) => Some(decoded),
+            TemplateCooked::Invalid => None,
+        }
     }
 }
 

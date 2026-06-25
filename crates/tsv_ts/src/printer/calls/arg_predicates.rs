@@ -267,11 +267,15 @@ pub fn is_simple_call_argument(expr: &Expression, depth: usize) -> bool {
 
         // Template literals: simple if no newlines and expressions are simple
         Expression::TemplateLiteral(template) => {
-            // Check both raw and cooked for newlines (Prettier checks both)
-            let has_newline = template
-                .quasis
-                .iter()
-                .any(|q| q.has_newline || q.cooked.as_ref().is_some_and(|c| c.contains('\n')));
+            // Check both raw and cooked for newlines (Prettier checks both).
+            // `has_newline` covers the raw side (and the no-escape `Verbatim`
+            // cooked, which equals raw); only a `Decoded` cooked can introduce a
+            // newline raw lacks (a `\n` escape) — and it owns its string, so this
+            // stays source-free.
+            let has_newline = template.quasis.iter().any(|q| {
+                q.has_newline
+                    || matches!(&q.cooked, internal::TemplateCooked::Decoded(c) if c.contains('\n'))
+            });
             if has_newline {
                 return false;
             }

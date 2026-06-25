@@ -54,7 +54,7 @@ pub(in crate::ast::convert) fn convert_template_element(
         loc: create_location(adjusted_span, loc, offset),
         value: public::TemplateElementValue {
             raw: element.raw(source).to_string(),
-            cooked: element.cooked.clone(),
+            cooked: element.cooked(source).map(str::to_string),
         },
         tail: element.tail,
     }
