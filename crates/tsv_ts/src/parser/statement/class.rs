@@ -287,8 +287,15 @@ impl<'a> Parser<'a> {
         ));
         self.advance()?;
 
-        // Parse class name (required for declarations, optional for export default)
-        let id = if matches!(self.current_kind(), TokenKind::Identifier) {
+        // Parse class name (required for declarations, optional for export default).
+        // Like the class-expression path, `implements` (a strict-mode reserved word) can
+        // never be the name — after `class` it starts the extends-less `implements` clause
+        // of an anonymous class, so `export default class implements Foo {}` (spec-valid,
+        // name optional) parses where acorn-typescript rejects it (`implements` reserved).
+        // A `name_required` declaration (`class implements Foo {}`) still errors below.
+        let id = if matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() != "implements"
+        {
             let (id_start, id_end) = self.current_pos();
             let symbol = self.intern_identifier();
             self.advance()?;
