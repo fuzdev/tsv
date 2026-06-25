@@ -641,7 +641,7 @@ fn convert_template_literal_type(
         quasis: template
             .quasis
             .iter()
-            .map(|q| super::convert_template_element(q, loc, offset))
+            .map(|q| super::convert_template_element(q, source, loc, offset))
             .collect(),
         expressions: template
             .types

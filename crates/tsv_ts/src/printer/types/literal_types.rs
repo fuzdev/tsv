@@ -74,7 +74,7 @@ impl<'a> Printer<'a> {
         for (i, quasi) in template.quasis.iter().enumerate() {
             // Visual columns, not bytes: a CJK char is 3 bytes but 2 columns, so a
             // byte sum would break a template whose rendered width is well under print width.
-            pos += visual_width(&quasi.raw, TAB_WIDTH);
+            pos += visual_width(quasi.raw(self.source), TAB_WIDTH);
             if i < template.types.len() {
                 let t = &template.types[i];
                 // Comments between `${` and the type
@@ -123,7 +123,7 @@ impl<'a> Printer<'a> {
         let mut interp_iter = interps.into_iter();
 
         for quasi in &template.quasis {
-            parts.push(d.text_owned(quasi.raw.clone()));
+            parts.push(d.text_owned(quasi.raw(self.source).to_string()));
             if let Some(Interpolation {
                 type_doc,
                 comments_doc,

@@ -268,7 +268,7 @@ fn array_pattern_nesting_depth(arr: &internal::ArrayPattern) -> usize {
 ///
 /// Matches Prettier's `templateLiteralHasNewLines` function
 pub(crate) fn template_literal_has_newlines(template: &internal::TemplateLiteral) -> bool {
-    template.quasis.iter().any(|q| q.raw.contains('\n'))
+    template.quasis.iter().any(|q| q.has_newline)
 }
 
 /// Check if an expression is a template literal (or tagged template) with embedded newlines.

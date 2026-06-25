@@ -12,7 +12,7 @@ pub(in crate::ast) fn convert_template_literal(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::TemplateLiteral {
-    let _ = (source, interner); // Suppress unused warnings - available for future use
+    let _ = interner; // Suppress unused warning - available for future use
     public::TemplateLiteral {
         node_type: "TemplateLiteral".to_string(),
         start: template.span.start,
@@ -21,7 +21,7 @@ pub(in crate::ast) fn convert_template_literal(
         quasis: template
             .quasis
             .iter()
-            .map(|q| convert_template_element(q, loc, offset))
+            .map(|q| convert_template_element(q, source, loc, offset))
             .collect(),
         expressions: template
             .expressions
@@ -33,6 +33,7 @@ pub(in crate::ast) fn convert_template_literal(
 
 pub(in crate::ast::convert) fn convert_template_element(
     element: &internal::TemplateElement,
+    source: &str,
     loc: &LocationTracker,
     offset: usize,
 ) -> public::TemplateElement {
@@ -52,7 +53,7 @@ pub(in crate::ast::convert) fn convert_template_element(
         end: adjusted_end,
         loc: create_location(adjusted_span, loc, offset),
         value: public::TemplateElementValue {
-            raw: element.raw.clone(),
+            raw: element.raw(source).to_string(),
             cooked: element.cooked.clone(),
         },
         tail: element.tail,

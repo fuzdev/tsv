@@ -936,8 +936,12 @@ impl<'a> Lexer<'a> {
     /// The lexer syncs to that position and reads `/pattern/flags`.
     /// For `/=` tokens, the `=` becomes the first character of the pattern (e.g., `/=\s*/`).
     ///
-    /// Pattern and flags are stored in token.decoded as "pattern\0flags" (null-separated).
-    pub fn read_regex_literal(&mut self, slash_start: usize) -> Result<Token, ParseError> {
+    /// Pattern and flags are verbatim source slices (escapes preserved), so the
+    /// parser recovers them from spans rather than the token. Returns the token
+    /// plus the position of the closing `/` (the pattern/flags boundary), letting
+    /// the parser slice `[slash_start+1, close]` and `[close+1, end]` without the
+    /// caller ever materializing the strings (`token.decoded` is `None`).
+    pub fn read_regex_literal(&mut self, slash_start: usize) -> Result<(Token, usize), ParseError> {
         // Sync to just after the opening /
         self.set_position(slash_start + 1);
 
@@ -1011,7 +1015,8 @@ impl<'a> Lexer<'a> {
         // TODO: Validate flags are only valid regex flags (d, g, i, m, s, u, v, y)
         // TODO: Reject duplicate flags (e.g., /test/gg)
         // TODO: Support Unicode escape sequences in flags (e.g., /test/\u0067 for 'g')
-        let flags_start = self.position;
+        // The flags text is recovered from the span by the parser, not sliced here;
+        // this loop only advances `self.position` to the token end.
         while let Some(ch) = self.current {
             if is_id_continue(ch) {
                 self.advance();
@@ -1019,17 +1024,16 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
-        let flags = &self.source[flags_start..self.position];
 
-        // Store pattern and flags as "pattern\0flags"
-        let decoded = format!("{pattern}\0{flags}");
-
-        Ok(Token {
-            kind: TokenKind::RegexLiteral,
-            start: slash_start,
-            end: self.position,
-            decoded: Some(decoded),
-        })
+        Ok((
+            Token {
+                kind: TokenKind::RegexLiteral,
+                start: slash_start,
+                end: self.position,
+                decoded: None,
+            },
+            pattern_end,
+        ))
     }
 
     /// Continue reading template after an interpolation expression.

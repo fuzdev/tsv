@@ -47,18 +47,21 @@ impl<'a> Parser<'a> {
             TokenKind::NoSubstitutionTemplate => {
                 // Simple template with no interpolation: `hello world`
                 let (elem_start, elem_end) = self.current_pos();
-                let raw = self.current_value();
-                let content = extract_template_simple_content(raw).to_string();
+                let content = extract_template_simple_content(self.current_value());
+                let has_newline = content.contains('\n');
                 let cooked = self.current_decoded().map_or_else(
-                    || Some(content.clone()),
+                    || Some(content.to_string()),
                     |decoded| Some(decoded.to_string()),
                 );
+                // Content span: strip the opening and closing backticks.
+                let raw_span = Span::new(elem_start as u32 + 1, elem_end as u32 - 1);
 
                 self.advance()?;
 
                 quasis.push(TemplateElement {
-                    raw: content,
+                    raw_span,
                     cooked,
+                    has_newline,
                     tail: true,
                     span: Span::new(elem_start as u32, elem_end as u32),
                 });
@@ -72,18 +75,21 @@ impl<'a> Parser<'a> {
             TokenKind::TemplateHead => {
                 // Template with interpolation: `hello ${name}...`
                 let (elem_start, elem_end) = self.current_pos();
-                let raw = self.current_value();
-                let content = extract_template_head_content(raw).to_string();
+                let content = extract_template_head_content(self.current_value());
+                let has_newline = content.contains('\n');
                 let cooked = self.current_decoded().map_or_else(
-                    || Some(content.clone()),
+                    || Some(content.to_string()),
                     |decoded| Some(decoded.to_string()),
                 );
+                // Content span: strip the opening backtick and trailing `${`.
+                let raw_span = Span::new(elem_start as u32 + 1, elem_end as u32 - 2);
 
                 self.advance()?;
 
                 quasis.push(TemplateElement {
-                    raw: content,
+                    raw_span,
                     cooked,
+                    has_newline,
                     tail: false,
                     span: Span::new(elem_start as u32, elem_end as u32),
                 });
@@ -115,39 +121,46 @@ impl<'a> Parser<'a> {
                     self.update_current(next_token);
 
                     let (elem_start, elem_end) = self.current_pos();
-                    let raw = self.current_value().to_string();
 
                     match *self.current_kind() {
                         TokenKind::TemplateMiddle => {
                             // More interpolations to come: }content${
-                            let content = extract_template_head_content(&raw).to_string();
+                            let content = extract_template_head_content(self.current_value());
+                            let has_newline = content.contains('\n');
                             let cooked = self.current_decoded().map_or_else(
-                                || Some(content.clone()),
+                                || Some(content.to_string()),
                                 |decoded| Some(decoded.to_string()),
                             );
+                            // Content span: strip the leading `}` and trailing `${`.
+                            let raw_span = Span::new(elem_start as u32 + 1, elem_end as u32 - 2);
 
                             self.advance()?;
 
                             quasis.push(TemplateElement {
-                                raw: content,
+                                raw_span,
                                 cooked,
+                                has_newline,
                                 tail: false,
                                 span: Span::new(elem_start as u32, elem_end as u32),
                             });
                         }
                         TokenKind::TemplateTail => {
                             // End of template: }content`
-                            let content = extract_template_tail_content(&raw).to_string();
+                            let content = extract_template_tail_content(self.current_value());
+                            let has_newline = content.contains('\n');
                             let cooked = self.current_decoded().map_or_else(
-                                || Some(content.clone()),
+                                || Some(content.to_string()),
                                 |decoded| Some(decoded.to_string()),
                             );
+                            // Content span: strip the leading `}` and trailing backtick.
+                            let raw_span = Span::new(elem_start as u32 + 1, elem_end as u32 - 1);
 
                             self.advance()?;
 
                             quasis.push(TemplateElement {
-                                raw: content,
+                                raw_span,
                                 cooked,
+                                has_newline,
                                 tail: true,
                                 span: Span::new(elem_start as u32, elem_end as u32),
                             });
