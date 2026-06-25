@@ -414,6 +414,7 @@ impl<'a> Printer<'a> {
                     kind_text,
                     prop.span.start,
                     prop.key.span().start,
+                    prop.computed,
                 );
                 kw_parts.push(key_doc);
                 d.concat(&kw_parts)
@@ -454,15 +455,11 @@ impl<'a> Printer<'a> {
                     self.push_member_keyword_doc(&mut parts, "async ", &mut cursor, key_start);
                 }
                 if func.generator {
-                    self.push_generator_star_doc(&mut parts, cursor, key_start);
+                    self.push_generator_star_doc(&mut parts, cursor, key_start, prop.computed);
                 } else if func.r#async {
                     // Comments before the name (bounded at `[` for computed keys,
                     // whose inner comments the bracket builder handles)
-                    let bound = if prop.computed {
-                        self.find_opening_bracket_after(cursor, key_start)
-                    } else {
-                        key_start
-                    };
+                    let bound = self.computed_key_name_bound(cursor, key_start, prop.computed);
                     self.push_pre_name_comments_doc(&mut parts, cursor, bound);
                 }
                 parts.push(key_doc);
@@ -858,7 +855,7 @@ impl<'a> Printer<'a> {
 
     /// Find the opening `[` bracket between two positions (for computed properties).
     /// Returns the first `[` found outside comments in the range [start, end).
-    fn find_opening_bracket_after(&self, start: u32, end: u32) -> u32 {
+    pub(in crate::printer) fn find_opening_bracket_after(&self, start: u32, end: u32) -> u32 {
         tsv_lang::source_scan::find_char_skipping_comments(
             self.source.as_bytes(),
             start as usize,

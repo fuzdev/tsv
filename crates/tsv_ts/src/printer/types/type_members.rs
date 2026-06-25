@@ -144,12 +144,14 @@ impl<'a> Printer<'a> {
                 "get ",
                 method.span.start,
                 method.key.span().start,
+                method.computed,
             ),
             internal::MethodKind::Set => self.push_accessor_keyword_doc(
                 &mut parts,
                 "set ",
                 method.span.start,
                 method.key.span().start,
+                method.computed,
             ),
             _ => {}
         }

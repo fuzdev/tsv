@@ -592,7 +592,7 @@ impl<'a> Printer<'a> {
 
         // Generator marker (owns the `*` and comment handling around it)
         if method.value.generator {
-            self.push_generator_star_doc(&mut parts, cursor, key_start);
+            self.push_generator_star_doc(&mut parts, cursor, key_start, method.computed);
         }
 
         // Get/set for accessors

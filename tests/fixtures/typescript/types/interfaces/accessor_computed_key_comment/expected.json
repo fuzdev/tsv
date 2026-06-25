@@ -1,0 +1,364 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 193,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Comment inside a computed accessor key is preserved once (not duplicated onto the keyword)",
+			"start": 20,
+			"end": 113,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 94
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 136,
+			"end": 144,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 7
+				},
+				"end": {
+					"line": 4,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 161,
+			"end": 169,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 7
+				},
+				"end": {
+					"line": 5,
+					"column": 15
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 192,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 183,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 115,
+					"end": 182,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 125,
+						"end": 126,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 11
+							},
+							"end": {
+								"line": 3,
+								"column": 12
+							}
+						},
+						"name": "I"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 127,
+						"end": 182,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 13
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSMethodSignature",
+								"start": 131,
+								"end": 153,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 24
+									}
+								},
+								"computed": true,
+								"key": {
+									"type": "Identifier",
+									"start": 145,
+									"end": 146,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 16
+										},
+										"end": {
+											"line": 4,
+											"column": 17
+										}
+									},
+									"name": "a",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 136,
+											"end": 144
+										}
+									]
+								},
+								"kind": "get",
+								"parameters": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 149,
+									"end": 152,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 20
+										},
+										"end": {
+											"line": 4,
+											"column": 23
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 151,
+										"end": 152,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 22
+											},
+											"end": {
+												"line": 4,
+												"column": 23
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 151,
+											"end": 152,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 22
+												},
+												"end": {
+													"line": 4,
+													"column": 23
+												}
+											},
+											"name": "A"
+										}
+									}
+								}
+							},
+							{
+								"type": "TSMethodSignature",
+								"start": 156,
+								"end": 179,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 25
+									}
+								},
+								"computed": true,
+								"key": {
+									"type": "Identifier",
+									"start": 170,
+									"end": 171,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 16
+										},
+										"end": {
+											"line": 5,
+											"column": 17
+										}
+									},
+									"name": "b",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 161,
+											"end": 169
+										}
+									]
+								},
+								"kind": "set",
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 173,
+										"end": 177,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 19
+											},
+											"end": {
+												"line": 5,
+												"column": 23
+											}
+										},
+										"name": "v",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 174,
+											"end": 177,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 20
+												},
+												"end": {
+													"line": 5,
+													"column": 23
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 176,
+												"end": 177,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 22
+													},
+													"end": {
+														"line": 5,
+														"column": 23
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 176,
+													"end": 177,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 22
+														},
+														"end": {
+															"line": 5,
+															"column": 23
+														}
+													},
+													"name": "A"
+												}
+											}
+										}
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Comment inside a computed accessor key is preserved once (not duplicated onto the keyword)",
+							"start": 20,
+							"end": 113
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
