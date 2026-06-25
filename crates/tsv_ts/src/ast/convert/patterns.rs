@@ -12,7 +12,6 @@ pub(in crate::ast) fn convert_template_literal(
     interner: &DefaultStringInterner,
     offset: usize,
 ) -> public::TemplateLiteral {
-    let _ = (source, interner); // Suppress unused warnings - available for future use
     public::TemplateLiteral {
         node_type: "TemplateLiteral".to_string(),
         start: template.span.start,
@@ -95,24 +94,38 @@ fn convert_object_pattern_property(
             convert_property(p, source, loc, interner, offset),
         ),
         internal::ObjectPatternProperty::RestElement(r) => {
-            public::ObjectPatternProperty::RestElement(public::RestElement {
-                node_type: "RestElement".to_string(),
-                start: r.span.start,
-                end: r.span.end,
-                loc: create_location(r.span, loc, offset),
-                argument: Box::new(convert_expression(
-                    &r.argument,
-                    source,
-                    loc,
-                    interner,
-                    offset,
-                )),
-                type_annotation: r
-                    .type_annotation
-                    .as_ref()
-                    .map(|ta| convert_type_annotation(ta, source, loc, interner, offset)),
-            })
+            public::ObjectPatternProperty::RestElement(convert_rest_element(
+                r, source, loc, interner, offset,
+            ))
         }
+    }
+}
+
+/// Convert an internal `RestElement` to its public node. Shared by the
+/// object-pattern rest (`{...r}`) and the expression rest (`[...r]` / call rest).
+pub(in crate::ast) fn convert_rest_element(
+    rest: &internal::RestElement,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+    offset: usize,
+) -> public::RestElement {
+    public::RestElement {
+        node_type: "RestElement".to_string(),
+        start: rest.span.start,
+        end: rest.span.end,
+        loc: create_location(rest.span, loc, offset),
+        argument: Box::new(convert_expression(
+            &rest.argument,
+            source,
+            loc,
+            interner,
+            offset,
+        )),
+        type_annotation: rest
+            .type_annotation
+            .as_ref()
+            .map(|ta| convert_type_annotation(ta, source, loc, interner, offset)),
     }
 }
 
