@@ -575,7 +575,7 @@ impl<'a> Printer<'a> {
         let open_bracket = span.start;
 
         for comment in comments_in_range(self.comments, open_bracket + 1, span.end - 1) {
-            if !comment.is_block || comment.content.contains('\n') {
+            if !comment.is_block || comment.multiline {
                 continue;
             }
 
@@ -804,7 +804,8 @@ impl<'a> Printer<'a> {
     /// Check if any comment in the range is a format-ignore directive.
     /// Used to emit the next node as raw source text instead of formatting.
     fn has_format_ignore_in_range(&self, start: u32, end: u32) -> bool {
-        comments_in_range(self.comments, start, end).any(|c| is_format_ignore_directive(&c.content))
+        comments_in_range(self.comments, start, end)
+            .any(|c| is_format_ignore_directive(c.content(self.source)))
     }
 
     /// Emit a node's source span verbatim. Used to round-trip the source of a

@@ -671,7 +671,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         for comment in comments_in_range(self.comments, start, end) {
             if comment.is_block {
-                parts.push(d.text_owned(format!("/*{}*/ ", comment.content)));
+                parts.push(d.text_owned(format!("/*{}*/ ", comment.content(self.source))));
             }
         }
     }
@@ -689,7 +689,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         for comment in comments_in_range(self.comments, start, end) {
             if comment.is_block {
-                parts.push(d.text_owned(format!(" /*{}*/", comment.content)));
+                parts.push(d.text_owned(format!(" /*{}*/", comment.content(self.source))));
             }
         }
     }

@@ -978,11 +978,14 @@ impl<'a> Printer<'a> {
         if comment.is_block {
             d.concat(&[
                 d.text("/*"),
-                d.text_owned(comment.content.clone()),
+                d.text_owned(comment.content(self.source).to_string()),
                 d.text("*/"),
             ])
         } else {
-            d.concat(&[d.text("//"), d.text_owned(comment.content.clone())])
+            d.concat(&[
+                d.text("//"),
+                d.text_owned(comment.content(self.source).to_string()),
+            ])
         }
     }
 

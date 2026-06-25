@@ -5,8 +5,18 @@ use smallvec::SmallVec;
 
 #[derive(Debug, Clone)]
 pub struct Comment {
-    pub content: String,
+    /// Byte span of the comment's content (delimiters excluded), into the
+    /// source. The text is recovered on demand via [`Comment::content`] rather
+    /// than stored owned — comments are a pure sub-slice of source (no decoding
+    /// for JS/TS/CSS comments), so a span avoids a `String` allocation per
+    /// comment in the lexer and the parser's collect-clone.
+    pub content_span: Span,
     pub is_block: bool, // true for /* */ or <!-- -->, false for //
+    /// Whether the content contains a `\n`. Precomputed at construction so the
+    /// multi-line-block-comment expansion checks (here and in the printers) stay
+    /// O(1) and source-free. Line comments never contain a newline, so this is
+    /// only ever `true` for block comments.
+    pub multiline: bool,
     pub span: Span,
     /// Public-AST serializer hint: when true, the JSON `loc` for this comment
     /// includes a `character` (byte-offset) field alongside `line`/`column`.
@@ -19,6 +29,17 @@ pub struct Comment {
     // (a parallel comment collection on the language root, or per-element
     // attachment if a richer model is needed).
     pub emit_character_field: bool,
+}
+
+impl Comment {
+    /// The comment's content (delimiters excluded), sliced from `source`.
+    ///
+    /// `source` must be the same text the comment's spans were recorded
+    /// against (the host document for embedded `<script>`/`{expr}` comments).
+    #[inline]
+    pub fn content<'s>(&self, source: &'s str) -> &'s str {
+        self.content_span.extract(source)
+    }
 }
 
 //
@@ -287,7 +308,7 @@ pub fn has_line_comments_in_range(comments: &[Comment], start: u32, end: u32) ->
 /// Uses binary search: O(log n + k) where k is comments in range
 #[inline]
 pub fn has_multiline_block_comments_in_range(comments: &[Comment], start: u32, end: u32) -> bool {
-    comments_in_range(comments, start, end).any(|c| c.is_block && c.content.contains('\n'))
+    comments_in_range(comments, start, end).any(|c| c.is_block && c.multiline)
 }
 
 /// Iterate over comments after a position (span.start >= pos)
@@ -307,8 +328,11 @@ mod tests {
 
     fn comment(start: u32, end: u32, is_block: bool, content: &str) -> Comment {
         Comment {
-            content: content.to_string(),
+            // The lookup/classification tests exercise span-based logic only;
+            // content_span mirrors the full span (no source to slice here).
+            content_span: Span::new(start, end),
             is_block,
+            multiline: content.contains('\n'),
             span: Span::new(start, end),
             emit_character_field: false,
         }

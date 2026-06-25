@@ -255,7 +255,7 @@ impl<'a> Printer<'a> {
         for comment in comments_in_range(self.comments, start, end) {
             parts.push(self.build_comment_doc(comment));
             if comment.is_block {
-                if comment.content.contains('\n') {
+                if comment.multiline {
                     // Multiline block comment: value starts on next line
                     // Prettier ref: hasLeadingOwnLineComment → break-after-operator
                     parts.push(d.hardline());

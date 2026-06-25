@@ -18,24 +18,25 @@ impl<'a> Printer<'a> {
     /// - Other comments: if continuation lines had indentation, use hardline; otherwise literalline
     pub(crate) fn build_comment_doc(&self, comment: &internal::Comment) -> DocId {
         let d = self.d();
+        let content = comment.content(self.source);
         if comment.is_block {
             // Block comment: /* content */
-            if !comment.content.contains('\n') {
+            if !comment.multiline {
                 // Single-line block comment
-                d.text_owned(format!("/*{}*/", comment.content))
-            } else if printing::is_indentable_block_comment(&comment.content) {
-                self.build_indentable_block_comment_doc(&comment.content)
+                d.text_owned(format!("/*{content}*/"))
+            } else if printing::is_indentable_block_comment(content) {
+                self.build_indentable_block_comment_doc(content)
             } else {
                 self.build_preserved_block_comment_doc(comment)
             }
-        } else if comment.span.start == 0 && comment.content.starts_with("#!") {
+        } else if comment.span.start == 0 && content.starts_with("#!") {
             // Hashbang comment: #!/usr/bin/env node (no // prefix)
             // Content already includes the #! prefix. Like a line comment it runs
             // to end-of-line, so tag it for the swallow check.
-            d.line_comment_text_owned(comment.content.clone())
+            d.line_comment_text_owned(content.to_string())
         } else {
             // Line comment: // content. Tagged for the swallow check (runs to EOL).
-            d.line_comment_text_owned(format!("//{}", comment.content))
+            d.line_comment_text_owned(format!("//{content}"))
         }
     }
 
@@ -86,14 +87,14 @@ impl<'a> Printer<'a> {
     /// indented; other comments preserve their lines at column 0 (`literalline`).
     fn build_preserved_block_comment_doc(&self, comment: &internal::Comment) -> DocId {
         let d = self.d();
+        let content = comment.content(self.source);
         let stripped =
-            printing::strip_comment_indentation(self.source, &comment.content, comment.span.start);
+            printing::strip_comment_indentation(self.source, content, comment.span.start);
 
         // A `/**`-prefixed comment that reached here is only partially starred
         // (some line lacks `*`); it still gets context indent. Otherwise use
         // context indent only when the comment's lines were indented.
-        let use_context_indent =
-            comment.content.starts_with('*') || stripped.len() != comment.content.len();
+        let use_context_indent = content.starts_with('*') || stripped.len() != content.len();
 
         // ≥2 lines: `build_comment_doc` only routes newline-containing content here.
         let lines: Vec<&str> = stripped.split('\n').collect();

@@ -445,7 +445,7 @@ impl<'a> Printer<'a> {
         for comment in comments_in_range(self.comments, after_q_start, true_type_start) {
             q_parts.push(d.text(" "));
             q_parts.push(self.build_comment_doc(comment));
-            if !comment.is_block || comment.content.contains('\n') {
+            if !comment.is_block || comment.multiline {
                 needs_indent_before_true = true;
             }
         }
@@ -484,7 +484,7 @@ impl<'a> Printer<'a> {
                 q_parts.push(d.text(" "));
             }
             q_parts.push(self.build_comment_doc(comment));
-            if !comment.is_block || comment.content.contains('\n') {
+            if !comment.is_block || comment.multiline {
                 needs_indent_before_false = true;
             }
             prev_was_line_comment = !comment.is_block;

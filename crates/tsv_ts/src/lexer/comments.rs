@@ -2,7 +2,8 @@ use super::token::{Token, TokenKind};
 use tsv_lang::ParseError;
 
 /// Read a TypeScript line comment: // ...
-/// Returns the comment content WITHOUT the // prefix
+/// Records `content_start` after the `//` prefix; the content (the source slice
+/// `[content_start, end)`) is recovered on demand, not copied here.
 /// Reads until end of line or end of file
 ///
 /// NOTE: Content is preserved exactly as written. Indentation stripping for multi-line
@@ -14,8 +15,9 @@ pub(crate) fn read_line_comment(source: &str, pos: &mut usize) -> Result<Token, 
     *pos += 1; // /
     *pos += 1; // /
 
-    let mut content = String::new();
-
+    // Scan to the end of the comment without copying — the content is recovered
+    // on demand as a source slice (`[start + 2, end)`).
+    //
     // Read until line terminator or EOF — U+2028/U+2029 terminate line
     // comments like LF/CR per the spec
     loop {
@@ -27,7 +29,6 @@ pub(crate) fn read_line_comment(source: &str, pos: &mut usize) -> Result<Token, 
                 break;
             }
             Some(ch) => {
-                content.push(ch);
                 *pos += ch.len_utf8();
             }
         }
@@ -35,8 +36,8 @@ pub(crate) fn read_line_comment(source: &str, pos: &mut usize) -> Result<Token, 
 
     Ok(Token {
         kind: TokenKind::Comment {
-            content,
             is_block: false,
+            content_start: start + 2,
         },
         start,
         end: *pos,
@@ -45,7 +46,8 @@ pub(crate) fn read_line_comment(source: &str, pos: &mut usize) -> Result<Token, 
 }
 
 /// Read a TypeScript block comment: /* ... */
-/// Returns the comment content WITHOUT the /* */ delimiters
+/// Records `content_start` after the `/*`; the content (the source slice
+/// `[content_start, end - 2)`) is recovered on demand, not copied here.
 /// Note: Unlike CSS, JS/TypeScript does NOT support nested block comments
 ///
 /// NOTE: Content is preserved exactly as written. Indentation stripping for multi-line
@@ -57,8 +59,8 @@ pub(crate) fn read_block_comment(source: &str, pos: &mut usize) -> Result<Token,
     *pos += 1; // /
     *pos += 1; // *
 
-    let mut content = String::new();
-
+    // Scan to the closing `*/` without copying — the content is recovered on
+    // demand as a source slice (`[start + 2, end - 2)`).
     loop {
         let current_char = source[*pos..].chars().next();
         match current_char {
@@ -77,11 +79,9 @@ pub(crate) fn read_block_comment(source: &str, pos: &mut usize) -> Result<Token,
                     *pos += 1; // /
                     break;
                 }
-                content.push('*');
                 *pos += 1;
             }
             Some(ch) => {
-                content.push(ch);
                 *pos += ch.len_utf8();
             }
         }
@@ -89,8 +89,8 @@ pub(crate) fn read_block_comment(source: &str, pos: &mut usize) -> Result<Token,
 
     Ok(Token {
         kind: TokenKind::Comment {
-            content,
             is_block: true,
+            content_start: start + 2,
         },
         start,
         end: *pos,

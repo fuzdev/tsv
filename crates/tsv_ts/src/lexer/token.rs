@@ -315,7 +315,15 @@ pub enum TokenKind {
     AmpersandAmpersandEquals, // &&=
     PipePipeEquals,           // ||=
     QuestionQuestionEquals,   // ??=
-    Comment { content: String, is_block: bool },
+    /// `content_start` is the byte offset where the comment's content begins
+    /// (delimiters excluded): `start + 2` for `//` and `/* */`, `start` for a
+    /// `#!` hashbang (whose content includes the `#!`). The end is derived by
+    /// the parser (`end - 2` for block comments, `end` otherwise). Carrying the
+    /// content start here keeps the lexer the single owner of delimiter widths.
+    Comment {
+        is_block: bool,
+        content_start: usize,
+    },
     // Template literal tokens
     // NoSubstitutionTemplate: `content` (no ${} interpolation)
     NoSubstitutionTemplate,

@@ -54,11 +54,16 @@ impl<'a> CssParser<'a> {
         debug_assert!(matches!(self.current_kind, TokenKind::Comment));
         let comment_start = self.base_offset + self.current_start;
         let comment_end = self.base_offset + self.current_end;
-        // Extract content without /* */ delimiters
-        let content = self.source[self.current_start + 2..self.current_end - 2].to_string();
+        // Content excludes the `/* */` delimiters; recovered on demand as a
+        // source slice rather than copied.
+        let multiline = self.source[self.current_start + 2..self.current_end - 2].contains('\n');
         self.add_comment(Comment {
-            content,
+            content_span: Span {
+                start: (comment_start + 2) as u32,
+                end: (comment_end - 2) as u32,
+            },
             is_block: true,
+            multiline,
             span: Span {
                 start: comment_start as u32,
                 end: comment_end as u32,
@@ -212,12 +217,16 @@ impl<'a> CssParser<'a> {
     pub(crate) fn parse_block_comment(&mut self) -> Result<Comment, ParseError> {
         let comment_start = self.base_offset + self.current_start;
         let comment_end = self.base_offset + self.current_end;
-        let content = self.source[self.current_start + 2..self.current_end - 2].to_string();
+        let multiline = self.source[self.current_start + 2..self.current_end - 2].contains('\n');
         self.advance()?;
         self.skip_whitespace()?;
         Ok(Comment {
-            content,
+            content_span: Span {
+                start: (comment_start + 2) as u32,
+                end: (comment_end - 2) as u32,
+            },
             is_block: true,
+            multiline,
             span: Span {
                 start: comment_start as u32,
                 end: comment_end as u32,

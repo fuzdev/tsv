@@ -1136,9 +1136,9 @@ impl<'a> Lexer<'a> {
         self.advance(); // #
         self.advance(); // !
 
-        let mut content = String::from("#!");
-
-        // Read until newline or EOF
+        // Read until newline or EOF without copying. Unlike `//`, the hashbang's
+        // content includes the `#!` prefix, so its content starts at `start`
+        // (no delimiter stripping) — recovered on demand as a source slice.
         loop {
             match self.current {
                 None | Some('\n') | Some('\r') => {
@@ -1146,8 +1146,7 @@ impl<'a> Lexer<'a> {
                     // Don't consume the newline - it's whitespace for the next token
                     break;
                 }
-                Some(ch) => {
-                    content.push(ch);
+                Some(_) => {
                     self.advance();
                 }
             }
@@ -1155,8 +1154,8 @@ impl<'a> Lexer<'a> {
 
         Ok(Token {
             kind: TokenKind::Comment {
-                content,
                 is_block: false,
+                content_start: start,
             },
             start,
             end: self.position,

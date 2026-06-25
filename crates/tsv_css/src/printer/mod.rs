@@ -227,7 +227,7 @@ impl<'a> Printer<'a> {
             // Check printed comments for a format-ignore directive (O(k) where k = comments_before)
             let has_ignore = self.comments[idx_before..comment_idx]
                 .iter()
-                .any(|c| is_format_ignore_directive(&c.content));
+                .any(|c| is_format_ignore_directive(c.content(self.source)));
 
             // Add separator before node
             if printed_any || comments_before > 0 {
@@ -449,7 +449,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn print_css_comment(&mut self, comment: &Comment) {
         // Write comment with delimiters - content is preserved exactly as written
         self.write("/*");
-        self.write(&comment.content);
+        self.write(comment.content(self.source));
         self.write("*/");
     }
 
@@ -473,7 +473,7 @@ impl<'a> Printer<'a> {
             && self.is_same_line(last_end, next_comment.span.start)
         {
             self.write(" /*");
-            self.write(&next_comment.content);
+            self.write(next_comment.content(self.source));
             self.write("*/");
             last_end = next_comment.span.end;
             consumed += 1;
@@ -504,7 +504,7 @@ impl<'a> Printer<'a> {
                 self.buffer_remove_trailing_newline();
             }
             self.write(" /*");
-            self.write(&next_comment.content);
+            self.write(next_comment.content(self.source));
             self.write("*/");
             last_end = next_comment.span.end;
             consumed += 1;

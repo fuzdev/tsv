@@ -209,22 +209,12 @@ impl<'a> SvelteParser<'a> {
         let mut comments = Vec::new();
         if let Some(ref script) = instance {
             for ts_comment in &script.content.comments {
-                comments.push(Comment {
-                    content: ts_comment.content.clone(),
-                    is_block: ts_comment.is_block,
-                    span: ts_comment.span,
-                    emit_character_field: ts_comment.emit_character_field,
-                });
+                comments.push(ts_comment.clone());
             }
         }
         if let Some(ref script) = module {
             for ts_comment in &script.content.comments {
-                comments.push(Comment {
-                    content: ts_comment.content.clone(),
-                    is_block: ts_comment.is_block,
-                    span: ts_comment.span,
-                    emit_character_field: ts_comment.emit_character_field,
-                });
+                comments.push(ts_comment.clone());
             }
         }
         // Add expression comments collected during template parsing

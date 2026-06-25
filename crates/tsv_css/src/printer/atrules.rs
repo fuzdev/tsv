@@ -232,7 +232,7 @@ impl<'a> Printer<'a> {
                     }
                     internal::CssBlockChild::Comment(comment) => {
                         // Check for a format-ignore directive
-                        if is_format_ignore_directive(&comment.content) {
+                        if is_format_ignore_directive(comment.content(self.source)) {
                             format_ignore_next = true;
                         }
                         // Standalone comment
@@ -284,7 +284,7 @@ impl<'a> Printer<'a> {
                     {
                         // Print comment inline after selector
                         self.write(" /*");
-                        self.write(&comment.content);
+                        self.write(comment.content(self.source));
                         self.write("*/");
                         start_index = 1; // Skip this comment when processing declarations
                     }
@@ -334,7 +334,7 @@ impl<'a> Printer<'a> {
                                 self.write("\n");
                             }
                             // Check for a format-ignore directive
-                            if is_format_ignore_directive(&comment.content) {
+                            if is_format_ignore_directive(comment.content(self.source)) {
                                 format_ignore_next = true;
                             }
                             self.write_indent();
@@ -565,7 +565,7 @@ impl<'a> Printer<'a> {
                         self.write(" ");
                     }
                     self.write("/*");
-                    self.write(&comment.content);
+                    self.write(comment.content(self.source));
                     self.write("*/");
                 }
                 self.write(" ");
@@ -580,7 +580,7 @@ impl<'a> Printer<'a> {
         if !comments.is_empty() {
             for comment in comments.iter() {
                 self.write(" /*");
-                self.write(&comment.content);
+                self.write(comment.content(self.source));
                 self.write("*/");
             }
         }
@@ -636,7 +636,7 @@ impl<'a> Printer<'a> {
                         result.push(' ');
                     }
                     result.push_str("/*");
-                    result.push_str(&comment.content);
+                    result.push_str(comment.content(self.source));
                     result.push_str("*/");
                 }
                 return (result, String::new());
@@ -660,7 +660,7 @@ impl<'a> Printer<'a> {
                         result.push(' ');
                     }
                     result.push_str("/*");
-                    result.push_str(&comment.content);
+                    result.push_str(comment.content(self.source));
                     result.push_str("*/");
                 }
                 return (result, String::new());
@@ -672,7 +672,7 @@ impl<'a> Printer<'a> {
         let mut after = String::new();
 
         for comment in comments {
-            let formatted = format!("/*{}*/", comment.content);
+            let formatted = format!("/*{}*/", comment.content(self.source));
             if comment.span.end <= connector_abs_pos {
                 if !before.is_empty() {
                     before.push(' ');

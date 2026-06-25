@@ -391,10 +391,11 @@ fn recurse_children(node: &mut serde_json::Value, ctx: &mut CommentAttachmentCon
 /// For multi-line block comments, strips leading indentation to match Svelte's behavior.
 /// See: svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js:115-124
 fn get_comment_value(comment: &Comment, source: &str) -> String {
-    if comment.is_block && comment.content.contains('\n') {
-        printing::strip_comment_indentation(source, &comment.content, comment.span.start)
+    let content = comment.content(source);
+    if comment.is_block && comment.multiline {
+        printing::strip_comment_indentation(source, content, comment.span.start)
     } else {
-        comment.content.clone()
+        content.to_string()
     }
 }
 

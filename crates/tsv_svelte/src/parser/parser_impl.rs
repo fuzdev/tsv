@@ -204,8 +204,12 @@ impl<'a> SvelteParser<'a> {
                 // Extract comment content (without /* */)
                 let comment_content = &content[start + 2..end.saturating_sub(2)];
                 self.expression_comments.push(Comment {
-                    content: comment_content.to_string(),
+                    content_span: Span {
+                        start: (base_offset + start + 2) as u32,
+                        end: (base_offset + end.saturating_sub(2)) as u32,
+                    },
                     is_block: true,
+                    multiline: comment_content.contains('\n'),
                     span: Span {
                         start: (base_offset + start) as u32,
                         end: (base_offset + end) as u32,
@@ -227,8 +231,12 @@ impl<'a> SvelteParser<'a> {
                 // Extract comment content (without //)
                 let comment_content = &content[start + 2..end];
                 self.expression_comments.push(Comment {
-                    content: comment_content.to_string(),
+                    content_span: Span {
+                        start: (base_offset + start + 2) as u32,
+                        end: (base_offset + end) as u32,
+                    },
                     is_block: false,
+                    multiline: comment_content.contains('\n'),
                     span: Span {
                         start: (base_offset + start) as u32,
                         end: (base_offset + end) as u32,
@@ -286,8 +294,12 @@ impl<'a> SvelteParser<'a> {
 
                 let content = &self.source[content_start..end];
                 self.expression_comments.push(Comment {
-                    content: content.to_string(),
+                    content_span: Span {
+                        start: content_start as u32,
+                        end: end as u32,
+                    },
                     is_block: false,
+                    multiline: content.contains('\n'),
                     span: Span {
                         start: pos as u32,
                         end: end as u32,
@@ -316,8 +328,12 @@ impl<'a> SvelteParser<'a> {
                 let content = &self.source[content_start..end];
                 let comment_end = end + 2; // past */
                 self.expression_comments.push(Comment {
-                    content: content.to_string(),
+                    content_span: Span {
+                        start: content_start as u32,
+                        end: end as u32,
+                    },
                     is_block: true,
+                    multiline: content.contains('\n'),
                     span: Span {
                         start: pos as u32,
                         end: comment_end as u32,
