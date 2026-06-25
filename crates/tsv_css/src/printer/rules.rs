@@ -40,7 +40,7 @@ impl<'a> Printer<'a> {
             // Always add space before comment for readability (normalize)
             // This is an intentional divergence from prettier (which preserves no-space)
             self.write(" /*");
-            self.write(&comment.content);
+            self.write(comment.content(self.source));
             self.write("*/");
             start_index += 1; // Skip this comment when processing declarations
         }
@@ -84,7 +84,7 @@ impl<'a> Printer<'a> {
                     }
 
                     // Check for a format-ignore directive
-                    if is_format_ignore_directive(&comment.content) {
+                    if is_format_ignore_directive(comment.content(self.source)) {
                         format_ignore_next = true;
                     }
 

@@ -126,10 +126,11 @@ impl<'a> Printer<'a> {
     /// - `leading: false` for comments after elements → space before: `elem /*c*/`
     fn format_inline_block_comment(&self, comment: &tsv_lang::Comment, leading: bool) -> DocId {
         let d = self.d();
+        let content = comment.content(self.source);
         if leading {
-            d.text_owned(format!("/*{}*/ ", comment.content))
+            d.text_owned(format!("/*{content}*/ "))
         } else {
-            d.text_owned(format!(" /*{}*/", comment.content))
+            d.text_owned(format!(" /*{content}*/"))
         }
     }
 
