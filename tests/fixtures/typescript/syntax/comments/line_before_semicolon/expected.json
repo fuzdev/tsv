@@ -1,0 +1,600 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 391,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A line comment before a statement's `;` trails after it (the `;` binds to the",
+			"start": 20,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " statement; emitting it before would swallow the `;`). A block stays before `;`.",
+			"start": 102,
+			"end": 184,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 199,
+			"end": 203,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 14
+				},
+				"end": {
+					"line": 4,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " d",
+			"start": 211,
+			"end": 215,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 7
+				},
+				"end": {
+					"line": 5,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " f",
+			"start": 236,
+			"end": 240,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 9
+				},
+				"end": {
+					"line": 7,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A same-line comment trails the `;`; an own-line comment drops to its own line",
+			"start": 245,
+			"end": 325,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " after the `;`.",
+			"start": 327,
+			"end": 344,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own",
+			"start": 360,
+			"end": 366,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 390,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 381,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 14,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 186,
+					"end": 198,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 192,
+							"end": 197,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 192,
+								"end": 193,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 196,
+								"end": 197,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 11
+									},
+									"end": {
+										"line": 4,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment before a statement's `;` trails after it (the `;` binds to the",
+							"start": 20,
+							"end": 100
+						},
+						{
+							"type": "Line",
+							"value": " statement; emitting it before would swallow the `;`). A block stays before `;`.",
+							"start": 102,
+							"end": 184
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c",
+							"start": 199,
+							"end": 203
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 205,
+					"end": 210,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 205,
+						"end": 209,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 1
+							},
+							"end": {
+								"line": 5,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 205,
+							"end": 207,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 1
+								},
+								"end": {
+									"line": 5,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " d",
+							"start": 211,
+							"end": 215
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 217,
+					"end": 243,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 223,
+						"end": 224,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 7
+							},
+							"end": {
+								"line": 6,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 225,
+						"end": 243,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 9
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 229,
+								"end": 235,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 229,
+									"end": 230,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 3
+										}
+									},
+									"name": "e"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 233,
+									"end": 234,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 6
+										},
+										"end": {
+											"line": 7,
+											"column": 7
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " f",
+										"start": 236,
+										"end": 240
+									}
+								]
+							}
+						]
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 346,
+					"end": 358,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 352,
+							"end": 357,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 352,
+								"end": 353,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"name": "g"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 356,
+								"end": 357,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 11
+									},
+									"end": {
+										"line": 11,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A same-line comment trails the `;`; an own-line comment drops to its own line",
+							"start": 245,
+							"end": 325
+						},
+						{
+							"type": "Line",
+							"value": " after the `;`.",
+							"start": 327,
+							"end": 344
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 368,
+					"end": 380,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 374,
+							"end": 379,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 374,
+								"end": 375,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 8
+									}
+								},
+								"name": "h"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 378,
+								"end": 379,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 11
+									},
+									"end": {
+										"line": 13,
+										"column": 12
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " own",
+							"start": 360,
+							"end": 366
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
