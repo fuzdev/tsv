@@ -399,21 +399,34 @@ tsv/
 
 ### Conformance
 
-**Comment position is preserved, not relocated.** A core tsv stance and the
-single largest category of deliberate divergence from Prettier: a comment's
-placement is an authoring choice that communicates what it refers to, so tsv
-keeps comments where the author wrote them instead of moving them to a
-"canonical" position. Prettier routinely relocates comments across syntactic
-boundaries (into adjacent blocks, parens, onto their own line, past `;`); tsv
-treats every such boundary as semantic and holds the comment in place. The intent
-is **universal** — preserve everywhere. Where tsv today still matches a Prettier
-relocation (a few spots like the method/call/construct-signature `(`, the
-union-member alignment rendering, or the `with {…}` import-attribute brace), that
-is an un-converted implementation gap being closed incrementally — **not** a
-deliberate exception. The one sanctioned safety valve is adopting Prettier's
-position only if preserving the author's would be genuinely wrong (e.g. it lands
-inside a token boundary); no such case exists in the catalog today. When a fix
-changes comment handling, default to preserving position and add a
+**Comment position is preserved by default — but the rule is principled, not
+absolute.** A core tsv stance and the single largest category of deliberate
+divergence from Prettier: a comment's placement is usually an authoring choice
+that communicates what it refers to, so tsv keeps comments where the author wrote
+them rather than moving them to a "canonical" position. Prettier routinely
+relocates comments across syntactic boundaries (into adjacent blocks, parens, onto
+their own line, past `;`), and in doing so often **loses information** — two
+comments merging onto one line (the second `//` becoming text), or reordering
+them. tsv treats such a boundary as semantic and holds the comment in place.
+
+The line tsv draws: **preserve when the comment's position carries authorship
+signal, or when relocating would lose information** (the common case, and why most
+relocations are divergences). But tsv will **deliberately trail** a same-line line
+comment past a *pure separator* when doing so is **lossless and the position
+carries no signal** — e.g. a line comment between a list element and its comma
+(`A // c⏎, B` → `A, // c`): the comma is structure, the comment trails the element
+either way, and the list's per-element line breaks keep even multiple comments
+distinct, so there is nothing to preserve and tsv matches Prettier. That carve-out
+is a deliberate choice, **not** a gap to close. (Contrast the name→`=`/`:`/`?`
+binding cases, where two comments *would* collide on one trailing line — there tsv
+preserves + continuation-indents to stay lossless, diverging from Prettier's merge.)
+
+Separately, a few spots where tsv still matches a Prettier relocation that genuinely
+moves a comment across a semantic boundary (the method/call/construct-signature `(`,
+the union-member alignment rendering, the `with {…}` import-attribute brace) are
+un-converted implementation gaps being closed incrementally. When a fix changes
+comment handling, default to preserving position; matching Prettier is fine only
+when trailing is lossless and the position carries no signal — otherwise add a
 `_prettier_divergence` fixture. Full principles + the divergence catalog:
 ./docs/conformance_prettier.md §Comment Position Philosophy.
 
