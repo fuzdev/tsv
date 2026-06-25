@@ -54,21 +54,52 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The end bound for a member's pre-name comment scan: the computed key's
+    /// `[` (via [`Self::find_opening_bracket_after`]) when `computed`, else the
+    /// key's start `key_start`.
+    ///
+    /// Comments *inside* `[ … ]` belong to the computed-key bracket builder
+    /// (`build_computed_key_bracket_doc`), so a keyword/marker emitter that
+    /// scanned all the way to the key expression's start (which lies past `[`)
+    /// would emit them a second time — duplicating the comment onto the keyword
+    /// (`get /* c */ [/* c */ a]`, `*/* c */ [/* c */ a]`). A comment the author
+    /// wrote *before* `[` (`get /* c */ [a]`) still falls in the bounded range
+    /// and stays with the keyword. Shared by the accessor-keyword, generator-`*`,
+    /// and async-method pre-name emitters; the class member path inlines the same
+    /// `[`-bound directly.
+    pub(in crate::printer) fn computed_key_name_bound(
+        &self,
+        from: u32,
+        key_start: u32,
+        computed: bool,
+    ) -> u32 {
+        if computed {
+            self.find_opening_bracket_after(from, key_start)
+        } else {
+            key_start
+        }
+    }
+
     /// Emit an accessor keyword (`get ` / `set `) preserving comments between
     /// the keyword and the key (e.g., `get /* c */ a()`).
     ///
     /// Single-keyword convenience over [`Self::push_member_keyword_doc`] +
     /// [`Self::push_pre_name_comments_doc`]; `search_from` is the member's start.
+    /// The pre-name scan is bounded at `[` for a computed key
+    /// ([`Self::computed_key_name_bound`]) so an in-bracket comment isn't emitted
+    /// twice.
     pub(crate) fn push_accessor_keyword_doc(
         &self,
         parts: &mut DocBuf,
         kind_text: &'static str,
         search_from: u32,
         key_start: u32,
+        computed: bool,
     ) {
         let mut cursor = search_from;
         self.push_member_keyword_doc(parts, kind_text, &mut cursor, key_start);
-        self.push_pre_name_comments_doc(parts, cursor, key_start);
+        let name_bound = self.computed_key_name_bound(cursor, key_start, computed);
+        self.push_pre_name_comments_doc(parts, cursor, name_bound);
     }
 
     /// Emit an optional/definite modifier marker (`?` or `!`) that follows a key
@@ -601,11 +632,17 @@ impl<'a> Printer<'a> {
     /// (`*/* c */ m`). The `*` is located with the comment/string-skipping scan,
     /// so a `*` inside a comment (`/* a * b */`) is not mistaken for the marker.
     /// This pushes the `*` itself — call it instead of pushing `d.text("*")`.
+    ///
+    /// For a **computed** key the after-`*` scan is bounded at `[`
+    /// ([`Self::computed_key_name_bound`]): comments inside the brackets belong
+    /// to the computed-key bracket builder, so scanning to the key expression's
+    /// start (past `[`) would duplicate them onto the `*` (`*/* c */ [/* c */ a]`).
     pub(crate) fn push_generator_star_doc(
         &self,
         parts: &mut DocBuf,
         search_start: u32,
         key_start: u32,
+        computed: bool,
     ) {
         let d = self.d();
         let star = find_char(
@@ -625,9 +662,11 @@ impl<'a> Printer<'a> {
             parts.push(d.text(" "));
         }
         parts.push(d.text("*"));
-        // Comments between the `*` and the key trail it.
+        // Comments between the `*` and the key trail it (bounded at `[` for a
+        // computed key, whose in-bracket comments the bracket builder owns).
         if let Some(star) = star {
-            for comment in comments_in_range(self.comments, star + 1, key_start) {
+            let name_bound = self.computed_key_name_bound(star + 1, key_start, computed);
+            for comment in comments_in_range(self.comments, star + 1, name_bound) {
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.text(" "));
             }
