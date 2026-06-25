@@ -13,6 +13,18 @@ use tsv_lang::{ParseError, Span};
 use super::expression_tag::scan_to_matching_brace;
 use super::parser_impl::SvelteParser;
 
+/// Whether `c` may START a JS identifier (letter, `_`, or `$` — never a digit).
+/// Mirrors the leading-char rule of Svelte's `read_identifier`, used to validate the
+/// `{#each}` index so a comment glyph or numeric literal isn't taken as the index.
+fn is_identifier_start(c: char) -> bool {
+    c.is_alphabetic() || c == '_' || c == '$'
+}
+
+/// Whether `c` may CONTINUE a JS identifier (`is_identifier_start` plus digits).
+fn is_identifier_continue(c: char) -> bool {
+    c.is_alphanumeric() || c == '_' || c == '$'
+}
+
 /// Find the position of the LAST top-level ` as ` keyword in a string.
 ///
 /// "Top-level" means not inside `()`, `[]`, `{}`, or `<>` brackets, and not inside string
@@ -55,16 +67,24 @@ fn find_last_top_level_as(s: &str) -> Option<usize> {
     last_pos
 }
 
-/// Return type for parse_each_binding: (context, index, key_expr, key_span)
+/// Return type for parse_each_binding: (context, index, key_expr, key_span, consumed_end).
+/// `consumed_end` is the absolute source offset just past the last token the binding
+/// consumed — the caller rejects any non-whitespace between it and the closing `}`.
 type EachBindingResult = (
     tsv_ts::Expression,
     Option<String>,
     Option<tsv_ts::Expression>,
     Option<Span>,
+    usize,
 );
 
-/// Return type for parse_index_and_key_after_context: (index, key_expr, key_span)
-type IndexAndKeyResult = (Option<String>, Option<tsv_ts::Expression>, Option<Span>);
+/// Return type for parse_index_and_key_after_context: (index, key_expr, key_span, consumed_end).
+type IndexAndKeyResult = (
+    Option<String>,
+    Option<tsv_ts::Expression>,
+    Option<Span>,
+    usize,
+);
 
 impl<'a> SvelteParser<'a> {
     /// Parse a control flow block starting with {#
@@ -234,9 +254,10 @@ impl<'a> SvelteParser<'a> {
         let after_expr = &content[expr_consumed..];
 
         // Try to strip " as " to get binding (with context pattern)
-        let (expression, context, index, key, key_span) = if let Some(binding_str) = after_expr
-            .strip_prefix(" as ")
-            .or_else(|| after_expr.trim_start().strip_prefix("as "))
+        let (expression, context, index, key, key_span, binding_end) = if let Some(binding_str) =
+            after_expr
+                .strip_prefix(" as ")
+                .or_else(|| after_expr.trim_start().strip_prefix("as "))
         {
             let as_len = after_expr.len() - binding_str.len();
             let binding_offset = content_offset + expr_consumed + as_len;
@@ -256,27 +277,42 @@ impl<'a> SvelteParser<'a> {
                 let real_binding_start = last_as_pos + " as ".len();
                 let real_binding = &binding_str[real_binding_start..];
                 let real_binding_offset = binding_offset + real_binding_start;
-                let (ctx, idx, k, k_span) =
+                let (ctx, idx, k, k_span, b_end) =
                     self.parse_each_binding(real_binding, real_binding_offset)?;
-                (expression, Some(ctx), idx, k, k_span)
+                (expression, Some(ctx), idx, k, k_span, b_end)
             } else {
                 // Normal case: first `as` is the Svelte binding separator
-                let (ctx, idx, k, k_span) = self.parse_each_binding(binding_str, binding_offset)?;
-                (expression, Some(ctx), idx, k, k_span)
+                let (ctx, idx, k, k_span, b_end) =
+                    self.parse_each_binding(binding_str, binding_offset)?;
+                (expression, Some(ctx), idx, k, k_span, b_end)
             }
         } else {
-            // No `as` clause: {#each expr} or {#each expr, index}
-            // Check for ", index" syntax
-            let trimmed = after_expr.trim();
-            if let Some(rest) = trimmed.strip_prefix(',') {
-                // {#each expr, index} - just index, no context
-                let index_str = rest.trim().to_string();
-                (expression, None, Some(index_str), None, None)
-            } else {
-                // {#each expr} - no context, no index
-                (expression, None, None, None, None)
-            }
+            // No `as` clause: the remainder is the optional `, index` and/or `(key)` —
+            // the same grammar as after a context, just without one — so route it through
+            // the shared parser (context stays `None`). Svelte allows index/key without
+            // `as` (`{#each items, i}`, `{#each items, i (key)}`); the shared parser also
+            // bounds the key with the trivia-aware bracket scanner and reports a precise
+            // `consumed_end`, so trailing junk is rejected below instead of swallowed.
+            //
+            // Read from the expression's SEMANTIC end, not `expr_end_pos` (the partial
+            // parser's stop, which swallows a trailing comment as trivia) — mirroring
+            // Svelte's `parser.index = expression.end`. This way a comment after the
+            // iterable with no binding (`{#each items /* c */}`) becomes trailing junk
+            // rejected below, not a silently kept comment. (The `as` branch keeps using
+            // `after_expr` so a comment *before* `as` — `{#each items /* c */ as item}`,
+            // which Svelte accepts — still resolves to the binding.)
+            let semantic_end = expression.span().end as usize;
+            let after_semantic = &content[semantic_end - content_offset..];
+            let (idx, k, k_span, b_end) =
+                self.parse_index_and_key_after_context(after_semantic, semantic_end)?;
+            (expression, None, idx, k, k_span, b_end)
         };
+
+        // The opening tag must end at `}` immediately after the binding (Svelte's final
+        // `eat('}')`): only whitespace may remain. A stray comment, leftover index/key
+        // fragment, or junk here is rejected — not silently dropped (content loss).
+        let brace_pos = content_start - 1;
+        self.reject_trailing_tag_content(&self.source[binding_end..brace_pos], binding_end)?;
 
         // Parse body
         let body = self.parse_block_children(&["else", "each"], content_start)?;
@@ -344,10 +380,10 @@ impl<'a> SvelteParser<'a> {
         // Parse remaining: ", index" and/or "(key)"
         let consumed = pattern_end - adjusted_offset;
         let remaining = &trimmed[consumed..];
-        let (index, key, key_span) =
+        let (index, key, key_span, consumed_end) =
             self.parse_index_and_key_after_context(remaining, pattern_end)?;
 
-        Ok((context, index, key, key_span))
+        Ok((context, index, key, key_span, consumed_end))
     }
 
     /// Parse a context pattern: identifier or destructuring pattern.
@@ -371,7 +407,7 @@ impl<'a> SvelteParser<'a> {
         } else {
             // Simple identifier - read until non-identifier char
             let end = trimmed
-                .find(|c: char| !c.is_alphanumeric() && c != '_' && c != '$')
+                .find(|c: char| !is_identifier_continue(c))
                 .unwrap_or(trimmed.len());
             if end == 0 {
                 return Err(self.error_expected_at("identifier or pattern", offset));
@@ -440,43 +476,68 @@ impl<'a> SvelteParser<'a> {
         let mut rest = trimmed;
         let mut rest_offset = offset;
         let mut index = None;
+        // Absolute offset just past the last token the binding consumed. Starts at the
+        // context end (`remaining_offset`): with no index/key the binding ends there, so
+        // everything in `remaining` is trailing and the caller rejects it.
+        let mut consumed_end = remaining_offset;
 
-        // Check for ", index"
+        // Check for ", index" — the index is a bare identifier (Svelte's `read_identifier`).
         if let Some(after_comma) = rest.strip_prefix(',') {
             let after_comma_trimmed = after_comma.trim_start();
             let comma_ws = after_comma.len() - after_comma_trimmed.len();
 
-            // Read index identifier (until whitespace or '(')
-            let idx_end = after_comma_trimmed
-                .find(|c: char| c.is_whitespace() || c == '(')
-                .unwrap_or(after_comma_trimmed.len());
+            // An identifier must start with a letter / `_` / `$` (never a digit, comment
+            // glyph, or other char). A non-start leaves the index unread and the comma
+            // unconsumed, so the caller's trailing check rejects — matching Svelte, which
+            // emits "Expected an identifier" for `{#each x as y, /* c */ i}` and `, 5`.
+            let idx_end = if after_comma_trimmed.starts_with(|c: char| is_identifier_start(c)) {
+                after_comma_trimmed
+                    .find(|c: char| !is_identifier_continue(c))
+                    .unwrap_or(after_comma_trimmed.len())
+            } else {
+                0
+            };
 
             if idx_end > 0 {
                 index = Some(after_comma_trimmed[..idx_end].to_string());
                 rest = &after_comma_trimmed[idx_end..];
                 rest_offset = offset + 1 + comma_ws + idx_end;
+                consumed_end = rest_offset;
             }
         }
 
-        // Check for "(key)"
+        // Check for "(key)" — match the `)` with the trivia-aware bracket scanner so a
+        // `)` inside a string/comment in the key can't end it early, and any trailing
+        // junk after the real `)` is left for the caller's trailing check (not swallowed).
         let rest_trimmed = rest.trim_start();
-        let (key, key_span) = if rest_trimmed.starts_with('(') && rest_trimmed.ends_with(')') {
-            let key_str = &rest_trimmed[1..rest_trimmed.len() - 1];
+        let (key, key_span) = if rest_trimmed.starts_with('(') {
             let key_ws = rest.len() - rest_trimmed.len();
-            let key_offset = rest_offset + key_ws + 1; // +1 for '('
+            let paren_start = rest_offset + key_ws; // absolute offset of '('
+            let close = super::match_bracket(
+                rest_trimmed.as_bytes(),
+                0,
+                rest_trimmed.len(),
+                b'(',
+                b')',
+                TriviaProfile::JS,
+            )
+            .ok_or_else(|| self.error_expected_at("')'", paren_start + rest_trimmed.len()))?;
+            let key_str = &rest_trimmed[1..close];
+            let key_offset = paren_start + 1; // after '('
             let key_expr = self.parse_ts_expression(
                 key_str.trim(),
                 key_offset + (key_str.len() - key_str.trim_start().len()),
             )?;
-            // Span includes the parentheses: from '(' to after ')'
-            let span_start = (rest_offset + key_ws) as u32;
-            let span_end = (rest_offset + key_ws + rest_trimmed.len()) as u32;
+            // Span includes the parentheses: from '(' to after ')'.
+            let span_start = paren_start as u32;
+            let span_end = (paren_start + close + 1) as u32;
+            consumed_end = span_end as usize;
             (Some(key_expr), Some(Span::new(span_start, span_end)))
         } else {
             (None, None)
         };
 
-        Ok((index, key, key_span))
+        Ok((index, key, key_span, consumed_end))
     }
 
     /// Parse an await block: {#await expression}...{:then value}...{:catch error}...{/await}
@@ -538,11 +599,10 @@ impl<'a> SvelteParser<'a> {
         {
             // Shorthand then syntax: {#await promise then value}...{/await}
             let value = if !value_str.is_empty() {
-                // Calculate offset: we know value_str comes after "expression then "
+                // `value_str` starts right after "expression then "; the pattern parser
+                // trims its own leading whitespace, so pass the raw slice + that offset.
                 let then_keyword_end = expr_end_pos + (after_expr.len() - value_str.len());
-                let value_trimmed = value_str.trim_start();
-                let value_offset = then_keyword_end + (value_str.len() - value_trimmed.len());
-                Some(self.parse_ts_pattern(value_trimmed, value_offset)?)
+                Some(self.parse_await_value_pattern(value_str, then_keyword_end)?)
             } else {
                 None
             };
@@ -551,7 +611,7 @@ impl<'a> SvelteParser<'a> {
 
             // Check for optional {:catch} continuation after then-shorthand
             let (catch_fragment, error) = if self.check_await_continuation("catch") {
-                self.parse_await_catch_continuation()?
+                self.parse_await_continuation("catch", &["await"])?
             } else {
                 (None, None)
             };
@@ -569,11 +629,10 @@ impl<'a> SvelteParser<'a> {
         } else if let Some(error_str) = shorthand_catch {
             // Shorthand catch syntax: {#await promise catch error}...{/await}
             let error = if !error_str.is_empty() {
-                // Calculate offset: we know error_str comes after "expression catch "
+                // `error_str` starts right after "expression catch "; the pattern parser
+                // trims its own leading whitespace, so pass the raw slice + that offset.
                 let catch_keyword_end = expr_end_pos + (after_expr.len() - error_str.len());
-                let error_trimmed = error_str.trim_start();
-                let error_offset = catch_keyword_end + (error_str.len() - error_trimmed.len());
-                Some(self.parse_ts_pattern(error_trimmed, error_offset)?)
+                Some(self.parse_await_value_pattern(error_str, catch_keyword_end)?)
             } else {
                 None
             };
@@ -582,7 +641,7 @@ impl<'a> SvelteParser<'a> {
 
             // Check for optional {:then} continuation after catch-shorthand
             let (then_fragment, value) = if self.check_await_continuation("then") {
-                self.parse_await_then_continuation(&["await"])?
+                self.parse_await_continuation("then", &["await"])?
             } else {
                 (None, None)
             };
@@ -602,11 +661,7 @@ impl<'a> SvelteParser<'a> {
             // right after the promise expression. Reject trailing content like
             // `{#await p garbage}` or a shorthand jammed against the expression
             // (`{#await p then(v)}`) — the canonical parser rejects both.
-            let trailing = after_expr.trim_start();
-            if !trailing.is_empty() {
-                let trailing_start = expr_end_pos + (after_expr.len() - trailing.len());
-                return Err(self.error_expected_at("'}'", trailing_start));
-            }
+            self.reject_trailing_tag_content(after_expr, expr_end_pos)?;
 
             // Full syntax with pending block
             let pending_content =
@@ -625,11 +680,11 @@ impl<'a> SvelteParser<'a> {
             // Parse :then and :catch blocks
             loop {
                 if self.check_await_continuation("then") {
-                    let (frag, val) = self.parse_await_then_continuation(&["catch", "await"])?;
+                    let (frag, val) = self.parse_await_continuation("then", &["catch", "await"])?;
                     then_fragment = frag;
                     value = val;
                 } else if self.check_await_continuation("catch") {
-                    let (frag, err) = self.parse_await_catch_continuation()?;
+                    let (frag, err) = self.parse_await_continuation("catch", &["await"])?;
                     catch_fragment = frag;
                     error = err;
                 } else {
@@ -672,51 +727,30 @@ impl<'a> SvelteParser<'a> {
                 .starts_with(keyword)
     }
 
-    /// Parse a {:catch error} continuation block within an await block.
-    /// Returns (catch_fragment, error_pattern) if a catch continuation is found.
-    fn parse_await_catch_continuation(
+    /// Parse a `{:then value}` / `{:catch error}` continuation block within an await block.
+    /// `keyword` is `"then"` or `"catch"`; `stop_keywords` are the continuations that end this
+    /// block's body (`{:catch}` always stops only at `{/await}`; `{:then}` also stops at a
+    /// following `{:catch}` in the full form). Returns `(fragment, binding_pattern)`.
+    fn parse_await_continuation(
         &mut self,
-    ) -> Result<(Option<Fragment>, Option<tsv_ts::Expression>), ParseError> {
-        let catch_tag_start = self.current_end;
-        let (catch_tag_content, catch_content_start) =
-            self.scan_block_tag_content(catch_tag_start)?;
-        let error_str = self
-            .strip_keyword_value(catch_tag_content, "catch", catch_tag_start)?
-            .trim();
-
-        let error = if !error_str.is_empty() {
-            let error_offset =
-                catch_tag_start + super::subslice_offset(catch_tag_content, error_str);
-            Some(self.parse_ts_pattern(error_str, error_offset)?)
-        } else {
-            None
-        };
-
-        let catch_fragment = self.parse_block_children(&["await"], catch_content_start)?;
-        Ok((Some(catch_fragment), error))
-    }
-
-    /// Parse a {:then value} continuation block within an await block.
-    /// Returns (then_fragment, value_pattern) if a then continuation is found.
-    fn parse_await_then_continuation(
-        &mut self,
+        keyword: &str,
         stop_keywords: &[&str],
     ) -> Result<(Option<Fragment>, Option<tsv_ts::Expression>), ParseError> {
-        let then_tag_start = self.current_end;
-        let (then_tag_content, then_content_start) = self.scan_block_tag_content(then_tag_start)?;
-        let value_str = self
-            .strip_keyword_value(then_tag_content, "then", then_tag_start)?
+        let tag_start = self.current_end;
+        let (tag_content, content_start) = self.scan_block_tag_content(tag_start)?;
+        let binding_str = self
+            .strip_keyword_value(tag_content, keyword, tag_start)?
             .trim();
 
-        let value = if !value_str.is_empty() {
-            let value_offset = then_tag_start + super::subslice_offset(then_tag_content, value_str);
-            Some(self.parse_ts_pattern(value_str, value_offset)?)
+        let binding = if !binding_str.is_empty() {
+            let offset = tag_start + super::subslice_offset(tag_content, binding_str);
+            Some(self.parse_await_value_pattern(binding_str, offset)?)
         } else {
             None
         };
 
-        let then_fragment = self.parse_block_children(stop_keywords, then_content_start)?;
-        Ok((Some(then_fragment), value))
+        let fragment = self.parse_block_children(stop_keywords, content_start)?;
+        Ok((Some(fragment), binding))
     }
 
     /// Read the leading alphabetic keyword at `pos` in the source — the `if` in
@@ -783,6 +817,62 @@ impl<'a> SvelteParser<'a> {
         Ok(rest)
     }
 
+    /// Require that `region` — whose first byte is at absolute source offset `region_start` —
+    /// holds only whitespace before the tag's closing `}`. This is Svelte's `allow_whitespace`
+    /// then `eat('}')` after a tag's payload: a stray comment, leftover binding fragment, or
+    /// junk is rejected (erroring at the first non-whitespace byte), never silently dropped.
+    /// Shared by every block whose tag ends right after its payload — `{#each}`'s binding,
+    /// `{#await}`'s promise, `{#snippet}`'s `)`, and every `{/block}` close.
+    fn reject_trailing_tag_content(
+        &self,
+        region: &str,
+        region_start: usize,
+    ) -> Result<(), ParseError> {
+        let trailing = region.trim_start();
+        if !trailing.is_empty() {
+            let trailing_start = region_start + (region.len() - trailing.len());
+            return Err(self.error_expected_at("'}'", trailing_start));
+        }
+        Ok(())
+    }
+
+    /// Parse a `{#await}` `then`/`catch` binding pattern (the value/error), rejecting a
+    /// comment immediately BEFORE the pattern or BETWEEN the pattern and its `:`/`}`.
+    /// Svelte reads these with `read_pattern` — acorn at the current index, having skipped
+    /// only whitespace — so a comment before the pattern fails ("Expected identifier or
+    /// destructure pattern") and the following `eat()` rejects one between the pattern and
+    /// the next token. A comment INSIDE a destructure (`{ a /* c */ }`) or INSIDE the type
+    /// annotation (`value: /* c */ number`) stays valid — it's acorn trivia within the
+    /// pattern/type. tsv's `parse_ts_pattern` is comment-tolerant (it would relocate or drop
+    /// a surrounding comment), so this gate restores Svelte's strictness. `region_offset` is
+    /// the absolute source offset of `region[0]`.
+    fn parse_await_value_pattern(
+        &mut self,
+        region: &str,
+        region_offset: usize,
+    ) -> Result<tsv_ts::Expression, ParseError> {
+        let lead = region.len() - region.trim_start().len();
+        let value_start = region_offset + lead;
+        let trimmed = region.trim();
+        let pattern = self.parse_ts_pattern(trimmed, value_start)?;
+        let span = pattern.span();
+        // Leading comment: the pattern would start past `value_start`.
+        if span.start as usize != value_start {
+            return Err(self.error_expected_at("identifier or destructure pattern", value_start));
+        }
+        // Comment right after the pattern, before its `:`/`}`. The leftover may legitimately
+        // be a `: type` annotation (kept), so we reject only when it *starts* with a comment —
+        // a comment INSIDE the type (`value: /* c */ number`) leaves `:` first and is allowed.
+        let after = span.end as usize - value_start; // index into `trimmed`
+        let tail = trimmed[after..].trim_start();
+        if tail.starts_with("/*") || tail.starts_with("//") {
+            return Err(
+                self.error_expected_at("identifier or destructure pattern", span.end as usize)
+            );
+        }
+        Ok(pattern)
+    }
+
     /// Consume the closing `{/expected}` tag and return the position after it.
     /// `block_start` is the byte offset of the opening `{#expected`, used to
     /// locate the unclosed-block error.
@@ -812,11 +902,10 @@ impl<'a> SvelteParser<'a> {
 
         // Only whitespace may follow the keyword: `{/each foo}` is rejected.
         // The keyword matched above, so `close_content` starts with `expected`.
-        let trailing = close_content[expected.len()..].trim_start();
-        if !trailing.is_empty() {
-            let trailing_start = close_tag_start + (close_content.len() - trailing.len());
-            return Err(self.error_expected_at("'}'", trailing_start));
-        }
+        self.reject_trailing_tag_content(
+            &close_content[expected.len()..],
+            close_tag_start + expected.len(),
+        )?;
 
         Ok(after_close)
     }
@@ -890,7 +979,7 @@ impl<'a> SvelteParser<'a> {
         // Name: the leading identifier run, like Svelte's `read_identifier`. `content` is
         // trimmed, so it starts at the name.
         let name_len = content
-            .find(|c: char| !c.is_alphanumeric() && c != '_' && c != '$')
+            .find(|c: char| !is_identifier_continue(c))
             .unwrap_or(content.len());
         if name_len == 0 {
             return Err(self.error_expected_at("snippet name", content_offset));
@@ -946,11 +1035,10 @@ impl<'a> SvelteParser<'a> {
 
         // Only whitespace may follow `)` before the closing `}` — Svelte's
         // `allow_whitespace` then `eat('}', true)`. `{#snippet fn() junk}` is rejected.
-        let trailing = content[close_paren + 1..].trim_start();
-        if !trailing.is_empty() {
-            let trailing_start = content_offset + (content.len() - trailing.len());
-            return Err(self.error_expected_at("'}'", trailing_start));
-        }
+        self.reject_trailing_tag_content(
+            &content[close_paren + 1..],
+            content_offset + close_paren + 1,
+        )?;
 
         // Absolute source span of the parens (`start` = `(`, `end` = `)`), for comment
         // lookup when printing the parameter list.
