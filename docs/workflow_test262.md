@@ -17,9 +17,6 @@ This document contains:
 - The command interface and frontmatter/execution design
 - Design decisions (strict mode only)
 
-The known-gap backlog is tracked with the project's planning notes, not in
-the conformance doc.
-
 **This workflow doc describes HOW to work. The conformance doc describes WHAT we're testing against.**
 
 ---
@@ -56,6 +53,15 @@ cargo run -p tsv_cli parse --content 'a /* comment */ => x' --parser typescript 
 - These parse successfully but should fail
 
 **C) Parser bug** → Create fixture, **★ GET APPROVAL ★**, implement fix
+
+**Tip — let the differential pre-sort A/B/C.** The
+[differential vs oxc-parser](./conformance_test262.md#differential-comparison-tsv-vs-oxc-parser)
+already buckets every graded test, which short-circuits this triage: a positive
+*tsv-rejects-oxc-accepts* failure is almost always **(C) a parser bug** (a real
+parser handles it); a positive *both-reject* is **(A) out of scope** (shared
+limitation / test artifact); a negative *oxc-rejects-tsv-accepts* is **(B) a
+missing early error** (the enumerated target list). Start from those lists rather
+than eyeballing raw failures.
 
 ---
 

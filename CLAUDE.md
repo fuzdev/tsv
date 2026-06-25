@@ -652,6 +652,14 @@ cargo run -p tsv_debug conformance_audit
 cargo run -p tsv_debug test262                       # run all tests (expects ../test262)
 cargo run -p tsv_debug test262 language/expressions  # filter by path pattern
 # Options: --path <dir>, --list, --verbose (show all failures), --negative-only, --positive-only
+
+# Differential conformance (tsv vs oxc-parser) — emit a JSON manifest of the
+# graded strict subset, then run the Deno consumer to bucket the agreement and
+# triage tsv's failures (real bug vs shared limitation). See ./docs/conformance_test262.md §Differential.
+cargo run -p tsv_debug test262 --emit-manifest /tmp/t262.json   # path/expected/tsv verdict per graded test
+deno run --allow-read --allow-env --allow-ffi --allow-net --allow-sys \
+  --config benches/deno/deno.json \
+  benches/deno/diagnostics/test262_compare.ts --manifest /tmp/t262.json
 ```
 
 See ./docs/conformance_test262.md.

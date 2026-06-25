@@ -3,7 +3,7 @@
 #![allow(dead_code)] // Some types/variants are useful for future expansion
 
 use super::discovery::TestFile;
-use super::frontmatter::{self, Frontmatter};
+use super::frontmatter;
 use std::fs;
 
 /// Result of running a single test.
@@ -110,9 +110,49 @@ impl TestSummary {
     }
 }
 
+/// How a test's frontmatter classifies it: skip (with a reason) or grade it.
+///
+/// The single source of truth for "what tsv grades", shared by `run_test` and
+/// `grade_for_manifest` so the differential manifest covers exactly the runner's
+/// graded set.
+enum Classification {
+    /// tsv does not grade this test.
+    Skip(SkipReason),
+    /// tsv grades this test in the parse phase.
+    Grade {
+        /// Whether a parse-phase failure is expected (negative parse test).
+        is_negative_parse: bool,
+        /// Whether the test carries `flags: [module]`.
+        module: bool,
+    },
+}
+
+/// Read a test's frontmatter and decide skip-vs-grade.
+///
+/// tsv is strict-mode only, so sloppy (`noStrict`) tests are skipped, as are
+/// runtime/resolution negatives (we only test parsing) and files with no
+/// frontmatter.
+fn classify(content: &str) -> Classification {
+    let Some(frontmatter) = frontmatter::parse(content) else {
+        return Classification::Skip(SkipReason::NoFrontmatter);
+    };
+    if frontmatter.is_negative_runtime() {
+        return Classification::Skip(SkipReason::RuntimePhase);
+    }
+    if frontmatter.is_negative_resolution() {
+        return Classification::Skip(SkipReason::ResolutionPhase);
+    }
+    if frontmatter.requires_sloppy_mode() {
+        return Classification::Skip(SkipReason::SloppyModeRequired);
+    }
+    Classification::Grade {
+        is_negative_parse: frontmatter.is_negative_parse(),
+        module: frontmatter.is_module(),
+    }
+}
+
 /// Run a single test and return the result.
 pub fn run_test(test: &TestFile) -> (TestResult, Option<bool>) {
-    // Read the test file
     let content = match fs::read_to_string(&test.path) {
         Ok(c) => c,
         Err(e) => {
@@ -123,36 +163,114 @@ pub fn run_test(test: &TestFile) -> (TestResult, Option<bool>) {
         }
     };
 
-    // Parse frontmatter
-    let Some(frontmatter) = frontmatter::parse(&content) else {
-        return (TestResult::Skipped(SkipReason::NoFrontmatter), None);
+    match classify(&content) {
+        Classification::Skip(reason) => (TestResult::Skipped(reason), None),
+        Classification::Grade {
+            is_negative_parse, ..
+        } => (
+            run_parse_test(&content, is_negative_parse),
+            Some(is_negative_parse),
+        ),
+    }
+}
+
+/// Accept-or-reject verdict for a single parse — the unit of the differential
+/// manifest.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Verdict {
+    /// The parser produced an AST.
+    Accept,
+    /// The parser reported a syntax error.
+    Reject,
+}
+
+/// One graded test's row in the differential manifest.
+///
+/// `expected` is what test262 wants (accept for positives, reject for
+/// parse-phase negatives); `tsv` is what `tsv_ts::parse` actually did. A
+/// downstream consumer (`benches/deno/diagnostics/test262_compare.ts`) runs the
+/// alternative parser over the same file and joins on `relative_path`.
+#[derive(Debug, serde::Serialize)]
+pub struct ManifestEntry {
+    /// Path relative to the test262 root — the join key, and (joined onto
+    /// `Manifest::test262_root`) where the consumer reads the source.
+    pub relative_path: String,
+    /// Whether the test carries `flags: [module]`. Informational only: tsv
+    /// parses *every* graded test as a strict ES module (it has no script
+    /// mode), so a faithful comparison parses the alternative as a module too —
+    /// regardless of this flag. Recorded so an analyst can see which tests are
+    /// genuinely module-flagged vs. script tests tsv grades in module mode.
+    pub module: bool,
+    /// Always `true` for the graded subset — tsv is strict-mode only and skips
+    /// `noStrict` tests. Emitted for transparency / future flexibility.
+    pub strict: bool,
+    /// What test262 expects: `accept` for positives, `reject` for parse negatives.
+    pub expected: Verdict,
+    /// What `tsv_ts::parse` did on this file.
+    pub tsv: Verdict,
+}
+
+/// Top-level differential manifest: tsv's graded strict subset plus metadata.
+#[derive(Debug, serde::Serialize)]
+pub struct Manifest {
+    /// The test262 root the `relative_path`s are relative to, exactly as passed
+    /// on the CLI (e.g. `../test262`). The consumer joins it with each
+    /// `relative_path` to read the source.
+    pub test262_root: String,
+    /// Number of graded tests (`== tests.len()`).
+    pub count: usize,
+    /// One row per graded test (positive and negative).
+    pub tests: Vec<ManifestEntry>,
+}
+
+impl Manifest {
+    /// Grade every test, keeping only the rows tsv actually grades.
+    pub fn build(test262_root: String, tests: &[TestFile]) -> Self {
+        let entries: Vec<ManifestEntry> = tests.iter().filter_map(grade_for_manifest).collect();
+        Self {
+            test262_root,
+            count: entries.len(),
+            tests: entries,
+        }
+    }
+}
+
+/// Grade one test for the differential manifest, or `None` if tsv skips it.
+///
+/// Shares `classify` with `run_test`, so the manifest covers precisely tsv's
+/// graded strict subset (unreadable files are also skipped).
+pub fn grade_for_manifest(test: &TestFile) -> Option<ManifestEntry> {
+    let content = fs::read_to_string(&test.path).ok()?;
+    let Classification::Grade {
+        is_negative_parse,
+        module,
+    } = classify(&content)
+    else {
+        return None;
     };
 
-    // Check if we should skip this test
-    if frontmatter.is_negative_runtime() {
-        return (TestResult::Skipped(SkipReason::RuntimePhase), None);
-    }
-    if frontmatter.is_negative_resolution() {
-        return (TestResult::Skipped(SkipReason::ResolutionPhase), None);
-    }
-    // Skip tests that require sloppy (non-strict) mode
-    // tsv parses as strict mode only (TypeScript/ES modules are always strict)
-    if frontmatter.requires_sloppy_mode() {
-        return (TestResult::Skipped(SkipReason::SloppyModeRequired), None);
-    }
+    let expected = if is_negative_parse {
+        Verdict::Reject
+    } else {
+        Verdict::Accept
+    };
+    let tsv = match tsv_ts::parse(&content) {
+        Ok(_) => Verdict::Accept,
+        Err(_) => Verdict::Reject,
+    };
 
-    let is_negative_parse = frontmatter.is_negative_parse();
-
-    // Run the test
-    let result = run_parse_test(&content, &frontmatter);
-
-    (result, Some(is_negative_parse))
+    Some(ManifestEntry {
+        relative_path: test.relative_path.clone(),
+        module,
+        strict: true,
+        expected,
+        tsv,
+    })
 }
 
 /// Run a parse test and return the result.
-fn run_parse_test(content: &str, frontmatter: &Frontmatter) -> TestResult {
-    let is_negative_parse = frontmatter.is_negative_parse();
-
+fn run_parse_test(content: &str, is_negative_parse: bool) -> TestResult {
     // Try to parse the content as TypeScript/JS
     // Note: test262 tests are pure ECMAScript, so we parse as TypeScript
     // (which is a superset of JS)
