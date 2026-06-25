@@ -157,9 +157,15 @@ impl<'a> Printer<'a> {
             return true;
         }
 
+        let source = self.source;
+
         // Find first and last non-whitespace content indices
-        let first_content_idx = nodes.iter().position(|n| !n.is_whitespace_only_text());
-        let last_content_idx = nodes.iter().rposition(|n| !n.is_whitespace_only_text());
+        let first_content_idx = nodes
+            .iter()
+            .position(|n| !n.is_whitespace_only_text(source));
+        let last_content_idx = nodes
+            .iter()
+            .rposition(|n| !n.is_whitespace_only_text(source));
 
         let (Some(first), Some(last)) = (first_content_idx, last_content_idx) else {
             return false;
@@ -175,9 +181,9 @@ impl<'a> Printer<'a> {
         // Fill mode (`{a} {b}`) stays inline even with both breaks.
         let first_text_starts_with_newline = nodes
             .first()
-            .is_some_and(|n| matches!(n, FragmentNode::Text(t) if t.raw.starts_with('\n')));
+            .is_some_and(|n| matches!(n, FragmentNode::Text(t) if t.raw(source).starts_with('\n')));
         let last_text_ends_with_whitespace = nodes.last().is_some_and(
-            |n| matches!(n, FragmentNode::Text(t) if t.raw.ends_with(char::is_whitespace)),
+            |n| matches!(n, FragmentNode::Text(t) if t.raw(source).ends_with(char::is_whitespace)),
         );
 
         if first_text_starts_with_newline && last_text_ends_with_whitespace {
@@ -188,7 +194,7 @@ impl<'a> Printer<'a> {
             // Check if content is in fill mode: expressions separated by space-only text
             let is_fill_mode = nodes[first..=last].windows(2).any(|w| {
                 !matches!(w[0], FragmentNode::Text(_))
-                    && matches!(&w[1], FragmentNode::Text(t) if !t.raw.is_empty() && t.raw.bytes().all(|b| b == b' '))
+                    && matches!(&w[1], FragmentNode::Text(t) if { let r = t.raw(source); !r.is_empty() && r.bytes().all(|b| b == b' ') })
             });
 
             if has_nontext_content && !is_fill_mode {
@@ -206,21 +212,22 @@ impl<'a> Printer<'a> {
                 return false;
             };
 
+            let raw = t.raw(source);
             if kind.preserves_boundary_breaks() {
                 // Block/component: any newline triggers source break
-                t.raw.contains('\n')
-            } else if t.raw.trim().is_empty() {
+                raw.contains('\n')
+            } else if raw.trim().is_empty() {
                 // Inline, whitespace-only: newlines are separators
-                t.raw.contains('\n')
+                raw.contains('\n')
             } else {
                 // Inline, text with content: exclude boundary whitespace
                 let is_first_content = i == 0;
                 let is_last_content = i == last - first;
                 let check_str = match (is_first_content, is_last_content) {
-                    (true, true) => t.raw.trim(),
-                    (true, false) => t.raw.trim_start(),
-                    (false, true) => t.raw.trim_end(),
-                    (false, false) => &t.raw,
+                    (true, true) => raw.trim(),
+                    (true, false) => raw.trim_start(),
+                    (false, true) => raw.trim_end(),
+                    (false, false) => raw,
                 };
                 check_str.contains('\n')
             }
@@ -261,26 +268,28 @@ impl<'a> Printer<'a> {
             && element.fragment.nodes.is_empty()
             && self.span_was_self_closing(element.span);
 
+        let source = self.source;
+
         // Check if empty
         let is_empty = element.fragment.nodes.is_empty()
             || element
                 .fragment
                 .nodes
                 .iter()
-                .all(FragmentNode::is_whitespace_only_text);
+                .all(|n| n.is_whitespace_only_text(source));
 
         // Source boundary breaks
         let source_has_leading_break = element
             .fragment
             .nodes
             .first()
-            .is_some_and(FragmentNode::is_boundary_break);
+            .is_some_and(|n| n.is_boundary_break(source));
         let source_has_trailing_break = source_has_leading_break
             && element
                 .fragment
                 .nodes
                 .last()
-                .is_some_and(FragmentNode::is_boundary_break);
+                .is_some_and(|n| n.is_boundary_break(source));
 
         // Hug modes
         let hug_start = self.should_hug_start(element, kind.is_block());
@@ -381,7 +390,7 @@ impl<'a> Printer<'a> {
         let has_block_children = block_child_count > 0;
         if has_block_children {
             let has_non_block = element.fragment.nodes.iter().any(|n| match n {
-                FragmentNode::Text(t) => !t.raw.is_whitespace_only(),
+                FragmentNode::Text(t) => !t.raw(self.source).is_whitespace_only(),
                 FragmentNode::Element(e) => !self.is_block_element(e),
                 FragmentNode::ExpressionTag(_) => true,
                 FragmentNode::HtmlTag(_)
@@ -437,7 +446,7 @@ impl<'a> Printer<'a> {
         // follow a sibling, so their body-drop matches if/each (via the multiline path) and
         // the sibling-`>` dangle / block-on-own-line separation resolves in one pass.
         if kind.is_block()
-            && super::helpers::has_control_flow_after_sibling(&element.fragment.nodes)
+            && super::helpers::has_control_flow_after_sibling(&element.fragment.nodes, self.source)
         {
             return true;
         }
@@ -484,9 +493,10 @@ impl<'a> Printer<'a> {
             .nodes
             .iter()
             .any(super::helpers::is_expanding_control_flow_block);
+        let source = self.source;
         let has_ws_around_blocks = has_expanding_blocks
             && element.fragment.nodes.iter().any(|n| {
-                matches!(n, FragmentNode::Text(t) if t.raw.is_whitespace_only() && !t.raw.is_empty())
+                matches!(n, FragmentNode::Text(t) if { let r = t.raw(source); r.is_whitespace_only() && !r.is_empty() })
             });
 
         has_non_inline_block || has_ws_around_blocks
@@ -498,8 +508,9 @@ impl<'a> Printer<'a> {
         element: &internal::Element,
         source_has_leading_break: bool,
     ) -> bool {
+        let source = self.source;
         let has_leading_content_break = element.fragment.nodes.first().is_some_and(|n| {
-            matches!(n, FragmentNode::Text(t) if t.raw.starts_with('\n') && !t.raw.is_whitespace_only())
+            matches!(n, FragmentNode::Text(t) if { let r = t.raw(source); r.starts_with('\n') && !r.is_whitespace_only() })
         });
 
         (source_has_leading_break || has_leading_content_break)
@@ -507,7 +518,7 @@ impl<'a> Printer<'a> {
                 .fragment
                 .nodes
                 .iter()
-                .any(|n| matches!(n, FragmentNode::Text(t) if t.raw.trim().contains('\n')))
+                .any(|n| matches!(n, FragmentNode::Text(t) if t.raw(source).trim().contains('\n')))
     }
 
     /// Compute element layout from analyzed context

@@ -48,9 +48,11 @@ pub(super) fn convert_fragment_node(
         internal::FragmentNode::ExpressionTag(tag) => {
             public::FragmentNode::ExpressionTag(convert_expression_tag(tag, source, loc, interner))
         }
-        internal::FragmentNode::Text(text) => public::FragmentNode::Text(convert_text(text)),
+        internal::FragmentNode::Text(text) => {
+            public::FragmentNode::Text(convert_text(text, source))
+        }
         internal::FragmentNode::Comment(comment) => {
-            public::FragmentNode::Comment(convert_comment(comment))
+            public::FragmentNode::Comment(convert_comment(comment, source))
         }
         internal::FragmentNode::IfBlock(block) => {
             public::FragmentNode::IfBlock(convert_if_block(block, source, loc, interner))
@@ -88,13 +90,13 @@ pub(super) fn convert_fragment_node(
     }
 }
 
-fn convert_comment(comment: &internal::HtmlComment) -> public::Comment {
+fn convert_comment(comment: &internal::HtmlComment, source: &str) -> public::Comment {
     // Note: internal uses `content`, public uses `data` (Svelte's naming)
     public::Comment {
         node_type: "Comment".to_string(),
         start: comment.span.start,
         end: comment.span.end,
-        data: comment.content.clone(),
+        data: comment.content(source).to_string(),
     }
 }
 
@@ -144,14 +146,14 @@ pub(super) fn convert_expression_tag(
     }
 }
 
-pub(super) fn convert_text(text: &internal::Text) -> public::Text {
+pub(super) fn convert_text(text: &internal::Text, source: &str) -> public::Text {
     // raw contains original source with entities (&lt;, &#65;, etc.)
     // data contains decoded text (<, A, etc.)
     public::Text {
         node_type: "Text".to_string(),
         start: text.span.start,
         end: text.span.end,
-        raw: text.raw.clone(),
-        data: text.data().into_owned(),
+        raw: text.raw(source).to_string(),
+        data: text.data(source).into_owned(),
     }
 }

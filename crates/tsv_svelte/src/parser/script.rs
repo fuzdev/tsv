@@ -110,7 +110,7 @@ impl<'a> SvelteParser<'a> {
     /// Detect whether a script is a module script based on its attributes
     fn detect_script_context(
         attributes: &[AttributeNode],
-        _source: &str,
+        source: &str,
         interner: &SharedInterner,
     ) -> ScriptContext {
         for attr_node in attributes {
@@ -141,7 +141,7 @@ impl<'a> SvelteParser<'a> {
             if name == "context"
                 && let Some(values) = &attr.value
                 && let Some(AttributeValue::Text(text)) = values.first()
-                && text.data() == "module"
+                && text.data(source) == "module"
             {
                 return ScriptContext::Module;
             }

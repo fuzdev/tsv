@@ -59,13 +59,14 @@ impl<'a> Printer<'a> {
             let mut last_ends_newline = true;
             for node in &element.fragment.nodes {
                 if let FragmentNode::Text(text) = node {
+                    let raw = text.raw(self.source);
                     if is_first_node {
-                        starts_with_ws = text.raw.starts_with(|c: char| c.is_ascii_whitespace());
+                        starts_with_ws = raw.starts_with(|c: char| c.is_ascii_whitespace());
                     }
-                    if text.raw.contains('\n') {
+                    if raw.contains('\n') {
                         has_newline = true;
                     }
-                    last_ends_newline = text.raw.trim_end_matches([' ', '\t']).ends_with('\n');
+                    last_ends_newline = raw.trim_end_matches([' ', '\t']).ends_with('\n');
                 }
                 is_first_node = false;
             }
@@ -300,7 +301,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match node {
             // Text: preserve exact whitespace (significant in pre/textarea)
-            FragmentNode::Text(text) => d.text_owned(text.raw.clone()),
+            FragmentNode::Text(text) => d.text_owned(text.raw(self.source).to_string()),
 
             // Elements: recursively build as whitespace-sensitive (no indent wrapper needed -
             // the element's own indentation logic handles it)
@@ -411,7 +412,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
 
         // Check if this can be flattened to {:else if ...}
-        if let Some(else_if) = Self::get_flattenable_else_if(alt) {
+        if let Some(else_if) = Self::get_flattenable_else_if(alt, self.source) {
             let expr_doc = self.build_else_if_expr_doc(else_if, false);
 
             let body_doc = self.build_whitespace_sensitive_content_doc(&else_if.consequent.nodes);

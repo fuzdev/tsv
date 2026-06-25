@@ -164,16 +164,17 @@ impl<'a> Printer<'a> {
                     })));
 
         // Check for source multiline layout
+        let source = self.source;
         let source_has_leading_break = element
             .fragment
             .nodes
             .first()
-            .is_some_and(FragmentNode::is_boundary_break);
+            .is_some_and(|n| n.is_boundary_break(source));
         let source_has_trailing_break = element
             .fragment
             .nodes
             .last()
-            .is_some_and(FragmentNode::is_boundary_break);
+            .is_some_and(|n| n.is_boundary_break(source));
 
         // Check for expanding control flow blocks (if/each/key) or expanding blocks inside await
         // These force hug mode (not full multiline) for inline special elements like <slot>
@@ -188,7 +189,7 @@ impl<'a> Printer<'a> {
                 .fragment
                 .nodes
                 .iter()
-                .any(|n| matches!(n, FragmentNode::Text(t) if t.raw.is_whitespace_only() && !t.raw.is_empty()));
+                .any(|n| matches!(n, FragmentNode::Text(t) if { let r = t.raw(source); r.is_whitespace_only() && !r.is_empty() }));
         // Only force hug mode when expanding blocks present WITHOUT surrounding whitespace
         // svelte:boundary never uses hug mode - it always uses normal multiline for expanding blocks
         let forces_hug_mode =
@@ -453,7 +454,7 @@ impl<'a> Printer<'a> {
             return true;
         }
         match &element.fragment.nodes[0] {
-            FragmentNode::Text(text) => !text.raw.starts_with(char::is_whitespace),
+            FragmentNode::Text(text) => !text.raw(self.source).starts_with(char::is_whitespace),
             _ => true,
         }
     }
@@ -464,7 +465,7 @@ impl<'a> Printer<'a> {
             return true;
         }
         match element.fragment.nodes.last() {
-            Some(FragmentNode::Text(text)) => !text.raw.ends_with(char::is_whitespace),
+            Some(FragmentNode::Text(text)) => !text.raw(self.source).ends_with(char::is_whitespace),
             _ => true,
         }
     }

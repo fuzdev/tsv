@@ -748,14 +748,14 @@ impl<'a> SvelteParser<'a> {
 
         // For script/style tag attributes, don't parse expressions - treat as literal text
         if !parse_expressions {
-            let text_content = self.source[content_start..content_end].to_string();
+            let span = Span {
+                start: content_start as u32,
+                end: content_end as u32,
+            };
             parts.push(AttributeValue::Text(Text {
-                raw: text_content,
+                raw_span: span,
                 decoding: TextDecoding::AttributeValue,
-                span: Span {
-                    start: content_start as u32,
-                    end: content_end as u32,
-                },
+                span,
             }));
             return Ok(parts);
         }
@@ -775,13 +775,14 @@ impl<'a> SvelteParser<'a> {
                 pos += 1;
             }
             if pos > text_start {
+                let span = Span {
+                    start: text_start as u32,
+                    end: pos as u32,
+                };
                 parts.push(AttributeValue::Text(Text {
-                    raw: self.source[text_start..pos].to_string(),
+                    raw_span: span,
                     decoding: TextDecoding::AttributeValue,
-                    span: Span {
-                        start: text_start as u32,
-                        end: pos as u32,
-                    },
+                    span,
                 }));
             }
 
@@ -796,10 +797,15 @@ impl<'a> SvelteParser<'a> {
             }
         }
 
-        // If no parts were created (empty string or quote mismatch), create empty text
+        // If no parts were created (empty string or quote mismatch), create empty text.
+        // `raw` is empty here even when the node span covers a stray byte (e.g. a
+        // literal `{`), so `raw_span` is an empty span, not the node span.
         if parts.is_empty() {
             parts.push(AttributeValue::Text(Text {
-                raw: String::new(),
+                raw_span: Span {
+                    start: content_start as u32,
+                    end: content_start as u32,
+                },
                 decoding: TextDecoding::AttributeValue,
                 span: Span {
                     start: content_start as u32,
@@ -841,13 +847,14 @@ impl<'a> SvelteParser<'a> {
 
         let flush_text = |parts: &mut Vec<AttributeValue>, from: usize, to: usize| {
             if to > from {
+                let span = Span {
+                    start: from as u32,
+                    end: to as u32,
+                };
                 parts.push(AttributeValue::Text(Text {
-                    raw: src[from..to].to_string(),
+                    raw_span: span,
                     decoding: TextDecoding::AttributeValue,
-                    span: Span {
-                        start: from as u32,
-                        end: to as u32,
-                    },
+                    span,
                 }));
             }
         };
