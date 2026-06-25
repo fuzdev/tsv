@@ -293,6 +293,27 @@ impl<'a> Printer<'a> {
                 let has_comments_before_eq = self.has_comments_between(id_end, equals_pos);
                 let has_comments_after_eq = self.has_comments_between(equals_pos + 1, init_start);
 
+                // A line comment between the binding and `=` keeps the comment in place
+                // and drops `= value` to a continuation line indented one level (preserve
+                // — lossless when a second comment also trails the statement; prettier
+                // relocates it to end-of-statement and merges the two onto one line —
+                // conformance_prettier.md §Comment relocation). Bypasses the
+                // assignment-layout selection below; value built lazily so the common
+                // no-comment path is unaffected. Init declarators always feed `parts`
+                // (the comma/separator is handled above, the `;` after the loop), so a
+                // plain push + `continue` is safe.
+                if let Some(cont) =
+                    self.build_initializer_line_continuation(id_end, equals_pos, || {
+                        let value_doc = self
+                            .build_expression_doc_with_paren_comments(init, declarator.span.end);
+                        self.prepend_rhs_comments(value_doc, equals_pos + 1, init_start)
+                    })
+                {
+                    parts.push(id_doc);
+                    parts.push(cont);
+                    continue;
+                }
+
                 // When JSDoc cast parens are stripped, 2+ block comments may end up
                 // after `=` even though prettier places the first one before `=`.
                 // Detect and promote the first comment to before `=`.
@@ -306,6 +327,8 @@ impl<'a> Printer<'a> {
                 // some rebuild it (break-lhs wrapping type, fluid non-wrapping type).
                 // Comments before `=` are always appended after the LHS.
                 // Promoted comments also go here (between identifier and `=`).
+                // (Only block / promoted comments reach here — a before-`=` *line*
+                // comment took the continuation `continue` path above.)
                 let push_lhs = |parts: &mut DocBuf, lhs_doc: DocId| {
                     parts.push(lhs_doc);
                     if has_comments_before_eq {
@@ -770,20 +793,19 @@ impl<'a> Printer<'a> {
             parts.push(d.indent(d.concat(&rest_parts)));
         }
 
-        // Preserve comments between last declarator and semicolon in place:
-        // `const x = 1 /* comment */;` stays before `;`
-        // Prettier moves these after: `const x = 1; /* comment */`
+        // Comments between the last declarator and the `;`, with the `;` bound to the
+        // declaration: a same-line block stays before it (`const x = 1 /* c */;` — a
+        // divergence; prettier moves it after), a same-line line trails after it via
+        // `line_suffix` (`const x = 1; // c`), an own-line comment drops to its own line
+        // after it (`const x = 1;⏎// c`). See `split_separator_gap_comments`.
         if emit_semicolon {
+            let mut after = DocBuf::new();
             if let Some(last) = decl.declarations.last() {
                 let semicolon_pos = decl.span.end.saturating_sub(1);
-                if let Some(comments_doc) =
-                    self.build_inline_comments_between_doc_opt(last.span.end, semicolon_pos)
-                {
-                    parts.push(comments_doc);
-                }
+                after = self.split_separator_gap_comments(&mut parts, last.span.end, semicolon_pos);
             }
-
             parts.push(d.text(";"));
+            parts.extend(after);
         }
 
         // Restore context flags

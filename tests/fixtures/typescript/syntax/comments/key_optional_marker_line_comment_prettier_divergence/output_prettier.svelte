@@ -1,20 +1,20 @@
 <script lang="ts">
 	interface I {
-		a? // c1
-			: number;
+		a?: number; // c1
 
 		// Two comments around the member stay distinct (prettier merges them — loss).
-		g? // c4
-			: number; // c5
+		g?: number; // c5 // c6
 	}
 
 	type T = {
-		b? // c2
-			: number;
+		b?: number; // c2
 	};
 
 	class A {
-		c? // c3
-			: number = 1;
+		c?: number; // c3
+	}
+
+	interface M {
+		fn?(): void; // c4
 	}
 </script>

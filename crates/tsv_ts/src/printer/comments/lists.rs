@@ -657,6 +657,41 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Partition the comments in a content→separator gap `[start, sep_pos)`, binding
+    /// the separator (`,` / `;`) to the content the way prettier does:
+    ///
+    /// - a **same-line** comment is pushed to `parts` (before the separator) — a block
+    ///   inline (`X /* c */<sep>`, preserved), a line via `line_suffix` (zero width, so
+    ///   it floats past the separator to the next hardline → `X<sep> // c`);
+    /// - an **own-line** comment is *returned* (not pushed), each on its own line
+    ///   (`hardline` + comment), for the caller to emit **after** the separator so the
+    ///   author's line break is kept and a `//` can't swallow the separator.
+    ///
+    /// Caller idiom: `let after = self.split_separator_gap_comments(parts, start, sep);
+    /// parts.push(sep_text); parts.extend(after);`. Shared by the list `,` separator
+    /// (`emit_multiline_comma_with_comments`) and the statement/member `;` terminator
+    /// (variable / expression-statement / class-property). Emitting an own-line comment
+    /// *before* the separator would put the separator on the comment's line — a `//`
+    /// swallows it (content loss), a block just diverges from prettier.
+    pub(crate) fn split_separator_gap_comments(
+        &self,
+        parts: &mut DocBuf,
+        start: u32,
+        sep_pos: u32,
+    ) -> DocBuf {
+        let d = self.d();
+        let mut deferred = DocBuf::new();
+        for comment in comments_in_range(self.comments, start, sep_pos) {
+            if self.is_same_line(start, comment.span.start) {
+                parts.push(self.build_trailing_comment_doc(comment));
+            } else {
+                deferred.push(d.hardline());
+                deferred.push(self.build_comment_doc(comment));
+            }
+        }
+        deferred
+    }
+
     /// Append leading inline block comments (`/*content*/ ` format) between two positions.
     ///
     /// Only emits block comments; line comments are skipped (they would have been
@@ -736,11 +771,12 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let comma_pos = self.find_list_comma(elem_end, next_start);
 
-        // Trailing comments before comma
-        parts.extend(self.build_trailing_comments_multiline(elem_end, comma_pos));
-
-        // Comma
+        // The comma binds to the element; same-line gap comments stay before it,
+        // own-line ones defer to after it (leading the next element). See
+        // `split_separator_gap_comments`.
+        let deferred_own_line = self.split_separator_gap_comments(parts, elem_end, comma_pos);
         parts.push(d.text(","));
+        parts.extend(deferred_own_line);
 
         // Same-line trailing comments after comma (line comments that consume the line).
         // A line comment goes through `line_suffix` (zero width) so it never forces the

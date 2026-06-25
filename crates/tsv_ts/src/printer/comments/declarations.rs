@@ -127,10 +127,22 @@ impl<'a> Printer<'a> {
             marker,
         )
         .expect("modifier marker (`?`/`!`) not found") as u32;
-        if self.has_comments_between(after, pos) {
-            parts.push(self.build_inline_comments_between_doc(after, pos));
+        let marker_doc = d.text(if marker == b'?' { "?" } else { "!" });
+        // A line comment between the name and the marker keeps the comment after
+        // the name and drops the marker (and whatever the caller appends next — the
+        // `: type` / `(params)`) to a continuation line indented one level
+        // (`a // c⏎\t?: T`). Block stays inline (`a /* c */?`). Prettier relocates a
+        // such comment — a `_prettier_divergence` (conformance_prettier.md §Comment
+        // relocation). The marker is the continuation `tail`; later pushes continue
+        // mid-line after it.
+        if self.has_line_comments_between(after, pos) {
+            parts.push(self.build_continuation_indent(after, pos, marker_doc));
+        } else {
+            if self.has_comments_between(after, pos) {
+                parts.push(self.build_inline_comments_between_doc(after, pos));
+            }
+            parts.push(marker_doc);
         }
-        parts.push(d.text(if marker == b'?' { "?" } else { "!" }));
         pos + 1
     }
 
@@ -220,6 +232,38 @@ impl<'a> Printer<'a> {
     ) -> Option<DocId> {
         self.has_line_comments_between(marker_end, colon_pos)
             .then(|| self.build_continuation_indent(marker_end, colon_pos, type_doc))
+    }
+
+    /// When a **line** comment sits in the name→`=` gap of an initializer, build the
+    /// indented continuation: the comment trails the name on its line, then the `=`
+    /// and value (`value_doc`, built by the caller — the bare value, no leading
+    /// `= `) drop to a continuation line indented one level (the uniform
+    /// forced-continuation indent, `build_continuation_indent`). Returns `None` when
+    /// the gap has no line comment, leaving the caller's block / no-comment /
+    /// assignment-layout handling in place.
+    ///
+    /// `name_end` is the offset just before the `=` gap (past the binding name and
+    /// any `?`/`!`/type annotation); `eq_pos` is the `=`. `build_value` lazily builds
+    /// the bare value doc — only invoked on the (rare) line-comment path, so the
+    /// common no-comment path never builds the value twice. Unlike the `:` twin
+    /// (`build_marker_colon_line_continuation`, where prettier keeps the continuation
+    /// flush), prettier here *relocates* the comment past the value to
+    /// end-of-statement — which is **lossy when a second comment already trails the
+    /// construct** (prettier merges them onto one line, the second `//` becoming text;
+    /// tsv keeps both comments distinct). Shared by the initializer `=` sites: enum
+    /// members, class properties, variable declarators. See conformance_prettier.md
+    /// §Comment relocation.
+    pub(crate) fn build_initializer_line_continuation(
+        &self,
+        name_end: u32,
+        eq_pos: u32,
+        build_value: impl FnOnce() -> DocId,
+    ) -> Option<DocId> {
+        let d = self.d();
+        self.has_line_comments_between(name_end, eq_pos).then(|| {
+            let tail = d.concat(&[d.text("= "), build_value()]);
+            self.build_continuation_indent(name_end, eq_pos, tail)
+        })
     }
 
     /// Build a binding/identifier `: type` annotation including any before-`:`

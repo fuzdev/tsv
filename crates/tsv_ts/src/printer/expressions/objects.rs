@@ -506,6 +506,30 @@ impl<'a> Printer<'a> {
             let colon_pos = self.find_colon_after(key_region_end);
             let value_start = prop.value.span().start;
 
+            // A line comment between the key and `:` keeps the comment after the key
+            // and drops `: value` to a continuation line indented one level (prettier
+            // relocates it to end-of-line — conformance_prettier.md §Comment
+            // relocation). Bypasses the assignment layout below.
+            if self.has_line_comments_between(key_region_end, colon_pos) {
+                let value_doc = {
+                    let v = self.build_expression_doc(&prop.value);
+                    let v = if super::needs_parens(
+                        &prop.value,
+                        super::ParenContext::ObjectPropertyValue,
+                    ) {
+                        d.concat(&[d.text("("), v, d.text(")")])
+                    } else {
+                        v
+                    };
+                    self.prepend_rhs_comments(v, colon_pos + 1, value_start)
+                };
+                let tail = d.concat(&[d.text(": "), value_doc]);
+                return d.concat(&[
+                    key_doc,
+                    self.build_continuation_indent(key_region_end, colon_pos, tail),
+                ]);
+            }
+
             // Comments between key region and colon (e.g., {key /* comment */: value})
             let pre_colon_comments: Vec<_> =
                 comments_in_range(self.comments, key_region_end, colon_pos).collect();

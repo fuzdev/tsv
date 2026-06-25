@@ -272,4 +272,22 @@ impl<'a> Printer<'a> {
             Some(d.concat(&parts))
         }
     }
+
+    /// Prepend optional RHS leading comments — block comments in the gap between an
+    /// `=`/`:` and the value (`build_rhs_comments_opt`) — to an already-built
+    /// `value_doc`, returning `value_doc` unchanged when the gap carries none.
+    /// Centralizes the `match build_rhs_comments_opt { Some(c) => concat([c, v]),
+    /// None => v }` idiom shared by the initializer/property value sites (variable
+    /// declarators, class properties, enum members, object property values).
+    pub(crate) fn prepend_rhs_comments(
+        &self,
+        value_doc: DocId,
+        start: u32,
+        value_start: u32,
+    ) -> DocId {
+        match self.build_rhs_comments_opt(start, value_start) {
+            Some(comments_doc) => self.d().concat(&[comments_doc, value_doc]),
+            None => value_doc,
+        }
+    }
 }
