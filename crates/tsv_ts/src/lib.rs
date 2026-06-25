@@ -85,7 +85,8 @@ fn make_doc_printer<'a>(
 /// # Example
 ///
 /// ```rust,ignore
-/// let ast = tsv_ts::parse("const x = 42;")?;
+/// let arena = bumpalo::Bump::new();
+/// let ast = tsv_ts::parse("const x = 42;", &arena)?;
 /// ```
 pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Program<'arena>> {
     parser::parse_typescript(source, arena).map_err(|e| e.with_context(source))
@@ -105,7 +106,8 @@ pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Progr
 ///
 /// ```rust,ignore
 /// let source = "const x=42;";
-/// let ast = tsv_ts::parse(source)?;
+/// let arena = bumpalo::Bump::new();
+/// let ast = tsv_ts::parse(source, &arena)?;
 /// let formatted = tsv_ts::format(&ast, source);
 /// assert_eq!(formatted, "const x = 42;\n");
 /// ```
@@ -137,7 +139,8 @@ pub fn format(program: &Program<'_>, source: &str) -> String {
 ///
 /// ```rust,ignore
 /// let source = "const x: number = 42;";
-/// let ast = tsv_ts::parse(source)?;
+/// let arena = bumpalo::Bump::new();
+/// let ast = tsv_ts::parse(source, &arena)?;
 /// let public_ast = tsv_ts::convert_ast(&ast, source);
 /// let json = serde_json::to_string_pretty(&public_ast)?;
 /// ```

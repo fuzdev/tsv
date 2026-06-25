@@ -48,7 +48,8 @@ pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Root<
 ///
 /// ```rust,ignore
 /// let source = "<div>Hello</div>";
-/// let ast = tsv_svelte::parse(source)?;
+/// let arena = bumpalo::Bump::new();
+/// let ast = tsv_svelte::parse(source, &arena)?;
 /// let formatted = tsv_svelte::format(&ast, source);
 /// ```
 pub fn format(root: &Root<'_>, source: &str) -> String {
@@ -70,7 +71,8 @@ pub fn format(root: &Root<'_>, source: &str) -> String {
 ///
 /// ```rust,ignore
 /// let source = "<div>Hello</div>";
-/// let ast = tsv_svelte::parse(source)?;
+/// let arena = bumpalo::Bump::new();
+/// let ast = tsv_svelte::parse(source, &arena)?;
 /// let public_ast = tsv_svelte::convert_ast(&ast, source);
 /// let json = serde_json::to_string_pretty(&public_ast)?;
 /// ```
@@ -91,7 +93,8 @@ pub fn convert_ast(root: &Root<'_>, source: &str) -> ast::public::Root {
 ///
 /// ```rust,ignore
 /// let source = "<div>Hello</div>";
-/// let ast = tsv_svelte::parse(source)?;
+/// let arena = bumpalo::Bump::new();
+/// let ast = tsv_svelte::parse(source, &arena)?;
 /// let json = tsv_svelte::convert_ast_json(&ast, source);
 /// ```
 #[cfg(feature = "convert")]
