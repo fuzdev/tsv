@@ -305,7 +305,11 @@ impl<'a> Printer<'a> {
     /// Build a doc for a value list joined by `sep` — `" "` for a space-separated
     /// list (`CssValue::List`), `", "` for a comma-separated one
     /// (`CssValue::CommaSeparated`).
-    fn build_separated_values_doc(&self, values: &[CssValue], sep: &'static str) -> DocId {
+    pub(crate) fn build_separated_values_doc(
+        &self,
+        values: &[CssValue],
+        sep: &'static str,
+    ) -> DocId {
         self.d()
             .join(values.iter().map(|v| self.build_css_value_doc(v)), sep)
     }

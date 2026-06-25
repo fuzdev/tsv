@@ -68,16 +68,7 @@ pub(in crate::ast) fn convert_type_alias_declaration(
         start: type_alias.span.start,
         end: type_alias.span.end,
         loc: create_location(type_alias.span, loc, offset),
-        id: public::Identifier {
-            node_type: "Identifier".to_string(),
-            start: type_alias.id.span.start,
-            end: type_alias.id.span.end,
-            loc: create_location(type_alias.id.span, loc, offset),
-            name: interner.resolve_infallible(type_alias.id.name).to_string(),
-            optional: false,
-            type_annotation: None,
-            decorators: Vec::new(),
-        },
+        id: super::convert_identifier(&type_alias.id, loc, interner, offset),
         type_parameters: type_alias
             .type_parameters
             .as_ref()
@@ -99,16 +90,10 @@ pub(in crate::ast) fn convert_function_declaration(
         start: func_decl.span.start,
         end: func_decl.span.end,
         loc: create_location(func_decl.span, loc, offset),
-        id: func_decl.id.as_ref().map(|id| public::Identifier {
-            node_type: "Identifier".to_string(),
-            start: id.span.start,
-            end: id.span.end,
-            loc: create_location(id.span, loc, offset),
-            name: interner.resolve_infallible(id.name).to_string(),
-            optional: false,
-            type_annotation: None,
-            decorators: Vec::new(),
-        }),
+        id: func_decl
+            .id
+            .as_ref()
+            .map(|id| super::convert_identifier(id, loc, interner, offset)),
         expression: false,
         generator: func_decl.generator,
         is_async: func_decl.r#async,
@@ -165,16 +150,10 @@ pub(in crate::ast) fn convert_class_declaration(
         }),
         declare: class_decl.declare.then_some(true),
         abstract_: class_decl.r#abstract.then_some(true),
-        id: class_decl.id.as_ref().map(|id| public::Identifier {
-            node_type: "Identifier".to_string(),
-            start: id.span.start,
-            end: id.span.end,
-            loc: create_location(id.span, loc, offset),
-            name: interner.resolve_infallible(id.name).to_string(),
-            optional: false,
-            type_annotation: None,
-            decorators: Vec::new(),
-        }),
+        id: class_decl
+            .id
+            .as_ref()
+            .map(|id| super::convert_identifier(id, loc, interner, offset)),
         type_parameters: class_decl
             .type_parameters
             .as_ref()
@@ -233,16 +212,10 @@ pub(in crate::ast) fn convert_class_expression(
                 .collect()
         }),
         abstract_: class_expr.r#abstract.then_some(true),
-        id: class_expr.id.as_ref().map(|id| public::Identifier {
-            node_type: "Identifier".to_string(),
-            start: id.span.start,
-            end: id.span.end,
-            loc: create_location(id.span, loc, offset),
-            name: interner.resolve_infallible(id.name).to_string(),
-            optional: false,
-            type_annotation: None,
-            decorators: Vec::new(),
-        }),
+        id: class_expr
+            .id
+            .as_ref()
+            .map(|id| super::convert_identifier(id, loc, interner, offset)),
         type_parameters: class_expr
             .type_parameters
             .as_ref()

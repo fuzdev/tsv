@@ -2,12 +2,11 @@
 
 use super::super::{internal, public};
 use super::{
-    bigint_to_decimal, convert_arrow_function_expression, convert_await_expression,
-    convert_call_expression, convert_class_expression, convert_conditional_expression,
-    convert_function_expression, convert_member_expression, convert_new_expression,
-    convert_object_pattern, convert_property, convert_template_literal, convert_type,
-    convert_type_annotation, convert_type_parameter_instantiation, convert_yield_expression,
-    create_location, json_number_from_f64,
+    convert_arrow_function_expression, convert_await_expression, convert_call_expression,
+    convert_class_expression, convert_conditional_expression, convert_function_expression,
+    convert_member_expression, convert_new_expression, convert_object_pattern, convert_property,
+    convert_template_literal, convert_type, convert_type_annotation,
+    convert_type_parameter_instantiation, convert_yield_expression, create_location,
 };
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker, Span};
@@ -381,25 +380,9 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 )),
             })
         }
-        internal::Expression::RestElement(rest) => {
-            public::Expression::RestElement(public::RestElement {
-                node_type: "RestElement".to_string(),
-                start: rest.span.start,
-                end: rest.span.end,
-                loc: create_location(rest.span, loc, offset),
-                argument: Box::new(convert_expression(
-                    &rest.argument,
-                    source,
-                    loc,
-                    interner,
-                    offset,
-                )),
-                type_annotation: rest
-                    .type_annotation
-                    .as_ref()
-                    .map(|ta| convert_type_annotation(ta, source, loc, interner, offset)),
-            })
-        }
+        internal::Expression::RestElement(rest) => public::Expression::RestElement(
+            super::convert_rest_element(rest, source, loc, interner, offset),
+        ),
         internal::Expression::TSTypeAssertion(type_assert) => {
             public::Expression::TSTypeAssertion(public::TSTypeAssertion {
                 node_type: "TSTypeAssertion".to_string(),
@@ -547,26 +530,8 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 start: meta.span.start,
                 end: meta.span.end,
                 loc: create_location(meta.span, loc, offset),
-                meta: public::Identifier {
-                    node_type: "Identifier".to_string(),
-                    start: meta.meta.span.start,
-                    end: meta.meta.span.end,
-                    loc: create_location(meta.meta.span, loc, offset),
-                    name: interner.resolve_infallible(meta.meta.name).to_string(),
-                    optional: false,
-                    type_annotation: None,
-                    decorators: Vec::new(),
-                },
-                property: public::Identifier {
-                    node_type: "Identifier".to_string(),
-                    start: meta.property.span.start,
-                    end: meta.property.span.end,
-                    loc: create_location(meta.property.span, loc, offset),
-                    name: interner.resolve_infallible(meta.property.name).to_string(),
-                    optional: false,
-                    type_annotation: None,
-                    decorators: Vec::new(),
-                },
+                meta: super::convert_identifier(&meta.meta, loc, interner, offset),
+                property: super::convert_identifier(&meta.property, loc, interner, offset),
             })
         }
         internal::Expression::TSParameterProperty(param_prop) => {
@@ -656,36 +621,9 @@ fn convert_literal_expression(
         });
     }
 
-    let (value, bigint) = match &lit.value {
-        internal::LiteralValue::Number(n) => {
-            (serde_json::Value::Number(json_number_from_f64(*n)), None)
-        }
-        internal::LiteralValue::String { content, .. } => {
-            (serde_json::Value::String(content.clone()), None)
-        }
-        internal::LiteralValue::BigInt(val) => {
-            // BigInt: acorn converts non-decimal BigInts to decimal string
-            let decimal_val = bigint_to_decimal(val);
-            (
-                serde_json::Value::String(decimal_val.clone()),
-                Some(decimal_val),
-            )
-        }
-        internal::LiteralValue::Boolean(b) => (serde_json::Value::Bool(*b), None),
-        internal::LiteralValue::Null => (serde_json::Value::Null, None),
-        internal::LiteralValue::Undefined => unreachable!(),
-    };
-    // Extract raw from source using span
-    let raw = lit.span.extract(source);
-    public::Expression::Literal(public::Literal {
-        node_type: "Literal".to_string(),
-        start: lit.span.start,
-        end: lit.span.end,
-        loc: create_location(lit.span, loc, offset),
-        value,
-        raw: raw.to_string(),
-        bigint,
-    })
+    // Every other literal shares the canonical converter (`undefined` is the
+    // only `LiteralValue` it would handle differently, and it's returned above).
+    public::Expression::Literal(super::convert_literal(lit, source, loc, offset))
 }
 
 fn convert_object_property(
