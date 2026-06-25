@@ -20,7 +20,7 @@ pub(in crate::ast) fn convert_template_literal(
         quasis: template
             .quasis
             .iter()
-            .map(|q| convert_template_element(q, loc, offset))
+            .map(|q| convert_template_element(q, source, loc, offset))
             .collect(),
         expressions: template
             .expressions
@@ -32,6 +32,7 @@ pub(in crate::ast) fn convert_template_literal(
 
 pub(in crate::ast::convert) fn convert_template_element(
     element: &internal::TemplateElement,
+    source: &str,
     loc: &LocationTracker,
     offset: usize,
 ) -> public::TemplateElement {
@@ -51,8 +52,8 @@ pub(in crate::ast::convert) fn convert_template_element(
         end: adjusted_end,
         loc: create_location(adjusted_span, loc, offset),
         value: public::TemplateElementValue {
-            raw: element.raw.clone(),
-            cooked: element.cooked.clone(),
+            raw: element.raw(source).to_string(),
+            cooked: element.cooked(source).map(str::to_string),
         },
         tail: element.tail,
     }

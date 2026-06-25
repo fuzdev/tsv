@@ -617,7 +617,7 @@ fn is_short_arg(expr: &Expression, source: &str, print_width: usize) -> bool {
         Expression::UnaryExpression(unary) => is_short_arg(&unary.argument, source, print_width),
 
         // Prettier: regexpPattern.length <= threshold (line 456)
-        Expression::RegexLiteral(regex) => regex.pattern.len() <= threshold,
+        Expression::RegexLiteral(regex) => regex.pattern(source).len() <= threshold,
 
         // Prettier: printString(getRaw(node), options).length <= threshold (line 460)
         Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. }) => {
@@ -628,7 +628,7 @@ fn is_short_arg(expr: &Expression, source: &str, print_width: usize) -> bool {
         Expression::TemplateLiteral(template) => {
             template.expressions.is_empty()
                 && !template.quasis.is_empty()
-                && template.quasis[0].raw.len() <= threshold
+                && template.quasis[0].raw(source).len() <= threshold
                 && !crate::printer::template_literal_has_newlines(template)
         }
 

@@ -339,8 +339,8 @@ impl<'a> Printer<'a> {
     pub(super) fn build_regex_doc(&self, regex: &internal::RegexLiteral) -> DocId {
         self.d().text_owned(format!(
             "/{}/{}",
-            regex.pattern,
-            sort_regex_flags(&regex.flags)
+            regex.pattern(self.source),
+            sort_regex_flags(regex.flags(self.source))
         ))
     }
 

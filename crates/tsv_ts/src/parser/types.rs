@@ -1271,27 +1271,31 @@ impl<'a> Parser<'a> {
             TokenKind::NoSubstitutionTemplate => {
                 // Simple template with no interpolation: `hello world`
                 let (elem_start, elem_end) = self.current_pos();
-                let raw = self.current_value().to_string();
+                let raw = self.current_value();
 
                 // Extract content between backticks
-                let content = if raw.len() >= 2 {
-                    raw[1..raw.len() - 1].to_string()
+                let (content, raw_span) = if raw.len() >= 2 {
+                    (
+                        &raw[1..raw.len() - 1],
+                        Span::new(elem_start as u32 + 1, elem_end as u32 - 1),
+                    )
                 } else {
-                    String::new()
+                    ("", Span::new(elem_start as u32, elem_start as u32))
                 };
+                let has_newline = content.contains('\n');
 
                 // Decode escapes for cooked value
-                let cooked = if let Some(decoded) = self.current_decoded() {
-                    Some(decoded.to_string())
-                } else {
-                    Some(content.clone())
+                let cooked = match self.current_decoded() {
+                    Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                    None => TemplateCooked::Verbatim,
                 };
 
                 self.advance()?;
 
                 quasis.push(TemplateElement {
-                    raw: content,
+                    raw_span,
                     cooked,
+                    has_newline,
                     tail: true,
                     span: Span::new(elem_start as u32, elem_end as u32),
                 });
@@ -1305,26 +1309,30 @@ impl<'a> Parser<'a> {
             TokenKind::TemplateHead => {
                 // Template with interpolation: `hello ${string}...`
                 let (elem_start, elem_end) = self.current_pos();
-                let raw = self.current_value().to_string();
+                let raw = self.current_value();
 
                 // Extract content: remove leading ` and trailing ${
-                let content = if raw.len() >= 3 {
-                    raw[1..raw.len() - 2].to_string()
+                let (content, raw_span) = if raw.len() >= 3 {
+                    (
+                        &raw[1..raw.len() - 2],
+                        Span::new(elem_start as u32 + 1, elem_end as u32 - 2),
+                    )
                 } else {
-                    String::new()
+                    ("", Span::new(elem_start as u32, elem_start as u32))
                 };
+                let has_newline = content.contains('\n');
 
-                let cooked = if let Some(decoded) = self.current_decoded() {
-                    Some(decoded.to_string())
-                } else {
-                    Some(content.clone())
+                let cooked = match self.current_decoded() {
+                    Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                    None => TemplateCooked::Verbatim,
                 };
 
                 self.advance()?;
 
                 quasis.push(TemplateElement {
-                    raw: content,
+                    raw_span,
                     cooked,
+                    has_newline,
                     tail: false,
                     span: Span::new(elem_start as u32, elem_end as u32),
                 });
@@ -1350,27 +1358,33 @@ impl<'a> Parser<'a> {
                     match *self.current_kind() {
                         TokenKind::TemplateTail => {
                             // Final part: }content`
-                            let (_tail_start, tail_end) = self.current_pos();
-                            let tail_raw = self.current_value().to_string();
+                            let (tail_start, tail_end) = self.current_pos();
+                            let tail_raw = self.current_value();
 
-                            // Extract content: remove leading } and trailing `
-                            let tail_content = if tail_raw.len() >= 2 {
-                                tail_raw[1..tail_raw.len() - 1].to_string()
+                            // Extract content: remove leading } and trailing `.
+                            // The node span starts at the prior `}` (brace_start); the
+                            // raw content span uses the token's own start (tail_start).
+                            let (tail_content, raw_span) = if tail_raw.len() >= 2 {
+                                (
+                                    &tail_raw[1..tail_raw.len() - 1],
+                                    Span::new(tail_start as u32 + 1, tail_end as u32 - 1),
+                                )
                             } else {
-                                String::new()
+                                ("", Span::new(tail_start as u32, tail_start as u32))
                             };
+                            let has_newline = tail_content.contains('\n');
 
-                            let tail_cooked = if let Some(decoded) = self.current_decoded() {
-                                Some(decoded.to_string())
-                            } else {
-                                Some(tail_content.clone())
+                            let tail_cooked = match self.current_decoded() {
+                                Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                                None => TemplateCooked::Verbatim,
                             };
 
                             self.advance()?;
 
                             quasis.push(TemplateElement {
-                                raw: tail_content,
+                                raw_span,
                                 cooked: tail_cooked,
+                                has_newline,
                                 tail: true,
                                 span: Span::new(brace_start as u32, tail_end as u32),
                             });
@@ -1383,27 +1397,33 @@ impl<'a> Parser<'a> {
                         }
                         TokenKind::TemplateMiddle => {
                             // Middle part: }content${
-                            let (_mid_start, mid_end) = self.current_pos();
-                            let mid_raw = self.current_value().to_string();
+                            let (mid_start, mid_end) = self.current_pos();
+                            let mid_raw = self.current_value();
 
-                            // Extract content: remove leading } and trailing ${
-                            let mid_content = if mid_raw.len() >= 3 {
-                                mid_raw[1..mid_raw.len() - 2].to_string()
+                            // Extract content: remove leading } and trailing ${.
+                            // The node span starts at the prior `}` (brace_start); the
+                            // raw content span uses the token's own start (mid_start).
+                            let (mid_content, raw_span) = if mid_raw.len() >= 3 {
+                                (
+                                    &mid_raw[1..mid_raw.len() - 2],
+                                    Span::new(mid_start as u32 + 1, mid_end as u32 - 2),
+                                )
                             } else {
-                                String::new()
+                                ("", Span::new(mid_start as u32, mid_start as u32))
                             };
+                            let has_newline = mid_content.contains('\n');
 
-                            let mid_cooked = if let Some(decoded) = self.current_decoded() {
-                                Some(decoded.to_string())
-                            } else {
-                                Some(mid_content.clone())
+                            let mid_cooked = match self.current_decoded() {
+                                Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                                None => TemplateCooked::Verbatim,
                             };
 
                             self.advance()?;
 
                             quasis.push(TemplateElement {
-                                raw: mid_content,
+                                raw_span,
                                 cooked: mid_cooked,
+                                has_newline,
                                 tail: false,
                                 span: Span::new(brace_start as u32, mid_end as u32),
                             });

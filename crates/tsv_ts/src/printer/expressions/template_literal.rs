@@ -35,7 +35,7 @@ impl<'a> Printer<'a> {
             // (matches Prettier's replaceEndOfLine(node.value.raw) for TemplateElement).
             // Using literalline makes will_break() propagate correctly through
             // containing groups, so chains/calls break when they contain multiline templates.
-            parts.push(self.replace_end_of_line(&quasi.raw));
+            parts.push(self.replace_end_of_line(quasi.raw(self.source)));
 
             // Interpolation
             if i < template.expressions.len() {
@@ -43,7 +43,7 @@ impl<'a> Printer<'a> {
                 let next_quasi = &template.quasis[i + 1];
 
                 // Calculate indent size from quasi text (Prettier's getIndentSize)
-                let text = &quasi.raw;
+                let text = quasi.raw(self.source);
                 let indent_size = if text.contains('\n') {
                     self.get_template_indent_size(text)
                 } else {

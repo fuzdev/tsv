@@ -1,7 +1,7 @@
 //! Call-argument and arrow shape predicates shared by the call, new, and chain printers.
 
 use crate::ast::internal::{self, Expression};
-use tsv_lang::printing::{has_newline_between_fast, visual_width};
+use tsv_lang::printing::has_newline_between_fast;
 
 /// Check if an argument is "hopefully short" enough to stay inline
 ///
@@ -254,8 +254,9 @@ pub fn is_simple_call_argument(expr: &Expression, depth: usize) -> bool {
         // Simple literals are always simple (Prettier: isLiteral)
         Expression::Literal(_) => true,
 
-        // Regex: simple only if pattern is short (Prettier: getStringWidth(pattern) <= 5)
-        Expression::RegexLiteral(regex) => visual_width(&regex.pattern, 2) <= 5,
+        // Regex: simple only if pattern is short (Prettier: getStringWidth(pattern) <= 5).
+        // Uses the precomputed pattern width so this stays source-free.
+        Expression::RegexLiteral(regex) => usize::from(regex.pattern_width) <= 5,
 
         // Single-word types are simple (Prettier: isSingleWordType)
         // Includes: Identifier, ThisExpression, Super, MetaProperty
@@ -266,9 +267,14 @@ pub fn is_simple_call_argument(expr: &Expression, depth: usize) -> bool {
 
         // Template literals: simple if no newlines and expressions are simple
         Expression::TemplateLiteral(template) => {
-            // Check both raw and cooked for newlines (Prettier checks both)
+            // Check both raw and cooked for newlines (Prettier checks both).
+            // `has_newline` covers the raw side (and the no-escape `Verbatim`
+            // cooked, which equals raw); only a `Decoded` cooked can introduce a
+            // newline raw lacks (a `\n` escape) — and it owns its string, so this
+            // stays source-free.
             let has_newline = template.quasis.iter().any(|q| {
-                q.raw.contains('\n') || q.cooked.as_ref().is_some_and(|c| c.contains('\n'))
+                q.has_newline
+                    || matches!(&q.cooked, internal::TemplateCooked::Decoded(c) if c.contains('\n'))
             });
             if has_newline {
                 return false;
