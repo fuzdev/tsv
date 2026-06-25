@@ -2,7 +2,7 @@
 
 use super::super::{internal, public};
 use super::declarations::convert_type_parameter;
-use super::{bigint_to_decimal, convert_expression, create_location, json_number_from_f64};
+use super::{convert_expression, create_location};
 use internal::TSKeywordKind;
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
@@ -182,16 +182,12 @@ pub(in crate::ast) fn convert_type(
                     loc: create_location(p.parameter_name.span, loc, offset),
                 })
             } else {
-                public::TSTypePredicateParameterName::Identifier(public::Identifier {
-                    node_type: "Identifier".to_string(),
-                    start: p.parameter_name.span.start,
-                    end: p.parameter_name.span.end,
-                    loc: create_location(p.parameter_name.span, loc, offset),
-                    name,
-                    optional: false,
-                    type_annotation: None,
-                    decorators: Vec::new(),
-                })
+                public::TSTypePredicateParameterName::Identifier(super::convert_identifier(
+                    &p.parameter_name,
+                    loc,
+                    interner,
+                    offset,
+                ))
             };
             public::TSType::TSTypePredicate(public::TSTypePredicate {
                 node_type: "TSTypePredicate".to_string(),
@@ -275,41 +271,25 @@ pub(in crate::ast) fn convert_type(
                 )),
             })
         }
-        internal::TSType::Import(i) => {
-            let raw = i.argument.span.extract(source);
-            let value = match &i.argument.value {
-                internal::LiteralValue::String { content, .. } => {
-                    serde_json::Value::String(content.clone())
-                }
-                _ => serde_json::Value::Null,
-            };
-            public::TSType::TSImportType(public::TSImportType {
-                node_type: "TSImportType".to_string(),
-                start: i.span.start,
-                end: i.span.end,
-                loc: create_location(i.span, loc, offset),
-                argument: public::Literal {
-                    node_type: "Literal".to_string(),
-                    start: i.argument.span.start,
-                    end: i.argument.span.end,
-                    loc: create_location(i.argument.span, loc, offset),
-                    value,
-                    raw: raw.to_string(),
-                    bigint: None,
-                },
-                options: i
-                    .options
-                    .as_ref()
-                    .map(|o| Box::new(convert_expression(o, source, loc, interner, offset))),
-                qualifier: i
-                    .qualifier
-                    .as_ref()
-                    .map(|q| convert_entity_name(q, loc, interner, offset)),
-                type_arguments: i.type_arguments.as_ref().map(|ta| {
-                    convert_type_parameter_instantiation(ta, source, loc, interner, offset)
-                }),
-            })
-        }
+        internal::TSType::Import(i) => public::TSType::TSImportType(public::TSImportType {
+            node_type: "TSImportType".to_string(),
+            start: i.span.start,
+            end: i.span.end,
+            loc: create_location(i.span, loc, offset),
+            argument: super::convert_literal(&i.argument, source, loc, offset),
+            options: i
+                .options
+                .as_ref()
+                .map(|o| Box::new(convert_expression(o, source, loc, interner, offset))),
+            qualifier: i
+                .qualifier
+                .as_ref()
+                .map(|q| convert_entity_name(q, loc, interner, offset)),
+            type_arguments: i
+                .type_arguments
+                .as_ref()
+                .map(|ta| convert_type_parameter_instantiation(ta, source, loc, interner, offset)),
+        }),
         internal::TSType::TypeQuery(q) => public::TSType::TSTypeQuery(public::TSTypeQuery {
             node_type: "TSTypeQuery".to_string(),
             start: q.span.start,
@@ -363,16 +343,7 @@ pub(in crate::ast) fn convert_type(
                 start: n.span.start,
                 end: n.span.end,
                 loc: create_location(n.span, loc, offset),
-                label: public::Identifier {
-                    node_type: "Identifier".to_string(),
-                    start: n.label.span.start,
-                    end: n.label.span.end,
-                    loc: create_location(n.label.span, loc, offset),
-                    name: interner.resolve_infallible(n.label.name).to_string(),
-                    optional: false,
-                    type_annotation: None,
-                    decorators: Vec::new(),
-                },
+                label: super::convert_identifier(&n.label, loc, interner, offset),
                 element_type: Box::new(convert_type(
                     &n.element_type,
                     source,
@@ -417,18 +388,9 @@ fn convert_type_query_expr_name(
 ) -> public::TSTypeQueryExprName {
     match expr_name {
         internal::TSTypeQueryExprName::EntityName(entity) => match entity {
-            internal::TSEntityName::Identifier(id) => {
-                public::TSTypeQueryExprName::Identifier(public::Identifier {
-                    node_type: "Identifier".to_string(),
-                    start: id.span.start,
-                    end: id.span.end,
-                    loc: create_location(id.span, loc, offset),
-                    name: interner.resolve_infallible(id.name).to_string(),
-                    optional: false,
-                    type_annotation: None,
-                    decorators: Vec::new(),
-                })
-            }
+            internal::TSEntityName::Identifier(id) => public::TSTypeQueryExprName::Identifier(
+                super::convert_identifier(id, loc, interner, offset),
+            ),
             internal::TSEntityName::QualifiedName(qn) => {
                 public::TSTypeQueryExprName::QualifiedName(public::TSQualifiedName {
                     node_type: "TSQualifiedName".to_string(),
@@ -436,41 +398,17 @@ fn convert_type_query_expr_name(
                     end: qn.span.end,
                     loc: create_location(qn.span, loc, offset),
                     left: Box::new(convert_entity_name(&qn.left, loc, interner, offset)),
-                    right: public::Identifier {
-                        node_type: "Identifier".to_string(),
-                        start: qn.right.span.start,
-                        end: qn.right.span.end,
-                        loc: create_location(qn.right.span, loc, offset),
-                        name: interner.resolve_infallible(qn.right.name).to_string(),
-                        optional: false,
-                        type_annotation: None,
-                        decorators: Vec::new(),
-                    },
+                    right: super::convert_identifier(&qn.right, loc, interner, offset),
                 })
             }
         },
         internal::TSTypeQueryExprName::Import(i) => {
-            let raw = i.argument.span.extract(source);
-            let value = match &i.argument.value {
-                internal::LiteralValue::String { content, .. } => {
-                    serde_json::Value::String(content.clone())
-                }
-                _ => serde_json::Value::Null,
-            };
             public::TSTypeQueryExprName::Import(public::TSImportType {
                 node_type: "TSImportType".to_string(),
                 start: i.span.start,
                 end: i.span.end,
                 loc: create_location(i.span, loc, offset),
-                argument: public::Literal {
-                    node_type: "Literal".to_string(),
-                    start: i.argument.span.start,
-                    end: i.argument.span.end,
-                    loc: create_location(i.argument.span, loc, offset),
-                    value,
-                    raw: raw.to_string(),
-                    bigint: None,
-                },
+                argument: super::convert_literal(&i.argument, source, loc, offset),
                 options: i
                     .options
                     .as_ref()
@@ -506,77 +444,18 @@ fn convert_literal_type(
                 ),
             })
         }
-        internal::TSLiteralType::String(literal) => {
-            let raw = literal.span.extract(source);
-            let (value, bigint) = match &literal.value {
-                internal::LiteralValue::String { content, .. } => {
-                    (serde_json::Value::String(content.clone()), None)
-                }
-                _ => (serde_json::Value::Null, None),
-            };
+        internal::TSLiteralType::String(literal)
+        | internal::TSLiteralType::Number(literal)
+        | internal::TSLiteralType::BigInt(literal) => {
+            // `convert_literal` derives value/raw/bigint from the literal's variant.
             public::TSType::TSLiteralType(public::TSLiteralType {
                 node_type: "TSLiteralType".to_string(),
                 start: literal.span.start,
                 end: literal.span.end,
                 loc: create_location(literal.span, loc, offset),
-                literal: public::TSLiteralTypeLiteral::Literal(public::Literal {
-                    node_type: "Literal".to_string(),
-                    start: literal.span.start,
-                    end: literal.span.end,
-                    loc: create_location(literal.span, loc, offset),
-                    value,
-                    raw: raw.to_string(),
-                    bigint,
-                }),
-            })
-        }
-        internal::TSLiteralType::Number(literal) => {
-            let raw = literal.span.extract(source);
-            let (value, bigint) = match &literal.value {
-                internal::LiteralValue::Number(n) => {
-                    (serde_json::Value::Number(json_number_from_f64(*n)), None)
-                }
-                _ => (serde_json::Value::Null, None),
-            };
-            public::TSType::TSLiteralType(public::TSLiteralType {
-                node_type: "TSLiteralType".to_string(),
-                start: literal.span.start,
-                end: literal.span.end,
-                loc: create_location(literal.span, loc, offset),
-                literal: public::TSLiteralTypeLiteral::Literal(public::Literal {
-                    node_type: "Literal".to_string(),
-                    start: literal.span.start,
-                    end: literal.span.end,
-                    loc: create_location(literal.span, loc, offset),
-                    value,
-                    raw: raw.to_string(),
-                    bigint,
-                }),
-            })
-        }
-        internal::TSLiteralType::BigInt(literal) => {
-            let raw = literal.span.extract(source);
-            let (value, bigint) = match &literal.value {
-                internal::LiteralValue::BigInt(val) => {
-                    let decimal = bigint_to_decimal(val);
-                    (serde_json::Value::String(decimal.clone()), Some(decimal))
-                }
-                _ => (serde_json::Value::Null, None),
-            };
-            public::TSType::TSLiteralType(public::TSLiteralType {
-                node_type: "TSLiteralType".to_string(),
-                start: literal.span.start,
-                end: literal.span.end,
-                loc: create_location(literal.span, loc, offset),
-                literal: public::TSLiteralTypeLiteral::Literal(public::Literal {
-                    node_type: "Literal".to_string(),
-                    start: literal.span.start,
-                    end: literal.span.end,
-                    loc: create_location(literal.span, loc, offset),
-                    value,
-                    raw: raw.to_string(),
-                    bigint,
-                }),
+                literal: public::TSLiteralTypeLiteral::Literal(super::convert_literal(
+                    literal, source, loc, offset,
+                )),
             })
         }
         internal::TSLiteralType::UnaryExpression(unary) => {
@@ -587,18 +466,6 @@ fn convert_literal_type(
                     "parser only creates TSLiteralType::UnaryExpression with Literal argument"
                 )
             };
-            let arg_raw = arg_lit.span.extract(source);
-            let (arg_value, arg_bigint) = match &arg_lit.value {
-                internal::LiteralValue::Number(n) => {
-                    (serde_json::Value::Number(json_number_from_f64(*n)), None)
-                }
-                internal::LiteralValue::BigInt(val) => {
-                    let decimal = bigint_to_decimal(val);
-                    (serde_json::Value::String(decimal.clone()), Some(decimal))
-                }
-                _ => (serde_json::Value::Null, None),
-            };
-
             public::TSType::TSLiteralType(public::TSLiteralType {
                 node_type: "TSLiteralType".to_string(),
                 start: unary.span.start,
@@ -611,15 +478,9 @@ fn convert_literal_type(
                     loc: create_location(unary.span, loc, offset),
                     operator: unary.operator.as_str().to_string(),
                     prefix: unary.prefix,
-                    argument: Box::new(public::Expression::Literal(public::Literal {
-                        node_type: "Literal".to_string(),
-                        start: arg_lit.span.start,
-                        end: arg_lit.span.end,
-                        loc: create_location(arg_lit.span, loc, offset),
-                        value: arg_value,
-                        raw: arg_raw.to_string(),
-                        bigint: arg_bigint,
-                    })),
+                    argument: Box::new(public::Expression::Literal(super::convert_literal(
+                        arg_lit, source, loc, offset,
+                    ))),
                 }),
             })
         }
@@ -715,16 +576,7 @@ pub(super) fn convert_entity_name(
 ) -> public::TSEntityName {
     match name {
         internal::TSEntityName::Identifier(id) => {
-            public::TSEntityName::Identifier(public::Identifier {
-                node_type: "Identifier".to_string(),
-                start: id.span.start,
-                end: id.span.end,
-                loc: create_location(id.span, loc, offset),
-                name: interner.resolve_infallible(id.name).to_string(),
-                optional: false,
-                type_annotation: None,
-                decorators: Vec::new(),
-            })
+            public::TSEntityName::Identifier(super::convert_identifier(id, loc, interner, offset))
         }
         internal::TSEntityName::QualifiedName(qn) => {
             public::TSEntityName::QualifiedName(public::TSQualifiedName {
@@ -733,16 +585,7 @@ pub(super) fn convert_entity_name(
                 end: qn.span.end,
                 loc: create_location(qn.span, loc, offset),
                 left: Box::new(convert_entity_name(&qn.left, loc, interner, offset)),
-                right: public::Identifier {
-                    node_type: "Identifier".to_string(),
-                    start: qn.right.span.start,
-                    end: qn.right.span.end,
-                    loc: create_location(qn.right.span, loc, offset),
-                    name: interner.resolve_infallible(qn.right.name).to_string(),
-                    optional: false,
-                    type_annotation: None,
-                    decorators: Vec::new(),
-                },
+                right: super::convert_identifier(&qn.right, loc, interner, offset),
             })
         }
     }
@@ -784,24 +627,7 @@ fn convert_type_parameter_declaration_simple(
         params: params
             .params
             .iter()
-            .map(|p| public::TSTypeParameter {
-                node_type: "TSTypeParameter".to_string(),
-                start: p.span.start,
-                end: p.span.end,
-                loc: create_location(p.span, loc, offset),
-                is_const: p.is_const,
-                is_in: p.is_in,
-                is_out: p.is_out,
-                name: interner.resolve_infallible(p.name.name).to_string(),
-                constraint: p
-                    .constraint
-                    .as_ref()
-                    .map(|c| Box::new(convert_type(c, source, loc, interner, offset))),
-                default: p
-                    .default
-                    .as_ref()
-                    .map(|d| Box::new(convert_type(d, source, loc, interner, offset))),
-            })
+            .map(|p| convert_type_parameter(p, source, loc, interner, offset))
             .collect(),
         extra: params
             .trailing_comma
@@ -963,16 +789,7 @@ pub(in crate::ast) fn convert_interface_declaration(
         start: iface.span.start,
         end: iface.span.end,
         loc: create_location(iface.span, loc, offset),
-        id: public::Identifier {
-            node_type: "Identifier".to_string(),
-            start: iface.id.span.start,
-            end: iface.id.span.end,
-            loc: create_location(iface.id.span, loc, offset),
-            name: interner.resolve_infallible(iface.id.name).to_string(),
-            optional: false,
-            type_annotation: None,
-            decorators: Vec::new(),
-        },
+        id: super::convert_identifier(&iface.id, loc, interner, offset),
         type_parameters: iface
             .type_parameters
             .as_ref()
@@ -1041,16 +858,7 @@ pub(in crate::ast) fn convert_declare_function(
         end: func.span.end,
         loc: create_location(func.span, loc, offset),
         declare: func.declare,
-        id: public::Identifier {
-            node_type: "Identifier".to_string(),
-            start: func.id.span.start,
-            end: func.id.span.end,
-            loc: create_location(func.id.span, loc, offset),
-            name: interner.resolve_infallible(func.id.name).to_string(),
-            optional: false,
-            type_annotation: None,
-            decorators: Vec::new(),
-        },
+        id: super::convert_identifier(&func.id, loc, interner, offset),
         expression: false, // Always false for declarations
         generator: func.generator,
         is_async: func.r#async,
