@@ -8,4 +8,4 @@ pub mod frontmatter;
 pub mod runner;
 
 pub use discovery::{DiscoveryOptions, discover_tests};
-pub use runner::{TestSummary, format_failure, run_test};
+pub use runner::{Manifest, TestSummary, format_failure, run_test};

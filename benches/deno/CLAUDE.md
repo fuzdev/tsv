@@ -488,6 +488,7 @@ benches/deno/
 ├── divergence_audit.ts    # Divergence audit entry point
 ├── diagnostics/           # ad-hoc diagnostic scripts (not wired into `deno task` — see §Diagnostic scripts)
 │   ├── skip_triage.ts        # parse-gap triage (tsv vs canonical)
+│   ├── test262_compare.ts    # test262 differential (tsv vs oxc-parser, from the Rust manifest)
 │   ├── wasm_json_probe.ts    # WASM-vs-native JSON parse penalty attribution
 │   ├── wasm_format_probe.ts  # WASM format wall-time A/B
 │   ├── comment_dup_scan.ts   # comment-dup fixture-corpus completeness guard
@@ -748,6 +749,14 @@ CWD-relative).
   bucket into tsv-fails-canonical-ok / canonical-fails-tsv-ok / both-fail.
   Run:
   `deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/deno/diagnostics/skip_triage.ts`
+- `diagnostics/test262_compare.ts` — test262 differential conformance, tsv vs oxc-parser. Consumes
+  the manifest from `tsv_debug test262 --emit-manifest <file>` (tsv's graded strict subset + each
+  test's expected/tsv verdict), runs oxc over the same files as a module (mirroring tsv's module-only
+  parse), and buckets the agreement — surfacing positive **tsv real-bug candidates** (tsv rejects,
+  oxc accepts) and negative **early-error gaps** (oxc rejects, tsv accepts). On-demand triage, not a
+  CI gate; numbers move with the pinned oxc version. No biome (its js-api has no parser to grade).
+  See `docs/conformance_test262.md` §Differential. Run from the repo root:
+  `cargo run -p tsv_debug test262 --emit-manifest /tmp/t262.json && deno run --allow-read --allow-env --allow-ffi --allow-net --allow-sys --config benches/deno/deno.json benches/deno/diagnostics/test262_compare.ts --manifest /tmp/t262.json`
 - `diagnostics/comment_dup_scan.ts` — comment-duplication fixture-corpus completeness guard.
   Walks all fixtures with two oracles (live `svelte/compiler` parse + committed expected
   JSON), flagging any comment span emitted ≥2× within one array (the acorn backtrack-reparse
@@ -759,8 +768,7 @@ CWD-relative).
   acorn-typescript's own ~200 construct test inputs and flags any `onComment` double-fire;
   the broadest net for an un-enumerated duplicating construct, and the upstream-fix
   validation harness (a correct A+B patch drops the count to 0). Default reads
-  `~/dev/acorn-typescript-fork/test`; pass a path to override. See grimoire
-  `lore/tsv/TODO_ACORN_COMMENT_DUP.md`.
+  `~/dev/acorn-typescript-fork/test`; pass a path to override.
   Run:
   `deno run --allow-read --allow-env --allow-net --allow-sys --config benches/deno/deno.json benches/deno/diagnostics/acorn_dup_fuzz.ts`
 - `diagnostics/wasm_json_probe.ts` — split parse cost into pure-parse vs materialization for

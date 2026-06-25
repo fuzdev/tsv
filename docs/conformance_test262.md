@@ -195,6 +195,47 @@ Pass rate: 23535/23538 (99.9%)
 
 Tests with `noStrict` flag (requiring sloppy mode) are skipped. This is intentional.
 
+## Differential Comparison (tsv vs oxc-parser)
+
+The pass rate above is **un-baselined** — a positive failure could be a genuine
+tsv parser gap, or a test even other parsers reject. To triage, the harness can
+emit a **manifest** of tsv's graded strict subset and a Deno consumer compares
+each verdict against [oxc-parser](https://github.com/oxc-project/oxc):
+
+```bash
+# 1. Rust emits the manifest: one row per graded test (relative path, module
+#    flag, expected verdict, tsv verdict). Honors the same path filters.
+cargo run -p tsv_debug test262 --emit-manifest /tmp/t262.json
+
+# 2. Deno consumer runs oxc-parser over the same files (parsed as a module, to
+#    mirror tsv) and buckets the agreement. Run from the repo root:
+deno run --allow-read --allow-env --allow-ffi --allow-net --allow-sys \
+  --config benches/deno/deno.json \
+  benches/deno/diagnostics/test262_compare.ts --manifest /tmp/t262.json
+```
+
+**Why oxc-parser only (no biome).** test262 is a *parse*-conformance suite, and
+oxc-parser is the alternative with a real, gradable accept/reject verdict
+(`parseSync` + `errors`). Biome's `@biomejs/js-api` exposes **no parser** (only
+format/lint), so it has no verdict to grade; it stays a *formatter* subject in
+the bench, not here.
+
+**Fairness — same subset, same mode.** The consumer runs oxc over *only* the
+tests tsv grades (the strict, non-sloppy, parse-phase subset), and parses every
+one as `sourceType: 'module'` — because tsv has no script mode (it parses
+everything as a strict ES module). A genuinely script-only test therefore
+rejects on both sides and lands in `both-reject`, correctly *not* attributed to
+tsv. The two actionable buckets:
+
+- **positives where tsv rejects but oxc accepts** → tsv real-bug candidates
+- **negatives where oxc rejects but tsv accepts** → tsv early-error gaps (the
+  deferred-diagnostics map; tsv under-enforces early errors by design)
+
+The consumer prints a same-subset pass-rate baseline (`tsv X% vs oxc Y%`) plus
+the bucket counts to stderr, and the full per-bucket path lists as JSON to
+stdout. It's an **on-demand diagnostic** (not committed, not a CI gate) — its
+numbers move with the pinned oxc version.
+
 ## Dependencies
 
 No new crate dependencies — frontmatter parsing uses string operations, not a regex crate.

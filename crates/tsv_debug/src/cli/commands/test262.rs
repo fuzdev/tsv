@@ -1,7 +1,9 @@
 //! test262 command - run ECMAScript conformance tests against our parser.
 
 use crate::cli::CliError;
-use crate::test262::{DiscoveryOptions, TestSummary, discover_tests, format_failure, run_test};
+use crate::test262::{
+    DiscoveryOptions, Manifest, TestSummary, discover_tests, format_failure, run_test,
+};
 use argh::FromArgs;
 use std::path::PathBuf;
 
@@ -31,6 +33,12 @@ pub struct Test262Command {
     /// only run positive parse tests
     #[argh(switch)]
     positive_only: bool,
+
+    /// emit a JSON manifest of the graded strict subset (relative path, module
+    /// flag, expected verdict, tsv verdict) to this file and exit — the input
+    /// to `benches/deno/diagnostics/test262_compare.ts` (tsv vs oxc-parser)
+    #[argh(option)]
+    emit_manifest: Option<PathBuf>,
 
     /// filter tests by path pattern (multiple = OR)
     #[argh(positional)]
@@ -95,6 +103,31 @@ impl Test262Command {
             );
         }
         println!();
+
+        // Manifest mode: grade the strict subset, write JSON, and exit — the
+        // input to the tsv-vs-oxc differential consumer. Runs `tsv_ts::parse`
+        // on every graded test, so it's about as costly as a normal run.
+        if let Some(manifest_path) = self.emit_manifest.as_ref() {
+            eprintln!("Grading {} tests for manifest…", filtered_tests.len());
+            let manifest =
+                Manifest::build(self.path.to_string_lossy().into_owned(), &filtered_tests);
+
+            let file = std::fs::File::create(manifest_path).map_err(|e| {
+                eprintln!("Error creating manifest {}: {e}", manifest_path.display());
+                CliError::Failed
+            })?;
+            serde_json::to_writer(std::io::BufWriter::new(file), &manifest).map_err(|e| {
+                eprintln!("Error writing manifest: {e}");
+                CliError::Failed
+            })?;
+
+            println!(
+                "Wrote {} graded tests to {}",
+                manifest.count,
+                manifest_path.display()
+            );
+            return Ok(());
+        }
 
         // List only mode
         if self.list {
