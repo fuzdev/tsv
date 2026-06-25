@@ -16,6 +16,6 @@ Per comment placement policy, we preserve the user's original position.
 
 (The type-literal counterpart isn't covered: tsv's parser rejects a computed
 property signature with no annotation in a type literal — an unrelated parser
-gap, tracked separately.)
+gap.)
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
