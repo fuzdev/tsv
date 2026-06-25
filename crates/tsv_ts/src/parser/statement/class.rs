@@ -188,8 +188,15 @@ impl<'a> Parser<'a> {
         ));
         self.advance()?;
 
-        // Parse optional class name
-        let id = if matches!(self.current_kind(), TokenKind::Identifier) {
+        // Parse optional class name. `implements` is a strict-mode reserved word, so it
+        // can never be the name — directly after `class` it starts the (extends-less)
+        // `implements` clause of an anonymous class expression (`class implements Foo {}`).
+        // Without this guard it lexes as an identifier and gets swallowed as the name,
+        // leaving the `implements` clause unparsed. acorn matches this; the declaration
+        // path keeps its own behavior (acorn rejects a bare-`implements` class statement).
+        let id = if matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() != "implements"
+        {
             let (id_start, id_end) = self.current_pos();
             let symbol = self.intern_identifier();
             self.advance()?;

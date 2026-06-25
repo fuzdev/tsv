@@ -180,6 +180,18 @@ normalization fixture) — so the parse gap only surfaces on unformatted
 source, where the corpus parse comparison skips it as a canonical parse
 failure.
 
+**Anonymous class-expression `id` for implements-first heritage**
+(`class implements I {}`): acorn-typescript omits the `id` key entirely from an
+anonymous class *expression* whose first heritage clause is `implements` with no
+name, type parameters, or `extends` — yet emits `id: null` for every other
+anonymous class (`class {}`, `class extends B {}`, `class<T> implements I {}`).
+ESTree specifies `id: Identifier | null` (always present), so tsv emits
+`id: null` consistently across all anonymous classes. Harmless metadata only —
+the `id` key is the sole difference, `ast_diff` confirms semantic equivalence,
+and formatting is unaffected. Fixture:
+[expression_implements](../tests/fixtures/typescript/declarations/class/expression_implements_svelte_divergence/).
+**Upstream candidate**: acorn-typescript class-expression `id` omission.
+
 ### TypeScript Parser Corrections (corpus-enforced)
 
 Intentional AST divergences from acorn-typescript that have no prettier-stable
@@ -238,6 +250,7 @@ All corrections exist because of upstream bugs. If fixed upstream, tsv would rem
 - `using` / `await using` — ES2024 declarations not recognized
 - `const` type params — `const` modifier on class type params
 - Import type options — `import()` type assertion options
+- Anonymous class-expression `id` — omitted for implements-first heritage
 
 **acorn** — fix in acorn core:
 
