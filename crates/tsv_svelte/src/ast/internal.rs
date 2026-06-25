@@ -62,15 +62,27 @@ pub enum FragmentNode {
 
 /// HTML comment node: <!-- content -->
 ///
-/// Represents an HTML comment in the template. The `content` field contains
-/// the raw content between `<!--` and `-->`, with whitespace preserved exactly.
+/// Represents an HTML comment in the template. `content_span` is the span of the
+/// raw content between `<!--` and `-->` (whitespace preserved exactly) in the host
+/// source; recover the text via `HtmlComment::content`. A pure sub-slice — no
+/// decode — so it is a `Span`, not an owned `String` (mirrors
+/// `tsv_lang::Comment::content_span`).
 ///
-/// Note: This uses `content` internally for consistency with `tsv_lang::Comment`
-/// and `CssComment`. The public AST uses `data` (Svelte's naming) via conversion.
+/// Note: `content` mirrors `tsv_lang::Comment` and `CssComment` for naming
+/// consistency. The public AST uses `data` (Svelte's naming) via conversion.
 #[derive(Debug, Clone)]
 pub struct HtmlComment {
-    pub content: String, // Content between <!-- and -->
+    /// Span of the content between `<!--` and `-->` in the host source; text via `content`.
+    pub content_span: Span,
     pub span: Span,
+}
+
+impl HtmlComment {
+    /// Content between `<!--` and `-->` — a sub-slice of `source`, no allocation.
+    /// `source` must be the host document the spans were recorded against.
+    pub fn content<'s>(&self, source: &'s str) -> &'s str {
+        self.content_span.extract(source)
+    }
 }
 
 /// Svelte IfBlock - conditional rendering
@@ -641,8 +653,8 @@ impl FragmentNode {
     /// Returns true only for Text nodes containing only whitespace characters.
     /// All other node types return false.
     #[inline]
-    pub fn is_whitespace_only_text(&self) -> bool {
-        matches!(self, FragmentNode::Text(t) if t.raw.trim().is_empty())
+    pub fn is_whitespace_only_text(&self, source: &str) -> bool {
+        matches!(self, FragmentNode::Text(t) if t.raw(source).trim().is_empty())
     }
 
     /// Check if this node is a whitespace-only text containing at least one newline.
@@ -650,8 +662,11 @@ impl FragmentNode {
     /// Used to detect source line breaks at element boundaries (hug mode pattern).
     /// Returns false for non-Text nodes or Text without newlines.
     #[inline]
-    pub fn is_boundary_break(&self) -> bool {
-        matches!(self, FragmentNode::Text(t) if t.raw.trim().is_empty() && t.raw.contains('\n'))
+    pub fn is_boundary_break(&self, source: &str) -> bool {
+        matches!(self, FragmentNode::Text(t) if {
+            let raw = t.raw(source);
+            raw.trim().is_empty() && raw.contains('\n')
+        })
     }
 }
 
@@ -766,18 +781,23 @@ pub enum AttributeValue {
 /// Represents static text in the template or attribute values.
 /// In attribute values, this represents the unquoted string content.
 ///
-/// Stores only `raw` (the original text with HTML entities: `&lt;`, `&#65;`);
-/// the decoded form (`<`, `A`) is computed lazily via `Text::data`. The vast
-/// majority of real-world text nodes contain no entities, so `data()` borrows
-/// `raw` without allocating on that fast path.
+/// Stores `raw_span` — the span of the original text (with HTML entities:
+/// `&lt;`, `&#65;`) in the host source; the text is a pure sub-slice (no decode)
+/// recovered on demand via `Text::raw`, so it is a `Span` rather than an owned
+/// `String` (mirrors `tsv_lang::Comment::content_span`). The decoded form
+/// (`<`, `A`) is computed lazily via `Text::data`, borrowing `raw` without
+/// allocating when no entity is present.
 ///
-/// TODO(performance): Printer repeatedly calls is_whitespace_only() on text nodes in
-/// hot loops (multiline children, inline run detection). Could cache this as a bool field
-/// computed during parsing: `pub is_whitespace_only: bool`. Trade-off: 1 byte per Text
-/// node vs repeated string scans. Profile before optimizing.
+/// TODO(performance): Printer repeatedly calls is_whitespace_only()/contains('\n')
+/// on text nodes in hot loops (multiline children, inline run detection), each
+/// re-slicing source. Could precompute these as bool fields during parsing (the
+/// `multiline`-style trick comment-as-span used). Trade-off: a few bytes per Text
+/// node vs repeated source scans; per-predicate semantics (`trim` vs `trim_ascii`)
+/// must be preserved. Profile before optimizing.
 #[derive(Debug, Clone)]
 pub struct Text {
-    pub raw: String, // Raw text with HTML entities: "&lt;", "&#65;"
+    /// Span of the raw text (entities preserved) in the host source; text via `raw`.
+    pub raw_span: Span,
     /// Which entity decode `data()` applies, fixed at parse time by context.
     pub decoding: TextDecoding,
     pub span: Span,
@@ -798,23 +818,30 @@ pub enum TextDecoding {
 }
 
 impl Text {
+    /// Raw text (entities preserved) — a sub-slice of `source`, no allocation.
+    /// `source` must be the host document the spans were recorded against.
+    pub fn raw<'s>(&self, source: &'s str) -> &'s str {
+        self.raw_span.extract(source)
+    }
+
     /// Decoded text (`&lt;` → `<`, `&#65;` → `A`), computed lazily from `raw`.
     ///
     /// Borrows `raw` when no `&` is present (no entity possible, decode is
     /// identity) or when the node's context applies no decode.
-    pub fn data(&self) -> Cow<'_, str> {
+    pub fn data<'s>(&self, source: &'s str) -> Cow<'s, str> {
+        let raw = self.raw(source);
         let is_attribute_value = match self.decoding {
-            TextDecoding::Raw => return Cow::Borrowed(&self.raw),
+            TextDecoding::Raw => return Cow::Borrowed(raw),
             TextDecoding::Fragment => false,
             TextDecoding::AttributeValue => true,
         };
-        if self.raw.contains('&') {
+        if raw.contains('&') {
             Cow::Owned(tsv_html::decode_character_references(
-                &self.raw,
+                raw,
                 is_attribute_value,
             ))
         } else {
-            Cow::Borrowed(&self.raw)
+            Cow::Borrowed(raw)
         }
     }
 }
