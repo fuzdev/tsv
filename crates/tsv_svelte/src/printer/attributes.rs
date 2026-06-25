@@ -483,7 +483,7 @@ impl<'a> Printer<'a> {
     fn build_modifiers_doc(&self, modifiers: &[String]) -> Vec<DocId> {
         modifiers
             .iter()
-            .flat_map(|m| vec![self.d().text("|"), self.d().text_owned(m.clone())])
+            .flat_map(|m| [self.d().text("|"), self.d().text_owned(m.clone())])
             .collect()
     }
 
