@@ -1,0 +1,1 @@
+{#each items, i, j}a{/each}

@@ -1,0 +1,1 @@
+{#await p catch /* c */ e}x{/await}
