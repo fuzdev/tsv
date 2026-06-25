@@ -1,0 +1,1 @@
+{#each items as item, /* c */ i}a{/each}

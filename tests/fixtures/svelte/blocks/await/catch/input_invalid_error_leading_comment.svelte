@@ -1,0 +1,1 @@
+{#await p}x{:catch /* c */ e}y{/await}

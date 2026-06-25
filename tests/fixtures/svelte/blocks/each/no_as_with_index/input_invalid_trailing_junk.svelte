@@ -1,0 +1,1 @@
+{#each items, i garbage}a{/each}

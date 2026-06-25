@@ -138,8 +138,9 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Destructuring - array (`{#each items as [a, b]}`)
 - Destructuring with rest (`{#each items as {a, ...rest}}`)
 - Destructuring with defaults (`{#each items as {a = 1}}`) — prettier divergences: literal defaults normalize (single quotes + numeric form), and a renamed property keeps its key where prettier drops it. See [conformance_prettier.md](./conformance_prettier.md)
-- Each without `as` (`{#each items}`)
+- Each without `as` (`{#each items}`, `{#each items, i}`, `{#each items, i (key)}`) — index/key are valid without a context binding; all route through the same index/key parser as the `as` form
 - Nested each blocks
+- Binding ends at `}` — a stray comment, leftover index/key fragment, or junk after the binding is rejected (matching Svelte's final `eat('}')`), never silently dropped. Index must be a bare identifier; the key `(…)` is matched with the trivia-aware bracket scanner. See `blocks/each/{no_as_with_index_key, with_index_key/input_invalid_*}`
 
 ### Await Blocks
 
@@ -150,6 +151,8 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Shorthand then (`{#await promise then value}`)
 - Shorthand catch (`{#await promise catch error}`)
 - Destructuring in `then`/`catch` bindings (`{:then {a = 1}}`) — same brace-hugging + default-value divergences as each blocks
+- Typed `then`/`catch` value (`{:then value: number}`, lang="ts")
+- `then`/`catch` value is a bare pattern — a comment immediately before it, or between it and the `:`/`}`, is rejected (matching Svelte's `read_pattern`), never relocated or dropped; a comment *inside* a destructure (`{a /* c */}`) or *inside* the type (`value: /* c */ number`) stays valid. See `await/{then_shorthand,then,catch_shorthand,catch}/input_invalid_*_comment`
 - Nested await blocks
 
 ### Key Blocks

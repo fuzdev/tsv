@@ -1,0 +1,1 @@
+{#await p}x{:then /* c */ v}y{/await}

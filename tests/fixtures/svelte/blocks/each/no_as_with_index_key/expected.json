@@ -1,0 +1,103 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 42,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "EachBlock",
+				"start": 0,
+				"end": 41,
+				"expression": {
+					"type": "Identifier",
+					"start": 7,
+					"end": 12,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 7
+						},
+						"end": {
+							"line": 1,
+							"column": 12
+						}
+					},
+					"name": "items"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 20,
+							"end": 34,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 1,
+									"column": 21,
+									"character": 21
+								},
+								"end": {
+									"line": 1,
+									"column": 24,
+									"character": 24
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 25,
+										"end": 28,
+										"expression": {
+											"type": "Identifier",
+											"start": 26,
+											"end": 27,
+											"loc": {
+												"start": {
+													"line": 1,
+													"column": 26
+												},
+												"end": {
+													"line": 1,
+													"column": 27
+												}
+											},
+											"name": "i"
+										}
+									}
+								]
+							}
+						}
+					]
+				},
+				"context": null,
+				"index": "i",
+				"key": {
+					"type": "Identifier",
+					"start": 17,
+					"end": 18,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 17
+						},
+						"end": {
+							"line": 1,
+							"column": 18
+						}
+					},
+					"name": "i"
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
