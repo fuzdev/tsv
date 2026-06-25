@@ -827,12 +827,23 @@ Comments are stored **separately from AST nodes** in a flat `Vec<Comment>` at th
 
 ```rust
 pub struct Comment {
-    pub content: String,           // WITHOUT delimiters (/* */ or // stripped)
+    pub content_span: Span,        // content WITHOUT delimiters; text via content(source)
     pub is_block: bool,
-    pub span: Span,
+    pub multiline: bool,           // content contains '\n' (precomputed; block-only in practice)
+    pub span: Span,                // full comment span, delimiters included
     pub emit_character_field: bool, // Serializer hint: include `character` in JSON loc
 }
 ```
+
+The content is **not stored owned** — comment text is a pure delimiter-stripped
+sub-slice of source (no decoding for JS/TS/CSS comments), so `Comment` holds a
+`content_span` and recovers the text on demand via `Comment::content(source) -> &str`
+(`source` must be the host document the spans were recorded against). This avoids a
+`String` allocation per comment in the lexer and the parser's collect-clone; every
+field is `Copy`. `multiline` is precomputed so the multi-line-block expansion checks
+(`has_multiline_block_comments_in_range` and the printers) stay O(1) and source-free.
+The full comment span includes its delimiters (`//` / `/* */` / a `#!` hashbang,
+whose content includes the `#!`); the lexer is the single owner of those widths.
 
 **Printer strategy**: Range-based lookup via `comments_in_range(prev_end, node_start)`. Source string for context (same-line detection, blank line preservation). Tradeoff: simple/efficient AST matching Prettier's model, but printer must manually track `prev_end` positions; edge cases (e.g., arrow function comments) require careful span math.
 

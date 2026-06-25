@@ -86,14 +86,14 @@ impl<'a> Printer<'a> {
         if comment.is_block {
             d.concat(&[
                 d.text("/*"),
-                d.text_owned(comment.content.clone()),
+                d.text_owned(comment.content(self.source).to_string()),
                 d.text("*/ "),
             ])
         } else {
             // Content already includes the space after // (e.g., " comment" from "// comment")
             d.concat(&[
                 d.text("//"),
-                d.text_owned(comment.content.clone()),
+                d.text_owned(comment.content(self.source).to_string()),
                 d.hardline(),
             ])
         }
@@ -118,14 +118,14 @@ impl<'a> Printer<'a> {
         if comment.is_block {
             d.concat(&[
                 d.text(" /*"),
-                d.text_owned(comment.content.clone()),
+                d.text_owned(comment.content(self.source).to_string()),
                 d.text("*/"),
             ])
         } else {
             // Content already includes the space after // (e.g., " comment" from "// comment")
             d.concat(&[
                 d.text(" //"),
-                d.text_owned(comment.content.clone()),
+                d.text_owned(comment.content(self.source).to_string()),
                 d.hardline(),
             ])
         }
@@ -483,7 +483,7 @@ impl<'a> Printer<'a> {
     fn build_modifiers_doc(&self, modifiers: &[String]) -> Vec<DocId> {
         modifiers
             .iter()
-            .flat_map(|m| vec![self.d().text("|"), self.d().text_owned(m.clone())])
+            .flat_map(|m| [self.d().text("|"), self.d().text_owned(m.clone())])
             .collect()
     }
 
@@ -739,11 +739,11 @@ impl<'a> Printer<'a> {
         // `() => a, (v) => (a = v)` on one line under a leading comment).
         let first_start = seq.expressions[0].span().start;
         for comment in tsv_lang::comments_in_range(self.comments, tag_span.start + 1, first_start) {
-            if comment.is_block && comment.content.contains('\n') {
+            if comment.is_block && comment.multiline {
                 // Multi-line block: own line(s), forcing the broken layout. Emitted
                 // without the inline trailing space so the line ends at `*/`.
                 content.push(d.text("/*"));
-                content.push(d.text_owned(comment.content.clone()));
+                content.push(d.text_owned(comment.content(self.source).to_string()));
                 content.push(d.text("*/"));
                 content.push(d.hardline());
             } else {

@@ -360,7 +360,7 @@ impl<'a> Printer<'a> {
             // Leading block comments before this item (after prev comma or `{`)
             for comment in comments_in_range(self.comments, prev_end, item_start) {
                 if comment.is_block {
-                    item_parts.push(d.text_owned(format!("/*{}*/ ", comment.content)));
+                    item_parts.push(d.text_owned(format!("/*{}*/ ", comment.content(self.source))));
                 }
             }
 

@@ -21,6 +21,42 @@ mod statement; // Statement parsing (refactored into submodules)
 mod type_members; // Type-literal / interface-body member grammar (property/method/signature elements)
 mod types; // TypeScript type-syntax parsing (annotations, type expressions, type parameters)
 
+/// Build a detached [`Comment`] from a lexed comment token's positions.
+///
+/// `content_start` / `token_*` are local (pre-`base_offset`) byte offsets; the
+/// stored spans are shifted into host coordinates by `base_offset` so embedded
+/// `<script>` / `{expr}` comments slice the host source. The content end is the
+/// token end minus the closing `*/` for block comments (`//` and `#!` run to the
+/// token end). Returns the comment plus whether its content holds a line
+/// terminator — block comments only — which callers fold into
+/// `had_line_terminator` for ASI (a multi-line comment counts as one terminator).
+fn comment_from_token(
+    source: &str,
+    token_start: usize,
+    token_end: usize,
+    content_start: usize,
+    is_block: bool,
+    base_offset: usize,
+) -> (Comment, bool) {
+    let content_end = if is_block { token_end - 2 } else { token_end };
+    let content = &source[content_start..content_end];
+    let has_line_terminator = is_block && content.contains(['\n', '\r', '\u{2028}', '\u{2029}']);
+    let comment = Comment {
+        content_span: Span::new(
+            (content_start + base_offset) as u32,
+            (content_end + base_offset) as u32,
+        ),
+        is_block,
+        multiline: content.contains('\n'),
+        span: Span::new(
+            (token_start + base_offset) as u32,
+            (token_end + base_offset) as u32,
+        ),
+        emit_character_field: false,
+    };
+    (comment, has_line_terminator)
+}
+
 #[allow(clippy::struct_excessive_bools)]
 pub struct Parser<'a> {
     source: &'a str,
@@ -92,13 +128,14 @@ impl<'a> Parser<'a> {
 
         // Collect leading comment tokens
         let mut comments = Vec::new();
-        while let TokenKind::Comment { content, is_block } = &kind {
-            comments.push(Comment {
-                content: content.clone(),
-                is_block: *is_block,
-                span: Span::new((start + base_offset) as u32, (end + base_offset) as u32),
-                emit_character_field: false,
-            });
+        while let TokenKind::Comment {
+            is_block,
+            content_start,
+        } = &kind
+        {
+            let (comment, _) =
+                comment_from_token(source, start, end, *content_start, *is_block, base_offset);
+            comments.push(comment);
             let token = lexer.next_token()?;
             kind = token.kind;
             start = token.start;
@@ -167,23 +204,26 @@ impl<'a> Parser<'a> {
     /// the regex relex path (`parse_primary_expression`), both of which land on a fresh token and
     /// must absorb any comments before the next consumer reads the current token.
     pub(super) fn collect_comments(&mut self) -> Result<(), ParseError> {
-        while let TokenKind::Comment { content, is_block } = &self.current_kind {
+        while let TokenKind::Comment {
+            is_block,
+            content_start,
+        } = &self.current_kind
+        {
             // ECMAScript spec: if a MultiLineComment contains one or more line terminators,
             // then it is replaced by a single line terminator for ASI purposes.
             // So block comments with newlines should set had_line_terminator.
-            if *is_block && content.contains(['\n', '\r', '\u{2028}', '\u{2029}']) {
+            let (comment, has_line_terminator) = comment_from_token(
+                self.source,
+                self.current_start,
+                self.current_end,
+                *content_start,
+                *is_block,
+                self.base_offset,
+            );
+            if has_line_terminator {
                 self.had_line_terminator = true;
             }
-
-            self.comments.push(Comment {
-                content: content.clone(),
-                is_block: *is_block,
-                span: Span::new(
-                    (self.current_start + self.base_offset) as u32,
-                    (self.current_end + self.base_offset) as u32,
-                ),
-                emit_character_field: false,
-            });
+            self.comments.push(comment);
             let token = self.lexer.next_token()?;
             self.update_current(token);
             // Also check line terminator in whitespace after comment
@@ -512,21 +552,25 @@ impl<'a> Parser<'a> {
                         if self.lexer.had_line_terminator() {
                             self.peek_had_line_terminator = true;
                         }
-                        if let TokenKind::Comment { content, is_block } = &token.kind {
+                        if let TokenKind::Comment {
+                            is_block,
+                            content_start,
+                        } = &token.kind
+                        {
                             // ECMAScript spec: a MultiLineComment containing a line
                             // terminator counts as one for ASI purposes.
-                            if *is_block && content.contains(['\n', '\r', '\u{2028}', '\u{2029}']) {
+                            let (comment, has_line_terminator) = comment_from_token(
+                                self.source,
+                                token.start,
+                                token.end,
+                                *content_start,
+                                *is_block,
+                                self.base_offset,
+                            );
+                            if has_line_terminator {
                                 self.peek_had_line_terminator = true;
                             }
-                            self.comments.push(Comment {
-                                content: content.clone(),
-                                is_block: *is_block,
-                                span: Span::new(
-                                    (token.start + self.base_offset) as u32,
-                                    (token.end + self.base_offset) as u32,
-                                ),
-                                emit_character_field: false,
-                            });
+                            self.comments.push(comment);
                             continue;
                         }
                         self.peek_cache = Some(PeekData::with_decoded(

@@ -559,12 +559,23 @@ Comments are stored **separately from AST nodes** in a flat `Vec<Comment>` at ea
 
 ```rust
 pub struct Comment {
-    pub content: String,           // WITHOUT delimiters (/* */ or // stripped)
+    pub content_span: Span,        // content WITHOUT delimiters; text via content(source)
     pub is_block: bool,            // true for /* */, false for //
-    pub span: Span,                // Includes delimiters
+    pub multiline: bool,           // content contains '\n' (precomputed; block-only in practice)
+    pub span: Span,                // full comment span, delimiters included
     pub emit_character_field: bool, // Serializer hint: include `character` in JSON loc
 }
 ```
+
+Comment content is **not stored owned**. The text is a pure delimiter-stripped
+sub-slice of source (no decoding for JS/TS/CSS comments), so `Comment` keeps a
+`content_span` and the text is recovered on demand via `Comment::content(source) ->
+&str` (slicing the host document the spans were recorded against). This drops a
+`String` allocation per comment in the lexer plus the parser's collect-clone, and
+makes every field `Copy`. `multiline` is precomputed so the multi-line-block
+expansion checks stay O(1) and never need `source`. A `#!` hashbang is a line
+comment whose content includes the `#!` (no delimiter stripping); the lexer records
+each comment's content start so derivation never has to re-guess delimiter widths.
 
 ### Lookup Functions
 
