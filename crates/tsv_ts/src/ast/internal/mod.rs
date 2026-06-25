@@ -75,8 +75,8 @@ pub use expressions::{
     MemberExpression, MetaProperty, NewExpression, ObjectExpression, ObjectProperty, Property,
     PropertyKind, RegexLiteral, SequenceExpression, SpreadElement, Super, TSAsExpression,
     TSInstantiationExpression, TSNonNullExpression, TSSatisfiesExpression, TSTypeAssertion,
-    TaggedTemplateExpression, TemplateElement, TemplateLiteral, ThisExpression, UnaryExpression,
-    UnaryOperator, UpdateExpression, UpdateOperator, YieldExpression,
+    TaggedTemplateExpression, TemplateCooked, TemplateElement, TemplateLiteral, ThisExpression,
+    UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator, YieldExpression,
 };
 
 //

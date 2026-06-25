@@ -10,7 +10,8 @@ use crate::ast::internal::{
     YieldExpression,
 };
 use crate::lexer::{KeywordKind, TokenKind};
-use tsv_lang::{ParseError, Span};
+use tsv_lang::printing::visual_width;
+use tsv_lang::{ParseError, Span, TAB_WIDTH};
 
 use super::Parser;
 use super::expression_lookahead::scan_parens_then_arrow;
@@ -1009,16 +1010,25 @@ impl<'a> Parser<'a> {
                     "regex relex with populated peek cache"
                 );
                 let lexer_start = self.current_start;
-                let regex_token = self.lexer.read_regex_literal(lexer_start)?;
+                let (regex_token, pattern_end) = self.lexer.read_regex_literal(lexer_start)?;
                 let lexer_end = regex_token.end;
 
                 // Calculate span with base_offset for the AST
                 let span_start = lexer_start + self.base_offset;
                 let span_end = lexer_end + self.base_offset;
 
-                // Extract pattern and flags from the decoded value (format: "pattern\0flags")
-                let decoded = regex_token.decoded.as_deref().unwrap_or("\0");
-                let (pattern, flags) = decoded.split_once('\0').unwrap_or((decoded, ""));
+                // Pattern and flags are verbatim source slices (escapes preserved),
+                // recovered from spans rather than owned strings. `pattern_end` is the
+                // closing `/` (local): pattern is [slash+1, close), flags are
+                // [close+1, token end). Spans are stored in host coordinates.
+                let pattern_span =
+                    Span::new(span_start as u32 + 1, (pattern_end + self.base_offset) as u32);
+                let flags_span =
+                    Span::new((pattern_end + 1 + self.base_offset) as u32, span_end as u32);
+                // Precompute the pattern's visual width so the "simple call argument"
+                // width check stays source-free; saturate to the field's u16 range.
+                let pattern_width = visual_width(&self.source[lexer_start + 1..pattern_end], TAB_WIDTH)
+                    .min(u16::MAX as usize) as u16;
 
                 // Advance past the regex token by reading the next token. The regex relex
                 // bypasses advance_inner() (the lexer was resynced by read_regex_literal), so
@@ -1037,8 +1047,9 @@ impl<'a> Parser<'a> {
 
                 Ok(ParsedExpr::with_end(
                     Expression::RegexLiteral(RegexLiteral {
-                        pattern: pattern.to_string(),
-                        flags: flags.to_string(),
+                        pattern_span,
+                        flags_span,
+                        pattern_width,
                         span: Span::new(span_start as u32, span_end as u32),
                     }),
                     span_end,

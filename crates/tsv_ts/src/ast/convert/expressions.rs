@@ -292,8 +292,8 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 value: serde_json::Value::Object(serde_json::Map::new()), // Empty object {}
                 raw,
                 regex: public::RegexValue {
-                    pattern: regex.pattern.clone(),
-                    flags: regex.flags.clone(),
+                    pattern: regex.pattern(source).to_string(),
+                    flags: regex.flags(source).to_string(),
                 },
             })
         }

@@ -612,22 +612,67 @@ pub struct TemplateLiteral {
     pub span: Span,
 }
 
+/// The decoded ("cooked") value of a template element.
+///
+/// The common no-escape case (`Verbatim`) carries no allocation: the cooked
+/// text equals the raw source slice, recovered via the element's `raw_span`.
+/// Only genuinely decoded values (escapes present) own a `String`.
+#[derive(Debug, Clone)]
+pub enum TemplateCooked {
+    /// Cooked value == the raw source slice (no escapes to decode).
+    Verbatim,
+    /// Escapes were decoded into a value distinct from the raw text.
+    Decoded(String),
+    /// No cooked value — an invalid escape in a tagged template (acorn emits
+    /// `null`). Reserved for that feature; not produced today.
+    Invalid,
+}
+
 /// Template element - a static string part of a template literal
 ///
 /// Each quasi has:
-/// - raw: The literal source text (preserving escape syntax)
-/// - cooked: The decoded value (escapes interpreted), None if contains invalid escape
+/// - raw_span: Span of the literal source text (escapes preserved); text via `raw(source)`
+/// - cooked: The decoded value (escapes interpreted); text via `cooked(source)`
 /// - tail: true for the last element in the template
 #[derive(Debug, Clone)]
 pub struct TemplateElement {
-    /// The raw source text (escape sequences NOT decoded)
-    pub raw: String,
-    /// The decoded value (escape sequences interpreted)
-    /// None for tagged templates with invalid escapes
-    pub cooked: Option<String>,
+    /// Span of the raw source text (escape sequences NOT decoded), delimiters
+    /// excluded. The raw content is a verbatim sub-slice of source, so it is
+    /// stored as a span and recovered on demand via `raw(source)` rather than
+    /// owning a `String`. Distinct from `span` (the full token span, which for
+    /// middle/tail type quasis starts at the prior `}` brace, not the content).
+    pub raw_span: Span,
+    /// The decoded value. `Verbatim` (the common no-escape case) costs no
+    /// allocation — its text equals `raw(source)`; recover via `cooked(source)`.
+    pub cooked: TemplateCooked,
+    /// Whether the raw text contains a newline (precomputed so newline checks
+    /// stay O(1) and source-free, matching `Comment::multiline`).
+    pub has_newline: bool,
     /// True if this is the last element (tail)
     pub tail: bool,
     pub span: Span,
+}
+
+impl TemplateElement {
+    /// The raw source text (escape sequences NOT decoded), a delimiter-stripped
+    /// sub-slice of `source` (the host document the spans were recorded against).
+    #[inline]
+    pub fn raw<'s>(&self, source: &'s str) -> &'s str {
+        self.raw_span.extract(source)
+    }
+
+    /// The decoded ("cooked") value as text, or `None` for an invalid escape.
+    /// The no-escape case borrows the raw source slice (no owned string); the
+    /// returned slice borrows from either `self` (`Decoded`) or `source`
+    /// (`Verbatim`), so both share the lifetime `'a`.
+    #[inline]
+    pub fn cooked<'a>(&'a self, source: &'a str) -> Option<&'a str> {
+        match &self.cooked {
+            TemplateCooked::Verbatim => Some(self.raw(source)),
+            TemplateCooked::Decoded(decoded) => Some(decoded),
+            TemplateCooked::Invalid => None,
+        }
+    }
 }
 
 /// Tagged template expression: tag`content ${expr}`
@@ -686,12 +731,31 @@ pub struct SequenceExpression {
 /// TODO: Add regex validation (pattern is valid, flags are valid and unique)
 #[derive(Debug, Clone)]
 pub struct RegexLiteral {
-    /// The pattern between the slashes (e.g., "\\d+")
-    /// Contains the raw source text, preserving escape sequences.
-    pub pattern: String,
-    /// The flags after the closing slash (e.g., "gi")
-    pub flags: String,
+    /// Span of the pattern between the slashes (e.g., "\\d+"). The pattern is a
+    /// verbatim sub-slice of source (escape sequences preserved, never decoded),
+    /// so it is stored as a span and recovered via `pattern(source)`.
+    pub pattern_span: Span,
+    /// Span of the flags after the closing slash (e.g., "gi"). Verbatim sub-slice
+    /// of source; recovered via `flags(source)`.
+    pub flags_span: Span,
+    /// Visual width of the pattern (tab width 2), precomputed so the "simple
+    /// call argument" width check stays source-free. Saturates at `u16::MAX`.
+    pub pattern_width: u16,
     pub span: Span,
+}
+
+impl RegexLiteral {
+    /// The pattern between the slashes (a verbatim sub-slice of `source`).
+    #[inline]
+    pub fn pattern<'s>(&self, source: &'s str) -> &'s str {
+        self.pattern_span.extract(source)
+    }
+
+    /// The flags after the closing slash (a verbatim sub-slice of `source`).
+    #[inline]
+    pub fn flags<'s>(&self, source: &'s str) -> &'s str {
+        self.flags_span.extract(source)
+    }
 }
 
 /// This expression: `this`
