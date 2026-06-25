@@ -1,0 +1,1502 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 992,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " leading own-line comment forces expansion; the lone binary-chain arg keeps",
+			"start": 10,
+			"end": 87,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " its continuation indent",
+			"start": 89,
+			"end": 115,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " lead",
+			"start": 138,
+			"end": 145,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " cont",
+			"start": 156,
+			"end": 163,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 3
+				},
+				"end": {
+					"line": 7,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inter-argument comment before a binary-chain last arg keeps continuation indent",
+			"start": 184,
+			"end": 266,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 294,
+			"end": 301,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " cont",
+			"start": 310,
+			"end": 317,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 3
+				},
+				"end": {
+					"line": 16,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " ternary arg whose test is a logical chain keeps the continuation indent",
+			"start": 338,
+			"end": 412,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 440,
+			"end": 447,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 2
+				},
+				"end": {
+					"line": 24,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " cont",
+			"start": 460,
+			"end": 467,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 3
+				},
+				"end": {
+					"line": 25,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing line comment after a binary-chain arg keeps continuation indent",
+			"start": 497,
+			"end": 572,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " cont",
+			"start": 603,
+			"end": 610,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 3
+				},
+				"end": {
+					"line": 34,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trail",
+			"start": 626,
+			"end": 634,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 7
+				},
+				"end": {
+					"line": 36,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " assignment-expression arg keeps its clarity parens through the comment path",
+			"start": 645,
+			"end": 723,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 1
+				},
+				"end": {
+					"line": 40,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 743,
+			"end": 750,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 19
+				},
+				"end": {
+					"line": 41,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a blank line between args forces expansion; a binary-chain arg (broken by its",
+			"start": 766,
+			"end": 846,
+			"loc": {
+				"start": {
+					"line": 43,
+					"column": 1
+				},
+				"end": {
+					"line": 43,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own internal comment) keeps its continuation indent on that path too",
+			"start": 848,
+			"end": 919,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 1
+				},
+				"end": {
+					"line": 44,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " cont",
+			"start": 956,
+			"end": 963,
+			"loc": {
+				"start": {
+					"line": 49,
+					"column": 3
+				},
+				"end": {
+					"line": 49,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 991,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 982,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 53,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 117,
+					"end": 181,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 123,
+							"end": 180,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 10,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 123,
+								"end": 124,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "NewExpression",
+								"start": 127,
+								"end": 180,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 11
+									},
+									"end": {
+										"line": 10,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 131,
+									"end": 134,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 15
+										},
+										"end": {
+											"line": 4,
+											"column": 18
+										}
+									},
+									"name": "Foo"
+								},
+								"arguments": [
+									{
+										"type": "BinaryExpression",
+										"start": 148,
+										"end": 177,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 5
+											}
+										},
+										"left": {
+											"type": "BinaryExpression",
+											"start": 148,
+											"end": 169,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 2
+												},
+												"end": {
+													"line": 8,
+													"column": 5
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 148,
+												"end": 150,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 2
+													},
+													"end": {
+														"line": 6,
+														"column": 4
+													}
+												},
+												"name": "c1"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 167,
+												"end": 169,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 3
+													},
+													"end": {
+														"line": 8,
+														"column": 5
+													}
+												},
+												"name": "c2",
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " cont",
+														"start": 156,
+														"end": 163
+													}
+												]
+											}
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 175,
+											"end": 177,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 3
+												},
+												"end": {
+													"line": 9,
+													"column": 5
+												}
+											},
+											"name": "c3"
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " lead",
+												"start": 138,
+												"end": 145
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " leading own-line comment forces expansion; the lone binary-chain arg keeps",
+							"start": 10,
+							"end": 87
+						},
+						{
+							"type": "Line",
+							"value": " its continuation indent",
+							"start": 89,
+							"end": 115
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 268,
+					"end": 335,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 274,
+							"end": 334,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 7
+								},
+								"end": {
+									"line": 19,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 274,
+								"end": 275,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "NewExpression",
+								"start": 278,
+								"end": 334,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 11
+									},
+									"end": {
+										"line": 19,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 282,
+									"end": 285,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 15
+										},
+										"end": {
+											"line": 13,
+											"column": 18
+										}
+									},
+									"name": "Foo"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 289,
+										"end": 290,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 2
+											},
+											"end": {
+												"line": 14,
+												"column": 3
+											}
+										},
+										"name": "x"
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 302,
+										"end": 331,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 10
+											},
+											"end": {
+												"line": 18,
+												"column": 5
+											}
+										},
+										"left": {
+											"type": "BinaryExpression",
+											"start": 302,
+											"end": 323,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 10
+												},
+												"end": {
+													"line": 17,
+													"column": 5
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 302,
+												"end": 304,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 10
+													},
+													"end": {
+														"line": 15,
+														"column": 12
+													}
+												},
+												"name": "c1"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 321,
+												"end": 323,
+												"loc": {
+													"start": {
+														"line": 17,
+														"column": 3
+													},
+													"end": {
+														"line": 17,
+														"column": 5
+													}
+												},
+												"name": "c2",
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " cont",
+														"start": 310,
+														"end": 317
+													}
+												]
+											}
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 329,
+											"end": 331,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 3
+												},
+												"end": {
+													"line": 18,
+													"column": 5
+												}
+											},
+											"name": "c3"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 294,
+												"end": 301
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " inter-argument comment before a binary-chain last arg keeps continuation indent",
+							"start": 184,
+							"end": 266
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 414,
+					"end": 494,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 420,
+							"end": 493,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 7
+								},
+								"end": {
+									"line": 29,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 420,
+								"end": 421,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 7
+									},
+									"end": {
+										"line": 22,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "NewExpression",
+								"start": 424,
+								"end": 493,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 11
+									},
+									"end": {
+										"line": 29,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 428,
+									"end": 431,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 15
+										},
+										"end": {
+											"line": 22,
+											"column": 18
+										}
+									},
+									"name": "Foo"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 435,
+										"end": 436,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 2
+											},
+											"end": {
+												"line": 23,
+												"column": 3
+											}
+										},
+										"name": "x"
+									},
+									{
+										"type": "ConditionalExpression",
+										"start": 448,
+										"end": 490,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 10
+											},
+											"end": {
+												"line": 28,
+												"column": 6
+											}
+										},
+										"test": {
+											"type": "LogicalExpression",
+											"start": 448,
+											"end": 476,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 10
+												},
+												"end": {
+													"line": 26,
+													"column": 8
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 448,
+												"end": 453,
+												"loc": {
+													"start": {
+														"line": 24,
+														"column": 10
+													},
+													"end": {
+														"line": 24,
+														"column": 15
+													}
+												},
+												"name": "cond1"
+											},
+											"operator": "&&",
+											"right": {
+												"type": "Identifier",
+												"start": 471,
+												"end": 476,
+												"loc": {
+													"start": {
+														"line": 26,
+														"column": 3
+													},
+													"end": {
+														"line": 26,
+														"column": 8
+													}
+												},
+												"name": "cond2",
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " cont",
+														"start": 460,
+														"end": 467
+													}
+												]
+											}
+										},
+										"consequent": {
+											"type": "Identifier",
+											"start": 482,
+											"end": 483,
+											"loc": {
+												"start": {
+													"line": 27,
+													"column": 5
+												},
+												"end": {
+													"line": 27,
+													"column": 6
+												}
+											},
+											"name": "p"
+										},
+										"alternate": {
+											"type": "Identifier",
+											"start": 489,
+											"end": 490,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 5
+												},
+												"end": {
+													"line": 28,
+													"column": 6
+												}
+											},
+											"name": "q"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 440,
+												"end": 447
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " ternary arg whose test is a logical chain keeps the continuation indent",
+							"start": 338,
+							"end": 412
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 574,
+					"end": 642,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 580,
+							"end": 641,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 7
+								},
+								"end": {
+									"line": 38,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 580,
+								"end": 581,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 7
+									},
+									"end": {
+										"line": 32,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "NewExpression",
+								"start": 584,
+								"end": 641,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 11
+									},
+									"end": {
+										"line": 38,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 588,
+									"end": 591,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 15
+										},
+										"end": {
+											"line": 32,
+											"column": 18
+										}
+									},
+									"name": "Foo"
+								},
+								"arguments": [
+									{
+										"type": "BinaryExpression",
+										"start": 595,
+										"end": 624,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 2
+											},
+											"end": {
+												"line": 36,
+												"column": 5
+											}
+										},
+										"left": {
+											"type": "BinaryExpression",
+											"start": 595,
+											"end": 616,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 2
+												},
+												"end": {
+													"line": 35,
+													"column": 5
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 595,
+												"end": 597,
+												"loc": {
+													"start": {
+														"line": 33,
+														"column": 2
+													},
+													"end": {
+														"line": 33,
+														"column": 4
+													}
+												},
+												"name": "c1"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 614,
+												"end": 616,
+												"loc": {
+													"start": {
+														"line": 35,
+														"column": 3
+													},
+													"end": {
+														"line": 35,
+														"column": 5
+													}
+												},
+												"name": "c2",
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " cont",
+														"start": 603,
+														"end": 610
+													}
+												]
+											}
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 622,
+											"end": 624,
+											"loc": {
+												"start": {
+													"line": 36,
+													"column": 3
+												},
+												"end": {
+													"line": 36,
+													"column": 5
+												}
+											},
+											"name": "c3"
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " trail",
+												"start": 626,
+												"end": 634
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 637,
+										"end": 638,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 2
+											},
+											"end": {
+												"line": 37,
+												"column": 3
+											}
+										},
+										"name": "y"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " trailing line comment after a binary-chain arg keeps continuation indent",
+							"start": 497,
+							"end": 572
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 725,
+					"end": 763,
+					"loc": {
+						"start": {
+							"line": 41,
+							"column": 1
+						},
+						"end": {
+							"line": 41,
+							"column": 39
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 731,
+							"end": 762,
+							"loc": {
+								"start": {
+									"line": 41,
+									"column": 7
+								},
+								"end": {
+									"line": 41,
+									"column": 38
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 731,
+								"end": 732,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 7
+									},
+									"end": {
+										"line": 41,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "NewExpression",
+								"start": 735,
+								"end": 762,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 11
+									},
+									"end": {
+										"line": 41,
+										"column": 38
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 739,
+									"end": 742,
+									"loc": {
+										"start": {
+											"line": 41,
+											"column": 15
+										},
+										"end": {
+											"line": 41,
+											"column": 18
+										}
+									},
+									"name": "Foo"
+								},
+								"arguments": [
+									{
+										"type": "AssignmentExpression",
+										"start": 752,
+										"end": 757,
+										"loc": {
+											"start": {
+												"line": 41,
+												"column": 28
+											},
+											"end": {
+												"line": 41,
+												"column": 33
+											}
+										},
+										"operator": "=",
+										"left": {
+											"type": "Identifier",
+											"start": 752,
+											"end": 753,
+											"loc": {
+												"start": {
+													"line": 41,
+													"column": 28
+												},
+												"end": {
+													"line": 41,
+													"column": 29
+												}
+											},
+											"name": "a"
+										},
+										"right": {
+											"type": "Identifier",
+											"start": 756,
+											"end": 757,
+											"loc": {
+												"start": {
+													"line": 41,
+													"column": 32
+												},
+												"end": {
+													"line": 41,
+													"column": 33
+												}
+											},
+											"name": "b"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 743,
+												"end": 750
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 760,
+										"end": 761,
+										"loc": {
+											"start": {
+												"line": 41,
+												"column": 36
+											},
+											"end": {
+												"line": 41,
+												"column": 37
+											}
+										},
+										"name": "c"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " assignment-expression arg keeps its clarity parens through the comment path",
+							"start": 645,
+							"end": 723
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 921,
+					"end": 981,
+					"loc": {
+						"start": {
+							"line": 45,
+							"column": 1
+						},
+						"end": {
+							"line": 52,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 927,
+							"end": 980,
+							"loc": {
+								"start": {
+									"line": 45,
+									"column": 7
+								},
+								"end": {
+									"line": 52,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 927,
+								"end": 928,
+								"loc": {
+									"start": {
+										"line": 45,
+										"column": 7
+									},
+									"end": {
+										"line": 45,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "NewExpression",
+								"start": 931,
+								"end": 980,
+								"loc": {
+									"start": {
+										"line": 45,
+										"column": 11
+									},
+									"end": {
+										"line": 52,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 935,
+									"end": 938,
+									"loc": {
+										"start": {
+											"line": 45,
+											"column": 15
+										},
+										"end": {
+											"line": 45,
+											"column": 18
+										}
+									},
+									"name": "Foo"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 942,
+										"end": 943,
+										"loc": {
+											"start": {
+												"line": 46,
+												"column": 2
+											},
+											"end": {
+												"line": 46,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 948,
+										"end": 977,
+										"loc": {
+											"start": {
+												"line": 48,
+												"column": 2
+											},
+											"end": {
+												"line": 51,
+												"column": 5
+											}
+										},
+										"left": {
+											"type": "BinaryExpression",
+											"start": 948,
+											"end": 969,
+											"loc": {
+												"start": {
+													"line": 48,
+													"column": 2
+												},
+												"end": {
+													"line": 50,
+													"column": 5
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 948,
+												"end": 950,
+												"loc": {
+													"start": {
+														"line": 48,
+														"column": 2
+													},
+													"end": {
+														"line": 48,
+														"column": 4
+													}
+												},
+												"name": "c1"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 967,
+												"end": 969,
+												"loc": {
+													"start": {
+														"line": 50,
+														"column": 3
+													},
+													"end": {
+														"line": 50,
+														"column": 5
+													}
+												},
+												"name": "c2",
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " cont",
+														"start": 956,
+														"end": 963
+													}
+												]
+											}
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 975,
+											"end": 977,
+											"loc": {
+												"start": {
+													"line": 51,
+													"column": 3
+												},
+												"end": {
+													"line": 51,
+													"column": 5
+												}
+											},
+											"name": "c3"
+										}
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a blank line between args forces expansion; a binary-chain arg (broken by its",
+							"start": 766,
+							"end": 846
+						},
+						{
+							"type": "Line",
+							"value": " own internal comment) keeps its continuation indent on that path too",
+							"start": 848,
+							"end": 919
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
