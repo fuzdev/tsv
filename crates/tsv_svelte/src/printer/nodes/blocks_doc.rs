@@ -378,7 +378,7 @@ impl<'a> Printer<'a> {
         let mut all_inline = self.fragment_inline_authored(&block.consequent, imc);
         let mut alt = block.alternate.as_ref();
         while let Some(a) = alt {
-            if let Some(else_if) = Self::get_flattenable_else_if(a) {
+            if let Some(else_if) = Self::get_flattenable_else_if(a, self.source) {
                 all_inline &= self.fragment_inline_authored(&else_if.consequent, imc);
                 alt = else_if.alternate.as_ref();
             } else {
@@ -427,7 +427,7 @@ impl<'a> Printer<'a> {
     fn build_if_alternate_tail(&self, alt: &Fragment, multiline: bool) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
-        if let Some(else_if) = Self::get_flattenable_else_if(alt) {
+        if let Some(else_if) = Self::get_flattenable_else_if(alt, self.source) {
             // Build the else-if head with wrapping enabled so it can dangle within the
             // expanded form; in the inline form `BlockHead` resolves flat (no dangle).
             let expr_doc = self.build_else_if_expr_doc(else_if, true);
@@ -569,7 +569,10 @@ impl<'a> Printer<'a> {
     /// content, or a block-form `{:else}{#if}{/if}` (`elseif: false`): that form is
     /// preserved verbatim rather than collapsed — matching prettier, which keeps the
     /// two distinct (collapsing would be information loss).
-    pub(super) fn get_flattenable_else_if(alt: &Fragment) -> Option<&internal::IfBlock> {
+    pub(super) fn get_flattenable_else_if<'f>(
+        alt: &'f Fragment,
+        source: &str,
+    ) -> Option<&'f internal::IfBlock> {
         let mut if_block: Option<&internal::IfBlock> = None;
 
         for node in &alt.nodes {
@@ -581,7 +584,7 @@ impl<'a> Printer<'a> {
                     }
                     if_block = Some(b);
                 }
-                FragmentNode::Text(t) if t.raw.trim().is_empty() => {
+                FragmentNode::Text(t) if t.raw(source).trim().is_empty() => {
                     // Whitespace-only text is OK
                 }
                 _ => {
@@ -633,7 +636,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         // Check if this can be flattened to {:else if ...}
-        if let Some(else_if) = Self::get_flattenable_else_if(alt) {
+        if let Some(else_if) = Self::get_flattenable_else_if(alt, self.source) {
             // {:else if condition}
             let expr_doc = self.build_else_if_expr_doc(else_if, in_multiline_context);
 
@@ -721,7 +724,7 @@ impl<'a> Printer<'a> {
         };
 
         // Check if this is an else-if chain
-        if let Some(else_if) = Self::get_flattenable_else_if(alt) {
+        if let Some(else_if) = Self::get_flattenable_else_if(alt, self.source) {
             // Recurse into else-if
             return self.get_final_branch_trailing(else_if, in_multiline_context);
         }

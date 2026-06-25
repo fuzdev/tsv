@@ -168,7 +168,7 @@ impl<'a> SvelteParser<'a> {
         // root.start: First fragment node (whitespace-only text → skip, content/element/comment → include)
         if let Some(first_node) = fragment.nodes.first() {
             root_start = Some(match first_node {
-                FragmentNode::Text(text) if text.data().trim().is_empty() => {
+                FragmentNode::Text(text) if text.data(self.source).trim().is_empty() => {
                     // Whitespace-only: skip it (start after the whitespace)
                     text.span.end_usize()
                 }
@@ -180,7 +180,7 @@ impl<'a> SvelteParser<'a> {
         // root.end: Last fragment node (whitespace-only text → exclude, content/element/comment → include)
         let end = if let Some(last_node) = fragment.nodes.last() {
             match last_node {
-                FragmentNode::Text(text) if text.data().trim().is_empty() => {
+                FragmentNode::Text(text) if text.data(self.source).trim().is_empty() => {
                     // Whitespace-only: exclude it (end before the whitespace)
                     text.span.start
                 }

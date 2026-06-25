@@ -88,7 +88,7 @@ impl<'a> Printer<'a> {
                 {
                     for part in value_parts {
                         if let internal::AttributeValue::Text(text) = part {
-                            let lang = text.raw.trim();
+                            let lang = text.raw(self.source).trim();
                             let lang = lang.strip_prefix("text/").unwrap_or(lang);
                             return Some(lang.to_string());
                         }

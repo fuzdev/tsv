@@ -55,7 +55,7 @@ fn has_raw_content(element: &internal::Element) -> bool {
         .fragment
         .nodes
         .iter()
-        .any(|node| !matches!(node, FragmentNode::Text(t) if t.raw.is_empty()))
+        .any(|node| !matches!(node, FragmentNode::Text(t) if t.raw_span.range().is_empty()))
 }
 
 #[cfg(test)]

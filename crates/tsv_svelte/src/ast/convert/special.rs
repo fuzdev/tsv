@@ -21,7 +21,11 @@ use super::{convert_attribute_node, convert_fragment, span_to_name_loc, to_json_
 /// Otherwise (plain `<script>`), it's parsed by Svelte's parser (Svelte context), which
 /// omits `importKind`/`exportKind` for "value" and always includes `attributes` on
 /// import/export declarations.
-fn script_has_lang_ts(script: &internal::Script, interner: &DefaultStringInterner) -> bool {
+fn script_has_lang_ts(
+    script: &internal::Script,
+    source: &str,
+    interner: &DefaultStringInterner,
+) -> bool {
     for attr_node in &script.attributes {
         let internal::AttributeNode::Attribute(attr) = attr_node else {
             continue;
@@ -30,7 +34,7 @@ fn script_has_lang_ts(script: &internal::Script, interner: &DefaultStringInterne
         if name == "lang"
             && let Some(values) = &attr.value
             && let Some(internal::AttributeValue::Text(text)) = values.first()
-            && text.data() == "ts"
+            && text.data(source) == "ts"
         {
             return true;
         }
@@ -52,7 +56,7 @@ pub(super) fn convert_script(
     // Detect whether this is a TypeScript script (lang="ts") or plain script.
     // Plain scripts use Svelte's parser conventions (no importKind/exportKind for "value",
     // always include `attributes` on import/export declarations).
-    let is_lang_ts = script_has_lang_ts(script, interner);
+    let is_lang_ts = script_has_lang_ts(script, source, interner);
 
     // Delegate to tsv_ts for program conversion, using the appropriate schema
     let schema = if is_lang_ts {
@@ -126,7 +130,7 @@ pub(super) fn convert_script(
     {
         let html_comment = serde_json::json!({
             "type": "Line",
-            "value": comment.content,
+            "value": comment.content(source),
         });
         match map.get_mut("leadingComments") {
             Some(serde_json::Value::Array(arr)) => {
@@ -176,10 +180,10 @@ fn find_option_values<'a>(
 }
 
 /// Extract a plain text value from attribute values.
-fn text_value(values: &[internal::AttributeValue]) -> Option<String> {
+fn text_value(values: &[internal::AttributeValue], source: &str) -> Option<String> {
     values.iter().find_map(|v| {
         if let internal::AttributeValue::Text(text) = v {
-            Some(text.data().into_owned())
+            Some(text.data(source).into_owned())
         } else {
             None
         }
@@ -227,11 +231,12 @@ pub(super) fn convert_svelte_options(
     let preserve_whitespace = bool_option(&options.attributes, "preserveWhitespace", interner);
 
     // `css` — plain text value (`css="injected"`)
-    let css = find_option_values(&options.attributes, "css", interner).and_then(|v| text_value(v));
+    let css = find_option_values(&options.attributes, "css", interner)
+        .and_then(|v| text_value(v, source));
 
     // `namespace` — plain text value
-    let namespace =
-        find_option_values(&options.attributes, "namespace", interner).and_then(|v| text_value(v));
+    let namespace = find_option_values(&options.attributes, "namespace", interner)
+        .and_then(|v| text_value(v, source));
 
     // `customElement` — object expression, string expression, or plain text
     let custom_element = find_option_values(&options.attributes, "customElement", interner)
@@ -265,7 +270,7 @@ pub(super) fn convert_svelte_options(
                 }
                 // Plain text or string literal: customElement="tag-name"
                 let tag_str = match v {
-                    internal::AttributeValue::Text(text) => Some(text.data().into_owned()),
+                    internal::AttributeValue::Text(text) => Some(text.data(source).into_owned()),
                     internal::AttributeValue::ExpressionTag(expr) => {
                         if let tsv_ts::ast::internal::Expression::Literal(lit) = &expr.expression
                             && let tsv_ts::ast::internal::LiteralValue::String { content, .. } =
@@ -342,7 +347,7 @@ pub(super) fn convert_style(
                     "type": "Comment",
                     "start": c.span.start,
                     "end": c.span.end,
-                    "data": c.content,
+                    "data": c.content(source),
                 })
             }),
         },

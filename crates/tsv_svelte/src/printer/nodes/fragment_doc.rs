@@ -113,7 +113,7 @@ impl<'a> Printer<'a> {
                 }
                 continue;
             }
-            if Self::is_format_ignore_comment(node) {
+            if Self::is_format_ignore_comment(node, self.source) {
                 if let Some(doc) = self.build_fragment_node_doc_with_context(node, trim_text) {
                     docs.push(doc);
                 }
@@ -212,11 +212,12 @@ impl<'a> Printer<'a> {
         // - Inline elements (trim_boundaries=false): keep whitespace (normalize to space in handle_text_child)
         //
         // Helper: should we skip this node at the boundary?
+        let source = self.source;
         let should_skip_at_boundary = |n: &FragmentNode| -> bool {
             if let FragmentNode::Text(text) = n {
                 // Whitespace-only: skip only for block elements
                 // Inline elements keep boundary whitespace (normalized to single space)
-                text.raw.trim().is_empty() && trim_boundaries
+                text.raw(source).trim().is_empty() && trim_boundaries
             } else {
                 false // Not text, don't skip
             }
@@ -265,7 +266,7 @@ impl<'a> Printer<'a> {
                 }
                 continue;
             }
-            if Self::is_format_ignore_comment(node) {
+            if Self::is_format_ignore_comment(node, source) {
                 format_ignore_next = true;
             }
 
@@ -276,8 +277,8 @@ impl<'a> Printer<'a> {
             // the inline callers never see adjacent whitespace-only nodes.
             if multiline
                 && i > 0
-                && matches!(node, FragmentNode::Text(t) if t.raw.trim_ascii().is_empty())
-                && matches!(&trimmed_nodes[i - 1], FragmentNode::Text(p) if p.raw.trim_ascii().is_empty())
+                && matches!(node, FragmentNode::Text(t) if t.raw(source).trim_ascii().is_empty())
+                && matches!(&trimmed_nodes[i - 1], FragmentNode::Text(p) if p.raw(source).trim_ascii().is_empty())
             {
                 continue;
             }
@@ -400,8 +401,8 @@ impl<'a> Printer<'a> {
     ///
     // Recognition lives in `tsv_lang::is_format_ignore_directive` — the single source of
     // truth for the directive set, shared across all three language printers.
-    fn is_format_ignore_comment(node: &FragmentNode) -> bool {
-        matches!(node, FragmentNode::Comment(c) if is_format_ignore_directive(&c.content))
+    fn is_format_ignore_comment(node: &FragmentNode, source: &str) -> bool {
+        matches!(node, FragmentNode::Comment(c) if is_format_ignore_directive(c.content(source)))
     }
 
     /// Build the verbatim doc for a format-ignored node, or `None` when the node is
@@ -410,7 +411,7 @@ impl<'a> Printer<'a> {
     /// caller owns its sink and clears `format_ignore_next` only when this returns `Some`.
     fn format_ignore_raw_doc(&self, node: &FragmentNode) -> Option<DocId> {
         if let FragmentNode::Text(text) = node
-            && text.raw.is_whitespace_only()
+            && text.raw(self.source).is_whitespace_only()
         {
             return None;
         }
@@ -437,7 +438,7 @@ impl<'a> Printer<'a> {
         let FragmentNode::Text(text) = &trimmed_nodes[i] else {
             return;
         };
-        let raw: &str = &text.raw;
+        let raw: &str = text.raw(self.source);
 
         // Sibling-kind facts, derived from the node's position in `trimmed_nodes`.
         let is_first = i == 0;
@@ -877,7 +878,9 @@ impl<'a> Printer<'a> {
             Some(p) if !self.is_block_element_node(p) => match p {
                 FragmentNode::Text(t) => {
                     *handle_whitespace_of_prev_text
-                        || !t.raw.ends_with(|c: char| c.is_ascii_whitespace())
+                        || !t
+                            .raw(self.source)
+                            .ends_with(|c: char| c.is_ascii_whitespace())
                 }
                 _ => true,
             },
@@ -894,10 +897,11 @@ impl<'a> Printer<'a> {
 
         let break_after = match next {
             Some(FragmentNode::Text(t)) => {
-                let is_empty_ws = t.raw.trim_ascii().is_empty();
+                let raw = t.raw(self.source);
+                let is_empty_ws = raw.trim_ascii().is_empty();
                 // idx+2 is an inline element (prettier's `isInlineElement`, excludes components)
                 let next2_inline = self.next_is_inline_element(trimmed_nodes, i + 1);
-                (!is_empty_ws || next2_inline) && !text_starts_with_linebreak(&t.raw)
+                (!is_empty_ws || next2_inline) && !text_starts_with_linebreak(raw)
             }
             Some(_) => true,
             None => false,
@@ -942,9 +946,10 @@ impl<'a> Printer<'a> {
     /// children and at least one is a block element, content should break.
     /// This forces the multiline path even for "inline" Svelte block bodies.
     pub(super) fn fragment_should_force_break_content(&self, nodes: &[FragmentNode]) -> bool {
+        let source = self.source;
         let non_ws_count = nodes
             .iter()
-            .filter(|n| !n.is_whitespace_only_text())
+            .filter(|n| !n.is_whitespace_only_text(source))
             .count();
         non_ws_count > 1 && nodes.iter().any(|n| self.is_block_fragment_node(n))
     }
@@ -990,7 +995,7 @@ impl<'a> Printer<'a> {
                 // (source_has_leading_break && has_trailing_whitespace)
                 nodes[first..=last]
                     .iter()
-                    .any(FragmentNode::is_whitespace_only_text)
+                    .any(|n| n.is_whitespace_only_text(self.source))
             }
             _ => false,
         }
@@ -1281,10 +1286,11 @@ impl<'a> Printer<'a> {
     /// - `trim_completely`: If true, trim leading/trailing whitespace (block context).
     ///   If false, preserve single space at boundaries (inline context).
     fn build_text_doc(&self, text: &internal::Text, trim_completely: bool) -> Option<DocId> {
-        let trimmed = text.raw.trim();
+        let raw = text.raw(self.source);
+        let trimmed = raw.trim();
         if trimmed.is_empty() {
             // Pure whitespace: collapse to single space only in inline context
-            if !trim_completely && text.raw.contains(char::is_whitespace) {
+            if !trim_completely && raw.contains(char::is_whitespace) {
                 Some(self.d().text(" "))
             } else {
                 None
@@ -1292,7 +1298,7 @@ impl<'a> Printer<'a> {
         } else {
             // Has content: use fill() for word-level line breaking
             // This matches Prettier's splitTextToDocs behavior
-            self.build_text_fill_doc(&text.raw, trim_completely)
+            self.build_text_fill_doc(raw, trim_completely)
         }
     }
 
@@ -1405,7 +1411,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         d.concat(&[
             d.text("<!--"),
-            d.text_owned(comment.content.clone()),
+            d.text_owned(comment.content(self.source).to_string()),
             d.text("-->"),
         ])
     }

@@ -11,14 +11,14 @@ impl<'a> SvelteParser<'a> {
     /// Stores the original source text; HTML entities decode lazily via
     /// `Text::data` with text-content rules (`TextDecoding::Fragment`).
     pub(crate) fn parse_text(&self, start: usize, end: usize) -> Result<Text, ParseError> {
-        let raw = self.source[start..end].to_string();
+        let span = Span {
+            start: start as u32,
+            end: end as u32,
+        };
         Ok(Text {
-            raw,
+            raw_span: span,
             decoding: TextDecoding::Fragment,
-            span: Span {
-                start: start as u32,
-                end: end as u32,
-            },
+            span,
         })
     }
 
@@ -33,18 +33,24 @@ impl<'a> SvelteParser<'a> {
         // Token value is the full comment including <!-- and -->
         let token_value = self.current_value();
 
-        // Extract content: text between <!-- and -->
-        let content = if token_value.len() >= 7 {
-            // Remove "<!--" (4 chars) from start and "-->" (3 chars) from end
-            token_value[4..token_value.len() - 3].to_string()
+        // Content span: text between <!-- and --> (strip "<!--" = 4, "-->" = 3),
+        // a pure source sub-slice recovered via `HtmlComment::content`.
+        let content_span = if token_value.len() >= 7 {
+            Span {
+                start: (start + 4) as u32,
+                end: (end - 3) as u32,
+            }
         } else {
-            String::new()
+            Span {
+                start: start as u32,
+                end: start as u32,
+            }
         };
 
         self.advance()?;
 
         Ok(HtmlComment {
-            content,
+            content_span,
             span: Span {
                 start: start as u32,
                 end: end as u32,

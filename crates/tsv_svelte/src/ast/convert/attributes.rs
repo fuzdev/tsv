@@ -183,7 +183,7 @@ pub(super) fn convert_attribute_value(
 ) -> public::AttributeValue {
     match value {
         internal::AttributeValue::Text(text) => {
-            public::AttributeValue::Text(convert_attribute_text(text))
+            public::AttributeValue::Text(convert_attribute_text(text, source))
         }
         internal::AttributeValue::ExpressionTag(tag) => public::AttributeValue::ExpressionTag(
             convert_expression_tag(tag, source, loc, interner),
@@ -191,12 +191,12 @@ pub(super) fn convert_attribute_value(
     }
 }
 
-fn convert_attribute_text(text: &internal::Text) -> public::AttributeText {
+fn convert_attribute_text(text: &internal::Text, source: &str) -> public::AttributeText {
     public::AttributeText {
         start: text.span.start,
         end: text.span.end,
         node_type: "Text".to_string(),
-        raw: text.raw.clone(),
-        data: text.data().into_owned(),
+        raw: text.raw(source).to_string(),
+        data: text.data(source).into_owned(),
     }
 }

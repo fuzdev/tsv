@@ -222,7 +222,9 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an attribute value part
     fn build_attribute_value_doc(&self, value: &internal::AttributeValue) -> DocId {
         match value {
-            internal::AttributeValue::Text(text) => self.build_attribute_text_doc(&text.raw),
+            internal::AttributeValue::Text(text) => {
+                self.build_attribute_text_doc(text.raw(self.source))
+            }
             internal::AttributeValue::ExpressionTag(expr_tag) => {
                 self.build_attribute_expression_doc(expr_tag)
             }
@@ -241,7 +243,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         match value {
             internal::AttributeValue::Text(text) => {
-                let normalized = normalize_class_text(&text.raw, is_last_part);
+                let normalized = normalize_class_text(text.raw(self.source), is_last_part);
                 // `normalized` is freshly owned — move it straight into the doc on the
                 // common single-line path instead of re-cloning through the borrowed
                 // `build_attribute_text_doc` (which would `to_string()` it again).

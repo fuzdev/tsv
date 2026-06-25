@@ -444,7 +444,9 @@ impl<'a> Printer<'a> {
                 let is_inline = ctx.kind.is_inline();
                 let leading_break = if start_mode == BoundaryMode::Hard {
                     d.hardline()
-                } else if is_inline && Self::first_child_has_leading_ws(&element.fragment.nodes) {
+                } else if is_inline
+                    && Self::first_child_has_leading_ws(&element.fragment.nodes, self.source)
+                {
                     d.line()
                 } else {
                     d.softline()
@@ -507,14 +509,18 @@ impl<'a> Printer<'a> {
                 let is_inline = ctx.kind.is_inline();
                 let leading_break = if start_mode == BoundaryMode::Hard {
                     d.hardline()
-                } else if is_inline && Self::first_child_has_leading_ws(&element.fragment.nodes) {
+                } else if is_inline
+                    && Self::first_child_has_leading_ws(&element.fragment.nodes, self.source)
+                {
                     d.line()
                 } else {
                     d.softline()
                 };
                 let trailing_break = if end_mode == BoundaryMode::Hard {
                     d.hardline()
-                } else if is_inline && Self::last_child_has_trailing_ws(&element.fragment.nodes) {
+                } else if is_inline
+                    && Self::last_child_has_trailing_ws(&element.fragment.nodes, self.source)
+                {
                     d.line()
                 } else {
                     d.softline()
@@ -623,15 +629,15 @@ impl<'a> Printer<'a> {
         ]))
     }
 
-    fn first_child_has_leading_ws(nodes: &[FragmentNode]) -> bool {
+    fn first_child_has_leading_ws(nodes: &[FragmentNode], source: &str) -> bool {
         nodes.first().is_some_and(
-            |n| matches!(n, FragmentNode::Text(t) if !t.raw.leading_whitespace().is_empty()),
+            |n| matches!(n, FragmentNode::Text(t) if !t.raw(source).leading_whitespace().is_empty()),
         )
     }
 
-    fn last_child_has_trailing_ws(nodes: &[FragmentNode]) -> bool {
+    fn last_child_has_trailing_ws(nodes: &[FragmentNode], source: &str) -> bool {
         nodes.last().is_some_and(
-            |n| matches!(n, FragmentNode::Text(t) if !t.raw.trailing_whitespace().is_empty()),
+            |n| matches!(n, FragmentNode::Text(t) if !t.raw(source).trailing_whitespace().is_empty()),
         )
     }
 
@@ -661,7 +667,7 @@ impl<'a> Printer<'a> {
                 .fragment
                 .nodes
                 .iter()
-                .all(FragmentNode::is_whitespace_only_text);
+                .all(|n| n.is_whitespace_only_text(self.source));
 
         if has_attrs && (is_inline || kind.is_component()) {
             // Closing for inline/hug states: "></tag>" or "> </tag>"
@@ -756,7 +762,7 @@ impl<'a> Printer<'a> {
         // Raw content from fragment text nodes
         for node in &element.fragment.nodes {
             if let FragmentNode::Text(text) = node {
-                parts.push(d.text_owned(text.raw.clone()));
+                parts.push(d.text_owned(text.raw(self.source).to_string()));
             }
         }
 
@@ -794,7 +800,7 @@ impl<'a> Printer<'a> {
 
         // Get raw content from the single Text child
         let content = element.fragment.nodes.first().and_then(|node| match node {
-            FragmentNode::Text(text) => Some(text.data()),
+            FragmentNode::Text(text) => Some(text.data(self.source)),
             _ => None,
         });
 

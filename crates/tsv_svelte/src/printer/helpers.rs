@@ -51,10 +51,11 @@ impl<'a> Printer<'a> {
         };
 
         // Check the actual boundary character
+        let raw = text.raw(self.source);
         let boundary_char = if is_leading {
-            text.raw.chars().next()
+            raw.chars().next()
         } else {
-            text.raw.chars().last()
+            raw.chars().last()
         };
         let Some(ch) = boundary_char else {
             return false;
@@ -76,9 +77,10 @@ impl<'a> Printer<'a> {
 
     /// Check if any text node in the fragment contains a newline.
     fn fragment_has_any_newlines(&self, fragment: &Fragment) -> bool {
+        let source = self.source;
         fragment.nodes.iter().any(|n| {
             if let FragmentNode::Text(t) = n {
-                t.raw.contains('\n')
+                t.raw(source).contains('\n')
             } else {
                 false
             }
@@ -102,12 +104,13 @@ impl<'a> Printer<'a> {
         } else {
             fragment.nodes.last()
         };
+        let source = self.source;
         node.is_some_and(|n| {
             if let FragmentNode::Text(t) = n {
                 let ch = if is_leading {
-                    t.raw.chars().next()
+                    t.raw(source).chars().next()
                 } else {
-                    t.raw.chars().last()
+                    t.raw(source).chars().last()
                 };
                 ch.is_some_and(char::is_whitespace)
             } else {
