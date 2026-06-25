@@ -2,6 +2,8 @@
 
 use crate::ast::internal::*;
 use crate::lexer::{KeywordKind, Lexer, TokenKind};
+use bumpalo::Bump;
+use bumpalo::collections::Vec as BumpVec;
 use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol};
@@ -58,7 +60,15 @@ fn comment_from_token(
 }
 
 #[allow(clippy::struct_excessive_bools)]
-pub struct Parser<'a> {
+pub struct Parser<'a, 'arena> {
+    /// Bump arena that owns every AST node this parser allocates. Supplied by
+    /// the caller (caller-owns-`Bump`); the returned `Program<'arena>` borrows
+    /// from it. `&'arena Bump` is `Copy`, so `self.alloc(owned)` and
+    /// `self.arena.alloc(self.parse_x()?)` (even while `&mut self` is held — the
+    /// field read borrows the `Bump`, not `self`) both work directly; lift it into a
+    /// local (`let arena = self.arena;`) only when several allocations in one method
+    /// share it.
+    arena: &'arena Bump,
     source: &'a str,
     lexer: Lexer<'a>,
     current_kind: TokenKind,
@@ -101,13 +111,42 @@ pub struct Parser<'a> {
     allow_in: bool,
 }
 
-impl<'a> Parser<'a> {
-    fn new(source: &'a str) -> Result<Self, ParseError> {
+impl<'a, 'arena> Parser<'a, 'arena> {
+    fn new(source: &'a str, arena: &'arena Bump) -> Result<Self, ParseError> {
         Self::with_interner(
             source,
             0,
             Rc::new(RefCell::new(DefaultStringInterner::new())),
+            arena,
         )
+    }
+
+    /// Allocate a single AST node in the arena, returning a shared `&'arena`
+    /// reference (replaces `Box::new`). Zero-copy: `Bump::alloc` moves the value
+    /// into arena memory; the mut→shared reborrow is implicit.
+    #[inline]
+    fn alloc<T>(&self, val: T) -> &'arena T {
+        self.arena.alloc(val)
+    }
+
+    /// A growable vector that builds AST-node collections **directly in the
+    /// arena** — the preferred way to gather children. Build it in the parse
+    /// loop, then `.into_bump_slice()` to store the field (zero-copy: the buffer
+    /// is already arena-owned; `into_bump_slice` just hands it back). Carries its
+    /// own `Copy` `&'arena Bump`, so pushing `self.parse_x()?` inside the loop
+    /// does NOT borrow `self` — no `&mut self` conflict.
+    #[inline]
+    fn bvec<T>(&self) -> BumpVec<'arena, T> {
+        BumpVec::new_in(self.arena)
+    }
+
+    /// Allocate a decoded string (escapes processed — not a verbatim source
+    /// slice) in the arena. One copy into the arena. (No-escape string literals
+    /// are a verbatim source slice and should eventually use a `Span`/`Verbatim`
+    /// form for zero copy — tracked follow-up, see TODO_BUMPALO_ARENA.md.)
+    #[inline]
+    fn alloc_str_in(&self, s: &str) -> &'arena str {
+        self.arena.alloc_str(s)
     }
 
     /// Create a parser with shared interner and base offset.
@@ -118,6 +157,7 @@ impl<'a> Parser<'a> {
         source: &'a str,
         base_offset: usize,
         interner: SharedInterner,
+        arena: &'arena Bump,
     ) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
         // Extract token data immediately to avoid keeping token alive
@@ -144,6 +184,7 @@ impl<'a> Parser<'a> {
         }
 
         Ok(Self {
+            arena,
             source,
             lexer,
             current_kind: kind,
@@ -400,22 +441,18 @@ impl<'a> Parser<'a> {
     /// Extract string literal content and quote character from current token.
     ///
     /// Assumes current token is `TokenKind::String`. Returns `(content, quote)` where:
-    /// - `content` is the decoded string value (escapes processed)
-    /// - `quote` is the quote character used (`'` or `"`)
+    /// Decoded form of the current string-literal token, as a [`StringCooked`].
     ///
-    /// Uses decoded value from lexer if available (escapes present),
-    /// otherwise extracts content by stripping quotes from raw value.
-    pub(super) fn extract_string_literal(&self) -> (String, char) {
-        let raw = self.current_value();
-        let quote = raw.chars().next().unwrap_or('"');
-        let content = if let Some(decoded) = self.current_decoded() {
-            decoded.to_string()
-        } else if raw.len() >= 2 {
-            raw[1..raw.len() - 1].to_string()
-        } else {
-            String::new()
-        };
-        (content, quote)
+    /// `Verbatim` (no escapes) carries no allocation — the decoded value equals
+    /// the inner source slice (recovered later via `StringCooked::resolve(span,
+    /// source)`). `Decoded` (escapes present) arena-copies the lexer's decoded
+    /// value (one copy). The quote char is no longer stored — recover it via
+    /// `Literal::string_quote(source)`.
+    pub(super) fn extract_string_cooked(&self) -> StringCooked<'arena> {
+        match self.current_decoded() {
+            Some(decoded) => StringCooked::Decoded(self.alloc_str_in(decoded)),
+            None => StringCooked::Verbatim,
+        }
     }
 
     // Error construction helpers - reduce boilerplate for common error patterns
@@ -1030,9 +1067,9 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Program, ParseError> {
+    pub fn parse(&mut self) -> Result<Program<'arena>, ParseError> {
         let start = self.base_offset; // Start at base_offset for embedded contexts
-        let mut body = Vec::new();
+        let mut body = self.bvec();
 
         while self.current_kind != TokenKind::Eof {
             body.push(self.parse_statement()?);
@@ -1051,7 +1088,7 @@ impl<'a> Parser<'a> {
             .collect();
 
         Ok(Program {
-            body,
+            body: body.into_bump_slice(),
             comments: std::mem::take(&mut self.comments),
             line_breaks,
             span: Span::new(start as u32, end as u32),
@@ -1060,7 +1097,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a single expression (used by Svelte for expression tags)
-    pub fn parse_expression_public(&mut self) -> Result<Expression, ParseError> {
+    pub fn parse_expression_public(&mut self) -> Result<Expression<'arena>, ParseError> {
         self.parse_expression()
     }
 
@@ -1068,7 +1105,7 @@ impl<'a> Parser<'a> {
     /// Used for expressions in Svelte templates where comments need to be preserved.
     pub fn parse_expression_with_comments(
         &mut self,
-    ) -> Result<(Expression, Vec<Comment>), ParseError> {
+    ) -> Result<(Expression<'arena>, Vec<Comment>), ParseError> {
         let expr = self.parse_expression()?;
         let comments = self.take_comments();
         Ok((expr, comments))
@@ -1093,7 +1130,7 @@ impl<'a> Parser<'a> {
     /// unparsed content begins (in absolute source coordinates with base_offset).
     pub fn parse_assignment_expression_partial(
         &mut self,
-    ) -> Result<(Expression, usize), ParseError> {
+    ) -> Result<(Expression<'arena>, usize), ParseError> {
         // Disable TypeScript type assertion parsing in partial mode
         // to avoid consuming `as` which has different meaning in Svelte templates
         let saved = self.allow_ts_type_assertions;
@@ -1114,7 +1151,7 @@ impl<'a> Parser<'a> {
 
     /// Parse a type annotation (`: Type`) at the current position.
     /// Public wrapper for use from lib.rs.
-    pub fn parse_type_annotation_public(&mut self) -> Result<TSTypeAnnotation, ParseError> {
+    pub fn parse_type_annotation_public(&mut self) -> Result<TSTypeAnnotation<'arena>, ParseError> {
         self.parse_type_annotation()
     }
 
@@ -1137,29 +1174,35 @@ impl<'a> Parser<'a> {
     ///
     /// * `Ok(Expression)` - The converted pattern (ObjectPattern, ArrayPattern, etc.)
     /// * `Err(ParseError)` - If the expression cannot be converted to a valid pattern
-    pub fn expression_to_pattern(&self, expr: Expression) -> Result<Expression, ParseError> {
+    pub fn expression_to_pattern(
+        &self,
+        expr: Expression<'arena>,
+    ) -> Result<Expression<'arena>, ParseError> {
         self.to_assignable(expr)
     }
 
     /// Parse a string literal into a Literal node.
     ///
     /// Expects the current token to be a String token.
-    pub(super) fn parse_string_literal(&mut self) -> Result<Literal, ParseError> {
+    pub(super) fn parse_string_literal(&mut self) -> Result<Literal<'arena>, ParseError> {
         debug_assert!(matches!(self.current_kind(), TokenKind::String));
 
         let (start, end) = self.current_pos();
-        let (content, quote) = self.extract_string_literal();
+        let cooked = self.extract_string_cooked();
         self.advance()?;
 
         Ok(Literal {
-            value: LiteralValue::String { content, quote },
+            value: LiteralValue::String(cooked),
             span: Span::new(start as u32, end as u32),
         })
     }
 }
 
-/// Parse TypeScript source code into an AST.
-pub fn parse_typescript(source: &str) -> Result<Program, ParseError> {
-    let mut parser = Parser::new(source)?;
+/// Parse TypeScript source code into an AST allocated in `arena`.
+pub fn parse_typescript<'arena>(
+    source: &str,
+    arena: &'arena Bump,
+) -> Result<Program<'arena>, ParseError> {
+    let mut parser = Parser::new(source, arena)?;
     parser.parse()
 }

@@ -16,7 +16,7 @@ use tsv_lang::doc::arena::DocId;
 /// (`{#each items /* c */ as item}`) in place rather than relocating it to trail
 /// the collection expression. Shared by the standard and whitespace-sensitive each
 /// builders so the two can't drift.
-pub(crate) fn each_expr_comment_end(block: &EachBlock) -> u32 {
+pub(crate) fn each_expr_comment_end(block: &EachBlock<'_>) -> u32 {
     block
         .context
         .as_ref()
@@ -27,7 +27,7 @@ pub(crate) fn each_expr_comment_end(block: &EachBlock) -> u32 {
 ///
 /// Control flow blocks can hug adjacent inline content when directly adjacent,
 /// unlike HTML block elements (`<div>`, `<p>`) which get their own lines.
-pub(crate) fn is_control_flow_block(node: &FragmentNode) -> bool {
+pub(crate) fn is_control_flow_block(node: &FragmentNode<'_>) -> bool {
     matches!(
         node,
         FragmentNode::IfBlock(_)
@@ -42,7 +42,7 @@ pub(crate) fn is_control_flow_block(node: &FragmentNode) -> bool {
 ///
 /// Only if/each/key blocks force expansion. Await blocks do NOT - they stay inline
 /// in block elements (e.g., `<div>{#await promise}loading{/await}</div>` stays inline).
-pub(crate) fn is_expanding_control_flow_block(node: &FragmentNode) -> bool {
+pub(crate) fn is_expanding_control_flow_block(node: &FragmentNode<'_>) -> bool {
     matches!(
         node,
         FragmentNode::IfBlock(_) | FragmentNode::EachBlock(_) | FragmentNode::KeyBlock(_)
@@ -53,7 +53,7 @@ pub(crate) fn is_expanding_control_flow_block(node: &FragmentNode) -> bool {
 ///
 /// This is a convenience function combining `is_expanding_control_flow_block` and
 /// `has_expanding_block_in_await` checks that are commonly used together.
-pub(crate) fn has_any_expanding_blocks(nodes: &[FragmentNode]) -> bool {
+pub(crate) fn has_any_expanding_blocks(nodes: &[FragmentNode<'_>]) -> bool {
     nodes.iter().any(is_expanding_control_flow_block) || has_expanding_block_in_await(nodes)
 }
 
@@ -66,7 +66,7 @@ pub(crate) fn has_any_expanding_blocks(nodes: &[FragmentNode]) -> bool {
 ///
 /// Single source of truth for the `has_preceding_breakable` test in `fragment_doc`'s node
 /// loops and for [`has_control_flow_after_sibling`]'s breakable-sibling gate.
-pub(crate) fn is_inline_content(node: &FragmentNode) -> bool {
+pub(crate) fn is_inline_content(node: &FragmentNode<'_>) -> bool {
     matches!(
         node,
         FragmentNode::Element(_)
@@ -92,7 +92,7 @@ pub(crate) fn is_inline_content(node: &FragmentNode) -> bool {
 /// siblings are skipped. (Block elements are `Element`, hence breakable, so their
 /// separation still fires.) The force is also gated on `kind.is_block()` at the call site,
 /// so it only applies to block-element parents.
-pub(crate) fn has_control_flow_after_sibling(nodes: &[FragmentNode], source: &str) -> bool {
+pub(crate) fn has_control_flow_after_sibling(nodes: &[FragmentNode<'_>], source: &str) -> bool {
     let mut seen_breakable = false;
     for node in nodes {
         if node.is_whitespace_only_text(source) {
@@ -118,14 +118,14 @@ pub(crate) fn has_control_flow_after_sibling(nodes: &[FragmentNode], source: &st
 /// This function recursively checks nested await blocks, so deeply nested
 /// structures like `{#await p1}{#await p2}{#if c}...{/if}{/await}{/await}`
 /// are also detected.
-fn has_expanding_block_in_await(nodes: &[FragmentNode]) -> bool {
+fn has_expanding_block_in_await(nodes: &[FragmentNode<'_>]) -> bool {
     nodes.iter().any(|n| {
         if let FragmentNode::AwaitBlock(block) = n {
             // Check all branches of the await block for expanding blocks
             // or recursively for nested awaits containing expanding blocks
-            let check_fragment = |f: &crate::ast::internal::Fragment| {
+            let check_fragment = |f: &crate::ast::internal::Fragment<'_>| {
                 f.nodes.iter().any(is_expanding_control_flow_block)
-                    || has_expanding_block_in_await(&f.nodes)
+                    || has_expanding_block_in_await(f.nodes)
             };
             let has_in_pending = block.pending.as_ref().is_some_and(check_fragment);
             let has_in_then = block.then.as_ref().is_some_and(check_fragment);
@@ -141,7 +141,7 @@ fn has_expanding_block_in_await(nodes: &[FragmentNode]) -> bool {
 ///
 /// Used to detect when a parent element will go multiline due to
 /// nested content forcing line breaks.
-pub(crate) fn has_nested_block_flow(nodes: &[FragmentNode]) -> bool {
+pub(crate) fn has_nested_block_flow(nodes: &[FragmentNode<'_>]) -> bool {
     nodes.iter().any(|n| {
         if let FragmentNode::Element(child) = n {
             child.fragment.nodes.iter().any(is_control_flow_block)
@@ -225,7 +225,11 @@ impl<'a> Printer<'a> {
 
     /// Build a `...rest` binding, threading any comment in the `...`→binding gap
     /// (`.../* c */ rest`). Shared by the array-pattern and object-pattern rest arms.
-    fn build_rest_pattern_doc(&self, rest_span_start: u32, argument: &tsv_ts::Expression) -> DocId {
+    fn build_rest_pattern_doc(
+        &self,
+        rest_span_start: u32,
+        argument: &tsv_ts::Expression<'_>,
+    ) -> DocId {
         let d = self.d();
         let dots_end = rest_span_start + 3; // past "..."
         let lead = self.build_pattern_leading_comments(dots_end, argument.span().start);
@@ -239,7 +243,7 @@ impl<'a> Printer<'a> {
     fn build_pattern_key_doc(
         &self,
         computed: bool,
-        key: &tsv_ts::Expression,
+        key: &tsv_ts::Expression<'_>,
         prop_start: u32,
         value_start: u32,
     ) -> (DocId, u32) {
@@ -277,8 +281,8 @@ impl<'a> Printer<'a> {
         &self,
         shorthand: bool,
         computed: bool,
-        key: &tsv_ts::Expression,
-        value: &tsv_ts::Expression,
+        key: &tsv_ts::Expression<'_>,
+        value: &tsv_ts::Expression<'_>,
         prop_start: u32,
     ) -> DocId {
         let d = self.d();
@@ -294,7 +298,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Property dispatcher for a binding `ObjectPattern`.
-    fn build_object_pattern_property_doc(&self, prop: &tsv_ts::ObjectPatternProperty) -> DocId {
+    fn build_object_pattern_property_doc(&self, prop: &tsv_ts::ObjectPatternProperty<'_>) -> DocId {
         match prop {
             tsv_ts::ObjectPatternProperty::Property(p) => self.build_pattern_property_kv(
                 p.shorthand,
@@ -304,7 +308,7 @@ impl<'a> Printer<'a> {
                 p.span.start,
             ),
             tsv_ts::ObjectPatternProperty::RestElement(r) => {
-                self.build_rest_pattern_doc(r.span.start, &r.argument)
+                self.build_rest_pattern_doc(r.span.start, r.argument)
             }
         }
     }
@@ -312,7 +316,7 @@ impl<'a> Printer<'a> {
     /// Property dispatcher for an `ObjectExpression` reached as an assignment-pattern
     /// **default value** (`{ a = { b: /* c */ 1 } }`). Same shape as the binding
     /// dispatcher; only the enum (`ObjectProperty` / `SpreadElement`) differs.
-    fn build_object_expr_property_doc(&self, prop: &tsv_ts::ObjectProperty) -> DocId {
+    fn build_object_expr_property_doc(&self, prop: &tsv_ts::ObjectProperty<'_>) -> DocId {
         match prop {
             tsv_ts::ObjectProperty::Property(p) => self.build_pattern_property_kv(
                 p.shorthand,
@@ -322,7 +326,7 @@ impl<'a> Printer<'a> {
                 p.span.start,
             ),
             tsv_ts::ObjectProperty::SpreadElement(s) => {
-                self.build_rest_pattern_doc(s.span.start, &s.argument)
+                self.build_rest_pattern_doc(s.span.start, s.argument)
             }
         }
     }
@@ -369,7 +373,7 @@ impl<'a> Printer<'a> {
     /// (default-value) arms, which carry identical `Vec<Option<Expression>>` elements.
     fn build_array_brackets(
         &self,
-        elements: &[Option<tsv_ts::Expression>],
+        elements: &[Option<tsv_ts::Expression<'_>>],
         span_start: u32,
         span_end: u32,
     ) -> DocId {
@@ -422,7 +426,7 @@ impl<'a> Printer<'a> {
     /// numeric form), where prettier-plugin-svelte preserves the author's source
     /// token — a separate deliberate divergence (see conformance_prettier.md §Svelte:
     /// destructuring literal normalization).
-    pub(super) fn build_pattern_doc(&self, expr: &tsv_ts::Expression) -> DocId {
+    pub(super) fn build_pattern_doc(&self, expr: &tsv_ts::Expression<'_>) -> DocId {
         let d = self.d();
         match expr {
             // Comments thread through every gap so a comment in any pattern position is
@@ -454,37 +458,37 @@ impl<'a> Printer<'a> {
                 self.build_object_braces(obj.span.start, obj.span.end, &entries)
             }
             tsv_ts::Expression::ArrayPattern(arr) => {
-                self.build_array_brackets(&arr.elements, arr.span.start, arr.span.end)
+                self.build_array_brackets(arr.elements, arr.span.start, arr.span.end)
             }
             tsv_ts::Expression::ArrayExpression(arr) => {
-                self.build_array_brackets(&arr.elements, arr.span.start, arr.span.end)
+                self.build_array_brackets(arr.elements, arr.span.start, arr.span.end)
             }
             tsv_ts::Expression::RestElement(rest) => {
-                self.build_rest_pattern_doc(rest.span.start, &rest.argument)
+                self.build_rest_pattern_doc(rest.span.start, rest.argument)
             }
             // Comments around the `=` stay on the side the author wrote them
             // (`a /* c */ = 1` vs `a = /* c */ 1`). The `Expression` variant is the
             // default-value form of the same `=`.
             tsv_ts::Expression::AssignmentPattern(assign) => {
-                let left = self.build_pattern_doc(&assign.left);
+                let left = self.build_pattern_doc(assign.left);
                 let eq = self.build_pattern_delim_gap(
                     assign.left.span().end,
                     assign.right.span().start,
                     b'=',
                     " = ",
                 );
-                let right = self.build_pattern_doc(&assign.right);
+                let right = self.build_pattern_doc(assign.right);
                 d.concat(&[left, eq, right])
             }
             tsv_ts::Expression::AssignmentExpression(assign) => {
-                let left = self.build_pattern_doc(&assign.left);
+                let left = self.build_pattern_doc(assign.left);
                 let eq = self.build_pattern_delim_gap(
                     assign.left.span().end,
                     assign.right.span().start,
                     b'=',
                     " = ",
                 );
-                let right = self.build_pattern_doc(&assign.right);
+                let right = self.build_pattern_doc(assign.right);
                 d.concat(&[left, eq, right])
             }
             // Default: build doc directly in shared arena. Literals route here too,
@@ -513,7 +517,7 @@ impl<'a> Printer<'a> {
     /// `suffix_width` estimation needed.
     pub(super) fn build_expression_with_comments_doc(
         &self,
-        expr: &tsv_ts::Expression,
+        expr: &tsv_ts::Expression<'_>,
         span_start: u32,
         span_end: u32,
     ) -> DocId {
@@ -571,7 +575,7 @@ impl<'a> Printer<'a> {
     /// - `in_multiline_context` - Whether the block is on its own line (multiline) or inline
     pub(super) fn build_expression_doc_for_block(
         &self,
-        expr: &tsv_ts::Expression,
+        expr: &tsv_ts::Expression<'_>,
         span_start: u32,
         span_end: u32,
         opening_offset: usize,
@@ -644,7 +648,7 @@ impl<'a> Printer<'a> {
         &self,
         open: &'static str,
         opening_tag_span: tsv_lang::Span,
-        expr: &tsv_ts::Expression,
+        expr: &tsv_ts::Expression<'_>,
         comment_end: u32,
         wrapping: bool,
     ) -> DocId {
@@ -684,9 +688,13 @@ mod tests {
     use super::{has_any_expanding_blocks, is_control_flow_block, is_expanding_control_flow_block};
     use crate::ast::internal::FragmentNode;
 
-    /// Parse a Svelte template and return its top-level fragment nodes.
-    fn parse_nodes(src: &str) -> Vec<FragmentNode> {
-        crate::parse(src)
+    /// Parse a Svelte template and return its top-level fragment nodes. The
+    /// nodes borrow the caller-owned `arena`, so each test holds the `Bump`.
+    fn parse_nodes<'arena>(
+        arena: &'arena bumpalo::Bump,
+        src: &str,
+    ) -> &'arena [FragmentNode<'arena>] {
+        crate::parse(src, arena)
             .expect("template should parse")
             .fragment
             .nodes
@@ -694,11 +702,12 @@ mod tests {
 
     #[test]
     fn control_flow_classification_await_is_not_expanding() {
-        let if_nodes = parse_nodes("{#if c}x{/if}");
+        let arena = bumpalo::Bump::new();
+        let if_nodes = parse_nodes(&arena, "{#if c}x{/if}");
         assert!(is_control_flow_block(&if_nodes[0]));
         assert!(is_expanding_control_flow_block(&if_nodes[0]));
 
-        let await_nodes = parse_nodes("{#await p}x{/await}");
+        let await_nodes = parse_nodes(&arena, "{#await p}x{/await}");
         assert!(is_control_flow_block(&await_nodes[0]));
         // Await blocks are control-flow but do NOT force expansion.
         assert!(!is_expanding_control_flow_block(&await_nodes[0]));
@@ -706,16 +715,20 @@ mod tests {
 
     #[test]
     fn expanding_block_detected_through_nested_awaits() {
+        let arena = bumpalo::Bump::new();
         // An if directly inside an await is detected.
-        assert!(has_any_expanding_blocks(&parse_nodes(
+        assert!(has_any_expanding_blocks(parse_nodes(
+            &arena,
             "{#await p}{#if c}x{/if}{/await}"
         )));
         // ...and through a second level of await nesting (recursion).
-        assert!(has_any_expanding_blocks(&parse_nodes(
+        assert!(has_any_expanding_blocks(parse_nodes(
+            &arena,
             "{#await p}{#await q}{#if c}x{/if}{/await}{/await}"
         )));
         // An await with only inline/element content does NOT expand.
-        assert!(!has_any_expanding_blocks(&parse_nodes(
+        assert!(!has_any_expanding_blocks(parse_nodes(
+            &arena,
             "{#await p}<span>x</span>{/await}"
         )));
     }

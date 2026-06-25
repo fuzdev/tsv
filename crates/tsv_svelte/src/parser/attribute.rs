@@ -1,5 +1,7 @@
 // Attribute parsing
 
+use bumpalo::collections::Vec as BumpVec;
+
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
@@ -55,7 +57,7 @@ impl DirectiveType {
     }
 }
 
-impl<'a> SvelteParser<'a> {
+impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Return `end + 1` if the byte at `end` is a quote character, else `end`.
     ///
     /// Used when the last value part of a quoted attribute is an ExpressionTag:
@@ -78,7 +80,9 @@ impl<'a> SvelteParser<'a> {
     /// - Attach tags: `{@attach expr}` (Svelte 5.29+)
     /// - Spread attributes: `{...obj}` (Svelte 3+)
     /// - Shorthand attributes: `{name}` (equivalent to `name={name}`)
-    pub(crate) fn parse_attributes(&mut self) -> Result<Vec<AttributeNode>, ParseError> {
+    pub(crate) fn parse_attributes(
+        &mut self,
+    ) -> Result<BumpVec<'arena, AttributeNode<'arena>>, ParseError> {
         self.parse_attributes_inner(true)
     }
 
@@ -86,15 +90,17 @@ impl<'a> SvelteParser<'a> {
     ///
     /// Script and style tags use plain text attribute values - `{a: A}` is literal text,
     /// not an expression tag.
-    pub(crate) fn parse_attributes_literal(&mut self) -> Result<Vec<AttributeNode>, ParseError> {
+    pub(crate) fn parse_attributes_literal(
+        &mut self,
+    ) -> Result<BumpVec<'arena, AttributeNode<'arena>>, ParseError> {
         self.parse_attributes_inner(false)
     }
 
     fn parse_attributes_inner(
         &mut self,
         parse_expressions: bool,
-    ) -> Result<Vec<AttributeNode>, ParseError> {
-        let mut attributes = Vec::new();
+    ) -> Result<BumpVec<'arena, AttributeNode<'arena>>, ParseError> {
+        let mut attributes = self.bvec();
 
         loop {
             // Skip JS comments (// and /* */) between attributes
@@ -148,7 +154,7 @@ impl<'a> SvelteParser<'a> {
     fn parse_attribute_or_directive(
         &mut self,
         parse_expressions: bool,
-    ) -> Result<AttributeNode, ParseError> {
+    ) -> Result<AttributeNode<'arena>, ParseError> {
         let name_str = self.current_value().to_string();
 
         // Check if this is a directive (contains colon)
@@ -171,10 +177,10 @@ impl<'a> SvelteParser<'a> {
         directive_type: DirectiveType,
         full_name: &str,
         colon_idx: usize,
-    ) -> Result<AttributeNode, ParseError> {
+    ) -> Result<AttributeNode<'arena>, ParseError> {
         let start = self.current_start;
         let name_end = self.current_end;
-        let name_span = Span {
+        let head_span = Span {
             start: start as u32,
             end: name_end as u32,
         };
@@ -182,8 +188,23 @@ impl<'a> SvelteParser<'a> {
         // Extract directive name and modifiers from: prefix:name|mod1|mod2
         let after_colon = &full_name[colon_idx + 1..];
         let mut parts = after_colon.split('|');
-        let directive_name = parts.next().unwrap_or("").to_string();
-        let modifiers: Vec<String> = parts.map(str::to_string).collect();
+        // The name is a verbatim source slice (HTML/Svelte attribute names are never
+        // entity-decoded), so it's stored as a span — not an arena copy. `start` is the
+        // attribute-name token start and `full_name` is that raw token, so the name occupies
+        // `source[start + colon_idx + 1 .. + name.len()]`. The borrow lives only for this
+        // method (the AST stores `name_span`, not the string).
+        let directive_name: &str = parts.next().unwrap_or("");
+        let name_start = start + colon_idx + 1;
+        let name_span = Span {
+            start: name_start as u32,
+            end: (name_start + directive_name.len()) as u32,
+        };
+        let mut modifiers_vec = self.bvec();
+        for m in parts {
+            let m: &'arena str = self.alloc_str_in(m);
+            modifiers_vec.push(m);
+        }
+        let modifiers: &'arena [&'arena str] = modifiers_vec.into_bump_slice();
 
         if directive_name.is_empty() {
             return Err(self.error_msg_at(
@@ -196,13 +217,7 @@ impl<'a> SvelteParser<'a> {
 
         // Style directives accept expression OR string values, handle separately
         if directive_type == DirectiveType::Style {
-            return self.parse_style_directive(
-                directive_name,
-                modifiers,
-                start,
-                name_end,
-                name_span,
-            );
+            return self.parse_style_directive(name_span, modifiers, start, name_end, head_span);
         }
 
         // Check for = (directive with value)
@@ -231,93 +246,93 @@ impl<'a> SvelteParser<'a> {
         // Create the directive
         match directive_type {
             DirectiveType::On => Ok(AttributeNode::OnDirective(OnDirective {
-                name: directive_name,
+                name_span,
                 expression,
                 modifiers,
                 span,
-                name_span,
+                head_span,
                 expression_tag_span,
             })),
             DirectiveType::Bind => {
                 // Bind directive always has an expression (auto-generated for shorthand)
                 let expr = expression.unwrap_or_else(|| {
-                    self.make_shorthand_identifier(&directive_name, colon_idx + 1 + start, name_end)
+                    self.make_shorthand_identifier(directive_name, colon_idx + 1 + start, name_end)
                 });
                 Ok(AttributeNode::BindDirective(BindDirective {
-                    name: directive_name,
+                    name_span,
                     expression: expr,
                     modifiers,
                     span,
-                    name_span,
+                    head_span,
                     expression_tag_span,
                 }))
             }
             DirectiveType::Class => {
                 // Class directive always has an expression (auto-generated for shorthand)
                 let expr = expression.unwrap_or_else(|| {
-                    self.make_shorthand_identifier(&directive_name, colon_idx + 1 + start, name_end)
+                    self.make_shorthand_identifier(directive_name, colon_idx + 1 + start, name_end)
                 });
                 Ok(AttributeNode::ClassDirective(ClassDirective {
-                    name: directive_name,
+                    name_span,
                     expression: expr,
                     modifiers,
                     span,
-                    name_span,
+                    head_span,
                     expression_tag_span,
                 }))
             }
             DirectiveType::Style => unreachable!("handled above"),
             DirectiveType::Use => Ok(AttributeNode::UseDirective(UseDirective {
-                name: directive_name,
+                name_span,
                 expression,
                 modifiers,
                 span,
-                name_span,
+                head_span,
                 expression_tag_span,
             })),
             DirectiveType::Transition => {
                 Ok(AttributeNode::TransitionDirective(TransitionDirective {
-                    name: directive_name,
+                    name_span,
                     expression,
                     modifiers,
                     direction: TransitionDirection::Both,
                     span,
-                    name_span,
+                    head_span,
                     expression_tag_span,
                 }))
             }
             DirectiveType::In => Ok(AttributeNode::TransitionDirective(TransitionDirective {
-                name: directive_name,
+                name_span,
                 expression,
                 modifiers,
                 direction: TransitionDirection::In,
                 span,
-                name_span,
+                head_span,
                 expression_tag_span,
             })),
             DirectiveType::Out => Ok(AttributeNode::TransitionDirective(TransitionDirective {
-                name: directive_name,
+                name_span,
                 expression,
                 modifiers,
                 direction: TransitionDirection::Out,
                 span,
-                name_span,
+                head_span,
                 expression_tag_span,
             })),
             DirectiveType::Animate => Ok(AttributeNode::AnimateDirective(AnimateDirective {
-                name: directive_name,
+                name_span,
                 expression,
                 modifiers,
                 span,
-                name_span,
+                head_span,
                 expression_tag_span,
             })),
             DirectiveType::Let => Ok(AttributeNode::LetDirective(LetDirective {
-                name: directive_name,
+                name_span,
                 expression,
                 modifiers,
                 span,
-                name_span,
+                head_span,
                 expression_tag_span,
             })),
         }
@@ -328,7 +343,7 @@ impl<'a> SvelteParser<'a> {
     ///
     /// Accepts both `{expr}` and `"{expr}"` (quoted mustache) forms.
     /// Svelte's parser accepts quoted expressions in directives; prettier strips the quotes.
-    fn parse_directive_expression(&mut self) -> Result<(Expression, Span), ParseError> {
+    fn parse_directive_expression(&mut self) -> Result<(Expression<'arena>, Span), ParseError> {
         if self.check(TokenKind::LeftBrace) {
             // Standard form: {expr}
             let expr_tag = self.parse_expression_tag()?;
@@ -355,30 +370,32 @@ impl<'a> SvelteParser<'a> {
     }
 
     /// Create an identifier expression for shorthand directives (bind:value, class:class1)
-    fn make_shorthand_identifier(&self, name: &str, start: usize, end: usize) -> Expression {
+    fn make_shorthand_identifier(
+        &self,
+        name: &str,
+        start: usize,
+        end: usize,
+    ) -> Expression<'arena> {
         let symbol = self.interner.borrow_mut().get_or_intern(name);
-        Expression::Identifier(Identifier {
-            name: symbol,
-            optional: false,
-            type_annotation: None,
-            decorators: None,
-            span: Span {
+        Expression::Identifier(Identifier::simple(
+            symbol,
+            Span {
                 start: start as u32,
                 end: end as u32,
             },
-        })
+        ))
     }
 
     /// Parse a style directive (style:property={value} or style:property="value")
     /// Style directives can have expression values OR string values
     fn parse_style_directive(
         &mut self,
-        directive_name: String,
-        modifiers: Vec<String>,
+        name_span: Span,
+        modifiers: &'arena [&'arena str],
         start: usize,
         name_end: usize,
-        name_span: Span,
-    ) -> Result<AttributeNode, ParseError> {
+        head_span: Span,
+    ) -> Result<AttributeNode<'arena>, ParseError> {
         // Check for = (directive with value)
         let value = if self.check(TokenKind::Equals) {
             self.advance()?; // consume =
@@ -399,12 +416,12 @@ impl<'a> SvelteParser<'a> {
                         };
                         StyleDirectiveValue::ExpressionTag(expr_tag)
                     }
-                    _ => StyleDirectiveValue::Parts(parts),
+                    _ => StyleDirectiveValue::Parts(parts.into_bump_slice()),
                 }
             } else if self.check(TokenKind::Identifier) {
                 // Unquoted value: style:background=green
                 let parts = self.parse_unquoted_attribute_value(true)?;
-                StyleDirectiveValue::Parts(parts)
+                StyleDirectiveValue::Parts(parts.into_bump_slice())
             } else {
                 return Err(
                     self.error_msg("Style directive value must be an expression or quoted string")
@@ -436,11 +453,11 @@ impl<'a> SvelteParser<'a> {
         };
 
         Ok(AttributeNode::StyleDirective(StyleDirective {
-            name: directive_name,
+            name_span,
             value,
             modifiers,
             span,
-            name_span,
+            head_span,
         }))
     }
 
@@ -453,7 +470,7 @@ impl<'a> SvelteParser<'a> {
     /// - A call expression: {@attach tooltip("hi")}
     /// - A conditional: {@attach a ? fn1 : fn2}
     /// - An arrow function: {@attach (el) => el.focus()}
-    pub(crate) fn parse_attach_tag(&mut self) -> Result<AttachTag, ParseError> {
+    pub(crate) fn parse_attach_tag(&mut self) -> Result<AttachTag<'arena>, ParseError> {
         let start = self.current_start;
 
         // We're at '{@', scan forward to find the closing '}'
@@ -509,7 +526,7 @@ impl<'a> SvelteParser<'a> {
     /// - An identifier: {...obj}
     /// - A call expression: {...getProps()}
     /// - A member expression: {...obj.nested}
-    fn parse_spread_attribute(&mut self) -> Result<SpreadAttribute, ParseError> {
+    fn parse_spread_attribute(&mut self) -> Result<SpreadAttribute<'arena>, ParseError> {
         let start = self.current_start;
 
         // We're at '{', scan forward to find the closing '}'
@@ -564,7 +581,7 @@ impl<'a> SvelteParser<'a> {
     /// Equivalent to: name={name}
     ///
     /// The content must be a valid identifier.
-    fn parse_shorthand_attribute(&mut self) -> Result<Attribute, ParseError> {
+    fn parse_shorthand_attribute(&mut self) -> Result<Attribute<'arena>, ParseError> {
         let start = self.current_start;
 
         // We're at '{', scan forward to find the closing '}'
@@ -613,16 +630,13 @@ impl<'a> SvelteParser<'a> {
 
         // Create the value as an ExpressionTag containing an Identifier
         // The identifier has the same name as the attribute
-        let identifier = Identifier {
+        let identifier = Identifier::simple(
             name,
-            optional: false,
-            type_annotation: None,
-            decorators: None,
-            span: Span {
+            Span {
                 start: content_start as u32,
                 end: content_end as u32,
             },
-        };
+        );
 
         let expression_tag = ExpressionTag {
             expression: Expression::Identifier(identifier),
@@ -635,9 +649,12 @@ impl<'a> SvelteParser<'a> {
         // Advance the lexer past the entire {name} construct
         self.advance_to_position(end)?;
 
+        let mut value_vec = self.bvec();
+        value_vec.push(AttributeValue::ExpressionTag(expression_tag));
+
         Ok(Attribute {
             name,
-            value: Some(vec![AttributeValue::ExpressionTag(expression_tag)]),
+            value: Some(value_vec.into_bump_slice()),
             span: Span {
                 start: start as u32,
                 end: end as u32,
@@ -649,7 +666,10 @@ impl<'a> SvelteParser<'a> {
         })
     }
 
-    fn parse_attribute_inner(&mut self, parse_expressions: bool) -> Result<Attribute, ParseError> {
+    fn parse_attribute_inner(
+        &mut self,
+        parse_expressions: bool,
+    ) -> Result<Attribute<'arena>, ParseError> {
         let start = self.current_start;
 
         // Parse attribute name
@@ -688,7 +708,7 @@ impl<'a> SvelteParser<'a> {
 
             Ok(Attribute {
                 name,
-                value: Some(value),
+                value: Some(value.into_bump_slice()),
                 span: Span {
                     start: start as u32,
                     end: value_end as u32,
@@ -717,14 +737,16 @@ impl<'a> SvelteParser<'a> {
 
     /// Parse attribute value (e.g., `"ts"`, `{expr}`, or unquoted `value`)
     /// Returns a Vec<AttributeValue> to support mixed text/expressions
-    pub(crate) fn parse_attribute_value(&mut self) -> Result<Vec<AttributeValue>, ParseError> {
+    pub(crate) fn parse_attribute_value(
+        &mut self,
+    ) -> Result<BumpVec<'arena, AttributeValue<'arena>>, ParseError> {
         self.parse_attribute_value_inner(true)
     }
 
     fn parse_attribute_value_inner(
         &mut self,
         parse_expressions: bool,
-    ) -> Result<Vec<AttributeValue>, ParseError> {
+    ) -> Result<BumpVec<'arena, AttributeValue<'arena>>, ParseError> {
         // Any value not starting with a quote is unquoted, read as a Svelte
         // `read_sequence` — a run of Text + {expr} chunks to the terminator regex.
         // Covers a bare identifier (`data-attr=value`), a single expression
@@ -734,7 +756,7 @@ impl<'a> SvelteParser<'a> {
             return self.parse_unquoted_attribute_value(parse_expressions);
         }
 
-        let mut parts = Vec::new();
+        let mut parts = self.bvec();
 
         // Extract string content (without quotes)
         let (token_start, token_end) = self.current_pos();
@@ -835,29 +857,30 @@ impl<'a> SvelteParser<'a> {
     pub(crate) fn parse_unquoted_attribute_value(
         &mut self,
         parse_expressions: bool,
-    ) -> Result<Vec<AttributeValue>, ParseError> {
+    ) -> Result<BumpVec<'arena, AttributeValue<'arena>>, ParseError> {
         // `src`/`bytes` borrow the source data (lifetime `'a`), so they stay valid
         // across the `&mut self` `parse_expression_tag_at` call below.
         let src = self.source;
         let bytes = src.as_bytes();
         let start = self.current_start;
-        let mut parts: Vec<AttributeValue> = Vec::new();
+        let mut parts: BumpVec<'arena, AttributeValue<'arena>> = self.bvec();
         let mut text_start = start;
         let mut pos = start;
 
-        let flush_text = |parts: &mut Vec<AttributeValue>, from: usize, to: usize| {
-            if to > from {
-                let span = Span {
-                    start: from as u32,
-                    end: to as u32,
-                };
-                parts.push(AttributeValue::Text(Text {
-                    raw_span: span,
-                    decoding: TextDecoding::AttributeValue,
-                    span,
-                }));
-            }
-        };
+        let flush_text =
+            |parts: &mut BumpVec<'arena, AttributeValue<'arena>>, from: usize, to: usize| {
+                if to > from {
+                    let span = Span {
+                        start: from as u32,
+                        end: to as u32,
+                    };
+                    parts.push(AttributeValue::Text(Text {
+                        raw_span: span,
+                        decoding: TextDecoding::AttributeValue,
+                        span,
+                    }));
+                }
+            };
 
         loop {
             // Terminator regex: `/>` or one of whitespace " ' = < > `

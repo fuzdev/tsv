@@ -15,6 +15,7 @@ tsv_lang.workspace = true
 tsv_html.workspace = true
 tsv_ts.workspace = true
 tsv_css.workspace = true
+bumpalo.workspace = true
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 string-interner.workspace = true

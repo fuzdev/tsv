@@ -186,7 +186,7 @@ fn scan_to_terminator(source: &str, from: usize) -> usize {
 /// first whitespace/colon, and `value` is the raw post-colon source with block
 /// comments stripped and the ends trimmed (so `red   !   important` stays raw and
 /// `!important` is never re-serialized).
-fn convert_declaration(decl: &internal::CssDeclaration, source: &str) -> serde_json::Value {
+fn convert_declaration(decl: &internal::CssDeclaration<'_>, source: &str) -> serde_json::Value {
     let content_end = decl
         .important_end
         .map_or(decl.span.end, |e| e.max(decl.span.end));
@@ -209,7 +209,10 @@ fn convert_declaration(decl: &internal::CssDeclaration, source: &str) -> serde_j
 /// Convert PseudoClassArgs to Svelte's expected JSON structure
 ///
 /// Generates the wrapper structure: SelectorList → ComplexSelector → RelativeSelector → Nth
-fn convert_pseudo_class_args(args: &internal::PseudoClassArgs, source: &str) -> serde_json::Value {
+fn convert_pseudo_class_args(
+    args: &internal::PseudoClassArgs<'_>,
+    source: &str,
+) -> serde_json::Value {
     match args {
         internal::PseudoClassArgs::Nth {
             value,
@@ -296,7 +299,7 @@ fn convert_pseudo_class_args(args: &internal::PseudoClassArgs, source: &str) -> 
 }
 
 /// Convert a CSS node to JSON representation
-pub fn convert_css_node(node: &internal::CssNode, source: &str) -> serde_json::Value {
+pub fn convert_css_node(node: &internal::CssNode<'_>, source: &str) -> serde_json::Value {
     match node {
         internal::CssNode::Rule(rule) => convert_css_rule(rule, source),
         internal::CssNode::Atrule(atrule) => convert_css_atrule(atrule, source),
@@ -304,7 +307,7 @@ pub fn convert_css_node(node: &internal::CssNode, source: &str) -> serde_json::V
 }
 
 /// Convert a CSS rule to JSON representation
-fn convert_css_rule(rule: &internal::CssRule, source: &str) -> serde_json::Value {
+fn convert_css_rule(rule: &internal::CssRule<'_>, source: &str) -> serde_json::Value {
     // Filter out comments to match Svelte's CSS parser output
     // (Our internal AST has comments for the formatter, but public JSON AST should match Svelte)
     // Support nested rules (CSS Nesting Module) and at-rules within rule blocks
@@ -349,7 +352,7 @@ fn convert_css_rule(rule: &internal::CssRule, source: &str) -> serde_json::Value
 }
 
 /// Convert a CSS at-rule to JSON representation
-fn convert_css_atrule(atrule: &internal::CssAtrule, source: &str) -> serde_json::Value {
+fn convert_css_atrule(atrule: &internal::CssAtrule<'_>, source: &str) -> serde_json::Value {
     let block = atrule.block.as_ref().map(|b| {
         // Filter out comments to match Svelte's CSS parser output
         // (Our internal AST has comments for the formatter, but public JSON AST should match Svelte)
@@ -386,7 +389,7 @@ fn convert_css_atrule(atrule: &internal::CssAtrule, source: &str) -> serde_json:
 /// Svelte 5.55.x strips `/* ... */` block comments from at-rule preludes (surrounding
 /// whitespace preserved, then trimmed). Applied to all source-extracted variants;
 /// `Values` is built from parsed tokens that never contained comments.
-fn convert_prelude_to_string(prelude: &internal::PreludeValue, source: &str) -> String {
+fn convert_prelude_to_string(prelude: &internal::PreludeValue<'_>, source: &str) -> String {
     match prelude {
         internal::PreludeValue::Values { span, .. } => {
             // Extract the prelude verbatim from source and strip comments, matching
@@ -422,7 +425,10 @@ fn convert_prelude_to_string(prelude: &internal::PreludeValue, source: &str) -> 
 /// Convert an at-rule block child to JSON representation
 ///
 /// Note: Comments are filtered out before calling this function (see convert_css_atrule)
-fn convert_atrule_block_child(child: &internal::CssBlockChild, source: &str) -> serde_json::Value {
+fn convert_atrule_block_child(
+    child: &internal::CssBlockChild<'_>,
+    source: &str,
+) -> serde_json::Value {
     match child {
         internal::CssBlockChild::Rule(rule) => convert_css_rule(rule, source),
         internal::CssBlockChild::Declaration(decl) => convert_declaration(decl, source),
@@ -436,7 +442,7 @@ fn convert_atrule_block_child(child: &internal::CssBlockChild, source: &str) -> 
 
 /// Convert a SelectorList to JSON
 fn convert_selector_list(
-    selector_list: &internal::SelectorList,
+    selector_list: &internal::SelectorList<'_>,
     source: &str,
 ) -> serde_json::Value {
     let children: Vec<serde_json::Value> = selector_list
@@ -466,7 +472,7 @@ fn convert_selector_list(
 /// This filtering happens at conversion time, not in the internal AST, to preserve
 /// full semantic information for the formatter (which outputs all selectors).
 fn convert_selector_list_filtered(
-    selector_list: &internal::SelectorList,
+    selector_list: &internal::SelectorList<'_>,
     source: &str,
 ) -> serde_json::Value {
     let children: Vec<serde_json::Value> = selector_list
@@ -485,9 +491,9 @@ fn convert_selector_list_filtered(
 }
 
 /// Check if a complex selector contains Invalid simple selectors (from forgiving parsing)
-fn selector_contains_invalid(complex: &internal::ComplexSelector) -> bool {
-    for relative in &complex.children {
-        for simple in &relative.selectors {
+fn selector_contains_invalid(complex: &internal::ComplexSelector<'_>) -> bool {
+    for relative in complex.children {
+        for simple in relative.selectors {
             if matches!(simple, internal::SimpleSelector::Invalid { .. }) {
                 return true;
             }
@@ -498,7 +504,7 @@ fn selector_contains_invalid(complex: &internal::ComplexSelector) -> bool {
 
 /// Convert a ComplexSelector to JSON
 fn convert_complex_selector(
-    complex: &internal::ComplexSelector,
+    complex: &internal::ComplexSelector<'_>,
     source: &str,
 ) -> serde_json::Value {
     let children: Vec<serde_json::Value> = complex
@@ -517,7 +523,7 @@ fn convert_complex_selector(
 
 /// Convert a RelativeSelector to JSON
 fn convert_relative_selector(
-    relative: &internal::RelativeSelector,
+    relative: &internal::RelativeSelector<'_>,
     source: &str,
 ) -> serde_json::Value {
     let combinator =
@@ -599,25 +605,41 @@ fn raw_selector_name(source: &str, span: tsv_lang::Span, prefix_len: usize) -> S
     out
 }
 
+/// The end position of a pseudo selector's name, excluding any `(args)`.
+///
+/// A pseudo's `span` covers the whole `:name(args)` / `::name(args)`, so when it has
+/// arguments the name runs only up to the first `(`; without arguments the whole span is
+/// the name. Used to bound the `raw_selector_name` slice (and, for pseudo-elements, the
+/// public `end`) to just the name — the decoded internal name is never re-serialized.
+fn pseudo_name_end(source: &str, span: tsv_lang::Span, has_args: bool) -> u32 {
+    if has_args {
+        let raw = &source[span.start as usize..span.end as usize];
+        raw.find('(').map_or(span.end, |i| span.start + i as u32)
+    } else {
+        span.end
+    }
+}
+
 /// Convert a SimpleSelector to JSON
-fn convert_simple_selector(simple: &internal::SimpleSelector, source: &str) -> serde_json::Value {
+fn convert_simple_selector(
+    simple: &internal::SimpleSelector<'_>,
+    source: &str,
+) -> serde_json::Value {
     match simple {
-        internal::SimpleSelector::Type {
-            namespace,
-            name,
-            span,
-        } => {
+        internal::SimpleSelector::Type { namespace, span } => {
             // SVELTE QUIRK: Namespace prefixes are parsed but NOT included in the JSON AST
             // Example: svg|rect → {"type": "TypeSelector", "name": "rect"}
             // The namespace is preserved in the source span but not exposed in the JSON.
             // Without a namespace the span is exactly the name, so emit the raw source
-            // (Svelte never decodes escapes in selector names); with one, the raw slice
-            // would include the prefix, so keep the decoded name (canonical errors on
-            // namespaces anyway — see conformance_svelte.md).
+            // (Svelte never decodes escapes in selector names); with one, skip past the
+            // `|` so the prefix isn't included (canonical errors on namespaces anyway —
+            // see conformance_svelte.md).
             let raw_name = if namespace.is_none() {
                 raw_selector_name(source, *span, 0)
             } else {
-                name.clone()
+                let raw = &source[span.start as usize..span.end as usize];
+                let prefix = raw.find('|').map_or(0, |i| i + 1);
+                raw_selector_name(source, *span, prefix)
             };
             serde_json::json!({
                 "type": "TypeSelector",
@@ -636,7 +658,7 @@ fn convert_simple_selector(simple: &internal::SimpleSelector, source: &str) -> s
                 "end": span.end,
             })
         }
-        internal::SimpleSelector::Class { name: _, span } => {
+        internal::SimpleSelector::Class { span } => {
             serde_json::json!({
                 "type": "ClassSelector",
                 "name": raw_selector_name(source, *span, 1),
@@ -644,7 +666,7 @@ fn convert_simple_selector(simple: &internal::SimpleSelector, source: &str) -> s
                 "end": span.end,
             })
         }
-        internal::SimpleSelector::Id { name: _, span } => {
+        internal::SimpleSelector::Id { span } => {
             serde_json::json!({
                 "type": "IdSelector",
                 "name": raw_selector_name(source, *span, 1),
@@ -654,7 +676,7 @@ fn convert_simple_selector(simple: &internal::SimpleSelector, source: &str) -> s
         }
         internal::SimpleSelector::Attribute {
             namespace,
-            name,
+            name_span,
             matcher,
             value,
             flags,
@@ -664,15 +686,20 @@ fn convert_simple_selector(simple: &internal::SimpleSelector, source: &str) -> s
                 serde_json::Value::String(m.as_str().to_string())
             });
             let value_val = value.as_ref().map_or(serde_json::Value::Null, |v| {
-                serde_json::Value::String(v.clone())
+                serde_json::Value::String((*v).to_string())
             });
             let flags_val = flags.as_ref().map_or(serde_json::Value::Null, |f| {
-                serde_json::Value::String(f.clone())
+                serde_json::Value::String((*f).to_string())
             });
 
+            // The name is half-decoded from its own span (`name_span` is exactly the name
+            // token — no sigil prefix, so `prefix_len` is 0), matching Svelte's `read_identifier`
+            // like class/id/type and pseudo names: hex escapes decode, identity escapes keep the
+            // backslash (`[f\oo]` → `"f\\oo"`, not `"foo"`). See conformance_svelte.md
+            // §Selector-name half-decoding.
             let mut obj = serde_json::json!({
                 "type": "AttributeSelector",
-                "name": name,
+                "name": raw_selector_name(source, *name_span, 0),
                 "start": span.start,
                 "end": span.end,
                 "matcher": matcher_val,
@@ -680,17 +707,24 @@ fn convert_simple_selector(simple: &internal::SimpleSelector, source: &str) -> s
                 "flags": flags_val,
             });
             if let Some(ns) = namespace {
-                obj["namespace"] = serde_json::Value::String(ns.clone());
+                obj["namespace"] = serde_json::Value::String((*ns).to_string());
             }
             obj
         }
-        // TODO: PseudoClass/PseudoElement/Attribute names still emit the fully
-        // decoded internal form; Svelte keeps escapes half-decoded there too
-        // (`:\68over`). No corpus file hits it — align if one ever does.
-        internal::SimpleSelector::PseudoClass { name, args, span } => {
+        // Pseudo-class/-element names are half-decoded like every other selector name
+        // (`raw_selector_name`): hex escapes decode, identity escapes keep the backslash —
+        // matching Svelte's `read_identifier`. The name slice runs from the `:`/`::` sigil to
+        // the `(` (when there are args) or the span end, so the decoded internal name is never
+        // re-serialized; only `span` and `source` feed the public `name`.
+        internal::SimpleSelector::PseudoClass { args, span } => {
             let args_val = args.as_ref().map_or(serde_json::Value::Null, |a| {
                 convert_pseudo_class_args(a, source)
             });
+            let name_span = tsv_lang::Span {
+                start: span.start,
+                end: pseudo_name_end(source, *span, args.is_some()),
+            };
+            let name = raw_selector_name(source, name_span, 1);
 
             serde_json::json!({
                 "type": "PseudoClassSelector",
@@ -700,21 +734,24 @@ fn convert_simple_selector(simple: &internal::SimpleSelector, source: &str) -> s
                 "end": span.end,
             })
         }
-        internal::SimpleSelector::PseudoElement { name, args, span } => {
+        internal::SimpleSelector::PseudoElement { args, span } => {
             // Truncate span to match Svelte: just the pseudo-element name, excluding args.
             // Example: ::slotted(*) has full span 9-21, but Svelte outputs 9-18 (just ::slotted).
             // Public AST matches Svelte for drop-in compatibility; the internal AST keeps the
             // full accurate span (including args) for the formatter/tooling.
             //
-            // Derive the name end from the source `(` rather than the decoded `name.len()`,
-            // which undercounts when the name contains escapes (`::\41 b` is 7 raw bytes but
-            // decodes to "Ab"). Without args the span is already exactly `::name`.
-            let name_end = if args.is_some() {
-                let raw = &source[span.start as usize..span.end as usize];
-                raw.find('(').map_or(span.end, |i| span.start + i as u32)
-            } else {
-                span.end
-            };
+            // Derive the name end from the source `(` (when there are args), not a decoded
+            // length, which undercounts when the name contains escapes (`::\41 b` is 7 raw
+            // bytes but decodes to "Ab"). Without args the span is already exactly `::name`.
+            let name_end = pseudo_name_end(source, *span, args.is_some());
+            let name = raw_selector_name(
+                source,
+                tsv_lang::Span {
+                    start: span.start,
+                    end: name_end,
+                },
+                2,
+            );
 
             serde_json::json!({
                 "type": "PseudoElementSelector",
@@ -806,7 +843,10 @@ fn translate_positions_recursive(value: &mut serde_json::Value, map: &tsv_lang::
 }
 
 /// Convert a list of CSS nodes to a typed StyleSheet structure (for Svelte embedding)
-pub fn convert_css_nodes(nodes: &[internal::CssNode], source: &str) -> super::public::StyleSheet {
+pub fn convert_css_nodes(
+    nodes: &[internal::CssNode<'_>],
+    source: &str,
+) -> super::public::StyleSheet {
     // Convert all nodes (comments are stored separately and not included in JSON output)
     let children: Vec<serde_json::Value> = nodes
         .iter()
@@ -848,7 +888,7 @@ pub fn convert_css_nodes(nodes: &[internal::CssNode], source: &str) -> super::pu
 /// nodes, matching Svelte's `parseCss()` output (which includes these for standalone
 /// CSS but not for embedded `<style>` in `.svelte` files).
 pub fn convert_css_nodes_standalone(
-    nodes: &[internal::CssNode],
+    nodes: &[internal::CssNode<'_>],
     source: &str,
 ) -> serde_json::Value {
     let children: Vec<serde_json::Value> = nodes

@@ -10,7 +10,7 @@ use tsv_lang::{ParseError, Span};
 
 use super::Parser;
 
-impl<'a> Parser<'a> {
+impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse the body of an index signature after `[identifier` has been consumed.
     /// Expects current token to be `:` (the colon after the parameter name).
     /// Returns the completed `TSTypeElement::IndexSignature`.
@@ -20,20 +20,23 @@ impl<'a> Parser<'a> {
         param_symbol: DefaultSymbol,
         id_start: usize,
         readonly: bool,
-    ) -> Result<TSTypeElement, ParseError> {
+    ) -> Result<TSTypeElement<'arena>, ParseError> {
         let param_colon_start = self.current_pos().0;
         self.expect(&TokenKind::Colon)?;
         let param_type = self.parse_type()?;
         let param_type_end = param_type.span().end;
 
-        let param = Identifier {
-            name: param_symbol,
-            optional: false,
+        let extra: &'arena IdentifierParamExtra<'arena> = self.alloc(IdentifierParamExtra {
             type_annotation: Some(TSTypeAnnotation {
-                type_annotation: Box::new(param_type),
+                type_annotation: self.alloc(param_type),
                 span: Span::new(param_colon_start as u32, param_type_end),
             }),
             decorators: None,
+        });
+        let param = Identifier {
+            name: param_symbol,
+            optional: false,
+            extra: Some(extra),
             span: Span::new(id_start as u32, param_type_end),
         };
 
@@ -44,10 +47,12 @@ impl<'a> Parser<'a> {
         let value_type = self.parse_type()?;
         let member_end = value_type.span().end;
 
+        let mut parameters = self.bvec();
+        parameters.push(param);
         Ok(TSTypeElement::IndexSignature(TSIndexSignature {
-            parameters: vec![param],
+            parameters: parameters.into_bump_slice(),
             type_annotation: TSTypeAnnotation {
-                type_annotation: Box::new(value_type),
+                type_annotation: self.alloc(value_type),
                 span: Span::new(value_colon_start as u32, member_end),
             },
             is_static: false,
@@ -61,8 +66,8 @@ impl<'a> Parser<'a> {
     /// is present. Shared by type literals (`{ … }`) and interface bodies.
     pub(in crate::parser) fn parse_type_members(
         &mut self,
-    ) -> Result<Vec<TSTypeElement>, ParseError> {
-        let mut members = Vec::new();
+    ) -> Result<bumpalo::collections::Vec<'arena, TSTypeElement<'arena>>, ParseError> {
+        let mut members = self.bvec();
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
             let mut element = self.parse_type_element()?;
             // Consume separator (; or ,) if present, extending the element span to include it
@@ -75,7 +80,9 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse type element: property, method, call signature, construct signature, or index signature
-    pub(in crate::parser) fn parse_type_element(&mut self) -> Result<TSTypeElement, ParseError> {
+    pub(in crate::parser) fn parse_type_element(
+        &mut self,
+    ) -> Result<TSTypeElement<'arena>, ParseError> {
         let start = self.current_pos().0;
 
         // Check for readonly modifier - only if followed by a property name or bracket
@@ -107,7 +114,7 @@ impl<'a> Parser<'a> {
         if self.check(&TokenKind::ParenOpen) || self.check(&TokenKind::LessThan) {
             // Parse optional type parameters: <T>
             let type_parameters = self.parse_optional_type_parameters()?;
-            let params = self.parse_parameter_list()?;
+            let params = self.parse_parameter_list()?.into_bump_slice();
             let (return_type, end) = self.parse_signature_return_type(true)?;
             return Ok(TSTypeElement::CallSignature(TSCallSignatureDeclaration {
                 type_parameters,
@@ -128,7 +135,7 @@ impl<'a> Parser<'a> {
                 self.advance()?;
                 // Parse optional type parameters: <T>
                 let type_parameters = self.parse_optional_type_parameters()?;
-                let params = self.parse_parameter_list()?;
+                let params = self.parse_parameter_list()?.into_bump_slice();
                 let (return_type, end) = self.parse_signature_return_type(false)?;
                 return Ok(TSTypeElement::ConstructSignature(
                     TSConstructSignatureDeclaration {
@@ -202,12 +209,12 @@ impl<'a> Parser<'a> {
         } else if self.check(&TokenKind::String) {
             // String literal key: {'multi-word': number}
             let (key_start, key_end) = self.current_pos();
-            let (content, quote) = self.extract_string_literal();
+            let cooked = self.extract_string_cooked();
             self.advance()?;
             (
                 false,
                 Expression::Literal(Literal {
-                    value: LiteralValue::String { content, quote },
+                    value: LiteralValue::String(cooked),
                     span: Span::new(key_start as u32, key_end as u32),
                 }),
             )
@@ -239,7 +246,7 @@ impl<'a> Parser<'a> {
             // Parse type parameters if present: `<T>` or `<T, U extends V>`
             let type_parameters = self.parse_optional_type_parameters()?;
 
-            let params = self.parse_parameter_list()?;
+            let params = self.parse_parameter_list()?.into_bump_slice();
             let (return_type, end) = self.parse_signature_return_type(true)?;
 
             return Ok(TSTypeElement::MethodSignature(TSMethodSignature {
@@ -284,7 +291,7 @@ impl<'a> Parser<'a> {
     fn parse_signature_return_type(
         &mut self,
         allow_type_predicate: bool,
-    ) -> Result<(Option<TSTypeAnnotation>, u32), ParseError> {
+    ) -> Result<(Option<TSTypeAnnotation<'arena>>, u32), ParseError> {
         let return_type = if self.check(&TokenKind::Colon) {
             Some(if allow_type_predicate {
                 self.parse_return_type_annotation()?

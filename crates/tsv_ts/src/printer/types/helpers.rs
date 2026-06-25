@@ -21,7 +21,7 @@ use crate::ast::internal::{self, TSIntersectionType, TSKeywordKind, TSType, TSUn
 /// Returns false for single simple type args (like `Promise<void>`) - these should
 /// let function params break first rather than breaking the return type.
 pub(super) fn type_args_should_wrap_for_return_type(
-    args: &internal::TSTypeParameterInstantiation,
+    args: &internal::TSTypeParameterInstantiation<'_>,
 ) -> bool {
     // Multiple type args can break between them
     if args.params.len() > 1 {
@@ -70,9 +70,9 @@ pub(super) fn find_separator_position(
 //
 
 /// Recursively unwrap TSParenthesizedType to get the inner type.
-pub fn unwrap_parenthesized(ts_type: &TSType) -> &TSType {
+pub fn unwrap_parenthesized<'a>(ts_type: &'a TSType<'a>) -> &'a TSType<'a> {
     match ts_type {
-        TSType::Parenthesized(p) => unwrap_parenthesized(&p.type_annotation),
+        TSType::Parenthesized(p) => unwrap_parenthesized(p.type_annotation),
         _ => ts_type,
     }
 }
@@ -83,9 +83,11 @@ pub fn unwrap_parenthesized(ts_type: &TSType) -> &TSType {
 ///
 /// Used to recover the paren span so `build_parenthesized_union_doc` can emit comments
 /// the user wrote inside retained parens (`(/* c */ a | b)`, `(a | b /* c */)`).
-pub(super) fn immediate_union_paren(ts_type: &TSType) -> Option<&internal::TSParenthesizedType> {
+pub(super) fn immediate_union_paren<'a>(
+    ts_type: &'a TSType<'a>,
+) -> Option<&'a internal::TSParenthesizedType<'a>> {
     match ts_type {
-        TSType::Parenthesized(p) => match p.type_annotation.as_ref() {
+        TSType::Parenthesized(p) => match p.type_annotation {
             TSType::Union(_) => Some(p),
             inner @ TSType::Parenthesized(_) => immediate_union_paren(inner),
             _ => None,
@@ -99,7 +101,7 @@ pub(super) fn immediate_union_paren(ts_type: &TSType) -> Option<&internal::TSPar
 /// TypeLiteral (`{ a: T }`) and Mapped (`{ [K in T]: V }`) types are huggable:
 /// they handle their own expansion and should keep `{` hugged to the context.
 #[inline]
-pub fn is_huggable_type(ts_type: &TSType) -> bool {
+pub fn is_huggable_type(ts_type: &TSType<'_>) -> bool {
     matches!(ts_type, TSType::TypeLiteral(_) | TSType::Mapped(_))
 }
 
@@ -111,7 +113,7 @@ pub fn is_huggable_type(ts_type: &TSType) -> bool {
 /// are void types (void, null).
 ///
 /// Example: `{ name: string; value: number } | null` stays hugged.
-pub fn should_hug_union_type(union: &TSUnionType) -> bool {
+pub fn should_hug_union_type(union: &TSUnionType<'_>) -> bool {
     // Find exactly one object-like type
     let mut object_idx = None;
     for (i, t) in union.types.iter().enumerate() {
@@ -138,14 +140,14 @@ pub fn should_hug_union_type(union: &TSUnionType) -> bool {
 /// Check if a type is "object-like" for union hugging purposes.
 /// Matches Prettier's `isObjectLikeType`: TSTypeLiteral and TSTypeReference.
 #[inline]
-fn is_object_like_type(ts_type: &TSType) -> bool {
+fn is_object_like_type(ts_type: &TSType<'_>) -> bool {
     matches!(ts_type, TSType::TypeLiteral(_) | TSType::TypeReference(_))
 }
 
 /// Check if a type is a "void type" for union hugging purposes.
 /// Matches Prettier's `isVoidType`: void and null keywords.
 #[inline]
-fn is_void_type(ts_type: &TSType) -> bool {
+fn is_void_type(ts_type: &TSType<'_>) -> bool {
     matches!(
         ts_type,
         TSType::Keyword(kw) if matches!(kw.kind, TSKeywordKind::Void | TSKeywordKind::Null)
@@ -157,7 +159,7 @@ fn is_void_type(ts_type: &TSType) -> bool {
 /// Huggable types expand independently and should not have breaks/indent applied
 /// around them in the parent context. This keeps patterns like `& {` hugged together.
 #[inline]
-pub fn intersection_has_huggable_last_type(intersection: &TSIntersectionType) -> bool {
+pub fn intersection_has_huggable_last_type(intersection: &TSIntersectionType<'_>) -> bool {
     intersection
         .types
         .last()
@@ -170,7 +172,7 @@ pub fn intersection_has_huggable_last_type(intersection: &TSIntersectionType) ->
 /// the continuation should use space instead of line to keep `} & Type` together.
 /// This is the mirror of `intersection_has_huggable_last_type` for the first position.
 #[inline]
-pub fn intersection_has_expanding_first_type(intersection: &TSIntersectionType) -> bool {
+pub fn intersection_has_expanding_first_type(intersection: &TSIntersectionType<'_>) -> bool {
     intersection
         .types
         .first()
@@ -183,7 +185,7 @@ pub fn intersection_has_expanding_first_type(intersection: &TSIntersectionType) 
 
 /// Check if a type needs parentheses when used as the object in indexed access (`T[K]`).
 /// Without parens: `A | B[K]` parses as `A | (B[K])`, not `(A | B)[K]`
-pub(super) fn type_needs_parens_for_indexed_access_object(ts_type: &TSType) -> bool {
+pub(super) fn type_needs_parens_for_indexed_access_object(ts_type: &TSType<'_>) -> bool {
     let inner = unwrap_parenthesized(ts_type);
     // TypeOperator included: `(keyof T)[K]` is valid and different from `keyof T[K]`
     matches!(
@@ -201,7 +203,7 @@ pub(super) fn type_needs_parens_for_indexed_access_object(ts_type: &TSType) -> b
 
 /// Check if a type needs parentheses when used as the element type in an array (`T[]`).
 /// Without parens: `A | B[]` parses as `A | (B[])`, not `(A | B)[]`
-pub(super) fn type_needs_parens_for_array_element(ts_type: &TSType) -> bool {
+pub(super) fn type_needs_parens_for_array_element(ts_type: &TSType<'_>) -> bool {
     let inner = unwrap_parenthesized(ts_type);
     // TypeOperator included: `(keyof T)[]` differs from `keyof T[]`, and
     // `(readonly string[])[]` differs from `readonly string[][]`.
@@ -223,7 +225,7 @@ pub(super) fn type_needs_parens_for_array_element(ts_type: &TSType) -> bool {
 /// (union/intersection plus the `TSTypeOperator`-case fall-through). Without
 /// parens the `?` rebinds: `[() => void?]` / `[A | B?]` are invalid or change
 /// meaning.
-pub(super) fn type_needs_parens_for_optional_element(ts_type: &TSType) -> bool {
+pub(super) fn type_needs_parens_for_optional_element(ts_type: &TSType<'_>) -> bool {
     let inner = unwrap_parenthesized(ts_type);
     matches!(
         inner,
@@ -242,7 +244,7 @@ pub(super) fn type_needs_parens_for_optional_element(ts_type: &TSType) -> bool {
 /// keeps its parens (`(() => void) extends E ? ...`, `(A extends B ? C : D) extends E ? ...`);
 /// without them the `extends`/`?` rebinds. Union/intersection/keyof check types need
 /// none. Matches Prettier's `checkType` rule (`needs-parentheses.js`).
-pub(super) fn type_needs_parens_for_conditional_check(ts_type: &TSType) -> bool {
+pub(super) fn type_needs_parens_for_conditional_check(ts_type: &TSType<'_>) -> bool {
     let inner = unwrap_parenthesized(ts_type);
     matches!(
         inner,
@@ -261,7 +263,7 @@ pub(super) fn type_needs_parens_for_conditional_check(ts_type: &TSType) -> bool 
 ///   constraint) and ordinary return types strip.
 ///
 /// Matches Prettier's `extendsType` rule (`needs-parentheses.js`).
-pub(super) fn type_needs_parens_for_conditional_extends(ts_type: &TSType) -> bool {
+pub(super) fn type_needs_parens_for_conditional_extends(ts_type: &TSType<'_>) -> bool {
     match unwrap_parenthesized(ts_type) {
         TSType::Conditional(_) => true,
         TSType::Function(f) => return_type_is_constrained_infer(&f.return_type),
@@ -275,10 +277,10 @@ pub(super) fn type_needs_parens_for_conditional_extends(ts_type: &TSType) -> boo
 /// `TSInferType` carrying an `extends` constraint. The nesting matters:
 /// `() => () => infer U extends C` trails the same trailing-`?` ambiguity through
 /// every arrow, so the outermost function type still needs parens.
-fn return_type_is_constrained_infer(return_type: &internal::TSTypeAnnotation) -> bool {
-    let mut ty = return_type.type_annotation.as_ref();
+fn return_type_is_constrained_infer(return_type: &internal::TSTypeAnnotation<'_>) -> bool {
+    let mut ty = return_type.type_annotation;
     if let TSType::TypePredicate(pred) = ty {
-        match pred.type_annotation.as_deref() {
+        match pred.type_annotation {
             Some(inner) => ty = inner,
             None => return false,
         }
@@ -296,7 +298,7 @@ fn return_type_is_constrained_infer(return_type: &internal::TSTypeAnnotation) ->
 /// and lower-precedence operands lose their meaning entirely (`keyof (() => void)` →
 /// the invalid `keyof () => void`). Matches Prettier's `TSTypeOperator` case in
 /// `needs-parentheses.js` (parens when `parent.type === "TSTypeOperator"`).
-pub(super) fn type_needs_parens_for_prefix_operator(ts_type: &TSType) -> bool {
+pub(super) fn type_needs_parens_for_prefix_operator(ts_type: &TSType<'_>) -> bool {
     let inner = unwrap_parenthesized(ts_type);
     matches!(
         inner,
@@ -319,7 +321,7 @@ pub(super) fn type_needs_parens_for_prefix_operator(ts_type: &TSType) -> bool {
 /// `TSConstructorType`, `TSConditionalType`, `TSUnionType`, and
 /// `TSIntersectionType` all fall through to the same check in
 /// `needs-parentheses.js` — `isUnionType(parent) || isIntersectionType(parent)`.
-pub(super) fn type_needs_parens_in_union_or_intersection(ts_type: &TSType) -> bool {
+pub(super) fn type_needs_parens_in_union_or_intersection(ts_type: &TSType<'_>) -> bool {
     let inner = unwrap_parenthesized(ts_type);
     matches!(
         inner,
@@ -337,6 +339,6 @@ pub(super) fn type_needs_parens_in_union_or_intersection(ts_type: &TSType) -> bo
 /// its own — any required parens come from the union's parent context, applied
 /// one level up. Pairs with `type_needs_parens_in_union_or_intersection` (used
 /// for 2+ members).
-pub(super) fn type_never_needs_parens(_ts_type: &TSType) -> bool {
+pub(super) fn type_never_needs_parens(_ts_type: &TSType<'_>) -> bool {
     false
 }

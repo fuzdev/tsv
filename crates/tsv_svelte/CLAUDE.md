@@ -19,7 +19,7 @@ See [../../CLAUDE.md §Project Structure](../../CLAUDE.md#project-structure) for
 
 `src/lib.rs` exports free functions matching the tsv pattern:
 
-- `parse(source) -> Result<Root>` — internal AST
+- `parse(source, arena: &'arena Bump) -> Result<Root<'arena>>` — internal AST, bump-arena-allocated (caller owns the `Bump`). The Svelte parser creates the one arena per document and shares it with every embedded sub-AST — `tsv_ts` (`<script>` / `{expr}`) and `tsv_css` (`<style>`) — so the whole component is one bump-allocated graph. See [docs/architecture.md §Nested AST](../../docs/architecture.md#nested-ast-bump-arena-not-flatindexed).
 - `format(&Root, source) -> String` — round-trips through the doc builder
 - `convert_ast(&Root, source) -> public::Root`, `convert_ast_json(...) -> serde_json::Value`, and `convert_ast_json_string(...) -> String` — public JSON AST (byte→char position translation + template-expression comment attachment happen here, gated on `feature = "convert"`). The string variant is the compact-wire hot path (FFI/WASM/CLI non-pretty): it serializes the typed public AST directly when eligible (per-language eligibility matrix: [docs/architecture.md §Closed Scope, Open Convention](../../docs/architecture.md#closed-scope-open-convention)); otherwise it falls back to the `Value` path. Output is byte-identical either way.
 - `script_content_spans(&Root) -> Vec<(u32, u32)>` — byte spans of the instance/module `<script>` contents (gated on `feature = "convert"`). Feeds the string variant's eligibility gate; also used by tooling that extracts script contents as standalone TS (`tsv_debug`'s typed-walk parity probes, `json_profile`)

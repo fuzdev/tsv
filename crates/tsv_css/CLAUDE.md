@@ -14,7 +14,7 @@ Standard `ast/lexer/parser/printer` crate layout — see [root CLAUDE.md §Proje
 
 **Standalone** (top-level CSS files):
 
-- `parse(source) -> Result<CssStyleSheet>` — parse a full CSS file
+- `parse(source, arena: &'arena Bump) -> Result<CssStyleSheet<'arena>>` — parse a full CSS file. The internal AST is bump-arena-allocated (caller-owns-`Bump`); `CssStyleSheet<'arena>` borrows from it. Matches `tsv_ts`/`tsv_svelte`'s signature for the shared `lang_bindings!` macro + CLI/FFI/WASM callers.
 - `format(&stylesheet, source) -> String` — format with default config
 - `convert_ast(&stylesheet, source) -> StyleSheet` — internal → public JSON-ready AST (gated on `convert` feature)
 - `convert_ast_json(&stylesheet, source) -> serde_json::Value` — public AST with byte-to-char offset translation; matches Svelte's `parseCss()` JSON shape
@@ -22,7 +22,7 @@ Standard `ast/lexer/parser/printer` crate layout — see [root CLAUDE.md §Proje
 
 **Embedding** (used by `tsv_svelte` for `<style>` blocks):
 
-- `parse_embedded(source, base_offset) -> Result<CssStyleSheet>` — same parser, but span positions are shifted by `base_offset` so they index into the parent Svelte file
+- `parse_embedded(source, base_offset, arena: &'arena Bump) -> Result<CssStyleSheet<'arena>>` — same parser, but span positions are shifted by `base_offset` so they index into the parent Svelte file; `arena` is the host document's `Bump`, so the embedded CSS AST shares it
 - `format_embedded(&stylesheet, source, EmbedContext)` — formats with `EmbedContext::base_indent_offset` so wrapped lines respect outer Svelte indentation
 
 The two `StyleSheet` / `StyleContent` types (re-exported only with `convert`) are the public-AST envelopes `tsv_svelte` uses when embedding CSS in a `<style>` element's JSON. Distinct from `CssStyleSheet` (the internal AST root) and `CssNode` (the top-level statement enum).

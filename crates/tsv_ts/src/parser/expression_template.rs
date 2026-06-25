@@ -33,15 +33,15 @@ fn extract_template_simple_content(raw: &str) -> &str {
     extract_template_tail_content(raw) // Same logic: strip first and last char
 }
 
-impl<'a> Parser<'a> {
+impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse template literal: `hello ${name}`
     ///
     /// Handles both simple templates (no interpolation) and templates with expressions.
     /// See also `parse_template_literal_type()` in statement.rs for type context version.
-    pub(super) fn parse_template_literal(&mut self) -> Result<Expression, ParseError> {
+    pub(super) fn parse_template_literal(&mut self) -> Result<Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
-        let mut quasis = Vec::new();
-        let mut expressions = Vec::new();
+        let mut quasis = self.bvec();
+        let mut expressions = self.bvec();
 
         match self.current_kind() {
             TokenKind::NoSubstitutionTemplate => {
@@ -50,7 +50,7 @@ impl<'a> Parser<'a> {
                 let content = extract_template_simple_content(self.current_value());
                 let has_newline = content.contains('\n');
                 let cooked = match self.current_decoded() {
-                    Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                    Some(decoded) => TemplateCooked::Decoded(self.alloc_str_in(decoded)),
                     None => TemplateCooked::Verbatim,
                 };
                 // Content span: strip the opening and closing backticks.
@@ -67,8 +67,8 @@ impl<'a> Parser<'a> {
                 });
 
                 Ok(Expression::TemplateLiteral(TemplateLiteral {
-                    quasis,
-                    expressions,
+                    quasis: quasis.into_bump_slice(),
+                    expressions: expressions.into_bump_slice(),
                     span: Span::new(start as u32, elem_end as u32),
                 }))
             }
@@ -78,7 +78,7 @@ impl<'a> Parser<'a> {
                 let content = extract_template_head_content(self.current_value());
                 let has_newline = content.contains('\n');
                 let cooked = match self.current_decoded() {
-                    Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                    Some(decoded) => TemplateCooked::Decoded(self.alloc_str_in(decoded)),
                     None => TemplateCooked::Verbatim,
                 };
                 // Content span: strip the opening backtick and trailing `${`.
@@ -128,7 +128,9 @@ impl<'a> Parser<'a> {
                             let content = extract_template_head_content(self.current_value());
                             let has_newline = content.contains('\n');
                             let cooked = match self.current_decoded() {
-                                Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                                Some(decoded) => {
+                                    TemplateCooked::Decoded(self.alloc_str_in(decoded))
+                                }
                                 None => TemplateCooked::Verbatim,
                             };
                             // Content span: strip the leading `}` and trailing `${`.
@@ -149,7 +151,9 @@ impl<'a> Parser<'a> {
                             let content = extract_template_tail_content(self.current_value());
                             let has_newline = content.contains('\n');
                             let cooked = match self.current_decoded() {
-                                Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                                Some(decoded) => {
+                                    TemplateCooked::Decoded(self.alloc_str_in(decoded))
+                                }
                                 None => TemplateCooked::Verbatim,
                             };
                             // Content span: strip the leading `}` and trailing backtick.
@@ -180,8 +184,8 @@ impl<'a> Parser<'a> {
                 let end = quasis.last().map_or(start as u32, |q| q.span.end);
 
                 Ok(Expression::TemplateLiteral(TemplateLiteral {
-                    quasis,
-                    expressions,
+                    quasis: quasis.into_bump_slice(),
+                    expressions: expressions.into_bump_slice(),
                     span: Span::new(start as u32, end),
                 }))
             }

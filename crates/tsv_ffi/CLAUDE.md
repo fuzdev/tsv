@@ -4,7 +4,7 @@
 
 ## Architecture Position
 
-Depends on `tsv_ts`, `tsv_css`, `tsv_svelte` and `tsv_lang` transitively. Sibling binding crate: [`tsv_wasm`](../tsv_wasm/) (WebAssembly). Consumers include Deno FFI, Python `ctypes`, and any other C-FFI host. N-API is not used.
+Depends on `tsv_ts`, `tsv_css`, `tsv_svelte`, and `tsv_lang` (the last for `estimated_ast_arena_capacity`, the parse-arena pre-size). Sibling binding crate: [`tsv_wasm`](../tsv_wasm/) (WebAssembly). Consumers include Deno FFI, Python `ctypes`, and any other C-FFI host. N-API is not used.
 
 Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-bindings).
 

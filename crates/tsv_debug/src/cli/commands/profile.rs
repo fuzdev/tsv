@@ -186,8 +186,12 @@ fn profile_file(path: &Path, iterations: usize) -> Result<FileResult, String> {
 fn profile_once(source: &str, parser_type: ParserType) -> Result<(Duration, Duration), String> {
     match parser_type {
         ParserType::TypeScript => {
+            // Allocate the arena outside the timed region so its setup isn't
+            // counted in the parse measurement.
+            let arena =
+                bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
             let t0 = Instant::now();
-            let ast = tsv_ts::parse(source).map_err(|e| format!("parse error: {e}"))?;
+            let ast = tsv_ts::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
             let parse_dur = t0.elapsed();
 
             let t1 = Instant::now();
@@ -197,8 +201,10 @@ fn profile_once(source: &str, parser_type: ParserType) -> Result<(Duration, Dura
             Ok((parse_dur, format_dur))
         }
         ParserType::Svelte => {
+            let arena =
+                bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
             let t0 = Instant::now();
-            let ast = tsv_svelte::parse(source).map_err(|e| format!("parse error: {e}"))?;
+            let ast = tsv_svelte::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
             let parse_dur = t0.elapsed();
 
             let t1 = Instant::now();
@@ -208,8 +214,10 @@ fn profile_once(source: &str, parser_type: ParserType) -> Result<(Duration, Dura
             Ok((parse_dur, format_dur))
         }
         ParserType::Css => {
+            let arena =
+                bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
             let t0 = Instant::now();
-            let ast = tsv_css::parse(source).map_err(|e| format!("parse error: {e}"))?;
+            let ast = tsv_css::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
             let parse_dur = t0.elapsed();
 
             let t1 = Instant::now();

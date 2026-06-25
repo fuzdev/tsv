@@ -230,8 +230,10 @@ fn profile_ts_once(
     steps: &mut StepDurations,
     meta: &mut Option<IterMeta>,
 ) -> Result<(), String> {
+    // Arena allocated outside the timed region so its setup isn't counted.
+    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
     let t = Instant::now();
-    let ast = tsv_ts::parse(source).map_err(|e| format!("parse error: {e}"))?;
+    let ast = tsv_ts::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
     steps.parse.push(t.elapsed());
 
     let t = Instant::now();
@@ -352,8 +354,10 @@ fn profile_svelte_once(
     steps: &mut StepDurations,
     meta: &mut Option<IterMeta>,
 ) -> Result<(), String> {
+    // Arena allocated outside the timed region so its setup isn't counted.
+    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
     let t = Instant::now();
-    let ast = tsv_svelte::parse(source).map_err(|e| format!("parse error: {e}"))?;
+    let ast = tsv_svelte::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
     steps.parse.push(t.elapsed());
 
     let t = Instant::now();
@@ -431,12 +435,14 @@ fn profile_css_once(
     steps: &mut StepDurations,
     meta: &mut Option<IterMeta>,
 ) -> Result<(), String> {
+    // Arena allocated outside the timed region so its setup isn't counted.
+    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
     let t = Instant::now();
-    let ast = tsv_css::parse(source).map_err(|e| format!("parse error: {e}"))?;
+    let ast = tsv_css::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
     steps.parse.push(t.elapsed());
 
     let t = Instant::now();
-    let mut value = tsv_css::ast::convert::convert_css_nodes_standalone(&ast.nodes, source);
+    let mut value = tsv_css::ast::convert::convert_css_nodes_standalone(ast.nodes, source);
     steps.convert.push(t.elapsed());
 
     let t = Instant::now();

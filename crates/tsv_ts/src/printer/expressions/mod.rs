@@ -36,7 +36,7 @@ use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Print an expression using doc-based formatting
-    pub(crate) fn print_expression(&mut self, expression: &Expression) {
+    pub(crate) fn print_expression(&mut self, expression: &Expression<'_>) {
         let doc = self.build_expression_doc(expression);
         self.write_arena_doc(doc);
     }
@@ -58,7 +58,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an expression (for use in object/array contexts and statements)
-    pub(crate) fn build_expression_doc(&self, expr: &Expression) -> DocId {
+    pub(crate) fn build_expression_doc(&self, expr: &Expression<'_>) -> DocId {
         let d = self.d();
 
         // Take and clear is_expression_statement so it doesn't leak to sub-expressions.
@@ -127,15 +127,12 @@ impl<'a> Printer<'a> {
             Expression::TSTypeAssertion(type_assert) => {
                 self.build_ts_type_assertion_doc(type_assert)
             }
-            Expression::TSAsExpression(as_expr) => self.build_binary_cast_doc(
-                &as_expr.expression,
-                &as_expr.type_annotation,
-                "as",
-                true,
-            ),
+            Expression::TSAsExpression(as_expr) => {
+                self.build_binary_cast_doc(as_expr.expression, as_expr.type_annotation, "as", true)
+            }
             Expression::TSSatisfiesExpression(sat_expr) => self.build_binary_cast_doc(
-                &sat_expr.expression,
-                &sat_expr.type_annotation,
+                sat_expr.expression,
+                sat_expr.type_annotation,
                 "satisfies",
                 false,
             ),
@@ -172,11 +169,11 @@ impl<'a> Printer<'a> {
     /// inner gets a breakable group (`(inner)` flat, `(⏎\tinner⏎)` when wide). A
     /// line comment in the gap forces a hardline layout so it can't swallow the
     /// inner and the closing `)`.
-    fn build_jsdoc_cast_doc(&self, cast: &crate::ast::internal::JsdocCast) -> DocId {
+    fn build_jsdoc_cast_doc(&self, cast: &crate::ast::internal::JsdocCast<'_>) -> DocId {
         let d = self.d();
         let open = cast.span.start; // the `(`
         let inner_start = cast.inner.span().start;
-        let inner_doc = self.build_expression_doc(&cast.inner);
+        let inner_doc = self.build_expression_doc(cast.inner);
 
         // A line comment in the gap before the inner must force a hardline layout —
         // otherwise `(// c <inner>)` runs the inner and the `)` into the comment
@@ -210,7 +207,7 @@ impl<'a> Printer<'a> {
 
         // Object/array literals hug the parens; the inner's own group breaks it.
         if matches!(
-            &*cast.inner,
+            cast.inner,
             Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
         ) {
             d.concat(&[d.text("("), body, d.text(")")])
@@ -225,7 +222,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for function parameter expression, using FunctionParameter context for patterns
-    pub(super) fn build_function_parameter_doc(&self, expr: &Expression) -> DocId {
+    pub(super) fn build_function_parameter_doc(&self, expr: &Expression<'_>) -> DocId {
         match expr {
             Expression::ObjectPattern(obj) => {
                 self.build_object_pattern_doc_with_context(obj, PatternContext::FunctionParameter)
@@ -247,7 +244,7 @@ impl<'a> Printer<'a> {
     ///
     /// Assignment expressions are wrapped in parens for clarity:
     /// `fn((a = b))` not `fn(a = b)`
-    pub(super) fn build_arg_expression_doc(&self, expr: &Expression) -> DocId {
+    pub(super) fn build_arg_expression_doc(&self, expr: &Expression<'_>) -> DocId {
         let d = self.d();
         // Assignment expressions need parens in argument context for clarity
         if needs_parens(expr, ParenContext::Argument) {
@@ -275,7 +272,7 @@ impl<'a> Printer<'a> {
     /// Used by chain arg formatting when we need the object/array to expand
     /// internally with hardlines so fits() can correctly measure the first line.
     /// For example, `.fn({prop})` should become `.fn({\n  prop,\n})` when expanded.
-    pub(super) fn build_arg_expression_doc_expanded(&self, expr: &Expression) -> DocId {
+    pub(super) fn build_arg_expression_doc_expanded(&self, expr: &Expression<'_>) -> DocId {
         match expr {
             Expression::ObjectExpression(obj) => self.build_object_doc_expanded(obj),
             Expression::ArrayExpression(arr) => self.build_array_doc_expanded(arr),
@@ -291,11 +288,11 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a TypeScript angle-bracket type assertion: `<Type>expr`
     fn build_ts_type_assertion_doc(
         &self,
-        type_assert: &crate::ast::internal::TSTypeAssertion,
+        type_assert: &crate::ast::internal::TSTypeAssertion<'_>,
     ) -> DocId {
         let d = self.d();
         let expr_needs_parens =
-            needs_parens(&type_assert.expression, ParenContext::AngleBracketAssertion);
+            needs_parens(type_assert.expression, ParenContext::AngleBracketAssertion);
         // Cast boundary positions: `<` … type … `>` … expression. The `>` is found
         // past any comment that itself contains a `>` (`<T /* > */>`).
         let open_pos = type_assert.span.start; // the `<`
@@ -304,7 +301,7 @@ impl<'a> Printer<'a> {
         let type_end = type_assert.type_annotation.span().end;
         let expr_start = type_assert.expression.span().start;
         let close_angle = self.find_assertion_close_angle(type_end, expr_start);
-        let type_doc = self.build_type_doc_with_wrapping_type_args(&type_assert.type_annotation);
+        let type_doc = self.build_type_doc_with_wrapping_type_args(type_assert.type_annotation);
 
         // Comments in the cast stay where the author wrote them. Block comments hug
         // inline (`</* c */ T>`, `<T /* c */>`, `<T>/* c */ expr`); a `//` runs to
@@ -340,7 +337,7 @@ impl<'a> Printer<'a> {
             ]))
         };
 
-        let inner_expr = self.build_expression_doc(&type_assert.expression);
+        let inner_expr = self.build_expression_doc(type_assert.expression);
         let expr_doc = if expr_needs_parens {
             d.parens(inner_expr)
         } else {
@@ -388,7 +385,7 @@ impl<'a> Printer<'a> {
         // (they expand themselves), everything else may break the expression into
         // its own parenthesized block before the cast group itself breaks.
         let should_break_after_cast = !matches!(
-            &*type_assert.expression,
+            type_assert.expression,
             Expression::ArrayExpression(_) | Expression::ObjectExpression(_)
         );
 
@@ -466,8 +463,8 @@ impl<'a> Printer<'a> {
     /// place except for `as const`, where Prettier relocates them after `const`.
     fn build_binary_cast_doc(
         &self,
-        expression: &Expression,
-        type_annotation: &TSType,
+        expression: &Expression<'_>,
+        type_annotation: &TSType<'_>,
         keyword: &'static str,
         is_as: bool,
     ) -> DocId {
@@ -575,7 +572,7 @@ impl<'a> Printer<'a> {
         &self,
         keyword: &'static str,
         keyword_pos: Option<u32>,
-        type_annotation: &TSType,
+        type_annotation: &TSType<'_>,
         type_start: u32,
     ) -> Option<DocId> {
         let keyword_len = keyword.len() as u32;
@@ -599,7 +596,7 @@ impl<'a> Printer<'a> {
         &self,
         keyword: &'static str,
         keyword_pos: Option<u32>,
-        type_annotation: &TSType,
+        type_annotation: &TSType<'_>,
         type_start: u32,
     ) -> Option<DocId> {
         let keyword_len = keyword.len() as u32;
@@ -617,16 +614,16 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a TypeScript instantiation expression
     fn build_ts_instantiation_doc(
         &self,
-        inst_expr: &crate::ast::internal::TSInstantiationExpression,
+        inst_expr: &crate::ast::internal::TSInstantiationExpression<'_>,
     ) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
         let needs_parens =
-            needs_parens(&inst_expr.expression, ParenContext::InstantiationExpression);
+            needs_parens(inst_expr.expression, ParenContext::InstantiationExpression);
         if needs_parens {
             parts.push(d.text("("));
         }
-        parts.push(self.build_expression_doc(&inst_expr.expression));
+        parts.push(self.build_expression_doc(inst_expr.expression));
         if needs_parens {
             parts.push(d.text(")"));
         }
@@ -654,18 +651,18 @@ impl<'a> Printer<'a> {
     /// ```
     fn build_ts_non_null_doc(
         &self,
-        non_null_expr: &crate::ast::internal::TSNonNullExpression,
+        non_null_expr: &crate::ast::internal::TSNonNullExpression<'_>,
     ) -> DocId {
         let d = self.d();
-        let needs_parens = needs_parens(&non_null_expr.expression, ParenContext::NonNull);
+        let needs_parens = needs_parens(non_null_expr.expression, ParenContext::NonNull);
 
         if needs_parens {
             // For expressions that need parens, use a special doc structure
             // that indents continuations when breaking
             let inner_doc =
-                self.build_expression_doc_with_indent_on_break(&non_null_expr.expression);
+                self.build_expression_doc_with_indent_on_break(non_null_expr.expression);
             d.concat(&[d.text("("), inner_doc, d.text(")!")])
-        } else if Self::is_chain_expression(&non_null_expr.expression) {
+        } else if Self::is_chain_expression(non_null_expr.expression) {
             // When inner expression is a chain (member or call), use chain architecture
             // to properly handle breaking. This ensures the outer `!` is included
             // in the linearized chain for proper segment grouping.
@@ -673,7 +670,7 @@ impl<'a> Printer<'a> {
             let groups = chain::group_chain_nodes(&nodes);
             chain::build_chain_doc(&groups, self)
         } else {
-            let inner_doc = self.build_expression_doc(&non_null_expr.expression);
+            let inner_doc = self.build_expression_doc(non_null_expr.expression);
             // Check for trailing comments from stripped grouping parens: `(x /* c */)!`
             let argument_end = non_null_expr.expression.span().end;
             let has_trailing_comments =
@@ -704,13 +701,13 @@ impl<'a> Printer<'a> {
     /// now-redundant parens (`(a?.b)!` → `a?.b!`), so they are restored per-context
     /// here. Normalizes to the `!`-outside form, matching the Sprint-2 sealed-base
     /// rendering (`push_sealed_chain_base` / the chain linearizer's non-null arm).
-    pub(crate) fn build_sealed_non_null_paren_doc(&self, expr: &Expression) -> Option<DocId> {
+    pub(crate) fn build_sealed_non_null_paren_doc(&self, expr: &Expression<'_>) -> Option<DocId> {
         let Expression::TSNonNullExpression(non_null) = expr else {
             return None;
         };
         if non_null.seals_optional_chain() {
             let d = self.d();
-            let inner_doc = self.build_expression_doc_with_indent_on_break(&non_null.expression);
+            let inner_doc = self.build_expression_doc_with_indent_on_break(non_null.expression);
             Some(d.concat(&[d.text("("), inner_doc, d.text(")!")]))
         } else {
             None
@@ -718,7 +715,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if an expression is part of a chain (member, call, or non-null)
-    fn is_chain_expression(expr: &Expression) -> bool {
+    fn is_chain_expression(expr: &Expression<'_>) -> bool {
         matches!(
             expr,
             Expression::MemberExpression(_)
@@ -729,7 +726,7 @@ impl<'a> Printer<'a> {
 
     /// Build expression doc with indentation added to line breaks
     /// Used when expression is inside inline parens like `(expr)!`
-    pub(crate) fn build_expression_doc_with_indent_on_break(&self, expr: &Expression) -> DocId {
+    pub(crate) fn build_expression_doc_with_indent_on_break(&self, expr: &Expression<'_>) -> DocId {
         match expr {
             Expression::BinaryExpression(binary) => {
                 // Build binary chain with indented continuations
@@ -741,7 +738,7 @@ impl<'a> Printer<'a> {
 
     /// Build binary chain doc with indented continuations
     /// Used when the binary expression is inside inline parens
-    fn build_binary_chain_doc_indented(&self, binary: &BinaryExpression) -> DocId {
+    fn build_binary_chain_doc_indented(&self, binary: &BinaryExpression<'_>) -> DocId {
         let d = self.d();
         d.group(self.build_binary_chain_parts_indented(binary))
     }
@@ -750,7 +747,7 @@ impl<'a> Printer<'a> {
     ///
     /// Returns the concat without a group wrapper, for cases where the caller
     /// wants to control the grouping (e.g., chain printing).
-    pub(crate) fn build_binary_chain_parts_indented(&self, binary: &BinaryExpression) -> DocId {
+    pub(crate) fn build_binary_chain_parts_indented(&self, binary: &BinaryExpression<'_>) -> DocId {
         let d = self.d();
         // If there are comments within the binary expression, use the comment-aware
         // implementation from operators.rs which preserves comments and their line breaks.
@@ -849,20 +846,20 @@ impl<'a> Printer<'a> {
     /// Flattens both left and right sides when operators are compatible.
     fn collect_binary_operands_for_indent(
         &self,
-        expr: &BinaryExpression,
+        expr: &BinaryExpression<'_>,
         operands: &mut DocBuf,
         operators: &mut Vec<BinaryOperator>,
     ) {
         // Recursively flatten left side if it can be chained with current operator
-        if let Expression::BinaryExpression(left_binary) = &*expr.left {
+        if let Expression::BinaryExpression(left_binary) = expr.left {
             if expr.operator.can_flatten_with(left_binary.operator) {
                 self.collect_binary_operands_for_indent(left_binary, operands, operators);
             } else {
                 // Can't flatten - build operand with parens if needed
-                operands.push(self.build_binary_operand_doc(&expr.left, expr.operator, false));
+                operands.push(self.build_binary_operand_doc(expr.left, expr.operator, false));
             }
         } else {
-            operands.push(self.build_binary_operand_doc(&expr.left, expr.operator, false));
+            operands.push(self.build_binary_operand_doc(expr.left, expr.operator, false));
         }
 
         // Add current operator
@@ -870,7 +867,7 @@ impl<'a> Printer<'a> {
 
         // Also flatten right side for truly associative operators (removes redundant parens)
         // Only logical operators are truly associative; arithmetic preserves right-side parens
-        if let Expression::BinaryExpression(right_binary) = &*expr.right
+        if let Expression::BinaryExpression(right_binary) = expr.right
             && expr.operator.can_flatten_with(right_binary.operator)
             && expr.operator.is_logical()
             && right_binary.operator.is_logical()
@@ -880,7 +877,7 @@ impl<'a> Printer<'a> {
         }
 
         // Right operand can't be flattened - add as-is
-        operands.push(self.build_binary_operand_doc(&expr.right, expr.operator, true));
+        operands.push(self.build_binary_operand_doc(expr.right, expr.operator, true));
     }
 
     /// Build binary chain specifically for parenthesized context in chain printing
@@ -888,7 +885,7 @@ impl<'a> Printer<'a> {
     /// Structure: operand1 " /", line, operand2 " /", line, operand3
     /// In flat: `a / b / c`
     /// In break: `a /\nb /\nc` (with outer indent providing indentation)
-    pub(crate) fn build_binary_chain_for_parens(&self, binary: &BinaryExpression) -> DocId {
+    pub(crate) fn build_binary_chain_for_parens(&self, binary: &BinaryExpression<'_>) -> DocId {
         let d = self.d();
         // Collect all operands and operators in the chain
         let mut operands = DocBuf::new();
@@ -943,7 +940,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a TypeScript parameter property
     fn build_ts_parameter_property_doc(
         &self,
-        param_prop: &crate::ast::internal::TSParameterProperty,
+        param_prop: &crate::ast::internal::TSParameterProperty<'_>,
     ) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
@@ -963,7 +960,7 @@ impl<'a> Printer<'a> {
         }
 
         // Print the parameter (identifier or assignment pattern)
-        parts.push(self.build_expression_doc(&param_prop.parameter));
+        parts.push(self.build_expression_doc(param_prop.parameter));
 
         d.concat(&parts)
     }

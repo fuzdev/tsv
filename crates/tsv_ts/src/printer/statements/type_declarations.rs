@@ -13,7 +13,7 @@ use tsv_lang::{Comment, SymbolToU32, comments_in_range};
 
 /// Check if a type is "generic" - i.e., has type parameters.
 /// This matches prettier's `isGeneric` function in assignment.js.
-fn is_generic_type(ts_type: &TSType) -> bool {
+fn is_generic_type(ts_type: &TSType<'_>) -> bool {
     match ts_type {
         TSType::Function(f) => f.type_parameters.is_some(),
         TSType::TypeReference(r) => r.type_arguments.is_some(),
@@ -24,13 +24,13 @@ fn is_generic_type(ts_type: &TSType) -> bool {
 /// Check if we should break before the conditional type in a type alias.
 /// Returns true if either checkType or extendsType has type parameters.
 /// This matches prettier's `shouldBreakBeforeConditionalType` in assignment.js.
-fn should_break_before_conditional_type(conditional: &internal::TSConditionalType) -> bool {
-    is_generic_type(&conditional.check_type) || is_generic_type(&conditional.extends_type)
+fn should_break_before_conditional_type(conditional: &internal::TSConditionalType<'_>) -> bool {
+    is_generic_type(conditional.check_type) || is_generic_type(conditional.extends_type)
 }
 
 /// Returns true if the type has its own internal breaking mechanism
 /// (e.g., braces, brackets, parentheses) and should NOT break after `=`.
-fn type_has_internal_breaking(ts_type: &TSType) -> bool {
+fn type_has_internal_breaking(ts_type: &TSType<'_>) -> bool {
     match ts_type {
         TSType::TypeLiteral(_)
         | TSType::Mapped(_)
@@ -75,7 +75,7 @@ impl<'a> Printer<'a> {
     /// ```
     pub(super) fn build_type_alias_declaration_doc(
         &self,
-        decl: &internal::TSTypeAliasDeclaration,
+        decl: &internal::TSTypeAliasDeclaration<'_>,
     ) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = smallvec![];
@@ -197,7 +197,7 @@ impl<'a> Printer<'a> {
     /// next line via the operator's own layout) instead of breaking after `=` —
     /// matching prettier and the conditional / internal-breaking arms. A long
     /// *comment-free* operator still breaks after `=` (the hanging-indent arm).
-    fn type_operator_has_leading_line_comment(&self, ty: &TSType) -> bool {
+    fn type_operator_has_leading_line_comment(&self, ty: &TSType<'_>) -> bool {
         match ty {
             TSType::TypeOperator(o) => {
                 let kw_end = o.span.start + o.operator.as_str().len() as u32;
@@ -213,7 +213,7 @@ impl<'a> Printer<'a> {
 
     fn build_type_alias_eq_value_doc(
         &self,
-        decl: &internal::TSTypeAliasDeclaration,
+        decl: &internal::TSTypeAliasDeclaration<'_>,
         eq_pos: u32,
         type_start: u32,
         has_complex_params: bool,
@@ -344,7 +344,7 @@ impl<'a> Printer<'a> {
     /// Uses group mode when extends has multiple items - heritage breaks when group breaks.
     pub(super) fn build_interface_declaration_doc(
         &self,
-        decl: &internal::TSInterfaceDeclaration,
+        decl: &internal::TSInterfaceDeclaration<'_>,
     ) -> DocId {
         let d = self.d();
 
@@ -400,7 +400,7 @@ impl<'a> Printer<'a> {
         let extends_doc = if !decl.extends.is_empty() {
             Some(self.build_heritage_clause_doc(
                 "extends",
-                &decl.extends,
+                decl.extends,
                 group_mode,
                 extends_keyword_start,
             ))
@@ -487,7 +487,7 @@ impl<'a> Printer<'a> {
             parts.push(d.text("{"));
             parts.push(d.concat(&brace_line_prefix));
             parts.push(d.indent(d.concat(&[self.build_type_elements_doc(
-                &decl.body.body,
+                decl.body.body,
                 decl.body.span.start,
                 decl.body.span.end,
                 delimiter_pull_pos,
@@ -500,7 +500,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for declare function with wrapping support for type parameters
-    pub(super) fn build_declare_function_doc(&self, decl: &internal::TSDeclareFunction) -> DocId {
+    pub(super) fn build_declare_function_doc(
+        &self,
+        decl: &internal::TSDeclareFunction<'_>,
+    ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
 
@@ -562,7 +565,7 @@ impl<'a> Printer<'a> {
         {
             self.append_type_params_to_paren_comments(&mut tail, tp, pp);
         }
-        tail.push(self.build_signature_params_doc(&decl.params, paren_pos));
+        tail.push(self.build_signature_params_doc(decl.params, paren_pos));
 
         // Return type (preserves a comment between `)` and `:`)
         if let Some(return_type) = &decl.return_type {
@@ -591,7 +594,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for entity name
-    pub(crate) fn build_entity_name_doc(&self, name: &internal::TSEntityName) -> DocId {
+    pub(crate) fn build_entity_name_doc(&self, name: &internal::TSEntityName<'_>) -> DocId {
         // Delegate to standalone function - doesn't need printer state
         build_entity_name_doc(self.d(), name)
     }
@@ -604,7 +607,7 @@ impl<'a> Printer<'a> {
     /// trailing-comment divergence). Pass `None` to keep the default behavior.
     fn build_type_elements_doc(
         &self,
-        members: &[internal::TSTypeElement],
+        members: &[internal::TSTypeElement<'_>],
         body_start: u32,
         body_end: u32,
         delimiter_pull_pos: Option<u32>,
@@ -699,7 +702,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for a single type element
-    fn build_type_element_doc(&self, elem: &internal::TSTypeElement) -> DocId {
+    fn build_type_element_doc(&self, elem: &internal::TSTypeElement<'_>) -> DocId {
         let d = self.d();
         match elem {
             internal::TSTypeElement::PropertySignature(p) => {
@@ -742,7 +745,10 @@ impl<'a> Printer<'a> {
     ///     Blue,
     /// }
     /// ```
-    pub(super) fn build_enum_declaration_doc(&self, decl: &internal::TSEnumDeclaration) -> DocId {
+    pub(super) fn build_enum_declaration_doc(
+        &self,
+        decl: &internal::TSEnumDeclaration<'_>,
+    ) -> DocId {
         let d = self.d();
         let mut prefix = DocBuf::new();
 
@@ -917,7 +923,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for a single enum member
-    fn build_enum_member_doc(&self, member: &internal::TSEnumMember) -> DocId {
+    fn build_enum_member_doc(&self, member: &internal::TSEnumMember<'_>) -> DocId {
         let d = self.d();
         // Member id (identifier or string literal)
         let id_doc = match &member.id {
@@ -979,7 +985,7 @@ impl<'a> Printer<'a> {
     /// ```
     pub(super) fn build_module_declaration_doc(
         &self,
-        decl: &internal::TSModuleDeclaration,
+        decl: &internal::TSModuleDeclaration<'_>,
     ) -> DocId {
         self.build_module_declaration_doc_inner(decl, true)
     }
@@ -988,7 +994,7 @@ impl<'a> Printer<'a> {
     /// `is_root` is true for the outermost declaration (prints `namespace` keyword)
     fn build_module_declaration_doc_inner(
         &self,
-        decl: &internal::TSModuleDeclaration,
+        decl: &internal::TSModuleDeclaration<'_>,
         is_root: bool,
     ) -> DocId {
         let d = self.d();
@@ -1079,7 +1085,7 @@ impl<'a> Printer<'a> {
                     let body_end = block.span.end.saturating_sub(1); // Before '}'
                     let (mut stmt_parts, prev_end, _prev_stmt_end) = self
                         .build_statement_list_docs(
-                            &block.body,
+                            block.body,
                             body_start,
                             body_end,
                             DocBuf::new(),

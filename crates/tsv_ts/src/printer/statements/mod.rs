@@ -28,7 +28,7 @@ use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a statement
-    pub(super) fn build_statement_doc(&self, statement: &Statement) -> DocId {
+    pub(super) fn build_statement_doc(&self, statement: &Statement<'_>) -> DocId {
         let d = self.d();
         match statement {
             Statement::ExpressionStatement(stmt) => self.build_expression_statement_doc(stmt),
@@ -76,7 +76,7 @@ impl<'a> Printer<'a> {
     ///
     /// Handles parentheses for object patterns and comments before semicolon.
     /// Preserves source parens around string literals: `('hello');` stays parenthesized.
-    fn build_expression_statement_doc(&self, stmt: &internal::ExpressionStatement) -> DocId {
+    fn build_expression_statement_doc(&self, stmt: &internal::ExpressionStatement<'_>) -> DocId {
         let d = self.d();
 
         let mut parts = DocBuf::new();
@@ -148,7 +148,10 @@ impl<'a> Printer<'a> {
     /// `('hello');` stays as-is, not stripped to `'hello';`.
     /// Detected via span: if ExpressionStatement.span.start < Expression.span.start,
     /// the source had a `(` before the expression.
-    fn has_expression_statement_source_parens(&self, stmt: &internal::ExpressionStatement) -> bool {
+    fn has_expression_statement_source_parens(
+        &self,
+        stmt: &internal::ExpressionStatement<'_>,
+    ) -> bool {
         if stmt.span.start >= stmt.expression.span().start {
             return false;
         }
@@ -159,7 +162,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a return statement.
-    fn build_return_statement_doc(&self, ret: &internal::ReturnStatement) -> DocId {
+    fn build_return_statement_doc(&self, ret: &internal::ReturnStatement<'_>) -> DocId {
         let d = self.d();
         let Some(arg) = &ret.argument else {
             // Check for comments between `return` and `;`: return /* comment */;
@@ -187,7 +190,7 @@ impl<'a> Printer<'a> {
         keyword: &'static str,
         keyword_start: u32,
         span_end: u32,
-        arg: &Expression,
+        arg: &Expression<'_>,
     ) -> DocId {
         let d = self.d();
 
@@ -256,7 +259,7 @@ impl<'a> Printer<'a> {
     /// unconditional paren wrapping.
     ///
     /// Matches Prettier's `returnArgumentHasLeadingComment` (function.js:290-318).
-    fn argument_has_own_line_comment(&self, keyword_start: u32, arg: &Expression) -> bool {
+    fn argument_has_own_line_comment(&self, keyword_start: u32, arg: &Expression<'_>) -> bool {
         // Check for own-line comments before the argument itself
         // (e.g., `return // comment\n expr`)
         if self.has_leading_own_line_comment_in_range(keyword_start, arg.span().start) {
@@ -273,9 +276,9 @@ impl<'a> Printer<'a> {
     /// `hasLeadingOwnLineComment` check at each node. Only counts comments
     /// that are on their own line (not trailing comments on the same line
     /// as the preceding expression).
-    fn chain_has_own_line_comment(&self, expr: &Expression) -> bool {
+    fn chain_has_own_line_comment(&self, expr: &Expression<'_>) -> bool {
         match expr {
-            Expression::CallExpression(call) => self.chain_has_own_line_comment(&call.callee),
+            Expression::CallExpression(call) => self.chain_has_own_line_comment(call.callee),
             Expression::MemberExpression(member) => {
                 // Check for leading own-line comments between object and property.
                 // Must NOT be on the same line as the object — trailing comments
@@ -285,13 +288,13 @@ impl<'a> Printer<'a> {
                 if self.has_leading_own_line_comment_in_range(obj_end, prop_start) {
                     return true;
                 }
-                self.chain_has_own_line_comment(&member.object)
+                self.chain_has_own_line_comment(member.object)
             }
             Expression::TSNonNullExpression(non_null) => {
-                self.chain_has_own_line_comment(&non_null.expression)
+                self.chain_has_own_line_comment(non_null.expression)
             }
             Expression::TaggedTemplateExpression(tagged) => {
-                self.chain_has_own_line_comment(&tagged.tag)
+                self.chain_has_own_line_comment(tagged.tag)
             }
             _ => false,
         }
@@ -316,7 +319,7 @@ impl<'a> Printer<'a> {
     fn build_comment_paren_doc(
         &self,
         keyword: &'static str,
-        arg: &Expression,
+        arg: &Expression<'_>,
         inline_comments: Option<DocId>,
     ) -> DocId {
         let d = self.d();
@@ -355,7 +358,7 @@ impl<'a> Printer<'a> {
     fn build_binary_paren_doc(
         &self,
         keyword: &'static str,
-        binary: &internal::BinaryExpression,
+        binary: &internal::BinaryExpression<'_>,
         inline_comments: Option<DocId>,
     ) -> DocId {
         let d = self.d();

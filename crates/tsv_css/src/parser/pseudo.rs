@@ -7,10 +7,10 @@ use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 
 /// Parse pseudo-class or pseudo-element: :hover, ::before, :nth-child(2n+1)
-pub(crate) fn parse_pseudo_selector(
-    parser: &mut CssParser<'_>,
+pub(crate) fn parse_pseudo_selector<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
     start: usize,
-) -> Result<SimpleSelector, ParseError> {
+) -> Result<SimpleSelector<'arena>, ParseError> {
     parser.advance()?; // consume first :
 
     // Check for :: (pseudo-element)
@@ -23,17 +23,22 @@ pub(crate) fn parse_pseudo_selector(
         return Err(parser.error_expected("pseudo-class or pseudo-element name"));
     }
 
-    // Internal AST: use decoded value (spec-compliant)
-    let name = parser
+    // Decode the name only for parse-time argument dispatch (`:nth-child` → Nth,
+    // `:is`/`:not` → SelectorList). It is NOT stored on the node: the name is recovered
+    // from `span` at convert/print time (half-decoded to match Svelte — see convert.rs),
+    // so storing a fully-decoded copy would be redundant and, for identity escapes, wrong.
+    // The arena copy is needed because `current_identifier()` borrows a buffer that
+    // `advance()` overwrites, and dispatch happens after the name token is consumed.
+    let name_ident = parser
         .current_identifier()
-        .unwrap_or_else(|| parser.current_value())
-        .to_string();
+        .unwrap_or_else(|| parser.current_value());
+    let name = parser.alloc_str_in(name_ident);
     let mut end = (parser.base_offset() + parser.current_end) as u32; // Capture end of name token
     parser.advance()?;
 
     // Check for arguments: :nth-child(2n+1), :is(), :not(), etc.
     let args = if parser.check(TokenKind::LeftParen) {
-        let (args_opt, args_end) = parse_pseudo_args(parser, &name)?;
+        let (args_opt, args_end) = parse_pseudo_args(parser, name)?;
         end = args_end; // Use end of closing paren
         args_opt
     } else {
@@ -42,7 +47,6 @@ pub(crate) fn parse_pseudo_selector(
 
     if is_pseudo_element {
         Ok(SimpleSelector::PseudoElement {
-            name,
             args,
             span: Span {
                 start: start as u32,
@@ -51,7 +55,6 @@ pub(crate) fn parse_pseudo_selector(
         })
     } else {
         Ok(SimpleSelector::PseudoClass {
-            name,
             args,
             span: Span {
                 start: start as u32,
@@ -68,10 +71,10 @@ pub(crate) fn parse_pseudo_selector(
 /// - :nth-child(), :nth-of-type(), :nth-last-child(), :nth-last-of-type() → PseudoClassArgs::Nth
 /// - :is(), :not(), :where(), :has(), :global() → PseudoClassArgs::SelectorList
 /// - Others: returns None (unknown pseudo-classes)
-fn parse_pseudo_args(
-    parser: &mut CssParser<'_>,
+fn parse_pseudo_args<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
     pseudo_name: &str,
-) -> Result<(Option<PseudoClassArgs>, u32), ParseError> {
+) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
     parser.expect(TokenKind::LeftParen)?;
 
     let args_start = parser.current_start;
@@ -85,7 +88,7 @@ fn parse_pseudo_args(
 
         // Parse compound selector (sequence of simple selectors, no combinators)
         let compound_start = parser.current_start;
-        let mut compound_selectors = Vec::new();
+        let mut compound_selectors = parser.bvec();
 
         // Parse simple selectors until we hit a combinator or closing paren
         while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
@@ -125,7 +128,7 @@ fn parse_pseudo_args(
 
         return Ok((
             Some(PseudoClassArgs::Slotted {
-                selectors: compound_selectors,
+                selectors: compound_selectors.into_bump_slice(),
                 span: Span {
                     start: (parser.base_offset() + args_start) as u32,
                     end,
@@ -142,7 +145,7 @@ fn parse_pseudo_args(
     if pseudo_name == "part" {
         parser.skip_whitespace_and_comments()?;
 
-        let mut idents = Vec::new();
+        let mut idents = parser.bvec();
 
         // Parse space-separated identifiers
         while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
@@ -150,10 +153,10 @@ fn parse_pseudo_args(
                 return Err(parser.error_msg("::part() requires identifier arguments"));
             }
 
-            let ident = parser
+            let ident_str = parser
                 .current_identifier()
-                .unwrap_or_else(|| parser.current_value())
-                .to_string();
+                .unwrap_or_else(|| parser.current_value());
+            let ident = parser.alloc_str_in(ident_str);
             idents.push(ident);
             parser.advance()?;
 
@@ -171,7 +174,7 @@ fn parse_pseudo_args(
 
         return Ok((
             Some(PseudoClassArgs::Part {
-                idents,
+                idents: idents.into_bump_slice(),
                 span: Span {
                     start: (parser.base_offset() + args_start) as u32,
                     end,
@@ -213,7 +216,7 @@ fn parse_pseudo_args(
 
         return Ok((
             Some(PseudoClassArgs::Identifier {
-                value: ident_value,
+                value: parser.alloc_str_in(&ident_value),
                 span: Span {
                     start: (parser.base_offset() + ident_start) as u32,
                     end: (parser.base_offset() + ident_end) as u32,
@@ -313,7 +316,7 @@ fn parse_pseudo_args(
             }
 
             // Extract An+B value
-            let anb_value = parser.source()[anb_start..anb_end].trim().to_string();
+            let anb_value = parser.alloc_str_in(parser.source()[anb_start..anb_end].trim());
 
             // Parse optional selector list after "of"
             let of_selector = if found_of {

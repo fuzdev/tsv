@@ -71,7 +71,7 @@ fn to_json_value<T: Serialize>(value: &T) -> serde_json::Value {
 /// Simple identifiers get `character` in loc via `inject_loc_character()`.
 /// Destructure patterns get column +1 via `adjust_read_pattern_columns()`.
 fn convert_pattern_expression(
-    expr: &tsv_ts::ast::internal::Expression,
+    expr: &tsv_ts::ast::internal::Expression<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &string_interner::DefaultStringInterner,
@@ -177,7 +177,7 @@ fn adjust_columns_on_line(value: &mut serde_json::Value, target_line: u64) {
 }
 
 /// Convert Svelte Root AST to public format
-pub fn convert_root(root: &internal::Root, source: &str) -> public::Root {
+pub fn convert_root(root: &internal::Root<'_>, source: &str) -> public::Root {
     let loc = LocationTracker::new(source);
     let interner = root.interner.borrow();
 

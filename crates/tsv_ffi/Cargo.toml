@@ -13,7 +13,9 @@ crate-type = ["cdylib"]
 tsv_svelte = { workspace = true }
 tsv_ts = { workspace = true }
 tsv_css = { workspace = true }
+tsv_lang.workspace = true
 serde_json.workspace = true
+bumpalo.workspace = true
 
 [features]
 # Default build — both halves: the full libtsv_ffi the bench perf rows load and

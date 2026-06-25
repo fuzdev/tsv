@@ -2,7 +2,7 @@
 
 > Production CLI for `tsv` — pure Rust, no Deno
 
-Ships the `tsv` binary (defined in `Cargo.toml` `[[bin]]`). Depends on `tsv_ts`, `tsv_css`, and `tsv_svelte` (each with `convert` features), `tsv_ignore` (discovery ignore-file matching) and `tsv_discover` (the per-directory prune/descend policy over it), plus `argh`, `serde`, and `serde_json` — nothing else. `tsv_debug` depends on this crate and reuses its `cli::` library surface for its own command set; keep that surface stable.
+Ships the `tsv` binary (defined in `Cargo.toml` `[[bin]]`). Depends on `tsv_ts`, `tsv_css`, and `tsv_svelte` (each with `convert` features), `tsv_lang` (the `estimated_ast_arena_capacity` parse-arena pre-size), `tsv_ignore` (discovery ignore-file matching) and `tsv_discover` (the per-directory prune/descend policy over it), plus `argh`, `serde`, and `serde_json` — nothing else. `tsv_debug` depends on this crate and reuses its `cli::` library surface for its own command set; keep that surface stable.
 
 For end-user invocation syntax see the [root CLAUDE.md §CLI Usage](../../CLAUDE.md#cli-usage---parse--format). For pattern background see [`docs/cli.md`](../../docs/cli.md).
 

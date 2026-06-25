@@ -29,7 +29,7 @@ fn is_keyframes_atrule(name: &str) -> bool {
 }
 
 /// Check if current token is a CSS boolean operator keyword (and, or, not)
-pub(super) fn is_boolean_operator(parser: &CssParser<'_>) -> bool {
+pub(super) fn is_boolean_operator(parser: &CssParser<'_, '_>) -> bool {
     if let TokenKind::Identifier = &parser.current_kind {
         let identifier = parser
             .current_identifier()
@@ -43,10 +43,10 @@ pub(super) fn is_boolean_operator(parser: &CssParser<'_>) -> bool {
 /// Parse a CSS at-rule: `@media (...) { ... }` or `@import "...";`
 ///
 /// `nested_in_rule`: true if this at-rule is nested inside a regular rule's declaration block
-pub(crate) fn parse_atrule(
-    parser: &mut CssParser<'_>,
+pub(crate) fn parse_atrule<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
     nested_in_rule: bool,
-) -> Result<CssAtrule, ParseError> {
+) -> Result<CssAtrule<'arena>, ParseError> {
     let start = parser.base_offset() + parser.current_start;
 
     // Expect @ symbol
@@ -58,10 +58,10 @@ pub(crate) fn parse_atrule(
     }
 
     // Internal AST: use decoded value (spec-compliant)
-    let name = parser
+    let name_ident = parser
         .current_identifier()
-        .unwrap_or_else(|| parser.current_value())
-        .to_string();
+        .unwrap_or_else(|| parser.current_value());
+    let name = parser.alloc_str_in(name_ident);
     parser.advance()?;
 
     parser.skip_whitespace()?;
@@ -110,7 +110,7 @@ pub(crate) fn parse_atrule(
 
     // Parse block (if present)
     let (block, end) = if parser.check(TokenKind::LeftBrace) {
-        let block = parse_atrule_block(parser, &name, nested_in_rule)?;
+        let block = parse_atrule_block(parser, name, nested_in_rule)?;
         let end = block.span.end;
         (Some(block), end)
     } else if parser.check(TokenKind::Semicolon) {
@@ -148,18 +148,18 @@ pub(crate) fn parse_atrule(
 /// - @font-face, @page: contain declarations
 ///
 /// `nested_in_rule`: true if this at-rule is nested inside a regular rule's declaration block
-fn parse_atrule_block(
-    parser: &mut CssParser<'_>,
+fn parse_atrule_block<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
     atrule_name: &str,
     nested_in_rule: bool,
-) -> Result<CssAtruleBlock, ParseError> {
+) -> Result<CssAtruleBlock<'arena>, ParseError> {
     let start = parser.base_offset() + parser.current_start;
 
     // Expect {
     parser.expect(TokenKind::LeftBrace)?;
     parser.skip_whitespace()?;
 
-    let mut children = Vec::new();
+    let mut children = parser.bvec();
 
     // Determine what content to expect based on at-rule type and nesting context
     // When nested inside a rule, at-rules that normally contain rules should contain declarations instead
@@ -253,7 +253,7 @@ fn parse_atrule_block(
     parser.advance()?; // consume }
 
     Ok(CssAtruleBlock {
-        children,
+        children: children.into_bump_slice(),
         span: Span {
             start: start as u32,
             end: end as u32,

@@ -41,9 +41,9 @@ checksum = "812e12b5285cc515a9c72a5c1d3b6d46a19dac5acfef5265968c166106e31dd3"
 
 [[package]]
 name = "bumpalo"
-version = "3.19.0"
+version = "3.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46c5e41b57b8bba42a04676d81cb89e9ee8e859a1a66f80a5a72e1cb76b34d43"
+checksum = "72f5acc6cb2ba439de613abc23857ec3d78374d8ed5ac84e9d11336e87da8649"
 
 [[package]]
 name = "bytes"
@@ -469,6 +469,7 @@ dependencies = [
 name = "tsv"
 version = "0.1.0"
 dependencies = [
+ "bumpalo",
  "futures-util",
  "serde",
  "serde_json",
@@ -486,11 +487,13 @@ name = "tsv_cli"
 version = "0.1.0"
 dependencies = [
  "argh",
+ "bumpalo",
  "serde",
  "serde_json",
  "tsv_css",
  "tsv_discover",
  "tsv_ignore",
+ "tsv_lang",
  "tsv_svelte",
  "tsv_ts",
 ]
@@ -499,6 +502,7 @@ dependencies = [
 name = "tsv_css"
 version = "0.1.0"
 dependencies = [
+ "bumpalo",
  "phf",
  "serde",
  "serde_json",
@@ -510,6 +514,7 @@ name = "tsv_debug"
 version = "0.1.0"
 dependencies = [
  "argh",
+ "bumpalo",
  "futures-util",
  "serde",
  "serde_json",
@@ -536,8 +541,10 @@ dependencies = [
 name = "tsv_ffi"
 version = "0.1.0"
 dependencies = [
+ "bumpalo",
  "serde_json",
  "tsv_css",
+ "tsv_lang",
  "tsv_svelte",
  "tsv_ts",
 ]
@@ -569,6 +576,7 @@ dependencies = [
 name = "tsv_svelte"
 version = "0.1.0"
 dependencies = [
+ "bumpalo",
  "serde",
  "serde_json",
  "smallvec",
@@ -583,6 +591,7 @@ dependencies = [
 name = "tsv_ts"
 version = "0.1.0"
 dependencies = [
+ "bumpalo",
  "phf",
  "serde",
  "serde_json",
@@ -596,10 +605,12 @@ dependencies = [
 name = "tsv_wasm"
 version = "0.1.0"
 dependencies = [
+ "bumpalo",
  "js-sys",
  "tsv_css",
  "tsv_discover",
  "tsv_ignore",
+ "tsv_lang",
  "tsv_svelte",
  "tsv_ts",
  "wasm-bindgen",

@@ -14,6 +14,9 @@ pub use tsv_lang::{ParseError, Result};
 /// # Arguments
 ///
 /// * `source` - The Svelte component source code to parse
+/// * `arena` - The bump arena that owns the parsed graph (the template AST plus
+///   the embedded TS `<script>`/`{expr}` ASTs, which share this one `Bump`); the
+///   returned `Root<'arena>` borrows from it (caller-owns-`Bump`).
 ///
 /// # Returns
 ///
@@ -23,10 +26,11 @@ pub use tsv_lang::{ParseError, Result};
 /// # Example
 ///
 /// ```rust,ignore
-/// let ast = tsv_svelte::parse("<div>Hello</div>")?;
+/// let arena = bumpalo::Bump::new();
+/// let ast = tsv_svelte::parse("<div>Hello</div>", &arena)?;
 /// ```
-pub fn parse(source: &str) -> Result<Root> {
-    parser::parse_svelte(source).map_err(|e| e.with_context(source))
+pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Root<'arena>> {
+    parser::parse_svelte(source, arena).map_err(|e| e.with_context(source))
 }
 
 /// Format a Svelte AST back to source code
@@ -47,7 +51,7 @@ pub fn parse(source: &str) -> Result<Root> {
 /// let ast = tsv_svelte::parse(source)?;
 /// let formatted = tsv_svelte::format(&ast, source);
 /// ```
-pub fn format(root: &Root, source: &str) -> String {
+pub fn format(root: &Root<'_>, source: &str) -> String {
     printer::format_svelte(root, source)
 }
 
@@ -71,7 +75,7 @@ pub fn format(root: &Root, source: &str) -> String {
 /// let json = serde_json::to_string_pretty(&public_ast)?;
 /// ```
 #[cfg(feature = "convert")]
-pub fn convert_ast(root: &Root, source: &str) -> ast::public::Root {
+pub fn convert_ast(root: &Root<'_>, source: &str) -> ast::public::Root {
     ast::convert::convert_root(root, source)
 }
 
@@ -92,7 +96,7 @@ pub fn convert_ast(root: &Root, source: &str) -> ast::public::Root {
 /// ```
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
-pub fn convert_ast_json(root: &Root, source: &str) -> serde_json::Value {
+pub fn convert_ast_json(root: &Root<'_>, source: &str) -> serde_json::Value {
     let public_ast = ast::convert::convert_root(root, source);
     let mut json = serde_json::to_value(&public_ast).expect("AST types derive Serialize correctly");
 
@@ -123,7 +127,7 @@ pub fn convert_ast_json(root: &Root, source: &str) -> serde_json::Value {
 /// and the CLI's compact output.
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
-pub fn convert_ast_json_string(root: &Root, source: &str) -> String {
+pub fn convert_ast_json_string(root: &Root<'_>, source: &str) -> String {
     let script_spans = script_content_spans(root);
     let mut buf = Vec::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
     if source.is_ascii()
@@ -145,12 +149,12 @@ pub fn convert_ast_json_string(root: &Root, source: &str) -> String {
 /// extract script contents as standalone TS (e.g. the fixture suite's
 /// typed-walk parity probes).
 #[cfg(feature = "convert")]
-pub fn script_content_spans(root: &Root) -> Vec<(u32, u32)> {
+pub fn script_content_spans(root: &Root<'_>) -> Vec<(u32, u32)> {
     let mut script_spans: Vec<(u32, u32)> = Vec::new();
-    if let Some(ref script) = root.instance {
+    if let Some(script) = root.instance {
         script_spans.push((script.content.span.start, script.content.span.end));
     }
-    if let Some(ref script) = root.module {
+    if let Some(script) = root.module {
         script_spans.push((script.content.span.start, script.content.span.end));
     }
     script_spans

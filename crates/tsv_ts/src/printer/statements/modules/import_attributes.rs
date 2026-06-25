@@ -27,7 +27,7 @@ impl<'a> Printer<'a> {
     pub(super) fn push_import_attributes_clause(
         &self,
         parts: &mut DocBuf,
-        attributes: Option<&[internal::ImportAttribute]>,
+        attributes: Option<&[internal::ImportAttribute<'_>]>,
         source_end: u32,
         stmt_end: u32,
     ) -> u32 {
@@ -126,11 +126,12 @@ impl<'a> Printer<'a> {
     /// a string-literal key follows prettier's `quoteProps: as-needed` — quotes
     /// are stripped when the value is a valid identifier with no escapes
     /// (`'type'` → `type`), else kept and normalized (`'resolution-mode'`).
-    fn build_import_attribute_key_doc(&self, key: &internal::ImportAttributeKey) -> DocId {
+    fn build_import_attribute_key_doc(&self, key: &internal::ImportAttributeKey<'_>) -> DocId {
         match key {
             internal::ImportAttributeKey::Identifier(id) => self.d().symbol(id.name.to_u32()),
             internal::ImportAttributeKey::Literal(lit) => {
-                if let internal::LiteralValue::String { content, .. } = &lit.value {
+                if let internal::LiteralValue::String(cooked) = &lit.value {
+                    let content = cooked.resolve(lit.span, self.source);
                     self.build_string_literal_key_doc(lit, content)
                 } else {
                     // Attribute keys are only identifiers or string literals.
@@ -143,7 +144,7 @@ impl<'a> Printer<'a> {
     /// Build doc for a single import attribute: `key: value`
     ///
     /// Handles comments between key, `:`, and value.
-    fn build_import_attribute_doc(&self, attr: &internal::ImportAttribute) -> DocId {
+    fn build_import_attribute_doc(&self, attr: &internal::ImportAttribute<'_>) -> DocId {
         let d = self.d();
         let key_end = attr.key.span().end;
         let value_start = attr.value.span.start;

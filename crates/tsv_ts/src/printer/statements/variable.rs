@@ -20,7 +20,7 @@ use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::{INDENT, PRINT_WIDTH};
 
 /// Wrap a doc in parentheses if the expression needs them for variable init context
-fn wrap_init_doc(d: &DocArena, init_doc: DocId, init: &Expression) -> DocId {
+fn wrap_init_doc(d: &DocArena, init_doc: DocId, init: &Expression<'_>) -> DocId {
     if needs_parens(init, ParenContext::VariableInit) {
         d.parens(init_doc)
     } else {
@@ -47,7 +47,7 @@ impl<'a> Printer<'a> {
     ///
     /// For identifiers with `definite: true`, builds doc for `name!: type` instead of `name: type`.
     /// Uses wrapping type annotations so TypeReference type arguments break internally when needed.
-    fn build_variable_binding_doc(&self, id: &Expression, definite: bool) -> DocId {
+    fn build_variable_binding_doc(&self, id: &Expression<'_>, definite: bool) -> DocId {
         if definite {
             if let Expression::Identifier(ident) = id {
                 self.build_typed_identifier_doc(ident, true, true)
@@ -68,7 +68,7 @@ impl<'a> Printer<'a> {
     /// - `wrap_type`: use wrapping type annotation (breaks internally) vs non-wrapping (stays on one line)
     fn build_typed_identifier_doc(
         &self,
-        ident: &internal::Identifier,
+        ident: &internal::Identifier<'_>,
         definite: bool,
         wrap_type: bool,
     ) -> DocId {
@@ -77,8 +77,7 @@ impl<'a> Printer<'a> {
 
         // Compute name_end for comment extraction
         let search_end = ident
-            .type_annotation
-            .as_ref()
+            .type_annotation()
             .map_or(ident.span.end, |ta| ta.span.start);
         let raw_name_end = analysis::skip_identifier_at(
             self.source.as_bytes(),
@@ -93,7 +92,7 @@ impl<'a> Printer<'a> {
         if ident.optional {
             after_modifier = self.push_modifier_marker_doc(&mut parts, after_modifier, b'?');
         }
-        if let Some(type_ann) = &ident.type_annotation {
+        if let Some(type_ann) = ident.type_annotation() {
             // `: type` annotation, handling a before-`:` comment between the binding
             // name (and any `!`/`?`) and `:` — line → indented continuation, block →
             // inline before `:`.
@@ -111,7 +110,7 @@ impl<'a> Printer<'a> {
     /// the `;` (a bare `{let a}` is the lone exception, which passes `true`).
     pub(crate) fn build_variable_declaration_doc(
         &self,
-        decl: &internal::VariableDeclaration,
+        decl: &internal::VariableDeclaration<'_>,
         emit_semicolon: bool,
     ) -> DocId {
         let d = self.d();
@@ -279,7 +278,7 @@ impl<'a> Printer<'a> {
                 // `!` (already emitted inside the id doc) aren't re-emitted before `=`.
                 if declarator.definite
                     && let Expression::Identifier(ident) = &declarator.id
-                    && ident.type_annotation.is_none()
+                    && ident.type_annotation().is_none()
                     && let Some(bang_pos) = tsv_lang::source_scan::find_char_skipping_comments(
                         self.source.as_bytes(),
                         id_end as usize,
@@ -525,7 +524,7 @@ impl<'a> Printer<'a> {
                     init,
                     self.source,
                     PRINT_WIDTH,
-                ) && matches!(&declarator.id, Expression::Identifier(id) if id.type_annotation.is_some());
+                ) && matches!(&declarator.id, Expression::Identifier(id) if id.type_annotation().is_some());
 
                 let is_simple_rhs_with_breakable_lhs =
                     can_break_left && is_simple_self_expanding(init);

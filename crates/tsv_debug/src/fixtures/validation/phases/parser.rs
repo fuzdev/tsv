@@ -95,7 +95,7 @@ pub(in crate::fixtures::validation) fn validate_parser_ours_matches_expected(
 pub(in crate::fixtures::validation) fn validate_typed_walk_parity(
     result: &mut FixtureValidation,
     input: &str,
-    parsed: &ParsedInput,
+    parsed: &ParsedInput<'_>,
 ) {
     let parity = super::super::parsed_input::typed_walk_parity_probes(input, parsed);
     for (probe, failure) in parity.failures {
@@ -311,10 +311,13 @@ pub(in crate::fixtures::validation) async fn validate_invalid_syntax(
         };
 
         // Check our parser
+        let arena = bumpalo::Bump::new();
         let ours_failed = match input_type {
-            InputType::Svelte => tsv_svelte::parse(&variant_content).is_err(),
-            InputType::SvelteTs | InputType::TypeScript => tsv_ts::parse(&variant_content).is_err(),
-            InputType::Css => tsv_css::parse(&variant_content).is_err(),
+            InputType::Svelte => tsv_svelte::parse(&variant_content, &arena).is_err(),
+            InputType::SvelteTs | InputType::TypeScript => {
+                tsv_ts::parse(&variant_content, &arena).is_err()
+            }
+            InputType::Css => tsv_css::parse(&variant_content, &arena).is_err(),
         };
 
         // Check canonical parser

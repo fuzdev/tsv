@@ -1,5 +1,5 @@
 use crate::cli::discover::discover_files;
-use crate::cli::format_source::format_source;
+use crate::cli::format_source::{format_source, format_source_in};
 use crate::cli::input::{InputArgs, ParserType};
 use argh::FromArgs;
 use std::fs;
@@ -185,14 +185,22 @@ impl FormatCommand {
             .unwrap_or_else(|| thread::available_parallelism().map_or(1, NonZeroUsize::get));
         let outcomes = format_files(&files, self.check, jobs);
 
+        // Buffer the changed-path lines and emit them in one write, for the same
+        // reason `--list` does (above): a per-path `println!` re-locks stdout and
+        // flushes for each of (potentially thousands of) changed files, which
+        // dominates `--check` on a large unformatted tree. The common case (few
+        // changes) keeps the buffer tiny. Errors stay per-line on stderr (rare,
+        // and stderr is for immediate diagnostics).
+        use std::fmt::Write as _;
         let (mut changed, mut unchanged) = (0u32, 0u32);
         let mut errors = discovered.errors.len() as u32;
+        let mut changed_paths = String::new();
         for (path, outcome) in files.iter().zip(&outcomes) {
             match outcome {
                 FileOutcome::Unchanged => unchanged += 1,
                 FileOutcome::Changed => {
                     changed += 1;
-                    println!("{}", path.display());
+                    let _ = writeln!(changed_paths, "{}", path.display());
                 }
                 FileOutcome::Error(e) => {
                     errors += 1;
@@ -200,6 +208,7 @@ impl FormatCommand {
                 }
             }
         }
+        print!("{changed_paths}");
 
         let action = if self.check {
             "would change"
@@ -222,8 +231,10 @@ impl FormatCommand {
     }
 }
 
-/// Format one file, writing in place when the output differs (unless `check`).
-fn format_file(path: &Path, check: bool) -> FileOutcome {
+/// Format one file into the worker's reusable `arena`, writing in place when the
+/// output differs (unless `check`). Nothing borrowed from `arena` escapes, so the
+/// caller resets it after this returns (see `format_files`).
+fn format_file(path: &Path, check: bool, arena: &bumpalo::Bump) -> FileOutcome {
     let source = match fs::read_to_string(path) {
         Ok(source) => source,
         Err(e) => return FileOutcome::Error(format!("read failed: {e}")),
@@ -231,7 +242,9 @@ fn format_file(path: &Path, check: bool) -> FileOutcome {
     let parser_type = ParserType::from_extension(&path.to_string_lossy());
     // catch_unwind isolates formatter bugs to the file; release builds use
     // panic=abort so this only pays off in dev/corpus profiles
-    let result = panic::catch_unwind(AssertUnwindSafe(|| format_source(&source, parser_type)));
+    let result = panic::catch_unwind(AssertUnwindSafe(|| {
+        format_source_in(&source, parser_type, arena)
+    }));
     let formatted = match result {
         Ok(Ok(formatted)) => formatted,
         Ok(Err(e)) => return FileOutcome::Error(e),
@@ -263,12 +276,26 @@ fn format_files(files: &[PathBuf], check: bool, jobs: usize) -> Vec<FileOutcome>
             .map(|_| {
                 scope.spawn(|| {
                     let mut outcomes = Vec::new();
+                    // One arena per worker, reused across its files: `reset()` keeps
+                    // the largest chunk and rewinds the cursor, so only the first
+                    // file (and any that grow past the high-water mark) pays a chunk
+                    // alloc — the rest reuse it. The per-file AST borrows `&arena`
+                    // and is dropped inside `format_file` (returns an owned outcome),
+                    // so the `&mut` reset is sound.
+                    // One arena per worker, reused across its files: `reset()` keeps
+                    // the largest chunk and rewinds the cursor, so only the first
+                    // file (and any that grow past the high-water mark) pays a chunk
+                    // alloc — the rest reuse it. The per-file AST borrows `&arena`
+                    // and is dropped inside `format_file` (returns an owned outcome),
+                    // so the `&mut` reset is sound.
+                    let mut arena = bumpalo::Bump::new();
                     loop {
                         let i = next.fetch_add(1, Ordering::Relaxed);
                         if i >= files.len() {
                             break;
                         }
-                        outcomes.push((i, format_file(&files[i], check)));
+                        outcomes.push((i, format_file(&files[i], check, &arena)));
+                        arena.reset();
                     }
                     outcomes
                 })

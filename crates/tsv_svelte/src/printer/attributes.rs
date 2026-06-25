@@ -140,7 +140,7 @@ impl<'a> Printer<'a> {
     /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
     pub(super) fn build_attribute_node_doc(
         &self,
-        node: &internal::AttributeNode,
+        node: &internal::AttributeNode<'_>,
         is_html: bool,
     ) -> DocId {
         match node {
@@ -169,7 +169,11 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a single attribute (name="value" or name or {shorthand})
     ///
     /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
-    pub(super) fn build_attribute_doc(&self, attr: &internal::Attribute, is_html: bool) -> DocId {
+    pub(super) fn build_attribute_doc(
+        &self,
+        attr: &internal::Attribute<'_>,
+        is_html: bool,
+    ) -> DocId {
         let d = self.d();
         let name_sym = attr.name.to_u32();
 
@@ -220,7 +224,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an attribute value part
-    fn build_attribute_value_doc(&self, value: &internal::AttributeValue) -> DocId {
+    fn build_attribute_value_doc(&self, value: &internal::AttributeValue<'_>) -> DocId {
         match value {
             internal::AttributeValue::Text(text) => {
                 self.build_attribute_text_doc(text.raw(self.source))
@@ -238,7 +242,7 @@ impl<'a> Printer<'a> {
     /// Expression tags are passed through unchanged.
     fn build_class_attribute_value_doc(
         &self,
-        value: &internal::AttributeValue,
+        value: &internal::AttributeValue<'_>,
         is_last_part: bool,
     ) -> DocId {
         match value {
@@ -260,7 +264,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an expression tag inside an attribute value.
-    fn build_attribute_expression_doc(&self, expr_tag: &internal::ExpressionTag) -> DocId {
+    fn build_attribute_expression_doc(&self, expr_tag: &internal::ExpressionTag<'_>) -> DocId {
         self.build_expression_tag_doc(expr_tag)
     }
 
@@ -282,7 +286,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a spread attribute: `{...expr}`
-    fn build_spread_attribute_doc(&self, spread: &internal::SpreadAttribute) -> DocId {
+    fn build_spread_attribute_doc(&self, spread: &internal::SpreadAttribute<'_>) -> DocId {
         self.build_braced_expression_doc(
             SPREAD_OPEN,
             &spread.expression,
@@ -292,7 +296,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an attach tag: `{@attach expr}`
-    fn build_attach_tag_doc(&self, tag: &internal::AttachTag) -> DocId {
+    fn build_attach_tag_doc(&self, tag: &internal::AttachTag<'_>) -> DocId {
         self.build_braced_expression_doc(
             ATTACH_TAG_OPEN,
             &tag.expression,
@@ -307,7 +311,7 @@ impl<'a> Printer<'a> {
     fn build_braced_expression_doc(
         &self,
         prefix: &'static str,
-        expr: &Expression,
+        expr: &Expression<'_>,
         span_start: u32,
         span_end: u32,
     ) -> DocId {
@@ -351,8 +355,8 @@ impl<'a> Printer<'a> {
         &self,
         prefix: DocId,
         name: &str,
-        modifiers: &[String],
-        expression: Option<&Expression>,
+        modifiers: &[&str],
+        expression: Option<&Expression<'_>>,
         expression_tag_span: Option<tsv_lang::Span>,
     ) -> DocId {
         let d = self.d();
@@ -365,23 +369,24 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for on:event directive
-    fn build_on_directive_doc(&self, dir: &internal::OnDirective) -> DocId {
+    fn build_on_directive_doc(&self, dir: &internal::OnDirective<'_>) -> DocId {
         self.build_simple_directive_doc(
             self.d().text("on:"),
-            &dir.name,
-            &dir.modifiers,
+            dir.name_span.extract(self.source),
+            dir.modifiers,
             dir.expression.as_ref(),
             dir.expression_tag_span,
         )
     }
 
     /// Build a Doc for bind:prop directive
-    fn build_bind_directive_doc(&self, dir: &internal::BindDirective) -> DocId {
+    fn build_bind_directive_doc(&self, dir: &internal::BindDirective<'_>) -> DocId {
         let d = self.d();
-        let mut parts: DocBuf = smallvec![d.text("bind:"), d.text_owned(dir.name.clone())];
-        parts.extend(self.build_modifiers_doc(&dir.modifiers));
+        let name = dir.name_span.extract(self.source);
+        let mut parts: DocBuf = smallvec![d.text("bind:"), d.text_owned(name.to_string())];
+        parts.extend(self.build_modifiers_doc(dir.modifiers));
         // Only include expression if not shorthand
-        if !self.is_identifier_with_name(&dir.expression, &dir.name) {
+        if !self.is_identifier_with_name(&dir.expression, name) {
             // bind: uses {getter, setter} syntax where SequenceExpression is bare (no parens)
             parts.extend(self.build_expression_doc_parts_with_span_for_bind(
                 &dir.expression,
@@ -392,12 +397,13 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for class:name directive
-    fn build_class_directive_doc(&self, dir: &internal::ClassDirective) -> DocId {
+    fn build_class_directive_doc(&self, dir: &internal::ClassDirective<'_>) -> DocId {
         let d = self.d();
-        let mut parts: DocBuf = smallvec![d.text("class:"), d.text_owned(dir.name.clone())];
-        parts.extend(self.build_modifiers_doc(&dir.modifiers));
+        let name = dir.name_span.extract(self.source);
+        let mut parts: DocBuf = smallvec![d.text("class:"), d.text_owned(name.to_string())];
+        parts.extend(self.build_modifiers_doc(dir.modifiers));
         // Only include expression if not shorthand
-        if !self.is_identifier_with_name(&dir.expression, &dir.name) {
+        if !self.is_identifier_with_name(&dir.expression, name) {
             parts.extend(
                 self.build_expression_doc_parts_with_span(&dir.expression, dir.expression_tag_span),
             );
@@ -406,22 +412,23 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for style:prop directive
-    fn build_style_directive_doc(&self, dir: &internal::StyleDirective) -> DocId {
+    fn build_style_directive_doc(&self, dir: &internal::StyleDirective<'_>) -> DocId {
         let d = self.d();
-        let mut parts: DocBuf = smallvec![d.text("style:"), d.text_owned(dir.name.clone())];
-        parts.extend(self.build_modifiers_doc(&dir.modifiers));
+        let name = dir.name_span.extract(self.source);
+        let mut parts: DocBuf = smallvec![d.text("style:"), d.text_owned(name.to_string())];
+        parts.extend(self.build_modifiers_doc(dir.modifiers));
         match &dir.value {
             internal::StyleDirectiveValue::True => {}
             internal::StyleDirectiveValue::ExpressionTag(tag) => {
                 // Only include expression if not shorthand (style:color={color} → style:color)
-                if !self.is_identifier_with_name(&tag.expression, &dir.name) {
+                if !self.is_identifier_with_name(&tag.expression, name) {
                     parts.push(d.text("="));
                     parts.push(self.build_expression_tag_doc(tag));
                 }
             }
             internal::StyleDirectiveValue::Parts(value_parts) => {
                 parts.push(d.text("=\""));
-                for part in value_parts {
+                for part in value_parts.iter() {
                     parts.push(self.build_attribute_value_doc(part));
                 }
                 parts.push(d.text("\""));
@@ -431,46 +438,47 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for use:action directive
-    fn build_use_directive_doc(&self, dir: &internal::UseDirective) -> DocId {
+    fn build_use_directive_doc(&self, dir: &internal::UseDirective<'_>) -> DocId {
         self.build_simple_directive_doc(
             self.d().text("use:"),
-            &dir.name,
-            &dir.modifiers,
+            dir.name_span.extract(self.source),
+            dir.modifiers,
             dir.expression.as_ref(),
             dir.expression_tag_span,
         )
     }
 
     /// Build a Doc for transition/in/out directive
-    fn build_transition_directive_doc(&self, dir: &internal::TransitionDirective) -> DocId {
+    fn build_transition_directive_doc(&self, dir: &internal::TransitionDirective<'_>) -> DocId {
         self.build_simple_directive_doc(
             self.d().text(dir.direction.prefix_with_colon()),
-            &dir.name,
-            &dir.modifiers,
+            dir.name_span.extract(self.source),
+            dir.modifiers,
             dir.expression.as_ref(),
             dir.expression_tag_span,
         )
     }
 
     /// Build a Doc for animate:name directive
-    fn build_animate_directive_doc(&self, dir: &internal::AnimateDirective) -> DocId {
+    fn build_animate_directive_doc(&self, dir: &internal::AnimateDirective<'_>) -> DocId {
         self.build_simple_directive_doc(
             self.d().text("animate:"),
-            &dir.name,
-            &dir.modifiers,
+            dir.name_span.extract(self.source),
+            dir.modifiers,
             dir.expression.as_ref(),
             dir.expression_tag_span,
         )
     }
 
     /// Build a Doc for let:name directive
-    fn build_let_directive_doc(&self, dir: &internal::LetDirective) -> DocId {
+    fn build_let_directive_doc(&self, dir: &internal::LetDirective<'_>) -> DocId {
         let d = self.d();
-        let mut parts: DocBuf = smallvec![d.text("let:"), d.text_owned(dir.name.clone())];
-        parts.extend(self.build_modifiers_doc(&dir.modifiers));
+        let name = dir.name_span.extract(self.source);
+        let mut parts: DocBuf = smallvec![d.text("let:"), d.text_owned(name.to_string())];
+        parts.extend(self.build_modifiers_doc(dir.modifiers));
         // Only include expression if not shorthand (let:foo={foo} → let:foo)
         if let Some(expr) = &dir.expression
-            && !self.is_identifier_with_name(expr, &dir.name)
+            && !self.is_identifier_with_name(expr, name)
         {
             parts.extend(self.build_expression_doc_parts_with_span(expr, dir.expression_tag_span));
         }
@@ -482,10 +490,10 @@ impl<'a> Printer<'a> {
     //
 
     /// Build Doc parts for modifiers: `|mod1|mod2`
-    fn build_modifiers_doc(&self, modifiers: &[String]) -> Vec<DocId> {
+    fn build_modifiers_doc(&self, modifiers: &[&str]) -> Vec<DocId> {
         modifiers
             .iter()
-            .flat_map(|m| [self.d().text("|"), self.d().text_owned(m.clone())])
+            .flat_map(|m| [self.d().text("|"), self.d().text_owned((*m).to_string())])
             .collect()
     }
 
@@ -493,7 +501,7 @@ impl<'a> Printer<'a> {
     ///
     /// Sets `LayoutMode::Embedded` so binary expressions use ContinuationIndent style.
     /// Assignment expressions get wrapped in parens: `prop={(a = b)}`.
-    fn build_expression_doc_for_attribute(&self, expr: &Expression) -> DocId {
+    fn build_expression_doc_for_attribute(&self, expr: &Expression<'_>) -> DocId {
         let d = self.d();
         let embedded = tsv_lang::EmbedContext {
             mode: tsv_lang::LayoutMode::Embedded,
@@ -521,7 +529,7 @@ impl<'a> Printer<'a> {
     /// - Broken: `={\n\t\ta &&\n\t\t\tb &&\n\t\t\tc\n\t}`
     fn build_expression_doc_parts_with_span(
         &self,
-        expr: &Expression,
+        expr: &Expression<'_>,
         tag_span: Option<tsv_lang::Span>,
     ) -> Vec<DocId> {
         let expr_content = self.build_expression_content_with_comments(expr, tag_span);
@@ -586,7 +594,7 @@ impl<'a> Printer<'a> {
     /// Returns a Vec<DocId> containing: leading comments + expression doc + trailing comments
     fn build_expression_content_with_comments(
         &self,
-        expr: &Expression,
+        expr: &Expression<'_>,
         tag_span: Option<tsv_lang::Span>,
     ) -> Vec<DocId> {
         // Collect leading comments
@@ -648,7 +656,7 @@ impl<'a> Printer<'a> {
     /// ```
     fn build_expression_doc_parts_with_span_for_bind(
         &self,
-        expr: &Expression,
+        expr: &Expression<'_>,
         tag_span: Option<tsv_lang::Span>,
     ) -> Vec<DocId> {
         let d = self.d();
@@ -727,7 +735,7 @@ impl<'a> Printer<'a> {
     /// them.
     fn build_bind_sequence_with_comments_doc(
         &self,
-        seq: &tsv_ts::ast::internal::SequenceExpression,
+        seq: &tsv_ts::ast::internal::SequenceExpression<'_>,
         tag_span: tsv_lang::Span,
     ) -> DocId {
         let d = self.d();
@@ -815,7 +823,7 @@ impl<'a> Printer<'a> {
     /// Used for bind: directive expressions where Prettier always uses this format.
     fn build_expression_doc_parts_with_span_block_structure(
         &self,
-        expr: &Expression,
+        expr: &Expression<'_>,
         tag_span: Option<tsv_lang::Span>,
     ) -> Vec<DocId> {
         let expr_content = self.build_expression_content_with_comments(expr, tag_span);
@@ -834,7 +842,7 @@ impl<'a> Printer<'a> {
     ///   condB &&
     ///   condC}
     /// ```
-    pub(super) fn build_expression_tag_doc(&self, tag: &internal::ExpressionTag) -> DocId {
+    pub(super) fn build_expression_tag_doc(&self, tag: &internal::ExpressionTag<'_>) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = smallvec![d.text("{")];
 
@@ -861,7 +869,7 @@ impl<'a> Printer<'a> {
     fn is_shorthand_attribute(
         &self,
         attr_name: string_interner::DefaultSymbol,
-        value_parts: &[internal::AttributeValue],
+        value_parts: &[internal::AttributeValue<'_>],
     ) -> bool {
         // Must be exactly one value part
         if value_parts.len() != 1 {
@@ -883,7 +891,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if expression is an identifier with the given name
-    fn is_identifier_with_name(&self, expr: &Expression, name: &str) -> bool {
+    fn is_identifier_with_name(&self, expr: &Expression<'_>, name: &str) -> bool {
         if let Expression::Identifier(id) = expr {
             self.with_resolved_symbol(id.name, |s| s == name)
         } else {

@@ -46,7 +46,7 @@ fn wrap_import_hardline(d: &DocArena, inner: DocId) -> DocId {
 /// - Only the options object expands with its properties indented
 pub(super) fn build_import_expression_doc(
     printer: &Printer<'_>,
-    import_expr: &internal::ImportExpression,
+    import_expr: &internal::ImportExpression<'_>,
 ) -> DocId {
     let d = printer.d();
 
@@ -56,7 +56,7 @@ pub(super) fn build_import_expression_doc(
     let open_paren_end = import_expr.span.start + "import(".len() as u32;
     let source_start = import_expr.source.span().start;
 
-    let raw_source_doc = printer.build_expression_doc(&import_expr.source);
+    let raw_source_doc = printer.build_expression_doc(import_expr.source);
     let (source_doc, leading_forces_break) =
         printer.build_paren_leading_value_doc(open_paren_end, source_start, raw_source_doc);
 
@@ -241,7 +241,7 @@ pub(super) fn build_import_expression_doc(
 /// Build a Doc for a meta property: `import.meta`, `new.target`
 pub(super) fn build_meta_property_doc(
     printer: &Printer<'_>,
-    meta: &internal::MetaProperty,
+    meta: &internal::MetaProperty<'_>,
 ) -> DocId {
     let d = printer.d();
     let meta_name = printer.resolve_symbol(meta.meta.name);

@@ -9,7 +9,7 @@ use tsv_lang::{ParseError, Span};
 
 use super::parser_impl::SvelteParser;
 
-impl<'a> SvelteParser<'a> {
+impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse an expression tag `{expression}` at the current lexer position, then
     /// advance the lexer past the closing `}`.
     ///
@@ -17,7 +17,7 @@ impl<'a> SvelteParser<'a> {
     /// directive values). Position-based callers that own their own cursor — the
     /// attribute-value sequence readers — use `parse_expression_tag_at`, which runs
     /// the same scan + parse without touching the lexer.
-    pub(crate) fn parse_expression_tag(&mut self) -> Result<ExpressionTag, ParseError> {
+    pub(crate) fn parse_expression_tag(&mut self) -> Result<ExpressionTag<'arena>, ParseError> {
         // Verify we're at opening brace
         if !self.check(TokenKind::LeftBrace) {
             return Err(self.error_expected_found("'{'"));
@@ -46,7 +46,7 @@ impl<'a> SvelteParser<'a> {
     pub(crate) fn parse_expression_tag_at(
         &mut self,
         brace_pos: usize,
-    ) -> Result<ExpressionTag, ParseError> {
+    ) -> Result<ExpressionTag<'arena>, ParseError> {
         debug_assert_eq!(
             self.source.as_bytes().get(brace_pos),
             Some(&b'{'),
@@ -68,6 +68,7 @@ impl<'a> SvelteParser<'a> {
             expr_content,
             expr_start,
             Rc::clone(&self.interner),
+            self.arena,
         )?;
 
         // Add expression comments to the parser's collection for later inclusion in Root.comments

@@ -14,7 +14,7 @@ use tsv_lang::LocationTracker;
 use super::convert_pattern_expression;
 
 pub(super) fn convert_html_tag(
-    tag: &internal::HtmlTag,
+    tag: &internal::HtmlTag<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -31,7 +31,7 @@ pub(super) fn convert_html_tag(
 }
 
 pub(super) fn convert_const_tag(
-    tag: &internal::ConstTag,
+    tag: &internal::ConstTag<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -66,7 +66,7 @@ pub(super) fn convert_const_tag(
 }
 
 pub(super) fn convert_declaration_tag(
-    tag: &internal::DeclarationTag,
+    tag: &internal::DeclarationTag<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -92,7 +92,7 @@ pub(super) fn convert_declaration_tag(
 }
 
 pub(super) fn convert_debug_tag(
-    tag: &internal::DebugTag,
+    tag: &internal::DebugTag<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -112,7 +112,7 @@ pub(super) fn convert_debug_tag(
 }
 
 pub(super) fn convert_render_tag(
-    tag: &internal::RenderTag,
+    tag: &internal::RenderTag<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,

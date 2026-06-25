@@ -34,7 +34,7 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         paren_end: u32,
-        body: &Statement,
+        body: &Statement<'_>,
     ) {
         let d = self.d();
         let body_start = body.span().start;
@@ -105,13 +105,13 @@ impl<'a> Printer<'a> {
     /// Build a complete for statement doc including the body
     ///
     /// This includes the body in the doc so the width calculation accounts for ` {`.
-    fn build_for_statement_with_body_doc(&self, stmt: &internal::ForStatement) -> DocId {
+    fn build_for_statement_with_body_doc(&self, stmt: &internal::ForStatement<'_>) -> DocId {
         let d = self.d();
         let header_doc = self.build_for_header_doc(stmt);
-        if matches!(stmt.body.as_ref(), Statement::EmptyStatement(_)) {
+        if matches!(stmt.body, Statement::EmptyStatement(_)) {
             // No space before empty statement: `for (...);`
-            d.concat(&[header_doc, self.build_statement_doc(&stmt.body)])
-        } else if let Statement::BlockStatement(block) = stmt.body.as_ref() {
+            d.concat(&[header_doc, self.build_statement_doc(stmt.body)])
+        } else if let Statement::BlockStatement(block) = stmt.body {
             // Block body: `for (...) { ... }`
             // Note: Unlike for-in/for-of, standard for loops keep empty blocks inline `{}`
             d.concat(&[
@@ -127,13 +127,13 @@ impl<'a> Printer<'a> {
             // the outer group breaks and the body drops to its own indented line;
             // the inner header group still decides its own flat/break, so a
             // width-only overflow keeps the header flat (matching Prettier).
-            let body_doc = self.build_statement_doc(&stmt.body);
+            let body_doc = self.build_statement_doc(stmt.body);
             d.group(d.concat(&[header_doc, d.indent_line(body_doc)]))
         }
     }
 
     /// Get the end position of a for loop header (position after the closing paren)
-    fn get_for_header_end(&self, stmt: &internal::ForStatement) -> u32 {
+    fn get_for_header_end(&self, stmt: &internal::ForStatement<'_>) -> u32 {
         // Find the last expression end
         let last_expr_end = stmt
             .update
@@ -163,7 +163,7 @@ impl<'a> Printer<'a> {
     ///     i++ // inline with update
     /// ) {
     /// ```
-    fn build_for_header_doc(&self, stmt: &internal::ForStatement) -> DocId {
+    fn build_for_header_doc(&self, stmt: &internal::ForStatement<'_>) -> DocId {
         self.build_for_header_doc_impl(stmt, false, None)
     }
 
@@ -171,7 +171,7 @@ impl<'a> Printer<'a> {
     ///
     /// Preserves comments in their original positions (divergence from prettier).
     /// Format: for (\n\t; // comment\n\t; // comment\n\t// comment\n)
-    fn build_for_empty_with_comments(&self, stmt: &internal::ForStatement) -> DocId {
+    fn build_for_empty_with_comments(&self, stmt: &internal::ForStatement<'_>) -> DocId {
         let d = self.d();
         let Some(open_paren) = self.find_open_paren_after(stmt.span.start) else {
             return d.text("for (;;)");
@@ -228,7 +228,7 @@ impl<'a> Printer<'a> {
 
     fn build_for_header_doc_impl(
         &self,
-        stmt: &internal::ForStatement,
+        stmt: &internal::ForStatement<'_>,
         force_break: bool,
         keyword_comments: Option<DocId>,
     ) -> DocId {
@@ -638,7 +638,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a for loop update expression
-    fn build_for_update_doc(&self, expr: &Expression) -> DocId {
+    fn build_for_update_doc(&self, expr: &Expression<'_>) -> DocId {
         let d = self.d();
         if let Expression::SequenceExpression(seq) = expr {
             d.join(
@@ -651,11 +651,11 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a complete for-in statement doc including the body
-    fn build_for_in_statement_with_body_doc(&self, stmt: &internal::ForInStatement) -> DocId {
+    fn build_for_in_statement_with_body_doc(&self, stmt: &internal::ForInStatement<'_>) -> DocId {
         self.build_for_in_of_statement_with_body_doc(
             &stmt.left,
             &stmt.right,
-            &stmt.body,
+            stmt.body,
             stmt.span.start,
             "in",
             false,
@@ -703,11 +703,11 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a complete for-of statement doc including the body
-    fn build_for_of_statement_with_body_doc(&self, stmt: &internal::ForOfStatement) -> DocId {
+    fn build_for_of_statement_with_body_doc(&self, stmt: &internal::ForOfStatement<'_>) -> DocId {
         self.build_for_in_of_statement_with_body_doc(
             &stmt.left,
             &stmt.right,
-            &stmt.body,
+            stmt.body,
             stmt.span.start,
             "of",
             stmt.r#await,
@@ -725,9 +725,9 @@ impl<'a> Printer<'a> {
     /// `" ("`.
     fn build_for_in_of_statement_with_body_doc(
         &self,
-        left: &internal::ForInOfLeft,
-        right: &Expression,
-        body: &Statement,
+        left: &internal::ForInOfLeft<'_>,
+        right: &Expression<'_>,
+        body: &Statement<'_>,
         stmt_start: u32,
         keyword: &str,  // "in" or "of"
         is_await: bool, // for-of `for await`; always false for for-in
@@ -860,9 +860,9 @@ impl<'a> Printer<'a> {
     #[allow(clippy::too_many_arguments)]
     fn build_for_in_of_with_line_comments(
         &self,
-        left: &internal::ForInOfLeft,
-        right: &Expression,
-        body: &Statement,
+        left: &internal::ForInOfLeft<'_>,
+        right: &Expression<'_>,
+        body: &Statement<'_>,
         keyword: &str, // "in" or "of"
         keyword_pos: u32,
         open_paren: Option<u32>,
@@ -980,7 +980,7 @@ impl<'a> Printer<'a> {
     fn push_for_close_paren_and_body(
         &self,
         parts: &mut DocBuf,
-        body: &Statement,
+        body: &Statement<'_>,
         right_end: u32,
         close_paren: Option<u32>,
     ) {
@@ -994,7 +994,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Get the end position of the left side of a for-in/for-of statement
-    fn get_for_in_of_left_end(&self, left: &internal::ForInOfLeft) -> u32 {
+    fn get_for_in_of_left_end(&self, left: &internal::ForInOfLeft<'_>) -> u32 {
         match left {
             internal::ForInOfLeft::VariableDeclaration(decl) => decl.span.end,
             internal::ForInOfLeft::Pattern(expr) => expr.span().end,
@@ -1002,7 +1002,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Get the start position of the left side of a for-in/for-of statement
-    fn get_for_in_of_left_start(&self, left: &internal::ForInOfLeft) -> u32 {
+    fn get_for_in_of_left_start(&self, left: &internal::ForInOfLeft<'_>) -> u32 {
         match left {
             internal::ForInOfLeft::VariableDeclaration(decl) => decl.span.start,
             internal::ForInOfLeft::Pattern(expr) => expr.span().start,
@@ -1044,7 +1044,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_for_statement_doc(
         &self,
-        stmt: &internal::ForStatement,
+        stmt: &internal::ForStatement<'_>,
     ) -> DocId {
         let d = self.d();
 
@@ -1073,8 +1073,8 @@ impl<'a> Printer<'a> {
             // the body drops to its own indented line when the header breaks (a
             // comment hardline propagates) or the whole thing overflows — while the
             // header group still decides its own flat/break.
-            let is_block_body = matches!(stmt.body.as_ref(), Statement::BlockStatement(_));
-            let body_doc = self.build_statement_doc(&stmt.body);
+            let is_block_body = matches!(stmt.body, Statement::BlockStatement(_));
+            let body_doc = self.build_statement_doc(stmt.body);
 
             let (tail, group_it) = if self.has_comments_between(header_end, body_start) {
                 if has_line_comment && !is_block_body {
@@ -1148,7 +1148,7 @@ impl<'a> Printer<'a> {
                         )
                     }
                 }
-            } else if matches!(stmt.body.as_ref(), Statement::EmptyStatement(_)) {
+            } else if matches!(stmt.body, Statement::EmptyStatement(_)) {
                 // Empty body attaches directly: `);` (no space, no adjustClause).
                 // Matches the main path (`build_for_statement_with_body_doc`) and Prettier.
                 (body_doc, false)
@@ -1170,7 +1170,7 @@ impl<'a> Printer<'a> {
         }
     }
 
-    fn build_for_init_doc(&self, init: &internal::ForInit) -> DocId {
+    fn build_for_init_doc(&self, init: &internal::ForInit<'_>) -> DocId {
         let d = self.d();
         match init {
             internal::ForInit::VariableDeclaration(decl) => {
@@ -1212,7 +1212,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_for_in_statement_doc(
         &self,
-        stmt: &internal::ForInStatement,
+        stmt: &internal::ForInStatement<'_>,
     ) -> DocId {
         // Delegate to the sophisticated version that handles empty block expansion
         self.build_for_in_statement_with_body_doc(stmt)
@@ -1220,13 +1220,13 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_for_of_statement_doc(
         &self,
-        stmt: &internal::ForOfStatement,
+        stmt: &internal::ForOfStatement<'_>,
     ) -> DocId {
         // Delegate to the sophisticated version that handles empty block expansion
         self.build_for_of_statement_with_body_doc(stmt)
     }
 
-    fn build_for_in_of_left_doc(&self, left: &internal::ForInOfLeft) -> DocId {
+    fn build_for_in_of_left_doc(&self, left: &internal::ForInOfLeft<'_>) -> DocId {
         let d = self.d();
         match left {
             internal::ForInOfLeft::VariableDeclaration(decl) => {
@@ -1241,7 +1241,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Get the end position of a ForInit
-    fn get_for_init_span_end(&self, init: &internal::ForInit) -> u32 {
+    fn get_for_init_span_end(&self, init: &internal::ForInit<'_>) -> u32 {
         match init {
             internal::ForInit::VariableDeclaration(decl) => decl.span.end,
             internal::ForInit::Expression(expr) => expr.span().end,

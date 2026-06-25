@@ -12,7 +12,10 @@ impl<'a> Printer<'a> {
     ///
     /// Matches Prettier's architecture: the discriminant wraps to multiple lines
     /// when the `switch (discriminant) {` line exceeds print width.
-    fn build_switch_statement_with_wrapping_doc(&self, stmt: &internal::SwitchStatement) -> DocId {
+    fn build_switch_statement_with_wrapping_doc(
+        &self,
+        stmt: &internal::SwitchStatement<'_>,
+    ) -> DocId {
         let d = self.d();
         // Find paren positions for comment handling
         let open_paren = self.find_open_paren_after(stmt.span.start);
@@ -148,7 +151,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Get the end position of a case label (position after the colon)
-    fn get_case_label_end(&self, case: &internal::SwitchCase) -> u32 {
+    fn get_case_label_end(&self, case: &internal::SwitchCase<'_>) -> u32 {
         let bytes = self.source.as_bytes();
         if let Some(test) = &case.test {
             // Find the label ':' after the test expression, skipping any ':' inside
@@ -176,7 +179,7 @@ impl<'a> Printer<'a> {
     /// on this case label (typically the next case start or switch body end).
     fn build_switch_case_doc_inner(
         &self,
-        case: &internal::SwitchCase,
+        case: &internal::SwitchCase<'_>,
         inline_comment_boundary: u32,
     ) -> DocId {
         let d = self.d();
@@ -347,7 +350,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer::statements) fn build_switch_statement_doc(
         &self,
-        stmt: &internal::SwitchStatement,
+        stmt: &internal::SwitchStatement<'_>,
     ) -> DocId {
         // Delegate to the wrapping version which handles proper indentation structure
         self.build_switch_statement_with_wrapping_doc(stmt)

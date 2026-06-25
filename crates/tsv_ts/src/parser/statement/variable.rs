@@ -7,7 +7,7 @@ use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
 
-impl<'a> Parser<'a> {
+impl<'a, 'arena> Parser<'a, 'arena> {
     /// Variable kind from the current `const`/`let`/`var` keyword token.
     fn current_variable_kind(&self) -> VariableDeclarationKind {
         match self.current_kind() {
@@ -25,8 +25,9 @@ impl<'a> Parser<'a> {
         &mut self,
         kind: VariableDeclarationKind,
         start: usize,
-    ) -> Result<Statement, ParseError> {
-        let mut declarations = vec![self.parse_variable_declarator()?];
+    ) -> Result<Statement<'arena>, ParseError> {
+        let mut declarations = self.bvec();
+        declarations.push(self.parse_variable_declarator()?);
         while self.eat(TokenKind::Comma) {
             declarations.push(self.parse_variable_declarator()?);
         }
@@ -35,20 +36,22 @@ impl<'a> Parser<'a> {
 
         Ok(Statement::VariableDeclaration(VariableDeclaration {
             kind,
-            declarations,
+            declarations: declarations.into_bump_slice(),
             declare: false,
             span: Span::new(start as u32, end),
         }))
     }
 
-    pub(super) fn parse_variable_declaration(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_variable_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
         let kind = self.current_variable_kind();
         self.advance()?;
         self.finish_variable_declaration(kind, start)
     }
 
-    pub(super) fn parse_variable_declarator(&mut self) -> Result<VariableDeclarator, ParseError> {
+    pub(super) fn parse_variable_declarator(
+        &mut self,
+    ) -> Result<VariableDeclarator<'arena>, ParseError> {
         let id_start = self.current_pos().0;
 
         // Parse binding pattern: identifier, array pattern [a, b], or object pattern {a, b}
@@ -70,7 +73,7 @@ impl<'a> Parser<'a> {
 
         // Check for initializer
         // Use assignment_expression because comma separates declarators
-        let init = if self.eat(TokenKind::Equals) {
+        let init: Option<Expression<'arena>> = if self.eat(TokenKind::Equals) {
             Some(self.parse_assignment_expression()?)
         } else {
             None
@@ -99,7 +102,7 @@ impl<'a> Parser<'a> {
     /// Parse variable declaration for for-loop init (without trailing semicolon)
     pub(super) fn parse_for_variable_declaration(
         &mut self,
-    ) -> Result<VariableDeclaration, ParseError> {
+    ) -> Result<VariableDeclaration<'arena>, ParseError> {
         let (decl_start, _) = self.current_pos();
 
         let kind = self.current_variable_kind();
@@ -110,7 +113,8 @@ impl<'a> Parser<'a> {
         let mut decl_end = first.span.end;
 
         // Parse additional declarators (comma-separated)
-        let mut declarations = vec![first];
+        let mut declarations = self.bvec();
+        declarations.push(first);
         while self.eat(TokenKind::Comma) {
             let decl = self.parse_variable_declarator()?;
             decl_end = decl.span.end;
@@ -119,7 +123,7 @@ impl<'a> Parser<'a> {
 
         Ok(VariableDeclaration {
             kind,
-            declarations,
+            declarations: declarations.into_bump_slice(),
             declare: false,
             span: Span::new(decl_start as u32, decl_end),
         })
@@ -127,7 +131,7 @@ impl<'a> Parser<'a> {
 
     /// Parse `using` declaration (ES2024 Explicit Resource Management)
     /// `using resource = getResource();`
-    pub(super) fn parse_using_declaration(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_using_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'using' contextual keyword
@@ -139,7 +143,9 @@ impl<'a> Parser<'a> {
 
     /// Parse `await using` declaration (ES2024 Explicit Resource Management)
     /// `await using resource = getAsyncResource();`
-    pub(super) fn parse_await_using_declaration(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_await_using_declaration(
+        &mut self,
+    ) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'await' keyword
@@ -157,7 +163,7 @@ impl<'a> Parser<'a> {
     /// `for (using resource of resources) { ... }`
     pub(super) fn parse_for_using_declaration(
         &mut self,
-    ) -> Result<VariableDeclaration, ParseError> {
+    ) -> Result<VariableDeclaration<'arena>, ParseError> {
         let (decl_start, _) = self.current_pos();
 
         // Consume 'using' contextual keyword
@@ -168,9 +174,11 @@ impl<'a> Parser<'a> {
         let declarator = self.parse_variable_declarator()?;
         let decl_end = declarator.span.end;
 
+        let mut declarations = self.bvec();
+        declarations.push(declarator);
         Ok(VariableDeclaration {
             kind: VariableDeclarationKind::Using,
-            declarations: vec![declarator],
+            declarations: declarations.into_bump_slice(),
             declare: false,
             span: Span::new(decl_start as u32, decl_end),
         })
@@ -180,7 +188,7 @@ impl<'a> Parser<'a> {
     /// `for await (await using resource of resources) { ... }`
     pub(super) fn parse_for_await_using_declaration(
         &mut self,
-    ) -> Result<VariableDeclaration, ParseError> {
+    ) -> Result<VariableDeclaration<'arena>, ParseError> {
         let (decl_start, _) = self.current_pos();
 
         // Consume 'await' keyword, then delegate to the `using` form
@@ -202,7 +210,7 @@ impl<'a> Parser<'a> {
     fn parse_simple_binding(
         &mut self,
         symbol: DefaultSymbol,
-    ) -> Result<(Expression, bool), ParseError> {
+    ) -> Result<(Expression<'arena>, bool), ParseError> {
         let (start, end) = self.current_pos();
         self.advance()?;
 
@@ -215,12 +223,18 @@ impl<'a> Parser<'a> {
             .as_ref()
             .map_or(end, |ta| ta.span.end_usize());
 
+        let extra = type_annotation.map(|ta| {
+            self.alloc(IdentifierParamExtra {
+                type_annotation: Some(ta),
+                decorators: None,
+            })
+        });
+
         Ok((
             Expression::Identifier(Identifier {
                 name: symbol,
                 optional: false,
-                type_annotation,
-                decorators: None,
+                extra,
                 span: Span::new(start as u32, id_end as u32),
             }),
             definite,

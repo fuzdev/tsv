@@ -20,7 +20,10 @@ fn accessibility_keyword(accessibility: &str) -> &'static str {
 impl<'a> Printer<'a> {
     /// Build a Doc for a class declaration
     #[inline]
-    pub(super) fn build_class_declaration_doc(&self, decl: &internal::ClassDeclaration) -> DocId {
+    pub(super) fn build_class_declaration_doc(
+        &self,
+        decl: &internal::ClassDeclaration<'_>,
+    ) -> DocId {
         self.build_class_declaration_doc_inner(decl, true)
     }
 
@@ -31,7 +34,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn build_class_declaration_without_decorators_doc(
         &self,
-        decl: &internal::ClassDeclaration,
+        decl: &internal::ClassDeclaration<'_>,
     ) -> DocId {
         self.build_class_declaration_doc_inner(decl, false)
     }
@@ -45,7 +48,7 @@ impl<'a> Printer<'a> {
     ///   Set to false when decorators are printed separately (e.g., before `export`).
     fn build_class_declaration_doc_inner(
         &self,
-        decl: &internal::ClassDeclaration,
+        decl: &internal::ClassDeclaration<'_>,
         include_decorators: bool,
     ) -> DocId {
         let d = self.d();
@@ -55,9 +58,9 @@ impl<'a> Printer<'a> {
             decl.span.start,
             decl.id.as_ref(),
             decl.type_parameters.as_ref(),
-            decl.super_class.as_deref(),
+            decl.super_class,
             decl.super_type_parameters.as_ref(),
-            &decl.implements,
+            decl.implements,
         );
 
         // Determine group mode: structural reasons OR heritage comments
@@ -69,9 +72,9 @@ impl<'a> Printer<'a> {
                     && self.has_comments_between(ext_end, decl.implements[0].span.start)
             });
         let group_mode = self.should_class_group_mode(
-            decl.super_class.as_deref(),
+            decl.super_class,
             decl.super_type_parameters.as_ref(),
-            &decl.implements,
+            decl.implements,
         ) || has_heritage_comments;
 
         // Check if heritage line comments force group break.
@@ -100,15 +103,11 @@ impl<'a> Printer<'a> {
         } else {
             "class"
         };
-        let keyword_start = self.find_keyword_after_decorators(
-            decl.decorators.as_deref(),
-            first_keyword,
-            decl.span.start,
-        );
+        let keyword_start =
+            self.find_keyword_after_decorators(decl.decorators, first_keyword, decl.span.start);
 
         if include_decorators
-            && let Some(dec_doc) =
-                self.build_decorators_doc(decl.decorators.as_deref(), keyword_start)
+            && let Some(dec_doc) = self.build_decorators_doc(decl.decorators, keyword_start)
         {
             parts.push(dec_doc);
         }
@@ -151,12 +150,12 @@ impl<'a> Printer<'a> {
 
         // Build heritage docs (shared with the class-expression printer).
         let extends_doc = self.build_class_extends_doc(
-            decl.super_class.as_deref(),
+            decl.super_class,
             decl.super_type_parameters.as_ref(),
             positions.extends_keyword_start,
         );
         let implements_doc = self.build_class_implements_doc(
-            &decl.implements,
+            decl.implements,
             group_mode,
             positions.implements_keyword_start,
         );
@@ -183,7 +182,7 @@ impl<'a> Printer<'a> {
                 &positions,
                 extends_doc,
                 implements_doc,
-                &decl.implements,
+                decl.implements,
                 decl.body.body.is_empty(),
                 decl.body.span.start,
                 group_mode,
@@ -212,7 +211,7 @@ impl<'a> Printer<'a> {
             &positions,
             extends_doc,
             implements_doc,
-            &decl.implements,
+            decl.implements,
             decl.body.body.is_empty(),
             decl.body.span.start,
             group_mode,
@@ -231,7 +230,7 @@ impl<'a> Printer<'a> {
     /// Handles comments between members, blank line preservation, and trailing comments.
     pub(in crate::printer) fn build_class_body_doc(
         &self,
-        body: &internal::ClassBody,
+        body: &internal::ClassBody<'_>,
         _is_ambient: bool,
     ) -> DocId {
         let d = self.d();
@@ -328,7 +327,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a class member
-    fn build_class_member_doc(&self, member: &internal::ClassMember) -> DocId {
+    fn build_class_member_doc(&self, member: &internal::ClassMember<'_>) -> DocId {
         match member {
             internal::ClassMember::MethodDefinition(method) => {
                 self.build_method_definition_doc(method)
@@ -345,17 +344,17 @@ impl<'a> Printer<'a> {
     /// Delegates to the shared `build_index_signature_member_doc` (which handles
     /// the `static`/`readonly` modifiers and every in-bracket comment gap) and
     /// appends the trailing `;`, matching the interface caller.
-    fn build_index_signature_doc(&self, sig: &internal::TSIndexSignature) -> DocId {
+    fn build_index_signature_doc(&self, sig: &internal::TSIndexSignature<'_>) -> DocId {
         let d = self.d();
         d.concat(&[self.build_index_signature_member_doc(sig), d.text(";")])
     }
 
     /// Build a Doc for a static initialization block
-    fn build_static_block_doc(&self, block: &internal::StaticBlock) -> DocId {
+    fn build_static_block_doc(&self, block: &internal::StaticBlock<'_>) -> DocId {
         let d = self.d();
         // Create a BlockStatement wrapper to reuse existing doc building logic
         let block_stmt = internal::BlockStatement {
-            body: block.body.clone(),
+            body: block.body,
             span: block.span,
         };
         d.concat(&[
@@ -365,7 +364,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a property definition
-    fn build_property_definition_doc(&self, prop: &internal::PropertyDefinition) -> DocId {
+    fn build_property_definition_doc(&self, prop: &internal::PropertyDefinition<'_>) -> DocId {
         let d = self.d();
         let mut parts = smallvec![];
 
@@ -378,7 +377,7 @@ impl<'a> Printer<'a> {
                 self.find_first_token_after(dec.span.end)
             });
         if let Some(dec_doc) =
-            self.build_class_member_decorators_doc(prop.decorators.as_deref(), next_token_start)
+            self.build_class_member_decorators_doc(prop.decorators, next_token_start)
         {
             parts.push(dec_doc);
         }
@@ -540,7 +539,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a method definition
-    fn build_method_definition_doc(&self, method: &internal::MethodDefinition) -> DocId {
+    fn build_method_definition_doc(&self, method: &internal::MethodDefinition<'_>) -> DocId {
         let d = self.d();
         let mut parts = smallvec![];
 
@@ -553,7 +552,7 @@ impl<'a> Printer<'a> {
                 self.find_first_token_after(dec.span.end)
             });
         if let Some(dec_doc) =
-            self.build_class_member_decorators_doc(method.decorators.as_deref(), next_token_start)
+            self.build_class_member_decorators_doc(method.decorators, next_token_start)
         {
             parts.push(dec_doc);
         }
@@ -676,7 +675,7 @@ impl<'a> Printer<'a> {
         // Parameters and return type - shared callable-signature builder (same path
         // as function declarations; MethodDefinition.value is field-identical).
         parts.push(self.build_callable_signature_doc(
-            &method.value.params,
+            method.value.params,
             method.value.type_parameters.as_ref(),
             method.value.return_type.as_ref(),
             method.value.params_start,

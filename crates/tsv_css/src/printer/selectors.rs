@@ -40,7 +40,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Print a selector list inline with `, ` separators
-    fn print_selector_list_inline(&mut self, list: &internal::SelectorList) {
+    fn print_selector_list_inline(&mut self, list: &internal::SelectorList<'_>) {
         for (i, complex) in list.selectors.iter().enumerate() {
             if i > 0 {
                 self.pop_selector_terminator();
@@ -68,7 +68,7 @@ impl<'a> Printer<'a> {
     ///
     /// Supports line wrapping for top-level selector lists (in rules).
     /// Nested selector lists (inside :is(), :where(), etc.) are NOT wrapped.
-    pub(super) fn print_selector_list(&mut self, list: &internal::SelectorList) {
+    pub(super) fn print_selector_list(&mut self, list: &internal::SelectorList<'_>) {
         self.print_selector_list_internal(list, false);
     }
 
@@ -76,7 +76,7 @@ impl<'a> Printer<'a> {
     ///
     /// For short lists: prints inline (e.g., `:is(.a, .b)`)
     /// For long lists: wraps each selector on its own line with indentation
-    pub(super) fn print_selector_list_nested(&mut self, list: &internal::SelectorList) {
+    pub(super) fn print_selector_list_nested(&mut self, list: &internal::SelectorList<'_>) {
         if list.selectors.is_empty() {
             return;
         }
@@ -130,7 +130,7 @@ impl<'a> Printer<'a> {
     ///
     /// - `nested`: if true, never wrap (for :is(), :where(), :not() arguments)
     /// - if false, wrap top-level selector lists with 2+ selectors (prettier's rule)
-    fn print_selector_list_internal(&mut self, list: &internal::SelectorList, nested: bool) {
+    fn print_selector_list_internal(&mut self, list: &internal::SelectorList<'_>, nested: bool) {
         // Check if source contains comments (/* ... */)
         let source_text = list.span.extract(self.source);
         if source_text.contains("/*") {
@@ -145,7 +145,11 @@ impl<'a> Printer<'a> {
     ///
     /// Prettier's rule for top-level selector lists: ALWAYS break with 2+ selectors.
     /// Nested selector lists (in :is(), :where(), etc.) never wrap.
-    fn print_selector_list_with_wrapping(&mut self, list: &internal::SelectorList, nested: bool) {
+    fn print_selector_list_with_wrapping(
+        &mut self,
+        list: &internal::SelectorList<'_>,
+        nested: bool,
+    ) {
         if list.selectors.is_empty() {
             return;
         }
@@ -176,7 +180,7 @@ impl<'a> Printer<'a> {
     /// Supports line wrapping for long selectors (>100 chars):
     /// - If selector fits on one line: print inline
     /// - If too long: break at combinators with indentation
-    pub(super) fn print_complex_selector(&mut self, complex: &internal::ComplexSelector) {
+    pub(super) fn print_complex_selector(&mut self, complex: &internal::ComplexSelector<'_>) {
         // Single selector part - always print inline
         if complex.children.len() == 1 {
             self.print_relative_selector_internal(&complex.children[0], true, false);
@@ -224,7 +228,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc representation of a selector list for width checking
-    pub(crate) fn build_selector_list_doc(&self, list: &internal::SelectorList) -> DocId {
+    pub(crate) fn build_selector_list_doc(&self, list: &internal::SelectorList<'_>) -> DocId {
         let d = self.d();
         let sep = d.text(", ");
         d.join_doc(
@@ -236,7 +240,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc representation of a complex selector for width checking
-    fn build_complex_selector_doc(&self, complex: &internal::ComplexSelector) -> DocId {
+    fn build_complex_selector_doc(&self, complex: &internal::ComplexSelector<'_>) -> DocId {
         let docs: Vec<_> = complex
             .children
             .iter()
@@ -268,9 +272,45 @@ impl<'a> Printer<'a> {
         self.d().text_owned(text.to_string())
     }
 
+    /// Reconstruct an attribute selector (`[ns|name op 'value' flags]`) verbatim from
+    /// source. Single source of truth for both selector-printing paths — the doc
+    /// builder (`build_simple_selector_doc`, via `text_owned`) and the direct writer
+    /// (`print_simple_selector`, via `write`) — so the reconstruction can't drift.
+    fn build_attribute_selector_text(
+        &self,
+        namespace: Option<&str>,
+        name_span: tsv_lang::Span,
+        matcher: Option<internal::AttributeMatcher>,
+        value: Option<&str>,
+        flags: Option<&str>,
+    ) -> String {
+        let mut result = String::from("[");
+        if let Some(ns) = namespace {
+            result.push_str(ns);
+            result.push('|');
+        }
+        // Emit the name verbatim from source (escapes preserved — never decode it).
+        result.push_str(name_span.extract(self.source));
+        if let Some(m) = matcher {
+            result.push_str(m.as_str());
+            if let Some(v) = value {
+                // TODO: Determine if value needs quotes
+                result.push('\'');
+                result.push_str(v);
+                result.push('\'');
+            }
+        }
+        if let Some(f) = flags {
+            result.push(' ');
+            result.push_str(f);
+        }
+        result.push(']');
+        result
+    }
+
     /// Build a width-measurement doc for a simple selector, dispatched by kind.
     /// Span-based kinds extract from source to preserve escapes verbatim.
-    pub(crate) fn build_simple_selector_doc(&self, simple: &internal::SimpleSelector) -> DocId {
+    pub(crate) fn build_simple_selector_doc(&self, simple: &internal::SimpleSelector<'_>) -> DocId {
         let d = self.d();
         match simple {
             internal::SimpleSelector::Type { span, .. } => self.build_span_selector_doc(*span),
@@ -285,32 +325,15 @@ impl<'a> Printer<'a> {
             internal::SimpleSelector::Id { span, .. } => self.build_span_selector_doc(*span),
             internal::SimpleSelector::Attribute {
                 namespace,
-                name,
+                name_span,
                 matcher,
                 value,
                 flags,
                 ..
             } => {
-                let mut result = String::from("[");
-                if let Some(ns) = namespace {
-                    result.push_str(ns);
-                    result.push('|');
-                }
-                result.push_str(name);
-                if let Some(m) = matcher {
-                    result.push_str(m.as_str());
-                    if let Some(v) = value {
-                        result.push('\'');
-                        result.push_str(v);
-                        result.push('\'');
-                    }
-                }
-                if let Some(f) = flags {
-                    result.push(' ');
-                    result.push_str(f);
-                }
-                result.push(']');
-                d.text_owned(result)
+                d.text_owned(self.build_attribute_selector_text(
+                    *namespace, *name_span, *matcher, *value, *flags,
+                ))
             }
             internal::SimpleSelector::PseudoClass { span, .. } => {
                 self.build_span_selector_doc(*span)
@@ -320,7 +343,9 @@ impl<'a> Printer<'a> {
             }
             internal::SimpleSelector::Nesting { .. } => d.text("&"),
             internal::SimpleSelector::Percentage { value, .. } => d.text_owned(format!("{value}%")),
-            internal::SimpleSelector::Invalid { raw, .. } => d.text_owned(raw.clone()),
+            internal::SimpleSelector::Invalid { span } => {
+                d.text_owned(span.extract(self.source).trim().to_string())
+            }
         }
     }
 
@@ -329,7 +354,7 @@ impl<'a> Printer<'a> {
     /// A relative selector is a combinator followed by simple selectors.
     fn build_relative_selector_doc(
         &self,
-        relative: &internal::RelativeSelector,
+        relative: &internal::RelativeSelector<'_>,
         is_first: bool,
     ) -> DocId {
         let d = self.d();
@@ -344,7 +369,7 @@ impl<'a> Printer<'a> {
         }
 
         // Add simple selectors
-        for simple in &relative.selectors {
+        for simple in relative.selectors {
             parts.push(self.build_simple_selector_doc(simple));
         }
 
@@ -357,7 +382,7 @@ impl<'a> Printer<'a> {
     /// - `at_line_start`: true if this selector is at the start of a line (after a line break)
     fn print_relative_selector_internal(
         &mut self,
-        relative: &internal::RelativeSelector,
+        relative: &internal::RelativeSelector<'_>,
         is_first_in_complex: bool,
         at_line_start: bool,
     ) {
@@ -388,7 +413,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        for simple in &relative.selectors {
+        for simple in relative.selectors {
             self.print_simple_selector(simple);
         }
     }
@@ -455,11 +480,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Format a simple selector
-    pub(super) fn print_simple_selector(&mut self, simple: &internal::SimpleSelector) {
+    pub(super) fn print_simple_selector(&mut self, simple: &internal::SimpleSelector<'_>) {
         match simple {
             internal::SimpleSelector::Type {
                 namespace: _, // Namespace already included in span/source
-                name: _,
                 span,
             } => {
                 // SVELTE QUIRK: Extract raw from source to preserve escape sequences
@@ -486,7 +510,7 @@ impl<'a> Printer<'a> {
                 }
                 self.write("*");
             }
-            internal::SimpleSelector::Class { name: _, span } => {
+            internal::SimpleSelector::Class { span } => {
                 // SVELTE QUIRK: Extract raw from source to preserve escape sequences
                 // Svelte does NOT decode escape sequences in CSS identifiers (selectors, property names)
                 // Example: `.cl\41ss` stays as `.cl\41ss`, not `.clAss`
@@ -498,7 +522,7 @@ impl<'a> Printer<'a> {
                 let raw = span.extract(self.source);
                 self.write(raw); // Includes the '.' prefix
             }
-            internal::SimpleSelector::Id { name: _, span } => {
+            internal::SimpleSelector::Id { span } => {
                 // SVELTE QUIRK: Extract raw from source to preserve escape sequences
                 // Same behavior as class selectors - identifiers preserve raw escapes
                 // Example: `#\1F4A9-id` stays as `#\1F4A9-id` (escape not decoded)
@@ -509,32 +533,16 @@ impl<'a> Printer<'a> {
             }
             internal::SimpleSelector::Attribute {
                 namespace,
-                name,
+                name_span,
                 matcher,
                 value,
                 flags,
                 ..
             } => {
-                self.write("[");
-                if let Some(ns) = namespace {
-                    self.write(ns);
-                    self.write("|");
-                }
-                self.write(name);
-                if let Some(m) = matcher {
-                    self.write(m.as_str());
-                    if let Some(v) = value {
-                        // TODO: Determine if value needs quotes
-                        self.write("'");
-                        self.write(v);
-                        self.write("'");
-                    }
-                }
-                if let Some(f) = flags {
-                    self.write(" ");
-                    self.write(f);
-                }
-                self.write("]");
+                let text = self.build_attribute_selector_text(
+                    *namespace, *name_span, *matcher, *value, *flags,
+                );
+                self.write(&text);
             }
             internal::SimpleSelector::PseudoClass { args, span, .. } => {
                 self.write_pseudo_name(*span, args.is_some());
@@ -559,11 +567,12 @@ impl<'a> Printer<'a> {
             internal::SimpleSelector::Percentage { value, .. } => {
                 self.write(&format!("{value}%"));
             }
-            internal::SimpleSelector::Invalid { raw, .. } => {
+            internal::SimpleSelector::Invalid { span } => {
                 // Forgiving selector list - preserve invalid selector as-is
                 // Used in :is() and :where() to maintain source fidelity
                 // Example: `:is(.a, ., .b)` preserves the `.` even though it's invalid
-                self.write(raw);
+                let raw = span.extract(self.source);
+                self.write(raw.trim());
             }
         }
     }
@@ -637,7 +646,7 @@ impl<'a> Printer<'a> {
     /// - `extra_indent`: if true, add extra indentation for nested content (selector-selector >2 nodes)
     fn print_pseudo_class_with_args(
         &mut self,
-        args: &internal::PseudoClassArgs,
+        args: &internal::PseudoClassArgs<'_>,
         extra_indent: bool,
     ) {
         // Build a doc for the args to check if they fit
@@ -695,7 +704,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if pseudo-class args contain complex content that would cause breaks
-    fn args_have_complex_content(&self, args: &internal::PseudoClassArgs) -> bool {
+    fn args_have_complex_content(&self, args: &internal::PseudoClassArgs<'_>) -> bool {
         match args {
             internal::PseudoClassArgs::SelectorList { selectors, .. } => {
                 self.selector_list_has_complex_content(selectors)
@@ -713,11 +722,11 @@ impl<'a> Printer<'a> {
     ///
     /// We check for pseudo-classes that would break, not just >2 simple selectors.
     /// The >2 check affects *indentation* when breaking, not *whether* to break.
-    fn selector_list_has_complex_content(&self, list: &internal::SelectorList) -> bool {
-        for complex in &list.selectors {
+    fn selector_list_has_complex_content(&self, list: &internal::SelectorList<'_>) -> bool {
+        for complex in list.selectors {
             // Check if any simple selector is a pseudo-class with long args
-            for rel in &complex.children {
-                for simple in &rel.selectors {
+            for rel in complex.children {
+                for simple in rel.selectors {
                     if let internal::SimpleSelector::PseudoClass {
                         args: Some(args), ..
                     } = simple
@@ -747,7 +756,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc for pseudo-class args to check if they fit
-    fn build_pseudo_class_args_doc(&self, args: &internal::PseudoClassArgs) -> DocId {
+    fn build_pseudo_class_args_doc(&self, args: &internal::PseudoClassArgs<'_>) -> DocId {
         let d = self.d();
         match args {
             internal::PseudoClassArgs::SelectorList { selectors, .. } => {
@@ -774,7 +783,7 @@ impl<'a> Printer<'a> {
                 d.concat(&sel_docs)
             }
             internal::PseudoClassArgs::Part { idents, .. } => d.text_owned(idents.join(" ")),
-            internal::PseudoClassArgs::Identifier { value, .. } => d.text_owned(value.clone()),
+            internal::PseudoClassArgs::Identifier { value, .. } => d.text_owned(value.to_string()),
         }
     }
 
@@ -784,7 +793,7 @@ impl<'a> Printer<'a> {
     /// - `multiline=true`: print with indentation and line breaks
     fn print_pseudo_class_args_with_mode(
         &mut self,
-        args: &internal::PseudoClassArgs,
+        args: &internal::PseudoClassArgs<'_>,
         multiline: bool,
     ) {
         match args {
@@ -816,7 +825,7 @@ impl<'a> Printer<'a> {
                 if multiline {
                     self.write_indent();
                 }
-                for selector in selectors {
+                for selector in selectors.iter() {
                     self.print_simple_selector(selector);
                 }
             }
@@ -845,7 +854,10 @@ impl<'a> Printer<'a> {
     /// Matches Prettier's behavior: selector-selector with >2 nodes gets extra indent
     /// The extra indent applies to the CONTENT of pseudo-classes within the selector,
     /// not to the selector itself.
-    fn print_selector_list_multiline_with_extra_indent(&mut self, list: &internal::SelectorList) {
+    fn print_selector_list_multiline_with_extra_indent(
+        &mut self,
+        list: &internal::SelectorList<'_>,
+    ) {
         for (i, complex) in list.selectors.iter().enumerate() {
             if i > 0 {
                 self.write(",\n");
@@ -864,7 +876,7 @@ impl<'a> Printer<'a> {
     /// Print a complex selector, propagating extra indent flag to nested content
     fn print_complex_selector_with_extra_indent(
         &mut self,
-        complex: &internal::ComplexSelector,
+        complex: &internal::ComplexSelector<'_>,
         extra_indent: bool,
     ) {
         for (i, relative) in complex.children.iter().enumerate() {
@@ -876,7 +888,7 @@ impl<'a> Printer<'a> {
     /// Print a relative selector, propagating extra indent flag
     fn print_relative_selector_with_extra_indent(
         &mut self,
-        relative: &internal::RelativeSelector,
+        relative: &internal::RelativeSelector<'_>,
         is_first: bool,
         extra_indent: bool,
     ) {
@@ -888,7 +900,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        for simple in &relative.selectors {
+        for simple in relative.selectors {
             self.print_simple_selector_with_extra_indent(simple, extra_indent);
         }
     }
@@ -896,7 +908,7 @@ impl<'a> Printer<'a> {
     /// Print a simple selector, using extra indent for pseudo-class content
     fn print_simple_selector_with_extra_indent(
         &mut self,
-        simple: &internal::SimpleSelector,
+        simple: &internal::SimpleSelector<'_>,
         extra_indent: bool,
     ) {
         match simple {
@@ -915,7 +927,7 @@ impl<'a> Printer<'a> {
     ///
     /// Used for pseudo-elements like `::slotted()`, `::part()`, `::highlight()`.
     /// Uses `print_selector_list_nested` which auto-wraps if content is too long.
-    fn print_pseudo_element_args(&mut self, args: &internal::PseudoClassArgs) {
+    fn print_pseudo_element_args(&mut self, args: &internal::PseudoClassArgs<'_>) {
         match args {
             internal::PseudoClassArgs::Nth {
                 value, of_selector, ..
@@ -931,7 +943,7 @@ impl<'a> Printer<'a> {
                 self.print_selector_list_nested(selectors);
             }
             internal::PseudoClassArgs::Slotted { selectors, .. } => {
-                for selector in selectors {
+                for selector in selectors.iter() {
                     self.print_simple_selector(selector);
                 }
             }

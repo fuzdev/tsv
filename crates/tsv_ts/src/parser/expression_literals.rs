@@ -7,7 +7,7 @@ use tsv_lang::{ParseError, Span};
 
 use super::Parser;
 
-impl<'a> Parser<'a> {
+impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse object literal: `{ prop: value, ... }`
     ///
     /// Supports all JS/TypeScript object literal features:
@@ -20,12 +20,13 @@ impl<'a> Parser<'a> {
     /// - String/number literal keys: `{ "key": value, 123: value }`
     /// - Trailing commas: `{ a: 1, }`
     /// - Empty objects: `{}`
-    pub(super) fn parse_object_expression(&mut self) -> Result<Expression, ParseError> {
+    pub(super) fn parse_object_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
+        let arena = self.arena;
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?; // consume '{'
         self.grouping_depth += 1;
 
-        let mut properties = Vec::new();
+        let mut properties = self.bvec();
 
         // Handle empty object: `{}`
         if self.check(&TokenKind::BraceClose) {
@@ -33,7 +34,7 @@ impl<'a> Parser<'a> {
             self.advance()?; // consume '}'
             self.grouping_depth -= 1;
             return Ok(Expression::ObjectExpression(ObjectExpression {
-                properties,
+                properties: properties.into_bump_slice(),
                 span: Span::new(start as u32, end as u32),
             }));
         }
@@ -52,7 +53,7 @@ impl<'a> Parser<'a> {
                 // object-value paths (acorn includes the `)` in the SpreadElement span).
                 let prop_end = self.prev_token_end();
                 properties.push(ObjectProperty::SpreadElement(SpreadElement {
-                    argument: Box::new(argument),
+                    argument: arena.alloc(argument),
                     span: Span::new(prop_start as u32, prop_end as u32),
                 }));
 
@@ -148,11 +149,11 @@ impl<'a> Parser<'a> {
                 TokenKind::String => {
                     // String literal key: {"prop-name": value}
                     let (key_start, key_end) = self.current_pos();
-                    let (content, quote) = self.extract_string_literal();
+                    let cooked = self.extract_string_cooked();
                     self.advance()?;
                     (
                         Expression::Literal(Literal {
-                            value: LiteralValue::String { content, quote },
+                            value: LiteralValue::String(cooked),
                             span: Span::new(key_start as u32, key_end as u32),
                         }),
                         false,
@@ -221,9 +222,9 @@ impl<'a> Parser<'a> {
                 (
                     PropertyKind::Init,
                     Expression::AssignmentExpression(AssignmentExpression {
-                        left: Box::new(key.clone()),
+                        left: arena.alloc(key.clone()),
                         operator: AssignmentOperator::Assign,
-                        right: Box::new(default_value),
+                        right: arena.alloc(default_value),
                         span: Span::new(key.span().start, assign_end),
                     }),
                     true,
@@ -264,7 +265,7 @@ impl<'a> Parser<'a> {
         self.grouping_depth -= 1;
 
         Ok(Expression::ObjectExpression(ObjectExpression {
-            properties,
+            properties: properties.into_bump_slice(),
             span: Span::new(start as u32, end as u32),
         }))
     }
@@ -277,12 +278,12 @@ impl<'a> Parser<'a> {
     /// - Elision (holes/sparse arrays): `[, a]`, `[1,,3]`, `[, , a]`
     /// - Trailing commas: `[1, 2, 3,]`
     /// - Empty arrays: `[]`
-    pub(super) fn parse_array_expression(&mut self) -> Result<Expression, ParseError> {
+    pub(super) fn parse_array_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BracketOpen)?; // consume '['
         self.grouping_depth += 1;
 
-        let mut elements = Vec::new();
+        let mut elements = self.bvec();
 
         // Handle empty array: `[]`
         if self.check(&TokenKind::BracketClose) {
@@ -290,7 +291,7 @@ impl<'a> Parser<'a> {
             self.advance()?; // consume ']'
             self.grouping_depth -= 1;
             return Ok(Expression::ArrayExpression(ArrayExpression {
-                elements,
+                elements: elements.into_bump_slice(),
                 span: Span::new(start as u32, end as u32),
             }));
         }
@@ -340,7 +341,7 @@ impl<'a> Parser<'a> {
         self.grouping_depth -= 1;
 
         Ok(Expression::ArrayExpression(ArrayExpression {
-            elements,
+            elements: elements.into_bump_slice(),
             span: Span::new(start as u32, end as u32),
         }))
     }
@@ -353,13 +354,13 @@ impl<'a> Parser<'a> {
         &mut self,
         is_async: bool,
         is_generator: bool,
-    ) -> Result<FunctionExpression, ParseError> {
+    ) -> Result<FunctionExpression<'arena>, ParseError> {
         // Parse optional type parameters: <T, U>
         let type_parameters = self.parse_optional_type_parameters()?;
 
         // Capture paren position before parsing params (for comment detection)
         let (params_start, _) = self.current_pos();
-        let params = self.parse_parameter_list()?;
+        let params = self.parse_parameter_list()?.into_bump_slice();
 
         // Check for return type annotation: (): type or type predicate
         let return_type = self.parse_optional_return_type()?;

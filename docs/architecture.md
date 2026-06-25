@@ -289,7 +289,7 @@ The `doc` module implements a declarative document builder inspired by prettier'
 
 ### Core Types (Arena-Based)
 
-Doc nodes are allocated in a contiguous `DocArena`. Each node is referenced by a `DocId` (a `u32` index), and child lists use `ChildRange` (start index + length). This eliminates per-node heap allocation and recursive `Drop` traversal. This fits the doc tree specifically: it's built once, rendered once, and dropped wholesale, so `DocId` indices are the natural access pattern. The AST makes the opposite choice (nested `Box`/`Vec` ownership) because it's traversed constantly — see [Nested AST](#nested-ast-not-flatindexed).
+Doc nodes are allocated in a contiguous `DocArena`. Each node is referenced by a `DocId` (a `u32` index), and child lists use `ChildRange` (start index + length). This eliminates per-node heap allocation and recursive `Drop` traversal. This fits the doc tree specifically: it's built once, rendered once, and dropped wholesale, so `DocId` indices are the natural access pattern. The AST is also bump-arena-allocated but uses **`&'arena` references, not `DocId` indices** — it's traversed repeatedly, so direct pointer access beats index lookups — see [Nested AST](#nested-ast-bump-arena-not-flatindexed).
 
 ```rust
 pub enum DocNode {
@@ -536,20 +536,27 @@ write!("{}", value);
 - Keywords and operators
 - Element tag names
 
-**Intentional stored-raw caches (do not "restore" span extraction):** a few
-internal nodes store raw/derivable text on the node because the formatter reads
-it repeatedly on hot paths, where re-slicing source on every check would cost
-more than the allocation — `TemplateElement.raw` and
-`RegexLiteral { pattern, flags }` (newline/width checks in `tsv_ts`'s printer),
-`SimpleSelector::Invalid { raw }` (printed verbatim), and
-`CssValue::String.content` (decoded content, genuinely needed). These are a
-deliberate cache-vs-extract tradeoff, not policy violations. The Svelte `Text`
-node splits the difference: `raw` stays stored under the same hot-path
-rationale (the printer's whitespace-classification loops read it repeatedly),
-while the decoded `data` is derived lazily (`Text::data()` borrows `raw`
-unless entities are present) because no hot path needs it. Removing any of
-these stored fields means routing the consumers through span extraction —
-verify the read paths first; don't assume the field is dead weight.
+**What the AST stores instead of raw text.** Verbatim source text is *not* cached
+on nodes — it is recovered via `span.extract(source)` on demand (string, template,
+regex, selector, and comment text all read from spans; `Text` keeps a `raw_span`
+with a lazily-derived `Text::data()` that borrows the slice unless HTML entities are
+present). Two kinds of owned data remain on nodes, both deliberate:
+
+- **Genuinely decoded text** — `CssValue::String.content`, `StringCooked::Decoded`,
+  `TemplateCooked::Decoded` (escape sequences resolved). A span can't reconstruct
+  these, so they're arena-allocated `&'arena str`. Don't "restore" them to span
+  extraction — verify a field is a *verbatim* source slice before assuming it's a
+  redundant copy.
+- **Precomputed derived scalars** — a node caches a small derived value (a `bool`/
+  `u16`), never the raw text, so hot predicate readers stay source-free without
+  re-scanning: `TemplateElement.has_newline` and `RegexLiteral.pattern_width` (the
+  `tsv_ts` printer's `is_simple_call_argument` checks), `Comment.multiline`.
+
+A handful of verbatim leaves whose *enclosing* span is larger than the leaf (a CSS
+function name inside `name(args)`, an at-rule name after `@`, a declaration property,
+a Svelte directive name inside `prefix:name|mods`) are still stored as `&'arena str`
+rather than a dedicated leaf span — a benign, low-frequency exception, not a stored
+raw cache of the printed text.
 
 ## Comment Handling
 
@@ -624,9 +631,9 @@ tsv runs on the system allocator — no `#[global_allocator]`, no alternative-al
 
 **Lexing — spans, not strings.** Tokens store byte offsets (`start`, `end`) into the source, never slices or copies, and the parser extracts token data before advancing so tokens are not cloned. The exceptions are deliberate: a string literal allocates its decoded value only when it actually contains escape sequences (`Token.decoded: Option<String>`), and each comment allocates its content once.
 
-**Internal AST — nested ownership, interned identifiers, no raw text.** Nodes use std `Box`/`Vec` (see [Nested AST](#nested-ast-not-flatindexed) for the rationale and the planned re-measurement). Identifiers are interned, and the interner is shared across embedded languages in a Svelte file, so a symbol appearing in both a template expression and the `<script>` block is stored once. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned `String`s is genuinely decoded data: string-literal values, BigInt digits, comment bodies.
+**Internal AST — bump-arena nested ownership, interned identifiers, no raw text.** Nodes are allocated in a per-parse bump arena: recursive children are `&'arena T` and child collections `&'arena [T]` (not `Box`/`Vec`), with small children kept inline by value (see [Nested AST](#nested-ast-bump-arena-not-flatindexed) for the layout rationale). Identifiers are interned, and the interner is shared across embedded languages in a Svelte file, so a symbol appearing in both a template expression and the `<script>` block is stored once. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, arena-allocated as `&'arena str`.
 
-**Svelte template nodes — contiguous storage.** Fragment children are a `Vec<FragmentNode>` of enum values rather than boxed nodes, keeping siblings contiguous in memory for the printer's traversal loops.
+**Svelte template nodes — contiguous storage.** Fragment children are an `&'arena [FragmentNode]` slice of enum values rather than boxed nodes, keeping siblings contiguous in arena memory for the printer's traversal loops.
 
 **Doc building — the doc arena.** All doc nodes live in a contiguous `DocArena` (two flat `Vec`s: nodes and child lists), referenced by `u32` `DocId`s — no per-node heap allocation, no recursive `Drop`. One arena per file, pre-sized from source length (~4 nodes per source byte; `DocArena::with_source_size_hint`), dropped wholesale after rendering. Embedded languages build doc nodes into the host file's arena rather than nesting their own. Identifier text never enters the doc tree: `DocText::Symbol` stores an interner ID resolved at print time (see [DocText](#doctext-static-owned-symbol)), so the only per-node string allocations are `Owned` text a printer actually constructs.
 
@@ -697,30 +704,59 @@ The crate structure scales to new languages and tools. A new language crate depe
 
 Decisions made during development with rationale preserved for future reference.
 
-### Nested AST (Not Flat/Indexed)
+### Nested AST (Bump-Arena, Not Flat/Indexed)
 
-tsv keeps the nested ownership model rather than flat array layouts with index-based references:
+tsv keeps the nested ownership model — not flat array layouts with index-based
+references — but allocates the nodes in a **per-parse bump arena** (`bumpalo`)
+tied to the program lifetime. Recursive children are `&'arena T<'arena>` (not
+`Box`), child collections are `&'arena [T<'arena>]` (not `Vec`), and decoded
+strings are `&'arena str`, so a whole parse is one bump-allocated graph freed
+wholesale when the arena drops, with no per-node `Drop`:
 
 ```rust
-pub struct Program {
-    pub body: Vec<Statement>,
-    pub comments: Vec<Comment>,
+pub struct Program<'arena> {
+    pub body: &'arena [Statement<'arena>],
+    pub comments: Vec<Comment>, // root-owned; not the per-node target
     pub span: Span,
+    // …interner (Rc<RefCell<…>>, shared across embedded languages)
 }
 
-pub enum Statement {
-    VariableDeclaration(VariableDeclaration),
-    ExpressionStatement(Box<ExpressionStatement>),
-    // ...
+pub enum Statement<'arena> {
+    VariableDeclaration(VariableDeclaration<'arena>), // small → inline by value
+    IfStatement(IfStatement<'arena>),                 // test inline; consequent: &'arena Statement
+    // …
 }
 ```
 
-**Rationale:** Flat/indexed layouts were benchmarked early in development (`arena` branch, similar to Zig's MultiArrayList). Traversal was slower because index lookups replaced direct pointer access — the cost was the flat/indexed _structure_, not arena allocation itself (a separate axis; see below). Memory savings didn't justify the complexity for a formatter that traverses constantly.
+The caller owns the arena (`parse(source, &arena)`); the returned AST borrows it,
+and `format`/`convert` consume it into an owned `String`/JSON, so the arena never
+escapes the call (no self-referential ownership — `unsafe_code = "forbid"`, safe
+bumpalo API only). The interner stays `Rc<RefCell<…>>` (created before the arena,
+mutated during parse, shared across the Svelte→TS embedding boundary) — orthogonal
+to `'arena`.
 
-**Planned re-measurement:** That benchmark predates most of the current printer, the doc arena, and the measurement tooling, so the result shouldn't be trusted indefinitely. The intent is to re-run it when performance optimization gets a dedicated pass — the internals are far more mature now, and the early prototype's numbers may not hold. Two follow-ups are worth measuring against the current corpus benchmarks, as separate axes:
+**Inline-by-value layout, deliberately not size-minimized.** A node holds its
+children inline by value where they were owned inline before; only genuinely
+recursive children sit behind `&'arena`. Variants are *not* boxed and inline
+fields are *not* indirected to shrink node size — the formatter is traversal-bound,
+and the extra pointer-chases that size-minimization adds on hot traversal paths
+cost more than the cache-density they buy. (The arena allocation itself is the
+win; the node *layout* favors traversal locality over byte size.)
 
-- **Flat/indexed structure, again** — re-run the layout comparison on the mature codebase rather than the early prototype.
-- **Bump allocation for the nested model** — keep the nested structure but allocate nodes in an arena. The `DocArena` is precedent that the pattern pays off here (it replaced `Box<Doc>` trees with a measured format-time win): faster allocation, wholesale deallocation, better locality, no change to traversal shape. Costs lifetime threading through every parser and printer API.
+**Rationale vs flat/indexed:** Flat/indexed layouts (index arrays, à la Zig's
+`MultiArrayList`) were benchmarked early in development and were slower —
+traversal replaced direct pointer/reference access with index lookups, and a
+formatter traverses constantly. The arena keeps direct `&'arena` access (full
+traversal speed) while eliminating per-node `malloc`/`free` and improving locality
+(nodes are bump-allocated in ≈parse order, which approximates traversal order).
+The `DocArena` (the doc-builder IR) is the index-arena precedent for the
+build-once/render-once doc tree; the AST uses references rather than indices
+because it is traversed repeatedly.
+
+**Still open (separate axis):** re-run the **flat/indexed structure** comparison
+on the mature codebase — an independent question from allocation strategy (the
+early prototype conflated the two). Bump allocation for the nested model is now
+the implemented design.
 
 ### Red-Green Trees (Deferred)
 
@@ -764,12 +800,14 @@ The closest Rust projects embody the alternative shapes, which makes the trade-o
   choice — one central `oxc_ast` crate shared by parser, linter, transformer, minifier, and
   formatter — answers a different question: many _tools_ sharing one language's AST. tsv does
   the same per language (see [Shared Parser, Divergent Tools](#shared-parser-divergent-tools));
-  the per-language crate split is the multi-language question oxc never faces. Allocation also
-  differs: oxc bump-allocates lifetime-threaded AST types with zero-copy source atoms, while
-  tsv keeps std nested ownership (benchmarked — see
-  [Nested AST](#nested-ast-not-flatindexed)) and `unsafe_code = "forbid"`. The convergences
-  are just as real: u32 spans, detached comments stored flat on the program, concrete types
-  without dyn dispatch, prettier-style doc IR.
+  the per-language crate split is the multi-language question oxc never faces. Allocation has
+  converged: like oxc, tsv now bump-allocates lifetime-threaded (`&'arena`) AST types — but
+  keeps an **inline-by-value node layout** (not size-minimized via boxing/indirection, which
+  regressed its traversal-bound formatter; see [Nested AST](#nested-ast-bump-arena-not-flatindexed)),
+  stays `unsafe_code = "forbid"` (safe bumpalo API only), and recovers source text via `span`
+  slices rather than zero-copy atoms. The other convergences are just as real: u32 spans,
+  detached comments stored flat on the program, concrete types without dyn dispatch,
+  prettier-style doc IR.
 - **[Biome](https://biomejs.dev/)** is multi-language like tsv and chose the centralized shape
   tsv rejects: a shared red-green CST (rowan) with unified formatter infrastructure across
   languages, comments attached to tokens as trivia. tsv instead keeps concrete per-language

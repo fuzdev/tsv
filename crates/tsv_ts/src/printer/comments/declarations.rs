@@ -206,7 +206,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_binding_type_annotation_doc(
         &self,
         marker_end: u32,
-        type_ann: &internal::TSTypeAnnotation,
+        type_ann: &internal::TSTypeAnnotation<'_>,
         wrap: bool,
     ) -> DocId {
         let d = self.d();
@@ -426,7 +426,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_heritage_clause_doc(
         &self,
         keyword: &'static str,
-        items: &[internal::TSInterfaceHeritage],
+        items: &[internal::TSInterfaceHeritage<'_>],
         group_mode: bool,
         keyword_start: Option<u32>,
     ) -> DocId {
@@ -679,7 +679,7 @@ impl<'a> Printer<'a> {
 }
 
 /// End position of a heritage item (after type arguments if present).
-fn heritage_item_end(item: &internal::TSInterfaceHeritage) -> u32 {
+fn heritage_item_end(item: &internal::TSInterfaceHeritage<'_>) -> u32 {
     item.type_arguments
         .as_ref()
         .map_or_else(|| item.expression.span().end, |ta| ta.span.end)

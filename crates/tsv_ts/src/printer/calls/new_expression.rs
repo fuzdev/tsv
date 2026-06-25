@@ -31,7 +31,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a new expression with argument wrapping
     pub(in crate::printer) fn build_new_doc_with_wrapping(
         &self,
-        new_expr: &internal::NewExpression,
+        new_expr: &internal::NewExpression<'_>,
     ) -> DocId {
         let d = self.d();
         // Wrap callee in parens if needed (e.g., `new (a || b)()`, `new (a ? b : c)()`,
@@ -39,9 +39,9 @@ impl<'a> Printer<'a> {
         // A non-null assertion sealing a parenthesized chain (`new (a?.b)!()`) keeps the
         // parens via the sealed-base rendering (checked first; the `!`-outside form is
         // not stripped here even though the standalone path would).
-        let callee = if let Some(sealed) = self.build_sealed_non_null_paren_doc(&new_expr.callee) {
+        let callee = if let Some(sealed) = self.build_sealed_non_null_paren_doc(new_expr.callee) {
             sealed
-        } else if needs_parens(&new_expr.callee, ParenContext::NewCallee) {
+        } else if needs_parens(new_expr.callee, ParenContext::NewCallee) {
             // For binary expressions (including logical), use a group with softlines
             // so the parens can break independently when the content is too long:
             // new (
@@ -50,7 +50,7 @@ impl<'a> Printer<'a> {
             //
             // Use ungrouped binary doc so the inner expression doesn't have its own
             // group - the outer group controls whether to break after `(`.
-            if let internal::Expression::BinaryExpression(binary) = &*new_expr.callee {
+            if let internal::Expression::BinaryExpression(binary) = new_expr.callee {
                 let inner_doc = self.build_binary_chain_doc_ungrouped(binary);
                 d.group(d.concat(&[
                     d.text("("),
@@ -59,11 +59,11 @@ impl<'a> Printer<'a> {
                     d.text(")"),
                 ]))
             } else {
-                let callee_doc = self.build_expression_doc(&new_expr.callee);
+                let callee_doc = self.build_expression_doc(new_expr.callee);
                 d.parens(callee_doc)
             }
         } else {
-            self.build_expression_doc(&new_expr.callee)
+            self.build_expression_doc(new_expr.callee)
         };
 
         // Check for comments between removed parentheses and callee
@@ -104,7 +104,7 @@ impl<'a> Printer<'a> {
         // These stay on the same line as the opening paren: `new Cls({...})` not `new Cls(\n{...})`
         // Skip hugging if there are trailing comments (line OR block) - let the comment handling below handle it
         let single_arg_has_trailing_comment = new_expr.arguments.len() == 1
-            && has_trailing_comments_slice(&new_expr.arguments, new_expr.span.end, self);
+            && has_trailing_comments_slice(new_expr.arguments, new_expr.span.end, self);
 
         if new_expr.arguments.len() == 1 && !single_arg_has_trailing_comment {
             match &new_expr.arguments[0] {
@@ -294,12 +294,12 @@ impl<'a> Printer<'a> {
         // e.g., new Cls(arr.map((x) => x), b) → new Cls(\n\t...,\n)
         // e.g., new Cls(() => a, () => b) → new Cls(\n\t...,\n)
         // Skip this path if there are trailing comments - let the comment handling paths handle it
-        if is_function_composition_args(&new_expr.arguments)
-            && !has_trailing_comments_slice(&new_expr.arguments, new_expr.span.end, self)
+        if is_function_composition_args(new_expr.arguments)
+            && !has_trailing_comments_slice(new_expr.arguments, new_expr.span.end, self)
         {
             let arg_parts = build_args_joined_with_comments(
                 self,
-                &new_expr.arguments,
+                new_expr.arguments,
                 paren_open,
                 true,
                 #[allow(clippy::redundant_closure_for_method_calls)]
@@ -314,7 +314,7 @@ impl<'a> Printer<'a> {
         if let Some(doc) = try_hug_multiline_template_arg(
             self,
             callee_with_types,
-            &new_expr.arguments,
+            new_expr.arguments,
             new_expr.span.end,
         ) {
             return doc;
@@ -330,7 +330,7 @@ impl<'a> Printer<'a> {
             // Force expansion with hardlines for multiline content
             let arg_parts = build_args_joined_with_comments(
                 self,
-                &new_expr.arguments,
+                new_expr.arguments,
                 paren_open,
                 true,
                 #[allow(clippy::redundant_closure_for_method_calls)]
@@ -350,13 +350,13 @@ impl<'a> Printer<'a> {
         });
 
         if has_blank_lines {
-            let arg_doc = build_args_with_blank_lines(self, &new_expr.arguments);
+            let arg_doc = build_args_with_blank_lines(self, new_expr.arguments);
             return wrap_call_with_hard_breaks(d, callee_with_types, arg_doc);
         }
 
         // "Expand first arg" pattern: callback first, short/empty container last
         // e.g., new Proxy((x) => { ... }, {}) - callback hugs, empty obj stays inline
-        if should_expand_first_arg(self, &new_expr.arguments) {
+        if should_expand_first_arg(self, new_expr.arguments) {
             let first_arg_doc = self.build_expression_doc(&new_expr.arguments[0]);
             let second_arg_doc = self.build_expression_doc(&new_expr.arguments[1]);
 
@@ -374,7 +374,7 @@ impl<'a> Printer<'a> {
         // Must check this BEFORE the "last arg is array/object" pattern below,
         // otherwise trailing comments on the last arg cause it to be hugged incorrectly.
         // e.g., new Class(arg1, // comment\n  arg2)
-        if has_trailing_line_comments_slice(&new_expr.arguments, new_expr.span.end, self) {
+        if has_trailing_line_comments_slice(new_expr.arguments, new_expr.span.end, self) {
             let mut arg_parts = DocBuf::new();
 
             for (i, arg) in new_expr.arguments.iter().enumerate() {
@@ -536,7 +536,7 @@ impl<'a> Printer<'a> {
 
                 // For function composition (multiple callbacks), use hardlines
                 // For simple args, use soft breaks (can stay inline)
-                if is_function_composition_args(&new_expr.arguments) {
+                if is_function_composition_args(new_expr.arguments) {
                     let arg_parts = d.join_doc(arg_docs, d.comma_hardline());
                     return wrap_call_with_hard_breaks_suffix(
                         d,
@@ -573,11 +573,11 @@ impl<'a> Printer<'a> {
 
             if new_expr.arguments.len() >= 2
                 && (last_is_function || last_is_expandable_collection)
-                && preceding_args_allow_expand_last(&new_expr.arguments, self.line_breaks)
-                && !has_inter_argument_comments_slice(&new_expr.arguments, self)
+                && preceding_args_allow_expand_last(new_expr.arguments, self.line_breaks)
+                && !has_inter_argument_comments_slice(new_expr.arguments, self)
             {
                 let (head_parts, last_arg_doc, all_args_broken) =
-                    build_args_split_last(&new_expr.arguments, self, paren_open);
+                    build_args_split_last(new_expr.arguments, self, paren_open);
 
                 // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
                 if head_parts.iter().any(|&id| d.will_break(id)) {
@@ -638,7 +638,7 @@ impl<'a> Printer<'a> {
 
                 // Array/object last arg path (matches call_formatting.rs's expand-last array/object path)
                 // Same outer type: skip hug, use expand-all
-                if last_two_args_same_type(&new_expr.arguments) {
+                if last_two_args_same_type(new_expr.arguments) {
                     // Same type: Prettier uses expand-all when last arg will break
                     if d.will_break(last_arg_doc) {
                         return build_expand_all_args(d, callee_with_types, all_args_broken);
@@ -682,7 +682,7 @@ impl<'a> Printer<'a> {
         // These need explicit handling that the simple join_doc path doesn't provide
         let has_leading_comments = !new_expr.arguments.is_empty()
             && self.has_comments_between(paren_open, new_expr.arguments[0].span().start);
-        let has_inter_arg_comments = has_inter_argument_comments_slice(&new_expr.arguments, self);
+        let has_inter_arg_comments = has_inter_argument_comments_slice(new_expr.arguments, self);
 
         // Comments trailing the `(` on the same line stay on the `(` line, with
         // own-line comments on their own lines before the first arg — preserving
@@ -715,7 +715,7 @@ impl<'a> Printer<'a> {
                 // (pass first_arg_start so the gap scan finds nothing).
                 inner.push(build_args_joined_with_comments(
                     self,
-                    &new_expr.arguments,
+                    new_expr.arguments,
                     first_arg_start,
                     true,
                     #[allow(clippy::redundant_closure_for_method_calls)]
@@ -736,7 +736,7 @@ impl<'a> Printer<'a> {
         if has_leading_comments || has_inter_arg_comments {
             let arg_parts = build_args_joined_with_comments(
                 self,
-                &new_expr.arguments,
+                new_expr.arguments,
                 paren_open,
                 false,
                 #[allow(clippy::redundant_closure_for_method_calls)]
@@ -759,7 +759,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a new expression (for nested contexts)
-    pub(in crate::printer) fn build_new_doc(&self, new_expr: &internal::NewExpression) -> DocId {
+    pub(in crate::printer) fn build_new_doc(
+        &self,
+        new_expr: &internal::NewExpression<'_>,
+    ) -> DocId {
         self.build_new_doc_with_wrapping(new_expr)
     }
 }

@@ -34,12 +34,12 @@ pub type ChainNodeRefVec<'n, 'a> = SmallVec<[&'n ChainNode<'a>; 8]>;
 pub enum ChainNode<'a> {
     /// Base expression: identifier, literal, complex expr in parens
     Base {
-        expr: &'a internal::Expression,
+        expr: &'a internal::Expression<'a>,
         needs_parens: bool,
     },
     /// Call expression: ()
     Call {
-        call: &'a internal::CallExpression,
+        call: &'a internal::CallExpression<'a>,
         optional: bool,
     },
     /// Member access: .prop
@@ -61,7 +61,7 @@ pub enum ChainNode<'a> {
     /// Computed member access: [expr]
     /// `bracket_end` is the position just before the closing `]` (for trailing comment detection)
     ComputedMember {
-        expr: &'a internal::Expression,
+        expr: &'a internal::Expression<'a>,
         optional: bool,
         object_end: u32,
         bracket_end: u32,
@@ -72,12 +72,12 @@ pub enum ChainNode<'a> {
 
 impl<'a> ChainNode<'a> {
     /// Create a new base node
-    pub fn base(expr: &'a internal::Expression, needs_parens: bool) -> Self {
+    pub fn base(expr: &'a internal::Expression<'a>, needs_parens: bool) -> Self {
         Self::Base { expr, needs_parens }
     }
 
     /// Create a new call node
-    pub fn call(call: &'a internal::CallExpression) -> Self {
+    pub fn call(call: &'a internal::CallExpression<'a>) -> Self {
         Self::Call {
             call,
             optional: false,
@@ -85,7 +85,7 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Create a new call node with optional chaining
-    pub fn call_optional(call: &'a internal::CallExpression) -> Self {
+    pub fn call_optional(call: &'a internal::CallExpression<'a>) -> Self {
         Self::Call {
             call,
             optional: true,
@@ -124,7 +124,7 @@ impl<'a> ChainNode<'a> {
 
     /// Create a new computed member node
     pub fn computed_member(
-        expr: &'a internal::Expression,
+        expr: &'a internal::Expression<'a>,
         optional: bool,
         object_end: u32,
         bracket_end: u32,
@@ -205,7 +205,7 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Get the CallExpression if this is a Call node
-    pub fn as_call_expression(&self) -> Option<&'a internal::CallExpression> {
+    pub fn as_call_expression(&self) -> Option<&'a internal::CallExpression<'a>> {
         if let Self::Call { call, .. } = self {
             Some(call)
         } else {

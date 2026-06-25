@@ -3,9 +3,9 @@
 use crate::ast::internal::{
     Accessibility, BlockStatement, CallExpression, ClassBody, ClassDeclaration, ClassExpression,
     ClassMember, Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind,
-    ExportNamedDeclaration, Expression, FunctionExpression, Identifier, Literal, LiteralValue,
-    MemberExpression, MethodDefinition, MethodKind, PropertyDefinition, PropertyModifier,
-    Statement, StaticBlock, TSIndexSignature, TSTypeParameterDeclaration,
+    ExportNamedDeclaration, Expression, FunctionExpression, Identifier, IdentifierParamExtra,
+    Literal, LiteralValue, MemberExpression, MethodDefinition, MethodKind, PropertyDefinition,
+    PropertyModifier, Statement, StaticBlock, TSIndexSignature, TSTypeParameterDeclaration,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
@@ -17,9 +17,9 @@ use super::super::Parser;
 /// markers. `parse_class_member` builds this, then dispatches to
 /// `finish_method_member` / `finish_property_member`.
 #[allow(clippy::struct_excessive_bools)] // independent modifier flags, not a state machine
-struct ClassMemberHeader {
+struct ClassMemberHeader<'arena> {
     start: usize,
-    decorators: Vec<Decorator>,
+    decorators: &'arena [Decorator<'arena>],
     accessibility: Option<Accessibility>,
     is_static: bool,
     is_declare: bool,
@@ -31,20 +31,20 @@ struct ClassMemberHeader {
     is_async: bool,
     accessor_kind: Option<MethodKind>,
     computed: bool,
-    key: Expression,
+    key: Expression<'arena>,
     method_name: Option<String>,
     modifier: PropertyModifier,
-    type_parameters: Option<TSTypeParameterDeclaration>,
+    type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
 }
 
-impl<'a> Parser<'a> {
-    pub(super) fn parse_class_declaration(&mut self) -> Result<Statement, ParseError> {
+impl<'a, 'arena> Parser<'a, 'arena> {
+    pub(super) fn parse_class_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
         let class = self.parse_class_declaration_inner(true, false)?;
         Ok(Statement::ClassDeclaration(class))
     }
 
     /// Parse an abstract class declaration: `abstract class Foo { ... }`
-    pub(super) fn parse_abstract_class(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_abstract_class(&mut self) -> Result<Statement<'arena>, ParseError> {
         // Capture position of 'abstract' before consuming it
         let abstract_start = self.current_pos().0;
         debug_assert!(self.current_value() == "abstract");
@@ -59,7 +59,7 @@ impl<'a> Parser<'a> {
     ///
     /// Decorators can be stacked: `@dec1 @dec2 class Foo { }`
     /// Decorator can be followed by `abstract class` or `export class`
-    pub(super) fn parse_decorated_class(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_decorated_class(&mut self) -> Result<Statement<'arena>, ParseError> {
         let start = self.current_pos().0;
 
         // Parse one or more decorators
@@ -102,7 +102,7 @@ impl<'a> Parser<'a> {
         class.decorators = if decorators.is_empty() {
             None
         } else {
-            Some(decorators)
+            Some(decorators.into_bump_slice())
         };
 
         // Update span to include decorators
@@ -114,15 +114,16 @@ impl<'a> Parser<'a> {
                 let end = class.span.end;
                 Ok(Statement::ExportDefaultDeclaration(
                     ExportDefaultDeclaration {
-                        declaration: ExportDefaultValue::ClassDeclaration(Box::new(class)),
+                        declaration: ExportDefaultValue::ClassDeclaration(class),
                         span: Span::new(start as u32, end),
                     },
                 ))
             } else {
                 let end = class.span.end;
+                let class_decl = Statement::ClassDeclaration(class);
                 Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
-                    declaration: Some(Box::new(Statement::ClassDeclaration(class))),
-                    specifiers: Vec::new(),
+                    declaration: Some(self.alloc(class_decl)),
+                    specifiers: &[],
                     source: None,
                     attributes: None,
                     export_kind: ExportKind::Value,
@@ -135,8 +136,10 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a list of decorators: `@dec1 @dec2 ...`
-    pub(super) fn parse_decorators(&mut self) -> Result<Vec<Decorator>, ParseError> {
-        let mut decorators = Vec::new();
+    pub(super) fn parse_decorators(
+        &mut self,
+    ) -> Result<bumpalo::collections::Vec<'arena, Decorator<'arena>>, ParseError> {
+        let mut decorators = self.bvec();
 
         while *self.current_kind() == TokenKind::At {
             decorators.push(self.parse_decorator()?);
@@ -151,7 +154,7 @@ impl<'a> Parser<'a> {
     /// - Identifier: `@foo`
     /// - Call expression: `@foo()` or `@foo(arg)`
     /// - Member expression: `@foo.bar` or `@foo.bar()`
-    fn parse_decorator(&mut self) -> Result<Decorator, ParseError> {
+    fn parse_decorator(&mut self) -> Result<Decorator<'arena>, ParseError> {
         let start = self.current_pos().0;
 
         // Consume '@'
@@ -178,7 +181,7 @@ impl<'a> Parser<'a> {
     /// - The name is always optional
     /// - They appear in expression position
     /// - No `declare` field
-    pub fn parse_class_expression(&mut self) -> Result<Expression, ParseError> {
+    pub fn parse_class_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'class' keyword
@@ -225,16 +228,16 @@ impl<'a> Parser<'a> {
             // Parse optional type arguments: `extends Base<T>`
             let type_args = self.parse_optional_type_arguments()?;
 
-            (Some(Box::new(expr)), type_args)
+            (Some(self.alloc(expr)), type_args)
         } else {
             (None, None)
         };
 
         // Parse optional `implements` clause
-        let implements = if self.eat_contextual_keyword("implements") {
-            self.parse_interface_heritage_list()?
+        let implements: &'arena [_] = if self.eat_contextual_keyword("implements") {
+            self.parse_interface_heritage_list()?.into_bump_slice()
         } else {
-            Vec::new()
+            &[]
         };
 
         // Parse class body
@@ -264,7 +267,7 @@ impl<'a> Parser<'a> {
         &mut self,
         name_required: bool,
         is_abstract: bool,
-    ) -> Result<ClassDeclaration, ParseError> {
+    ) -> Result<ClassDeclaration<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.parse_class_declaration_inner_with_start(name_required, is_abstract, start, false)
     }
@@ -279,7 +282,7 @@ impl<'a> Parser<'a> {
         is_abstract: bool,
         start: usize,
         declare: bool,
-    ) -> Result<ClassDeclaration, ParseError> {
+    ) -> Result<ClassDeclaration<'arena>, ParseError> {
         // Consume 'class' keyword
         debug_assert!(matches!(
             self.current_kind(),
@@ -326,16 +329,16 @@ impl<'a> Parser<'a> {
             // Parse optional type arguments: `extends Base<T>`
             let type_args = self.parse_optional_type_arguments()?;
 
-            (Some(Box::new(expr)), type_args)
+            (Some(self.alloc(expr)), type_args)
         } else {
             (None, None)
         };
 
         // Parse optional `implements` clause
-        let implements = if self.eat_contextual_keyword("implements") {
-            self.parse_interface_heritage_list()?
+        let implements: &'arena [_] = if self.eat_contextual_keyword("implements") {
+            self.parse_interface_heritage_list()?.into_bump_slice()
         } else {
-            Vec::new()
+            &[]
         };
 
         // Parse class body (ambient when this is a `declare class`)
@@ -360,11 +363,14 @@ impl<'a> Parser<'a> {
     /// bodiless signatures and decorators are forbidden; otherwise members are
     /// concrete (method bodies, property initializers). The member grammar — keys,
     /// modifiers, type parameters, return types, index/accessor signatures — is shared.
-    pub(super) fn parse_class_body(&mut self, ambient: bool) -> Result<ClassBody, ParseError> {
+    pub(super) fn parse_class_body(
+        &mut self,
+        ambient: bool,
+    ) -> Result<ClassBody<'arena>, ParseError> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?;
 
-        let mut body = Vec::new();
+        let mut body = self.bvec();
 
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
             // Stray semicolons are empty class members — acorn skips them,
@@ -380,7 +386,7 @@ impl<'a> Parser<'a> {
         self.expect(&TokenKind::BraceClose)?;
 
         Ok(ClassBody {
-            body,
+            body: body.into_bump_slice(),
             span: Span::new(start as u32, end as u32),
         })
     }
@@ -422,14 +428,14 @@ impl<'a> Parser<'a> {
     /// member), the result is a bodiless signature and decorators are not parsed
     /// (TypeScript forbids both in ambient context). All other member grammar is
     /// shared with concrete classes.
-    fn parse_class_member(&mut self, ambient: bool) -> Result<ClassMember, ParseError> {
+    fn parse_class_member(&mut self, ambient: bool) -> Result<ClassMember<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Parse any decorators on this member (forbidden in ambient context)
-        let decorators = if ambient {
-            Vec::new()
+        let decorators: &'arena [Decorator<'arena>] = if ambient {
+            &[]
         } else {
-            self.parse_decorators()?
+            self.parse_decorators()?.into_bump_slice()
         };
 
         // Handle 'declare' contextual keyword - only if followed by a class member name or another modifier
@@ -593,14 +599,17 @@ impl<'a> Parser<'a> {
             // `'constructor'` IS the constructor (kind detection reads the name),
             // unlike a computed `['constructor']`.
             let (key_start, key_end) = self.current_pos();
-            let (content, quote) = self.extract_string_literal();
+            let span = Span::new(key_start as u32, key_end as u32);
+            let cooked = self.extract_string_cooked();
             self.advance()?;
-            let name = content.clone();
+            // The method-name string (used for `constructor` detection) is the
+            // decoded value resolved from the literal's span.
+            let name = cooked.resolve(span, self.source).to_string();
             (
                 false,
                 Expression::Literal(Literal {
-                    value: LiteralValue::String { content, quote },
-                    span: Span::new(key_start as u32, key_end as u32),
+                    value: LiteralValue::String(cooked),
+                    span,
                 }),
                 Some(name),
             )
@@ -654,9 +663,9 @@ impl<'a> Parser<'a> {
     /// for ambient / abstract / overload methods.
     fn finish_method_member(
         &mut self,
-        header: ClassMemberHeader,
+        header: ClassMemberHeader<'arena>,
         ambient: bool,
-    ) -> Result<ClassMember, ParseError> {
+    ) -> Result<ClassMember<'arena>, ParseError> {
         let ClassMemberHeader {
             start,
             decorators,
@@ -685,7 +694,7 @@ impl<'a> Parser<'a> {
         let (params_start, _) = self.current_pos();
 
         // Parse parameter list and block body (like a function)
-        let params = self.parse_parameter_list()?;
+        let params = self.parse_parameter_list()?.into_bump_slice();
 
         // Check for return type annotation: (): type or type predicate
         let return_type = self.parse_optional_return_type()?;
@@ -714,7 +723,7 @@ impl<'a> Parser<'a> {
             // Create empty body for abstract methods and overload signatures
             (
                 BlockStatement {
-                    body: Vec::new(),
+                    body: &[],
                     span: Span::new(body_end, body_end),
                 },
                 end,
@@ -762,8 +771,8 @@ impl<'a> Parser<'a> {
     /// optional type annotation, optional initializer, and trailing semicolon.
     fn finish_property_member(
         &mut self,
-        header: ClassMemberHeader,
-    ) -> Result<ClassMember, ParseError> {
+        header: ClassMemberHeader<'arena>,
+    ) -> Result<ClassMember<'arena>, ParseError> {
         let ClassMemberHeader {
             start,
             decorators,
@@ -787,7 +796,7 @@ impl<'a> Parser<'a> {
         let type_annotation = self.parse_optional_type_annotation()?;
 
         // Check for value: `= value`
-        let value = if self.eat(TokenKind::Equals) {
+        let value: Option<Expression<'arena>> = if self.eat(TokenKind::Equals) {
             Some(self.parse_assignment_expression()?)
         } else {
             None
@@ -882,7 +891,7 @@ impl<'a> Parser<'a> {
     /// Parse a heritage expression for extends clause
     /// This can be an identifier, member expression, or call expression (mixin pattern)
     /// e.g., `Base`, `Foo.Bar`, `getMixin(Base)`, `ns.getMixin(Base)`
-    fn parse_heritage_expression(&mut self) -> Result<Expression, ParseError> {
+    fn parse_heritage_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
         // Start with an identifier
         if !matches!(self.current_kind(), TokenKind::Identifier) {
             return Err(self.error_expected_after("class name", "extends"));
@@ -913,8 +922,8 @@ impl<'a> Parser<'a> {
                     self.advance()?;
 
                     expr = Expression::MemberExpression(MemberExpression {
-                        object: Box::new(expr),
-                        property: Box::new(Expression::Identifier(Identifier::simple(
+                        object: self.alloc(expr),
+                        property: self.alloc(Expression::Identifier(Identifier::simple(
                             prop_name,
                             Span::new(prop_start as u32, prop_end as u32),
                         ))),
@@ -931,8 +940,9 @@ impl<'a> Parser<'a> {
                     let type_args = self.parse_type_parameter_instantiation()?;
                     self.advance()?; // consume '('
                     let (arguments, paren_end) = self.parse_call_arguments()?;
+                    let arguments = arguments.into_bump_slice();
                     expr = Expression::CallExpression(CallExpression {
-                        callee: Box::new(expr),
+                        callee: self.alloc(expr),
                         type_arguments: Some(type_args),
                         arguments,
                         optional: false,
@@ -943,8 +953,9 @@ impl<'a> Parser<'a> {
                     // Call expression: getMixin(Base) or ns.getMixin(Base)
                     self.advance()?; // consume '('
                     let (arguments, paren_end) = self.parse_call_arguments()?;
+                    let arguments = arguments.into_bump_slice();
                     expr = Expression::CallExpression(CallExpression {
-                        callee: Box::new(expr),
+                        callee: self.alloc(expr),
                         type_arguments: None,
                         arguments,
                         optional: false,
@@ -964,7 +975,7 @@ impl<'a> Parser<'a> {
         start: usize,
         is_static: bool,
         readonly: bool,
-    ) -> Result<ClassMember, ParseError> {
+    ) -> Result<ClassMember<'arena>, ParseError> {
         // Consume `[`
         self.expect(&TokenKind::BracketOpen)?;
 
@@ -984,11 +995,16 @@ impl<'a> Parser<'a> {
         };
 
         let param_end = param_type.as_ref().map_or(id_end, |t| t.span.end as usize);
+        let extra = param_type.map(|ta| {
+            self.alloc(IdentifierParamExtra {
+                type_annotation: Some(ta),
+                decorators: None,
+            })
+        });
         let parameter = Identifier {
             name: param_name,
             optional: false,
-            type_annotation: param_type,
-            decorators: None,
+            extra,
             span: Span::new(id_start as u32, param_end as u32),
         };
 
@@ -1008,8 +1024,10 @@ impl<'a> Parser<'a> {
             end = self.prev_token_end() as u32;
         }
 
+        let mut parameters = self.bvec();
+        parameters.push(parameter);
         Ok(ClassMember::IndexSignature(TSIndexSignature {
-            parameters: vec![parameter],
+            parameters: parameters.into_bump_slice(),
             type_annotation: value_type,
             is_static,
             readonly,

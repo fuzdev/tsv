@@ -9,22 +9,29 @@ use tsv_cli::json_utils::to_json_with_tabs;
 /// The parser-side validation phases (expected.json comparison, wire-path
 /// identity, typed-walk parity probes) all need the same AST — sharing one
 /// parse keeps `fixtures_validate` from re-parsing every fixture per phase.
-pub(super) enum ParsedInput {
-    Svelte(tsv_svelte::Root),
-    Ts(tsv_ts::Program),
-    Css(tsv_css::CssStyleSheet),
+pub(super) enum ParsedInput<'arena> {
+    Svelte(tsv_svelte::Root<'arena>),
+    Ts(tsv_ts::Program<'arena>),
+    Css(tsv_css::CssStyleSheet<'arena>),
 }
 
 /// Parse fixture content once for the parser-side validation phases.
-pub(super) fn parse_input(content: &str, input_type: InputType) -> Result<ParsedInput, String> {
+///
+/// `arena` owns the internal AST and must outlive the returned `ParsedInput`
+/// (caller-owns-`Bump`).
+pub(super) fn parse_input<'arena>(
+    content: &str,
+    input_type: InputType,
+    arena: &'arena bumpalo::Bump,
+) -> Result<ParsedInput<'arena>, String> {
     match input_type {
-        InputType::Svelte => tsv_svelte::parse(content)
+        InputType::Svelte => tsv_svelte::parse(content, arena)
             .map(ParsedInput::Svelte)
             .map_err(|e| format!("Parse error: {e:?}")),
-        InputType::SvelteTs | InputType::TypeScript => tsv_ts::parse(content)
+        InputType::SvelteTs | InputType::TypeScript => tsv_ts::parse(content, arena)
             .map(ParsedInput::Ts)
             .map_err(|e| format!("Parse error: {e:?}")),
-        InputType::Css => tsv_css::parse(content)
+        InputType::Css => tsv_css::parse(content, arena)
             .map(ParsedInput::Css)
             .map_err(|e| format!("Parse error: {e:?}")),
     }
@@ -50,7 +57,7 @@ pub(super) struct InputAstPaths {
 /// already-parsed input, materializing `convert_ast_json` once.
 #[allow(clippy::expect_used)] // Value serialization cannot fail
 pub(super) fn input_ast_paths(
-    parsed: &ParsedInput,
+    parsed: &ParsedInput<'_>,
     content: &str,
 ) -> Result<InputAstPaths, String> {
     let (ast_json, wire) = match parsed {
@@ -128,27 +135,30 @@ pub(super) struct TypedWalkParity {
 /// result for `.css` (no typed pipeline). Takes the already-parsed input so
 /// `.svelte` script-span extraction reuses the fixture's one parse.
 #[allow(clippy::expect_used)] // Value serialization cannot fail
-pub(super) fn typed_walk_parity_probes(content: &str, parsed: &ParsedInput) -> TypedWalkParity {
+pub(super) fn typed_walk_parity_probes(content: &str, parsed: &ParsedInput<'_>) -> TypedWalkParity {
     let mut parity = TypedWalkParity::default();
 
-    let mut probe = |ts_content: &str, description: &str| match tsv_ts::parse(ts_content) {
-        Ok(ast) => {
-            let string_path = tsv_ts::convert_ast_json_string(&ast, ts_content);
-            let value_path = serde_json::to_string(&tsv_ts::convert_ast_json(&ast, ts_content))
-                .expect("Value serialization cannot fail");
-            if string_path == value_path {
-                parity.checked += 1;
-            } else {
-                parity
-                    .failures
-                    .push((description.to_string(), TypedWalkParityFailure::Diverged));
+    let mut probe = |ts_content: &str, description: &str| {
+        let arena = bumpalo::Bump::new();
+        match tsv_ts::parse(ts_content, &arena) {
+            Ok(ast) => {
+                let string_path = tsv_ts::convert_ast_json_string(&ast, ts_content);
+                let value_path = serde_json::to_string(&tsv_ts::convert_ast_json(&ast, ts_content))
+                    .expect("Value serialization cannot fail");
+                if string_path == value_path {
+                    parity.checked += 1;
+                } else {
+                    parity
+                        .failures
+                        .push((description.to_string(), TypedWalkParityFailure::Diverged));
+                }
             }
-        }
-        Err(e) => {
-            parity.failures.push((
-                description.to_string(),
-                TypedWalkParityFailure::Parse(format!("{e:?}")),
-            ));
+            Err(e) => {
+                parity.failures.push((
+                    description.to_string(),
+                    TypedWalkParityFailure::Parse(format!("{e:?}")),
+                ));
+            }
         }
     };
 

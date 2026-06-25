@@ -25,7 +25,10 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an object expression
     ///
     /// Handles comments between properties, blank line preservation, and trailing comments.
-    pub(in crate::printer) fn build_object_doc(&self, obj: &internal::ObjectExpression) -> DocId {
+    pub(in crate::printer) fn build_object_doc(
+        &self,
+        obj: &internal::ObjectExpression<'_>,
+    ) -> DocId {
         let d = self.d();
         // Check for comments inside the object
         let has_comments = self.has_comments_between(obj.span.start, obj.span.end);
@@ -58,7 +61,7 @@ impl<'a> Printer<'a> {
                 crate::printer::has_multiline_content(&p.value, self.source)
             }
             internal::ObjectProperty::SpreadElement(s) => {
-                crate::printer::has_multiline_content(&s.argument, self.source)
+                crate::printer::has_multiline_content(s.argument, self.source)
             }
         });
 
@@ -340,7 +343,7 @@ impl<'a> Printer<'a> {
     /// Produces: `{\n  prop,\n}` with actual hardlines.
     pub(in crate::printer) fn build_object_doc_expanded(
         &self,
-        obj: &internal::ObjectExpression,
+        obj: &internal::ObjectExpression<'_>,
     ) -> DocId {
         let d = self.d();
         if obj.properties.is_empty() {
@@ -368,7 +371,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an object property (either Property or SpreadElement)
-    fn build_object_property_doc(&self, prop: &internal::ObjectProperty) -> DocId {
+    fn build_object_property_doc(&self, prop: &internal::ObjectProperty<'_>) -> DocId {
         match prop {
             internal::ObjectProperty::Property(p) => self.build_property_doc(p),
             internal::ObjectProperty::SpreadElement(s) => self.build_spread_doc(s),
@@ -376,7 +379,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a single property
-    fn build_property_doc(&self, prop: &internal::Property) -> DocId {
+    fn build_property_doc(&self, prop: &internal::Property<'_>) -> DocId {
         let d = self.d();
         // For computed keys, use expression doc (preserves string quotes)
         // For regular keys, use property key doc (converts strings to bare identifiers when valid)
@@ -493,10 +496,10 @@ impl<'a> Printer<'a> {
             // Handle shorthand with default value: {a = 1}
             // The value is an AssignmentExpression (or AssignmentPattern in proper patterns)
             if let Expression::AssignmentExpression(assign) = &prop.value {
-                let default_doc = self.build_expression_doc(&assign.right);
+                let default_doc = self.build_expression_doc(assign.right);
                 d.concat(&[key_doc, d.text(" = "), default_doc])
             } else if let Expression::AssignmentPattern(pattern) = &prop.value {
-                let default_doc = self.build_expression_doc(&pattern.right);
+                let default_doc = self.build_expression_doc(pattern.right);
                 d.concat(&[key_doc, d.text(" = "), default_doc])
             } else {
                 key_doc
@@ -637,7 +640,7 @@ impl<'a> Printer<'a> {
     ///
     /// Prettier ref: `isObjectPropertyWithShortKey` in print/assignment.js:401
     /// Uses `getStringWidth(cleanDoc(keyDoc)) < tabWidth + MIN_OVERLAP_FOR_BREAK`
-    fn is_short_property_key(&self, key: &Expression, computed: bool) -> bool {
+    fn is_short_property_key(&self, key: &Expression<'_>, computed: bool) -> bool {
         // Prettier: MIN_OVERLAP_FOR_BREAK = 3 (assignment.js:409)
         let threshold = TAB_WIDTH + super::assignment::MIN_OVERLAP_FOR_BREAK;
 
@@ -647,7 +650,8 @@ impl<'a> Printer<'a> {
                 self.with_resolved_symbol(id.name, |s| visual_width(s, TAB_WIDTH))
             }
             Expression::Literal(lit) => match &lit.value {
-                LiteralValue::String { content, .. } => {
+                LiteralValue::String(cooked) => {
+                    let content = cooked.resolve(lit.span, self.source);
                     // For computed keys, quotes are always preserved: ["x"] prints as ['x']
                     // For non-computed keys, valid identifiers are unquoted: {"x":1} → {x:1}
                     // Escape-bearing keys keep their quotes (see `string_key_unquotes`).
@@ -685,7 +689,7 @@ impl<'a> Printer<'a> {
     /// preserved — matching Prettier, which only unquotes when
     /// `rawText.slice(1, -1) === value`. Unquoting from the decoded value would
     /// silently rewrite the source text (data loss).
-    pub(in crate::printer) fn string_key_unquotes(&self, lit: &Literal, content: &str) -> bool {
+    pub(in crate::printer) fn string_key_unquotes(&self, lit: &Literal<'_>, content: &str) -> bool {
         if !is_valid_js_identifier(content) {
             return false;
         }
@@ -703,7 +707,7 @@ impl<'a> Printer<'a> {
     /// object property keys and import-attribute keys.
     pub(in crate::printer) fn build_string_literal_key_doc(
         &self,
-        lit: &Literal,
+        lit: &Literal<'_>,
         content: &str,
     ) -> DocId {
         let d = self.d();
@@ -718,14 +722,17 @@ impl<'a> Printer<'a> {
     ///
     /// String literal keys that are valid identifiers are output without quotes.
     /// Example: `{"key": 1}` → `{key: 1}`, but `{"kebab-case": 1}` keeps quotes.
-    pub(in crate::printer) fn build_property_key_doc(&self, key: &Expression) -> DocId {
+    pub(in crate::printer) fn build_property_key_doc(&self, key: &Expression<'_>) -> DocId {
         match key {
             Expression::Literal(
                 lit @ Literal {
-                    value: LiteralValue::String { content, .. },
+                    value: LiteralValue::String(cooked),
                     ..
                 },
-            ) => self.build_string_literal_key_doc(lit, content),
+            ) => {
+                let content = cooked.resolve(lit.span, self.source);
+                self.build_string_literal_key_doc(lit, content)
+            }
             _ => self.build_expression_doc(key),
         }
     }
@@ -742,7 +749,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_type_member_key_doc(
         &self,
         search_start: u32,
-        key: &Expression,
+        key: &Expression<'_>,
         computed: bool,
         unquote: bool,
     ) -> (DocId, u32) {
@@ -790,7 +797,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_computed_key_bracket_doc(
         &self,
         search_start: u32,
-        key: &Expression,
+        key: &Expression<'_>,
         key_doc: DocId,
     ) -> (DocId, u32) {
         let d = self.d();

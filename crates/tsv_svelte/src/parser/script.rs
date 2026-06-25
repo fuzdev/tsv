@@ -7,9 +7,9 @@ use tsv_lang::{InfallibleResolve, ParseError, SharedInterner, Span};
 
 use super::parser_impl::SvelteParser;
 
-impl<'a> SvelteParser<'a> {
+impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse a script tag: `<script lang="ts">...</script>`
-    pub(crate) fn parse_script_tag(&mut self) -> Result<Script, ParseError> {
+    pub(crate) fn parse_script_tag(&mut self) -> Result<Script<'arena>, ParseError> {
         let start = self.current_start;
 
         // Expect <
@@ -63,9 +63,14 @@ impl<'a> SvelteParser<'a> {
         // Extract script content
         let content = &self.source[content_start..content_end];
 
-        // Parse content with TypeScript parser (shared interner + base offset)
-        let program =
-            tsv_ts::parse_with_interner(content, content_start, Rc::clone(&self.interner))?;
+        // Parse content with TypeScript parser (shared interner + base offset);
+        // the embedded program shares this document's arena.
+        let program = tsv_ts::parse_with_interner(
+            content,
+            content_start,
+            Rc::clone(&self.interner),
+            self.arena,
+        )?;
 
         // Reposition the lexer to the closing `</script>` tag (resumes at `<`).
         self.advance_to_position(content_end)?;
@@ -98,7 +103,7 @@ impl<'a> SvelteParser<'a> {
 
         Ok(Script {
             content: program,
-            attributes,
+            attributes: attributes.into_bump_slice(),
             context,
             span: Span {
                 start: start as u32,
@@ -109,7 +114,7 @@ impl<'a> SvelteParser<'a> {
 
     /// Detect whether a script is a module script based on its attributes
     fn detect_script_context(
-        attributes: &[AttributeNode],
+        attributes: &[AttributeNode<'_>],
         source: &str,
         interner: &SharedInterner,
     ) -> ScriptContext {

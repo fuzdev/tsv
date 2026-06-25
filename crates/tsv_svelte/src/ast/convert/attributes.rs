@@ -17,7 +17,7 @@ use super::{
 };
 
 pub(super) fn convert_attribute_node(
-    node: &internal::AttributeNode,
+    node: &internal::AttributeNode<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -62,7 +62,7 @@ pub(super) fn convert_attribute_node(
 }
 
 fn convert_attach_tag(
-    tag: &internal::AttachTag,
+    tag: &internal::AttachTag<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -79,7 +79,7 @@ fn convert_attach_tag(
 }
 
 fn convert_spread_attribute(
-    spread: &internal::SpreadAttribute,
+    spread: &internal::SpreadAttribute<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -96,7 +96,7 @@ fn convert_spread_attribute(
 }
 
 fn convert_attribute(
-    attr: &internal::Attribute,
+    attr: &internal::Attribute<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -176,7 +176,7 @@ fn convert_attribute(
 }
 
 pub(super) fn convert_attribute_value(
-    value: &internal::AttributeValue,
+    value: &internal::AttributeValue<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,

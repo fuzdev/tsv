@@ -6,8 +6,8 @@ use tsv_lang::{ParseError, Span};
 
 use super::parser_impl::SvelteParser;
 
-impl<'a> SvelteParser<'a> {
-    pub(crate) fn parse_style_tag(&mut self) -> Result<Style, ParseError> {
+impl<'a, 'arena> SvelteParser<'a, 'arena> {
+    pub(crate) fn parse_style_tag(&mut self) -> Result<Style<'arena>, ParseError> {
         let start = self.current_start;
 
         // Expect <
@@ -74,9 +74,9 @@ impl<'a> SvelteParser<'a> {
         let end = self.current_end;
         self.expect(TokenKind::RightAngle)?; // consume >
 
-        // Parse CSS content
+        // Parse CSS content (shares the document's bump arena)
         let css_content = &self.source[content_start..content_end];
-        let css_stylesheet = tsv_css::parse_embedded(css_content, content_start)?;
+        let css_stylesheet = tsv_css::parse_embedded(css_content, content_start, self.arena)?;
 
         Ok(Style {
             span: Span {
@@ -87,7 +87,7 @@ impl<'a> SvelteParser<'a> {
                 start: content_start as u32,
                 end: content_end as u32,
             },
-            attributes,
+            attributes: attributes.into_bump_slice(),
             css_stylesheet,
         })
     }

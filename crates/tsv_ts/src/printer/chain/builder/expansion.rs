@@ -14,13 +14,13 @@ use super::super::types::{ChainGroup, ChainNode};
 use tsv_lang::printing::{self, has_blank_line_between_fast};
 
 /// Check if a function parameter has a type annotation.
-pub(super) fn has_param_type_annotation(param: &Expression) -> bool {
+pub(super) fn has_param_type_annotation(param: &Expression<'_>) -> bool {
     match param {
-        Expression::Identifier(id) => id.type_annotation.is_some(),
+        Expression::Identifier(id) => id.type_annotation().is_some(),
         Expression::ArrayPattern(arr) => arr.type_annotation.is_some(),
         Expression::ObjectPattern(obj) => obj.type_annotation.is_some(),
-        Expression::AssignmentPattern(assign) => match assign.left.as_ref() {
-            Expression::Identifier(id) => id.type_annotation.is_some(),
+        Expression::AssignmentPattern(assign) => match assign.left {
+            Expression::Identifier(id) => id.type_annotation().is_some(),
             Expression::ArrayPattern(arr) => arr.type_annotation.is_some(),
             Expression::ObjectPattern(obj) => obj.type_annotation.is_some(),
             _ => false,
@@ -120,7 +120,7 @@ pub(super) fn call_callback_status<'a>(
     let mut has_callback = false;
     let mut will_break = false;
 
-    for arg in &call.arguments {
+    for arg in call.arguments {
         match arg {
             Expression::ArrowFunctionExpression(arrow) => {
                 has_callback = true;

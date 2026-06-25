@@ -6,7 +6,7 @@ use string_interner::DefaultStringInterner;
 use tsv_lang::{LocationTracker, Span};
 
 pub(in crate::ast) fn convert_template_literal(
-    template: &internal::TemplateLiteral,
+    template: &internal::TemplateLiteral<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -31,7 +31,7 @@ pub(in crate::ast) fn convert_template_literal(
 }
 
 pub(in crate::ast::convert) fn convert_template_element(
-    element: &internal::TemplateElement,
+    element: &internal::TemplateElement<'_>,
     source: &str,
     loc: &LocationTracker,
     offset: usize,
@@ -60,7 +60,7 @@ pub(in crate::ast::convert) fn convert_template_element(
 }
 
 pub(in crate::ast) fn convert_object_pattern(
-    obj: &internal::ObjectPattern,
+    obj: &internal::ObjectPattern<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -84,7 +84,7 @@ pub(in crate::ast) fn convert_object_pattern(
 }
 
 fn convert_object_pattern_property(
-    prop: &internal::ObjectPatternProperty,
+    prop: &internal::ObjectPatternProperty<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -105,7 +105,7 @@ fn convert_object_pattern_property(
 /// Convert an internal `RestElement` to its public node. Shared by the
 /// object-pattern rest (`{...r}`) and the expression rest (`[...r]` / call rest).
 pub(in crate::ast) fn convert_rest_element(
-    rest: &internal::RestElement,
+    rest: &internal::RestElement<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -117,7 +117,7 @@ pub(in crate::ast) fn convert_rest_element(
         end: rest.span.end,
         loc: create_location(rest.span, loc, offset),
         argument: Box::new(convert_expression(
-            &rest.argument,
+            rest.argument,
             source,
             loc,
             interner,
@@ -134,7 +134,7 @@ pub(in crate::ast) fn convert_rest_element(
 // Convert decorator AST nodes from internal to public format
 // Needed when internal::Property gains decorators field
 pub(in crate::ast) fn convert_property(
-    prop: &internal::Property,
+    prop: &internal::Property<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,

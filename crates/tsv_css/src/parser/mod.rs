@@ -9,9 +9,11 @@ mod value;
 
 use crate::ast::internal::{Comment, CssNode, CssStyleSheet};
 use crate::lexer::{Lexer, TokenKind};
+use bumpalo::Bump;
+use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{ParseError, PeekData, Span};
 
-pub(crate) struct CssParser<'a> {
+pub(crate) struct CssParser<'a, 'arena> {
     source: &'a str,
     lexer: Lexer<'a>,
     pub(crate) current_kind: TokenKind,
@@ -21,10 +23,20 @@ pub(crate) struct CssParser<'a> {
     peek_cache: Option<PeekData<TokenKind>>,
     base_offset: usize, // Offset in full source (when parsing embedded CSS)
     pub(crate) comments: Vec<Comment>,
+    /// Bump arena that owns every AST node this parser allocates. Supplied by
+    /// the caller (caller-owns-`Bump`); the returned `CssStyleSheet<'arena>`
+    /// borrows from it. `&'arena Bump` is `Copy`; nodes are gathered via
+    /// `self.bvec()` and strings via `self.alloc_str_in()` (CSS has no single-node
+    /// `alloc` — every node lands in a child slice).
+    pub(crate) arena: &'arena Bump,
 }
 
-impl<'a> CssParser<'a> {
-    pub(crate) fn new(source: &'a str, base_offset: usize) -> Result<Self, ParseError> {
+impl<'a, 'arena> CssParser<'a, 'arena> {
+    pub(crate) fn new(
+        source: &'a str,
+        base_offset: usize,
+        arena: &'arena Bump,
+    ) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
         let (kind, start, end, decoded) = {
             let token = lexer.next_token()?;
@@ -40,7 +52,26 @@ impl<'a> CssParser<'a> {
             peek_cache: None,
             base_offset,
             comments: Vec::new(),
+            arena,
         })
+    }
+
+    /// Create an empty `BumpVec` whose backing buffer lives in the **arena** —
+    /// the preferred way to gather children. Build it in the parse loop, then
+    /// `.into_bump_slice()` to store the field (zero-copy: the buffer is already
+    /// arena-owned). Carries its own `Copy` `&'arena Bump`, so pushing
+    /// `parse_x(self)?` inside the loop does not borrow `self`.
+    #[inline]
+    pub(crate) fn bvec<T>(&self) -> BumpVec<'arena, T> {
+        BumpVec::new_in(self.arena)
+    }
+
+    /// Copy a string (a decoded value or a verbatim source slice) into the
+    /// arena. One copy into the arena; the returned `&'arena str` is stored
+    /// inline on the AST node in place of an owned `String`.
+    #[inline]
+    pub(crate) fn alloc_str_in(&self, s: &str) -> &'arena str {
+        self.arena.alloc_str(s)
     }
 
     /// Add a comment to the comments Vec
@@ -301,8 +332,8 @@ impl<'a> CssParser<'a> {
         }
     }
 
-    pub(crate) fn parse(&mut self) -> Result<CssStyleSheet, ParseError> {
-        let mut nodes = Vec::new();
+    pub(crate) fn parse(&mut self) -> Result<CssStyleSheet<'arena>, ParseError> {
+        let mut nodes = self.bvec();
 
         self.skip_whitespace()?;
 
@@ -342,7 +373,7 @@ impl<'a> CssParser<'a> {
             .collect();
 
         Ok(CssStyleSheet {
-            nodes,
+            nodes: nodes.into_bump_slice(),
             comments: std::mem::take(&mut self.comments),
             line_breaks,
         })
@@ -351,7 +382,11 @@ impl<'a> CssParser<'a> {
 
 /// Parse CSS source into AST nodes
 /// base_offset is the position of the CSS source in a larger file (for embedded CSS)
-pub fn parse_css(source: &str, base_offset: usize) -> Result<CssStyleSheet, ParseError> {
-    let mut parser = CssParser::new(source, base_offset)?;
+pub fn parse_css<'arena>(
+    source: &str,
+    base_offset: usize,
+    arena: &'arena Bump,
+) -> Result<CssStyleSheet<'arena>, ParseError> {
+    let mut parser = CssParser::new(source, base_offset, arena)?;
     parser.parse()
 }

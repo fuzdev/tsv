@@ -19,7 +19,7 @@ use tsv_lang::is_format_ignore_directive;
 
 impl<'a> Printer<'a> {
     /// Format a CSS rule (selector + declarations block)
-    pub(super) fn print_css_rule(&mut self, rule: &internal::CssRule) {
+    pub(super) fn print_css_rule(&mut self, rule: &internal::CssRule<'_>) {
         // Format selector (uses selectors module)
         self.print_selector_list(&rule.selector);
 
@@ -56,7 +56,7 @@ impl<'a> Printer<'a> {
             match child {
                 internal::CssBlockChild::Declaration(decl) => {
                     // Preserve blank line before declaration if source has one
-                    if i > start_index && self.has_blank_line_before_child(&rule.declarations, i) {
+                    if i > start_index && self.has_blank_line_before_child(rule.declarations, i) {
                         self.write("\n");
                     }
                     if format_ignore_next {
@@ -68,7 +68,7 @@ impl<'a> Printer<'a> {
 
                     // Check for inline comments after the declaration
                     let inline_count = self.try_print_inline_comments_after_decl(
-                        &rule.declarations,
+                        rule.declarations,
                         i,
                         decl.span.end,
                     );
@@ -79,7 +79,7 @@ impl<'a> Printer<'a> {
                 internal::CssBlockChild::Comment(comment) => {
                     // Standalone comment (not inline after a declaration)
                     // Preserve blank line before comment if present in source
-                    if i > start_index && self.has_blank_line_before_child(&rule.declarations, i) {
+                    if i > start_index && self.has_blank_line_before_child(rule.declarations, i) {
                         self.write("\n");
                     }
 
@@ -95,7 +95,7 @@ impl<'a> Printer<'a> {
                 internal::CssBlockChild::Rule(nested_rule) => {
                     // CSS Nesting Module - format nested rule
                     // Add blank line before nested rule if source has one (preserve author intent)
-                    if i > start_index && self.has_blank_line_before_child(&rule.declarations, i) {
+                    if i > start_index && self.has_blank_line_before_child(rule.declarations, i) {
                         self.write("\n");
                     }
                     self.write_indent();
@@ -108,7 +108,7 @@ impl<'a> Printer<'a> {
 
                     // Check for inline comment after nested rule's closing brace
                     let inline_count =
-                        self.try_print_inline_comments(&rule.declarations, i, nested_rule.span.end);
+                        self.try_print_inline_comments(rule.declarations, i, nested_rule.span.end);
 
                     self.write("\n");
 
@@ -117,7 +117,7 @@ impl<'a> Printer<'a> {
                 internal::CssBlockChild::Atrule(nested_atrule) => {
                     // Nested at-rule (e.g., @media inside a rule)
                     // Add blank line before nested at-rule only if source had one
-                    if i > start_index && self.has_blank_line_before_child(&rule.declarations, i) {
+                    if i > start_index && self.has_blank_line_before_child(rule.declarations, i) {
                         self.write("\n");
                     }
                     self.write_indent();

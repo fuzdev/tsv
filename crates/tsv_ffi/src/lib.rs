@@ -147,7 +147,10 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, |source| {
-                    let ast = $lang::parse(source).map_err(|e| e.to_string())?;
+                    let arena = bumpalo::Bump::with_capacity(
+                        tsv_lang::estimated_ast_arena_capacity(source.len()),
+                    );
+                    let ast = $lang::parse(source, &arena).map_err(|e| e.to_string())?;
                     Ok($lang::convert_ast_json_string(&ast, source))
                 })
             }
@@ -167,7 +170,14 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_parse_internal(source_ptr, source_len, out_len, |source| {
-                    $lang::parse(source).map_err(|e| e.to_string())
+                    let arena = bumpalo::Bump::with_capacity(
+                        tsv_lang::estimated_ast_arena_capacity(source.len()),
+                    );
+                    let ast = $lang::parse(source, &arena).map_err(|e| e.to_string())?;
+                    // Consume the borrowed AST before the arena drops at the end
+                    // of this closure (the AST borrows from `arena`).
+                    std::hint::black_box(&ast);
+                    Ok(())
                 })
             }
         }
@@ -185,7 +195,10 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, |source| {
-                    let ast = $lang::parse(source).map_err(|e| e.to_string())?;
+                    let arena = bumpalo::Bump::with_capacity(
+                        tsv_lang::estimated_ast_arena_capacity(source.len()),
+                    );
+                    let ast = $lang::parse(source, &arena).map_err(|e| e.to_string())?;
                     Ok($lang::format(&ast, source))
                 })
             }
