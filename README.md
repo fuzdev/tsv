@@ -21,7 +21,7 @@ It's a high-effort project that emphasizes quality.
 
 ## Install
 
-tsv ships three WASM packages to npm:
+tsv ships three WASM packages to npm (native builds will arrive with the v0.2 release):
 
 - [`@fuzdev/tsv_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_wasm) - the full tool (formatter + parser) with a `tsv` CLI
 - [`@fuzdev/tsv_format_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_format_wasm) - formatter only (smaller)
@@ -117,13 +117,13 @@ tool set, instead of more frameworks. Hard non-goals:
   if any, will be WASM plugins and/or pattern-based rules
 - no style config settings, so on-disk state and caller params
   never change the output for a given input
+- full Prettier conformance - see [discussion 1](https://github.com/fuzdev/tsv/discussions/1)
 
 Deferred rather than refused:
 
 - internal AST stabilization - not any time soon; the public JSON AST is the
   stable surface, tracking Svelte's
 - N-API native bindings - npm is WASM-only for now
-- full Prettier conformance? see [discussion 1](https://github.com/fuzdev/tsv/discussions/1)
 
 tsv is derived from:
 
@@ -141,12 +141,12 @@ Future features (unknown order):
 
 - CSS error recovery (recover past invalid CSS per the spec instead of
   failing the parse - doesn't add dialect support)
-- linter (type aware, all Rust, maybe WASM plugins and/or pattern-based rules for extensibility)
 - type stripper (easy, probably soon)
 - module lexer (easy, probably soon)
 - minifier
 - LSP
 - later
+  - linter (type aware, all Rust, maybe WASM plugins and/or pattern-based rules for extensibility)
   - Svelte compiler (exact mirror)
   - bundler
   - typechecker isn't off the table
@@ -157,6 +157,7 @@ Future features (unknown order):
 - **[CLAUDE.md](CLAUDE.md)** - development guide (commands, structure, conventions)
 - **[docs/architecture.md](docs/architecture.md)** - the major design decisions
 - **[docs/directives.md](docs/directives.md)** - `format-ignore` / `prettier-ignore` formatting directives
+- **[docs/cli.md](docs/cli.md)** - commands and design
 - **[docs/conformance_prettier.md](docs/conformance_prettier.md)** - where formatting diverges from Prettier (and why)
 - **[docs/conformance_svelte.md](docs/conformance_svelte.md)** - where the parser diverges from Svelte (and why)
 - **[docs/conformance_test262.md](docs/conformance_test262.md)** - ECMAScript parser conformance
@@ -169,8 +170,8 @@ Future features (unknown order):
 Dev dependencies:
 
 - [Rust](https://rust-lang.org/) - rustc, cargo
-- [Deno](https://docs.deno.com/runtime/) - see ./deno.json for the tasks
-  - currently uses `npm:` imports from `svelte`, `typescript`, `acorn`,
+- [Deno](https://docs.deno.com/runtime/) - see [deno.json](deno.json) for the tasks
+  - uses `npm:` imports from `svelte`, `typescript`, `acorn`,
     `@sveltejs/acorn-typescript`, `prettier`, `prettier-plugin-svelte`
 
 Rust dependencies are kept fairly minimal.
@@ -178,24 +179,21 @@ See [CLAUDE.md § Rust Crates](CLAUDE.md#rust-crates-minimal-deps) for the full 
 
 ```bash
 # Build workspace (recommended - uses deno tasks)
-deno task build                    # dev build
-deno task dev                      # watch mode (requires: cargo install cargo-watch)
+deno task build          # dev build
+deno task dev            # watch mode (requires: cargo install cargo-watch)
+deno task check          # all checks (typecheck, test, lint, fmt)
 
 # Or build directly with cargo
 cargo build --workspace
-cargo check --workspace            # fast syntax check (no codegen)
-
-# Generate test fixtures (requires Deno for Svelte parser + prettier)
-deno task fixtures:update:parsed
-
-# Run tests and checks (requires Deno)
-deno task check                     # all checks (typecheck, test, lint, fmt)
-cargo test --workspace              # all tests including fixture validation
+cargo check --workspace  # fast syntax check (no codegen)
+cargo test --workspace   # all tests including fixture validation
 
 # Run CLI
 cargo run -p tsv_cli parse --content "const x = 1;" --parser typescript
 cargo run -p tsv_cli format --content "<div>test</div>" --parser svelte
 ```
+
+For the full reference see [CLAUDE.md § Commands](CLAUDE.md#commands).
 
 ## Project structure
 
@@ -203,20 +201,20 @@ Multi-crate workspace with clean separation of concerns:
 
 ```
 tsv/
-├── Cargo.toml           # workspace root
+├── Cargo.toml         # workspace root
 ├── crates/
-│   ├── tsv_lang/       # foundation (Span, Location, ParseError)
-│   ├── tsv_html/       # HTML classification and whitespace rules
-│   ├── tsv_ignore/     # gitignore-aware discovery matcher (.gitignore/.formatignore/.prettierignore)
-│   ├── tsv_discover/   # file-discovery policy (build-output heuristic + safety nets) over tsv_ignore
-│   ├── tsv_ts/         # TypeScript parser/formatter (standalone)
-│   ├── tsv_css/        # CSS parser/formatter (standalone)
-│   ├── tsv_svelte/     # Svelte parser/formatter (uses tsv_ts + tsv_css)
-│   ├── tsv_cli/        # unified CLI (binary: `tsv`)
-│   ├── tsv_debug/      # dev utilities (binary: `tsv_debug`, uses Deno)
-│   ├── tsv_ffi/        # C FFI bindings
-│   └── tsv_wasm/       # WebAssembly bindings
-└── tests/              # workspace-level integration tests
+│   ├── tsv_lang/      # foundation (Span, Location, ParseError)
+│   ├── tsv_html/      # HTML classification and whitespace rules
+│   ├── tsv_ignore/    # gitignore-aware discovery matcher (.gitignore/.formatignore/.prettierignore)
+│   ├── tsv_discover/  # file-discovery policy (build-output heuristic + safety nets) over tsv_ignore
+│   ├── tsv_ts/        # TypeScript parser/formatter (standalone)
+│   ├── tsv_css/       # CSS parser/formatter (standalone)
+│   ├── tsv_svelte/    # Svelte parser/formatter (uses tsv_ts + tsv_css)
+│   ├── tsv_cli/       # unified CLI (binary: `tsv`)
+│   ├── tsv_debug/     # dev utilities (binary: `tsv_debug`, uses Deno)
+│   ├── tsv_ffi/       # C FFI bindings
+│   └── tsv_wasm/      # WebAssembly bindings
+└── tests/             # workspace-level integration tests
 ```
 
 Each language crate exports a consistent API:
@@ -251,7 +249,8 @@ Web Standards:
 - [W3C webref](https://github.com/w3c/webref) - Machine-readable web specs
 
 Claude Code was instrumental to this project, and tsv wouldn't exist without LLMs.
-Source code of projects similar to tsv was not used by agents unless listed above.
+Source code of projects similar to tsv was not used by agents
+or consulted by the author unless listed above.
 
 ## License
 
