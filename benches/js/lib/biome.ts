@@ -49,7 +49,12 @@ export class BiomeImplementation implements TsvImplementation {
 		const { projectKey } = this._biome.openProject('/tmp');
 		this._project_key = projectKey;
 
-		// Configure to match prettier defaults (useTabs) and enable Svelte/HTML
+		// Tab indent for every language to match prettier's style (the per-language
+		// `formatter.indentStyle` keys don't inherit the top-level one). Biome has no
+		// dedicated Svelte formatter — `html.experimentalFullSupportEnabled` is what lets
+		// it format `.svelte` at all, via its experimental HTML-superset pipeline; that
+		// path formats the embedded `<script>`/`<style>` too (verified), so the svelte row
+		// is comparable work to prettier-plugin-svelte / tsv. Without the flag biome skips it.
 		this._biome.applyConfiguration(projectKey, {
 			formatter: {
 				indentStyle: 'tab',

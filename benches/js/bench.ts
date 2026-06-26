@@ -30,6 +30,9 @@
  *   BENCH_FILTER        Filter files by path pattern (default: none)
  *   BENCH_DURATION      Duration per benchmark in ms (default: 5000)
  *   BENCH_WARMUP        Warmup iterations (default: 3)
+ *   BENCH_MODE          'intersection' (default) | 'union' — iteration corpus mode
+ *   BENCH_GC            Set to 1 to force a major GC between every iteration
+ *                       (default: off; see Fairness Caveats for the trade-off)
  *   BENCH_STALE_OK      Set to 1 to run despite stale artifacts (default: off;
  *                       see lib/check_artifact_freshness.ts)
  *   BENCH_FORCED_ASYNC  Set to 1 to add the `tsv-forced-async` control row

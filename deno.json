@@ -60,7 +60,8 @@
 		"corpus:compare:parse": "deno task build:ffi:corpus && TSV_FFI_PROFILE=corpus deno task corpus:compare:parse:run",
 		"corpus:compare:parse:run": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/js/corpus_compare_parse.ts",
 		"divergence:audit": "deno run --allow-read benches/js/divergence_audit.ts",
-		"test:deno": "deno test --config benches/js/deno.json --allow-read --allow-env --allow-net --allow-sys benches/js/lib/",
+		"test:deno": "deno test --allow-read benches/js/lib/divergence/",
+		"test:deno:canonical": "deno test --config benches/js/deno.json --allow-read --allow-env --allow-sys benches/js/lib/canonical_test.ts",
 
 		"test:npm": "deno task build:npm:format && deno task test:npm:run",
 		"test:npm:run": "PKG_DIR=crates/tsv_wasm/pkg/format/npm node --test scripts/test_npm.ts",

@@ -288,11 +288,13 @@ deno task bench:install
 # Smoke test (Deno; fast sanity check that every formatter+parser produces output)
 deno task smoke
 
-# Run benchmarks (builds the runtime's bench artifacts automatically)
-deno task bench         # ALL three + compose → report.{deno,node,bun}.* + combined report.{json,md}
-deno task bench:deno    # Deno only
-deno task bench:node    # Node only
-deno task bench:bun     # Bun only (reuses the Node artifacts)
+# Run benchmarks (builds the runtime's bench artifacts automatically).
+# `bench` runs ALL three and FAILS FAST if node or bun is missing — Deno is the
+# only hard dep, so without node/bun run the per-runtime tasks you have instead.
+deno task bench         # ALL three + compose (needs node AND bun installed)
+deno task bench:deno    # Deno only (no node/bun needed)
+deno task bench:node    # Node only (needs node)
+deno task bench:bun     # Bun only (needs bun; reuses the Node artifacts)
 deno task bench:compose # Fold existing per-runtime reports → combined report.{json,md}
 
 # Run without rebuilding (if already built; aborts on stale artifacts)
@@ -313,7 +315,12 @@ BENCH_STALE_OK=1 deno task bench:deno:run      # Run despite stale artifacts (de
 BENCH_FORCED_ASYNC=1 deno task bench:deno:run  # Add tsv-forced-async control row (diagnostic; default: off)
 ```
 
-**Prerequisites**: `cargo install wasm-pack`; Node ≥ 22.18 (native TS type-stripping); Bun (for `bench:bun`); `deno task bench:install` once.
+**Prerequisites**: `cargo install wasm-pack` and `deno task bench:install` once
+(the install needs `npm`, i.e. Node, to populate `node_modules`). Beyond that,
+**Deno is the only hard dependency** — `bench:deno` / `smoke` run with just Deno.
+Node ≥ 22.18 (native TS type-stripping) is needed for `bench:node` (and the
+install); Bun for `bench:bun`. The aggregate `deno task bench` needs both and
+fails fast if either is missing; run the per-runtime tasks for the ones you have.
 
 Compares: canonical (prettier + svelte/compiler), native (FFI under Deno / N-API under Node
 and Bun), WASM, and alternatives (oxc-parser, oxfmt, biome-wasm). Each runtime's results save

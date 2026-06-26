@@ -18,7 +18,7 @@
 		"zod": "^4.4.3",
 		"@fuzdev/fuz_util": "0.64.0"
 	},
-	"//types": "@types/node is types-only and dev-only (never ships, no runtime cost). Required so the shared harness's `node:` builtins type-check under `deno check`/`deno test` in npm-resolution mode — the portable-node:-builtins architecture's one new dep.",
+	"//types": "@types/node is types-only and dev-only (never ships, no runtime cost). It lets the shared harness's `node:` builtins type-check under `deno check` (and editors) when an npm package's .d.ts pulls in node types in npm-resolution mode — the portable-node:-builtins architecture's one new dev dep. NOT needed by the gated `deno task test:deno` (that's the dependency-free divergence suite — `node:assert` + relative imports, no node_modules).",
 	"devDependencies": {
 		"@types/node": "^24"
 	},

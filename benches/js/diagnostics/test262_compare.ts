@@ -51,7 +51,7 @@ interface Row {
 	oxc: Verdict;
 }
 
-/** Minimal flag reader (no @std/cli in the import map). */
+/** Minimal flag reader (no flag-parsing dependency). */
 function flag(name: string, fallback: string): string {
 	const i = Deno.args.indexOf(`--${name}`);
 	return i >= 0 && Deno.args[i + 1] ? Deno.args[i + 1] : fallback;

@@ -12,7 +12,7 @@
  * Plus language-scoping: a CSS marker must never fire on broken TS/Svelte.
  */
 
-import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { deepStrictEqual as assertEquals, ok as assert } from 'node:assert';
 import { check_expected_error } from './expected_errors.ts';
 
 // --- Bucket B: non-standard CSS → expected ---

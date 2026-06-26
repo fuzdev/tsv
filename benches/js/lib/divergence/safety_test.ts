@@ -7,7 +7,7 @@
  * the real-loss detection (over-normalization, dropped comments, added chars).
  */
 
-import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { deepStrictEqual as assertEquals } from 'node:assert';
 import { check_safety_vs_prettier } from './safety.ts';
 
 Deno.test('vs_prettier: identical output is safe', () => {

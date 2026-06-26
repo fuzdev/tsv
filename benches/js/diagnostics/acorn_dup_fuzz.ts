@@ -21,7 +21,7 @@
  *     --config benches/js/deno.json benches/js/diagnostics/acorn_dup_fuzz.ts [TEST_DIR]
  */
 
-import { walk } from '@std/fs';
+import { readdir, stat } from 'node:fs/promises';
 import * as acorn from 'acorn';
 import { tsPlugin } from '@sveltejs/acorn-typescript';
 
@@ -65,10 +65,13 @@ function category(name: string): string {
 let scanned = 0, parseable = 0, dup_as_is = 0;
 const dup_hits: { name: string; cat: string; pos: number; sample: string }[] = [];
 
-for await (const e of walk(TEST_ROOT, { includeDirs: false, match: [/input\.ts$/] })) {
+for (const rel of await readdir(TEST_ROOT, { recursive: true })) {
+	if (!rel.endsWith('input.ts')) continue;
+	const path = `${TEST_ROOT}/${rel}`;
+	if (!(await stat(path)).isFile()) continue;
 	scanned++;
-	const src = await Deno.readTextFile(e.path);
-	const name = e.path.split('/test/')[1].replace(/\/input\.ts$/, '');
+	const src = await Deno.readTextFile(path);
+	const name = path.split('/test/')[1].replace(/\/input\.ts$/, '');
 	if (dup_span(src) !== null) dup_as_is++; // baseline: dups using the file's own comments
 	try {
 		P.parse(src, { sourceType: 'module', ecmaVersion: 2025, locations: true });

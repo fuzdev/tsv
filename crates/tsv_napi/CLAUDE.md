@@ -6,7 +6,7 @@
 
 Depends on `tsv_ts`, `tsv_css`, `tsv_svelte`. The **Node/Bun** sibling of the binding trio: [`tsv_ffi`](../tsv_ffi/) is Deno's C-FFI path (`Deno.dlopen`), [`tsv_wasm`](../tsv_wasm/) is the universal WASM path, and `tsv_napi` is the native path for the N-API runtimes. Same engine, same `lang_bindings!` shape, different binding boundary.
 
-This is a **tsv-scoped carve-out** from the ecosystem N-API deferral (decided 2026-06-13; the `napi` crate approved 2026-06-26). It is **not** an ecosystem-wide flip.
+This is a **tsv-scoped carve-out** from the ecosystem N-API deferral — **not** an ecosystem-wide flip.
 
 Like `tsv_ffi`, the bindings hold a **per-thread reusable AST `Bump`** (`with_ast_arena`) that is `reset()` between calls rather than allocated fresh per call — the bindings are invoked once per file in tight loops, and per-call arena malloc/free churns the system allocator's heap high-water in a way that is measurable through a binding layer. The helper is currently **duplicated** from `tsv_ffi::with_ast_arena` (kept in lockstep by hand); factoring both onto one shared helper is a planned follow-up.
 

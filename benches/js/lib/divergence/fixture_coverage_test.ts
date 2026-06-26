@@ -21,7 +21,7 @@
  * Runs read-only (`--allow-read`).
  */
 
-import { assert } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { ok as assert } from 'node:assert';
 import { diff_lines, extract_hunks } from '../diff.ts';
 import { type DetectionContext, enrich_detection_context, PATTERNS } from './patterns.ts';
 import type { Language } from '../types.ts';

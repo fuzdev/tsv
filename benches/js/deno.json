@@ -1,13 +1,5 @@
 {
-	"//deps": "npm dep versions are the source of truth in ./package.json (read by BOTH runtimes). Deno consumes that node_modules via `nodeModulesDir: manual` — run `npm install` here first. Only jsr-only (`@std/*`) and Deno-specific subpath specifiers belong in `imports`; everything else npm resolves bare from package.json. Canonical-sync note lives in package.json now.",
+	"//deps": "npm dep versions are the source of truth in ./package.json (read by BOTH runtimes). Deno consumes that node_modules via `nodeModulesDir: manual` — run `deno task bench:install` first. The bench/diagnostics import npm packages by bare specifier (resolved from package.json); there are no jsr or remote deps, so `lock: false` (no deno.lock — npm integrity is package-lock.json's job). Canonical-sync note lives in package.json.",
 	"nodeModulesDir": "manual",
-	"imports": {
-		"@std/fs": "jsr:@std/fs@^1.0.24"
-	},
-	"fmt": {
-		"useTabs": true,
-		"lineWidth": 100,
-		"singleQuote": true,
-		"proseWrap": "preserve"
-	}
+	"lock": false
 }

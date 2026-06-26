@@ -11,7 +11,7 @@
  * `shouldForceTrailingComma` in `src/language-js/print/type-parameters.js`.
  */
 
-import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { deepStrictEqual as assertEquals, ok as assert } from 'node:assert';
 import { CanonicalImplementation } from './canonical.ts';
 import { load_all_versions } from './versions.ts';
 

@@ -27,7 +27,7 @@
  * The scan still walks every fixture's JSON to prove that empirically.
  */
 
-import { walk } from '@std/fs';
+import { readdir } from 'node:fs/promises';
 import { parse as svelte_parse } from 'svelte/compiler';
 import * as acorn from 'acorn';
 import { tsPlugin } from '@sveltejs/acorn-typescript';
@@ -188,15 +188,15 @@ const fixtures: FixtureScan[] = [];
 
 const INPUT_NAMES = new Set(['input.svelte', 'input.svelte.ts', 'input.ts', 'input.css']);
 
-for await (
-	const entry of walk(FIXTURES_ROOT, { includeDirs: false, includeFiles: true })
-) {
-	if (!INPUT_NAMES.has(entry.name)) continue;
-	const dir = entry.path.slice(0, entry.path.length - entry.name.length - 1);
-	// derive rel from the marker — FIXTURES_ROOT carries unresolved ../.. that walk normalizes away
+for (const entry_rel of await readdir(FIXTURES_ROOT, { recursive: true })) {
+	const entry_name = entry_rel.slice(entry_rel.lastIndexOf('/') + 1);
+	if (!INPUT_NAMES.has(entry_name)) continue;
+	const entry_path = `${FIXTURES_ROOT}/${entry_rel}`;
+	const dir = entry_path.slice(0, entry_path.length - entry_name.length - 1);
+	// derive rel from the marker — FIXTURES_ROOT carries unresolved ../.. that readdir leaves in the prefix
 	const marker = '/tests/fixtures/';
 	const rel = dir.slice(dir.indexOf(marker) + marker.length);
-	const ext = entry.name.replace(/^input\./, '');
+	const ext = entry_name.replace(/^input\./, '');
 	const suffix = suffix_of(dir.replace(/.*\//, ''));
 	const is_svelte_div = suffix === 'svelte' || suffix === 'svelte_prettier';
 

@@ -8,7 +8,7 @@
  * This catches overmatching — patterns incorrectly claiming hunks.
  */
 
-import { assertEquals, assertNotEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { deepStrictEqual as assertEquals, notDeepStrictEqual as assertNotEquals } from 'node:assert';
 import { diff_lines, extract_hunks } from '../diff.ts';
 import {
 	type DetectionContext,

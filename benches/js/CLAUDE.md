@@ -4,11 +4,10 @@
 
 Uses [@fuzdev/fuz_util](https://github.com/fuzdev/fuz_util) benchmarking library for statistical analysis.
 
-> **Directory note:** this directory (renamed from the legacy `benches/deno/` —
-> the harness is JS-runtime-agnostic, not Deno's) is the **runtime-neutral**
-> harness home: the same code runs under Deno, Node, and Bun (see
-> [Cross-Runtime](#cross-runtime-deno--node--bun)). The `corpus_compare_*` and
-> `diagnostics/` entries stay Deno-idiomatic; `smoke` is portable across all
+> **Directory note:** this is the **runtime-neutral** JS benchmark harness —
+> named `js` (not `deno`) because the same code runs under Deno, Node, and Bun
+> (see [Cross-Runtime](#cross-runtime-deno--node--bun)). The `corpus_compare_*`
+> and `diagnostics/` entries stay Deno-idiomatic; `smoke` is portable across all
 > three (`smoke` / `smoke:node` / `smoke:bun`).
 
 ## Cross-Runtime (Deno + Node + Bun)
@@ -36,9 +35,11 @@ sensitivity that mismeasured the native path (see §Known Issues + the lore
   (Deno supports them) + `@fuzdev/fuz_util` helpers (`fs_search`, `fs_exists`,
   `spawn_out`, `to_file_path`) — **no `Deno.*`, no `@std/*`**. The only genuinely
   runtime-specific files are the native loader (`ffi.ts` `Deno.dlopen` vs
-  `napi.ts` `process.dlopen`) and the WASM target the loader picks. Deno-only
-  tools (`corpus_compare_*`, `diagnostics/*`, the `deno test` suite) stay
-  Deno-idiomatic (`Deno.*` / `@std/fs`).
+  `napi.ts` `process.dlopen`) and the WASM target the loader picks. The
+  Deno-only entry points (`corpus_compare_*`, `diagnostics/*`) stay
+  Deno-idiomatic (`Deno.*` + `node:` builtins, no `@std/*`). The `deno test`
+  suite is the dependency-free divergence detectors (`node:assert` + relative
+  imports — see §Divergence Detection).
 - **The native row differs by runtime, fairly.** Deno → FFI (`tsv_ffi`, via
   `Deno.dlopen`); Node → N-API (`tsv_napi`, via `process.dlopen`). Same engine,
   same per-thread arena reuse, different binding boundary.
@@ -49,10 +50,12 @@ sensitivity that mismeasured the native path (see §Known Issues + the lore
 
 **Dependencies: `package.json` is the source of truth.** Both runtimes consume one
 `node_modules` (`benches/js/package.json`). Deno reads it via
-`"nodeModulesDir": "manual"` in `deno.json`; Node reads it directly. Only jsr-only
-specifiers (`@std/fs`, used by the Deno-only diagnostics) stay in the deno.json
-import map. `@types/node` is a types-only devDependency so the `node:` builtins
-type-check under `deno check`/`deno test`.
+`"nodeModulesDir": "manual"` in `deno.json`; Node reads it directly. There are no
+jsr or remote deps — the bench and the diagnostics import npm packages by bare
+specifier (resolved from `package.json`) and otherwise use `node:` builtins, so
+`deno.json` carries only `nodeModulesDir: manual` + `lock: false` (no `deno.lock`;
+npm integrity is `package-lock.json`'s job). `@types/node` is a types-only
+devDependency so the `node:` builtins type-check under `deno check`.
 
 **Install with `deno task bench:install`** (runs `benches/js/install_deps.ts`).
 It is the canonical installer: a plain `npm install` works but **prunes the
@@ -251,14 +254,20 @@ Patterns are ordered specific to broad. Each links to `conformance_sections` and
 deno task divergence:audit        # Human-readable report
 deno task divergence:audit --json # Machine-readable JSON
 
-# Deno test suite — every *_test.ts under lib/, gated by `deno task check`. Covers
-# the divergence detectors (pattern positive/negative overmatch-rejection cases,
+# Deno test suite — the divergence detectors under lib/divergence/, gated by
+# `deno task check`. Covers pattern positive/negative overmatch-rejection cases,
 # safety differential cases, and a behavioral fixture-coverage audit that drives
 # each detector against its own committed fixtures — input == ours, output_prettier
-# == prettier — failing if a pattern stops claiming a hunk in a fixture it lists)
-# plus canonical_test.ts (asserts the prettier baseline formats with a filepath, so
-# `.ts` single-type-param arrows stay `<T>` and `.svelte` ones get `<T,>`).
+# == prettier — failing if a pattern stops claiming a hunk in a fixture it lists.
+# These are dependency-free (`node:assert` + relative imports, no node_modules), so
+# CI runs them on a clean checkout with no `bench:install` — that's why they're in
+# the core `check` gate.
 deno task test:deno
+
+# The canonical-oracle test (NOT gated — it needs prettier/svelte, so run after
+# `bench:install`): asserts the prettier baseline formats with a filepath, so `.ts`
+# single-type-param arrows stay `<T>` and `.svelte` ones get `<T,>`.
+deno task test:deno:canonical
 
 # Per-pattern corpus coverage with sample diffs (spot-check for overmatching)
 deno task corpus:compare:format --all --audit-patterns
@@ -314,12 +323,16 @@ JSON-only.
 ```bash
 deno task bench:install   # one-time: install harness npm deps (see Cross-Runtime above)
 
-# Run benchmarks (builds the runtime's bench artifacts automatically)
-deno task bench           # ALL three runtimes + compose → report.{deno,node,bun}.* + combined report.{json,md}
-deno task bench:deno      # Deno only
-deno task bench:node      # Node only
-deno task bench:bun       # Bun only (reuses the Node artifacts — N-API + nodejs-target WASM)
-deno task bench:compose   # Fold existing report.{deno,node,bun}.json → combined report.{json,md}
+# Run benchmarks (builds the runtime's bench artifacts automatically).
+# `bench` runs all three and FAILS FAST if node or bun isn't installed (the `&&`
+# chain stops at the missing binary). Deno is the only hard dependency, so if you
+# don't have node and/or bun, run the per-runtime tasks you DO have — each writes
+# its own report.<runtime>.* sibling, and `bench:compose` folds whatever exists.
+deno task bench           # ALL three + compose (needs node AND bun installed)
+deno task bench:deno      # Deno only (no node/bun needed)
+deno task bench:node      # Node only (needs node)
+deno task bench:bun       # Bun only (needs bun; reuses the Node artifacts — N-API + nodejs-target WASM)
+deno task bench:compose   # Fold whatever report.{deno,node,bun}.json exist → combined report.{json,md}
 
 # Run without rebuilding (if already built) — guarded against stale artifacts,
 # see "Artifact Freshness Guard" below
@@ -575,7 +588,7 @@ and `skip` overrides. Non-existent paths are silently skipped.
 benches/js/
 ├── package.json           # npm dep source of truth (both runtimes); install_deps drives it
 ├── package-lock.json      # npm lock (committed for reproducibility)
-├── deno.json              # nodeModulesDir: manual + jsr-only imports (@std/fs) + fmt
+├── deno.json              # nodeModulesDir: manual + lock: false (npm from package.json; no jsr/remote deps)
 ├── install_deps.ts        # `bench:install`: npm install + force-fetch the oxc wasi binding
 ├── bench.ts               # Benchmark entry point (runtime-neutral — runs under Deno AND Node)
 ├── smoke.ts               # Smoke test for formatters and parsers (runtime-neutral: smoke / smoke:node / smoke:bun)
@@ -628,12 +641,11 @@ dep versions (the single source of truth, consumed by both runtimes) and
 `package-lock.json` pins their integrity. **Run `deno task bench:install`** to
 populate `node_modules` (one installer — `npm install` — plus the force-fetch of
 the oxc wasi binding; see [Cross-Runtime](#cross-runtime-deno--node--bun)). Deno reads
-that `node_modules` via `"nodeModulesDir": "manual"`; Node reads it directly.
-Only the jsr-only `@std/fs` (Deno-only diagnostics) stays in the `deno.json`
-import map, locked by `deno.lock`. The Rust artifacts the bench builds (`tsv_ffi`,
-`tsv_napi`, `tsv_wasm`) are pinned via `Cargo.lock`. Upgrading is always a
-deliberate, committed act. A plain `npm install` prunes the oxc wasi binding —
-re-run `bench:install`.
+that `node_modules` via `"nodeModulesDir": "manual"`; Node reads it directly (the
+config shape — no jsr/remote deps, no `deno.lock` — is covered above).
+The Rust artifacts the bench builds (`tsv_ffi`, `tsv_napi`, `tsv_wasm`) are pinned
+via `Cargo.lock`. Upgrading is always a deliberate, committed act. A plain
+`npm install` prunes the oxc wasi binding — re-run `bench:install`.
 
 **Routine refresh** (alternative impls + infra — no fixture impact):
 
@@ -642,8 +654,8 @@ cd benches/js && npm outdated   # shows current vs latest
 # bump the version in benches/js/package.json, then:
 deno task bench:install   # re-install at the new pins (+ re-fetch the oxc wasi binding)
 deno task smoke           # confirm every impl still loads + formats (32 checks)
-deno task bench           # regenerate report.deno.* + report.node.*
-# commit package.json + package-lock.json + deno.lock + results/report.*
+deno task bench           # regenerate report.{deno,node,bun}.* + combined report.{json,md}
+# commit package.json + package-lock.json + results/report.*
 ```
 
 These packages are free to bump independently — they're measured against, not
@@ -688,7 +700,10 @@ corpus divergences against `@ryanatkn` code that tsv was formatting correctly.
 
 - oxc-parser (NAPI) — Fast TypeScript parser; languages: TypeScript, JS
 - oxfmt (NAPI) — Fast formatter; languages: TypeScript, JS, CSS, Svelte (experimental)
-- biome (WASM) — Formatter/linter; languages: Svelte, TypeScript, JS, CSS
+- biome (WASM) — Formatter/linter; languages: TypeScript, JS, CSS, and Svelte
+  (Svelte via biome's experimental HTML-superset support — `html.experimentalFullSupportEnabled`;
+  it formats the template **and** the embedded `<script>`/`<style>`, so it's comparable
+  work to prettier-plugin-svelte / tsv, just on an experimental path)
 
 ### OXC Package Details
 
@@ -849,9 +864,10 @@ Implementation: `lib/binary_sizes.ts`
 ## Diagnostic scripts (ad-hoc, not wired into `deno task`)
 
 These live under `diagnostics/`. The parser-analysis ones (`comment_dup_scan`,
-`acorn_dup_fuzz`) need the canonical-parser import map, so pass `--config
-benches/js/deno.json`; all run from the repo root (corpus/artifact paths are
-CWD-relative).
+`acorn_dup_fuzz`) import the canonical parser (`acorn`, `svelte/compiler`) by bare
+specifier, so pass `--config benches/js/deno.json` to resolve them from
+`node_modules` (`nodeModulesDir: manual`); all run from the repo root
+(corpus/artifact paths are CWD-relative).
 
 - `diagnostics/skip_triage.ts` — parse every corpus file with tsv + the canonical parser,
   bucket into tsv-fails-canonical-ok / canonical-fails-tsv-ok / both-fail.
