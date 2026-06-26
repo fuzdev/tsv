@@ -828,6 +828,23 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Decode a template segment's escape sequences for the token's cooked value.
+    ///
+    /// Unlike a string literal, an **invalid** escape is not a lex error here: per
+    /// the ES2018 template-literals revision it is allowed in a *tagged* template
+    /// (cooked `null`) and is a syntax error only in an untagged template / template
+    /// type. The lexer can't know which (the tag precedes the backtick), so it
+    /// defers: `.ok()` yields `None` on a bad escape, exactly like a no-escape
+    /// segment, and the parser (`template_cooked`) distinguishes the two by the
+    /// presence of a backslash and decides based on tagged-ness.
+    fn decode_template_segment(content: &str, has_escapes: bool) -> Option<String> {
+        if has_escapes {
+            escapes::decode_string_escapes(content).ok()
+        } else {
+            None
+        }
+    }
+
     /// Read template literal content.
     ///
     /// Called when we see a backtick (start of template) or after reading `}` in template context.
@@ -858,11 +875,7 @@ impl<'a> Lexer<'a> {
                     };
 
                     let content = &self.source[content_start..content_end];
-                    let decoded = if has_escapes {
-                        Some(escapes::decode_string_escapes(content)?)
-                    } else {
-                        None
-                    };
+                    let decoded = Self::decode_template_segment(content, has_escapes);
 
                     return Ok(Token {
                         kind,
@@ -890,11 +903,7 @@ impl<'a> Lexer<'a> {
                         };
 
                         let content = &self.source[content_start..content_end];
-                        let decoded = if has_escapes {
-                            Some(escapes::decode_string_escapes(content)?)
-                        } else {
-                            None
-                        };
+                        let decoded = Self::decode_template_segment(content, has_escapes);
 
                         return Ok(Token {
                             kind,
@@ -1069,11 +1078,7 @@ impl<'a> Lexer<'a> {
                     self.advance(); // consume closing `
 
                     let content = &self.source[content_start..content_end];
-                    let decoded = if has_escapes {
-                        Some(escapes::decode_string_escapes(content)?)
-                    } else {
-                        None
-                    };
+                    let decoded = Self::decode_template_segment(content, has_escapes);
 
                     return Ok(Token {
                         kind: TokenKind::TemplateTail,
@@ -1093,11 +1098,7 @@ impl<'a> Lexer<'a> {
                         self.template_depth += 1;
 
                         let content = &self.source[content_start..content_end];
-                        let decoded = if has_escapes {
-                            Some(escapes::decode_string_escapes(content)?)
-                        } else {
-                            None
-                        };
+                        let decoded = Self::decode_template_segment(content, has_escapes);
 
                         return Ok(Token {
                             kind: TokenKind::TemplateMiddle,

@@ -16,12 +16,66 @@ at `../test262`); refresh this list when the parser or the test262 snapshot
 changes — at minimum per release. Counts below are from a snapshot of ~49k
 discovered tests (46,545 graded after skips).
 
-- Positive (should parse) — 41,827 passed, 287 failed
-- Negative (should reject) — 1,354 passed, 3,077 failed
+- Positive (should parse) — 41,903 passed, 211 failed
+- Negative (should reject) — 1,339 passed, 3,092 failed
 
-- **Overall**: 43,181/46,545 (92.8%)
-- **Positive pass rate**: 99.3% — valid syntax tsv accepts
+- **Overall**: 43,242/46,545 (92.9%)
+- **Positive pass rate**: 99.5% — valid syntax tsv accepts
 - **Skipped**: 2,591 (sloppy mode: 2,519, runtime: 38, resolution: 34)
+
+**Triaging the positive failures against the drop-in oracle.** Each of the 211 is
+parsed with the canonical parser (acorn-typescript in module mode — what the
+fixtures' `expected.json` is generated from). **~23 are genuine tsv-vs-acorn bugs
+(acorn accepts, tsv rejects) — real parser gaps to close.** The remaining ~188
+are rejected by acorn too (not tsv-specific). _(Methodology: parse each
+`../test262/<path>` with `canonical_parse` and bucket on whether it yields an
+AST. An earlier triage used a wrong path prefix, so every file came back
+"not found" and was mis-bucketed as rejected — the corrected sweep below is
+authoritative.)_
+
+**The ~23 real bugs**, by cluster:
+
+- **`in` not permitted where `[+In]` should be restored, inside a `for`-header (5)**
+  — the for-init disables `in` (`[~In]`), but nested sub-expressions must restore
+  `[+In]`: a computed class member/accessor name
+  (`for (C = class { get ['x' in y]() {} }; ;) {}`), a ternary branch, and a
+  dynamic-import 2nd argument. tsv leaks the for-header `[~In]` into them; the same
+  forms parse fine outside a for-header.
+- **Unicode `Other_ID_Start` / `Other_ID_Continue` identifiers (4)** — characters
+  like `゛` (U+309B) and their escaped forms. tsv's `unicode-ident` uses the XID
+  sets, which exclude the legacy `Other_ID_*` compatibility code points.
+- **Module export/import name = reserved word (4)** — `export * as default`,
+  `export { x as class }`, import specifiers naming a reserved word. An
+  export/import name is an `IdentifierName` (reserved words allowed), not a
+  `BindingIdentifier`.
+- **Rest parameter with a destructuring pattern (2)** — `function f(...[a, b]) {}`,
+  `function f(...{ a }) {}`. A rest element can be a `BindingPattern`, not only an
+  identifier.
+- **Hashbang terminated by U+2028 / U+2029 (2)** — a line/paragraph separator
+  should end a `#!` comment.
+- **Singletons (6)** — `import.meta` in some positions, `for await (… of …)` with
+  an async LHS, `var undefined` (`undefined` is not reserved), do-while ASI on one
+  line, a ZWNBSP (U+FEFF) after a regex literal, a decorator member-expression
+  position, and an assignment-target case.
+
+These are the actionable positive-conformance backlog (fixtures-first per the
+repo TDD gate). The ✅ tagged-template invalid-escape gap (ES2018) was one such
+bug and is now fixed.
+
+**The ~188 acorn-also-rejects** are not tsv bugs — they split into:
+**sloppy-mode-only** (`with`, AnnexB `f() = g()` / `for (var a = x in b)`, legacy
+octal — tsv is strict-only); **strict-*Script*-only** (top-level `await` as a
+*binding*, e.g. `var await = 1` — valid in a strict Script but not a Module;
+**strict-script support is planned**, sloppy is not — `yield` is unaffected, being
+a strict reserved word in both goals); **`await`-as-identifier inside a non-async
+function/generator/method** (`function foo(await) {}`, the `static-init-await`
+cluster — valid in *module* per spec but acorn rejects it anyway; the planned
+**`await`-context tracking** fixes this and the strict-Script bindings together);
+**Stage-3 proposals** (`import.source`, `import.defer` — the dynamic-import
+cluster, a roadmap question); and **plugin-gated syntax** (decorators, not in the
+oracle config). When the await-context work lands, the strict-Script + non-async
+buckets move from "acorn-also-rejects" to deliberate, more-spec-correct
+divergences from acorn-as-module.
 
 Most negative failures are over-acceptance of _early errors_ — programs that
 parse under the syntactic grammar but that the spec rejects semantically

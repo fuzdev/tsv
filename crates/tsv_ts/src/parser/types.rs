@@ -1308,11 +1308,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 };
                 let has_newline = content.contains('\n');
 
-                // Decode escapes for cooked value
-                let cooked = match self.current_decoded() {
-                    Some(decoded) => TemplateCooked::Decoded(self.alloc_str_in(decoded)),
-                    None => TemplateCooked::Verbatim,
-                };
+                let cooked = self.template_cooked(content, false)?;
 
                 self.advance()?;
 
@@ -1346,10 +1342,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 };
                 let has_newline = content.contains('\n');
 
-                let cooked = match self.current_decoded() {
-                    Some(decoded) => TemplateCooked::Decoded(self.alloc_str_in(decoded)),
-                    None => TemplateCooked::Verbatim,
-                };
+                let cooked = self.template_cooked(content, false)?;
 
                 self.advance()?;
 
@@ -1398,12 +1391,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             };
                             let has_newline = tail_content.contains('\n');
 
-                            let tail_cooked = match self.current_decoded() {
-                                Some(decoded) => {
-                                    TemplateCooked::Decoded(self.alloc_str_in(decoded))
-                                }
-                                None => TemplateCooked::Verbatim,
-                            };
+                            let tail_cooked = self.template_cooked(tail_content, false)?;
 
                             self.advance()?;
 
@@ -1439,12 +1427,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             };
                             let has_newline = mid_content.contains('\n');
 
-                            let mid_cooked = match self.current_decoded() {
-                                Some(decoded) => {
-                                    TemplateCooked::Decoded(self.alloc_str_in(decoded))
-                                }
-                                None => TemplateCooked::Verbatim,
-                            };
+                            let mid_cooked = self.template_cooked(mid_content, false)?;
 
                             self.advance()?;
 

@@ -34,11 +34,49 @@ fn extract_template_simple_content(raw: &str) -> &str {
 }
 
 impl<'a, 'arena> Parser<'a, 'arena> {
+    /// Build the cooked value for the current template token.
+    ///
+    /// The lexer reports `decoded == None` both for a segment with no escapes and
+    /// for one whose escape sequence is invalid — the latter is deferred here
+    /// (the lexer can't know whether the template is tagged). A backslash in the
+    /// raw `content` distinguishes the invalid case: per the ES2018 template-
+    /// literals revision an invalid escape is allowed in a **tagged** template
+    /// (cooked value `null` → `TemplateCooked::Invalid`), but is a syntax error in
+    /// an untagged template or a template-literal type.
+    pub(super) fn template_cooked(
+        &self,
+        content: &str,
+        tagged: bool,
+    ) -> Result<TemplateCooked<'arena>, ParseError> {
+        match self.current_decoded() {
+            Some(decoded) => Ok(TemplateCooked::Decoded(self.alloc_str_in(decoded))),
+            None if content.contains('\\') => {
+                if tagged {
+                    Ok(TemplateCooked::Invalid)
+                } else {
+                    // Re-run the decode to surface the precise escape error the
+                    // lexer swallowed to defer the tagged/untagged decision.
+                    Err(crate::lexer::escapes::decode_string_escapes(content)
+                        .err()
+                        .unwrap_or_else(|| {
+                            self.error_msg("Invalid escape sequence in template literal")
+                        }))
+                }
+            }
+            None => Ok(TemplateCooked::Verbatim),
+        }
+    }
+
     /// Parse template literal: `hello ${name}`
     ///
     /// Handles both simple templates (no interpolation) and templates with expressions.
-    /// See also `parse_template_literal_type()` in statement.rs for type context version.
-    pub(super) fn parse_template_literal(&mut self) -> Result<Expression<'arena>, ParseError> {
+    /// `tagged` is true when this template is the quasi of a tagged-template
+    /// expression — it relaxes invalid-escape handling per ES2018 (see
+    /// `template_cooked`). See also `parse_template_literal_type()` in types.rs.
+    pub(super) fn parse_template_literal(
+        &mut self,
+        tagged: bool,
+    ) -> Result<Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
         let mut quasis = self.bvec();
         let mut expressions = self.bvec();
@@ -49,10 +87,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let (elem_start, elem_end) = self.current_pos();
                 let content = extract_template_simple_content(self.current_value());
                 let has_newline = content.contains('\n');
-                let cooked = match self.current_decoded() {
-                    Some(decoded) => TemplateCooked::Decoded(self.alloc_str_in(decoded)),
-                    None => TemplateCooked::Verbatim,
-                };
+                let cooked = self.template_cooked(content, tagged)?;
                 // Content span: strip the opening and closing backticks.
                 let raw_span = Span::new(elem_start as u32 + 1, elem_end as u32 - 1);
 
@@ -77,10 +112,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let (elem_start, elem_end) = self.current_pos();
                 let content = extract_template_head_content(self.current_value());
                 let has_newline = content.contains('\n');
-                let cooked = match self.current_decoded() {
-                    Some(decoded) => TemplateCooked::Decoded(self.alloc_str_in(decoded)),
-                    None => TemplateCooked::Verbatim,
-                };
+                let cooked = self.template_cooked(content, tagged)?;
                 // Content span: strip the opening backtick and trailing `${`.
                 let raw_span = Span::new(elem_start as u32 + 1, elem_end as u32 - 2);
 
@@ -127,12 +159,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             // More interpolations to come: }content${
                             let content = extract_template_head_content(self.current_value());
                             let has_newline = content.contains('\n');
-                            let cooked = match self.current_decoded() {
-                                Some(decoded) => {
-                                    TemplateCooked::Decoded(self.alloc_str_in(decoded))
-                                }
-                                None => TemplateCooked::Verbatim,
-                            };
+                            let cooked = self.template_cooked(content, tagged)?;
                             // Content span: strip the leading `}` and trailing `${`.
                             let raw_span = Span::new(elem_start as u32 + 1, elem_end as u32 - 2);
 
@@ -150,12 +177,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             // End of template: }content`
                             let content = extract_template_tail_content(self.current_value());
                             let has_newline = content.contains('\n');
-                            let cooked = match self.current_decoded() {
-                                Some(decoded) => {
-                                    TemplateCooked::Decoded(self.alloc_str_in(decoded))
-                                }
-                                None => TemplateCooked::Verbatim,
-                            };
+                            let cooked = self.template_cooked(content, tagged)?;
                             // Content span: strip the leading `}` and trailing backtick.
                             let raw_span = Span::new(elem_start as u32 + 1, elem_end as u32 - 1);
 

@@ -1,0 +1,915 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 451,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Tagged templates tolerate otherwise-invalid escape sequences (ES2018 template",
+			"start": 20,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " literals revision): the cooked value is null but the raw text is preserved.",
+			"start": 102,
+			"end": 180,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Valid escapes in a tagged template still cook normally.",
+			"start": 356,
+			"end": 414,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 59
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 450,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 441,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 182,
+					"end": 211,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 30
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 188,
+							"end": 210,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 29
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 188,
+								"end": 195,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 14
+									}
+								},
+								"name": "unicode"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 198,
+								"end": 210,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 17
+									},
+									"end": {
+										"line": 4,
+										"column": 29
+									}
+								},
+								"tag": {
+									"type": "Identifier",
+									"start": 198,
+									"end": 201,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 17
+										},
+										"end": {
+											"line": 4,
+											"column": 20
+										}
+									},
+									"name": "tag"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 201,
+									"end": 210,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 20
+										},
+										"end": {
+											"line": 4,
+											"column": 29
+										}
+									},
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 202,
+											"end": 209,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 21
+												},
+												"end": {
+													"line": 4,
+													"column": 28
+												}
+											},
+											"value": {
+												"raw": "\\u{zzz}",
+												"cooked": null
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Tagged templates tolerate otherwise-invalid escape sequences (ES2018 template",
+							"start": 20,
+							"end": 100
+						},
+						{
+							"type": "Line",
+							"value": " literals revision): the cooked value is null but the raw text is preserved.",
+							"start": 102,
+							"end": 180
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 213,
+					"end": 248,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 36
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 219,
+							"end": 247,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 35
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 219,
+								"end": 231,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 19
+									}
+								},
+								"name": "unicodeShort"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 234,
+								"end": 247,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 22
+									},
+									"end": {
+										"line": 5,
+										"column": 35
+									}
+								},
+								"tag": {
+									"type": "Identifier",
+									"start": 234,
+									"end": 237,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 22
+										},
+										"end": {
+											"line": 5,
+											"column": 25
+										}
+									},
+									"name": "tag"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 237,
+									"end": 247,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 25
+										},
+										"end": {
+											"line": 5,
+											"column": 35
+										}
+									},
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 238,
+											"end": 246,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 26
+												},
+												"end": {
+													"line": 5,
+													"column": 34
+												}
+											},
+											"value": {
+												"raw": "\\unicode",
+												"cooked": null
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 250,
+					"end": 272,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 23
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 256,
+							"end": 271,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 22
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 256,
+								"end": 259,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 10
+									}
+								},
+								"name": "hex"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 262,
+								"end": 271,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 13
+									},
+									"end": {
+										"line": 6,
+										"column": 22
+									}
+								},
+								"tag": {
+									"type": "Identifier",
+									"start": 262,
+									"end": 265,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 13
+										},
+										"end": {
+											"line": 6,
+											"column": 16
+										}
+									},
+									"name": "tag"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 265,
+									"end": 271,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 16
+										},
+										"end": {
+											"line": 6,
+											"column": 22
+										}
+									},
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 266,
+											"end": 270,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 17
+												},
+												"end": {
+													"line": 6,
+													"column": 21
+												}
+											},
+											"value": {
+												"raw": "\\xZZ",
+												"cooked": null
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 274,
+					"end": 316,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 43
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 280,
+							"end": 315,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 42
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 280,
+								"end": 292,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 19
+									}
+								},
+								"name": "interpolated"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 295,
+								"end": 315,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 22
+									},
+									"end": {
+										"line": 7,
+										"column": 42
+									}
+								},
+								"tag": {
+									"type": "Identifier",
+									"start": 295,
+									"end": 298,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 22
+										},
+										"end": {
+											"line": 7,
+											"column": 25
+										}
+									},
+									"name": "tag"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 298,
+									"end": 315,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 25
+										},
+										"end": {
+											"line": 7,
+											"column": 42
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 308,
+											"end": 312,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 35
+												},
+												"end": {
+													"line": 7,
+													"column": 39
+												}
+											},
+											"name": "expr"
+										}
+									],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 299,
+											"end": 306,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 26
+												},
+												"end": {
+													"line": 7,
+													"column": 33
+												}
+											},
+											"value": {
+												"raw": "a\\u{zz}",
+												"cooked": null
+											},
+											"tail": false
+										},
+										{
+											"type": "TemplateElement",
+											"start": 313,
+											"end": 314,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 40
+												},
+												"end": {
+													"line": 7,
+													"column": 41
+												}
+											},
+											"value": {
+												"raw": "c",
+												"cooked": "c"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 318,
+					"end": 353,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 36
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 324,
+							"end": 352,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 35
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 324,
+								"end": 330,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 13
+									}
+								},
+								"name": "member"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 333,
+								"end": 352,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 16
+									},
+									"end": {
+										"line": 8,
+										"column": 35
+									}
+								},
+								"tag": {
+									"type": "MemberExpression",
+									"start": 333,
+									"end": 343,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 16
+										},
+										"end": {
+											"line": 8,
+											"column": 26
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 333,
+										"end": 339,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 16
+											},
+											"end": {
+												"line": 8,
+												"column": 22
+											}
+										},
+										"name": "String"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 340,
+										"end": 343,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 23
+											},
+											"end": {
+												"line": 8,
+												"column": 26
+											}
+										},
+										"name": "raw"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 343,
+									"end": 352,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 26
+										},
+										"end": {
+											"line": 8,
+											"column": 35
+										}
+									},
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 344,
+											"end": 351,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 27
+												},
+												"end": {
+													"line": 8,
+													"column": 34
+												}
+											},
+											"value": {
+												"raw": "\\u{zzz}",
+												"cooked": null
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 416,
+					"end": 440,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 25
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 422,
+							"end": 439,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 24
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 422,
+								"end": 427,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 12
+									}
+								},
+								"name": "valid"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 430,
+								"end": 439,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 15
+									},
+									"end": {
+										"line": 11,
+										"column": 24
+									}
+								},
+								"tag": {
+									"type": "Identifier",
+									"start": 430,
+									"end": 433,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 15
+										},
+										"end": {
+											"line": 11,
+											"column": 18
+										}
+									},
+									"name": "tag"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 433,
+									"end": 439,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 18
+										},
+										"end": {
+											"line": 11,
+											"column": 24
+										}
+									},
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 434,
+											"end": 438,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 19
+												},
+												"end": {
+													"line": 11,
+													"column": 23
+												}
+											},
+											"value": {
+												"raw": "\\n\\t",
+												"cooked": "\n\t"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Valid escapes in a tagged template still cook normally.",
+							"start": 356,
+							"end": 414
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

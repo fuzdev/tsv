@@ -814,7 +814,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
                 TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
                     // Tagged template expression: tag`content`
-                    let quasi = self.parse_template_literal()?;
+                    let quasi = self.parse_template_literal(true)?;
                     let quasi_span = quasi.span();
                     if let Expression::TemplateLiteral(template) = quasi {
                         // An optional chain can't be a template tag (per spec): `a?.b`x``
@@ -1145,7 +1145,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             TokenKind::DotDotDot => Ok(ParsedExpr::from_expr(self.parse_spread_element()?)),
             TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
-                Ok(ParsedExpr::from_expr(self.parse_template_literal()?))
+                // Untagged template literal (a primary expression): invalid escapes
+                // are a syntax error (only tagged templates tolerate them).
+                Ok(ParsedExpr::from_expr(self.parse_template_literal(false)?))
             }
             TokenKind::Slash | TokenKind::SlashEquals => {
                 // In expression context, `/` or `/=` starts a regex literal, not division
