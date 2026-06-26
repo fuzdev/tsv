@@ -15,7 +15,7 @@ pub(in crate::ast) fn convert_type_annotation(
     offset: usize,
 ) -> public::TSTypeAnnotation {
     public::TSTypeAnnotation {
-        node_type: "TSTypeAnnotation".to_string(),
+        node_type: "TSTypeAnnotation",
         start: type_annotation.span.start,
         end: type_annotation.span.end,
         loc: create_location(type_annotation.span, loc, offset),
@@ -40,7 +40,7 @@ pub(in crate::ast) fn convert_type(
         internal::TSType::Keyword(kw) => convert_keyword_type(kw, loc, offset),
         internal::TSType::Literal(lit) => convert_literal_type(lit, source, loc, interner, offset),
         internal::TSType::Array(arr) => public::TSType::TSArrayType(public::TSArrayType {
-            node_type: "TSArrayType".to_string(),
+            node_type: "TSArrayType",
             start: arr.span.start,
             end: arr.span.end,
             loc: create_location(arr.span, loc, offset),
@@ -53,7 +53,7 @@ pub(in crate::ast) fn convert_type(
             )),
         }),
         internal::TSType::Union(u) => public::TSType::TSUnionType(public::TSUnionType {
-            node_type: "TSUnionType".to_string(),
+            node_type: "TSUnionType",
             start: u.span.start,
             end: u.span.end,
             loc: create_location(u.span, loc, offset),
@@ -65,7 +65,7 @@ pub(in crate::ast) fn convert_type(
         }),
         internal::TSType::Intersection(i) => {
             public::TSType::TSIntersectionType(public::TSIntersectionType {
-                node_type: "TSIntersectionType".to_string(),
+                node_type: "TSIntersectionType",
                 start: i.span.start,
                 end: i.span.end,
                 loc: create_location(i.span, loc, offset),
@@ -78,7 +78,7 @@ pub(in crate::ast) fn convert_type(
         }
         internal::TSType::TypeReference(r) => {
             public::TSType::TSTypeReference(public::TSTypeReference {
-                node_type: "TSTypeReference".to_string(),
+                node_type: "TSTypeReference",
                 start: r.span.start,
                 end: r.span.end,
                 loc: create_location(r.span, loc, offset),
@@ -89,7 +89,7 @@ pub(in crate::ast) fn convert_type(
             })
         }
         internal::TSType::TypeLiteral(t) => public::TSType::TSTypeLiteral(public::TSTypeLiteral {
-            node_type: "TSTypeLiteral".to_string(),
+            node_type: "TSTypeLiteral",
             start: t.span.start,
             end: t.span.end,
             loc: create_location(t.span, loc, offset),
@@ -100,7 +100,7 @@ pub(in crate::ast) fn convert_type(
                 .collect(),
         }),
         internal::TSType::Function(f) => public::TSType::TSFunctionType(public::TSFunctionType {
-            node_type: "TSFunctionType".to_string(),
+            node_type: "TSFunctionType",
             start: f.span.start,
             end: f.span.end,
             loc: create_location(f.span, loc, offset),
@@ -122,7 +122,7 @@ pub(in crate::ast) fn convert_type(
         }),
         internal::TSType::Constructor(c) => {
             public::TSType::TSConstructorType(public::TSConstructorType {
-                node_type: "TSConstructorType".to_string(),
+                node_type: "TSConstructorType",
                 start: c.span.start,
                 end: c.span.end,
                 loc: create_location(c.span, loc, offset),
@@ -145,7 +145,7 @@ pub(in crate::ast) fn convert_type(
             })
         }
         internal::TSType::Tuple(t) => public::TSType::TSTupleType(public::TSTupleType {
-            node_type: "TSTupleType".to_string(),
+            node_type: "TSTupleType",
             start: t.span.start,
             end: t.span.end,
             loc: create_location(t.span, loc, offset),
@@ -157,7 +157,7 @@ pub(in crate::ast) fn convert_type(
         }),
         internal::TSType::Parenthesized(p) => {
             public::TSType::TSParenthesizedType(public::TSParenthesizedType {
-                node_type: "TSParenthesizedType".to_string(),
+                node_type: "TSParenthesizedType",
                 start: p.span.start,
                 end: p.span.end,
                 loc: create_location(p.span, loc, offset),
@@ -176,7 +176,7 @@ pub(in crate::ast) fn convert_type(
                 .to_string();
             let parameter_name = if name == "this" {
                 public::TSTypePredicateParameterName::TSThisType(public::TSThisType {
-                    node_type: "TSThisType".to_string(),
+                    node_type: "TSThisType",
                     start: p.parameter_name.span.start,
                     end: p.parameter_name.span.end,
                     loc: create_location(p.parameter_name.span, loc, offset),
@@ -190,14 +190,14 @@ pub(in crate::ast) fn convert_type(
                 ))
             };
             public::TSType::TSTypePredicate(public::TSTypePredicate {
-                node_type: "TSTypePredicate".to_string(),
+                node_type: "TSTypePredicate",
                 start: p.span.start,
                 end: p.span.end,
                 loc: create_location(p.span, loc, offset),
                 parameter_name,
                 type_annotation: p.type_annotation.as_ref().map(|t| {
                     Box::new(public::TSTypeAnnotation {
-                        node_type: "TSTypeAnnotation".to_string(),
+                        node_type: "TSTypeAnnotation",
                         start: t.span().start,
                         end: t.span().end,
                         loc: create_location(t.span(), loc, offset),
@@ -209,7 +209,7 @@ pub(in crate::ast) fn convert_type(
         }
         internal::TSType::Conditional(c) => {
             public::TSType::TSConditionalType(public::TSConditionalType {
-                node_type: "TSConditionalType".to_string(),
+                node_type: "TSConditionalType",
                 start: c.span.start,
                 end: c.span.end,
                 loc: create_location(c.span, loc, offset),
@@ -220,12 +220,12 @@ pub(in crate::ast) fn convert_type(
             })
         }
         internal::TSType::Mapped(m) => public::TSType::TSMappedType(public::TSMappedType {
-            node_type: "TSMappedType".to_string(),
+            node_type: "TSMappedType",
             start: m.span.start,
             end: m.span.end,
             loc: create_location(m.span, loc, offset),
             type_parameter: public::TSMappedTypeParameter {
-                node_type: "TSTypeParameter".to_string(),
+                node_type: "TSTypeParameter",
                 start: m.type_parameter.span.start,
                 end: m.type_parameter.span.end,
                 loc: create_location(m.type_parameter.span, loc, offset),
@@ -253,7 +253,7 @@ pub(in crate::ast) fn convert_type(
         }),
         internal::TSType::TypeOperator(o) => {
             public::TSType::TSTypeOperator(public::TSTypeOperator {
-                node_type: "TSTypeOperator".to_string(),
+                node_type: "TSTypeOperator",
                 start: o.span.start,
                 end: o.span.end,
                 loc: create_location(o.span, loc, offset),
@@ -268,7 +268,7 @@ pub(in crate::ast) fn convert_type(
             })
         }
         internal::TSType::Import(i) => public::TSType::TSImportType(public::TSImportType {
-            node_type: "TSImportType".to_string(),
+            node_type: "TSImportType",
             start: i.span.start,
             end: i.span.end,
             loc: create_location(i.span, loc, offset),
@@ -287,7 +287,7 @@ pub(in crate::ast) fn convert_type(
                 .map(|ta| convert_type_parameter_instantiation(ta, source, loc, interner, offset)),
         }),
         internal::TSType::TypeQuery(q) => public::TSType::TSTypeQuery(public::TSTypeQuery {
-            node_type: "TSTypeQuery".to_string(),
+            node_type: "TSTypeQuery",
             start: q.span.start,
             end: q.span.end,
             loc: create_location(q.span, loc, offset),
@@ -299,7 +299,7 @@ pub(in crate::ast) fn convert_type(
         }),
         internal::TSType::IndexedAccess(i) => {
             public::TSType::TSIndexedAccessType(public::TSIndexedAccessType {
-                node_type: "TSIndexedAccessType".to_string(),
+                node_type: "TSIndexedAccessType",
                 start: i.span.start,
                 end: i.span.end,
                 loc: create_location(i.span, loc, offset),
@@ -308,7 +308,7 @@ pub(in crate::ast) fn convert_type(
             })
         }
         internal::TSType::Rest(r) => public::TSType::TSRestType(public::TSRestType {
-            node_type: "TSRestType".to_string(),
+            node_type: "TSRestType",
             start: r.span.start,
             end: r.span.end,
             loc: create_location(r.span, loc, offset),
@@ -321,7 +321,7 @@ pub(in crate::ast) fn convert_type(
             )),
         }),
         internal::TSType::Optional(o) => public::TSType::TSOptionalType(public::TSOptionalType {
-            node_type: "TSOptionalType".to_string(),
+            node_type: "TSOptionalType",
             start: o.span.start,
             end: o.span.end,
             loc: create_location(o.span, loc, offset),
@@ -335,7 +335,7 @@ pub(in crate::ast) fn convert_type(
         }),
         internal::TSType::NamedTupleMember(n) => {
             public::TSType::TSNamedTupleMember(public::TSNamedTupleMember {
-                node_type: "TSNamedTupleMember".to_string(),
+                node_type: "TSNamedTupleMember",
                 start: n.span.start,
                 end: n.span.end,
                 loc: create_location(n.span, loc, offset),
@@ -345,7 +345,7 @@ pub(in crate::ast) fn convert_type(
             })
         }
         internal::TSType::Infer(i) => public::TSType::TSInferType(public::TSInferType {
-            node_type: "TSInferType".to_string(),
+            node_type: "TSInferType",
             start: i.span.start,
             end: i.span.end,
             loc: create_location(i.span, loc, offset),
@@ -361,7 +361,7 @@ pub(in crate::ast) fn convert_type(
             ),
         }),
         internal::TSType::ThisType(t) => public::TSType::TSThisType(public::TSThisType {
-            node_type: "TSThisType".to_string(),
+            node_type: "TSThisType",
             start: t.span.start,
             end: t.span.end,
             loc: create_location(t.span, loc, offset),
@@ -383,7 +383,7 @@ fn convert_type_query_expr_name(
             ),
             internal::TSEntityName::QualifiedName(qn) => {
                 public::TSTypeQueryExprName::QualifiedName(public::TSQualifiedName {
-                    node_type: "TSQualifiedName".to_string(),
+                    node_type: "TSQualifiedName",
                     start: qn.span.start,
                     end: qn.span.end,
                     loc: create_location(qn.span, loc, offset),
@@ -394,7 +394,7 @@ fn convert_type_query_expr_name(
         },
         internal::TSTypeQueryExprName::Import(i) => {
             public::TSTypeQueryExprName::Import(public::TSImportType {
-                node_type: "TSImportType".to_string(),
+                node_type: "TSImportType",
                 start: i.span.start,
                 end: i.span.end,
                 loc: create_location(i.span, loc, offset),
@@ -425,7 +425,7 @@ fn convert_literal_type(
     match lit {
         internal::TSLiteralType::TemplateLiteral(template) => {
             public::TSType::TSLiteralType(public::TSLiteralType {
-                node_type: "TSLiteralType".to_string(),
+                node_type: "TSLiteralType",
                 start: template.span.start,
                 end: template.span.end,
                 loc: create_location(template.span, loc, offset),
@@ -439,7 +439,7 @@ fn convert_literal_type(
         | internal::TSLiteralType::BigInt(literal) => {
             // `convert_literal` derives value/raw/bigint from the literal's variant.
             public::TSType::TSLiteralType(public::TSLiteralType {
-                node_type: "TSLiteralType".to_string(),
+                node_type: "TSLiteralType",
                 start: literal.span.start,
                 end: literal.span.end,
                 loc: create_location(literal.span, loc, offset),
@@ -457,12 +457,12 @@ fn convert_literal_type(
                 )
             };
             public::TSType::TSLiteralType(public::TSLiteralType {
-                node_type: "TSLiteralType".to_string(),
+                node_type: "TSLiteralType",
                 start: unary.span.start,
                 end: unary.span.end,
                 loc: create_location(unary.span, loc, offset),
                 literal: public::TSLiteralTypeLiteral::UnaryExpression(public::UnaryExpression {
-                    node_type: "UnaryExpression".to_string(),
+                    node_type: "UnaryExpression",
                     start: unary.span.start,
                     end: unary.span.end,
                     loc: create_location(unary.span, loc, offset),
@@ -485,7 +485,7 @@ fn convert_template_literal_type(
     offset: usize,
 ) -> public::TemplateLiteralType {
     public::TemplateLiteralType {
-        node_type: "TemplateLiteral".to_string(),
+        node_type: "TemplateLiteral",
         start: template.span.start,
         end: template.span.end,
         loc: create_location(template.span, loc, offset),
@@ -514,7 +514,7 @@ fn convert_keyword_type(
     macro_rules! make_public {
         ($variant:ident) => {{
             public::TSType::$variant(public::$variant {
-                node_type: kw.kind.node_type_name().to_string(),
+                node_type: kw.kind.node_type_name(),
                 start: kw.span.start,
                 end: kw.span.end,
                 loc: create_location(kw.span, loc, offset),
@@ -539,12 +539,12 @@ fn convert_keyword_type(
         TSKeywordKind::True | TSKeywordKind::False => {
             let is_true = matches!(kw.kind, TSKeywordKind::True);
             public::TSType::TSLiteralType(public::TSLiteralType {
-                node_type: "TSLiteralType".to_string(),
+                node_type: "TSLiteralType",
                 start: kw.span.start,
                 end: kw.span.end,
                 loc: create_location(kw.span, loc, offset),
                 literal: public::TSLiteralTypeLiteral::Literal(public::Literal {
-                    node_type: "Literal".to_string(),
+                    node_type: "Literal",
                     start: kw.span.start,
                     end: kw.span.end,
                     loc: create_location(kw.span, loc, offset),
@@ -570,7 +570,7 @@ pub(super) fn convert_entity_name(
         }
         internal::TSEntityName::QualifiedName(qn) => {
             public::TSEntityName::QualifiedName(public::TSQualifiedName {
-                node_type: "TSQualifiedName".to_string(),
+                node_type: "TSQualifiedName",
                 start: qn.span.start,
                 end: qn.span.end,
                 loc: create_location(qn.span, loc, offset),
@@ -589,7 +589,7 @@ fn convert_type_parameter_instantiation(
     offset: usize,
 ) -> public::TSTypeParameterInstantiation {
     public::TSTypeParameterInstantiation {
-        node_type: "TSTypeParameterInstantiation".to_string(),
+        node_type: "TSTypeParameterInstantiation",
         start: params.span.start,
         end: params.span.end,
         loc: create_location(params.span, loc, offset),
@@ -610,7 +610,7 @@ fn convert_type_parameter_declaration_simple(
     offset: usize,
 ) -> public::TSTypeParameterDeclaration {
     public::TSTypeParameterDeclaration {
-        node_type: "TSTypeParameterDeclaration".to_string(),
+        node_type: "TSTypeParameterDeclaration",
         start: params.span.start,
         end: params.span.end,
         loc: create_location(params.span, loc, offset),
@@ -637,7 +637,7 @@ fn convert_type_element(
     match elem {
         internal::TSTypeElement::PropertySignature(p) => {
             public::TSTypeElement::PropertySignature(public::TSPropertySignature {
-                node_type: "TSPropertySignature".to_string(),
+                node_type: "TSPropertySignature",
                 start: p.span.start,
                 end: p.span.end,
                 loc: create_location(p.span, loc, offset),
@@ -667,7 +667,7 @@ fn convert_type_element(
                 _ => Some("method".to_string()),
             };
             public::TSTypeElement::MethodSignature(public::TSMethodSignature {
-                node_type: "TSMethodSignature".to_string(),
+                node_type: "TSMethodSignature",
                 start: m.span.start,
                 end: m.span.end,
                 loc: create_location(m.span, loc, offset),
@@ -691,7 +691,7 @@ fn convert_type_element(
         }
         internal::TSTypeElement::CallSignature(c) => {
             public::TSTypeElement::CallSignature(public::TSCallSignatureDeclaration {
-                node_type: "TSCallSignatureDeclaration".to_string(),
+                node_type: "TSCallSignatureDeclaration",
                 start: c.span.start,
                 end: c.span.end,
                 loc: create_location(c.span, loc, offset),
@@ -711,7 +711,7 @@ fn convert_type_element(
         }
         internal::TSTypeElement::ConstructSignature(c) => {
             public::TSTypeElement::ConstructSignature(public::TSConstructSignatureDeclaration {
-                node_type: "TSConstructSignatureDeclaration".to_string(),
+                node_type: "TSConstructSignatureDeclaration",
                 start: c.span.start,
                 end: c.span.end,
                 loc: create_location(c.span, loc, offset),
@@ -731,7 +731,7 @@ fn convert_type_element(
         }
         internal::TSTypeElement::IndexSignature(i) => {
             public::TSTypeElement::IndexSignature(public::TSIndexSignature {
-                node_type: "TSIndexSignature".to_string(),
+                node_type: "TSIndexSignature",
                 start: i.span.start,
                 end: i.span.end,
                 loc: create_location(i.span, loc, offset),
@@ -739,7 +739,7 @@ fn convert_type_element(
                     .parameters
                     .iter()
                     .map(|p| public::Identifier {
-                        node_type: "Identifier".to_string(),
+                        node_type: "Identifier",
                         start: p.span.start,
                         end: p.span.end,
                         loc: create_location(p.span, loc, offset),
@@ -774,7 +774,7 @@ pub(in crate::ast) fn convert_interface_declaration(
     offset: usize,
 ) -> public::TSInterfaceDeclaration {
     public::TSInterfaceDeclaration {
-        node_type: "TSInterfaceDeclaration".to_string(),
+        node_type: "TSInterfaceDeclaration",
         start: iface.span.start,
         end: iface.span.end,
         loc: create_location(iface.span, loc, offset),
@@ -801,7 +801,7 @@ fn convert_interface_heritage(
     offset: usize,
 ) -> public::TSInterfaceHeritage {
     public::TSInterfaceHeritage {
-        node_type: "TSExpressionWithTypeArguments".to_string(),
+        node_type: "TSExpressionWithTypeArguments",
         start: heritage.span.start,
         end: heritage.span.end,
         loc: create_location(heritage.span, loc, offset),
@@ -821,7 +821,7 @@ fn convert_interface_body(
     offset: usize,
 ) -> public::TSInterfaceBody {
     public::TSInterfaceBody {
-        node_type: "TSInterfaceBody".to_string(),
+        node_type: "TSInterfaceBody",
         start: body.span.start,
         end: body.span.end,
         loc: create_location(body.span, loc, offset),
@@ -842,7 +842,7 @@ pub(in crate::ast) fn convert_declare_function(
     offset: usize,
 ) -> public::TSDeclareFunction {
     public::TSDeclareFunction {
-        node_type: "TSDeclareFunction".to_string(),
+        node_type: "TSDeclareFunction",
         start: func.span.start,
         end: func.span.end,
         loc: create_location(func.span, loc, offset),
@@ -877,7 +877,7 @@ pub(in crate::ast) fn convert_enum_declaration(
     offset: usize,
 ) -> public::TSEnumDeclaration {
     public::TSEnumDeclaration {
-        node_type: "TSEnumDeclaration".to_string(),
+        node_type: "TSEnumDeclaration",
         start: enum_decl.span.start,
         end: enum_decl.span.end,
         loc: create_location(enum_decl.span, loc, offset),
@@ -910,7 +910,7 @@ fn convert_enum_member(
     };
 
     public::TSEnumMember {
-        node_type: "TSEnumMember".to_string(),
+        node_type: "TSEnumMember",
         start: member.span.start,
         end: member.span.end,
         loc: create_location(member.span, loc, offset),

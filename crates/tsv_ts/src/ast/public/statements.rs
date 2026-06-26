@@ -53,7 +53,7 @@ pub enum Statement {
 #[derive(Debug, Clone, Serialize)]
 pub struct ExpressionStatement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -68,7 +68,7 @@ pub struct ExpressionStatement {
 #[derive(Debug, Clone, Serialize)]
 pub struct BlockStatement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -80,7 +80,7 @@ pub struct BlockStatement {
 #[derive(Debug, Clone, Serialize)]
 pub struct FunctionDeclaration {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -105,7 +105,7 @@ pub struct FunctionDeclaration {
 #[derive(Debug, Clone, Serialize)]
 pub struct ReturnStatement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -120,7 +120,7 @@ pub struct ReturnStatement {
 #[derive(Debug, Clone, Serialize)]
 pub struct IfStatement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -133,7 +133,7 @@ pub struct IfStatement {
 #[derive(Debug, Clone, Serialize)]
 pub struct ForStatement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -155,7 +155,7 @@ pub enum ForInit {
 #[derive(Debug, Clone, Serialize)]
 pub struct ForInStatement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -168,7 +168,7 @@ pub struct ForInStatement {
 #[derive(Debug, Clone, Serialize)]
 pub struct ForOfStatement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -191,7 +191,7 @@ pub enum ForInOfLeft {
 #[derive(Debug, Clone, Serialize)]
 pub struct WhileStatement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -203,7 +203,7 @@ pub struct WhileStatement {
 #[derive(Debug, Clone, Serialize)]
 pub struct DoWhileStatement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -215,7 +215,7 @@ pub struct DoWhileStatement {
 #[derive(Debug, Clone, Serialize)]
 pub struct SwitchStatement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -227,7 +227,7 @@ pub struct SwitchStatement {
 #[derive(Debug, Clone, Serialize)]
 pub struct SwitchCase {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -239,7 +239,7 @@ pub struct SwitchCase {
 #[derive(Debug, Clone, Serialize)]
 pub struct TryStatement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -252,7 +252,7 @@ pub struct TryStatement {
 #[derive(Debug, Clone, Serialize)]
 pub struct CatchClause {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -264,7 +264,7 @@ pub struct CatchClause {
 #[derive(Debug, Clone, Serialize)]
 pub struct ThrowStatement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -275,7 +275,7 @@ pub struct ThrowStatement {
 #[derive(Debug, Clone, Serialize)]
 pub struct BreakStatement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -286,7 +286,7 @@ pub struct BreakStatement {
 #[derive(Debug, Clone, Serialize)]
 pub struct ContinueStatement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -297,7 +297,7 @@ pub struct ContinueStatement {
 #[derive(Debug, Clone, Serialize)]
 pub struct LabeledStatement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -309,7 +309,7 @@ pub struct LabeledStatement {
 #[derive(Debug, Clone, Serialize)]
 pub struct EmptyStatement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -319,7 +319,7 @@ pub struct EmptyStatement {
 #[derive(Debug, Clone, Serialize)]
 pub struct DebuggerStatement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -328,7 +328,7 @@ pub struct DebuggerStatement {
 #[derive(Debug, Clone, Serialize)]
 pub struct VariableDeclaration {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -341,7 +341,7 @@ pub struct VariableDeclaration {
 #[derive(Debug, Clone, Serialize)]
 pub struct VariableDeclarator {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,

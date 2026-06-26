@@ -10,7 +10,7 @@ use super::{Expression, Identifier, Literal, SourceLocation, Statement};
 #[derive(Debug, Clone, Serialize)]
 pub struct ExportNamedDeclaration {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -32,7 +32,7 @@ pub struct ExportNamedDeclaration {
 #[derive(Debug, Clone, Serialize)]
 pub struct ExportDefaultDeclaration {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -58,7 +58,7 @@ pub enum ExportDefaultValue {
 #[derive(Debug, Clone, Serialize)]
 pub struct ExportAllDeclaration {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -79,7 +79,7 @@ pub struct ExportAllDeclaration {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSExportAssignment {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -90,7 +90,7 @@ pub struct TSExportAssignment {
 #[derive(Debug, Clone, Serialize)]
 pub struct ExportSpecifier {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -107,7 +107,7 @@ pub struct ExportSpecifier {
 #[derive(Debug, Clone, Serialize)]
 pub struct ImportDeclaration {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -134,7 +134,7 @@ pub enum ImportSpecifier {
 #[derive(Debug, Clone, Serialize)]
 pub struct ImportDefaultSpecifier {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -145,7 +145,7 @@ pub struct ImportDefaultSpecifier {
 #[derive(Debug, Clone, Serialize)]
 pub struct ImportNamedSpecifier {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -160,7 +160,7 @@ pub struct ImportNamedSpecifier {
 #[derive(Debug, Clone, Serialize)]
 pub struct ImportNamespaceSpecifier {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -171,7 +171,7 @@ pub struct ImportNamespaceSpecifier {
 #[derive(Debug, Clone, Serialize)]
 pub struct ImportAttribute {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -203,7 +203,7 @@ pub enum ModuleExportName {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSImportEqualsDeclaration {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -228,7 +228,7 @@ pub enum TSModuleReference {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSExternalModuleReference {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,

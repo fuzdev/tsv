@@ -46,7 +46,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         internal::Expression::Literal(lit) => convert_literal_expression(lit, source, loc, offset),
         internal::Expression::Identifier(id) => {
             public::Expression::Identifier(public::Identifier {
-                node_type: "Identifier".to_string(),
+                node_type: "Identifier",
                 start: id.span.start,
                 end: id.span.end,
                 loc: create_location(id.span, loc, offset),
@@ -67,7 +67,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         }
         internal::Expression::PrivateIdentifier(pid) => {
             public::Expression::PrivateIdentifier(public::PrivateIdentifier {
-                node_type: "PrivateIdentifier".to_string(),
+                node_type: "PrivateIdentifier",
                 start: pid.span.start,
                 end: pid.span.end,
                 loc: create_location(pid.span, loc, offset),
@@ -76,7 +76,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         }
         internal::Expression::ObjectExpression(obj) => {
             public::Expression::ObjectExpression(public::ObjectExpression {
-                node_type: "ObjectExpression".to_string(),
+                node_type: "ObjectExpression",
                 start: obj.span.start,
                 end: obj.span.end,
                 loc: create_location(obj.span, loc, offset),
@@ -89,7 +89,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         }
         internal::Expression::ArrayExpression(arr) => {
             public::Expression::ArrayExpression(public::ArrayExpression {
-                node_type: "ArrayExpression".to_string(),
+                node_type: "ArrayExpression",
                 start: arr.span.start,
                 end: arr.span.end,
                 loc: create_location(arr.span, loc, offset),
@@ -105,7 +105,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         }
         internal::Expression::UnaryExpression(unary) => {
             public::Expression::UnaryExpression(public::UnaryExpression {
-                node_type: "UnaryExpression".to_string(),
+                node_type: "UnaryExpression",
                 start: unary.span.start,
                 end: unary.span.end,
                 loc: create_location(unary.span, loc, offset),
@@ -122,7 +122,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         }
         internal::Expression::UpdateExpression(update) => {
             public::Expression::UpdateExpression(public::UpdateExpression {
-                node_type: "UpdateExpression".to_string(),
+                node_type: "UpdateExpression",
                 start: update.span.start,
                 end: update.span.end,
                 loc: create_location(update.span, loc, offset),
@@ -147,7 +147,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
             };
 
             public::Expression::BinaryExpression(public::BinaryExpression {
-                node_type: node_type.to_string(),
+                node_type,
                 start: binary.span.start,
                 end: binary.span.end,
                 loc: create_location(binary.span, loc, offset),
@@ -181,7 +181,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         ),
         internal::Expression::SpreadElement(spread) => {
             public::Expression::SpreadElement(public::SpreadElement {
-                node_type: "SpreadElement".to_string(),
+                node_type: "SpreadElement",
                 start: spread.span.start,
                 end: spread.span.end,
                 loc: create_location(spread.span, loc, offset),
@@ -243,7 +243,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         ),
         internal::Expression::TaggedTemplateExpression(tagged) => {
             public::Expression::TaggedTemplateExpression(public::TaggedTemplateExpression {
-                node_type: "TaggedTemplateExpression".to_string(),
+                node_type: "TaggedTemplateExpression",
                 start: tagged.span.start,
                 end: tagged.span.end,
                 loc: create_location(tagged.span, loc, offset),
@@ -264,7 +264,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         ),
         internal::Expression::SequenceExpression(seq) => {
             public::Expression::SequenceExpression(public::SequenceExpression {
-                node_type: "SequenceExpression".to_string(),
+                node_type: "SequenceExpression",
                 start: seq.span.start,
                 end: seq.span.end,
                 loc: create_location(seq.span, loc, offset),
@@ -279,7 +279,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
             // Reconstruct raw from source: /pattern/flags
             let raw = regex.span.extract(source).to_string();
             public::Expression::RegexLiteral(public::RegexLiteral {
-                node_type: "Literal".to_string(), // Regex uses "Literal" type in acorn/Svelte AST
+                node_type: "Literal", // Regex uses "Literal" type in acorn/Svelte AST
                 start: regex.span.start,
                 end: regex.span.end,
                 loc: create_location(regex.span, loc, offset),
@@ -293,21 +293,21 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         }
         internal::Expression::ThisExpression(t) => {
             public::Expression::ThisExpression(public::ThisExpression {
-                node_type: "ThisExpression".to_string(),
+                node_type: "ThisExpression",
                 start: t.span.start,
                 end: t.span.end,
                 loc: create_location(t.span, loc, offset),
             })
         }
         internal::Expression::Super(s) => public::Expression::Super(public::Super {
-            node_type: "Super".to_string(),
+            node_type: "Super",
             start: s.span.start,
             end: s.span.end,
             loc: create_location(s.span, loc, offset),
         }),
         internal::Expression::AssignmentExpression(assign) => {
             public::Expression::AssignmentExpression(public::AssignmentExpression {
-                node_type: "AssignmentExpression".to_string(),
+                node_type: "AssignmentExpression",
                 start: assign.span.start,
                 end: assign.span.end,
                 loc: create_location(assign.span, loc, offset),
@@ -333,7 +333,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         ),
         internal::Expression::ArrayPattern(arr) => {
             public::Expression::ArrayPattern(public::ArrayPattern {
-                node_type: "ArrayPattern".to_string(),
+                node_type: "ArrayPattern",
                 start: arr.span.start,
                 end: arr.span.end,
                 loc: create_location(arr.span, loc, offset),
@@ -354,7 +354,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         internal::Expression::AssignmentPattern(pattern) => {
             let base_loc = create_location(pattern.span, loc, offset);
             public::Expression::AssignmentPattern(public::AssignmentPattern {
-                node_type: "AssignmentPattern".to_string(),
+                node_type: "AssignmentPattern",
                 start: pattern.span.start,
                 end: pattern.span.end,
                 loc: base_loc,
@@ -379,7 +379,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         ),
         internal::Expression::TSTypeAssertion(type_assert) => {
             public::Expression::TSTypeAssertion(public::TSTypeAssertion {
-                node_type: "TSTypeAssertion".to_string(),
+                node_type: "TSTypeAssertion",
                 start: type_assert.span.start,
                 end: type_assert.span.end,
                 loc: create_location(type_assert.span, loc, offset),
@@ -401,7 +401,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         }
         internal::Expression::TSAsExpression(as_expr) => {
             public::Expression::TSAsExpression(public::TSAsExpression {
-                node_type: "TSAsExpression".to_string(),
+                node_type: "TSAsExpression",
                 start: as_expr.span.start,
                 end: as_expr.span.end,
                 loc: create_location(as_expr.span, loc, offset),
@@ -423,7 +423,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         }
         internal::Expression::TSSatisfiesExpression(sat_expr) => {
             public::Expression::TSSatisfiesExpression(public::TSSatisfiesExpression {
-                node_type: "TSSatisfiesExpression".to_string(),
+                node_type: "TSSatisfiesExpression",
                 start: sat_expr.span.start,
                 end: sat_expr.span.end,
                 loc: create_location(sat_expr.span, loc, offset),
@@ -445,7 +445,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         }
         internal::Expression::TSInstantiationExpression(inst_expr) => {
             public::Expression::TSInstantiationExpression(public::TSInstantiationExpression {
-                node_type: "TSInstantiationExpression".to_string(),
+                node_type: "TSInstantiationExpression",
                 start: inst_expr.span.start,
                 end: inst_expr.span.end,
                 loc: create_location(inst_expr.span, loc, offset),
@@ -477,7 +477,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 in_chain,
             );
             let converted = public::TSNonNullExpression {
-                node_type: "TSNonNullExpression".to_string(),
+                node_type: "TSNonNullExpression",
                 start: non_null_expr.span.start,
                 end: non_null_expr.span.end,
                 loc: create_location(non_null_expr.span, loc, offset),
@@ -500,7 +500,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         }
         internal::Expression::ImportExpression(import_expr) => {
             public::Expression::ImportExpression(public::ImportExpression {
-                node_type: "ImportExpression".to_string(),
+                node_type: "ImportExpression",
                 start: import_expr.span.start,
                 end: import_expr.span.end,
                 loc: create_location(import_expr.span, loc, offset),
@@ -520,7 +520,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         }
         internal::Expression::MetaProperty(meta) => {
             public::Expression::MetaProperty(public::MetaProperty {
-                node_type: "MetaProperty".to_string(),
+                node_type: "MetaProperty",
                 start: meta.span.start,
                 end: meta.span.end,
                 loc: create_location(meta.span, loc, offset),
@@ -547,7 +547,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 }
             }
             public::Expression::TSParameterProperty(public::TSParameterProperty {
-                node_type: "TSParameterProperty".to_string(),
+                node_type: "TSParameterProperty",
                 start: param_prop.span.start,
                 end: param_prop.span.end,
                 loc: create_location(param_prop.span, loc, offset),
@@ -584,7 +584,7 @@ fn maybe_wrap_chain(
 ) -> public::Expression {
     if needs_chain {
         public::Expression::ChainExpression(public::ChainExpression {
-            node_type: "ChainExpression".to_string(),
+            node_type: "ChainExpression",
             start: span.start,
             end: span.end,
             loc: create_location(span, loc, offset),
@@ -604,7 +604,7 @@ fn convert_literal_expression(
     // undefined is a global identifier, not a literal
     if matches!(lit.value, internal::LiteralValue::Undefined) {
         return public::Expression::Identifier(public::Identifier {
-            node_type: "Identifier".to_string(),
+            node_type: "Identifier",
             start: lit.span.start,
             end: lit.span.end,
             loc: create_location(lit.span, loc, offset),
@@ -633,7 +633,7 @@ fn convert_object_property(
         }
         internal::ObjectProperty::SpreadElement(s) => {
             public::ObjectProperty::SpreadElement(public::SpreadElement {
-                node_type: "SpreadElement".to_string(),
+                node_type: "SpreadElement",
                 start: s.span.start,
                 end: s.span.end,
                 loc: create_location(s.span, loc, offset),

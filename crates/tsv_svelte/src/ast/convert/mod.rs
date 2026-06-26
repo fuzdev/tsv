@@ -227,7 +227,7 @@ pub fn convert_root<'src>(root: &internal::Root<'_>, source: &'src str) -> publi
         js: vec![],
         start,
         end,
-        node_type: "Root".to_string(),
+        node_type: "Root",
         fragment: convert_fragment(&root.fragment, source, &loc, &interner),
         options: root
             .options

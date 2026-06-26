@@ -25,7 +25,7 @@ pub(super) fn convert_on_directive(
     public::OnDirective {
         start: d.span.start,
         end: d.span.end,
-        node_type: "OnDirective".to_string(),
+        node_type: "OnDirective",
         name: d.name_span.extract(source).to_string(),
         name_loc: span_to_name_loc(d.head_span, loc),
         expression,
@@ -50,7 +50,7 @@ pub(super) fn convert_bind_directive(
     public::BindDirective {
         start: d.span.start,
         end: d.span.end,
-        node_type: "BindDirective".to_string(),
+        node_type: "BindDirective",
         name: d.name_span.extract(source).to_string(),
         name_loc: span_to_name_loc(d.head_span, loc),
         expression,
@@ -75,7 +75,7 @@ pub(super) fn convert_class_directive(
     public::ClassDirective {
         start: d.span.start,
         end: d.span.end,
-        node_type: "ClassDirective".to_string(),
+        node_type: "ClassDirective",
         name: d.name_span.extract(source).to_string(),
         name_loc: span_to_name_loc(d.head_span, loc),
         expression,
@@ -121,7 +121,7 @@ pub(super) fn convert_style_directive(
     public::StyleDirective {
         start: d.span.start,
         end: d.span.end,
-        node_type: "StyleDirective".to_string(),
+        node_type: "StyleDirective",
         name: d.name_span.extract(source).to_string(),
         name_loc: span_to_name_loc(d.head_span, loc),
         modifiers: d.modifiers.iter().map(|m| (*m).to_string()).collect(),
@@ -143,7 +143,7 @@ pub(super) fn convert_use_directive(
     public::UseDirective {
         start: d.span.start,
         end: d.span.end,
-        node_type: "UseDirective".to_string(),
+        node_type: "UseDirective",
         name: d.name_span.extract(source).to_string(),
         name_loc: span_to_name_loc(d.head_span, loc),
         expression,
@@ -165,7 +165,7 @@ pub(super) fn convert_transition_directive(
     public::TransitionDirective {
         start: d.span.start,
         end: d.span.end,
-        node_type: "TransitionDirective".to_string(),
+        node_type: "TransitionDirective",
         name: d.name_span.extract(source).to_string(),
         name_loc: span_to_name_loc(d.head_span, loc),
         expression,
@@ -189,7 +189,7 @@ pub(super) fn convert_animate_directive(
     public::AnimateDirective {
         start: d.span.start,
         end: d.span.end,
-        node_type: "AnimateDirective".to_string(),
+        node_type: "AnimateDirective",
         name: d.name_span.extract(source).to_string(),
         name_loc: span_to_name_loc(d.head_span, loc),
         expression,
@@ -211,7 +211,7 @@ pub(super) fn convert_let_directive(
     public::LetDirective {
         start: d.span.start,
         end: d.span.end,
-        node_type: "LetDirective".to_string(),
+        node_type: "LetDirective",
         name: d.name_span.extract(source).to_string(),
         name_loc: span_to_name_loc(d.head_span, loc),
         expression,

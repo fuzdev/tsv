@@ -27,7 +27,7 @@ pub(in crate::ast) fn convert_arrow_function_expression(
         }
     };
     public::ArrowFunctionExpression {
-        node_type: "ArrowFunctionExpression".to_string(),
+        node_type: "ArrowFunctionExpression",
         start: arrow.span.start,
         end: arrow.span.end,
         loc: create_location(arrow.span, loc, offset),
@@ -60,12 +60,12 @@ pub(in crate::ast) fn convert_function_expression(
     offset: usize,
 ) -> public::FunctionExpression {
     public::FunctionExpression {
-        node_type: "FunctionExpression".to_string(),
+        node_type: "FunctionExpression",
         start: func.span.start,
         end: func.span.end,
         loc: create_location(func.span, loc, offset),
         id: func.id.as_ref().map(|id| public::Identifier {
-            node_type: "Identifier".to_string(),
+            node_type: "Identifier",
             start: id.span.start,
             end: id.span.end,
             loc: create_location(id.span, loc, offset),
@@ -102,7 +102,7 @@ pub(in crate::ast) fn convert_new_expression(
     offset: usize,
 ) -> public::NewExpression {
     public::NewExpression {
-        node_type: "NewExpression".to_string(),
+        node_type: "NewExpression",
         start: new_expr.span.start,
         end: new_expr.span.end,
         loc: create_location(new_expr.span, loc, offset),
@@ -154,7 +154,7 @@ pub(in crate::ast) fn convert_call_expression(
     let in_optional_chain = call.optional
         || (call.span.start >= call.callee.span().start && call.callee.has_optional_in_chain());
     public::CallExpression {
-        node_type: "CallExpression".to_string(),
+        node_type: "CallExpression",
         start: call.span.start,
         end: call.span.end,
         loc: create_location(call.span, loc, offset),
@@ -188,7 +188,7 @@ pub(in crate::ast) fn convert_member_expression(
     in_chain: bool,
 ) -> public::MemberExpression {
     public::MemberExpression {
-        node_type: "MemberExpression".to_string(),
+        node_type: "MemberExpression",
         start: member.span.start,
         end: member.span.end,
         loc: create_location(member.span, loc, offset),
@@ -220,7 +220,7 @@ pub(in crate::ast) fn convert_conditional_expression(
     offset: usize,
 ) -> public::ConditionalExpression {
     public::ConditionalExpression {
-        node_type: "ConditionalExpression".to_string(),
+        node_type: "ConditionalExpression",
         start: cond.span.start,
         end: cond.span.end,
         loc: create_location(cond.span, loc, offset),
@@ -250,7 +250,7 @@ pub(in crate::ast) fn convert_await_expression(
     offset: usize,
 ) -> public::AwaitExpression {
     public::AwaitExpression {
-        node_type: "AwaitExpression".to_string(),
+        node_type: "AwaitExpression",
         start: await_expr.span.start,
         end: await_expr.span.end,
         loc: create_location(await_expr.span, loc, offset),
@@ -272,7 +272,7 @@ pub(in crate::ast) fn convert_yield_expression(
     offset: usize,
 ) -> public::YieldExpression {
     public::YieldExpression {
-        node_type: "YieldExpression".to_string(),
+        node_type: "YieldExpression",
         start: yield_expr.span.start,
         end: yield_expr.span.end,
         loc: create_location(yield_expr.span, loc, offset),

@@ -22,7 +22,7 @@ pub(super) fn convert_if_block(
     let ts_expr = tsv_ts::ast::convert::convert_expression(&block.test, source, loc, interner, 0);
 
     public::IfBlock {
-        node_type: "IfBlock".to_string(),
+        node_type: "IfBlock",
         elseif: block.elseif,
         start: block.span.start,
         end: block.span.end,
@@ -53,7 +53,7 @@ pub(super) fn convert_each_block(
         .map(|k| tsv_ts::ast::convert::convert_expression(k, source, loc, interner, 0));
 
     public::EachBlock {
-        node_type: "EachBlock".to_string(),
+        node_type: "EachBlock",
         start: block.span.start,
         end: block.span.end,
         expression,
@@ -88,7 +88,7 @@ pub(super) fn convert_await_block(
         .map(|e| convert_pattern_expression(e, source, loc, interner));
 
     public::AwaitBlock {
-        node_type: "AwaitBlock".to_string(),
+        node_type: "AwaitBlock",
         start: block.span.start,
         end: block.span.end,
         expression,
@@ -119,7 +119,7 @@ pub(super) fn convert_key_block(
         tsv_ts::ast::convert::convert_expression(&block.expression, source, loc, interner, 0);
 
     public::KeyBlock {
-        node_type: "KeyBlock".to_string(),
+        node_type: "KeyBlock",
         start: block.span.start,
         end: block.span.end,
         expression,
@@ -144,7 +144,7 @@ pub(super) fn convert_snippet_block(
         .collect();
 
     public::SnippetBlock {
-        node_type: "SnippetBlock".to_string(),
+        node_type: "SnippetBlock",
         start: block.span.start,
         end: block.span.end,
         expression,

@@ -13,7 +13,7 @@ pub(in crate::ast) fn convert_template_literal(
     offset: usize,
 ) -> public::TemplateLiteral {
     public::TemplateLiteral {
-        node_type: "TemplateLiteral".to_string(),
+        node_type: "TemplateLiteral",
         start: template.span.start,
         end: template.span.end,
         loc: create_location(template.span, loc, offset),
@@ -47,7 +47,7 @@ pub(in crate::ast::convert) fn convert_template_element(
     };
     let adjusted_span = Span::new(adjusted_start, adjusted_end);
     public::TemplateElement {
-        node_type: "TemplateElement".to_string(),
+        node_type: "TemplateElement",
         start: adjusted_start,
         end: adjusted_end,
         loc: create_location(adjusted_span, loc, offset),
@@ -67,7 +67,7 @@ pub(in crate::ast) fn convert_object_pattern(
     offset: usize,
 ) -> public::ObjectPattern {
     public::ObjectPattern {
-        node_type: "ObjectPattern".to_string(),
+        node_type: "ObjectPattern",
         start: obj.span.start,
         end: obj.span.end,
         loc: create_location(obj.span, loc, offset),
@@ -112,7 +112,7 @@ pub(in crate::ast) fn convert_rest_element(
     offset: usize,
 ) -> public::RestElement {
     public::RestElement {
-        node_type: "RestElement".to_string(),
+        node_type: "RestElement",
         start: rest.span.start,
         end: rest.span.end,
         loc: create_location(rest.span, loc, offset),
@@ -145,7 +145,7 @@ pub(in crate::ast) fn convert_property(
     // After refactor: Match on PropertyKind to extract fields
     // Also needed: Support for Get/Set property kinds (change kind: String field)
     public::Property {
-        node_type: "Property".to_string(),
+        node_type: "Property",
         start: prop.span.start,
         end: prop.span.end,
         loc: create_location(prop.span, loc, offset),

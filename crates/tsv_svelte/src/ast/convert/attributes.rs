@@ -71,7 +71,7 @@ fn convert_attach_tag(
         tsv_ts::ast::convert::convert_expression(&tag.expression, source, loc, interner, 0);
 
     public::AttachTag {
-        node_type: "AttachTag".to_string(),
+        node_type: "AttachTag",
         start: tag.span.start,
         end: tag.span.end,
         expression,
@@ -88,7 +88,7 @@ fn convert_spread_attribute(
         tsv_ts::ast::convert::convert_expression(&spread.expression, source, loc, interner, 0);
 
     public::SpreadAttribute {
-        node_type: "SpreadAttribute".to_string(),
+        node_type: "SpreadAttribute",
         start: spread.span.start,
         end: spread.span.end,
         expression,
@@ -166,7 +166,7 @@ fn convert_attribute(
     };
 
     public::Attribute {
-        node_type: "Attribute".to_string(),
+        node_type: "Attribute",
         start: attr.span.start,
         end: attr.span.end,
         name,
@@ -195,7 +195,7 @@ fn convert_attribute_text(text: &internal::Text, source: &str) -> public::Attrib
     public::AttributeText {
         start: text.span.start,
         end: text.span.end,
-        node_type: "Text".to_string(),
+        node_type: "Text",
         raw: text.raw(source).to_string(),
         data: text.data(source).into_owned(),
     }
