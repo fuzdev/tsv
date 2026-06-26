@@ -700,7 +700,7 @@ impl<'arena> FragmentNode<'arena> {
 
 /// Svelte Element kind - distinguishes HTML elements from components
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "convert", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "convert", derive(serde::Serialize))]
 pub enum ElementKind {
     /// HTML element: `<div>`, `<span>`, `<input>`, etc. (lowercase first character)
     #[cfg_attr(feature = "convert", serde(rename = "Html"))]

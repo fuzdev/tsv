@@ -1,6 +1,6 @@
 //! TypeScript declaration types for public AST
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use super::types::{
     TSEntityName, TSInterfaceBody, TSTypeAnnotation, TSTypeParameterDeclaration,
@@ -9,7 +9,7 @@ use super::types::{
 use super::{Expression, Identifier, Literal, SourceLocation, Statement};
 
 /// TypeScript interface declaration: `interface Foo { ... }`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSInterfaceDeclaration {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -27,7 +27,7 @@ pub struct TSInterfaceDeclaration {
 }
 
 /// Interface heritage: `extends Foo, Bar`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSInterfaceHeritage {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -42,7 +42,7 @@ pub struct TSInterfaceHeritage {
 /// Declare function: `declare function foo(): void`
 ///
 /// Also used for function overload signatures (no body).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct TSDeclareFunction {
     #[serde(rename = "type")]
@@ -68,7 +68,7 @@ pub struct TSDeclareFunction {
 }
 
 /// Enum declaration: `enum Foo { A, B }`, `const enum Foo { A = 1 }`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSEnumDeclaration {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -88,7 +88,7 @@ pub struct TSEnumDeclaration {
 }
 
 /// Enum member: `A`, `A = 1`, `A = "value"`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSEnumMember {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -103,7 +103,7 @@ pub struct TSEnumMember {
 }
 
 /// Enum member id - can be identifier or string literal
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum TSEnumMemberId {
     Identifier(Identifier),
@@ -111,7 +111,7 @@ pub enum TSEnumMemberId {
 }
 
 /// TypeScript module/namespace declaration: `namespace Utils { ... }` or `module Utils { ... }`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSModuleDeclaration {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -133,7 +133,7 @@ pub struct TSModuleDeclaration {
 }
 
 /// Module/namespace name - can be an identifier or a string literal
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum TSModuleName {
     /// Regular identifier: `namespace Foo { }`
@@ -143,7 +143,7 @@ pub enum TSModuleName {
 }
 
 /// Body of a TypeScript module declaration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum TSModuleDeclarationBody {
     /// Block body with statements: `namespace A { ... }`
@@ -153,7 +153,7 @@ pub enum TSModuleDeclarationBody {
 }
 
 /// TypeScript module block: the `{ ... }` part of a namespace/module declaration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSModuleBlock {
     #[serde(rename = "type")]
     pub node_type: String,

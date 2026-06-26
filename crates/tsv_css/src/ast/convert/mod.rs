@@ -43,17 +43,19 @@ impl AstScope {
     }
 }
 
-fn rule_meta(meta: AstScope) -> Option<public::RuleMetadata> {
-    meta.has_metadata().then(public::RuleMetadata::default)
+fn rule_meta(scope: AstScope) -> Option<public::RuleMetadata> {
+    scope.has_metadata().then(public::RuleMetadata::default)
 }
 
-fn complex_meta(meta: AstScope) -> Option<public::ComplexSelectorMetadata> {
-    meta.has_metadata()
+fn complex_meta(scope: AstScope) -> Option<public::ComplexSelectorMetadata> {
+    scope
+        .has_metadata()
         .then(public::ComplexSelectorMetadata::default)
 }
 
-fn relative_meta(meta: AstScope) -> Option<public::RelativeSelectorMetadata> {
-    meta.has_metadata()
+fn relative_meta(scope: AstScope) -> Option<public::RelativeSelectorMetadata> {
+    scope
+        .has_metadata()
         .then(public::RelativeSelectorMetadata::default)
 }
 
@@ -250,7 +252,7 @@ fn convert_declaration(decl: &internal::CssDeclaration<'_>, source: &str) -> pub
 fn wrap_single_selector(
     selector: public::SimpleSelector,
     span: tsv_lang::Span,
-    meta: AstScope,
+    scope: AstScope,
 ) -> public::SelectorList {
     let relative = public::RelativeSelector {
         node_type: "RelativeSelector",
@@ -258,14 +260,14 @@ fn wrap_single_selector(
         selectors: vec![selector],
         start: span.start,
         end: span.end,
-        metadata: relative_meta(meta),
+        metadata: relative_meta(scope),
     };
     let complex = public::ComplexSelector {
         node_type: "ComplexSelector",
         start: span.start,
         end: span.end,
         children: vec![relative],
-        metadata: complex_meta(meta),
+        metadata: complex_meta(scope),
     };
     public::SelectorList {
         node_type: "SelectorList",
@@ -281,7 +283,7 @@ fn wrap_single_selector(
 fn convert_pseudo_class_args(
     args: &internal::PseudoClassArgs<'_>,
     source: &str,
-    meta: AstScope,
+    scope: AstScope,
 ) -> public::SelectorList {
     match args {
         internal::PseudoClassArgs::Nth {
@@ -291,9 +293,9 @@ fn convert_pseudo_class_args(
         } => {
             // If there's an "of <selector-list>", include it in the Nth node
             // (CSS Selectors Level 4: :nth-child(An+B of S)).
-            let selector = of_selector
-                .as_ref()
-                .map(|selectors| Box::new(convert_selector_list_filtered(selectors, source, meta)));
+            let selector = of_selector.as_ref().map(|selectors| {
+                Box::new(convert_selector_list_filtered(selectors, source, scope))
+            });
             let nth = public::SimpleSelector::Nth(public::Nth {
                 node_type: "Nth",
                 value: (*value).to_string(),
@@ -301,12 +303,12 @@ fn convert_pseudo_class_args(
                 end: span.end,
                 selector,
             });
-            wrap_single_selector(nth, *span, meta)
+            wrap_single_selector(nth, *span, scope)
         }
         internal::PseudoClassArgs::SelectorList { selectors, .. } => {
             // For :is(), :not(), :where(), :has(), :global() - convert the nested selector list
             // Filter out Invalid selectors (from forgiving parsing)
-            convert_selector_list_filtered(selectors, source, meta)
+            convert_selector_list_filtered(selectors, source, scope)
         }
         internal::PseudoClassArgs::Identifier { value, span } => {
             // SVELTE QUIRK: Identifier arguments (e.g., :dir(ltr), :lang(en-US)) are wrapped
@@ -323,7 +325,7 @@ fn convert_pseudo_class_args(
                 start: span.start,
                 end: span.end,
             });
-            wrap_single_selector(type_selector, *span, meta)
+            wrap_single_selector(type_selector, *span, scope)
         }
         // Note: Slotted and Part args are parsed internally but NOT exposed in public AST
         // This matches Svelte's behavior (they omit pseudo-element args from JSON output)
@@ -349,14 +351,14 @@ pub fn convert_css_node(node: &internal::CssNode<'_>, source: &str) -> public::C
 fn convert_node(
     node: &internal::CssNode<'_>,
     source: &str,
-    meta: AstScope,
+    scope: AstScope,
 ) -> public::CssNodePublic {
     match node {
         internal::CssNode::Rule(rule) => {
-            public::CssNodePublic::Rule(convert_rule(rule, source, meta))
+            public::CssNodePublic::Rule(convert_rule(rule, source, scope))
         }
         internal::CssNode::Atrule(atrule) => {
-            public::CssNodePublic::Atrule(convert_atrule(atrule, source, meta))
+            public::CssNodePublic::Atrule(convert_atrule(atrule, source, scope))
         }
     }
 }
@@ -367,7 +369,7 @@ fn convert_node(
 fn convert_block_child(
     child: &internal::CssBlockChild<'_>,
     source: &str,
-    meta: AstScope,
+    scope: AstScope,
 ) -> Option<public::CssNodePublic> {
     match child {
         internal::CssBlockChild::Declaration(decl) => Some(public::CssNodePublic::Declaration(
@@ -375,27 +377,27 @@ fn convert_block_child(
         )),
         // CSS Nesting Module - recursively convert nested rules
         internal::CssBlockChild::Rule(rule) => Some(public::CssNodePublic::Rule(convert_rule(
-            rule, source, meta,
+            rule, source, scope,
         ))),
         // At-rules can also be nested (e.g., @media inside a rule)
         internal::CssBlockChild::Atrule(atrule) => Some(public::CssNodePublic::Atrule(
-            convert_atrule(atrule, source, meta),
+            convert_atrule(atrule, source, scope),
         )),
         internal::CssBlockChild::Comment(_) => None,
     }
 }
 
 /// Convert a CSS rule to the typed public node.
-fn convert_rule(rule: &internal::CssRule<'_>, source: &str, meta: AstScope) -> public::Rule {
+fn convert_rule(rule: &internal::CssRule<'_>, source: &str, scope: AstScope) -> public::Rule {
     let children = rule
         .declarations
         .iter()
-        .filter_map(|child| convert_block_child(child, source, meta))
+        .filter_map(|child| convert_block_child(child, source, scope))
         .collect();
 
     public::Rule {
         node_type: "Rule",
-        prelude: convert_selector_list(&rule.selector, source, meta),
+        prelude: convert_selector_list(&rule.selector, source, scope),
         block: public::Block {
             node_type: "Block",
             start: rule.block_span.start,
@@ -404,7 +406,7 @@ fn convert_rule(rule: &internal::CssRule<'_>, source: &str, meta: AstScope) -> p
         },
         start: rule.span.start,
         end: rule.span.end,
-        metadata: rule_meta(meta),
+        metadata: rule_meta(scope),
     }
 }
 
@@ -412,13 +414,13 @@ fn convert_rule(rule: &internal::CssRule<'_>, source: &str, meta: AstScope) -> p
 fn convert_atrule(
     atrule: &internal::CssAtrule<'_>,
     source: &str,
-    meta: AstScope,
+    scope: AstScope,
 ) -> public::Atrule {
     let block = atrule.block.as_ref().map(|b| {
         let children = b
             .children
             .iter()
-            .filter_map(|child| convert_block_child(child, source, meta))
+            .filter_map(|child| convert_block_child(child, source, scope))
             .collect();
 
         public::Block {
@@ -482,12 +484,12 @@ fn convert_prelude_to_string(prelude: &internal::PreludeValue<'_>, source: &str)
 fn convert_selector_list(
     selector_list: &internal::SelectorList<'_>,
     source: &str,
-    meta: AstScope,
+    scope: AstScope,
 ) -> public::SelectorList {
     let children = selector_list
         .selectors
         .iter()
-        .map(|c| convert_complex_selector(c, source, meta))
+        .map(|c| convert_complex_selector(c, source, scope))
         .collect();
 
     public::SelectorList {
@@ -513,13 +515,13 @@ fn convert_selector_list(
 fn convert_selector_list_filtered(
     selector_list: &internal::SelectorList<'_>,
     source: &str,
-    meta: AstScope,
+    scope: AstScope,
 ) -> public::SelectorList {
     let children = selector_list
         .selectors
         .iter()
         .filter(|selector| !selector_contains_invalid(selector))
-        .map(|c| convert_complex_selector(c, source, meta))
+        .map(|c| convert_complex_selector(c, source, scope))
         .collect();
 
     public::SelectorList {
@@ -546,12 +548,12 @@ fn selector_contains_invalid(complex: &internal::ComplexSelector<'_>) -> bool {
 fn convert_complex_selector(
     complex: &internal::ComplexSelector<'_>,
     source: &str,
-    meta: AstScope,
+    scope: AstScope,
 ) -> public::ComplexSelector {
     let children = complex
         .children
         .iter()
-        .map(|r| convert_relative_selector(r, source, meta))
+        .map(|r| convert_relative_selector(r, source, scope))
         .collect();
 
     public::ComplexSelector {
@@ -559,7 +561,7 @@ fn convert_complex_selector(
         start: complex.span.start,
         end: complex.span.end,
         children,
-        metadata: complex_meta(meta),
+        metadata: complex_meta(scope),
     }
 }
 
@@ -567,7 +569,7 @@ fn convert_complex_selector(
 fn convert_relative_selector(
     relative: &internal::RelativeSelector<'_>,
     source: &str,
-    meta: AstScope,
+    scope: AstScope,
 ) -> public::RelativeSelector {
     let combinator =
         if let (Some(comb), Some(span)) = (&relative.combinator, &relative.combinator_span) {
@@ -584,7 +586,7 @@ fn convert_relative_selector(
     let selectors = relative
         .selectors
         .iter()
-        .map(|s| convert_simple_selector(s, source, meta))
+        .map(|s| convert_simple_selector(s, source, scope))
         .collect();
 
     public::RelativeSelector {
@@ -593,7 +595,7 @@ fn convert_relative_selector(
         selectors,
         start: relative.span.start,
         end: relative.span.end,
-        metadata: relative_meta(meta),
+        metadata: relative_meta(scope),
     }
 }
 
@@ -667,7 +669,7 @@ fn pseudo_name_end(source: &str, span: tsv_lang::Span, has_args: bool) -> u32 {
 fn convert_simple_selector(
     simple: &internal::SimpleSelector<'_>,
     source: &str,
-    meta: AstScope,
+    scope: AstScope,
 ) -> public::SimpleSelector {
     match simple {
         internal::SimpleSelector::Type { namespace, span } => {
@@ -750,7 +752,7 @@ fn convert_simple_selector(
         internal::SimpleSelector::PseudoClass { args, span } => {
             let args_val = args
                 .as_ref()
-                .map(|a| Box::new(convert_pseudo_class_args(a, source, meta)));
+                .map(|a| Box::new(convert_pseudo_class_args(a, source, scope)));
             let name_span = tsv_lang::Span {
                 start: span.start,
                 end: pseudo_name_end(source, *span, args.is_some()),

@@ -196,13 +196,18 @@ pub struct NamedSelector {
 
 /// `[name op 'value' flags]`. `matcher`/`value`/`flags` are `null` when absent;
 /// `namespace` is omitted when absent.
+///
+/// Field order is irregular on purpose: `parseCss` emits `start`/`end` *before*
+/// `name` here (unlike `NamedSelector`/the pseudo selectors, which are
+/// `type, name, start, end`), so this struct matches that quirk rather than the
+/// regular pattern. Don't "normalize" `name` back above `start`/`end`.
 #[derive(Debug, Clone, Serialize)]
 pub struct AttributeSelector {
     #[serde(rename = "type")]
     pub node_type: &'static str,
-    pub name: String,
     pub start: u32,
     pub end: u32,
+    pub name: String,
     pub matcher: Option<String>,
     pub value: Option<String>,
     pub flags: Option<String>,

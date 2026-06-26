@@ -282,12 +282,6 @@ fn format_files(files: &[PathBuf], check: bool, jobs: usize) -> Vec<FileOutcome>
                     // alloc — the rest reuse it. The per-file AST borrows `&arena`
                     // and is dropped inside `format_file` (returns an owned outcome),
                     // so the `&mut` reset is sound.
-                    // One arena per worker, reused across its files: `reset()` keeps
-                    // the largest chunk and rewinds the cursor, so only the first
-                    // file (and any that grow past the high-water mark) pays a chunk
-                    // alloc — the rest reuse it. The per-file AST borrows `&arena`
-                    // and is dropped inside `format_file` (returns an owned outcome),
-                    // so the `&mut` reset is sound.
                     let mut arena = bumpalo::Bump::new();
                     loop {
                         let i = next.fetch_add(1, Ordering::Relaxed);

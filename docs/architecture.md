@@ -541,11 +541,12 @@ regex, selector, and comment text all read from spans; `Text` keeps a `raw_span`
 with a lazily-derived `Text::data()` that borrows the slice unless HTML entities are
 present). Two kinds of owned data remain on nodes, both deliberate:
 
-- **Genuinely decoded text** — `CssValue::String.content`, `StringCooked::Decoded`,
-  `TemplateCooked::Decoded` (escape sequences resolved). A span can't reconstruct
-  these, so they're arena-allocated `&'arena str`. Don't "restore" them to span
-  extraction — verify a field is a *verbatim* source slice before assuming it's a
-  redundant copy.
+- **Genuinely decoded text** — `StringCooked::Decoded`, `TemplateCooked::Decoded`
+  (escape sequences resolved). Both the `tsv_ts` and `tsv_css` string literals hold a
+  `StringCooked` whose common `Verbatim` arm is span-recovered and allocation-free; only
+  the `Decoded` arm — which a span can't reconstruct — is arena-allocated `&'arena str`.
+  Don't "restore" a `Decoded` value to span extraction — verify a field is a *verbatim*
+  source slice before assuming it's a redundant copy.
 - **Precomputed derived scalars** — a node caches a small derived value (a `bool`/
   `u16`), never the raw text, so hot predicate readers stay source-free without
   re-scanning: `TemplateElement.has_newline` and `RegexLiteral.pattern_width` (the
