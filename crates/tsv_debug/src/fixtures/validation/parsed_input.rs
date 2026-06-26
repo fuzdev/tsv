@@ -147,29 +147,37 @@ pub(super) struct TypedWalkParity {
 pub(super) fn typed_walk_parity_probes(content: &str, parsed: &ParsedInput<'_>) -> TypedWalkParity {
     let mut parity = TypedWalkParity::default();
 
-    let mut probe = |ts_content: &str, description: &str| {
-        let arena = bumpalo::Bump::new();
-        match tsv_ts::parse(ts_content, &arena) {
-            Ok(ast) => {
-                let string_path = tsv_ts::convert_ast_json_string(&ast, ts_content);
-                let value_path = serde_json::to_string(&tsv_ts::convert_ast_json(&ast, ts_content))
-                    .expect("Value serialization cannot fail");
-                if string_path == value_path {
-                    parity.checked += 1;
-                } else {
-                    parity
-                        .failures
-                        .push((description.to_string(), TypedWalkParityFailure::Diverged));
+    // Parse `$content` as standalone `$lang` (tsv_ts / tsv_css — identical
+    // free-function API by convention) and assert its `convert_ast_json_string`
+    // is byte-identical to `to_string(&convert_ast_json(..))`, recording the
+    // result onto `parity`. One body for every language arm.
+    macro_rules! probe {
+        ($lang:ident, $content:expr, $description:expr) => {{
+            let content: &str = $content;
+            let description = $description;
+            let arena = bumpalo::Bump::new();
+            match $lang::parse(content, &arena) {
+                Ok(ast) => {
+                    let string_path = $lang::convert_ast_json_string(&ast, content);
+                    let value_path = serde_json::to_string(&$lang::convert_ast_json(&ast, content))
+                        .expect("Value serialization cannot fail");
+                    if string_path == value_path {
+                        parity.checked += 1;
+                    } else {
+                        parity
+                            .failures
+                            .push((description.to_string(), TypedWalkParityFailure::Diverged));
+                    }
+                }
+                Err(e) => {
+                    parity.failures.push((
+                        description.to_string(),
+                        TypedWalkParityFailure::Parse(format!("{e:?}")),
+                    ));
                 }
             }
-            Err(e) => {
-                parity.failures.push((
-                    description.to_string(),
-                    TypedWalkParityFailure::Parse(format!("{e:?}")),
-                ));
-            }
-        }
-    };
+        }};
+    }
 
     match parsed {
         ParsedInput::Ts(_) => {
@@ -180,7 +188,7 @@ pub(super) fn typed_walk_parity_probes(content: &str, parsed: &ParsedInput<'_>) 
             // The as-is input is already covered by the string-path identity
             // check; only the synthesized multibyte variant is new coverage.
             let synthesized = format!("{TYPED_WALK_SYNTH_PREFIX}{content}");
-            probe(&synthesized, "synthesized multibyte input");
+            probe!(tsv_ts, &synthesized, "synthesized multibyte input");
         }
         ParsedInput::Svelte(root) => {
             for (i, (start, end)) in tsv_svelte::script_content_spans(root)
@@ -192,12 +200,13 @@ pub(super) fn typed_walk_parity_probes(content: &str, parsed: &ParsedInput<'_>) 
                     // Multibyte .svelte inputs take the Value fallback in
                     // tsv_svelte, so this standalone-TS run is the only
                     // typed-walk coverage their script content gets
-                    probe(script, &format!("extracted script {i} (as-is)"));
+                    probe!(tsv_ts, script, &format!("extracted script {i} (as-is)"));
                 }
                 let synthesized = format!("{TYPED_WALK_SYNTH_PREFIX}{script}");
-                probe(
+                probe!(
+                    tsv_ts,
                     &synthesized,
-                    &format!("extracted script {i} (synthesized multibyte)"),
+                    &format!("extracted script {i} (synthesized multibyte)")
                 );
             }
         }
@@ -215,29 +224,7 @@ pub(super) fn typed_walk_parity_probes(content: &str, parsed: &ParsedInput<'_>) 
             // the BOM case) and rely on `corpus:compare:parse --multibyte-only` for
             // its multibyte coverage instead.
             let synthesized = format!("{CSS_TYPED_WALK_SYNTH_PREFIX}{content}");
-            let arena = bumpalo::Bump::new();
-            match tsv_css::parse(&synthesized, &arena) {
-                Ok(ast) => {
-                    let string_path = tsv_css::convert_ast_json_string(&ast, &synthesized);
-                    let value_path =
-                        serde_json::to_string(&tsv_css::convert_ast_json(&ast, &synthesized))
-                            .expect("Value serialization cannot fail");
-                    if string_path == value_path {
-                        parity.checked += 1;
-                    } else {
-                        parity.failures.push((
-                            "synthesized multibyte input".to_string(),
-                            TypedWalkParityFailure::Diverged,
-                        ));
-                    }
-                }
-                Err(e) => {
-                    parity.failures.push((
-                        "synthesized multibyte input".to_string(),
-                        TypedWalkParityFailure::Parse(format!("{e:?}")),
-                    ));
-                }
-            }
+            probe!(tsv_css, &synthesized, "synthesized multibyte input");
         }
     }
 

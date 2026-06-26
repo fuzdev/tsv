@@ -28,7 +28,7 @@ pub use translate_typed::translate_byte_to_char_offsets_typed;
 /// `Rule`/`ComplexSelector`/`RelativeSelector` for standalone CSS but never for
 /// embedded `<style>`; the converters thread this so one typed-node pass
 /// produces both shapes — no separate metadata walk.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 enum AstScope {
     /// Standalone `.css` file (`parseCss()` shape, `metadata` attached).
     Standalone,
