@@ -55,15 +55,18 @@ function file_size(path: URL): number | null {
 const VARIANTS = ['format', 'parse', 'all'] as const;
 const TARGETS = ['npm', 'deno'] as const;
 
-// Measured 2026-06-24 (perf10: the tsv_ts printer's Vec<DocId>→DocBuf
-// (SmallVec) sweep grew the format/printer code via monomorphization): format
-// 2,348,470 B (npm); parse 1,696,075 B; all 3,034,110 B. (Prior 2026-06-18
-// reference: format 2,213,589 B; parse 1,693,043 B; all 2,896,948 B — parse is
-// unchanged by perf10, format/all grew ~+6%/+5%.)
+// Measured 2026-06-26 (the class-heritage `extends <expr>` fix: its DRY parser
+// refactor — replacing the bespoke heritage walk with the shared postfix parser
+// — shaved the parser, on top of accumulated main shrinkage since perf10):
+// format 2,210,007 B (npm); parse 1,559,603 B; all 2,877,818 B. The parse-only
+// build (no printer) shows the parser reduction undiluted; format/all also pick
+// up the SuperClass paren-context printer addition, so they drifted less. (Prior
+// 2026-06-24 perf10 reference: format 2,348,470 B; parse 1,696,075 B; all
+// 3,034,110 B — all down ~5–8%.) Bounds recentered ±8% on the new sizes.
 const BOUNDS = {
-	format: { min: 2_020_000, max: 2_540_000 },
-	parse: { min: 1_560_000, max: 1_840_000 },
-	all: { min: 2_660_000, max: 3_280_000 },
+	format: { min: 2_030_000, max: 2_390_000 },
+	parse: { min: 1_435_000, max: 1_685_000 },
+	all: { min: 2_645_000, max: 3_110_000 },
 };
 
 // all = format + parse. `all − format` is the parse feature (parser convert +

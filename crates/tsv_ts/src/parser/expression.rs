@@ -88,6 +88,19 @@ impl<'arena> ParsedExpr<'arena> {
     }
 }
 
+/// How `parse_postfix_expression` should treat the subscript chain.
+///
+/// `ClassHeritage` is the `extends <expr>` clause — a `LeftHandSideExpression` that
+/// deviates from a normal subscript chain in two ways: a bare `<T>` (type args NOT
+/// followed by a call) stops the chain so the class can split it into
+/// `super_type_parameters`, and a postfix `++`/`--` stops too (acorn rejects
+/// `class C extends a++ {}`).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SubscriptMode {
+    Normal,
+    ClassHeritage,
+}
+
 /// Mirror of prettier's `isTypeCastComment` (`is-type-cast-comment.js`): the
 /// comment text (between `/*` and `*/`) starts with `*` — i.e. the `/**` form —
 /// and contains `@type` or `@satisfies` followed by a word boundary.
@@ -522,7 +535,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         // Parse any postfix operations (member access, call expressions)
-        self.parse_postfix_expression(parsed)
+        self.parse_postfix_expression(parsed, SubscriptMode::Normal)
     }
 
     /// Parse call arguments: `(arg1, arg2, ...)`
@@ -579,6 +592,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_postfix_expression(
         &mut self,
         mut left: ParsedExpr<'arena>,
+        mode: SubscriptMode,
     ) -> Result<ParsedExpr<'arena>, ParseError> {
         let arena = self.arena;
         // Tracks whether an optional `?.` was consumed in THIS subscript chain (not
@@ -833,7 +847,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     }
                 }
                 kind @ TokenKind::PlusPlus | kind @ TokenKind::MinusMinus
-                    if !self.had_line_terminator =>
+                    if mode == SubscriptMode::Normal && !self.had_line_terminator =>
                 {
                     // Postfix update expression: x++, x--
                     // ASI Rule: If there's a line terminator before ++/--, ASI fires
@@ -863,7 +877,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // Might be TSInstantiationExpression: f<T>, expr<Type>
                     // If it parses as type arguments it's instantiation; otherwise
                     // let binary expression handle it as comparison.
-                    if self.is_type_arguments_start() {
+                    //
+                    // In ClassHeritage mode a bare `<T>` (type args NOT followed by a
+                    // call) belongs to the class's `super_type_parameters` split, so we
+                    // leave it for the caller; only `Base<T>(...)` is consumed here (the
+                    // `(` arm below flattens the instantiation into a call with type
+                    // arguments). A `<` that isn't type args stops the chain either way.
+                    let consume = self.is_type_arguments_start()
+                        && (mode == SubscriptMode::Normal || self.is_type_args_followed_by_call());
+                    if consume {
                         left = self.parse_instantiation_expression(left)?;
                     } else {
                         break;
@@ -878,6 +900,121 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         Ok(left)
+    }
+
+    /// Parse the superclass expression of an `extends` clause.
+    ///
+    /// Per ecma262 §15.7 `ClassHeritage : extends LeftHandSideExpression`. Matches
+    /// acorn's `parseExprSubscripts` with `canBeArrow = false`: a primary atom
+    /// (identifier, literal, parenthesized expression, array/object, template,
+    /// `class`/`function` expression, `new`, `import()`) followed by member/call/
+    /// non-null/tagged-template subscripts. Non-LHS forms (ternary, binary, unary,
+    /// `await`, assignment, and a top-level `=>` arrow) are excluded — the class body
+    /// then errors when it fails to find `{`. A bare `<T>` is left for the class's
+    /// `super_type_parameters` split via `SubscriptMode::ClassHeritage`.
+    pub(in crate::parser) fn parse_heritage_expression(
+        &mut self,
+    ) -> Result<Expression<'arena>, ParseError> {
+        let atom = self.parse_heritage_atom()?;
+        let parsed = self.parse_postfix_expression(atom, SubscriptMode::ClassHeritage)?;
+        Ok(parsed.expr)
+    }
+
+    /// Parse the primary atom of an `extends` clause (acorn's `parseExprAtom` with
+    /// `canBeArrow = false`). `parse_primary_expression_with_end` covers identifiers,
+    /// literals, parens, arrays, objects, templates, `this`/`super`, and regex; the
+    /// keyword-led expression atoms (`new`, `class`, `function`, `async function`,
+    /// `import`) sit above the primary layer and are dispatched here.
+    fn parse_heritage_atom(&mut self) -> Result<ParsedExpr<'arena>, ParseError> {
+        let (start, _) = self.current_pos();
+        // `async function () {}` is the only `async`-led heritage atom. A bare `async`
+        // (or an `async`-arrow, which isn't a valid heritage atom) falls through to the
+        // primary path, where `async` parses as a plain identifier. Peeking needs
+        // `&mut self`, so this can't be a match guard over the borrowing `current_kind`.
+        if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Async))
+            && self.peek_kind() == TokenKind::Keyword(KeywordKind::Function)
+        {
+            self.advance()?; // consume 'async'
+            return Ok(ParsedExpr::from_expr(
+                self.parse_async_function_expression(start)?,
+            ));
+        }
+        match self.current_kind() {
+            TokenKind::Keyword(KeywordKind::New) => {
+                Ok(ParsedExpr::from_expr(self.parse_new_expression()?))
+            }
+            TokenKind::Keyword(KeywordKind::Class) => {
+                Ok(ParsedExpr::from_expr(self.parse_class_expression()?))
+            }
+            TokenKind::Keyword(KeywordKind::Function) => {
+                Ok(ParsedExpr::from_expr(self.parse_function_expression()?))
+            }
+            TokenKind::Keyword(KeywordKind::Import) => {
+                Ok(ParsedExpr::from_expr(self.parse_import_or_meta_property()?))
+            }
+            _ => {
+                let parsed = self.parse_primary_expression_with_end()?;
+                // Reject a top-level (unparenthesized) arrow: `class C extends (a) => b {}`.
+                // acorn parses the heritage atom with `canBeArrow = false`, so an outer
+                // arrow isn't a valid superclass. A *parenthesized* arrow
+                // (`extends (a => b) {}`) is fine — there the arrow's own span starts
+                // past the `(`, so it differs from `actual_start`. Same test the prefix
+                // layer uses to seal parenthesized arrows.
+                if matches!(parsed.expr, Expression::ArrowFunctionExpression(_))
+                    && parsed.actual_start == parsed.expr.span().start_usize()
+                {
+                    return Err(self.error_msg(
+                        "Arrow functions cannot be used as a class heritage expression",
+                    ));
+                }
+                Ok(parsed)
+            }
+        }
+    }
+
+    /// Check whether the current `<` opens type arguments immediately followed by a
+    /// call: `<T>(`. Used by the `ClassHeritage` subscript mode to tell a call's type
+    /// arguments (`getMixin<T>(Base)`, consumed) from a bare superclass instantiation
+    /// (`extends Base<T>`, left for the `super_type_parameters` split).
+    fn is_type_args_followed_by_call(&self) -> bool {
+        let bytes = self.source.as_bytes();
+        let mut pos = self.current_start;
+
+        // Must start with '<'
+        if pos >= bytes.len() || bytes[pos] != b'<' {
+            return false;
+        }
+        pos += 1;
+
+        // Track nesting to find the matching '>'
+        let mut depth = 1;
+        while pos < bytes.len() && depth > 0 {
+            match bytes[pos] {
+                b'<' => depth += 1,
+                b'>' => depth -= 1,
+                b'\'' | b'"' | b'`' => {
+                    // Skip strings
+                    let quote = bytes[pos];
+                    pos += 1;
+                    while pos < bytes.len() && bytes[pos] != quote {
+                        if bytes[pos] == b'\\' {
+                            pos += 1; // skip escaped char
+                        }
+                        pos += 1;
+                    }
+                }
+                _ => {}
+            }
+            pos += 1;
+        }
+
+        // Skip whitespace after '>'
+        while pos < bytes.len() && matches!(bytes[pos], b' ' | b'\t' | b'\n' | b'\r') {
+            pos += 1;
+        }
+
+        // Check if '(' follows
+        pos < bytes.len() && bytes[pos] == b'('
     }
 
     /// Parse a Number token into a Literal, handling BigInt suffix

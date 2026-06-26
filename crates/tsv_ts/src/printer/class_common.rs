@@ -134,7 +134,7 @@ impl<'a> Printer<'a> {
         if let Some(kw_start) = extends_keyword_start {
             let kw_end = kw_start + "extends".len() as u32;
             if self.has_line_comments_between(kw_end, super_class.span().start) {
-                let mut value_parts: DocBuf = smallvec![self.build_expression_doc(super_class)];
+                let mut value_parts: DocBuf = smallvec![self.build_super_class_doc(super_class)];
                 if let Some(type_args) = super_type_parameters {
                     let gap_start = super_class.span().end;
                     if let Some(doc) = self.build_name_to_type_params_comments_opt(
@@ -166,7 +166,7 @@ impl<'a> Printer<'a> {
                 CommentSpacing::Trailing,
             ));
         }
-        ext_parts.push(self.build_expression_doc(super_class));
+        ext_parts.push(self.build_super_class_doc(super_class));
         if let Some(type_args) = super_type_parameters {
             let gap_start = super_class.span().end;
             let gap_end = type_args.span.start;
@@ -180,6 +180,19 @@ impl<'a> Printer<'a> {
             ext_parts.push(self.build_type_arguments_doc_wrapping(type_args));
         }
         Some(d.concat(&ext_parts))
+    }
+
+    /// Render the superclass expression, wrapping it in parens when prettier's
+    /// heritage rule requires it (`extends (a + b)`, `extends (new X())`,
+    /// `extends ((a) => b)`, …). A bare `Base<T>` keeps `Base` unwrapped — its type
+    /// arguments are rendered separately via `super_type_parameters`.
+    fn build_super_class_doc(&self, super_class: &internal::Expression<'_>) -> DocId {
+        let doc = self.build_expression_doc(super_class);
+        if super::needs_parens(super_class, super::ParenContext::SuperClass) {
+            self.d().parens(doc)
+        } else {
+            doc
+        }
     }
 
     /// `implements <items>`, delegating to the shared heritage-clause builder
