@@ -7,6 +7,7 @@
 // - SpecialElement: <svelte:*> elements (head, body, window, etc.)
 
 use crate::ast::{internal, public};
+use std::borrow::Cow;
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
 
@@ -305,21 +306,21 @@ pub(super) fn convert_svelte_options(
     }
 }
 
-pub(super) fn convert_style(
+pub(super) fn convert_style<'src>(
     style: &internal::Style<'_>,
-    source: &str,
+    source: &'src str,
     interner: &DefaultStringInterner,
     preceding_comment: Option<&internal::HtmlComment>,
-) -> tsv_css::StyleSheet {
+) -> tsv_css::StyleSheet<'src> {
     // Create LocationTracker for the full source (for attributes)
     let full_loc = LocationTracker::new(source);
 
-    // Extract the raw CSS content
-    let styles = style.content_span.extract(source).to_string();
+    // Extract the raw CSS content (borrowed from source — no allocation)
+    let styles = style.content_span.extract(source);
 
     // Delegate to tsv_css for CSS node conversion
     // Comments are stored separately in stylesheet.comments and not included in JSON output
-    let children: Vec<tsv_css::ast::public::CssNodePublic> = style
+    let children: Vec<tsv_css::ast::public::CssNodePublic<'src>> = style
         .css_stylesheet
         .nodes
         .iter()
@@ -327,7 +328,7 @@ pub(super) fn convert_style(
         .collect();
 
     tsv_css::StyleSheet {
-        node_type: "StyleSheet".to_string(),
+        node_type: "StyleSheet",
         start: style.span.start,
         end: style.span.end,
         attributes: style
@@ -342,7 +343,7 @@ pub(super) fn convert_style(
         content: tsv_css::StyleContent {
             start: style.content_span.start,
             end: style.content_span.end,
-            styles,
+            styles: Cow::Borrowed(styles),
             comment: preceding_comment.map(|c| {
                 serde_json::json!({
                     "type": "Comment",

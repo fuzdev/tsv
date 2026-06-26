@@ -177,7 +177,7 @@ fn adjust_columns_on_line(value: &mut serde_json::Value, target_line: u64) {
 }
 
 /// Convert Svelte Root AST to public format
-pub fn convert_root(root: &internal::Root<'_>, source: &str) -> public::Root {
+pub fn convert_root<'src>(root: &internal::Root<'_>, source: &'src str) -> public::Root<'src> {
     let loc = LocationTracker::new(source);
     let interner = root.interner.borrow();
 
