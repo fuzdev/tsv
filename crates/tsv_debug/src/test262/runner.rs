@@ -255,7 +255,8 @@ pub fn grade_for_manifest(test: &TestFile) -> Option<ManifestEntry> {
     } else {
         Verdict::Accept
     };
-    let tsv = match tsv_ts::parse(&content) {
+    let arena = bumpalo::Bump::new();
+    let tsv = match tsv_ts::parse(&content, &arena) {
         Ok(_) => Verdict::Accept,
         Err(_) => Verdict::Reject,
     };
