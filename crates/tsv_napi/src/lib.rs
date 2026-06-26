@@ -44,6 +44,29 @@ fn with_ast_arena<R>(f: impl FnOnce(&bumpalo::Bump) -> R) -> R {
     })
 }
 
+/// Run `f` with a per-thread reusable doc arena (the `format` path's analogue of
+/// [`with_ast_arena`]).
+///
+/// Reusing one `DocArena` per thread and `reset()`ing it between calls retains the
+/// backing buffers instead of allocating a fresh doc arena per file. Soundness
+/// mirrors `with_ast_arena`: the doc tree is fully rendered to the returned
+/// `String` inside `f`, so no `DocId` outlives the next call's `reset()`.
+///
+/// Kept in lockstep with `tsv_ffi::with_doc_arena` by hand for now (same
+/// follow-up as `with_ast_arena`).
+#[cfg(feature = "format")]
+fn with_doc_arena<R>(f: impl FnOnce(&tsv_lang::doc::arena::DocArena) -> R) -> R {
+    thread_local! {
+        static DOC_ARENA: std::cell::RefCell<tsv_lang::doc::arena::DocArena> =
+            std::cell::RefCell::new(tsv_lang::doc::arena::DocArena::new());
+    }
+    DOC_ARENA.with(|cell| {
+        let mut arena = cell.borrow_mut();
+        arena.reset();
+        f(&arena)
+    })
+}
+
 /// Generate `parse_<lang>` / `parse_internal_<lang>` / `format_<lang>` N-API
 /// functions for one language module. The `js_name` literals keep the JS export
 /// names snake_case for parity with `tsv_wasm` (napi-rs would otherwise
@@ -87,7 +110,9 @@ macro_rules! lang_bindings {
             with_ast_arena(|arena| {
                 let ast = $lang::parse(&source, arena)
                     .map_err(|e| napi::Error::from_reason(e.to_string()))?;
-                Ok($lang::format(&ast, &source))
+                Ok(with_doc_arena(|doc_arena| {
+                    $lang::format_in(&ast, &source, doc_arena)
+                }))
             })
         }
     };

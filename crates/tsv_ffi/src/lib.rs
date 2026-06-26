@@ -154,6 +154,28 @@ fn with_ast_arena<R>(f: impl FnOnce(&bumpalo::Bump) -> R) -> R {
     })
 }
 
+/// Run `f` with a per-thread reusable doc arena (the `format` path's analogue of
+/// [`with_ast_arena`]).
+///
+/// The doc IR (`DocArena`) is rebuilt per call from the parsed AST; reusing one
+/// arena per thread and `reset()`ing it between calls retains the backing buffers
+/// instead of allocating a fresh doc arena per file — the same per-call heap-churn
+/// argument as the AST `Bump`. Soundness mirrors `with_ast_arena`: the doc tree is
+/// fully rendered to the returned `String` inside `f`, so no `DocId` outlives the
+/// next call's `reset()`. A future `tsv_napi` mirrors this shape.
+#[cfg(feature = "format")]
+fn with_doc_arena<R>(f: impl FnOnce(&tsv_lang::doc::arena::DocArena) -> R) -> R {
+    thread_local! {
+        static DOC_ARENA: std::cell::RefCell<tsv_lang::doc::arena::DocArena> =
+            std::cell::RefCell::new(tsv_lang::doc::arena::DocArena::new());
+    }
+    DOC_ARENA.with(|cell| {
+        let mut arena = cell.borrow_mut();
+        arena.reset();
+        f(&arena)
+    })
+}
+
 /// Generate `tsv_parse_<lang>` / `tsv_parse_internal_<lang>` / `tsv_format_<lang>`
 /// C FFI functions for one language module.
 ///
@@ -224,7 +246,9 @@ macro_rules! lang_bindings {
                 with_source_string(source_ptr, source_len, out_len, |source| {
                     with_ast_arena(|arena| {
                         let ast = $lang::parse(source, arena).map_err(|e| e.to_string())?;
-                        Ok($lang::format(&ast, source))
+                        Ok(with_doc_arena(|doc_arena| {
+                            $lang::format_in(&ast, source, doc_arena)
+                        }))
                     })
                 })
             }

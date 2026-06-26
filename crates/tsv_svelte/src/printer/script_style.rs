@@ -299,7 +299,7 @@ impl<'a> Printer<'a> {
         let output = {
             let interner = self.interner.borrow();
             doc::arena_print_doc_with_indent_resolved_preserve_whitespace(
-                &self.arena,
+                self.arena,
                 group,
                 &embed,
                 col,

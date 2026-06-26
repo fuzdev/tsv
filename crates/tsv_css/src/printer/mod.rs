@@ -55,8 +55,9 @@ pub(crate) struct Printer<'a> {
     pub(crate) indent_level: usize,
     /// Embedding context (base indent offset, first-line offset, layout mode, etc.).
     pub(crate) embed: EmbedContext,
-    /// Arena allocator for doc nodes
-    pub(crate) arena: DocArena,
+    /// Arena allocator for doc nodes (borrowed so a multi-file driver can reuse
+    /// one arena across files; see [`DocArena::reset`]).
+    pub(crate) arena: &'a DocArena,
     /// Original source (for blank line detection and raw value extraction)
     pub(crate) source: &'a str,
     /// All comments sorted by span.start
@@ -67,12 +68,24 @@ pub(crate) struct Printer<'a> {
 
 impl<'a> Printer<'a> {
     /// Create a new printer with source, comments, and line_breaks
-    pub(crate) fn new(source: &'a str, comments: &'a [Comment], line_breaks: &'a [u32]) -> Self {
-        Self::with_embed(source, comments, line_breaks, EmbedContext::default())
+    pub(crate) fn new(
+        arena: &'a DocArena,
+        source: &'a str,
+        comments: &'a [Comment],
+        line_breaks: &'a [u32],
+    ) -> Self {
+        Self::with_embed(
+            arena,
+            source,
+            comments,
+            line_breaks,
+            EmbedContext::default(),
+        )
     }
 
     /// Create a new printer with the given embedding context.
     pub(crate) fn with_embed(
+        arena: &'a DocArena,
         source: &'a str,
         comments: &'a [Comment],
         line_breaks: &'a [u32],
@@ -82,17 +95,17 @@ impl<'a> Printer<'a> {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
             embed,
-            arena: DocArena::for_source(source),
+            arena,
             source,
             comments,
             line_breaks,
         }
     }
 
-    /// Get a reference to the doc arena (convenience for `&self.arena`).
+    /// Get a reference to the doc arena (convenience for `self.arena`).
     #[inline]
     pub(crate) fn d(&self) -> &DocArena {
-        &self.arena
+        self.arena
     }
 
     /// Check if two positions are on the same line (O(log n) binary search)
@@ -194,7 +207,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn write_arena_doc(&mut self, d: DocId) {
         let current_col = self.current_column();
         let output = doc::arena_print_doc_with_indent(
-            &self.arena,
+            self.arena,
             d,
             &self.embed,
             current_col,
@@ -563,7 +576,17 @@ impl<'a> Printer<'a> {
 /// Format CSS stylesheet to a string
 /// Requires source for blank line preservation and raw value extraction
 pub(crate) fn format_css(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
-    let mut printer = Printer::new(source, &stylesheet.comments, &stylesheet.line_breaks);
+    let arena = DocArena::for_source(source);
+    format_css_in(stylesheet, source, &arena)
+}
+
+/// Format a CSS stylesheet into a caller-provided doc arena (the reuse path).
+pub(crate) fn format_css_in(
+    stylesheet: &CssStyleSheet<'_>,
+    source: &str,
+    arena: &DocArena,
+) -> String {
+    let mut printer = Printer::new(arena, source, &stylesheet.comments, &stylesheet.line_breaks);
     printer.print_css_nodes(stylesheet.nodes);
     printer.into_string()
 }
@@ -575,8 +598,17 @@ pub(crate) fn format_css_embedded(
     source: &str,
     embed: EmbedContext,
 ) -> String {
-    let mut printer =
-        Printer::with_embed(source, &stylesheet.comments, &stylesheet.line_breaks, embed);
+    // Embedded `<style>` formats to its own string with its own column-0 render
+    // pass, so it can't share the host svelte printer's arena; a fresh per-block
+    // arena is the deliberate scope boundary (per-`<style>`, not per-file).
+    let arena = DocArena::for_source(source);
+    let mut printer = Printer::with_embed(
+        &arena,
+        source,
+        &stylesheet.comments,
+        &stylesheet.line_breaks,
+        embed,
+    );
     printer.print_css_nodes(stylesheet.nodes);
     printer.into_string()
 }

@@ -231,10 +231,15 @@ impl FormatCommand {
     }
 }
 
-/// Format one file into the worker's reusable `arena`, writing in place when the
-/// output differs (unless `check`). Nothing borrowed from `arena` escapes, so the
-/// caller resets it after this returns (see `format_files`).
-fn format_file(path: &Path, check: bool, arena: &bumpalo::Bump) -> FileOutcome {
+/// Format one file into the worker's reusable arenas, writing in place when the
+/// output differs (unless `check`). Nothing borrowed from `arena`/`doc_arena`
+/// escapes, so the caller resets both after this returns (see `format_files`).
+fn format_file(
+    path: &Path,
+    check: bool,
+    arena: &bumpalo::Bump,
+    doc_arena: &tsv_lang::doc::arena::DocArena,
+) -> FileOutcome {
     let source = match fs::read_to_string(path) {
         Ok(source) => source,
         Err(e) => return FileOutcome::Error(format!("read failed: {e}")),
@@ -243,7 +248,7 @@ fn format_file(path: &Path, check: bool, arena: &bumpalo::Bump) -> FileOutcome {
     // catch_unwind isolates formatter bugs to the file; release builds use
     // panic=abort so this only pays off in dev/corpus profiles
     let result = panic::catch_unwind(AssertUnwindSafe(|| {
-        format_source_in(&source, parser_type, arena)
+        format_source_in(&source, parser_type, arena, doc_arena)
     }));
     let formatted = match result {
         Ok(Ok(formatted)) => formatted,
@@ -276,20 +281,22 @@ fn format_files(files: &[PathBuf], check: bool, jobs: usize) -> Vec<FileOutcome>
             .map(|_| {
                 scope.spawn(|| {
                     let mut outcomes = Vec::new();
-                    // One arena per worker, reused across its files: `reset()` keeps
-                    // the largest chunk and rewinds the cursor, so only the first
-                    // file (and any that grow past the high-water mark) pays a chunk
-                    // alloc — the rest reuse it. The per-file AST borrows `&arena`
-                    // and is dropped inside `format_file` (returns an owned outcome),
-                    // so the `&mut` reset is sound.
+                    // One AST `Bump` and one `DocArena` per worker, reused across
+                    // its files: each `reset()` keeps the largest chunk and rewinds,
+                    // so only the first file (and any that grow past the high-water
+                    // mark) pays an alloc — the rest reuse it. The per-file AST and
+                    // doc tree borrow the arenas and are dropped inside `format_file`
+                    // (which returns an owned outcome), so the `&mut` resets are sound.
                     let mut arena = bumpalo::Bump::new();
+                    let mut doc_arena = tsv_lang::doc::arena::DocArena::new();
                     loop {
                         let i = next.fetch_add(1, Ordering::Relaxed);
                         if i >= files.len() {
                             break;
                         }
-                        outcomes.push((i, format_file(&files[i], check, &arena)));
+                        outcomes.push((i, format_file(&files[i], check, &arena, &doc_arena)));
                         arena.reset();
+                        doc_arena.reset();
                     }
                     outcomes
                 })

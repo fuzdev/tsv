@@ -88,7 +88,8 @@ mod tests {
         let arena = bumpalo::Bump::new();
         let root = crate::parse(src, &arena).expect("template should parse");
         // Reuse the parse's interner so the tag-name symbols resolve.
-        let printer = Printer::new(src, Rc::clone(&root.interner), &[]);
+        let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
+        let printer = Printer::new(&doc_arena, src, Rc::clone(&root.interner), &[]);
         let div = match &root.fragment.nodes[0] {
             FragmentNode::Element(el) => el,
             other => panic!("expected a <div>, got: {other:?}"),
@@ -112,7 +113,8 @@ mod tests {
         let src = "<div><script>let x = 1;</script><style>a { color: red }</style></div>";
         let arena = bumpalo::Bump::new();
         let root = crate::parse(src, &arena).expect("template should parse");
-        let printer = Printer::new(src, Rc::clone(&root.interner), &[]);
+        let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
+        let printer = Printer::new(&doc_arena, src, Rc::clone(&root.interner), &[]);
         let div = match &root.fragment.nodes[0] {
             FragmentNode::Element(el) => el,
             other => panic!("expected a <div>, got: {other:?}"),
@@ -131,7 +133,8 @@ mod tests {
         let src = "<div><script></script><style></style></div>";
         let arena = bumpalo::Bump::new();
         let root = crate::parse(src, &arena).expect("template should parse");
-        let printer = Printer::new(src, Rc::clone(&root.interner), &[]);
+        let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
+        let printer = Printer::new(&doc_arena, src, Rc::clone(&root.interner), &[]);
         let div = match &root.fragment.nodes[0] {
             FragmentNode::Element(el) => el,
             other => panic!("expected a <div>, got: {other:?}"),

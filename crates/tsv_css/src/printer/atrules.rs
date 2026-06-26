@@ -487,7 +487,7 @@ impl<'a> Printer<'a> {
         let current_col = self.current_column();
         let available = PRINT_WIDTH.saturating_sub(current_col + suffix_len);
         let fits = doc::arena_fits::<dyn doc::TextResolver>(
-            &self.arena,
+            self.arena,
             prelude_doc,
             available,
             Mode::Flat,
