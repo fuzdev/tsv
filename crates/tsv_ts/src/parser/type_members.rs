@@ -190,8 +190,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse property/method name
         // Property key: identifier, keyword, string literal, number literal, or computed [expr]
         // Keywords are valid property names in type literals: { class: string }
-        let (computed, key) = if self.check(&TokenKind::BracketOpen) {
-            self.advance()?;
+        let (computed, key) = if self.eat(TokenKind::BracketOpen) {
             let expr = self.parse_expression()?;
             self.expect(&TokenKind::BracketClose)?;
             (true, expr)

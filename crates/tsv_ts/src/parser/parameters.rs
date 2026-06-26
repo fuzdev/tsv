@@ -53,8 +53,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         });
 
         // Check for default value: param = default
-        if self.check(&TokenKind::Equals) {
-            self.advance()?; // consume '='
+        if self.eat(TokenKind::Equals) {
             let default_value = self.parse_assignment_expression()?;
             // prev_token_end covers a parenthesized default's closing `)`
             let assign_end = self.prev_token_end() as u32;
@@ -233,9 +232,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         let pattern = self.parse_destructured_binding()?;
 
                         // Check for default value
-                        if self.check(&TokenKind::Equals) {
+                        if self.eat(TokenKind::Equals) {
                             let pattern_start = pattern.span().start;
-                            self.advance()?; // consume '='
                             let default_value = self.parse_assignment_expression()?;
                             // prev_token_end covers a parenthesized default's closing `)`
                             let assign_end = self.prev_token_end() as u32;

@@ -122,8 +122,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // After the first type, ASI no longer applies (we're in a union context)
         let mut types = self.bvec();
         types.push(first);
-        while self.check(&TokenKind::Pipe) {
-            self.advance()?; // consume '|'
+        while self.eat(TokenKind::Pipe) {
             types.push(self.parse_intersection_type()?);
         }
 
@@ -161,8 +160,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // After the first type, ASI no longer applies (we're in an intersection context)
         let mut types = self.bvec();
         types.push(first);
-        while self.check(&TokenKind::Ampersand) {
-            self.advance()?; // consume '&'
+        while self.eat(TokenKind::Ampersand) {
             types.push(self.parse_array_type()?);
         }
 
@@ -568,8 +566,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         };
 
         // Optional options object: `import('module', {with: {type: 'json'}})`
-        let options: Option<&'arena Expression<'arena>> = if self.check(&TokenKind::Comma) {
-            self.advance()?; // consume ','
+        let options: Option<&'arena Expression<'arena>> = if self.eat(TokenKind::Comma) {
             let expr = self.parse_expression()?;
             Some(self.alloc(expr))
         } else {
@@ -580,8 +577,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::ParenClose)?;
 
         // Optional qualifier: .Foo or .Foo.Bar
-        let qualifier = if self.check(&TokenKind::Dot) {
-            self.advance()?; // consume '.'
+        let qualifier = if self.eat(TokenKind::Dot) {
             Some(self.parse_entity_name()?)
         } else {
             None
@@ -654,9 +650,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Span::new(id_start as u32, id_end as u32),
         ));
 
-        while self.check(&TokenKind::Dot) {
-            self.advance()?; // consume '.'
-
+        while self.eat(TokenKind::Dot) {
             let right_symbol = self
                 .try_intern_identifier_or_keyword()
                 .ok_or_else(|| self.error_expected_after("identifier", "."))?;
@@ -1201,8 +1195,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let elem_start = self.current_pos().0;
 
         // Check for rest element: `...T` or `...label: T`
-        if self.check(&TokenKind::DotDotDot) {
-            self.advance()?; // consume `...`
+        if self.eat(TokenKind::DotDotDot) {
             let inner = self.parse_tuple_element_inner()?;
             let end = inner.span().end;
             return Ok(TSType::Rest(TSRestType {

@@ -44,8 +44,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let prop_start = self.current_pos().0;
 
             // Check for spread: { ...obj }
-            if self.check(&TokenKind::DotDotDot) {
-                self.advance()?; // consume '...'
+            if self.eat(TokenKind::DotDotDot) {
                 // Use assignment_expression because comma separates properties
                 let argument = self.parse_assignment_expression()?;
                 // Use prev_token_end() to include the closing paren when the argument
@@ -299,9 +298,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse elements (including elision/holes)
         loop {
             // Check for elision (hole): leading comma means empty slot
-            if self.check(&TokenKind::Comma) {
+            if self.eat(TokenKind::Comma) {
                 elements.push(None); // hole
-                self.advance()?; // consume ','
                 // Check if we hit the closing bracket (trailing comma after hole)
                 if self.check(&TokenKind::BracketClose) {
                     break;
@@ -319,8 +317,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             elements.push(Some(elem));
 
             // Check for comma or closing bracket
-            if self.check(&TokenKind::Comma) {
-                self.advance()?; // consume ','
+            if self.eat(TokenKind::Comma) {
                 // Check for trailing comma
                 if self.check(&TokenKind::BracketClose) {
                     break;

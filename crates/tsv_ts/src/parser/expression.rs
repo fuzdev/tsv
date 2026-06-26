@@ -358,9 +358,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Handle ternary operator (lowest precedence among binary-like ops, above comma)
         // Handle at BP_ASSIGNMENT to include in assignment expressions but not in binary ops
-        if min_bp <= BP_ASSIGNMENT && self.check(&TokenKind::Question) {
-            self.advance()?; // consume '?'
-
+        if min_bp <= BP_ASSIGNMENT && self.eat(TokenKind::Question) {
             // Parse consequent (then branch) - use BP_ASSIGNMENT to exclude comma operator
             // This ensures (a ? b : c, d) parses as ((a ? b : c), d) not (a ? b : (c, d))
             let consequent = self.parse_expression_bp(BP_ASSIGNMENT)?;
@@ -1594,8 +1592,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse optional arguments: new Date() vs new Date
         let (arguments, end): (&'arena [Expression<'arena>], u32) =
-            if self.check(&TokenKind::ParenOpen) {
-                self.advance()?; // consume '('
+            if self.eat(TokenKind::ParenOpen) {
                 let mut args = self.bvec();
 
                 if !self.check(&TokenKind::ParenClose) {
