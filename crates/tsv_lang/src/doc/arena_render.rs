@@ -463,7 +463,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                     // groups always try flat first, even inside a MODE_BREAK parent.
                     if should_break {
                         // Prettier: if (doc.break) → use most expanded in break mode
-                        let states = expanded_states.resolve(children_vec).to_vec();
+                        let states = expanded_states.resolve(children_vec);
                         let most_expanded = states.last().copied().unwrap_or(contents);
                         let chosen_mode = Mode::Break;
                         commands.push(cmd.with_mode(chosen_mode, most_expanded));
@@ -493,7 +493,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                             chosen_mode = Mode::Flat;
                             commands.push(cmd.with_mode(chosen_mode, contents));
                         } else {
-                            let states = expanded_states.resolve(children_vec).to_vec();
+                            let states = expanded_states.resolve(children_vec);
 
                             let mut found = false;
                             for i in 0..states.len() {
@@ -619,10 +619,10 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
             }
 
             DocNode::Fill(range) => {
-                let parts: Vec<DocId> = range.resolve(children_vec).to_vec();
+                let parts = range.resolve(children_vec);
                 render_fill_iterative(
                     arena,
-                    &parts,
+                    parts,
                     output,
                     pos,
                     cmd.indent,
@@ -639,9 +639,9 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 let context = context.clone();
 
                 if let DocNode::Fill(fill_range) = &nodes[inner_doc.index()] {
-                    let parts: Vec<DocId> = fill_range.resolve(children_vec).to_vec();
+                    let parts = fill_range.resolve(children_vec);
                     render_fill_iterative(
-                        arena, &parts, output, pos, cmd.indent, render, embed, &context, &commands,
+                        arena, parts, output, pos, cmd.indent, render, embed, &context, &commands,
                         resolver,
                     );
                 } else {
@@ -814,7 +814,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                     ) {
                         commands.push(cmd.with_mode(Mode::Flat, contents));
                     } else {
-                        let states = expanded_states.resolve(children_vec).to_vec();
+                        let states = expanded_states.resolve(children_vec);
 
                         let mut found = false;
                         for (i, &state) in states.iter().enumerate() {
@@ -927,7 +927,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
             }
 
             DocNode::Fill(range) => {
-                let parts: Vec<DocId> = range.resolve(children_vec).to_vec();
+                let parts = range.resolve(children_vec);
                 // Pass the remaining commands as look-ahead (like the top-level
                 // `render_doc_iterative` Fill arm), so a fill's final-segment fits check
                 // sees the content that follows it within this sub-render — e.g. the
@@ -935,7 +935,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                 // last word instead of over-shooting the print width.
                 render_fill_iterative(
                     arena,
-                    &parts,
+                    parts,
                     output,
                     pos,
                     cmd.indent,
@@ -953,11 +953,10 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
 
                 if tracking_suffix {
                     if let DocNode::Fill(fill_range) = &nodes[inner_doc.index()] {
-                        let fill_range = *fill_range;
-                        let parts: Vec<DocId> = fill_range.resolve(children_vec).to_vec();
+                        let parts = fill_range.resolve(children_vec);
                         render_fill_iterative(
                             arena,
-                            &parts,
+                            parts,
                             output,
                             pos,
                             cmd.indent,
