@@ -463,7 +463,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                     // groups always try flat first, even inside a MODE_BREAK parent.
                     if should_break {
                         // Prettier: if (doc.break) → use most expanded in break mode
-                        let states = expanded_states.resolve(children_vec).to_vec();
+                        let states = expanded_states.resolve(children_vec);
                         let most_expanded = states.last().copied().unwrap_or(contents);
                         let chosen_mode = Mode::Break;
                         commands.push(cmd.with_mode(chosen_mode, most_expanded));
@@ -493,7 +493,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                             chosen_mode = Mode::Flat;
                             commands.push(cmd.with_mode(chosen_mode, contents));
                         } else {
-                            let states = expanded_states.resolve(children_vec).to_vec();
+                            let states = expanded_states.resolve(children_vec);
 
                             let mut found = false;
                             for i in 0..states.len() {
@@ -814,7 +814,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                     ) {
                         commands.push(cmd.with_mode(Mode::Flat, contents));
                     } else {
-                        let states = expanded_states.resolve(children_vec).to_vec();
+                        let states = expanded_states.resolve(children_vec);
 
                         let mut found = false;
                         for (i, &state) in states.iter().enumerate() {
