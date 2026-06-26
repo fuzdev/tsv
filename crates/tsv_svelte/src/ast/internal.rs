@@ -2,6 +2,18 @@
 //
 // Internal representation optimized for manipulation and formatting.
 // Uses string interning for efficient storage and comparison of identifiers.
+//
+// ## Arena allocation
+//
+// Like `tsv_ts`, the Svelte AST is allocated in a per-parse [`bumpalo::Bump`]
+// supplied by the caller. Recursive children are `&'arena T<'arena>` (not
+// `Box`), child collections are `&'arena [T<'arena>]` (not `Vec`), and decoded /
+// raw strings are `&'arena str` (not `String`) — so a whole parse (template plus
+// the embedded TS `<script>`/`{expr}` and CSS `<style>` ASTs, which share the
+// same `Bump`) is one bump-allocated graph, freed wholesale when the `Bump`
+// drops. `Style` holds a `CssStyleSheet<'arena>` borrowing that shared arena.
+// Leaf nodes that hold only `Span`/`Symbol`/primitives carry no lifetime
+// (`HtmlComment`, `Text`, `SvelteOptions`, the `*Tag`-with-no-expression nodes).
 
 use std::borrow::Cow;
 
@@ -15,13 +27,13 @@ use tsv_ts::ast::internal::{Expression, Program, TSTypeParameterDeclaration, Var
 /// Represents a complete Svelte component with template, scripts, and styles.
 /// Contains optional instance script, module script, and style sections.
 #[derive(Debug, Clone)]
-pub struct Root {
-    pub fragment: Fragment,
-    pub instance: Option<Box<Script>>,
-    pub module: Option<Box<Script>>,
-    pub css: Option<Box<Style>>,
+pub struct Root<'arena> {
+    pub fragment: Fragment<'arena>,
+    pub instance: Option<&'arena Script<'arena>>,
+    pub module: Option<&'arena Script<'arena>>,
+    pub css: Option<&'arena Style<'arena>>,
     /// `<svelte:options>` configuration (not part of fragment)
-    pub options: Option<SvelteOptions>,
+    pub options: Option<SvelteOptions<'arena>>,
     /// All comments from scripts and template expressions.
     /// Use `comments_in_range(span)` to find comments for a specific node.
     pub comments: Vec<Comment>,
@@ -34,30 +46,34 @@ pub struct Root {
 /// A fragment contains a sequence of template nodes (elements, text, expressions).
 /// Used both at the root level and as children of elements.
 #[derive(Debug, Clone)]
-pub struct Fragment {
-    pub nodes: Vec<FragmentNode>,
+pub struct Fragment<'arena> {
+    pub nodes: &'arena [FragmentNode<'arena>],
 }
 
 /// Svelte template node types
 ///
 /// Represents the different kinds of nodes that can appear in a Svelte template.
+///
+/// All variants are inline by value: the layout favors traversal locality over
+/// node size (boxing the fat variants added a pointer-chase on hot format-read
+/// paths that cost more than the slice-density win). See TODO_BUMPALO_ARENA.md.
 #[derive(Debug, Clone)]
-pub enum FragmentNode {
-    Element(Element),
-    SpecialElement(SpecialElement),
-    ExpressionTag(ExpressionTag),
+pub enum FragmentNode<'arena> {
+    Element(Element<'arena>),
+    SpecialElement(SpecialElement<'arena>),
+    ExpressionTag(ExpressionTag<'arena>),
     Text(Text),
     Comment(HtmlComment),
-    IfBlock(IfBlock),
-    EachBlock(EachBlock),
-    AwaitBlock(AwaitBlock),
-    KeyBlock(KeyBlock),
-    SnippetBlock(SnippetBlock),
-    HtmlTag(HtmlTag),
-    ConstTag(ConstTag),
-    DeclarationTag(DeclarationTag),
-    DebugTag(DebugTag),
-    RenderTag(RenderTag),
+    IfBlock(IfBlock<'arena>),
+    EachBlock(EachBlock<'arena>),
+    AwaitBlock(AwaitBlock<'arena>),
+    KeyBlock(KeyBlock<'arena>),
+    SnippetBlock(SnippetBlock<'arena>),
+    HtmlTag(HtmlTag<'arena>),
+    ConstTag(ConstTag<'arena>),
+    DeclarationTag(DeclarationTag<'arena>),
+    DebugTag(DebugTag<'arena>),
+    RenderTag(RenderTag<'arena>),
 }
 
 /// HTML comment node: <!-- content -->
@@ -90,11 +106,11 @@ impl HtmlComment {
 /// Represents {#if test}...{:else if test}...{:else}...{/if} blocks.
 /// The `elseif` field is true for {:else if} branches (nested in alternate).
 #[derive(Debug, Clone)]
-pub struct IfBlock {
+pub struct IfBlock<'arena> {
     pub elseif: bool,
-    pub test: Expression,
-    pub consequent: Fragment,
-    pub alternate: Option<Fragment>,
+    pub test: Expression<'arena>,
+    pub consequent: Fragment<'arena>,
+    pub alternate: Option<Fragment<'arena>>,
     pub span: Span,
     /// Span of the opening tag `{#if ... }` or `{:else if ... }` for comment lookup
     pub opening_tag_span: Span,
@@ -105,15 +121,15 @@ pub struct IfBlock {
 /// Represents {#each expression as context, index (key)}...{:else}...{/each} blocks.
 /// Also supports {#each expression} and {#each expression, index} without `as`.
 #[derive(Debug, Clone)]
-pub struct EachBlock {
-    pub expression: Expression,
-    pub context: Option<Expression>, // Pattern (identifier or destructuring), None if no `as`
-    pub index: Option<String>,
-    pub key: Option<Expression>,
+pub struct EachBlock<'arena> {
+    pub expression: Expression<'arena>,
+    pub context: Option<Expression<'arena>>, // Pattern (identifier or destructuring), None if no `as`
+    pub index: Option<&'arena str>,
+    pub key: Option<Expression<'arena>>,
     /// Span of the key including parentheses `(key)` for comment lookup
     pub key_span: Option<Span>,
-    pub body: Fragment,
-    pub fallback: Option<Fragment>,
+    pub body: Fragment<'arena>,
+    pub fallback: Option<Fragment<'arena>>,
     pub span: Span,
     /// Span of the opening tag `{#each ... }` for comment lookup
     pub opening_tag_span: Span,
@@ -124,13 +140,13 @@ pub struct EachBlock {
 /// Represents {#await expression}...{:then value}...{:catch error}...{/await} blocks.
 /// Also supports shorthand: {#await expression then value}...{/await}
 #[derive(Debug, Clone)]
-pub struct AwaitBlock {
-    pub expression: Expression,
-    pub value: Option<Expression>, // Pattern for :then binding
-    pub error: Option<Expression>, // Pattern for :catch binding
-    pub pending: Option<Fragment>,
-    pub then: Option<Fragment>,
-    pub catch: Option<Fragment>,
+pub struct AwaitBlock<'arena> {
+    pub expression: Expression<'arena>,
+    pub value: Option<Expression<'arena>>, // Pattern for :then binding
+    pub error: Option<Expression<'arena>>, // Pattern for :catch binding
+    pub pending: Option<Fragment<'arena>>,
+    pub then: Option<Fragment<'arena>>,
+    pub catch: Option<Fragment<'arena>>,
     pub span: Span,
     /// Span of the opening tag `{#await ... }` for comment lookup
     pub opening_tag_span: Span,
@@ -141,9 +157,9 @@ pub struct AwaitBlock {
 /// Represents {#key expression}...{/key} blocks.
 /// Forces re-creation of contents when expression changes.
 #[derive(Debug, Clone)]
-pub struct KeyBlock {
-    pub expression: Expression,
-    pub fragment: Fragment,
+pub struct KeyBlock<'arena> {
+    pub expression: Expression<'arena>,
+    pub fragment: Fragment<'arena>,
     pub span: Span,
     /// Span of the opening tag `{#key ... }` for comment lookup
     pub opening_tag_span: Span,
@@ -154,25 +170,25 @@ pub struct KeyBlock {
 /// Represents {#snippet name(params)}...{/snippet} blocks.
 /// Defines a reusable chunk of markup that can be rendered with {@render}.
 #[derive(Debug, Clone)]
-pub struct SnippetBlock {
-    pub expression: Expression, // Snippet name (Identifier)
+pub struct SnippetBlock<'arena> {
+    pub expression: Expression<'arena>, // Snippet name (Identifier)
     /// Parsed generic type parameters (`<T extends X = Y>`), routed through
     /// `tsv_ts`'s type-parameter printer for constraint/default/modifier
     /// handling and width-based wrapping. `None` when absent or when the
     /// signature parse fell back to raw text (see `type_params_raw`).
-    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
     /// Raw inner text of the generics (`T extends X` for `<T extends X>`),
     /// always set when generics are present. Feeds the public AST's `typeParams`
     /// string (matching Svelte's parser) and is the formatter fallback when
     /// `type_parameters` is `None` (parse failure).
-    pub type_params_raw: Option<String>,
-    pub parameters: Vec<Expression>, // Function parameters (patterns) - may be empty if raw_parameters is set
-    pub raw_parameters: Option<String>, // Raw parameter string for TypeScript (when type annotations present)
+    pub type_params_raw: Option<&'arena str>,
+    pub parameters: &'arena [Expression<'arena>], // Function parameters (patterns) - may be empty if raw_parameters is set
+    pub raw_parameters: Option<&'arena str>, // Raw parameter string for TypeScript (when type annotations present)
     /// Source span of the parameter parens: `start` is the `(`, `end` is the `)`
     /// (for leading / dangling / trailing comment lookup when printing parameters).
     /// `None` only if no `(` was found (malformed).
     pub params_paren: Option<Span>,
-    pub body: Fragment,
+    pub body: Fragment<'arena>,
     pub span: Span,
     /// Span of the opening tag `{#snippet ... }` for comment lookup
     pub opening_tag_span: Span,
@@ -183,8 +199,8 @@ pub struct SnippetBlock {
 /// Represents {@html expression} tags.
 /// Injects raw HTML content without escaping.
 #[derive(Debug, Clone)]
-pub struct HtmlTag {
-    pub expression: Expression,
+pub struct HtmlTag<'arena> {
+    pub expression: Expression<'arena>,
     pub span: Span,
 }
 
@@ -194,9 +210,9 @@ pub struct HtmlTag {
 /// Declares a local constant within a block scope.
 /// The `id` is the pattern (identifier or destructuring) and `init` is the value.
 #[derive(Debug, Clone)]
-pub struct ConstTag {
-    pub id: Expression,   // Pattern (identifier or destructuring)
-    pub init: Expression, // Initializer expression
+pub struct ConstTag<'arena> {
+    pub id: Expression<'arena>,   // Pattern (identifier or destructuring)
+    pub init: Expression<'arena>, // Initializer expression
     pub span: Span,
 }
 
@@ -207,8 +223,8 @@ pub struct ConstTag {
 /// multiple declarators, comments, and every bracket/string case are handled
 /// natively. (`{@const}` is a separate `ConstTag` on its own path.)
 #[derive(Debug, Clone)]
-pub struct DeclarationTag {
-    pub declaration: VariableDeclaration,
+pub struct DeclarationTag<'arena> {
+    pub declaration: VariableDeclaration<'arena>,
     pub span: Span,
 }
 
@@ -222,8 +238,8 @@ pub struct DeclarationTag {
 /// within debug tags. Comments are stored in `Root.comments` and looked
 /// up by span during formatting. This is an intentional divergence.
 #[derive(Debug, Clone)]
-pub struct DebugTag {
-    pub identifiers: Vec<Expression>, // List of identifiers to debug
+pub struct DebugTag<'arena> {
+    pub identifiers: &'arena [Expression<'arena>], // List of identifiers to debug
     pub span: Span,
 }
 
@@ -232,8 +248,8 @@ pub struct DebugTag {
 /// Represents {@render fn()} or {@render fn?.()} tags.
 /// Renders a snippet, optionally with arguments.
 #[derive(Debug, Clone)]
-pub struct RenderTag {
-    pub expression: Expression, // CallExpression or ChainExpression
+pub struct RenderTag<'arena> {
+    pub expression: Expression<'arena>, // CallExpression or ChainExpression
     pub span: Span,
 }
 
@@ -242,8 +258,8 @@ pub struct RenderTag {
 /// Represents {@attach expr} inside element opening tags.
 /// Attaches reactive functions to elements (Svelte 5.29+).
 #[derive(Debug, Clone)]
-pub struct AttachTag {
-    pub expression: Expression,
+pub struct AttachTag<'arena> {
+    pub expression: Expression<'arena>,
     pub span: Span,
 }
 
@@ -256,12 +272,17 @@ pub struct AttachTag {
 /// Event handlers can have modifiers like `preventDefault`, `stopPropagation`, etc.
 /// When no expression is provided (rare), expression is null.
 #[derive(Debug, Clone)]
-pub struct OnDirective {
-    pub name: String,                   // Event name: "click", "keydown", etc.
-    pub expression: Option<Expression>, // Handler function
-    pub modifiers: Vec<String>,         // "preventDefault", "stopPropagation", etc.
-    pub span: Span,
+pub struct OnDirective<'arena> {
+    /// Span of the directive name only (e.g. "click"). A **verbatim** source slice —
+    /// HTML/Svelte attribute names are never entity-decoded — recovered via
+    /// `name_span.extract(source)`. Distinct from `head_span` below, which is the whole
+    /// directive head token ("on:click|preventDefault", prefix + name + modifiers).
     pub name_span: Span,
+    pub expression: Option<Expression<'arena>>, // Handler function
+    pub modifiers: &'arena [&'arena str],       // "preventDefault", "stopPropagation", etc.
+    pub span: Span,
+    /// Span of the whole directive head (`on:click|preventDefault`); used as `name_loc`.
+    pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
     pub expression_tag_span: Option<Span>,
 }
@@ -271,12 +292,13 @@ pub struct OnDirective {
 /// Bindings connect a property to a variable. When shorthand (`bind:value`),
 /// an identifier with the same name is auto-generated as the expression.
 #[derive(Debug, Clone)]
-pub struct BindDirective {
-    pub name: String,           // Property name: "value", "checked", "this", etc.
-    pub expression: Expression, // Binding target (always present - auto-generated for shorthand)
-    pub modifiers: Vec<String>, // Unofficial — no official modifier support; preserved verbatim
-    pub span: Span,
+pub struct BindDirective<'arena> {
+    /// Span of the property name only (e.g. "value") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
+    pub expression: Expression<'arena>, // Binding target (always present - auto-generated for shorthand)
+    pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
+    pub span: Span,
+    pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None for shorthand bindings)
     pub expression_tag_span: Option<Span>,
 }
@@ -286,12 +308,13 @@ pub struct BindDirective {
 /// Applies a class conditionally based on an expression.
 /// When shorthand (`class:class1`), an identifier with the same name is auto-generated.
 #[derive(Debug, Clone)]
-pub struct ClassDirective {
-    pub name: String,           // Class name: "class1", "class2", etc.
-    pub expression: Expression, // Condition (always present - auto-generated for shorthand)
-    pub modifiers: Vec<String>, // Unofficial — no official modifier support; preserved verbatim
-    pub span: Span,
+pub struct ClassDirective<'arena> {
+    /// Span of the class name only (e.g. "class1") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
+    pub expression: Expression<'arena>, // Condition (always present - auto-generated for shorthand)
+    pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
+    pub span: Span,
+    pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None for shorthand)
     pub expression_tag_span: Option<Span>,
 }
@@ -302,35 +325,37 @@ pub struct ClassDirective {
 /// because it can be a string value, not just an expression.
 /// When shorthand (`style:color`), value is `true` (boolean).
 #[derive(Debug, Clone)]
-pub struct StyleDirective {
-    pub name: String,               // CSS property: "color", "--custom", etc.
-    pub value: StyleDirectiveValue, // true, ExpressionTag, or mixed text/expressions
-    pub modifiers: Vec<String>,     // "important"
-    pub span: Span,
+pub struct StyleDirective<'arena> {
+    /// Span of the CSS property name only (e.g. "color") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
+    pub value: StyleDirectiveValue<'arena>, // true, ExpressionTag, or mixed text/expressions
+    pub modifiers: &'arena [&'arena str],   // "important"
+    pub span: Span,
+    pub head_span: Span,
 }
 
 /// Value of a style directive
 #[derive(Debug, Clone)]
-pub enum StyleDirectiveValue {
+pub enum StyleDirectiveValue<'arena> {
     /// Shorthand: `style:color` (uses variable with same name)
     True,
     /// Pure expression: `style:color={value}`
-    ExpressionTag(ExpressionTag),
+    ExpressionTag(ExpressionTag<'arena>),
     /// Mixed value (string with possible expressions): `style:color="red"`
-    Parts(Vec<AttributeValue>),
+    Parts(&'arena [AttributeValue<'arena>]),
 }
 
 /// UseDirective - action (`use:action={params}`)
 ///
 /// Actions are functions that run when an element is mounted.
 #[derive(Debug, Clone)]
-pub struct UseDirective {
-    pub name: String,                   // Action name: "action", "tooltip", etc.
-    pub expression: Option<Expression>, // Parameters passed to the action
-    pub modifiers: Vec<String>, // Unofficial — no official modifier support; preserved verbatim
-    pub span: Span,
+pub struct UseDirective<'arena> {
+    /// Span of the action name only (e.g. "action") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
+    pub expression: Option<Expression<'arena>>, // Parameters passed to the action
+    pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
+    pub span: Span,
+    pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
     pub expression_tag_span: Option<Span>,
 }
@@ -385,13 +410,14 @@ impl TransitionDirection {
 ///
 /// Controls enter/exit animations. Can be bidirectional (transition:) or unidirectional (in:/out:).
 #[derive(Debug, Clone)]
-pub struct TransitionDirective {
-    pub name: String,                   // Transition name: "fade", "fly", "slide", etc.
-    pub expression: Option<Expression>, // Transition parameters
-    pub modifiers: Vec<String>,         // "local", "global"
-    pub direction: TransitionDirection, // Which animations to run
-    pub span: Span,
+pub struct TransitionDirective<'arena> {
+    /// Span of the transition name only (e.g. "fade") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
+    pub expression: Option<Expression<'arena>>, // Transition parameters
+    pub modifiers: &'arena [&'arena str],       // "local", "global"
+    pub direction: TransitionDirection,         // Which animations to run
+    pub span: Span,
+    pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
     pub expression_tag_span: Option<Span>,
 }
@@ -400,12 +426,13 @@ pub struct TransitionDirective {
 ///
 /// FLIP animations for list items.
 #[derive(Debug, Clone)]
-pub struct AnimateDirective {
-    pub name: String,                   // Animation name: "flip", etc.
-    pub expression: Option<Expression>, // Animation parameters
-    pub modifiers: Vec<String>, // Unofficial — no official modifier support; preserved verbatim
-    pub span: Span,
+pub struct AnimateDirective<'arena> {
+    /// Span of the animation name only (e.g. "flip") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
+    pub expression: Option<Expression<'arena>>, // Animation parameters
+    pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
+    pub span: Span,
+    pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
     pub expression_tag_span: Option<Span>,
 }
@@ -414,12 +441,13 @@ pub struct AnimateDirective {
 ///
 /// Receives values from a slot. The expression is the local binding pattern.
 #[derive(Debug, Clone)]
-pub struct LetDirective {
-    pub name: String,                   // Slot prop name: "item", "index", etc.
-    pub expression: Option<Expression>, // Local binding pattern (Identifier, ArrayPattern, ObjectPattern)
-    pub modifiers: Vec<String>, // Unofficial — no official modifier support; preserved verbatim
-    pub span: Span,
+pub struct LetDirective<'arena> {
+    /// Span of the slot-prop name only (e.g. "item") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
+    pub expression: Option<Expression<'arena>>, // Local binding pattern (Identifier, ArrayPattern, ObjectPattern)
+    pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
+    pub span: Span,
+    pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
     pub expression_tag_span: Option<Span>,
 }
@@ -501,7 +529,7 @@ impl SpecialElementTag {
 /// Variants that require additional data (SvelteElement, SvelteComponent) carry it
 /// directly, eliminating the need for Option fields on the parent struct.
 #[derive(Debug, Clone)]
-pub enum SpecialElementKind {
+pub enum SpecialElementKind<'arena> {
     /// `<svelte:head>` - inject content into document head
     SvelteHead,
     /// `<svelte:window>` - bind to window events/properties
@@ -511,9 +539,9 @@ pub enum SpecialElementKind {
     /// `<svelte:document>` - bind to document events
     SvelteDocument,
     /// `<svelte:element this={tag}>` - dynamic element tag
-    SvelteElement { tag: Expression },
+    SvelteElement { tag: Expression<'arena> },
     /// `<svelte:component this={Component}>` - dynamic component (legacy)
-    SvelteComponent { expression: Expression },
+    SvelteComponent { expression: Expression<'arena> },
     /// `<svelte:self>` - recursive self-reference
     SvelteSelf,
     /// `<slot>` - content slot
@@ -526,7 +554,7 @@ pub enum SpecialElementKind {
     TitleElement,
 }
 
-impl SpecialElementKind {
+impl<'arena> SpecialElementKind<'arena> {
     /// Whether this special element is a block-level element (forces line breaks).
     ///
     /// Block elements: `svelte:head`, `svelte:window`, `svelte:body`, `svelte:document`
@@ -579,7 +607,7 @@ impl SpecialElementKind {
     }
 
     /// Get the tag expression for SvelteElement
-    pub fn tag(&self) -> Option<&Expression> {
+    pub fn tag(&self) -> Option<&Expression<'arena>> {
         match self {
             Self::SvelteElement { tag } => Some(tag),
             _ => None,
@@ -587,7 +615,7 @@ impl SpecialElementKind {
     }
 
     /// Get the component expression for SvelteComponent
-    pub fn expression(&self) -> Option<&Expression> {
+    pub fn expression(&self) -> Option<&Expression<'arena>> {
         match self {
             Self::SvelteComponent { expression } => Some(expression),
             _ => None,
@@ -606,10 +634,10 @@ impl SpecialElementKind {
 /// Variant-specific data (tag for SvelteElement, expression for SvelteComponent)
 /// is stored in the `SpecialElementKind` enum, not as Option fields here.
 #[derive(Debug, Clone)]
-pub struct SpecialElement {
-    pub kind: SpecialElementKind,
-    pub attributes: Vec<AttributeNode>,
-    pub fragment: Fragment,
+pub struct SpecialElement<'arena> {
+    pub kind: SpecialElementKind<'arena>,
+    pub attributes: &'arena [AttributeNode<'arena>],
+    pub fragment: Fragment<'arena>,
     pub span: Span,
     pub name_span: Span,
     /// Position of the `>` that closes the opening tag.
@@ -622,12 +650,12 @@ pub struct SpecialElement {
 /// Represents `<svelte:options>` which configures component behavior.
 /// Stored separately from the fragment in `Root.options`.
 #[derive(Debug, Clone)]
-pub struct SvelteOptions {
-    pub attributes: Vec<AttributeNode>,
+pub struct SvelteOptions<'arena> {
+    pub attributes: &'arena [AttributeNode<'arena>],
     pub span: Span,
 }
 
-impl FragmentNode {
+impl<'arena> FragmentNode<'arena> {
     pub fn span(&self) -> Span {
         match self {
             FragmentNode::Element(elem) => elem.span,
@@ -672,7 +700,7 @@ impl FragmentNode {
 
 /// Svelte Element kind - distinguishes HTML elements from components
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "convert", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "convert", derive(serde::Serialize))]
 pub enum ElementKind {
     /// HTML element: `<div>`, `<span>`, `<input>`, etc. (lowercase first character)
     #[cfg_attr(feature = "convert", serde(rename = "Html"))]
@@ -687,11 +715,11 @@ pub enum ElementKind {
 /// Represents an HTML element or Svelte component in the template.
 /// Elements have a name, attributes, and child nodes in a fragment.
 #[derive(Debug, Clone)]
-pub struct Element {
+pub struct Element<'arena> {
     pub name: DefaultSymbol,
     pub kind: ElementKind,
-    pub attributes: Vec<AttributeNode>,
-    pub fragment: Fragment,
+    pub attributes: &'arena [AttributeNode<'arena>],
+    pub fragment: Fragment<'arena>,
     pub span: Span,
     pub name_span: Span,
     /// Position of the `>` that closes the opening tag.
@@ -708,9 +736,9 @@ pub struct Element {
 /// Attribute with name="a" and value containing an ExpressionTag with Identifier "a".
 /// Detection is implicit: check if name matches expression identifier.
 #[derive(Debug, Clone)]
-pub struct Attribute {
+pub struct Attribute<'arena> {
     pub name: DefaultSymbol,
-    pub value: Option<Vec<AttributeValue>>,
+    pub value: Option<&'arena [AttributeValue<'arena>]>,
     pub span: Span,
     pub name_span: Span,
 }
@@ -720,8 +748,8 @@ pub struct Attribute {
 /// Represents `{...obj}` syntax that spreads an object's properties as attributes.
 /// The expression can be any valid expression: identifier, call, member access, etc.
 #[derive(Debug, Clone)]
-pub struct SpreadAttribute {
-    pub expression: Expression,
+pub struct SpreadAttribute<'arena> {
+    pub expression: Expression<'arena>,
     pub span: Span,
 }
 
@@ -733,22 +761,22 @@ pub struct SpreadAttribute {
 /// - `AttachTag`: `{@attach expr}` attachments (Svelte 5.29+)
 /// - Directives: `on:`, `bind:`, `class:`, `style:`, `use:`, `transition:`, `in:`, `out:`, `animate:`, `let:`
 #[derive(Debug, Clone)]
-pub enum AttributeNode {
-    Attribute(Attribute),
-    SpreadAttribute(SpreadAttribute),
-    AttachTag(AttachTag),
+pub enum AttributeNode<'arena> {
+    Attribute(Attribute<'arena>),
+    SpreadAttribute(SpreadAttribute<'arena>),
+    AttachTag(AttachTag<'arena>),
     // Directives
-    OnDirective(OnDirective),
-    BindDirective(BindDirective),
-    ClassDirective(ClassDirective),
-    StyleDirective(StyleDirective),
-    UseDirective(UseDirective),
-    TransitionDirective(TransitionDirective),
-    AnimateDirective(AnimateDirective),
-    LetDirective(LetDirective),
+    OnDirective(OnDirective<'arena>),
+    BindDirective(BindDirective<'arena>),
+    ClassDirective(ClassDirective<'arena>),
+    StyleDirective(StyleDirective<'arena>),
+    UseDirective(UseDirective<'arena>),
+    TransitionDirective(TransitionDirective<'arena>),
+    AnimateDirective(AnimateDirective<'arena>),
+    LetDirective(LetDirective<'arena>),
 }
 
-impl AttributeNode {
+impl<'arena> AttributeNode<'arena> {
     /// Get the span of this attribute node
     pub fn span(&self) -> Span {
         match self {
@@ -771,9 +799,9 @@ impl AttributeNode {
 ///
 /// Attribute values can contain static text or dynamic expressions.
 #[derive(Debug, Clone)]
-pub enum AttributeValue {
+pub enum AttributeValue<'arena> {
     Text(Text),
-    ExpressionTag(ExpressionTag),
+    ExpressionTag(ExpressionTag<'arena>),
 }
 
 /// Svelte Text node - raw text content
@@ -851,8 +879,8 @@ impl Text {
 /// Represents a TypeScript/JS expression embedded in the template.
 /// The expression is evaluated and its result is rendered.
 #[derive(Debug, Clone)]
-pub struct ExpressionTag {
-    pub expression: Expression,
+pub struct ExpressionTag<'arena> {
+    pub expression: Expression<'arena>,
     pub span: Span,
 }
 
@@ -861,9 +889,9 @@ pub struct ExpressionTag {
 /// Contains a TypeScript/JS program and metadata about the script tag.
 /// The `context` field distinguishes between instance and module scripts.
 #[derive(Debug, Clone)]
-pub struct Script {
-    pub content: Program,
-    pub attributes: Vec<AttributeNode>,
+pub struct Script<'arena> {
+    pub content: Program<'arena>,
+    pub attributes: &'arena [AttributeNode<'arena>],
     pub context: ScriptContext,
     pub span: Span,
 }
@@ -892,12 +920,21 @@ impl ScriptContext {
 /// Stores the span of the entire <style> tag and the content span.
 /// Style tag with parsed CSS content
 #[derive(Debug, Clone)]
-pub struct Style {
+pub struct Style<'arena> {
     pub span: Span,         // Full <style>...</style> span
     pub content_span: Span, // Just the CSS text inside the tags
-    pub attributes: Vec<AttributeNode>,
-    pub css_stylesheet: CssStyleSheet, // Parsed CSS stylesheet (nodes + value comments)
+    pub attributes: &'arena [AttributeNode<'arena>],
+    /// Parsed CSS stylesheet (nodes + value comments), bump-allocated in the
+    /// shared document `Bump` (`tsv_css` is arena-native).
+    pub css_stylesheet: CssStyleSheet<'arena>,
 }
+
+// No `size_of` guards on the slice-multiplied Svelte AST enums: the arena layout
+// deliberately favors traversal locality over node size, keeping every
+// `FragmentNode` / `AttributeNode` variant inline by value rather than
+// arena-boxing the fat ones for a smaller enum. Boxing them shrank the slice
+// element but added a pointer-chase on hot format-read paths that cost more than
+// the density win, so the inline form stands. See TODO_BUMPALO_ARENA.md.
 
 #[cfg(test)]
 mod tests {

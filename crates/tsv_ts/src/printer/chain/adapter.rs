@@ -22,31 +22,41 @@ impl<'a> ChainPrinter for Printer<'a> {
         self.arena
     }
 
-    fn print_expression(&self, expr: &internal::Expression) -> DocId {
+    fn print_expression(&self, expr: &internal::Expression<'_>) -> DocId {
         self.build_expression_doc(expr)
     }
 
-    fn build_parenthesized_base_inner_logical(&self, binary: &internal::BinaryExpression) -> DocId {
+    fn build_parenthesized_base_inner_logical(
+        &self,
+        binary: &internal::BinaryExpression<'_>,
+    ) -> DocId {
         let d = self.d();
         let inner = self.build_binary_chain_parts_indented(binary);
         d.group(inner)
     }
 
-    fn build_parenthesized_base_inner_binary(&self, binary: &internal::BinaryExpression) -> DocId {
+    fn build_parenthesized_base_inner_binary(
+        &self,
+        binary: &internal::BinaryExpression<'_>,
+    ) -> DocId {
         self.build_binary_chain_for_parens(binary)
     }
 
-    fn print_call_args(&self, call: &internal::CallExpression, optional: bool) -> DocId {
+    fn print_call_args(&self, call: &internal::CallExpression<'_>, optional: bool) -> DocId {
         self.build_call_args_doc_for_chain(call, optional)
     }
 
-    fn print_call_args_expanded(&self, call: &internal::CallExpression, optional: bool) -> DocId {
+    fn print_call_args_expanded(
+        &self,
+        call: &internal::CallExpression<'_>,
+        optional: bool,
+    ) -> DocId {
         self.build_call_args_doc_for_chain_expanded(call, optional)
     }
 
     fn print_call_args_standard_expanded(
         &self,
-        call: &internal::CallExpression,
+        call: &internal::CallExpression<'_>,
         optional: bool,
     ) -> DocId {
         self.build_call_args_doc_for_chain_standard_expanded(call, optional)
@@ -69,7 +79,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         self.format_block_comments(&block_comments, spacing)
     }
 
-    fn get_property_span(&self, expr: &internal::Expression) -> tsv_lang::Span {
+    fn get_property_span(&self, expr: &internal::Expression<'_>) -> tsv_lang::Span {
         expr.span()
     }
 

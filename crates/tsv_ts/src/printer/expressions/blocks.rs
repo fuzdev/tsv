@@ -21,7 +21,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a block statement
     pub(in crate::printer) fn build_block_statement_doc(
         &self,
-        block: &internal::BlockStatement,
+        block: &internal::BlockStatement<'_>,
     ) -> DocId {
         self.build_block_statement_doc_core(block, false)
     }
@@ -31,7 +31,7 @@ impl<'a> Printer<'a> {
     /// Used in if/else contexts where empty blocks should not stay on one line.
     pub(in crate::printer) fn build_block_statement_expand_empty_doc(
         &self,
-        block: &internal::BlockStatement,
+        block: &internal::BlockStatement<'_>,
     ) -> DocId {
         self.build_block_statement_doc_core(block, true)
     }
@@ -42,7 +42,7 @@ impl<'a> Printer<'a> {
     /// When false, they become `{}`.
     fn build_block_statement_doc_core(
         &self,
-        block: &internal::BlockStatement,
+        block: &internal::BlockStatement<'_>,
         expand_empty: bool,
     ) -> DocId {
         // Reset is_expression_statement when entering a block body.
@@ -59,14 +59,14 @@ impl<'a> Printer<'a> {
 
     fn build_block_statement_doc_inner(
         &self,
-        block: &internal::BlockStatement,
+        block: &internal::BlockStatement<'_>,
         expand_empty: bool,
     ) -> DocId {
         self.build_block_body_doc(block, expand_empty, DocBuf::new())
     }
 
     /// Build inner comments doc for empty block
-    fn build_inner_comments_for_empty_block(&self, block: &internal::BlockStatement) -> DocBuf {
+    fn build_inner_comments_for_empty_block(&self, block: &internal::BlockStatement<'_>) -> DocBuf {
         let d = self.d();
         let block_start = block.span.start + 1; // After '{'
         let block_end = block.span.end - 1; // Before '}'
@@ -90,7 +90,7 @@ impl<'a> Printer<'a> {
     /// The `leading_content` is prepended to the body (used for outer comments).
     fn build_block_body_doc(
         &self,
-        block: &internal::BlockStatement,
+        block: &internal::BlockStatement<'_>,
         expand_empty: bool,
         leading_content: DocBuf,
     ) -> DocId {
@@ -143,7 +143,7 @@ impl<'a> Printer<'a> {
         // Build statements (leading comments, blank-line separators,
         // format-ignore, trailing same-line comments) via the shared walk.
         let (mut body_parts, _prev_end, prev_stmt_end) = self.build_statement_list_docs(
-            &block.body,
+            block.body,
             block_start,
             block_end,
             leading_content,
@@ -201,7 +201,7 @@ impl<'a> Printer<'a> {
     /// last statement, and the enclosing braces — those differ between contexts.
     pub(in crate::printer) fn build_statement_list_docs(
         &self,
-        body: &[internal::Statement],
+        body: &[internal::Statement<'_>],
         body_start: u32,
         body_end: u32,
         leading_content: DocBuf,
@@ -298,7 +298,7 @@ impl<'a> Printer<'a> {
     /// that should appear at the start of the block body.
     pub(in crate::printer) fn build_block_statement_with_outer_comments_doc(
         &self,
-        block: &internal::BlockStatement,
+        block: &internal::BlockStatement<'_>,
         outer_comments: DocBuf,
     ) -> DocId {
         if outer_comments.is_empty() {

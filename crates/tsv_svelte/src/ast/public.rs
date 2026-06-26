@@ -4,7 +4,7 @@
 // Used for serialization and external tool compatibility.
 
 use crate::ast::internal::ElementKind;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tsv_css::ast::public::StyleSheet;
 use tsv_ts::ast::public::Expression;
 
@@ -12,14 +12,14 @@ use tsv_ts::ast::public::Expression;
 ///
 /// Used on elements, attributes, and directives. The `character` field
 /// is the byte offset (Svelte-specific; TS `loc` doesn't have it).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct NameLocation {
     pub start: NamePosition,
     pub end: NamePosition,
 }
 
 /// Position within a name location (line, column, byte offset)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct NamePosition {
     pub line: usize,
     pub column: usize,
@@ -29,7 +29,12 @@ pub struct NamePosition {
 /// Svelte Root node - top level of a .svelte file
 ///
 /// Serializes to match Svelte's parser output exactly.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// The public AST is Serialize-only — it is an output format (matching Svelte's
+/// JSON), never deserialized back into these types. (`css` also embeds
+/// `tsv_css`'s `StyleSheet`, whose `&'static str` type tags couldn't round-trip
+/// regardless.)
+#[derive(Debug, Clone, Serialize)]
 pub struct Root {
     pub css: Option<StyleSheet>,
     pub js: Vec<serde_json::Value>, // empty array for now
@@ -47,7 +52,7 @@ pub struct Root {
 }
 
 /// Svelte Fragment - container for template nodes
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Fragment {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -55,7 +60,7 @@ pub struct Fragment {
 }
 
 /// Svelte template node types
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum FragmentNode {
     Component(Element),
@@ -77,7 +82,7 @@ pub enum FragmentNode {
 }
 
 /// Svelte HTML Comment node: <!-- content -->
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Comment {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -87,7 +92,7 @@ pub struct Comment {
 }
 
 /// Svelte Element - HTML/component tag
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Element {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -106,7 +111,7 @@ pub struct Element {
 /// Represents: `<svelte:head>`, `<svelte:window>`, `<svelte:body>`, `<svelte:document>`,
 /// `<svelte:element>`, `<svelte:component>`, `<svelte:self>`, `<slot>`,
 /// `<svelte:fragment>`, `<svelte:boundary>`, `<title>` (inside svelte:head)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SpecialElement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -128,7 +133,7 @@ pub struct SpecialElement {
 ///
 /// Represents `<svelte:options runes={true} />` etc.
 /// Not part of the fragment - stored in Root.options
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SvelteOptions {
     pub start: u32,
     pub end: u32,
@@ -157,7 +162,7 @@ pub struct SvelteOptions {
 }
 
 /// Svelte Attribute - element attribute
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Attribute {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -170,7 +175,7 @@ pub struct Attribute {
 }
 
 /// Svelte AttachTag - element attachment (Svelte 5.29+)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct AttachTag {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -180,7 +185,7 @@ pub struct AttachTag {
 }
 
 /// Svelte SpreadAttribute - spread object as attributes (`{...obj}`)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SpreadAttribute {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -194,7 +199,7 @@ pub struct SpreadAttribute {
 //
 
 /// OnDirective - event handler (`on:click={handler}`)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct OnDirective {
     pub start: u32,
     pub end: u32,
@@ -211,7 +216,7 @@ pub struct OnDirective {
 /// The `expression` field is `serde_json::Value` because shorthand directives
 /// (`bind:value`) produce Svelte-style field ordering without `loc`, while
 /// explicit directives (`bind:value={a}`) use acorn-style ordering with `loc`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct BindDirective {
     pub start: u32,
     pub end: u32,
@@ -226,7 +231,7 @@ pub struct BindDirective {
 /// ClassDirective - conditional class (`class:class1={cond}`)
 ///
 /// See `BindDirective` for why `expression` is `serde_json::Value`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ClassDirective {
     pub start: u32,
     pub end: u32,
@@ -239,7 +244,7 @@ pub struct ClassDirective {
 }
 
 /// StyleDirective - inline style (`style:color={value}`)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct StyleDirective {
     pub start: u32,
     pub end: u32,
@@ -252,7 +257,7 @@ pub struct StyleDirective {
 }
 
 /// UseDirective - action (`use:action={params}`)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct UseDirective {
     pub start: u32,
     pub end: u32,
@@ -265,7 +270,7 @@ pub struct UseDirective {
 }
 
 /// TransitionDirective - transition (`transition:fade`, `in:fly`, `out:slide`)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TransitionDirective {
     pub start: u32,
     pub end: u32,
@@ -280,7 +285,7 @@ pub struct TransitionDirective {
 }
 
 /// AnimateDirective - animation (`animate:flip={params}`)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct AnimateDirective {
     pub start: u32,
     pub end: u32,
@@ -293,7 +298,7 @@ pub struct AnimateDirective {
 }
 
 /// LetDirective - slot prop (`let:item={localItem}`)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct LetDirective {
     pub start: u32,
     pub end: u32,
@@ -308,7 +313,7 @@ pub struct LetDirective {
 /// Svelte attribute-like node
 ///
 /// Elements can have various attribute-like constructs in their attributes array.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum AttributeNode {
     Attribute(Attribute),
@@ -325,7 +330,7 @@ pub enum AttributeNode {
 }
 
 /// Svelte Attribute value part
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum AttributeValue {
     Text(AttributeText),
@@ -336,7 +341,7 @@ pub enum AttributeValue {
 ///
 /// Svelte's parser serializes attribute-value Text nodes with `start, end` before `type`,
 /// unlike fragment-level Text nodes which use `type, start, end`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct AttributeText {
     pub start: u32,
     pub end: u32,
@@ -347,7 +352,7 @@ pub struct AttributeText {
 }
 
 /// Svelte Text node (fragment context: type, start, end, raw, data)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Text {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -358,7 +363,7 @@ pub struct Text {
 }
 
 /// Svelte ExpressionTag - {expression} in template
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ExpressionTag {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -368,7 +373,7 @@ pub struct ExpressionTag {
 }
 
 /// Svelte Script block
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Script {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -380,7 +385,7 @@ pub struct Script {
 }
 
 /// Svelte IfBlock - conditional rendering
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct IfBlock {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -393,7 +398,7 @@ pub struct IfBlock {
 }
 
 /// Svelte EachBlock - list iteration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct EachBlock {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -414,7 +419,7 @@ pub struct EachBlock {
 }
 
 /// Svelte AwaitBlock - promise handling
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct AwaitBlock {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -433,7 +438,7 @@ pub struct AwaitBlock {
 }
 
 /// Svelte KeyBlock - keyed updates
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct KeyBlock {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -444,7 +449,7 @@ pub struct KeyBlock {
 }
 
 /// Svelte SnippetBlock - reusable template snippets
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SnippetBlock {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -459,7 +464,7 @@ pub struct SnippetBlock {
 }
 
 /// Svelte HtmlTag - raw HTML injection
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct HtmlTag {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -471,7 +476,7 @@ pub struct HtmlTag {
 /// Svelte ConstTag - local constant declaration
 ///
 /// The declaration is a VariableDeclaration-like structure with a single declarator.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ConstTag {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -484,7 +489,7 @@ pub struct ConstTag {
 ///
 /// The declaration is a VariableDeclaration-like structure (`kind` is `const`
 /// or `let`) with one or more comma-separated declarators.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DeclarationTag {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -494,7 +499,7 @@ pub struct DeclarationTag {
 }
 
 /// Svelte DebugTag - debugging helper
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DebugTag {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -504,7 +509,7 @@ pub struct DebugTag {
 }
 
 /// Svelte RenderTag - snippet rendering
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct RenderTag {
     #[serde(rename = "type")]
     pub node_type: String,

@@ -13,6 +13,8 @@ pub mod spacing;
 pub mod strings;
 
 use crate::ast::internal::CssValue;
+use bumpalo::Bump;
+use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 
 // Re-export public functions
@@ -37,18 +39,18 @@ pub use strings::parse_string_literal;
 /// * `source` - The CSS source text (may be a substring of the full document)
 /// * `source_relative_span` - The span of the value relative to `source` (positions within source)
 /// * `base_offset` - Offset to add to spans for absolute positions in full document
-pub fn parse_value_from_source(
+pub fn parse_value_from_source<'arena>(
     source: &str,
     source_relative_span: Span,
     base_offset: u32,
-) -> CssValue {
+    arena: &'arena Bump,
+) -> CssValue<'arena> {
     // Extract value directly from source using source-relative positions
     let value_str = source_relative_span.extract(source);
     let trimmed = value_str.trim();
 
     if trimmed.is_empty() {
         return CssValue::Identifier {
-            name: String::new(),
             span: Span {
                 start: base_offset + source_relative_span.start,
                 end: base_offset + source_relative_span.end,
@@ -72,7 +74,7 @@ pub fn parse_value_from_source(
 
     // Use ValueParser for accurate span tracking through same-source recursion
     let parser = parser::ValueParser::new(trimmed, absolute_span);
-    parser.parse()
+    parser.parse(arena)
 }
 
 // Old parsing functions removed - replaced by ValueParser with same-source recursion
@@ -81,14 +83,18 @@ pub fn parse_value_from_source(
 // See: parser::ValueParser for the new implementation
 
 /// Parse a single CSS value (no lists)
-pub(crate) fn parse_single_value(s: &str, span: Span) -> Option<CssValue> {
+pub(crate) fn parse_single_value<'arena>(
+    s: &str,
+    span: Span,
+    arena: &'arena Bump,
+) -> Option<CssValue<'arena>> {
     let s = s.trim();
     if s.is_empty() {
         return None;
     }
 
     // String literal
-    if let Some(val) = parse_string_literal(s, span) {
+    if let Some(val) = parse_string_literal(s, span, arena) {
         return Some(val);
     }
 
@@ -97,7 +103,7 @@ pub(crate) fn parse_single_value(s: &str, span: Span) -> Option<CssValue> {
         && let Some((name, args, true)) = extract_function_parts(s, paren_pos)
     {
         // Try color function first
-        if let Some(color) = parse_color_function(&name.to_lowercase(), &args) {
+        if let Some(color) = parse_color_function(&name.to_lowercase(), args) {
             return Some(CssValue::Color { color, span });
         }
         // Fall back to generic function
@@ -109,24 +115,28 @@ pub(crate) fn parse_single_value(s: &str, span: Span) -> Option<CssValue> {
             start: span.start + args_start as u32,
             end: span.start + args_start as u32 + args.len() as u32,
         };
-        let mut parsed_args = parse_function_arguments(&args, args_span);
+        let parsed_args = parse_function_arguments(args, args_span, arena);
         // var()'s empty fallback (`var(--a,)`) is significant: per css-variables-1 the
         // trailing comma with an empty `<declaration-value>` substitutes nothing when the
         // variable is unset, distinct from `var(--a)`. The generic comma parser drops empty
         // elements, so restore the empty trailing fallback for var() specifically — other
         // functions (`rgb(0,0,0,)`, `min(1px,)`) correctly drop it, matching prettier.
-        if name.eq_ignore_ascii_case("var") && args.trim_end().ends_with(',') {
-            parsed_args.push(CssValue::Identifier {
-                name: String::new(),
+        let final_args = if name.eq_ignore_ascii_case("var") && args.trim_end().ends_with(',') {
+            let mut v = BumpVec::new_in(arena);
+            v.extend(parsed_args.iter().cloned());
+            v.push(CssValue::Identifier {
                 span: Span {
                     start: args_span.end,
                     end: args_span.end,
                 },
             });
-        }
+            v.into_bump_slice()
+        } else {
+            parsed_args
+        };
         return Some(CssValue::Function {
-            name,
-            args: parsed_args,
+            name: arena.alloc_str(name),
+            args: final_args,
             span,
         });
     }
@@ -141,15 +151,14 @@ pub(crate) fn parse_single_value(s: &str, span: Span) -> Option<CssValue> {
         return Some(dim);
     }
 
-    // Default to identifier
-    Some(CssValue::Identifier {
-        name: s.to_string(),
-        span,
-    })
+    // Default to identifier (text recovered from `span` at print time)
+    Some(CssValue::Identifier { span })
 }
 
-/// Extract function name and arguments, validating balanced parentheses
-fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(String, String, bool)> {
+/// Extract function name and arguments, validating balanced parentheses.
+/// Both returned strings borrow from `s` (the caller copies `name` into the
+/// arena when storing; `args` is re-parsed, not stored).
+fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str, bool)> {
     let name_part = s[..paren_pos].trim();
 
     // Validate function name: alphanumeric, hyphens, underscores only
@@ -185,6 +194,6 @@ fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(String, String, 
         return None;
     }
 
-    let args = s[paren_pos + 1..close_pos].to_string();
-    Some((name_part.to_string(), args, true))
+    let args = &s[paren_pos + 1..close_pos];
+    Some((name_part, args, true))
 }

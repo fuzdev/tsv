@@ -1,6 +1,6 @@
 //! Expression types for public AST
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use super::classes::{ClassExpression, FunctionExpression, TSParameterProperty};
 use super::patterns::{ArrayPattern, AssignmentPattern, ObjectPattern, RestElement};
@@ -10,7 +10,7 @@ use super::types::{
 };
 use super::{Identifier, Literal, PrivateIdentifier, SourceLocation};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum Expression {
     Literal(Literal),
@@ -118,7 +118,7 @@ impl Expression {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ObjectExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -129,14 +129,14 @@ pub struct ObjectExpression {
 }
 
 /// Object property - either a regular property or a spread element
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ObjectProperty {
     Property(Property),
     SpreadElement(SpreadElement),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ArrayExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -146,7 +146,7 @@ pub struct ArrayExpression {
     pub elements: Vec<Option<Expression>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct UnaryExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -159,7 +159,7 @@ pub struct UnaryExpression {
 }
 
 /// Update expression: `++x`, `x++`, `--x`, `x--`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct UpdateExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -171,7 +171,7 @@ pub struct UpdateExpression {
     pub argument: Box<Expression>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct BinaryExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -183,7 +183,7 @@ pub struct BinaryExpression {
     pub right: Box<Expression>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CallExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -200,7 +200,7 @@ pub struct CallExpression {
 }
 
 /// New expression: `new Date()`, `new Map()`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct NewExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -213,7 +213,7 @@ pub struct NewExpression {
     pub type_arguments: Option<TSTypeParameterInstantiation>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ImportExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -227,7 +227,7 @@ pub struct ImportExpression {
 }
 
 /// Meta property: `import.meta`, `new.target`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct MetaProperty {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -240,7 +240,7 @@ pub struct MetaProperty {
     pub property: Identifier,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct MemberExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -259,7 +259,7 @@ pub struct MemberExpression {
 ///
 /// Wraps the outermost MemberExpression/CallExpression in a chain that
 /// contains at least one `?.` operator. Matches acorn's ChainExpression node.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ChainExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -269,7 +269,7 @@ pub struct ChainExpression {
     pub expression: Box<Expression>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ConditionalExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -281,7 +281,7 @@ pub struct ConditionalExpression {
     pub alternate: Box<Expression>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ArrowFunctionExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -303,14 +303,14 @@ pub struct ArrowFunctionExpression {
 }
 
 /// Arrow function body - either expression or block statement
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ArrowFunctionBody {
     Expression(Box<Expression>),
     BlockStatement(BlockStatement),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SpreadElement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -321,7 +321,7 @@ pub struct SpreadElement {
 }
 
 /// Template literal expression: `hello ${name}`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TemplateLiteral {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -333,7 +333,7 @@ pub struct TemplateLiteral {
 }
 
 /// Template element - a static string part of a template literal
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TemplateElement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -345,7 +345,7 @@ pub struct TemplateElement {
 }
 
 /// Value field of a template element
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TemplateElementValue {
     pub raw: String,
     /// Cooked value is null for invalid escape sequences in tagged templates
@@ -353,7 +353,7 @@ pub struct TemplateElementValue {
 }
 
 /// Tagged template expression: tag`content ${expr}`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TaggedTemplateExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -367,7 +367,7 @@ pub struct TaggedTemplateExpression {
 }
 
 /// Await expression: `await promise`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct AwaitExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -378,7 +378,7 @@ pub struct AwaitExpression {
 }
 
 /// Yield expression: `yield value` or `yield* iterable`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct YieldExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -392,7 +392,7 @@ pub struct YieldExpression {
 }
 
 /// Sequence expression: `a, b, c`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SequenceExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -405,7 +405,7 @@ pub struct SequenceExpression {
 /// Regular expression literal.
 /// Serializes with type "Literal" to match acorn/Svelte AST.
 /// Example: `/hello/gi` becomes `{type: "Literal", value: {}, raw: "/hello/gi", regex: {pattern: "hello", flags: "gi"}}`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct RegexLiteral {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -421,14 +421,14 @@ pub struct RegexLiteral {
 }
 
 /// Regex pattern and flags for the AST.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct RegexValue {
     pub pattern: String,
     pub flags: String,
 }
 
 /// This expression: `this`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ThisExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -438,7 +438,7 @@ pub struct ThisExpression {
 }
 
 /// Super expression: `super`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Super {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -448,7 +448,7 @@ pub struct Super {
 }
 
 /// Assignment expression: `x = value`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct AssignmentExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -460,7 +460,7 @@ pub struct AssignmentExpression {
     pub right: Box<Expression>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Property {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -478,7 +478,7 @@ pub struct Property {
 // TypeScript expression nodes
 
 /// TypeScript angle-bracket type assertion: `<Type>expr`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSTypeAssertion {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -493,7 +493,7 @@ pub struct TSTypeAssertion {
 }
 
 /// TypeScript `as` type assertion: `expr as Type` or `expr as const`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSAsExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -508,7 +508,7 @@ pub struct TSAsExpression {
 }
 
 /// TypeScript `satisfies` expression: `expr satisfies Type`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSSatisfiesExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -523,7 +523,7 @@ pub struct TSSatisfiesExpression {
 }
 
 /// TypeScript instantiation expression: `f<T>`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSInstantiationExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -538,7 +538,7 @@ pub struct TSInstantiationExpression {
 }
 
 /// TypeScript non-null assertion expression: `expr!`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSNonNullExpression {
     #[serde(rename = "type")]
     pub node_type: String,

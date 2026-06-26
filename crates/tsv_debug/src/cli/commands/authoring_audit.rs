@@ -141,16 +141,17 @@ fn flip_run(run: &str) -> Option<(bool, &'static str)> {
 // dispatch here by the file's `ParserType`. They serve as a passing baseline: the
 // idempotency invariant predicts those embedded triggers are each self-stable.
 fn svelte_sites(f: &str) -> Option<Vec<Site>> {
-    let root = tsv_svelte::parse(f).ok()?;
+    let arena = bumpalo::Bump::new();
+    let root = tsv_svelte::parse(f, &arena).ok()?;
     let mut sites = Vec::new();
-    collect_sites(&root.fragment.nodes, f, false, &mut sites);
+    collect_sites(root.fragment.nodes, f, false, &mut sites);
     Some(sites)
 }
 
 /// Recurse the fragment tree collecting safe toggle sites. `ws_sig` is set once
 /// inside a `<pre>`/`<textarea>` subtree (whitespace is then literal — never
 /// toggled).
-fn collect_sites(nodes: &[FragmentNode], src: &str, ws_sig: bool, out: &mut Vec<Site>) {
+fn collect_sites(nodes: &[FragmentNode<'_>], src: &str, ws_sig: bool, out: &mut Vec<Site>) {
     let len = nodes.len();
     for (i, node) in nodes.iter().enumerate() {
         if !ws_sig && let FragmentNode::Text(_) = node {
@@ -213,12 +214,12 @@ fn is_ascii_ws(c: char) -> bool {
 
 /// Descend into a node's child fragments, propagating (and entering) whitespace
 /// significance.
-fn recurse_children(node: &FragmentNode, src: &str, ws_sig: bool, out: &mut Vec<Site>) {
+fn recurse_children(node: &FragmentNode<'_>, src: &str, ws_sig: bool, out: &mut Vec<Site>) {
     match node {
         FragmentNode::Element(el) => {
             let tag = el.name_span.extract(src).to_ascii_lowercase();
             let child_ws_sig = ws_sig || tsv_html::preserves_whitespace(&tag);
-            collect_sites(&el.fragment.nodes, src, child_ws_sig, out);
+            collect_sites(el.fragment.nodes, src, child_ws_sig, out);
         }
         FragmentNode::SpecialElement(el) => {
             // No special element preserves whitespace (svelte:*, slot, title).
@@ -226,27 +227,27 @@ fn recurse_children(node: &FragmentNode, src: &str, ws_sig: bool, out: &mut Vec<
             // the tag is dynamic and unknowable statically; treat as non-pre
             // (the conservative miss is a `<svelte:element this="pre">` literal,
             // vanishingly rare and not worth a special case here).
-            collect_sites(&el.fragment.nodes, src, ws_sig, out);
+            collect_sites(el.fragment.nodes, src, ws_sig, out);
         }
         FragmentNode::IfBlock(b) => {
-            collect_sites(&b.consequent.nodes, src, ws_sig, out);
+            collect_sites(b.consequent.nodes, src, ws_sig, out);
             if let Some(alt) = &b.alternate {
-                collect_sites(&alt.nodes, src, ws_sig, out);
+                collect_sites(alt.nodes, src, ws_sig, out);
             }
         }
         FragmentNode::EachBlock(b) => {
-            collect_sites(&b.body.nodes, src, ws_sig, out);
+            collect_sites(b.body.nodes, src, ws_sig, out);
             if let Some(fb) = &b.fallback {
-                collect_sites(&fb.nodes, src, ws_sig, out);
+                collect_sites(fb.nodes, src, ws_sig, out);
             }
         }
         FragmentNode::AwaitBlock(b) => {
             for frag in [&b.pending, &b.then, &b.catch].into_iter().flatten() {
-                collect_sites(&frag.nodes, src, ws_sig, out);
+                collect_sites(frag.nodes, src, ws_sig, out);
             }
         }
-        FragmentNode::KeyBlock(b) => collect_sites(&b.fragment.nodes, src, ws_sig, out),
-        FragmentNode::SnippetBlock(b) => collect_sites(&b.body.nodes, src, ws_sig, out),
+        FragmentNode::KeyBlock(b) => collect_sites(b.fragment.nodes, src, ws_sig, out),
+        FragmentNode::SnippetBlock(b) => collect_sites(b.body.nodes, src, ws_sig, out),
         // Leaf fragment nodes (no child fragment): text, comments, expression /
         // html / const / declaration / debug / render tags.
         _ => {}

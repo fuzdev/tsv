@@ -15,8 +15,8 @@ mod modules;
 mod type_declarations;
 mod variable;
 
-impl<'a> Parser<'a> {
-    pub(crate) fn parse_statement(&mut self) -> Result<Statement, ParseError> {
+impl<'a, 'arena> Parser<'a, 'arena> {
+    pub(crate) fn parse_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         // Check if this is a variable declaration
         match self.current_kind() {
             TokenKind::Keyword(kw) => match kw {
@@ -209,7 +209,7 @@ impl<'a> Parser<'a> {
     ///
     /// Captures the start position before parsing so the span includes any
     /// surrounding parens: `('hello');` → span starts at `(`, not `'`.
-    fn parse_expression_statement(&mut self) -> Result<Statement, ParseError> {
+    fn parse_expression_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let start = self.current_pos().0 as u32;
         let expr = self.parse_expression()?;
         let end = self.semicolon_end()?;
@@ -226,7 +226,7 @@ impl<'a> Parser<'a> {
     /// unparenthesized string-literal expression statements are directives
     /// (`"use strict";` and friends). Iteration stops at the first statement
     /// that isn't a directive candidate.
-    pub(super) fn adapt_directive_prologue(&self, statements: &mut [Statement]) {
+    pub(super) fn adapt_directive_prologue(&self, statements: &mut [Statement<'arena>]) {
         for stmt in statements {
             let Statement::ExpressionStatement(expr_stmt) = stmt else {
                 break;
@@ -234,7 +234,7 @@ impl<'a> Parser<'a> {
             let Expression::Literal(lit) = &expr_stmt.expression else {
                 break;
             };
-            if !matches!(lit.value, LiteralValue::String { .. }) {
+            if !matches!(lit.value, LiteralValue::String(_)) {
                 break;
             }
             // Reject parenthesized strings: the statement must open with a quote.

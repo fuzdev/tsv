@@ -12,7 +12,7 @@ use super::expression_lookahead::{
 };
 use super::scan::skip_whitespace_and_comments;
 
-impl<'a> Parser<'a> {
+impl<'a, 'arena> Parser<'a, 'arena> {
     /// Check if current position starts an arrow function
     ///
     /// Scans ahead looking for pattern: `(` ... `)` `=>`
@@ -51,7 +51,9 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse generic arrow function: `<T>() => ...`, `<T, U extends V>() => ...`
-    pub(super) fn parse_generic_arrow_function(&mut self) -> Result<Expression, ParseError> {
+    pub(super) fn parse_generic_arrow_function(
+        &mut self,
+    ) -> Result<Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Parse type parameters: <T, U extends V, ...>
@@ -61,7 +63,7 @@ impl<'a> Parser<'a> {
         let (params_start, _) = self.current_pos();
 
         // Parse parameter list
-        let params = self.parse_parameter_list()?;
+        let params = self.parse_parameter_list()?.into_bump_slice();
 
         // Check for return type annotation: <T>(): type => ... or type predicate
         let return_type = self.parse_optional_return_type()?;
@@ -85,14 +87,14 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse arrow function body: expression or block statement
-    fn parse_arrow_body(&mut self) -> Result<ArrowFunctionBody, ParseError> {
+    fn parse_arrow_body(&mut self) -> Result<ArrowFunctionBody<'arena>, ParseError> {
         if self.check(&TokenKind::BraceOpen) {
             let block = self.parse_function_body()?;
             Ok(ArrowFunctionBody::BlockStatement(block))
         } else {
             // Use assignment_expression so comma doesn't consume next object property
             let expr = self.parse_assignment_expression()?;
-            Ok(ArrowFunctionBody::Expression(Box::new(expr)))
+            Ok(ArrowFunctionBody::Expression(self.alloc(expr)))
         }
     }
 
@@ -109,14 +111,14 @@ impl<'a> Parser<'a> {
     ///
     /// Note: Single parameter without parens (`x => expr`) is handled by
     /// `parse_single_param_arrow_function()`.
-    pub(super) fn parse_arrow_function(&mut self) -> Result<Expression, ParseError> {
+    pub(super) fn parse_arrow_function(&mut self) -> Result<Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Capture paren position before parsing params
         let (params_start, _) = self.current_pos();
 
         // Parse parameter list (reuse shared method)
-        let params = self.parse_parameter_list()?;
+        let params = self.parse_parameter_list()?.into_bump_slice();
 
         // Check for return type annotation: (): type => ... or type predicate
         let return_type = self.parse_optional_return_type()?;
@@ -140,7 +142,9 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse single-parameter arrow function without parentheses: `x => expr`
-    pub(super) fn parse_single_param_arrow_function(&mut self) -> Result<Expression, ParseError> {
+    pub(super) fn parse_single_param_arrow_function(
+        &mut self,
+    ) -> Result<Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Parse the single identifier parameter
@@ -149,10 +153,12 @@ impl<'a> Parser<'a> {
         let symbol = self.intern_identifier();
         self.advance()?;
 
-        let params = vec![Expression::Identifier(Identifier::simple(
+        let mut params = self.bvec();
+        params.push(Expression::Identifier(Identifier::simple(
             symbol,
             Span::new(id_start as u32, id_end as u32),
-        ))];
+        )));
+        let params = params.into_bump_slice();
 
         self.expect(&TokenKind::Arrow)?; // consume '=>'
 
@@ -176,15 +182,20 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_async_arrow_function_after_async(
         &mut self,
         start: usize,
-    ) -> Result<Expression, ParseError> {
+    ) -> Result<Expression<'arena>, ParseError> {
         // Check for type parameters: `async <T>() => ...`
         let type_parameters = self.parse_optional_type_parameters()?;
 
         // Parse parameter list or single parameter
         // Note: with type parameters, must have parentheses
-        let (params, params_start) = if self.check(&TokenKind::ParenOpen) {
+        let (params, params_start): (&'arena [Expression<'arena>], Option<u32>) = if self
+            .check(&TokenKind::ParenOpen)
+        {
             let (paren_pos, _) = self.current_pos();
-            (self.parse_parameter_list()?, Some(paren_pos as u32))
+            (
+                self.parse_parameter_list()?.into_bump_slice(),
+                Some(paren_pos as u32),
+            )
         } else if type_parameters.is_none() && matches!(self.current_kind(), TokenKind::Identifier)
         {
             // Single parameter without parens: `async x => ...`
@@ -192,13 +203,12 @@ impl<'a> Parser<'a> {
             let (id_start, id_end) = self.current_pos();
             let symbol = self.intern_identifier();
             self.advance()?;
-            (
-                vec![Expression::Identifier(Identifier::simple(
-                    symbol,
-                    Span::new(id_start as u32, id_end as u32),
-                ))],
-                None,
-            )
+            let mut params = self.bvec();
+            params.push(Expression::Identifier(Identifier::simple(
+                symbol,
+                Span::new(id_start as u32, id_end as u32),
+            )));
+            (params.into_bump_slice(), None)
         } else {
             return Err(self.error_expected_after("'(' or identifier", "async"));
         };

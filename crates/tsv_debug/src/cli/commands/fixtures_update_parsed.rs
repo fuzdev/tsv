@@ -205,7 +205,8 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
     // preserve field order. Dispatch on input type (mirrors generate_expected_fixture).
     let our_json = match fixture.input_type() {
         InputType::SvelteTs | InputType::TypeScript => {
-            let ast = match tsv_ts::parse(source) {
+            let arena = bumpalo::Bump::new();
+            let ast = match tsv_ts::parse(source, &arena) {
                 Ok(ast) => ast,
                 Err(e) => return FixtureResult::Failed(format!("Our parser error: {e:?}")),
             };
@@ -218,7 +219,8 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
             }
         }
         InputType::Css => {
-            let ast = match tsv_css::parse(source) {
+            let arena = bumpalo::Bump::new();
+            let ast = match tsv_css::parse(source, &arena) {
                 Ok(ast) => ast,
                 Err(e) => return FixtureResult::Failed(format!("Our parser error: {e:?}")),
             };
@@ -231,7 +233,8 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
             }
         }
         InputType::Svelte => {
-            let ast = match tsv_svelte::parse(source) {
+            let arena = bumpalo::Bump::new();
+            let ast = match tsv_svelte::parse(source, &arena) {
                 Ok(ast) => ast,
                 Err(e) => return FixtureResult::Failed(format!("Our parser error: {e:?}")),
             };

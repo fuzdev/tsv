@@ -9,22 +9,29 @@ use tsv_cli::json_utils::to_json_with_tabs;
 /// The parser-side validation phases (expected.json comparison, wire-path
 /// identity, typed-walk parity probes) all need the same AST — sharing one
 /// parse keeps `fixtures_validate` from re-parsing every fixture per phase.
-pub(super) enum ParsedInput {
-    Svelte(tsv_svelte::Root),
-    Ts(tsv_ts::Program),
-    Css(tsv_css::CssStyleSheet),
+pub(super) enum ParsedInput<'arena> {
+    Svelte(tsv_svelte::Root<'arena>),
+    Ts(tsv_ts::Program<'arena>),
+    Css(tsv_css::CssStyleSheet<'arena>),
 }
 
 /// Parse fixture content once for the parser-side validation phases.
-pub(super) fn parse_input(content: &str, input_type: InputType) -> Result<ParsedInput, String> {
+///
+/// `arena` owns the internal AST and must outlive the returned `ParsedInput`
+/// (caller-owns-`Bump`).
+pub(super) fn parse_input<'arena>(
+    content: &str,
+    input_type: InputType,
+    arena: &'arena bumpalo::Bump,
+) -> Result<ParsedInput<'arena>, String> {
     match input_type {
-        InputType::Svelte => tsv_svelte::parse(content)
+        InputType::Svelte => tsv_svelte::parse(content, arena)
             .map(ParsedInput::Svelte)
             .map_err(|e| format!("Parse error: {e:?}")),
-        InputType::SvelteTs | InputType::TypeScript => tsv_ts::parse(content)
+        InputType::SvelteTs | InputType::TypeScript => tsv_ts::parse(content, arena)
             .map(ParsedInput::Ts)
             .map_err(|e| format!("Parse error: {e:?}")),
-        InputType::Css => tsv_css::parse(content)
+        InputType::Css => tsv_css::parse(content, arena)
             .map(ParsedInput::Css)
             .map_err(|e| format!("Parse error: {e:?}")),
     }
@@ -50,7 +57,7 @@ pub(super) struct InputAstPaths {
 /// already-parsed input, materializing `convert_ast_json` once.
 #[allow(clippy::expect_used)] // Value serialization cannot fail
 pub(super) fn input_ast_paths(
-    parsed: &ParsedInput,
+    parsed: &ParsedInput<'_>,
     content: &str,
 ) -> Result<InputAstPaths, String> {
     let (ast_json, wire) = match parsed {
@@ -82,6 +89,12 @@ pub(super) fn input_ast_paths(
 /// downstream byte offset away from its UTF-16 offset, so the typed
 /// offset-translation walk is exercised on the whole AST shape.
 const TYPED_WALK_SYNTH_PREFIX: &str = "// 中文😀\n";
+
+/// CSS counterpart of `TYPED_WALK_SYNTH_PREFIX` — a multibyte block comment (a
+/// `//` line comment isn't valid CSS). Top-level CSS comments live on
+/// `CssStyleSheet.comments`, not in `nodes`, so this shifts every node offset
+/// without changing the AST shape.
+const CSS_TYPED_WALK_SYNTH_PREFIX: &str = "/* 中文😀 */\n";
 
 /// How a typed-walk parity probe failed.
 #[derive(Debug)]
@@ -124,33 +137,47 @@ pub(super) struct TypedWalkParity {
 ///
 /// Each probe asserts `convert_ast_json_string` is byte-identical to
 /// `serde_json::to_string(&convert_ast_json(..))`. Probes are independent of
-/// `expected.json`, so they don't affect parser conformance. Returns an empty
-/// result for `.css` (no typed pipeline). Takes the already-parsed input so
-/// `.svelte` script-span extraction reuses the fixture's one parse.
+/// `expected.json`, so they don't affect parser conformance. `.css` inputs get
+/// a synthesized multibyte variant (the standalone `.css` fixtures are ASCII, so
+/// their own content never exercises the CSS typed walk's translation branch);
+/// broad CSS coverage comes from the `corpus:compare:parse --multibyte-only`
+/// gate. Takes the already-parsed input so `.svelte` script-span extraction
+/// reuses the fixture's one parse.
 #[allow(clippy::expect_used)] // Value serialization cannot fail
-pub(super) fn typed_walk_parity_probes(content: &str, parsed: &ParsedInput) -> TypedWalkParity {
+pub(super) fn typed_walk_parity_probes(content: &str, parsed: &ParsedInput<'_>) -> TypedWalkParity {
     let mut parity = TypedWalkParity::default();
 
-    let mut probe = |ts_content: &str, description: &str| match tsv_ts::parse(ts_content) {
-        Ok(ast) => {
-            let string_path = tsv_ts::convert_ast_json_string(&ast, ts_content);
-            let value_path = serde_json::to_string(&tsv_ts::convert_ast_json(&ast, ts_content))
-                .expect("Value serialization cannot fail");
-            if string_path == value_path {
-                parity.checked += 1;
-            } else {
-                parity
-                    .failures
-                    .push((description.to_string(), TypedWalkParityFailure::Diverged));
+    // Parse `$content` as standalone `$lang` (tsv_ts / tsv_css — identical
+    // free-function API by convention) and assert its `convert_ast_json_string`
+    // is byte-identical to `to_string(&convert_ast_json(..))`, recording the
+    // result onto `parity`. One body for every language arm.
+    macro_rules! probe {
+        ($lang:ident, $content:expr, $description:expr) => {{
+            let content: &str = $content;
+            let description = $description;
+            let arena = bumpalo::Bump::new();
+            match $lang::parse(content, &arena) {
+                Ok(ast) => {
+                    let string_path = $lang::convert_ast_json_string(&ast, content);
+                    let value_path = serde_json::to_string(&$lang::convert_ast_json(&ast, content))
+                        .expect("Value serialization cannot fail");
+                    if string_path == value_path {
+                        parity.checked += 1;
+                    } else {
+                        parity
+                            .failures
+                            .push((description.to_string(), TypedWalkParityFailure::Diverged));
+                    }
+                }
+                Err(e) => {
+                    parity.failures.push((
+                        description.to_string(),
+                        TypedWalkParityFailure::Parse(format!("{e:?}")),
+                    ));
+                }
             }
-        }
-        Err(e) => {
-            parity.failures.push((
-                description.to_string(),
-                TypedWalkParityFailure::Parse(format!("{e:?}")),
-            ));
-        }
-    };
+        }};
+    }
 
     match parsed {
         ParsedInput::Ts(_) => {
@@ -161,7 +188,7 @@ pub(super) fn typed_walk_parity_probes(content: &str, parsed: &ParsedInput) -> T
             // The as-is input is already covered by the string-path identity
             // check; only the synthesized multibyte variant is new coverage.
             let synthesized = format!("{TYPED_WALK_SYNTH_PREFIX}{content}");
-            probe(&synthesized, "synthesized multibyte input");
+            probe!(tsv_ts, &synthesized, "synthesized multibyte input");
         }
         ParsedInput::Svelte(root) => {
             for (i, (start, end)) in tsv_svelte::script_content_spans(root)
@@ -173,16 +200,32 @@ pub(super) fn typed_walk_parity_probes(content: &str, parsed: &ParsedInput) -> T
                     // Multibyte .svelte inputs take the Value fallback in
                     // tsv_svelte, so this standalone-TS run is the only
                     // typed-walk coverage their script content gets
-                    probe(script, &format!("extracted script {i} (as-is)"));
+                    probe!(tsv_ts, script, &format!("extracted script {i} (as-is)"));
                 }
                 let synthesized = format!("{TYPED_WALK_SYNTH_PREFIX}{script}");
-                probe(
+                probe!(
+                    tsv_ts,
                     &synthesized,
-                    &format!("extracted script {i} (synthesized multibyte)"),
+                    &format!("extracted script {i} (synthesized multibyte)")
                 );
             }
         }
-        ParsedInput::Css(_) => {} // no typed pipeline for CSS
+        ParsedInput::Css(_) => {
+            // Byte-0 BOM can't take a prepended comment (would change its semantics).
+            if content.starts_with('\u{feff}') {
+                return parity;
+            }
+            // This probe assumes a leading block comment is parse-inert — true for
+            // every standalone `.css` fixture today. It would NOT hold for an
+            // order-sensitive leading at-rule (`@charset`/`@import`, which must be
+            // first): prepending the comment would shift parse semantics and the
+            // string-vs-Value comparison would no longer reflect the fixture's own
+            // shape. If such a `.css` fixture is ever added, gate it out here (like
+            // the BOM case) and rely on `corpus:compare:parse --multibyte-only` for
+            // its multibyte coverage instead.
+            let synthesized = format!("{CSS_TYPED_WALK_SYNTH_PREFIX}{content}");
+            probe!(tsv_css, &synthesized, "synthesized multibyte input");
+        }
     }
 
     parity

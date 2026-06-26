@@ -11,18 +11,18 @@ impl<'a> Printer<'a> {
     ///
     /// This differs from checking for newlines because we want to hug content
     /// even if the content itself is multiline (e.g., component with wrapping attrs).
-    pub(super) fn is_inline_fragment(&self, fragment: &Fragment) -> bool {
+    pub(super) fn is_inline_fragment(&self, fragment: &Fragment<'_>) -> bool {
         // Inline if no leading AND no trailing whitespace
         !self.fragment_has_leading_ws(fragment) && !self.fragment_has_trailing_ws(fragment)
     }
 
     /// Check if a fragment has leading whitespace that triggers a line break.
-    pub(super) fn fragment_has_leading_ws(&self, fragment: &Fragment) -> bool {
+    pub(super) fn fragment_has_leading_ws(&self, fragment: &Fragment<'_>) -> bool {
         self.fragment_has_boundary_ws(fragment, true)
     }
 
     /// Check if a fragment has trailing whitespace that triggers a line break.
-    pub(super) fn fragment_has_trailing_ws(&self, fragment: &Fragment) -> bool {
+    pub(super) fn fragment_has_trailing_ws(&self, fragment: &Fragment<'_>) -> bool {
         self.fragment_has_boundary_ws(fragment, false)
     }
 
@@ -37,7 +37,7 @@ impl<'a> Printer<'a> {
     /// This prevents text like `,\n\tupdated` from being treated as having boundary whitespace
     /// when the boundary char `,` is not whitespace — important for inline runs like
     /// `{expr}{#if cond}, updated {expr2}{/if}` where the IfBlock body starts with `,`.
-    fn fragment_has_boundary_ws(&self, fragment: &Fragment, is_leading: bool) -> bool {
+    fn fragment_has_boundary_ws(&self, fragment: &Fragment<'_>, is_leading: bool) -> bool {
         if fragment.nodes.is_empty() {
             return false;
         }
@@ -76,7 +76,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if any text node in the fragment contains a newline.
-    fn fragment_has_any_newlines(&self, fragment: &Fragment) -> bool {
+    fn fragment_has_any_newlines(&self, fragment: &Fragment<'_>) -> bool {
         let source = self.source;
         fragment.nodes.iter().any(|n| {
             if let FragmentNode::Text(t) = n {
@@ -88,17 +88,17 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if a fragment has leading whitespace of any kind (space or newline).
-    pub(super) fn fragment_has_any_leading_ws(&self, fragment: &Fragment) -> bool {
+    pub(super) fn fragment_has_any_leading_ws(&self, fragment: &Fragment<'_>) -> bool {
         self.fragment_has_any_boundary_ws(fragment, true)
     }
 
     /// Check if a fragment has trailing whitespace of any kind (space or newline).
-    pub(super) fn fragment_has_any_trailing_ws(&self, fragment: &Fragment) -> bool {
+    pub(super) fn fragment_has_any_trailing_ws(&self, fragment: &Fragment<'_>) -> bool {
         self.fragment_has_any_boundary_ws(fragment, false)
     }
 
     /// Check if a fragment has any whitespace at a boundary (leading or trailing).
-    fn fragment_has_any_boundary_ws(&self, fragment: &Fragment, is_leading: bool) -> bool {
+    fn fragment_has_any_boundary_ws(&self, fragment: &Fragment<'_>, is_leading: bool) -> bool {
         let node = if is_leading {
             fragment.nodes.first()
         } else {
@@ -127,7 +127,7 @@ impl<'a> Printer<'a> {
     ///
     /// Note: Prettier has a quirk where the last block in a file doesn't expand.
     /// We consistently expand all such blocks regardless of position.
-    pub(super) fn fragment_has_space_only_ws(&self, fragment: &Fragment) -> bool {
+    pub(super) fn fragment_has_space_only_ws(&self, fragment: &Fragment<'_>) -> bool {
         // If there are newlines, the existing ws detection handles expansion
         if self.fragment_has_any_newlines(fragment) {
             return false;
@@ -145,7 +145,7 @@ impl<'a> Printer<'a> {
     /// Returns `(has_leading, has_trailing)`.
     pub(super) fn fragment_ws_status(
         &self,
-        fragment: &Fragment,
+        fragment: &Fragment<'_>,
         in_multiline_context: bool,
     ) -> (bool, bool) {
         let has_space_only = self.fragment_has_space_only_ws(fragment);

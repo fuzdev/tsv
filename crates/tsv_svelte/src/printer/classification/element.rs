@@ -24,7 +24,7 @@ impl<'a> Printer<'a> {
     /// Note: `<script>` and `<style>` elements with content are treated as block
     /// elements for formatting purposes, since their content will be formatted
     /// on separate lines. Empty `<script>`/`<style>` remain inline.
-    pub(crate) fn is_block_element(&self, element: &internal::Element) -> bool {
+    pub(crate) fn is_block_element(&self, element: &internal::Element<'_>) -> bool {
         // Components are treated as inline, not block
         if element.kind == ElementKind::Component {
             return false;
@@ -49,7 +49,7 @@ impl<'a> Printer<'a> {
 /// Whether a raw-text element (`<script>`/`<style>`) carries non-empty content.
 /// Raw-text parsing emits exactly one `Text` node whose `raw` is the verbatim
 /// body (empty for `<script></script>`), so an empty `raw` means no content.
-fn has_raw_content(element: &internal::Element) -> bool {
+fn has_raw_content(element: &internal::Element<'_>) -> bool {
     use crate::ast::internal::FragmentNode;
     element
         .fragment
@@ -66,11 +66,11 @@ mod tests {
     use std::rc::Rc;
 
     /// Find the first child element of `parent` whose resolved tag name is `tag`.
-    fn child<'p>(
+    fn child<'p, 'arena>(
         printer: &Printer<'_>,
-        parent: &'p internal::Element,
+        parent: &'p internal::Element<'arena>,
         tag: &str,
-    ) -> &'p internal::Element {
+    ) -> &'p internal::Element<'arena> {
         parent
             .fragment
             .nodes
@@ -85,7 +85,8 @@ mod tests {
     #[test]
     fn block_adapter_delegates_and_treats_components_as_inline() {
         let src = "<div><span>i</span><Comp>c</Comp></div>";
-        let root = crate::parse(src).expect("template should parse");
+        let arena = bumpalo::Bump::new();
+        let root = crate::parse(src, &arena).expect("template should parse");
         // Reuse the parse's interner so the tag-name symbols resolve.
         let printer = Printer::new(src, Rc::clone(&root.interner), &[]);
         let div = match &root.fragment.nodes[0] {
@@ -109,7 +110,8 @@ mod tests {
         assert!(!html::is_block_element("style"));
 
         let src = "<div><script>let x = 1;</script><style>a { color: red }</style></div>";
-        let root = crate::parse(src).expect("template should parse");
+        let arena = bumpalo::Bump::new();
+        let root = crate::parse(src, &arena).expect("template should parse");
         let printer = Printer::new(src, Rc::clone(&root.interner), &[]);
         let div = match &root.fragment.nodes[0] {
             FragmentNode::Element(el) => el,
@@ -127,7 +129,8 @@ mod tests {
         // line). The raw-text parser still emits a single empty Text node here, so
         // `has_raw_content` — not node-presence — is what makes this inline.
         let src = "<div><script></script><style></style></div>";
-        let root = crate::parse(src).expect("template should parse");
+        let arena = bumpalo::Bump::new();
+        let root = crate::parse(src, &arena).expect("template should parse");
         let printer = Printer::new(src, Rc::clone(&root.interner), &[]);
         let div = match &root.fragment.nodes[0] {
             FragmentNode::Element(el) => el,

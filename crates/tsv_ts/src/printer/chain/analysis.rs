@@ -45,7 +45,7 @@ pub trait SymbolLookup {
 /// for member-only chains.
 /// General-purpose entry point (used by tests; production code uses typed entry points)
 #[cfg(test)]
-fn linearize_chain<'a>(expr: &'a Expression) -> ChainNodeVec<'a> {
+fn linearize_chain<'a>(expr: &'a Expression<'_>) -> ChainNodeVec<'a> {
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
     linearize_recursive(expr, &mut nodes, &mut paren_gaps);
@@ -54,7 +54,7 @@ fn linearize_chain<'a>(expr: &'a Expression) -> ChainNodeVec<'a> {
 }
 
 /// Linearize starting from a CallExpression (avoids cloning to wrap in Expression)
-pub fn linearize_chain_from_call<'a>(call: &'a internal::CallExpression) -> ChainNodeVec<'a> {
+pub fn linearize_chain_from_call<'a>(call: &'a internal::CallExpression<'_>) -> ChainNodeVec<'a> {
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
     linearize_call_callee(call, &mut nodes, &mut paren_gaps);
@@ -68,7 +68,9 @@ pub fn linearize_chain_from_call<'a>(call: &'a internal::CallExpression) -> Chai
 }
 
 /// Linearize starting from a MemberExpression (avoids cloning to wrap in Expression)
-pub fn linearize_chain_from_member<'a>(member: &'a internal::MemberExpression) -> ChainNodeVec<'a> {
+pub fn linearize_chain_from_member<'a>(
+    member: &'a internal::MemberExpression<'_>,
+) -> ChainNodeVec<'a> {
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
     linearize_member_object(member, &mut nodes, &mut paren_gaps);
@@ -79,11 +81,11 @@ pub fn linearize_chain_from_member<'a>(member: &'a internal::MemberExpression) -
 
 /// Linearize starting from a TSNonNullExpression (avoids cloning to wrap in Expression)
 pub fn linearize_chain_from_non_null<'a>(
-    non_null: &'a internal::TSNonNullExpression,
+    non_null: &'a internal::TSNonNullExpression<'_>,
 ) -> ChainNodeVec<'a> {
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
-    linearize_recursive(&non_null.expression, &mut nodes, &mut paren_gaps);
+    linearize_recursive(non_null.expression, &mut nodes, &mut paren_gaps);
     nodes.push(ChainNode::non_null());
     finalize_chain_nodes(&mut nodes, &paren_gaps);
     nodes
@@ -171,7 +173,7 @@ fn fix_callee_base_parens(nodes: &mut [ChainNode<'_>]) {
 fn child_stops_optional_chain(
     parent_start: u32,
     parent_optional: bool,
-    child: &Expression,
+    child: &Expression<'_>,
 ) -> bool {
     !parent_optional && parent_start < child.span().start && child.has_optional_in_chain()
 }
@@ -186,9 +188,9 @@ fn child_stops_optional_chain(
 /// carries no runtime meaning, and both formatters normalize to the outside form.
 /// Any other sealed child (a bare optional chain, `(a?.b).c`) stays a single
 /// parenthesized base.
-fn push_sealed_chain_base<'a>(child: &'a Expression, nodes: &mut ChainNodeVec<'a>) {
+fn push_sealed_chain_base<'a>(child: &'a Expression<'_>, nodes: &mut ChainNodeVec<'a>) {
     if let Expression::TSNonNullExpression(non_null) = child {
-        nodes.push(ChainNode::base(&non_null.expression, true));
+        nodes.push(ChainNode::base(non_null.expression, true));
         nodes.push(ChainNode::non_null());
     } else {
         nodes.push(ChainNode::base(child, true));
@@ -196,7 +198,7 @@ fn push_sealed_chain_base<'a>(child: &'a Expression, nodes: &mut ChainNodeVec<'a
 }
 
 fn linearize_recursive<'a>(
-    expr: &'a Expression,
+    expr: &'a Expression<'_>,
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
@@ -243,7 +245,7 @@ fn linearize_recursive<'a>(
         // objects (`(A<T>).x`) take the `linearize_member_object` path instead,
         // which keeps the type args and parens.
         Expression::TSInstantiationExpression(inst) => {
-            linearize_recursive(&inst.expression, nodes, paren_gaps);
+            linearize_recursive(inst.expression, nodes, paren_gaps);
         }
 
         // Base case: expression that's not part of the chain structure
@@ -268,11 +270,11 @@ fn linearize_recursive<'a>(
 ///
 /// All other objects recurse normally.
 fn linearize_member_object<'a>(
-    member: &'a internal::MemberExpression,
+    member: &'a internal::MemberExpression<'_>,
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
-    let object: &Expression = &member.object;
+    let object: &Expression<'_> = member.object;
     if child_stops_optional_chain(member.span.start, member.optional, object) {
         push_sealed_chain_base(object, nodes);
     } else if matches!(object, Expression::TSInstantiationExpression(_)) {
@@ -288,14 +290,14 @@ fn linearize_member_object<'a>(
 /// must stay a parenthesized base node — see `child_stops_optional_chain`. All
 /// other callees recurse normally.
 fn linearize_call_callee<'a>(
-    call: &'a internal::CallExpression,
+    call: &'a internal::CallExpression<'_>,
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
-    if child_stops_optional_chain(call.span.start, call.optional, &call.callee) {
-        push_sealed_chain_base(&call.callee, nodes);
+    if child_stops_optional_chain(call.span.start, call.optional, call.callee) {
+        push_sealed_chain_base(call.callee, nodes);
     } else {
-        linearize_recursive(&call.callee, nodes, paren_gaps);
+        linearize_recursive(call.callee, nodes, paren_gaps);
     }
 }
 
@@ -303,7 +305,7 @@ fn linearize_call_callee<'a>(
 ///
 /// Extracted from `linearize_recursive` so it can be shared with `linearize_chain_from_member`.
 fn linearize_member_node<'a>(
-    member: &'a internal::MemberExpression,
+    member: &'a internal::MemberExpression<'_>,
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
@@ -333,19 +335,19 @@ fn linearize_member_node<'a>(
     let property_start = member.property.span().start;
     if member.computed {
         nodes.push(ChainNode::computed_member(
-            &member.property,
+            member.property,
             member.optional,
             object_end,
             member.span.end,
         ));
-    } else if let Expression::Identifier(id) = member.property.as_ref() {
+    } else if let Expression::Identifier(id) = member.property {
         nodes.push(ChainNode::member(
             id.name,
             member.optional,
             object_end,
             property_start,
         ));
-    } else if let Expression::PrivateIdentifier(pid) = member.property.as_ref() {
+    } else if let Expression::PrivateIdentifier(pid) = member.property {
         nodes.push(ChainNode::private_member(
             pid.name,
             member.optional,
@@ -355,7 +357,7 @@ fn linearize_member_node<'a>(
     } else {
         // Non-identifier property (shouldn't happen for non-computed)
         nodes.push(ChainNode::computed_member(
-            &member.property,
+            member.property,
             member.optional,
             object_end,
             member.span.end,
@@ -544,40 +546,36 @@ fn is_factory_name(symbol: DefaultSymbol, interner: &impl SymbolLookup) -> bool 
 mod tests {
     use super::*;
     use crate::ast::internal::{CallExpression, Identifier, MemberExpression};
+    use bumpalo::Bump;
     use string_interner::DefaultStringInterner;
     use tsv_lang::Span;
 
     /// Helper to create an identifier expression
-    fn make_identifier(interner: &mut DefaultStringInterner, name: &str) -> Expression {
+    fn make_identifier<'arena>(
+        interner: &mut DefaultStringInterner,
+        name: &str,
+    ) -> Expression<'arena> {
         let symbol = interner.get_or_intern(name);
-        Expression::Identifier(Identifier {
-            name: symbol,
-            type_annotation: None,
-            decorators: None,
-            optional: false,
-            span: Span::new(0, name.len() as u32),
-        })
+        Expression::Identifier(Identifier::simple(symbol, Span::new(0, name.len() as u32)))
     }
 
     /// Helper to create a member expression: object.property
-    fn make_member(
+    fn make_member<'arena>(
+        arena: &'arena Bump,
         interner: &mut DefaultStringInterner,
-        object: Expression,
+        object: Expression<'arena>,
         property_name: &str,
         object_end: u32,
-    ) -> Expression {
+    ) -> Expression<'arena> {
         let prop_symbol = interner.get_or_intern(property_name);
         let property_start = object_end + 1; // after the dot
         let span_end = property_start + property_name.len() as u32;
         Expression::MemberExpression(MemberExpression {
-            object: Box::new(object),
-            property: Box::new(Expression::Identifier(Identifier {
-                name: prop_symbol,
-                type_annotation: None,
-                decorators: None,
-                optional: false,
-                span: Span::new(property_start, span_end),
-            })),
+            object: arena.alloc(object),
+            property: arena.alloc(Expression::Identifier(Identifier::simple(
+                prop_symbol,
+                Span::new(property_start, span_end),
+            ))),
             computed: false,
             optional: false,
             span: Span::new(0, span_end),
@@ -585,10 +583,14 @@ mod tests {
     }
 
     /// Helper to create a call expression: callee()
-    fn make_call(callee: Expression, callee_end: u32) -> Expression {
+    fn make_call<'arena>(
+        arena: &'arena Bump,
+        callee: Expression<'arena>,
+        callee_end: u32,
+    ) -> Expression<'arena> {
         Expression::CallExpression(CallExpression {
-            callee: Box::new(callee),
-            arguments: Vec::new(),
+            callee: arena.alloc(callee),
+            arguments: &[],
             type_arguments: None,
             optional: false,
             span: Span::new(0, callee_end + "()".len() as u32),
@@ -614,11 +616,12 @@ mod tests {
 
     #[test]
     fn test_linearize_member_chain() {
+        let arena = Bump::new();
         let mut interner = DefaultStringInterner::new();
         // Build: a.b.c
         let a = make_identifier(&mut interner, "a");
-        let ab = make_member(&mut interner, a, "b", 1);
-        let abc = make_member(&mut interner, ab, "c", 3);
+        let ab = make_member(&arena, &mut interner, a, "b", 1);
+        let abc = make_member(&arena, &mut interner, ab, "c", 3);
 
         let nodes = linearize_chain(&abc);
 
@@ -631,12 +634,13 @@ mod tests {
 
     #[test]
     fn test_linearize_call_chain() {
+        let arena = Bump::new();
         let mut interner = DefaultStringInterner::new();
         // Build: a().b()
         let a = make_identifier(&mut interner, "a");
-        let a_call = make_call(a, 1);
-        let ab = make_member(&mut interner, a_call, "b", 3);
-        let ab_call = make_call(ab, 5);
+        let a_call = make_call(&arena, a, 1);
+        let ab = make_member(&arena, &mut interner, a_call, "b", 3);
+        let ab_call = make_call(&arena, ab, 5);
 
         let nodes = linearize_chain(&ab_call);
 
@@ -650,12 +654,13 @@ mod tests {
 
     #[test]
     fn test_group_member_only_chain() {
+        let arena = Bump::new();
         let mut interner = DefaultStringInterner::new();
         // Build: a.b.c.d
         let a = make_identifier(&mut interner, "a");
-        let ab = make_member(&mut interner, a, "b", 1);
-        let abc = make_member(&mut interner, ab, "c", 3);
-        let abcd = make_member(&mut interner, abc, "d", 5);
+        let ab = make_member(&arena, &mut interner, a, "b", 1);
+        let abc = make_member(&arena, &mut interner, ab, "c", 3);
+        let abcd = make_member(&arena, &mut interner, abc, "d", 5);
 
         let nodes = linearize_chain(&abcd);
         let groups = group_chain_nodes(&nodes);
@@ -675,13 +680,14 @@ mod tests {
 
     #[test]
     fn test_group_call_chain_breaks_after_call() {
+        let arena = Bump::new();
         let mut interner = DefaultStringInterner::new();
         // Build: a().b().c
         let a = make_identifier(&mut interner, "a");
-        let a_call = make_call(a, 1);
-        let ab = make_member(&mut interner, a_call, "b", 3);
-        let ab_call = make_call(ab, 5);
-        let abc = make_member(&mut interner, ab_call, "c", 7);
+        let a_call = make_call(&arena, a, 1);
+        let ab = make_member(&arena, &mut interner, a_call, "b", 3);
+        let ab_call = make_call(&arena, ab, 5);
+        let abc = make_member(&arena, &mut interner, ab_call, "c", 7);
 
         let nodes = linearize_chain(&abc);
         let groups = group_chain_nodes(&nodes);

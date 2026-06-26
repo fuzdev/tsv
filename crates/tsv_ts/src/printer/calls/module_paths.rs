@@ -17,8 +17,8 @@ use tsv_lang::SymbolResolver;
 ///
 /// Prettier doesn't add continuation indent for binary expressions inside Boolean() calls.
 /// This appears to be a specific quirk, treating Boolean() like !!() for type coercion.
-pub(super) fn is_boolean_call(call: &internal::CallExpression, printer: &Printer<'_>) -> bool {
-    if let internal::Expression::Identifier(id) = call.callee.as_ref() {
+pub(super) fn is_boolean_call(call: &internal::CallExpression<'_>, printer: &Printer<'_>) -> bool {
+    if let internal::Expression::Identifier(id) = call.callee {
         return printer.with_resolved_symbol(id.name, |s| s == "Boolean");
     }
     false
@@ -29,7 +29,7 @@ pub(super) fn is_boolean_call(call: &internal::CallExpression, printer: &Printer
 /// Patterns:
 /// - `require.resolve(string)` → don't break args, let assignment break
 pub(super) fn is_module_path_no_break(
-    call: &internal::CallExpression,
+    call: &internal::CallExpression<'_>,
     printer: &Printer<'_>,
 ) -> bool {
     // Must have exactly 1 argument that is a string literal
@@ -38,12 +38,12 @@ pub(super) fn is_module_path_no_break(
     }
 
     // Check for `require.resolve()`
-    if let internal::Expression::MemberExpression(member) = call.callee.as_ref()
+    if let internal::Expression::MemberExpression(member) = call.callee
         && !member.computed
         && !member.optional
-        && let internal::Expression::Identifier(resolve_id) = member.property.as_ref()
+        && let internal::Expression::Identifier(resolve_id) = member.property
         && printer.with_resolved_symbol(resolve_id.name, |s| s == "resolve")
-        && let internal::Expression::Identifier(require_id) = member.object.as_ref()
+        && let internal::Expression::Identifier(require_id) = member.object
         && printer.with_resolved_symbol(require_id.name, |s| s == "require")
     {
         return true;
@@ -59,16 +59,16 @@ pub(super) fn is_module_path_no_break(
 /// - `require.resolve.paths(string)` → break before `.paths`
 /// - `import.meta.resolve(string)` → break before `.resolve`
 pub(super) fn get_module_path_chain_break<'a>(
-    call: &'a internal::CallExpression,
+    call: &'a internal::CallExpression<'a>,
     printer: &Printer<'_>,
-) -> Option<(&'a internal::Expression, &'a internal::Identifier)> {
+) -> Option<(&'a internal::Expression<'a>, &'a internal::Identifier<'a>)> {
     // Must have exactly 1 argument that is a string literal
     if call.arguments.len() != 1 || !is_string_literal(&call.arguments[0]) {
         return None;
     }
 
     // Callee must be a member expression (not computed, not optional)
-    let internal::Expression::MemberExpression(member) = call.callee.as_ref() else {
+    let internal::Expression::MemberExpression(member) = call.callee else {
         return None;
     };
     if member.computed || member.optional {
@@ -76,7 +76,7 @@ pub(super) fn get_module_path_chain_break<'a>(
     }
 
     // Property must be an identifier
-    let internal::Expression::Identifier(method_name) = member.property.as_ref() else {
+    let internal::Expression::Identifier(method_name) = member.property else {
         return None;
     };
 
@@ -86,24 +86,24 @@ pub(super) fn get_module_path_chain_break<'a>(
     // Check for `require.resolve.paths()`
     if is_paths {
         // Object should be `require.resolve`
-        if let internal::Expression::MemberExpression(obj_member) = member.object.as_ref()
+        if let internal::Expression::MemberExpression(obj_member) = member.object
             && !obj_member.computed
             && !obj_member.optional
-            && let internal::Expression::Identifier(resolve_id) = obj_member.property.as_ref()
+            && let internal::Expression::Identifier(resolve_id) = obj_member.property
             && printer.with_resolved_symbol(resolve_id.name, |s| s == "resolve")
-            && let internal::Expression::Identifier(require_id) = obj_member.object.as_ref()
+            && let internal::Expression::Identifier(require_id) = obj_member.object
             && printer.with_resolved_symbol(require_id.name, |s| s == "require")
         {
-            return Some((&member.object, method_name));
+            return Some((member.object, method_name));
         }
     }
 
     // Check for `import.meta.resolve()`
-    if is_resolve && let internal::Expression::MetaProperty(meta) = member.object.as_ref() {
+    if is_resolve && let internal::Expression::MetaProperty(meta) = member.object {
         let is_import_meta = printer.with_resolved_symbol(meta.meta.name, |m| m == "import")
             && printer.with_resolved_symbol(meta.property.name, |p| p == "meta");
         if is_import_meta {
-            return Some((&member.object, method_name));
+            return Some((member.object, method_name));
         }
     }
 
