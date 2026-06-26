@@ -544,7 +544,6 @@ dependencies = [
  "bumpalo",
  "serde_json",
  "tsv_css",
- "tsv_lang",
  "tsv_svelte",
  "tsv_ts",
 ]
