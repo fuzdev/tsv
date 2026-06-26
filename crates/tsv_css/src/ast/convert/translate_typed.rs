@@ -19,7 +19,7 @@ use super::super::public;
 ///
 /// For ASCII-only sources this is a no-op (byte == char offset).
 pub fn translate_byte_to_char_offsets_typed(
-    root: &mut public::StyleSheetFile,
+    root: &mut public::StyleSheetFile<'_>,
     map: &tsv_lang::ByteToCharMap,
 ) {
     if !map.has_multibyte() {
@@ -39,7 +39,7 @@ impl Translator<'_> {
         *p = self.map.byte_to_char(*p);
     }
 
-    fn stylesheet(&self, n: &mut public::StyleSheetFile) {
+    fn stylesheet(&self, n: &mut public::StyleSheetFile<'_>) {
         self.pos(&mut n.start);
         self.pos(&mut n.end);
         for c in &mut n.children {
@@ -47,7 +47,7 @@ impl Translator<'_> {
         }
     }
 
-    fn node(&self, n: &mut public::CssNodePublic) {
+    fn node(&self, n: &mut public::CssNodePublic<'_>) {
         match n {
             public::CssNodePublic::Rule(r) => self.rule(r),
             public::CssNodePublic::Atrule(a) => self.atrule(a),
@@ -58,7 +58,7 @@ impl Translator<'_> {
         }
     }
 
-    fn rule(&self, n: &mut public::Rule) {
+    fn rule(&self, n: &mut public::Rule<'_>) {
         self.selector_list(&mut n.prelude);
         self.pos(&mut n.block.start);
         self.pos(&mut n.block.end);
@@ -69,7 +69,7 @@ impl Translator<'_> {
         self.pos(&mut n.end);
     }
 
-    fn atrule(&self, n: &mut public::Atrule) {
+    fn atrule(&self, n: &mut public::Atrule<'_>) {
         if let Some(block) = &mut n.block {
             self.pos(&mut block.start);
             self.pos(&mut block.end);
@@ -81,7 +81,7 @@ impl Translator<'_> {
         self.pos(&mut n.end);
     }
 
-    fn selector_list(&self, n: &mut public::SelectorList) {
+    fn selector_list(&self, n: &mut public::SelectorList<'_>) {
         self.pos(&mut n.start);
         self.pos(&mut n.end);
         for c in &mut n.children {
@@ -93,7 +93,7 @@ impl Translator<'_> {
         }
     }
 
-    fn relative(&self, n: &mut public::RelativeSelector) {
+    fn relative(&self, n: &mut public::RelativeSelector<'_>) {
         if let Some(comb) = &mut n.combinator {
             self.pos(&mut comb.start);
             self.pos(&mut comb.end);
@@ -105,7 +105,7 @@ impl Translator<'_> {
         self.pos(&mut n.end);
     }
 
-    fn simple(&self, n: &mut public::SimpleSelector) {
+    fn simple(&self, n: &mut public::SimpleSelector<'_>) {
         match n {
             public::SimpleSelector::Named(s) => {
                 self.pos(&mut s.start);

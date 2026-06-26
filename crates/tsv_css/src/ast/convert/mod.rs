@@ -18,6 +18,7 @@
 
 use super::internal;
 use super::public;
+use std::borrow::Cow;
 use tsv_lang::source_scan::{TriviaProfile, find_char};
 
 mod translate_typed;
@@ -118,7 +119,14 @@ fn split_declaration_svelte_compat(decl_source: &str) -> (&str, &str) {
 /// String- and url()-aware: `/*` sequences inside `"..."`, `'...'`, or `url(...)` are
 /// treated as content, not comments. Unterminated comments are left intact (parse
 /// error caught elsewhere).
-fn strip_css_comments(input: &str) -> String {
+fn strip_css_comments(input: &str) -> Cow<'_, str> {
+    // Fast path: no block-comment delimiter anywhere means nothing is stripped, so
+    // the result is just the trimmed input — a borrowed sub-slice, no allocation.
+    // (Conservative: a `/*` inside a string/url is preserved either way, so those
+    // rare inputs fall to the owned path; correctness is unaffected.)
+    if !input.contains("/*") {
+        return Cow::Borrowed(input.trim());
+    }
     let mut out = String::with_capacity(input.len());
     let mut rest = input;
     while let Some(ch) = rest.chars().next() {
@@ -147,7 +155,7 @@ fn strip_css_comments(input: &str) -> String {
         }
         emit(&mut out, &mut rest, ch);
     }
-    out.trim().to_string()
+    Cow::Owned(out.trim().to_string())
 }
 
 /// Push `ch` to `out` and advance `rest` past it.
@@ -226,7 +234,10 @@ fn scan_to_terminator(source: &str, from: usize) -> usize {
 /// first whitespace/colon, and `value` is the raw post-colon source with block
 /// comments stripped and the ends trimmed (so `red   !   important` stays raw and
 /// `!important` is never re-serialized).
-fn convert_declaration(decl: &internal::CssDeclaration<'_>, source: &str) -> public::Declaration {
+fn convert_declaration<'src>(
+    decl: &internal::CssDeclaration<'_>,
+    source: &'src str,
+) -> public::Declaration<'src> {
     let content_end = decl
         .important_end
         .map_or(decl.span.end, |e| e.max(decl.span.end));
@@ -241,7 +252,7 @@ fn convert_declaration(decl: &internal::CssDeclaration<'_>, source: &str) -> pub
         node_type: "Declaration",
         start: decl.span.start,
         end: end as u32,
-        property: property_source.trim_end().to_string(),
+        property: Cow::Borrowed(property_source.trim_end()),
         value,
     }
 }
@@ -249,11 +260,11 @@ fn convert_declaration(decl: &internal::CssDeclaration<'_>, source: &str) -> pub
 /// Wrap a single simple selector in Svelte's triple-wrapper
 /// (SelectorList → ComplexSelector → RelativeSelector → selector), all sharing
 /// `span`. Used for the `Nth` and identifier (`:dir(ltr)`) pseudo-class args.
-fn wrap_single_selector(
-    selector: public::SimpleSelector,
+fn wrap_single_selector<'src>(
+    selector: public::SimpleSelector<'src>,
     span: tsv_lang::Span,
     scope: AstScope,
-) -> public::SelectorList {
+) -> public::SelectorList<'src> {
     let relative = public::RelativeSelector {
         node_type: "RelativeSelector",
         combinator: None,
@@ -280,11 +291,11 @@ fn wrap_single_selector(
 /// Convert PseudoClassArgs to Svelte's expected wrapper structure
 /// (SelectorList → ComplexSelector → RelativeSelector → Nth/TypeSelector). The
 /// caller boxes the result into the recursive `args`/`selector` field.
-fn convert_pseudo_class_args(
+fn convert_pseudo_class_args<'src>(
     args: &internal::PseudoClassArgs<'_>,
-    source: &str,
+    source: &'src str,
     scope: AstScope,
-) -> public::SelectorList {
+) -> public::SelectorList<'src> {
     match args {
         internal::PseudoClassArgs::Nth {
             value,
@@ -298,7 +309,7 @@ fn convert_pseudo_class_args(
             });
             let nth = public::SimpleSelector::Nth(public::Nth {
                 node_type: "Nth",
-                value: (*value).to_string(),
+                value: Cow::Owned((*value).to_string()),
                 start: span.start,
                 end: span.end,
                 selector,
@@ -321,7 +332,7 @@ fn convert_pseudo_class_args(
             // Svelte's public quirk: TypeSelector wrapping
             let type_selector = public::SimpleSelector::Named(public::NamedSelector {
                 node_type: "TypeSelector",
-                name: (*value).to_string(),
+                name: Cow::Owned((*value).to_string()),
                 start: span.start,
                 end: span.end,
             });
@@ -343,16 +354,19 @@ fn convert_pseudo_class_args(
 /// `parseCss()` metadata; the standalone root uses `convert_stylesheet_file`.
 /// Both paths now build the same typed tree — no intermediate `serde_json::Value`
 /// for embedded CSS either.
-pub fn convert_css_node(node: &internal::CssNode<'_>, source: &str) -> public::CssNodePublic {
+pub fn convert_css_node<'src>(
+    node: &internal::CssNode<'_>,
+    source: &'src str,
+) -> public::CssNodePublic<'src> {
     convert_node(node, source, AstScope::Embedded)
 }
 
 /// Convert a top-level CSS node to the typed public node.
-fn convert_node(
+fn convert_node<'src>(
     node: &internal::CssNode<'_>,
-    source: &str,
+    source: &'src str,
     scope: AstScope,
-) -> public::CssNodePublic {
+) -> public::CssNodePublic<'src> {
     match node {
         internal::CssNode::Rule(rule) => {
             public::CssNodePublic::Rule(convert_rule(rule, source, scope))
@@ -366,11 +380,11 @@ fn convert_node(
 /// Convert a block child (declaration, nested rule, or nested at-rule) to a
 /// typed node. Comments are dropped to match Svelte's CSS parser output (our
 /// internal AST keeps them for the formatter).
-fn convert_block_child(
+fn convert_block_child<'src>(
     child: &internal::CssBlockChild<'_>,
-    source: &str,
+    source: &'src str,
     scope: AstScope,
-) -> Option<public::CssNodePublic> {
+) -> Option<public::CssNodePublic<'src>> {
     match child {
         internal::CssBlockChild::Declaration(decl) => Some(public::CssNodePublic::Declaration(
             convert_declaration(decl, source),
@@ -388,7 +402,11 @@ fn convert_block_child(
 }
 
 /// Convert a CSS rule to the typed public node.
-fn convert_rule(rule: &internal::CssRule<'_>, source: &str, scope: AstScope) -> public::Rule {
+fn convert_rule<'src>(
+    rule: &internal::CssRule<'_>,
+    source: &'src str,
+    scope: AstScope,
+) -> public::Rule<'src> {
     let children = rule
         .declarations
         .iter()
@@ -411,11 +429,11 @@ fn convert_rule(rule: &internal::CssRule<'_>, source: &str, scope: AstScope) -> 
 }
 
 /// Convert a CSS at-rule to the typed public node.
-fn convert_atrule(
+fn convert_atrule<'src>(
     atrule: &internal::CssAtrule<'_>,
-    source: &str,
+    source: &'src str,
     scope: AstScope,
-) -> public::Atrule {
+) -> public::Atrule<'src> {
     let block = atrule.block.as_ref().map(|b| {
         let children = b
             .children
@@ -433,7 +451,9 @@ fn convert_atrule(
 
     public::Atrule {
         node_type: "Atrule",
-        name: atrule.name.to_string(),
+        // `atrule.name` is an `'arena` slice (not `source`), so it can't borrow into
+        // the `'src` public tree — owned. At-rules are rare and the name is short.
+        name: Cow::Owned(atrule.name.to_string()),
         // Convert prelude to string format for Svelte compatibility
         prelude: convert_prelude_to_string(&atrule.prelude, source),
         block,
@@ -447,7 +467,10 @@ fn convert_atrule(
 /// Svelte 5.55.x strips `/* ... */` block comments from at-rule preludes (surrounding
 /// whitespace preserved, then trimmed). Applied to all source-extracted variants;
 /// `Values` is built from parsed tokens that never contained comments.
-fn convert_prelude_to_string(prelude: &internal::PreludeValue<'_>, source: &str) -> String {
+fn convert_prelude_to_string<'src>(
+    prelude: &internal::PreludeValue<'_>,
+    source: &'src str,
+) -> Cow<'src, str> {
     match prelude {
         internal::PreludeValue::Values { span, .. } => {
             // Extract the prelude verbatim from source and strip comments, matching
@@ -481,11 +504,11 @@ fn convert_prelude_to_string(prelude: &internal::PreludeValue<'_>, source: &str)
 }
 
 /// Convert a SelectorList to the typed public node.
-fn convert_selector_list(
+fn convert_selector_list<'src>(
     selector_list: &internal::SelectorList<'_>,
-    source: &str,
+    source: &'src str,
     scope: AstScope,
-) -> public::SelectorList {
+) -> public::SelectorList<'src> {
     let children = selector_list
         .selectors
         .iter()
@@ -512,11 +535,11 @@ fn convert_selector_list(
 ///
 /// This filtering happens at conversion time, not in the internal AST, to preserve
 /// full semantic information for the formatter (which outputs all selectors).
-fn convert_selector_list_filtered(
+fn convert_selector_list_filtered<'src>(
     selector_list: &internal::SelectorList<'_>,
-    source: &str,
+    source: &'src str,
     scope: AstScope,
-) -> public::SelectorList {
+) -> public::SelectorList<'src> {
     let children = selector_list
         .selectors
         .iter()
@@ -545,11 +568,11 @@ fn selector_contains_invalid(complex: &internal::ComplexSelector<'_>) -> bool {
 }
 
 /// Convert a ComplexSelector to the typed public node.
-fn convert_complex_selector(
+fn convert_complex_selector<'src>(
     complex: &internal::ComplexSelector<'_>,
-    source: &str,
+    source: &'src str,
     scope: AstScope,
-) -> public::ComplexSelector {
+) -> public::ComplexSelector<'src> {
     let children = complex
         .children
         .iter()
@@ -566,11 +589,11 @@ fn convert_complex_selector(
 }
 
 /// Convert a RelativeSelector to the typed public node.
-fn convert_relative_selector(
+fn convert_relative_selector<'src>(
     relative: &internal::RelativeSelector<'_>,
-    source: &str,
+    source: &'src str,
     scope: AstScope,
-) -> public::RelativeSelector {
+) -> public::RelativeSelector<'src> {
     let combinator =
         if let (Some(comb), Some(span)) = (&relative.combinator, &relative.combinator_span) {
             Some(public::Combinator {
@@ -604,8 +627,13 @@ fn convert_relative_selector(
 /// `\1F4A9`, optional single whitespace terminator) decode to their codepoint, while
 /// identity escapes (`\?`) keep the backslash. The internal AST stores the fully
 /// decoded spec form; this reconstructs Svelte's public form at the boundary.
-fn raw_selector_name(source: &str, span: tsv_lang::Span, prefix_len: usize) -> String {
+fn raw_selector_name(source: &str, span: tsv_lang::Span, prefix_len: usize) -> Cow<'_, str> {
     let raw = &source[span.start as usize + prefix_len..span.end as usize];
+    // Fast path: no backslash means no escapes to decode, so the name is the raw
+    // source slice verbatim — borrowed, no allocation. (The vast majority of names.)
+    if !raw.contains('\\') {
+        return Cow::Borrowed(raw);
+    }
     let mut out = String::with_capacity(raw.len());
     let mut chars = raw.chars().peekable();
     while let Some(ch) = chars.next() {
@@ -647,7 +675,7 @@ fn raw_selector_name(source: &str, span: tsv_lang::Span, prefix_len: usize) -> S
             out.push('\\');
         }
     }
-    out
+    Cow::Owned(out)
 }
 
 /// The end position of a pseudo selector's name, excluding any `(args)`.
@@ -666,11 +694,11 @@ fn pseudo_name_end(source: &str, span: tsv_lang::Span, has_args: bool) -> u32 {
 }
 
 /// Convert a SimpleSelector to the typed public node.
-fn convert_simple_selector(
+fn convert_simple_selector<'src>(
     simple: &internal::SimpleSelector<'_>,
-    source: &str,
+    source: &'src str,
     scope: AstScope,
-) -> public::SimpleSelector {
+) -> public::SimpleSelector<'src> {
     match simple {
         internal::SimpleSelector::Type { namespace, span } => {
             // SVELTE QUIRK: Namespace prefixes are parsed but NOT included in the JSON AST
@@ -699,7 +727,7 @@ fn convert_simple_selector(
             // SVELTE QUIRK: Namespace prefixes are parsed but NOT included in the JSON AST
             public::SimpleSelector::Named(public::NamedSelector {
                 node_type: "TypeSelector",
-                name: "*".to_string(),
+                name: Cow::Borrowed("*"),
                 start: span.start,
                 end: span.end,
             })
@@ -738,10 +766,12 @@ fn convert_simple_selector(
                 name: raw_selector_name(source, *name_span, 0),
                 start: span.start,
                 end: span.end,
-                matcher: matcher.as_ref().map(|m| m.as_str().to_string()),
-                value: value.as_ref().map(|v| (*v).to_string()),
-                flags: flags.as_ref().map(|f| (*f).to_string()),
-                namespace: namespace.as_ref().map(|ns| (*ns).to_string()),
+                // `matcher`/`value`/`flags`/`namespace` are `'arena` slices, not
+                // `source`, so they're owned (rare — attribute selectors).
+                matcher: matcher.as_ref().map(|m| Cow::Owned(m.as_str().to_string())),
+                value: value.as_ref().map(|v| Cow::Owned((*v).to_string())),
+                flags: flags.as_ref().map(|f| Cow::Owned((*f).to_string())),
+                namespace: namespace.as_ref().map(|ns| Cow::Owned((*ns).to_string())),
             })
         }
         // Pseudo-class/-element names are half-decoded like every other selector name
@@ -796,7 +826,7 @@ fn convert_simple_selector(
         internal::SimpleSelector::Nesting { span } => {
             public::SimpleSelector::Named(public::NamedSelector {
                 node_type: "NestingSelector",
-                name: "&".to_string(),
+                name: Cow::Borrowed("&"),
                 start: span.start,
                 end: span.end,
             })
@@ -810,7 +840,7 @@ fn convert_simple_selector(
             };
             public::SimpleSelector::Percentage(public::Percentage {
                 node_type: "Percentage",
-                value: value_str,
+                value: Cow::Owned(value_str),
                 start: span.start,
                 end: span.end,
             })
@@ -876,9 +906,12 @@ fn translate_positions_recursive(value: &mut serde_json::Value, map: &tsv_lang::
 }
 
 /// Convert a list of CSS nodes to a typed StyleSheet structure (for Svelte embedding)
-pub fn convert_css_nodes(nodes: &[internal::CssNode<'_>], source: &str) -> public::StyleSheet {
+pub fn convert_css_nodes<'src>(
+    nodes: &[internal::CssNode<'_>],
+    source: &'src str,
+) -> public::StyleSheet<'src> {
     // Convert all nodes (comments are stored separately and not included in JSON output)
-    let children: Vec<public::CssNodePublic> = nodes
+    let children: Vec<public::CssNodePublic<'src>> = nodes
         .iter()
         .map(|node| convert_css_node(node, source))
         .collect();
@@ -890,7 +923,7 @@ pub fn convert_css_nodes(nodes: &[internal::CssNode<'_>], source: &str) -> publi
     };
 
     public::StyleSheet {
-        node_type: "StyleSheetFile".to_string(),
+        node_type: "StyleSheetFile",
         start: content_start,
         end: content_end,
         attributes: Vec::new(),
@@ -898,7 +931,7 @@ pub fn convert_css_nodes(nodes: &[internal::CssNode<'_>], source: &str) -> publi
         content: public::StyleContent {
             start: content_start,
             end: content_end,
-            styles: source[content_start as usize..content_end as usize].to_string(),
+            styles: Cow::Borrowed(&source[content_start as usize..content_end as usize]),
             comment: None,
         },
     }
@@ -915,10 +948,10 @@ pub fn convert_css_nodes(nodes: &[internal::CssNode<'_>], source: &str) -> publi
 ///
 /// The `end` offset is set to the full source length (not the last node's span end),
 /// matching Svelte's behavior of including trailing whitespace in the file span.
-pub fn convert_stylesheet_file(
+pub fn convert_stylesheet_file<'src>(
     nodes: &[internal::CssNode<'_>],
-    source: &str,
-) -> public::StyleSheetFile {
+    source: &'src str,
+) -> public::StyleSheetFile<'src> {
     let children = nodes
         .iter()
         .map(|node| convert_node(node, source, AstScope::Standalone))
@@ -936,38 +969,37 @@ pub fn convert_stylesheet_file(
 mod tests {
     use super::*;
 
+    /// Owns the `Cow` result so assertions can compare against `&str` literals.
+    fn strip(s: &str) -> String {
+        strip_css_comments(s).into_owned()
+    }
+
     #[test]
     fn strip_css_comments_basic_removal_and_trim() {
-        assert_eq!(strip_css_comments("/* c */ 12px"), "12px");
-        assert_eq!(strip_css_comments("blue /* c */"), "blue");
-        assert_eq!(strip_css_comments("/* a */ red"), "red");
+        assert_eq!(strip("/* c */ 12px"), "12px");
+        assert_eq!(strip("blue /* c */"), "blue");
+        assert_eq!(strip("/* a */ red"), "red");
     }
 
     #[test]
     fn strip_css_comments_interior_whitespace_preserved() {
+        assert_eq!(strip("var(--a, /* c */ red)"), "var(--a,  red)",);
         assert_eq!(
-            strip_css_comments("var(--a, /* c */ red)"),
-            "var(--a,  red)",
-        );
-        assert_eq!(
-            strip_css_comments("sidebar /* x */ (min-width: 100px)"),
+            strip("sidebar /* x */ (min-width: 100px)"),
             "sidebar  (min-width: 100px)",
         );
     }
 
     #[test]
     fn strip_css_comments_inside_strings_are_preserved() {
-        assert_eq!(
-            strip_css_comments("\"/* not a comment */\""),
-            "\"/* not a comment */\"",
-        );
-        assert_eq!(strip_css_comments("'/* keep */'"), "'/* keep */'");
+        assert_eq!(strip("\"/* not a comment */\""), "\"/* not a comment */\"",);
+        assert_eq!(strip("'/* keep */'"), "'/* keep */'");
     }
 
     #[test]
     fn strip_css_comments_inside_url_are_preserved() {
         assert_eq!(
-            strip_css_comments("url(\"data:image/svg+xml,/* x */\")"),
+            strip("url(\"data:image/svg+xml,/* x */\")"),
             "url(\"data:image/svg+xml,/* x */\")",
         );
     }
@@ -976,22 +1008,19 @@ mod tests {
     fn strip_css_comments_inside_other_functions_are_stripped() {
         // Only url() is special — calc/var/etc. follow normal CSS tokenization,
         // so block comments inside them are stripped just like at top level.
-        assert_eq!(
-            strip_css_comments("calc(/* x */ 1px + 2px)"),
-            "calc( 1px + 2px)",
-        );
-        assert_eq!(strip_css_comments("URL(/* keep */)"), "URL(/* keep */)");
+        assert_eq!(strip("calc(/* x */ 1px + 2px)"), "calc( 1px + 2px)",);
+        assert_eq!(strip("URL(/* keep */)"), "URL(/* keep */)");
     }
 
     #[test]
     fn strip_css_comments_unterminated_kept_verbatim() {
-        assert_eq!(strip_css_comments("red /* oops"), "red /* oops");
+        assert_eq!(strip("red /* oops"), "red /* oops");
     }
 
     #[test]
     fn strip_css_comments_escaped_quote_does_not_close_string() {
         assert_eq!(
-            strip_css_comments("\"a\\\" /* in str */ b\" /* real */ c"),
+            strip("\"a\\\" /* in str */ b\" /* real */ c"),
             "\"a\\\" /* in str */ b\"  c",
         );
     }
