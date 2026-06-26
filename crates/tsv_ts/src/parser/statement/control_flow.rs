@@ -74,9 +74,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // 4. Variable declaration for-in/of (for (let x of ...))
         // 5. Expression pattern for-in/of (for (x of ...))
 
-        if self.check(&TokenKind::Semicolon) {
+        if self.eat(TokenKind::Semicolon) {
             // Empty init: for (;...)
-            self.advance()?; // consume ';'
             return self.parse_for_standard(start, None);
         }
 
@@ -453,9 +452,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         // Parse optional parameter: (param) or (param: type) or ({destructuring}) or ({destructuring}: Type)
-        let param = if self.check(&TokenKind::ParenOpen) {
-            self.advance()?;
-
+        let param = if self.eat(TokenKind::ParenOpen) {
             let param = match self.current_kind() {
                 TokenKind::Identifier => {
                     // Simple identifier: catch (e) or catch (e: Error)
