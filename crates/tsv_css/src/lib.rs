@@ -150,7 +150,7 @@ pub fn format_embedded(
 /// let json = serde_json::to_string_pretty(&public_ast).unwrap();
 /// ```
 #[cfg(feature = "convert")]
-pub fn convert_ast(stylesheet: &CssStyleSheet<'_>, source: &str) -> StyleSheet {
+pub fn convert_ast<'src>(stylesheet: &CssStyleSheet<'_>, source: &'src str) -> StyleSheet<'src> {
     ast::convert::convert_css_nodes(stylesheet.nodes, source)
 }
 

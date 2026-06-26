@@ -2,6 +2,7 @@
 // Uses u32 for positions (max 4GB file size) for memory efficiency
 
 use serde::Serialize;
+use std::borrow::Cow;
 
 /// StyleSheet - CSS content with parsed AST
 ///
@@ -14,22 +15,22 @@ use serde::Serialize;
 /// an output format — nothing deserializes it — and `CssNodePublic`'s
 /// `&'static str` type tags couldn't round-trip anyway.
 #[derive(Debug, Clone, Serialize)]
-pub struct StyleSheet {
+pub struct StyleSheet<'src> {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub attributes: Vec<serde_json::Value>, // Attributes from <style> tag
-    pub children: Vec<CssNodePublic>,       // CSS AST nodes (Rules, etc.)
-    pub content: StyleContent,
+    pub children: Vec<CssNodePublic<'src>>, // CSS AST nodes (Rules, etc.)
+    pub content: StyleContent<'src>,
 }
 
 /// StyleSheet content - raw CSS text
 #[derive(Debug, Clone, Serialize)]
-pub struct StyleContent {
+pub struct StyleContent<'src> {
     pub start: u32,
     pub end: u32,
-    pub styles: String,
+    pub styles: Cow<'src, str>,
     pub comment: Option<serde_json::Value>,
 }
 
@@ -43,9 +44,12 @@ pub struct StyleContent {
 // `Deserialize`). Field declaration order IS the JSON key order — it must match
 // Svelte's `parseCss()` output exactly (the contract `fixtures_update_parsed`
 // regenerates against and the P1 fixture gate byte-checks). Dynamic text
-// (`name`/`property`/`value`/`prelude`) is owned `String`, matching the strings
-// the old `json!` path allocated; the win is dropping the `IndexMap<String,
-// Value>` overhead, not the leaf strings.
+// (`property`/`value`/`prelude`/selector `name`/`styles`) is `Cow<'src, str>`
+// borrowed from `source` when it's a verbatim slice (the common case — no
+// alloc), owned only when genuinely computed (comment-stripped values, escape-
+// decoded names, `Percentage`, the `'arena`-derived at-rule `name`/attribute
+// parts). `Cow` serializes byte-identically to `String`/`&str`. The `'src`
+// lifetime ties the whole public tree to the source it was converted against.
 //
 // The embedded `<style>` path (`StyleSheet` above) shares these typed nodes as
 // its `children` (built with `AstScope::Embedded`), so it never carries
@@ -56,30 +60,30 @@ pub struct StyleContent {
 /// declaration. Serialized untagged — each variant carries its own `type`.
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
-pub enum CssNodePublic {
-    Rule(Rule),
-    Atrule(Atrule),
-    Declaration(Declaration),
+pub enum CssNodePublic<'src> {
+    Rule(Rule<'src>),
+    Atrule(Atrule<'src>),
+    Declaration(Declaration<'src>),
 }
 
 /// Standalone stylesheet root (`parseCss()` shape: `type`/`start`/`end`/`children`,
 /// no `attributes`/`content`). `end` is the full source length.
 #[derive(Debug, Clone, Serialize)]
-pub struct StyleSheetFile {
+pub struct StyleSheetFile<'src> {
     #[serde(rename = "type")]
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub children: Vec<CssNodePublic>,
+    pub children: Vec<CssNodePublic<'src>>,
 }
 
 /// CSS rule: selector list + declaration block.
 #[derive(Debug, Clone, Serialize)]
-pub struct Rule {
+pub struct Rule<'src> {
     #[serde(rename = "type")]
     pub node_type: &'static str,
-    pub prelude: SelectorList,
-    pub block: Block,
+    pub prelude: SelectorList<'src>,
+    pub block: Block<'src>,
     pub start: u32,
     pub end: u32,
     /// `parseCss()` standalone metadata; omitted for embedded `<style>`.
@@ -89,69 +93,69 @@ pub struct Rule {
 
 /// Declaration block `{ ... }`.
 #[derive(Debug, Clone, Serialize)]
-pub struct Block {
+pub struct Block<'src> {
     #[serde(rename = "type")]
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub children: Vec<CssNodePublic>,
+    pub children: Vec<CssNodePublic<'src>>,
 }
 
 /// `property: value` declaration. `property`/`value` are reconstructed from raw
 /// source (Svelte's scan semantics), not from the structured internal value.
 #[derive(Debug, Clone, Serialize)]
-pub struct Declaration {
+pub struct Declaration<'src> {
     #[serde(rename = "type")]
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub property: String,
-    pub value: String,
+    pub property: Cow<'src, str>,
+    pub value: Cow<'src, str>,
 }
 
 /// At-rule (`@media`, `@keyframes`, …). `prelude` is the raw prelude string;
 /// `block` is `null` for statement at-rules (`@import`).
 #[derive(Debug, Clone, Serialize)]
-pub struct Atrule {
+pub struct Atrule<'src> {
     #[serde(rename = "type")]
     pub node_type: &'static str,
-    pub name: String,
-    pub prelude: String,
-    pub block: Option<Block>,
+    pub name: Cow<'src, str>,
+    pub prelude: Cow<'src, str>,
+    pub block: Option<Block<'src>>,
     pub start: u32,
     pub end: u32,
 }
 
 /// Comma-separated selector list.
 #[derive(Debug, Clone, Serialize)]
-pub struct SelectorList {
+pub struct SelectorList<'src> {
     #[serde(rename = "type")]
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub children: Vec<ComplexSelector>,
+    pub children: Vec<ComplexSelector<'src>>,
 }
 
 /// One complex selector (relative selectors joined by combinators).
 #[derive(Debug, Clone, Serialize)]
-pub struct ComplexSelector {
+pub struct ComplexSelector<'src> {
     #[serde(rename = "type")]
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub children: Vec<RelativeSelector>,
+    pub children: Vec<RelativeSelector<'src>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ComplexSelectorMetadata>,
 }
 
 /// Combinator + the simple selectors it introduces.
 #[derive(Debug, Clone, Serialize)]
-pub struct RelativeSelector {
+pub struct RelativeSelector<'src> {
     #[serde(rename = "type")]
     pub node_type: &'static str,
     /// `null` when there's no leading combinator.
     pub combinator: Option<Combinator>,
-    pub selectors: Vec<SimpleSelector>,
+    pub selectors: Vec<SimpleSelector<'src>>,
     pub start: u32,
     pub end: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -172,23 +176,23 @@ pub struct Combinator {
 /// untagged — each variant carries its own `type`.
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
-pub enum SimpleSelector {
+pub enum SimpleSelector<'src> {
     /// `TypeSelector`/`ClassSelector`/`IdSelector`/`NestingSelector` — same
     /// `{type, name, start, end}` shape, distinguished by `node_type`.
-    Named(NamedSelector),
-    Attribute(AttributeSelector),
-    PseudoClass(PseudoClassSelector),
-    PseudoElement(PseudoElementSelector),
-    Percentage(Percentage),
-    Nth(Nth),
+    Named(NamedSelector<'src>),
+    Attribute(AttributeSelector<'src>),
+    PseudoClass(PseudoClassSelector<'src>),
+    PseudoElement(PseudoElementSelector<'src>),
+    Percentage(Percentage<'src>),
+    Nth(Nth<'src>),
 }
 
 /// `{type, name, start, end}` — Type/Class/Id/Nesting selectors.
 #[derive(Debug, Clone, Serialize)]
-pub struct NamedSelector {
+pub struct NamedSelector<'src> {
     #[serde(rename = "type")]
     pub node_type: &'static str,
-    pub name: String,
+    pub name: Cow<'src, str>,
     pub start: u32,
     pub end: u32,
 }
@@ -201,46 +205,46 @@ pub struct NamedSelector {
 /// `type, name, start, end`), so this struct matches that quirk rather than the
 /// regular pattern. Don't "normalize" `name` back above `start`/`end`.
 #[derive(Debug, Clone, Serialize)]
-pub struct AttributeSelector {
+pub struct AttributeSelector<'src> {
     #[serde(rename = "type")]
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub name: String,
-    pub matcher: Option<String>,
-    pub value: Option<String>,
-    pub flags: Option<String>,
+    pub name: Cow<'src, str>,
+    pub matcher: Option<Cow<'src, str>>,
+    pub value: Option<Cow<'src, str>>,
+    pub flags: Option<Cow<'src, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub namespace: Option<String>,
+    pub namespace: Option<Cow<'src, str>>,
 }
 
 /// `:name(args)`. `args` is `null` for argument-less pseudo-classes.
 #[derive(Debug, Clone, Serialize)]
-pub struct PseudoClassSelector {
+pub struct PseudoClassSelector<'src> {
     #[serde(rename = "type")]
     pub node_type: &'static str,
-    pub name: String,
-    pub args: Option<Box<SelectorList>>,
+    pub name: Cow<'src, str>,
+    pub args: Option<Box<SelectorList<'src>>>,
     pub start: u32,
     pub end: u32,
 }
 
 /// `::name` — pseudo-element. `end` excludes any `(args)`, matching Svelte.
 #[derive(Debug, Clone, Serialize)]
-pub struct PseudoElementSelector {
+pub struct PseudoElementSelector<'src> {
     #[serde(rename = "type")]
     pub node_type: &'static str,
-    pub name: String,
+    pub name: Cow<'src, str>,
     pub start: u32,
     pub end: u32,
 }
 
 /// `@keyframes` percentage selector (`50%`). `value` is the formatted string.
 #[derive(Debug, Clone, Serialize)]
-pub struct Percentage {
+pub struct Percentage<'src> {
     #[serde(rename = "type")]
     pub node_type: &'static str,
-    pub value: String,
+    pub value: Cow<'src, str>,
     pub start: u32,
     pub end: u32,
 }
@@ -248,14 +252,14 @@ pub struct Percentage {
 /// `An+B` term inside `:nth-child(...)` etc. `selector` is the optional
 /// `of <selector-list>` (omitted when absent).
 #[derive(Debug, Clone, Serialize)]
-pub struct Nth {
+pub struct Nth<'src> {
     #[serde(rename = "type")]
     pub node_type: &'static str,
-    pub value: String,
+    pub value: Cow<'src, str>,
     pub start: u32,
     pub end: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub selector: Option<Box<SelectorList>>,
+    pub selector: Option<Box<SelectorList<'src>>>,
 }
 
 //

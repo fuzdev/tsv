@@ -35,8 +35,8 @@ pub struct NamePosition {
 /// `tsv_css`'s `StyleSheet`, whose `&'static str` type tags couldn't round-trip
 /// regardless.)
 #[derive(Debug, Clone, Serialize)]
-pub struct Root {
-    pub css: Option<StyleSheet>,
+pub struct Root<'src> {
+    pub css: Option<StyleSheet<'src>>,
     pub js: Vec<serde_json::Value>, // empty array for now
     pub start: u32,
     pub end: u32,

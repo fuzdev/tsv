@@ -88,7 +88,7 @@ pub fn format_in(root: &Root<'_>, source: &str, arena: &tsv_lang::doc::arena::Do
 /// let json = serde_json::to_string_pretty(&public_ast)?;
 /// ```
 #[cfg(feature = "convert")]
-pub fn convert_ast(root: &Root<'_>, source: &str) -> ast::public::Root {
+pub fn convert_ast<'src>(root: &Root<'_>, source: &'src str) -> ast::public::Root<'src> {
     ast::convert::convert_root(root, source)
 }
 
