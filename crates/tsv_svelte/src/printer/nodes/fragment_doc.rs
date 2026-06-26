@@ -80,15 +80,15 @@ impl<'a> Printer<'a> {
     /// This is the entry point for doc-based inline content formatting.
     /// The resulting doc includes all nodes, so fits() checks will
     /// naturally account for siblings.
-    pub(crate) fn build_fragment_doc(&self, fragment: &Fragment) -> DocId {
-        self.build_nodes_doc(&fragment.nodes)
+    pub(crate) fn build_fragment_doc(&self, fragment: &Fragment<'_>) -> DocId {
+        self.build_nodes_doc(fragment.nodes)
     }
 
     /// Build a doc for a slice of fragment nodes
     ///
     /// Accepts a slice directly, avoiding Fragment allocation when caller
     /// already has a `&[FragmentNode]`.
-    pub(crate) fn build_nodes_doc(&self, nodes: &[FragmentNode]) -> DocId {
+    pub(crate) fn build_nodes_doc(&self, nodes: &[FragmentNode<'_>]) -> DocId {
         self.build_nodes_doc_with_context(nodes, false)
     }
 
@@ -99,7 +99,7 @@ impl<'a> Printer<'a> {
     ///   If false, preserve single space at boundaries (inline context).
     pub(crate) fn build_nodes_doc_with_context(
         &self,
-        nodes: &[FragmentNode],
+        nodes: &[FragmentNode<'_>],
         trim_text: bool,
     ) -> DocId {
         let mut docs: DocBuf = DocBuf::new();
@@ -152,8 +152,8 @@ impl<'a> Printer<'a> {
     /// which `skip` returns true. Returns `None` when every node is skipped (the range is empty),
     /// so callers can short-circuit to an empty doc.
     fn trimmed_node_bounds(
-        nodes: &[FragmentNode],
-        skip: impl Fn(&FragmentNode) -> bool,
+        nodes: &[FragmentNode<'_>],
+        skip: impl Fn(&FragmentNode<'_>) -> bool,
     ) -> Option<(usize, usize)> {
         let start = nodes.iter().position(|n| !skip(n))?;
         let end = nodes.iter().rposition(|n| !skip(n)).map_or(0, |i| i + 1);
@@ -197,7 +197,7 @@ impl<'a> Printer<'a> {
     ///   reroute onto this path + deletion is the remaining Slice-2/3 work.)
     pub(crate) fn build_nodes_doc_trimmed(
         &self,
-        nodes: &[FragmentNode],
+        nodes: &[FragmentNode<'_>],
         trim_boundaries: bool,
         breakable_exprs: bool,
         multiline: bool,
@@ -213,7 +213,7 @@ impl<'a> Printer<'a> {
         //
         // Helper: should we skip this node at the boundary?
         let source = self.source;
-        let should_skip_at_boundary = |n: &FragmentNode| -> bool {
+        let should_skip_at_boundary = |n: &FragmentNode<'_>| -> bool {
             if let FragmentNode::Text(text) = n {
                 // Whitespace-only: skip only for block elements
                 // Inline elements keep boundary whitespace (normalized to single space)
@@ -388,7 +388,7 @@ impl<'a> Printer<'a> {
     ///
     /// These tags use the leading/trailing line fill approach instead of group wrapping,
     /// because group wrapping forces line breaks after multiline expressions.
-    fn is_expression_tag(node: &FragmentNode) -> bool {
+    fn is_expression_tag(node: &FragmentNode<'_>) -> bool {
         matches!(
             node,
             FragmentNode::ExpressionTag(_) | FragmentNode::HtmlTag(_) | FragmentNode::RenderTag(_)
@@ -401,7 +401,7 @@ impl<'a> Printer<'a> {
     ///
     // Recognition lives in `tsv_lang::is_format_ignore_directive` — the single source of
     // truth for the directive set, shared across all three language printers.
-    fn is_format_ignore_comment(node: &FragmentNode, source: &str) -> bool {
+    fn is_format_ignore_comment(node: &FragmentNode<'_>, source: &str) -> bool {
         matches!(node, FragmentNode::Comment(c) if is_format_ignore_directive(c.content(source)))
     }
 
@@ -409,7 +409,7 @@ impl<'a> Printer<'a> {
     /// whitespace-only text to skip — the pin then carries to the next real node.
     /// Shared leading step of the three `build_nodes_doc_*` accumulation loops; each
     /// caller owns its sink and clears `format_ignore_next` only when this returns `Some`.
-    fn format_ignore_raw_doc(&self, node: &FragmentNode) -> Option<DocId> {
+    fn format_ignore_raw_doc(&self, node: &FragmentNode<'_>) -> Option<DocId> {
         if let FragmentNode::Text(text) = node
             && text.raw(self.source).is_whitespace_only()
         {
@@ -427,7 +427,7 @@ impl<'a> Printer<'a> {
     #[allow(clippy::too_many_arguments)]
     fn handle_text_child(
         &self,
-        trimmed_nodes: &[FragmentNode],
+        trimmed_nodes: &[FragmentNode<'_>],
         i: usize,
         trim_boundaries: bool,
         breakable_exprs: bool,
@@ -809,7 +809,7 @@ impl<'a> Printer<'a> {
     /// Handle an inline child element - matches prettier-plugin-svelte's handleInlineChild
     fn handle_inline_child(
         &self,
-        node: &FragmentNode,
+        node: &FragmentNode<'_>,
         child_docs: &mut DocBuf,
         handle_whitespace_of_prev_text: &mut bool,
     ) {
@@ -831,7 +831,7 @@ impl<'a> Printer<'a> {
     /// prettier-plugin-svelte (`isBlockElement`): an HTML block element, a block special
     /// element, or a block component. Excludes control-flow blocks (`{#if}` etc. — they
     /// separate via the whitespace-break path) and inline elements/components.
-    fn is_block_element_node(&self, node: &FragmentNode) -> bool {
+    fn is_block_element_node(&self, node: &FragmentNode<'_>) -> bool {
         matches!(
             node,
             FragmentNode::Element(_) | FragmentNode::SpecialElement(_)
@@ -857,7 +857,7 @@ impl<'a> Printer<'a> {
     ///   start with a linebreak — a leading-linebreak text supplies its own break.
     fn handle_block_child(
         &self,
-        trimmed_nodes: &[FragmentNode],
+        trimmed_nodes: &[FragmentNode<'_>],
         i: usize,
         force_break: bool,
         child_docs: &mut DocBuf,
@@ -922,7 +922,7 @@ impl<'a> Printer<'a> {
     /// root-inline-run dispatch, and the sibling-`>` dangle). `breakable_exprs` opts a fragment
     /// carrying a break-capable expression tag into the hard-width multi-expression layout
     /// (`fill_multiple_expr_long`).
-    pub(crate) fn build_nodes_doc_multiline(&self, nodes: &[FragmentNode]) -> DocId {
+    pub(crate) fn build_nodes_doc_multiline(&self, nodes: &[FragmentNode<'_>]) -> DocId {
         let breakable_exprs = Self::nodes_have_breakable_expression(nodes);
         self.build_nodes_doc_trimmed(nodes, true, breakable_exprs, true)
     }
@@ -931,7 +931,7 @@ impl<'a> Printer<'a> {
     ///
     /// Components are NOT treated as blocks - like Prettier, they're printed inline.
     /// The line structure comes from whitespace in text nodes, not from node types.
-    fn is_block_fragment_node(&self, node: &FragmentNode) -> bool {
+    fn is_block_fragment_node(&self, node: &FragmentNode<'_>) -> bool {
         match node {
             // Defer to the one block-element adapter (component + script/style overlay).
             FragmentNode::Element(el) => self.is_block_element(el),
@@ -945,7 +945,7 @@ impl<'a> Printer<'a> {
     /// Matches prettier's `forceBreakContent`: when there are multiple non-whitespace
     /// children and at least one is a block element, content should break.
     /// This forces the multiline path even for "inline" Svelte block bodies.
-    pub(super) fn fragment_should_force_break_content(&self, nodes: &[FragmentNode]) -> bool {
+    pub(super) fn fragment_should_force_break_content(&self, nodes: &[FragmentNode<'_>]) -> bool {
         let source = self.source;
         let non_ws_count = nodes
             .iter()
@@ -969,7 +969,7 @@ impl<'a> Printer<'a> {
     /// - Single expression
     /// - Expressions directly adjacent (no whitespace between)
     /// - Semantic text between expressions (e.g., `{'<'}div{'>'}`)
-    pub(super) fn should_split_expressions_in_nodes(&self, nodes: &[FragmentNode]) -> bool {
+    pub(super) fn should_split_expressions_in_nodes(&self, nodes: &[FragmentNode<'_>]) -> bool {
         // Count expression nodes
         let expr_count = nodes
             .iter()
@@ -1007,7 +1007,7 @@ impl<'a> Printer<'a> {
     /// boundary before such an element trims to a collapsible `group([line, element])`) and by
     /// `handle_block_child` (the `idx + 2` inline-element lookahead). The broader
     /// element-or-component flow set is [`Self::is_inline_el_or_comp`].
-    fn next_is_inline_element(&self, trimmed_nodes: &[FragmentNode], i: usize) -> bool {
+    fn next_is_inline_element(&self, trimmed_nodes: &[FragmentNode<'_>], i: usize) -> bool {
         match trimmed_nodes.get(i + 1) {
             Some(FragmentNode::Element(el)) => {
                 el.kind != internal::ElementKind::Component && !self.is_block_element(el)
@@ -1024,7 +1024,7 @@ impl<'a> Printer<'a> {
     /// (a sibling-only predicate that *excludes* components, because a space-separated component
     /// sibling breaks to its own line), this includes components: a wide `<Comp>` adjacent to
     /// flowing text is the case the Fill-idempotency fix targets.
-    fn is_inline_el_or_comp(&self, node: &FragmentNode) -> bool {
+    fn is_inline_el_or_comp(&self, node: &FragmentNode<'_>) -> bool {
         matches!(
             node,
             FragmentNode::Element(_) | FragmentNode::SpecialElement(_)
@@ -1036,7 +1036,7 @@ impl<'a> Printer<'a> {
     /// Returns None for whitespace-only text nodes that should be skipped.
     fn build_fragment_node_doc_with_context(
         &self,
-        node: &FragmentNode,
+        node: &FragmentNode<'_>,
         trim_text: bool,
     ) -> Option<DocId> {
         self.build_fragment_node_doc_impl(node, trim_text, false, false)
@@ -1048,7 +1048,7 @@ impl<'a> Printer<'a> {
     /// (spaces but no newlines) will expand to multiline format.
     fn build_fragment_node_doc_in_multiline(
         &self,
-        node: &FragmentNode,
+        node: &FragmentNode<'_>,
         trim_text: bool,
     ) -> Option<DocId> {
         self.build_fragment_node_doc_impl(node, trim_text, true, false)
@@ -1060,7 +1060,7 @@ impl<'a> Printer<'a> {
     /// to ensure earlier content breaks before the condition.
     fn build_fragment_node_doc_with_preceding_context(
         &self,
-        node: &FragmentNode,
+        node: &FragmentNode<'_>,
         trim_text: bool,
         has_preceding_breakable: bool,
     ) -> Option<DocId> {
@@ -1069,7 +1069,7 @@ impl<'a> Printer<'a> {
 
     fn build_fragment_node_doc_impl(
         &self,
-        node: &FragmentNode,
+        node: &FragmentNode<'_>,
         trim_text: bool,
         in_multiline_context: bool,
         has_preceding_breakable: bool,
@@ -1121,7 +1121,7 @@ impl<'a> Printer<'a> {
     /// whose body-drop is likewise gated on `can_wrap`.
     fn try_block_sibling_gt_dangle(
         &self,
-        trimmed_nodes: &[FragmentNode],
+        trimmed_nodes: &[FragmentNode<'_>],
         i: usize,
     ) -> Option<(DocId, DocId)> {
         let block = trimmed_nodes.get(i)?;
@@ -1159,7 +1159,7 @@ impl<'a> Printer<'a> {
     /// (`build_fragment_node_doc_impl`) and the sibling-`>` dangle (`build_block_node_doc_with_gt`).
     fn build_control_flow_block_doc(
         &self,
-        node: &FragmentNode,
+        node: &FragmentNode<'_>,
         in_multiline_context: bool,
         has_preceding_breakable: bool,
         gt_prefix: Option<DocId>,
@@ -1202,7 +1202,7 @@ impl<'a> Printer<'a> {
     /// Dispatch a control-flow block, threading a preceding sibling's split-off closing `>`
     /// (`gt`) into its expanding layout (in-multiline context, no preceding breakable — the
     /// dangle path forces both). See `build_control_flow_block_doc` and the caller's gate.
-    fn build_block_node_doc_with_gt(&self, node: &FragmentNode, gt: DocId) -> Option<DocId> {
+    fn build_block_node_doc_with_gt(&self, node: &FragmentNode<'_>, gt: DocId) -> Option<DocId> {
         self.build_control_flow_block_doc(node, true, false, Some(gt))
     }
 

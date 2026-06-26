@@ -52,10 +52,10 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an update expression
     pub(in crate::printer) fn build_update_doc(
         &self,
-        update: &internal::UpdateExpression,
+        update: &internal::UpdateExpression<'_>,
     ) -> DocId {
         let d = self.d();
-        let argument_doc = self.build_expression_doc(&update.argument);
+        let argument_doc = self.build_expression_doc(update.argument);
         let operator_doc = d.text(update.operator.as_str());
 
         if update.prefix {
@@ -68,7 +68,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a unary expression
-    pub(in crate::printer) fn build_unary_doc(&self, unary: &internal::UnaryExpression) -> DocId {
+    pub(in crate::printer) fn build_unary_doc(
+        &self,
+        unary: &internal::UnaryExpression<'_>,
+    ) -> DocId {
         let d = self.d();
 
         // Check for comments between operator and argument.
@@ -100,8 +103,8 @@ impl<'a> Printer<'a> {
 
         let argument_doc = if leading_comments_opt.is_some() || has_trailing_comments {
             // Comments inside grouping parens — must wrap in parens to preserve them.
-            let inner = self.build_expression_doc(&unary.argument);
-            let needs_paren_wrap = needs_parens(&unary.argument, ParenContext::UnaryArgument);
+            let inner = self.build_expression_doc(unary.argument);
+            let needs_paren_wrap = needs_parens(unary.argument, ParenContext::UnaryArgument);
             let inner = if needs_paren_wrap {
                 d.parens(inner)
             } else {
@@ -163,9 +166,9 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(")"));
                 d.concat(&parts)
             }
-        } else if needs_parens(&unary.argument, ParenContext::UnaryArgument) {
+        } else if needs_parens(unary.argument, ParenContext::UnaryArgument) {
             // Binary expressions need parens - use grouping for logical ops to allow line breaking
-            if let Expression::BinaryExpression(binary) = unary.argument.as_ref() {
+            if let Expression::BinaryExpression(binary) = unary.argument {
                 if binary.operator.is_logical() {
                     // Use ungrouped binary chain in a single paren group.
                     // Matches Prettier's `parent.type === "UnaryExpression"` path
@@ -183,7 +186,7 @@ impl<'a> Printer<'a> {
                 } else {
                     d.concat(&[
                         d.text("("),
-                        self.build_expression_doc(&unary.argument),
+                        self.build_expression_doc(unary.argument),
                         d.text(")"),
                     ])
                 }
@@ -191,12 +194,12 @@ impl<'a> Printer<'a> {
                 // Non-binary that needs parens (e.g., ternary or assignment in unary/assertion)
                 d.concat(&[
                     d.text("("),
-                    self.build_expression_doc(&unary.argument),
+                    self.build_expression_doc(unary.argument),
                     d.text(")"),
                 ])
             }
         } else {
-            self.build_expression_doc(&unary.argument)
+            self.build_expression_doc(unary.argument)
         };
 
         // Keyword operators need a space before the operand
@@ -229,7 +232,7 @@ impl<'a> Printer<'a> {
     /// See: prettier/src/language-js/print/binaryish.js
     pub(in crate::printer) fn build_binary_doc(
         &self,
-        binary: &internal::BinaryExpression,
+        binary: &internal::BinaryExpression<'_>,
     ) -> DocId {
         // Use continuation indent in embedded expression contexts (Svelte template expressions).
         // This matches Prettier where JsExpressionRoot parent triggers the normal indent path
@@ -262,7 +265,7 @@ impl<'a> Printer<'a> {
     /// - Block comments are printed inline
     pub(in crate::printer) fn build_binary_chain_doc(
         &self,
-        binary: &internal::BinaryExpression,
+        binary: &internal::BinaryExpression<'_>,
     ) -> DocId {
         self.build_binary_chain_doc_core(binary, BinaryChainStyle::Grouped)
     }
@@ -275,7 +278,7 @@ impl<'a> Printer<'a> {
     /// is computed normally — 2-operand chains get a sub-group.
     pub(in crate::printer) fn build_binary_chain_doc_ungrouped(
         &self,
-        binary: &internal::BinaryExpression,
+        binary: &internal::BinaryExpression<'_>,
     ) -> DocId {
         self.build_binary_chain_doc_core(binary, BinaryChainStyle::Ungrouped)
     }
@@ -287,7 +290,7 @@ impl<'a> Printer<'a> {
     /// Matches Prettier's `isInsideParenthesis` behavior (binaryish.js:331).
     pub(in crate::printer) fn build_binary_chain_doc_ungrouped_condition(
         &self,
-        binary: &internal::BinaryExpression,
+        binary: &internal::BinaryExpression<'_>,
     ) -> DocId {
         self.build_binary_chain_doc_core(binary, BinaryChainStyle::UngroupedCondition)
     }
@@ -305,7 +308,7 @@ impl<'a> Printer<'a> {
     /// this specific indentation style.
     pub(in crate::printer) fn build_binary_chain_doc_with_continuation_indent(
         &self,
-        binary: &internal::BinaryExpression,
+        binary: &internal::BinaryExpression<'_>,
     ) -> DocId {
         self.build_binary_chain_doc_core(binary, BinaryChainStyle::ContinuationIndent)
     }
@@ -316,7 +319,7 @@ impl<'a> Printer<'a> {
     /// Handles comments between operands correctly.
     pub(in crate::printer) fn build_binary_chain_parts_with_continuation_indent(
         &self,
-        binary: &internal::BinaryExpression,
+        binary: &internal::BinaryExpression<'_>,
     ) -> DocId {
         // Collect all operands (with spans) and operators in the chain
         let mut operands: OperandBuf = OperandBuf::new();
@@ -325,7 +328,7 @@ impl<'a> Printer<'a> {
 
         if operands.len() <= 1 {
             // Single operand, shouldn't happen but handle gracefully
-            return self.build_expression_doc(&binary.left);
+            return self.build_expression_doc(binary.left);
         }
 
         let should_inline_last = super::assignment::should_inline_logical_expression(binary);
@@ -347,7 +350,7 @@ impl<'a> Printer<'a> {
     /// - `ContinuationIndent`: First operand at base, rest indented (attribute contexts)
     fn build_binary_chain_doc_core(
         &self,
-        binary: &internal::BinaryExpression,
+        binary: &internal::BinaryExpression<'_>,
         style: BinaryChainStyle,
     ) -> DocId {
         // Collect all operands (with spans) and operators in the chain
@@ -357,7 +360,7 @@ impl<'a> Printer<'a> {
 
         if operands.len() <= 1 {
             // Single operand, shouldn't happen but handle gracefully
-            return self.build_expression_doc(&binary.left);
+            return self.build_expression_doc(binary.left);
         }
 
         // Compute shouldGroup from the original binary expression.
@@ -423,7 +426,7 @@ impl<'a> Printer<'a> {
     /// comments (so they defer past any enclosing semicolon).
     fn wrap_chain_with_paren_comments(
         &self,
-        binary: &internal::BinaryExpression,
+        binary: &internal::BinaryExpression<'_>,
         operands: &[ChainOperand],
         chain: DocId,
     ) -> DocId {
@@ -461,19 +464,19 @@ impl<'a> Printer<'a> {
     /// to independently evaluate whether it fits on the current line when the outer
     /// group breaks (e.g., due to a multi-line parenthesized left operand).
     pub(in crate::printer) fn should_group_binary_continuation(
-        binary: &internal::BinaryExpression,
+        binary: &internal::BinaryExpression<'_>,
     ) -> bool {
         let current_is_logical = binary.operator.is_logical();
 
         // Check if left operand is same AST type category
         let left_is_same_category = matches!(
-            &*binary.left,
+            binary.left,
             Expression::BinaryExpression(inner) if inner.operator.is_logical() == current_is_logical
         );
 
         // Check if right operand is same AST type category
         let right_is_same_category = matches!(
-            &*binary.right,
+            binary.right,
             Expression::BinaryExpression(inner) if inner.operator.is_logical() == current_is_logical
         );
 
@@ -797,23 +800,23 @@ impl<'a> Printer<'a> {
     /// Flattens both left and right sides when operators are compatible (e.g., `&&`, `||`).
     fn collect_binary_chain_with_spans(
         &self,
-        expr: &internal::BinaryExpression,
+        expr: &internal::BinaryExpression<'_>,
         operands: &mut OperandBuf,
         operators: &mut OperatorBuf,
     ) {
         // Recursively flatten left side if it can be chained with current operator
-        if let Expression::BinaryExpression(left_binary) = &*expr.left {
+        if let Expression::BinaryExpression(left_binary) = expr.left {
             if expr.operator.can_flatten_with(left_binary.operator) {
                 self.collect_binary_chain_with_spans(left_binary, operands, operators);
             } else {
                 operands.push(ChainOperand {
-                    doc: self.build_binary_operand_doc(&expr.left, expr.operator, false),
+                    doc: self.build_binary_operand_doc(expr.left, expr.operator, false),
                     span: expr.left.span(),
                 });
             }
         } else {
             operands.push(ChainOperand {
-                doc: self.build_binary_operand_doc(&expr.left, expr.operator, false),
+                doc: self.build_binary_operand_doc(expr.left, expr.operator, false),
                 span: expr.left.span(),
             });
         }
@@ -824,7 +827,7 @@ impl<'a> Printer<'a> {
         // Also flatten right side for truly associative operators (removes redundant parens)
         // e.g., `a && (b && c)` becomes `a && b && c`
         // Only logical operators are truly associative; arithmetic preserves right-side parens
-        if let Expression::BinaryExpression(right_binary) = &*expr.right
+        if let Expression::BinaryExpression(right_binary) = expr.right
             && expr.operator.can_flatten_with(right_binary.operator)
             && expr.operator.is_logical()
             && right_binary.operator.is_logical()
@@ -835,7 +838,7 @@ impl<'a> Printer<'a> {
 
         // Right operand can't be flattened - add as-is
         operands.push(ChainOperand {
-            doc: self.build_binary_operand_doc(&expr.right, expr.operator, true),
+            doc: self.build_binary_operand_doc(expr.right, expr.operator, true),
             span: expr.right.span(),
         });
     }
@@ -843,7 +846,7 @@ impl<'a> Printer<'a> {
     /// Build operand with parens if needed for clarity
     pub(in crate::printer) fn build_binary_operand_doc(
         &self,
-        operand: &Expression,
+        operand: &Expression<'_>,
         parent_op: BinaryOperator,
         is_right: bool,
     ) -> DocId {
@@ -898,7 +901,7 @@ impl<'a> Printer<'a> {
     /// `printArrowFunctionSignatures`; `should_use_arrow_chain_layout` still gates
     /// on untyped / comment-free chains, so a typed or comment-bearing operand
     /// falls through to the default path.
-    fn build_chain_aware_operand_doc(&self, operand: &Expression) -> DocId {
+    fn build_chain_aware_operand_doc(&self, operand: &Expression<'_>) -> DocId {
         if crate::printer::is_curried_arrow_chain(operand) {
             self.build_with_arrow_chain_context(
                 crate::printer::ArrowChainContext::CallArgOrBinaryish,
@@ -912,7 +915,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an await expression
     pub(in crate::printer) fn build_await_doc(
         &self,
-        await_expr: &internal::AwaitExpression,
+        await_expr: &internal::AwaitExpression<'_>,
     ) -> DocId {
         let d = self.d();
 
@@ -926,7 +929,7 @@ impl<'a> Printer<'a> {
         let has_trailing_comments = self.has_comments_between(argument_end, await_expr.span.end);
 
         let argument_doc = if comments_opt.is_some() || has_trailing_comments {
-            let inner = self.build_expression_doc(&await_expr.argument);
+            let inner = self.build_expression_doc(await_expr.argument);
             let mut parts = DocBuf::new();
             if let Some(comments) = comments_opt {
                 parts.push(comments);
@@ -934,14 +937,14 @@ impl<'a> Printer<'a> {
             parts.push(inner);
             self.append_trailing_paren_comments(&mut parts, argument_end, await_expr.span.end);
             d.concat(&parts)
-        } else if needs_parens(&await_expr.argument, ParenContext::AwaitArgument) {
+        } else if needs_parens(await_expr.argument, ParenContext::AwaitArgument) {
             d.concat(&[
                 d.text("("),
-                self.build_expression_doc(&await_expr.argument),
+                self.build_expression_doc(await_expr.argument),
                 d.text(")"),
             ])
         } else {
-            self.build_expression_doc(&await_expr.argument)
+            self.build_expression_doc(await_expr.argument)
         };
 
         d.concat(&[d.text("await "), argument_doc])
@@ -950,7 +953,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a yield expression
     pub(in crate::printer) fn build_yield_doc(
         &self,
-        yield_expr: &internal::YieldExpression,
+        yield_expr: &internal::YieldExpression<'_>,
     ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
@@ -961,7 +964,7 @@ impl<'a> Printer<'a> {
             parts.push(d.text("yield"));
         }
 
-        if let Some(ref arg) = yield_expr.argument {
+        if let Some(arg) = yield_expr.argument {
             parts.push(d.text(" "));
             // Preserve comments from stripped grouping parens: `yield (/** @type {T} */ expr)`
             let keyword_end = yield_expr.span.start
@@ -1016,7 +1019,7 @@ impl<'a> Printer<'a> {
     /// the comma-gap path below and match prettier — see operand_comments.
     pub(in crate::printer) fn build_sequence_doc(
         &self,
-        seq: &internal::SequenceExpression,
+        seq: &internal::SequenceExpression<'_>,
     ) -> DocId {
         // Line comments inside the sequence need break handling (a forced-multiline
         // layout) the inline comma-gap path below doesn't do; route those to the
@@ -1118,7 +1121,10 @@ impl<'a> Printer<'a> {
     /// The outer-edge comments — leading on the first operand, trailing on the last —
     /// still float OUT of the parens via the same helpers as the block-comment path
     /// (`append_floated_leading_comments` / `append_trailing_paren_comments`).
-    fn build_sequence_doc_with_line_comments(&self, seq: &internal::SequenceExpression) -> DocId {
+    fn build_sequence_doc_with_line_comments(
+        &self,
+        seq: &internal::SequenceExpression<'_>,
+    ) -> DocId {
         let d = self.d();
         let n = seq.expressions.len();
 
@@ -1210,8 +1216,9 @@ mod tests {
 
     /// Run `should_group_binary_continuation` on a parsed binary expression.
     fn group(src: &str) -> bool {
+        let arena = bumpalo::Bump::new();
         let interner = Rc::new(RefCell::new(DefaultStringInterner::new()));
-        let expr = crate::parse_expression_with_comments(src, 0, interner)
+        let expr = crate::parse_expression_with_comments(src, 0, interner, &arena)
             .expect("expression should parse")
             .0;
         match expr {

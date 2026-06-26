@@ -28,7 +28,7 @@ impl<'a> Printer<'a> {
     /// types are not indented.
     pub(in crate::printer) fn build_type_annotation_doc(
         &self,
-        annotation: &internal::TSTypeAnnotation,
+        annotation: &internal::TSTypeAnnotation<'_>,
     ) -> DocId {
         let d = self.d();
         // Check for comments between `:` and the type
@@ -46,7 +46,7 @@ impl<'a> Printer<'a> {
             // union, intersection, and simple types — see conformance_prettier.md
             // §Uniform forced-continuation indent. (Prettier indents only the union
             // here and leaves intersection/simple flush, so this diverges for those.)
-            let type_doc = self.build_type_doc(&annotation.type_annotation);
+            let type_doc = self.build_type_doc(annotation.type_annotation);
             d.concat(&[
                 d.text(":"),
                 self.build_continuation_indent(colon_end, type_start, type_doc),
@@ -61,7 +61,7 @@ impl<'a> Printer<'a> {
             // and inherit breaking from this context's group. Redundant comment-free
             // parens are stripped first so `(A | B)` / `(A & B)` get the bare layout
             // (prettier strips them too); other parens keep the `_` fall-through.
-            match self.unwrap_redundant_parens(annotation.type_annotation.as_ref()) {
+            match self.unwrap_redundant_parens(annotation.type_annotation) {
                 TSType::Union(u) => {
                     let type_doc = self.build_union_type_doc(u, false);
                     // Extract comments between `:` and the union type (e.g., `: /* c */ A | B`)
@@ -89,7 +89,7 @@ impl<'a> Printer<'a> {
                         type_start,
                         CommentSpacing::Trailing,
                     ));
-                    parts.push(self.build_type_doc(&annotation.type_annotation));
+                    parts.push(self.build_type_doc(annotation.type_annotation));
                     d.concat(&parts)
                 }
             }
@@ -113,7 +113,7 @@ impl<'a> Printer<'a> {
     /// Returns doc starting with `: ` (the annotation prefix).
     pub(in crate::printer) fn build_type_annotation_doc_wrapping(
         &self,
-        annotation: &internal::TSTypeAnnotation,
+        annotation: &internal::TSTypeAnnotation<'_>,
     ) -> DocId {
         self.build_type_annotation_doc_with_wrapping(annotation, true)
     }
@@ -127,7 +127,7 @@ impl<'a> Printer<'a> {
     /// Simple cases like `Promise<void>` should NOT wrap - we want params to break first.
     pub(in crate::printer) fn build_type_annotation_doc_for_return_type(
         &self,
-        annotation: &internal::TSTypeAnnotation,
+        annotation: &internal::TSTypeAnnotation<'_>,
     ) -> DocId {
         self.build_type_annotation_doc_with_wrapping(annotation, false)
     }
@@ -138,7 +138,7 @@ impl<'a> Printer<'a> {
     /// When false, only wraps if type args would benefit from breaking.
     fn build_type_annotation_doc_with_wrapping(
         &self,
-        annotation: &internal::TSTypeAnnotation,
+        annotation: &internal::TSTypeAnnotation<'_>,
         always_wrap: bool,
     ) -> DocId {
         let d = self.d();
@@ -151,7 +151,7 @@ impl<'a> Printer<'a> {
         }
 
         // Handle TypeReference with type arguments - use wrapping version when appropriate
-        if let TSType::TypeReference(r) = annotation.type_annotation.as_ref()
+        if let TSType::TypeReference(r) = annotation.type_annotation
             && let Some(type_args) = &r.type_arguments
             && (always_wrap || type_args_should_wrap_for_return_type(type_args))
         {
@@ -181,7 +181,7 @@ impl<'a> Printer<'a> {
         // `(A | B)` / `(A & B)` return type or member type gets the same break
         // layout as the bare form (prettier strips them too). Other parenthesized
         // types keep the existing fall-through below.
-        let value_type = self.unwrap_redundant_parens(annotation.type_annotation.as_ref());
+        let value_type = self.unwrap_redundant_parens(annotation.type_annotation);
         let value_type_start = value_type.span().start;
 
         // Handle Union types - break after colon with indent when long
@@ -241,7 +241,7 @@ impl<'a> Printer<'a> {
     /// has no line-comment handling and would otherwise drop them.
     fn build_intersection_type_annotation_doc(
         &self,
-        intersection: &internal::TSIntersectionType,
+        intersection: &internal::TSIntersectionType<'_>,
         colon_end: u32,
     ) -> DocId {
         let d = self.d();
@@ -391,7 +391,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build intersection member type with optional parens and wrapping type args.
-    fn build_intersection_member_type_doc(&self, t: &TSType) -> DocId {
+    fn build_intersection_member_type_doc(&self, t: &TSType<'_>) -> DocId {
         let d = self.d();
         if type_needs_parens_in_union_or_intersection(t) {
             // Special case: parenthesized union type

@@ -125,6 +125,35 @@ fn error_result(message: &str, out_len: *mut usize) -> *mut u8 {
     string_to_ptr(json, out_len)
 }
 
+/// Run `f` with a per-thread reusable AST arena.
+///
+/// The native bindings are called once per file in tight loops (formatters,
+/// editor save hooks, benchmarks). Allocating a fresh `Bump` per call — and
+/// freeing it at call end — churns the system allocator's heap high-water on
+/// every call, which is measurable through a host FFI layer even when the engine
+/// work is unchanged. Instead each thread keeps one `Bump` and `reset()`s it
+/// between calls: `reset()` rewinds the bump pointer and retains the largest
+/// chunk, so once a thread warms to its high-water mark there is no per-call
+/// malloc/free (this supersedes per-call `with_capacity` pre-sizing — the first
+/// few calls pay the chunk-growth tail once, then it amortizes to zero).
+///
+/// Soundness: the per-file AST borrows `&Bump` and is fully consumed inside `f`
+/// (the returned value owns its bytes — a formatted `String`, a JSON `String`,
+/// or `()`), so no AST outlives the `reset()` at the start of the next call;
+/// `reset()` also recovers cleanly after a `catch_unwind`-caught panic. A future
+/// `tsv_napi` should mirror this shape (the shared native-binding reuse path).
+fn with_ast_arena<R>(f: impl FnOnce(&bumpalo::Bump) -> R) -> R {
+    thread_local! {
+        static AST_ARENA: std::cell::RefCell<bumpalo::Bump> =
+            std::cell::RefCell::new(bumpalo::Bump::new());
+    }
+    AST_ARENA.with(|cell| {
+        let mut arena = cell.borrow_mut();
+        arena.reset();
+        f(&arena)
+    })
+}
+
 /// Generate `tsv_parse_<lang>` / `tsv_parse_internal_<lang>` / `tsv_format_<lang>`
 /// C FFI functions for one language module.
 ///
@@ -147,8 +176,10 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, |source| {
-                    let ast = $lang::parse(source).map_err(|e| e.to_string())?;
-                    Ok($lang::convert_ast_json_string(&ast, source))
+                    with_ast_arena(|arena| {
+                        let ast = $lang::parse(source, arena).map_err(|e| e.to_string())?;
+                        Ok($lang::convert_ast_json_string(&ast, source))
+                    })
                 })
             }
         }
@@ -167,7 +198,13 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_parse_internal(source_ptr, source_len, out_len, |source| {
-                    $lang::parse(source).map_err(|e| e.to_string())
+                    with_ast_arena(|arena| {
+                        let ast = $lang::parse(source, arena).map_err(|e| e.to_string())?;
+                        // Consume the borrowed AST before `with_ast_arena` resets
+                        // it on the next call (the AST borrows from `arena`).
+                        std::hint::black_box(&ast);
+                        Ok(())
+                    })
                 })
             }
         }
@@ -185,8 +222,10 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, |source| {
-                    let ast = $lang::parse(source).map_err(|e| e.to_string())?;
-                    Ok($lang::format(&ast, source))
+                    with_ast_arena(|arena| {
+                        let ast = $lang::parse(source, arena).map_err(|e| e.to_string())?;
+                        Ok($lang::format(&ast, source))
+                    })
                 })
             }
         }

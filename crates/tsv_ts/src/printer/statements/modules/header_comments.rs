@@ -59,7 +59,7 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         star_end: u32,
-        binding: &internal::ModuleExportName,
+        binding: &internal::ModuleExportName<'_>,
     ) {
         let d = self.d();
         let binding_start = binding.span().start;
@@ -152,7 +152,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_from_source_doc(
         &self,
         decl_start: u32,
-        source: &internal::Literal,
+        source: &internal::Literal<'_>,
         empty_brace_search_start: Option<u32>,
         content_end: Option<u32>,
     ) -> DocId {

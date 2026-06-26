@@ -178,15 +178,15 @@ pub(super) fn is_inline_block_after_comma(
 
 /// Check if a call expression has comments between any of its arguments
 pub(super) fn has_inter_argument_comments(
-    call: &internal::CallExpression,
+    call: &internal::CallExpression<'_>,
     printer: &Printer<'_>,
 ) -> bool {
-    has_inter_argument_comments_slice(&call.arguments, printer)
+    has_inter_argument_comments_slice(call.arguments, printer)
 }
 
 /// Check if there are comments between arguments in a slice
 pub(crate) fn has_inter_argument_comments_slice(
-    arguments: &[internal::Expression],
+    arguments: &[internal::Expression<'_>],
     printer: &Printer<'_>,
 ) -> bool {
     if arguments.len() < 2 {
@@ -279,7 +279,7 @@ pub(crate) fn should_force_expansion_for_comments(
 /// Returns true for line comments or standalone block comments (on their own line,
 /// not inline with either neighbor). Inline block comments do not force expansion.
 pub(super) fn any_comment_forces_expansion(
-    call: &internal::CallExpression,
+    call: &internal::CallExpression<'_>,
     printer: &Printer<'_>,
     paren_open: u32,
 ) -> bool {
@@ -332,7 +332,7 @@ pub(super) fn any_comment_forces_expansion(
 /// Used to prevent expand-last-arg layout when the last arg has comments,
 /// since prettier's shouldExpandLastArg returns false in that case.
 pub(super) fn last_arg_has_comments(
-    arguments: &[internal::Expression],
+    arguments: &[internal::Expression<'_>],
     printer: &Printer<'_>,
     call_end: u32,
     paren_open: u32,
@@ -372,7 +372,7 @@ pub(super) fn last_arg_has_comments(
 /// Used to prevent expand-first-arg layout when the first arg has comments,
 /// since prettier's shouldExpandFirstArg returns false in that case.
 pub(super) fn first_arg_has_any_comments(
-    arguments: &[internal::Expression],
+    arguments: &[internal::Expression<'_>],
     printer: &Printer<'_>,
     paren_open: u32,
 ) -> bool {
@@ -404,17 +404,17 @@ pub(super) fn first_arg_has_any_comments(
 /// either between the arg and its comma, or between the last arg and the closing paren.
 /// Example: `fn(a && b, // trailing)` - the `// trailing` is a trailing comment on `a && b`
 pub(super) fn has_trailing_comments_on_args(
-    call: &internal::CallExpression,
+    call: &internal::CallExpression<'_>,
     printer: &Printer<'_>,
 ) -> bool {
-    has_trailing_line_comments_slice(&call.arguments, call.span.end, printer)
+    has_trailing_line_comments_slice(call.arguments, call.span.end, printer)
 }
 
 /// Check if there are trailing line comments on any arguments (generic version)
 ///
 /// Used by both CallExpression and NewExpression.
 pub(crate) fn has_trailing_line_comments_slice(
-    arguments: &[internal::Expression],
+    arguments: &[internal::Expression<'_>],
     call_span_end: u32,
     printer: &Printer<'_>,
 ) -> bool {
@@ -458,7 +458,7 @@ pub(crate) fn emit_first_arg_leading_comments(
 /// This is important for new expressions where block comments after arguments
 /// can also be lost if not handled properly.
 pub(crate) fn has_trailing_comments_slice(
-    arguments: &[internal::Expression],
+    arguments: &[internal::Expression<'_>],
     call_span_end: u32,
     printer: &Printer<'_>,
 ) -> bool {
@@ -470,7 +470,7 @@ pub(crate) fn has_trailing_comments_slice(
 /// Shared implementation for checking trailing comments on arguments.
 #[inline]
 fn has_trailing_comments_slice_impl<F>(
-    arguments: &[internal::Expression],
+    arguments: &[internal::Expression<'_>],
     call_span_end: u32,
     has_comments: F,
 ) -> bool

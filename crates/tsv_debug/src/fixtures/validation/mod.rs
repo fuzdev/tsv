@@ -175,8 +175,10 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
     // Phases 2-4: Our parser/formatter validation (skip in prettier_only mode)
     if !prettier_only {
         // Phases 2/2b/2c/2d share one parse of the input (and one
-        // convert_ast_json materialization for 2/2b/2c)
-        match parse_input(&input, input_type) {
+        // convert_ast_json materialization for 2/2b/2c). The arena owns the
+        // internal AST and must outlive `parsed` (caller-owns-`Bump`).
+        let arena = bumpalo::Bump::new();
+        match parse_input(&input, input_type, &arena) {
             Ok(parsed) => {
                 match input_ast_paths(&parsed, &input) {
                     Ok(paths) => {

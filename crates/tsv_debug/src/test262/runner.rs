@@ -255,7 +255,8 @@ pub fn grade_for_manifest(test: &TestFile) -> Option<ManifestEntry> {
     } else {
         Verdict::Accept
     };
-    let tsv = match tsv_ts::parse(&content) {
+    let arena = bumpalo::Bump::new();
+    let tsv = match tsv_ts::parse(&content, &arena) {
         Ok(_) => Verdict::Accept,
         Err(_) => Verdict::Reject,
     };
@@ -274,7 +275,8 @@ fn run_parse_test(content: &str, is_negative_parse: bool) -> TestResult {
     // Try to parse the content as TypeScript/JS
     // Note: test262 tests are pure ECMAScript, so we parse as TypeScript
     // (which is a superset of JS)
-    let parse_result = tsv_ts::parse(content);
+    let arena = bumpalo::Bump::new();
+    let parse_result = tsv_ts::parse(content, &arena);
 
     match (parse_result, is_negative_parse) {
         // Positive test passed: parsed successfully as expected

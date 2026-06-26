@@ -33,17 +33,6 @@ pub(crate) fn find_declaration_colon(decl_source: &str) -> Option<usize> {
     )
 }
 
-/// Format an identifier value semantically
-///
-/// # Example
-/// ```ignore
-/// assert_eq!(format_identifier_value("red"), "red");
-/// assert_eq!(format_identifier_value("auto"), "auto");
-/// ```
-pub(crate) fn format_identifier_value(name: &str) -> String {
-    name.to_string()
-}
-
 /// Normalize CSS numbers and string quotes within a raw prelude string,
 /// mirroring prettier's `adjustNumbers(adjustStrings(...))` for at-rule preludes
 /// it parses as values (`@media`/`@supports`). `/* */` comments and `#`-prefixed

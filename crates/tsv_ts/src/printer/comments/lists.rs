@@ -595,7 +595,7 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         sig_end: u32,
-        body: &internal::BlockStatement,
+        body: &internal::BlockStatement<'_>,
     ) {
         let d = self.d();
         let body_start = body.span.start;
@@ -626,7 +626,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn append_signature_end_comments(
         &self,
         parts: &mut DocBuf,
-        return_type: Option<&internal::TSTypeAnnotation>,
+        return_type: Option<&internal::TSTypeAnnotation<'_>>,
         paren_pos: Option<u32>,
         span_end: u32,
     ) {

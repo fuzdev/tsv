@@ -38,11 +38,11 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn class_heritage_positions(
         &self,
         span_start: u32,
-        id: Option<&internal::Identifier>,
-        type_parameters: Option<&internal::TSTypeParameterDeclaration>,
-        super_class: Option<&internal::Expression>,
-        super_type_parameters: Option<&internal::TSTypeParameterInstantiation>,
-        implements: &[internal::TSInterfaceHeritage],
+        id: Option<&internal::Identifier<'_>>,
+        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+        super_class: Option<&internal::Expression<'_>>,
+        super_type_parameters: Option<&internal::TSTypeParameterInstantiation<'_>>,
+        implements: &[internal::TSInterfaceHeritage<'_>],
     ) -> ClassHeritagePositions {
         let pre_heritage_end = type_parameters.map_or_else(
             || id.map_or(span_start + "class".len() as u32, |id| id.span.end),
@@ -94,9 +94,9 @@ impl<'a> Printer<'a> {
     /// computed position data (avoids duplicate binary searches).
     pub(in crate::printer) fn should_class_group_mode(
         &self,
-        super_class: Option<&internal::Expression>,
-        super_type_parameters: Option<&internal::TSTypeParameterInstantiation>,
-        implements: &[internal::TSInterfaceHeritage],
+        super_class: Option<&internal::Expression<'_>>,
+        super_type_parameters: Option<&internal::TSTypeParameterInstantiation<'_>>,
+        implements: &[internal::TSInterfaceHeritage<'_>],
     ) -> bool {
         let mut count = if super_class.is_some() { 1 } else { 0 };
         count += implements.len();
@@ -121,8 +121,8 @@ impl<'a> Printer<'a> {
     /// type-argument builder (the same one the `implements` clause uses).
     pub(in crate::printer) fn build_class_extends_doc(
         &self,
-        super_class: Option<&internal::Expression>,
-        super_type_parameters: Option<&internal::TSTypeParameterInstantiation>,
+        super_class: Option<&internal::Expression<'_>>,
+        super_type_parameters: Option<&internal::TSTypeParameterInstantiation<'_>>,
         extends_keyword_start: Option<u32>,
     ) -> Option<DocId> {
         let d = self.d();
@@ -187,7 +187,7 @@ impl<'a> Printer<'a> {
     /// and inter-item comments).
     pub(in crate::printer) fn build_class_implements_doc(
         &self,
-        implements: &[internal::TSInterfaceHeritage],
+        implements: &[internal::TSInterfaceHeritage<'_>],
         group_mode: bool,
         implements_keyword_start: Option<u32>,
     ) -> Option<DocId> {
@@ -254,7 +254,7 @@ impl<'a> Printer<'a> {
         positions: &ClassHeritagePositions,
         extends_doc: Option<DocId>,
         implements_doc: Option<DocId>,
-        implements: &[internal::TSInterfaceHeritage],
+        implements: &[internal::TSInterfaceHeritage<'_>],
         body_is_empty: bool,
         body_start: u32,
         group_mode: bool,

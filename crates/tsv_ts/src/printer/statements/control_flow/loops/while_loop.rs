@@ -14,7 +14,10 @@ impl<'a> Printer<'a> {
     ///
     /// Matches Prettier's architecture: the condition wraps to multiple lines
     /// when the `while (condition)` line exceeds print width.
-    fn build_while_statement_with_wrapping_doc(&self, stmt: &internal::WhileStatement) -> DocId {
+    fn build_while_statement_with_wrapping_doc(
+        &self,
+        stmt: &internal::WhileStatement<'_>,
+    ) -> DocId {
         let d = self.d();
         // Find paren positions for comment handling
         let open_paren = self.find_open_paren_after(stmt.span.start);
@@ -32,7 +35,7 @@ impl<'a> Printer<'a> {
             self.build_condition_group(&stmt.test)
         };
 
-        if let Statement::BlockStatement(block) = stmt.body.as_ref() {
+        if let Statement::BlockStatement(block) = stmt.body {
             // Block body: while (cond) { ... }
             // Uses append_close_paren_with_comments for consistency with if/for-in/for-of:
             // block comments stay inline, line comments become trailing.
@@ -46,7 +49,7 @@ impl<'a> Printer<'a> {
             self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
             parts.push(self.build_block_statement_doc(block));
             d.group(d.concat(&parts))
-        } else if matches!(stmt.body.as_ref(), Statement::EmptyStatement(_)) {
+        } else if matches!(stmt.body, Statement::EmptyStatement(_)) {
             // Empty statement: `while (cond);` or `while (cond) /* comment */ ;`
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             let empty_start = stmt.body.span().start;
@@ -70,7 +73,7 @@ impl<'a> Printer<'a> {
             // - When broken: line becomes newline + indent -> `while (cond)\n\ta;`
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             let body_start = stmt.body.span().start;
-            let body_doc = self.build_statement_doc(&stmt.body);
+            let body_doc = self.build_statement_doc(stmt.body);
 
             let mut head_parts: DocBuf = smallvec![d.text("while")];
             if let Some(kc) = &keyword_comments {
@@ -84,7 +87,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_while_statement_doc(
         &self,
-        stmt: &internal::WhileStatement,
+        stmt: &internal::WhileStatement<'_>,
     ) -> DocId {
         // Delegate to the wrapping version for proper condition grouping
         self.build_while_statement_with_wrapping_doc(stmt)
@@ -92,10 +95,10 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_do_while_statement_doc(
         &self,
-        stmt: &internal::DoWhileStatement,
+        stmt: &internal::DoWhileStatement<'_>,
     ) -> DocId {
         let d = self.d();
-        let is_block = matches!(stmt.body.as_ref(), Statement::BlockStatement(_));
+        let is_block = matches!(stmt.body, Statement::BlockStatement(_));
 
         // Check for comments between `do` keyword and body
         let do_end = stmt.span.start + "do".len() as u32;
@@ -104,7 +107,7 @@ impl<'a> Printer<'a> {
             let has_line = self.has_line_comments_between(do_end, body_start);
             let comment_doc =
                 self.build_inline_comments_between_doc_no_leading_space(do_end, body_start);
-            let body_doc = self.build_statement_doc(&stmt.body);
+            let body_doc = self.build_statement_doc(stmt.body);
             let mut p = smallvec![d.text("do")];
             if has_line && !is_block {
                 // Line comment with non-block body: indent comment + body
@@ -123,12 +126,12 @@ impl<'a> Printer<'a> {
                 p.push(body_doc);
             }
             p
-        } else if matches!(stmt.body.as_ref(), Statement::EmptyStatement(_)) {
+        } else if matches!(stmt.body, Statement::EmptyStatement(_)) {
             // Prettier's `adjustClause` returns `";"` directly for an empty body
             // → `do;`, not `do ;`.
-            smallvec![d.text("do"), self.build_statement_doc(&stmt.body)]
+            smallvec![d.text("do"), self.build_statement_doc(stmt.body)]
         } else {
-            smallvec![d.text("do "), self.build_statement_doc(&stmt.body)]
+            smallvec![d.text("do "), self.build_statement_doc(stmt.body)]
         };
 
         // Find the while keyword position for comment handling

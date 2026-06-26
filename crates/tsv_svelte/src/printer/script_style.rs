@@ -18,12 +18,12 @@ impl<'a> Printer<'a> {
     /// Uses Doc-based integration instead of string post-processing. The Doc system
     /// naturally handles template literals correctly: `indent(doc)` only affects `Line` docs
     /// (hardline, softline, line), not newlines inside `text()` which output as-is.
-    pub(super) fn print_script(&mut self, script: &internal::Script) {
+    pub(super) fn print_script(&mut self, script: &internal::Script<'_>) {
         // Check if script had any original content (including whitespace)
         let had_content = script.content.span.start != script.content.span.end;
 
         // Opening tag with doc-based attribute wrapping
-        self.write_section_opening_tag("script", &script.attributes, had_content);
+        self.write_section_opening_tag("script", script.attributes, had_content);
 
         if had_content {
             self.write("\n");
@@ -77,14 +77,14 @@ impl<'a> Printer<'a> {
     /// Returns `None` if no `lang`/`type` attribute is present.
     pub(crate) fn get_lang_attribute(
         &self,
-        attributes: &[internal::AttributeNode],
+        attributes: &[internal::AttributeNode<'_>],
     ) -> Option<String> {
         let interner = self.interner.borrow();
         for attr_node in attributes {
             if let internal::AttributeNode::Attribute(attr) = attr_node {
                 let name = interner.resolve(attr.name).unwrap_or("");
                 if (name == "lang" || name == "type")
-                    && let Some(value_parts) = &attr.value
+                    && let Some(value_parts) = attr.value
                 {
                     for part in value_parts {
                         if let internal::AttributeValue::Text(text) = part {
@@ -104,16 +104,16 @@ impl<'a> Printer<'a> {
     /// Formats the `<style>` tag with its CSS content.
     /// The CSS is formatted using the CSS printer with indentation.
     /// For non-CSS languages (less, scss, etc.), content is preserved raw.
-    pub(super) fn print_style(&mut self, style: &internal::Style) {
+    pub(super) fn print_style(&mut self, style: &internal::Style<'_>) {
         // Check if there was any original content (including whitespace)
         let had_content = style.content_span.start != style.content_span.end;
 
         // Opening tag with doc-based attribute wrapping
-        self.write_section_opening_tag("style", &style.attributes, had_content);
+        self.write_section_opening_tag("style", style.attributes, had_content);
 
         // Foreign languages (less, scss, etc.) — preserve content raw but normalize indentation
         if self
-            .get_lang_attribute(&style.attributes)
+            .get_lang_attribute(style.attributes)
             .is_some_and(|l| l != "css")
         {
             if had_content {
@@ -231,7 +231,7 @@ impl<'a> Printer<'a> {
     /// Used by `write_section_opening_tag` (script/style) and `print_svelte_options`.
     pub(crate) fn build_indented_attrs_doc(
         &self,
-        attributes: &[internal::AttributeNode],
+        attributes: &[internal::AttributeNode<'_>],
     ) -> (DocId, bool) {
         let d = self.d();
         let mut parts = Vec::with_capacity(attributes.len() * 2);
@@ -260,7 +260,7 @@ impl<'a> Printer<'a> {
     fn write_section_opening_tag(
         &mut self,
         tag_name: &str,
-        attributes: &[internal::AttributeNode],
+        attributes: &[internal::AttributeNode<'_>],
         has_content: bool,
     ) {
         if attributes.is_empty() {

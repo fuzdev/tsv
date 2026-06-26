@@ -11,7 +11,7 @@ use string_interner::DefaultStringInterner;
 use tsv_lang::LocationTracker;
 
 pub(in crate::ast) fn convert_import_specifier(
-    spec: &internal::ImportSpecifier,
+    spec: &internal::ImportSpecifier<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -68,7 +68,7 @@ pub(in crate::ast) fn convert_import_specifier(
 }
 
 pub(in crate::ast) fn convert_import_attribute(
-    attr: &internal::ImportAttribute,
+    attr: &internal::ImportAttribute<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -93,7 +93,7 @@ pub(in crate::ast) fn convert_import_attribute(
 }
 
 pub(in crate::ast) fn convert_export_specifier(
-    spec: &internal::ExportSpecifier,
+    spec: &internal::ExportSpecifier<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -125,7 +125,7 @@ pub(in crate::ast) fn convert_export_specifier(
 /// namespace name): an identifier emits an `Identifier` node, a string a
 /// `Literal` node — mirroring acorn (`ModuleExportName : IdentifierName | StringLiteral`).
 pub(in crate::ast) fn convert_module_export_name(
-    name: &internal::ModuleExportName,
+    name: &internal::ModuleExportName<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -142,7 +142,7 @@ pub(in crate::ast) fn convert_module_export_name(
 }
 
 pub(in crate::ast) fn convert_export_default_value(
-    value: &internal::ExportDefaultValue,
+    value: &internal::ExportDefaultValue<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -172,7 +172,7 @@ pub(in crate::ast) fn convert_export_default_value(
 
 // Helper to convert literal for import attributes and export sources
 pub(in crate::ast) fn convert_literal(
-    lit: &internal::Literal,
+    lit: &internal::Literal<'_>,
     source: &str,
     loc: &LocationTracker,
     offset: usize,
@@ -181,11 +181,12 @@ pub(in crate::ast) fn convert_literal(
         internal::LiteralValue::Number(n) => {
             (serde_json::Value::Number(json_number_from_f64(*n)), None)
         }
-        internal::LiteralValue::String { content, .. } => {
-            (serde_json::Value::String(content.clone()), None)
-        }
-        internal::LiteralValue::BigInt(val) => {
-            let decimal = bigint_to_decimal(val);
+        internal::LiteralValue::String(cooked) => (
+            serde_json::Value::String(cooked.resolve(lit.span, source).to_string()),
+            None,
+        ),
+        internal::LiteralValue::BigInt => {
+            let decimal = bigint_to_decimal(lit.bigint_digits(source));
             (serde_json::Value::String(decimal.clone()), Some(decimal))
         }
         internal::LiteralValue::Boolean(b) => (serde_json::Value::Bool(*b), None),
@@ -206,7 +207,7 @@ pub(in crate::ast) fn convert_literal(
 
 // Helper for export default value conversion
 fn convert_function_to_public(
-    func: &internal::FunctionDeclaration,
+    func: &internal::FunctionDeclaration<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -243,7 +244,7 @@ fn convert_function_to_public(
 
 // Helper for export default class conversion
 fn convert_class_declaration_local(
-    class: &internal::ClassDeclaration,
+    class: &internal::ClassDeclaration<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,

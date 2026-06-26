@@ -16,7 +16,7 @@ impl<'a> Printer<'a> {
     /// This distinguishes `import {} from 'x'` from `import 'x'`.
     /// Also matches braces containing only whitespace and/or comments:
     /// `import { /* c */ } from 'x'`, `import { // c\n } from 'x'`.
-    pub(super) fn has_empty_named_braces(&self, decl: &internal::ImportDeclaration) -> bool {
+    pub(super) fn has_empty_named_braces(&self, decl: &internal::ImportDeclaration<'_>) -> bool {
         let text = decl.span.extract(self.source);
         // Find the `from` keyword, skipping comments and not matching inside an
         // identifier — so empty-brace detection isn't fooled by a `from` in a
@@ -64,7 +64,7 @@ impl<'a> Printer<'a> {
     /// inside the specifier list.
     pub(super) fn import_header_end(
         &self,
-        decl: &internal::ImportDeclaration,
+        decl: &internal::ImportDeclaration<'_>,
         search_end: u32,
     ) -> u32 {
         let is_type = decl.import_kind == internal::ImportKind::Type;
@@ -78,7 +78,7 @@ impl<'a> Printer<'a> {
     /// specifier start to avoid matching `type` inside the specifier list.
     pub(super) fn export_header_end(
         &self,
-        decl: &internal::ExportNamedDeclaration,
+        decl: &internal::ExportNamedDeclaration<'_>,
         search_end: u32,
     ) -> u32 {
         let is_type = decl.export_kind == internal::ExportKind::Type;
@@ -260,8 +260,8 @@ impl<'a> Printer<'a> {
         &self,
         declaration_is_type_only: bool,
         specifier_is_type: bool,
-        left: &internal::ModuleExportName,
-        right: &internal::ModuleExportName,
+        left: &internal::ModuleExportName<'_>,
+        right: &internal::ModuleExportName<'_>,
     ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
@@ -292,7 +292,10 @@ impl<'a> Printer<'a> {
     /// Build a doc for a `ModuleExportName`: a bare identifier emits its symbol;
     /// a string name (`'str'`) emits a quote-normalized string literal (preserved
     /// as a string — prettier keeps the form, never stripping to a bare identifier).
-    pub(super) fn build_module_export_name_doc(&self, name: &internal::ModuleExportName) -> DocId {
+    pub(super) fn build_module_export_name_doc(
+        &self,
+        name: &internal::ModuleExportName<'_>,
+    ) -> DocId {
         match name {
             internal::ModuleExportName::Identifier(id) => self.d().symbol(id.name.to_u32()),
             internal::ModuleExportName::Literal(lit) => self.build_literal_doc(lit),
@@ -302,7 +305,7 @@ impl<'a> Printer<'a> {
     /// Build a doc for a single import specifier
     pub(super) fn build_import_specifier_doc(
         &self,
-        named_spec: &internal::ImportNamedSpecifier,
+        named_spec: &internal::ImportNamedSpecifier<'_>,
         is_type_import: bool,
     ) -> DocId {
         // The local binding is always an identifier; wrap it so it shares the
@@ -319,7 +322,7 @@ impl<'a> Printer<'a> {
     /// Build a doc for a single export specifier
     pub(super) fn build_export_specifier_doc(
         &self,
-        spec: &internal::ExportSpecifier,
+        spec: &internal::ExportSpecifier<'_>,
         is_type_export: bool,
     ) -> DocId {
         self.build_renamed_specifier_doc(

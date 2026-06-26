@@ -14,14 +14,14 @@ use super::scan::{
     is_identifier_continue, is_identifier_start, skip_identifier, skip_whitespace_and_comments,
 };
 
-impl<'a> Parser<'a> {
+impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse a `: Type` annotation when the next token is a `:`, else `None` —
     /// the optional-annotation guard shared by variable declarations, class
     /// properties, and type members. Sites whose missing `:` is an error (e.g.
     /// an index-signature parameter) keep their own inline `else`.
     pub(in crate::parser) fn parse_optional_type_annotation(
         &mut self,
-    ) -> Result<Option<TSTypeAnnotation>, ParseError> {
+    ) -> Result<Option<TSTypeAnnotation<'arena>>, ParseError> {
         if self.check(&TokenKind::Colon) {
             Ok(Some(self.parse_type_annotation()?))
         } else {
@@ -31,7 +31,7 @@ impl<'a> Parser<'a> {
 
     pub(in crate::parser) fn parse_type_annotation(
         &mut self,
-    ) -> Result<TSTypeAnnotation, ParseError> {
+    ) -> Result<TSTypeAnnotation<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::Colon)?;
 
@@ -39,25 +39,30 @@ impl<'a> Parser<'a> {
         let end = type_node.span().end;
 
         Ok(TSTypeAnnotation {
-            type_annotation: Box::new(type_node),
+            type_annotation: self.alloc(type_node),
             span: Span::new(start as u32, end),
         })
     }
 
     /// Parse a complete type expression (handles unions and conditional types at top level)
-    pub(in crate::parser) fn parse_type(&mut self) -> Result<TSType, ParseError> {
+    pub(in crate::parser) fn parse_type(&mut self) -> Result<TSType<'arena>, ParseError> {
         self.parse_type_inner(false)
     }
 
     /// Parse a type in expression context (after `as` or `satisfies`).
     /// Does not consume `[` across a line terminator to respect ASI.
     /// Example: `x as A\n[B]` → ASI splits into `x as A;` and `[B];`
-    pub(in crate::parser) fn parse_type_no_asi_bracket(&mut self) -> Result<TSType, ParseError> {
+    pub(in crate::parser) fn parse_type_no_asi_bracket(
+        &mut self,
+    ) -> Result<TSType<'arena>, ParseError> {
         self.parse_type_inner(true)
     }
 
     /// Internal type parsing with ASI control
-    fn parse_type_inner(&mut self, respect_asi_bracket: bool) -> Result<TSType, ParseError> {
+    fn parse_type_inner(
+        &mut self,
+        respect_asi_bracket: bool,
+    ) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         let check_type = self.parse_union_type_inner(respect_asi_bracket)?;
 
@@ -79,10 +84,10 @@ impl<'a> Parser<'a> {
             let end = false_type.span().end;
 
             Ok(TSType::Conditional(TSConditionalType {
-                check_type: Box::new(check_type),
-                extends_type: Box::new(extends_type),
-                true_type: Box::new(true_type),
-                false_type: Box::new(false_type),
+                check_type: self.alloc(check_type),
+                extends_type: self.alloc(extends_type),
+                true_type: self.alloc(true_type),
+                false_type: self.alloc(false_type),
                 span: Span::new(start as u32, end),
             }))
         } else {
@@ -91,12 +96,15 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse union type: `A | B | C` or `| A | B | C`
-    fn parse_union_type(&mut self) -> Result<TSType, ParseError> {
+    fn parse_union_type(&mut self) -> Result<TSType<'arena>, ParseError> {
         self.parse_union_type_inner(false)
     }
 
     /// Internal union type parsing with ASI control
-    fn parse_union_type_inner(&mut self, respect_asi_bracket: bool) -> Result<TSType, ParseError> {
+    fn parse_union_type_inner(
+        &mut self,
+        respect_asi_bracket: bool,
+    ) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
 
         // Handle leading pipe: `| A | B`
@@ -112,7 +120,8 @@ impl<'a> Parser<'a> {
         }
 
         // After the first type, ASI no longer applies (we're in a union context)
-        let mut types = vec![first];
+        let mut types = self.bvec();
+        types.push(first);
         while self.check(&TokenKind::Pipe) {
             self.advance()?; // consume '|'
             types.push(self.parse_intersection_type()?);
@@ -120,13 +129,13 @@ impl<'a> Parser<'a> {
 
         let end = types.last().map_or_else(|| start as u32, |t| t.span().end);
         Ok(TSType::Union(TSUnionType {
-            types,
+            types: types.into_bump_slice(),
             span: Span::new(start as u32, end),
         }))
     }
 
     /// Parse intersection type: `A & B & C` or `& A & B & C`
-    fn parse_intersection_type(&mut self) -> Result<TSType, ParseError> {
+    fn parse_intersection_type(&mut self) -> Result<TSType<'arena>, ParseError> {
         self.parse_intersection_type_inner(false)
     }
 
@@ -134,7 +143,7 @@ impl<'a> Parser<'a> {
     fn parse_intersection_type_inner(
         &mut self,
         respect_asi_bracket: bool,
-    ) -> Result<TSType, ParseError> {
+    ) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
 
         // Handle leading ampersand: `& A & B`
@@ -150,7 +159,8 @@ impl<'a> Parser<'a> {
         }
 
         // After the first type, ASI no longer applies (we're in an intersection context)
-        let mut types = vec![first];
+        let mut types = self.bvec();
+        types.push(first);
         while self.check(&TokenKind::Ampersand) {
             self.advance()?; // consume '&'
             types.push(self.parse_array_type()?);
@@ -158,20 +168,23 @@ impl<'a> Parser<'a> {
 
         let end = types.last().map_or_else(|| start as u32, |t| t.span().end);
         Ok(TSType::Intersection(TSIntersectionType {
-            types,
+            types: types.into_bump_slice(),
             span: Span::new(start as u32, end),
         }))
     }
 
     /// Parse array type suffix `T[]` or indexed access type `T[K]`
-    fn parse_array_type(&mut self) -> Result<TSType, ParseError> {
+    fn parse_array_type(&mut self) -> Result<TSType<'arena>, ParseError> {
         self.parse_array_type_inner(false)
     }
 
     /// Internal array type parsing with ASI control.
     /// When `respect_asi_bracket` is true, we don't consume `[` if there's a line terminator
     /// before it (ASI would insert a semicolon there in expression context).
-    fn parse_array_type_inner(&mut self, respect_asi_bracket: bool) -> Result<TSType, ParseError> {
+    fn parse_array_type_inner(
+        &mut self,
+        respect_asi_bracket: bool,
+    ) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         let mut result = self.parse_primary_type()?;
 
@@ -192,7 +205,7 @@ impl<'a> Parser<'a> {
                 self.expect(&TokenKind::BracketClose)?;
 
                 result = TSType::Array(TSArrayType {
-                    element_type: Box::new(result),
+                    element_type: self.alloc(result),
                     span: Span::new(start as u32, arr_end as u32),
                 });
             } else {
@@ -203,8 +216,8 @@ impl<'a> Parser<'a> {
                 self.expect(&TokenKind::BracketClose)?;
 
                 result = TSType::IndexedAccess(TSIndexedAccessType {
-                    object_type: Box::new(result),
-                    index_type: Box::new(index_type),
+                    object_type: self.alloc(result),
+                    index_type: self.alloc(index_type),
                     span: Span::new(start as u32, end as u32),
                 });
             }
@@ -214,7 +227,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse primary type (highest precedence)
-    fn parse_primary_type(&mut self) -> Result<TSType, ParseError> {
+    fn parse_primary_type(&mut self) -> Result<TSType<'arena>, ParseError> {
         let (start, end) = self.current_pos();
         let span = Span::new(start as u32, end as u32);
 
@@ -254,7 +267,7 @@ impl<'a> Parser<'a> {
             // Numeric literal types: `1`, `42.5`, `1n`
             TokenKind::Number => {
                 let literal = self.parse_number_or_bigint_literal()?;
-                let is_bigint = matches!(literal.value, LiteralValue::BigInt(_));
+                let is_bigint = matches!(literal.value, LiteralValue::BigInt);
                 self.advance()?;
 
                 if is_bigint {
@@ -266,11 +279,11 @@ impl<'a> Parser<'a> {
             // String literal types: `"hello"`, `'world'`
             TokenKind::String => {
                 let (start, end) = self.current_pos();
-                let (content, quote) = self.extract_string_literal();
+                let cooked = self.extract_string_cooked();
                 self.advance()?;
 
                 Ok(TSType::Literal(TSLiteralType::String(Literal {
-                    value: LiteralValue::String { content, quote },
+                    value: LiteralValue::String(cooked),
                     span: Span::new(start as u32, end as u32),
                 })))
             }
@@ -286,13 +299,13 @@ impl<'a> Parser<'a> {
                 let argument = self.parse_number_or_bigint_literal()?;
                 let num_end = self.current_pos().1;
                 // TODO should this be used?
-                let _is_bigint = matches!(argument.value, LiteralValue::BigInt(_));
+                let _is_bigint = matches!(argument.value, LiteralValue::BigInt);
                 self.advance()?;
 
                 let unary = UnaryExpression {
                     operator: UnaryOperator::Minus,
                     prefix: true,
-                    argument: Box::new(Expression::Literal(argument)),
+                    argument: self.alloc(Expression::Literal(argument)),
                     span: Span::new(start as u32, num_end as u32),
                 };
                 Ok(TSType::Literal(TSLiteralType::UnaryExpression(unary)))
@@ -357,7 +370,10 @@ impl<'a> Parser<'a> {
     /// - `keyof A[B]` parses as `keyof (A[B])`, not `(keyof A)[B]`
     /// - `keyof A[]` parses as `keyof (A[])`, not `(keyof A)[]`
     /// - `readonly A[B][]` parses as `readonly ((A[B])[])`
-    fn parse_type_operator(&mut self, operator: TSTypeOperatorKind) -> Result<TSType, ParseError> {
+    fn parse_type_operator(
+        &mut self,
+        operator: TSTypeOperatorKind,
+    ) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.advance()?; // consume the operator keyword (keyof, unique, readonly)
 
@@ -367,13 +383,13 @@ impl<'a> Parser<'a> {
 
         Ok(TSType::TypeOperator(TSTypeOperator {
             operator,
-            type_annotation: Box::new(type_annotation),
+            type_annotation: self.alloc(type_annotation),
             span: Span::new(start as u32, end),
         }))
     }
 
     /// Parse infer type: `infer U` (in conditional type extends clause)
-    fn parse_infer_type(&mut self) -> Result<TSType, ParseError> {
+    fn parse_infer_type(&mut self) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.advance()?; // consume 'infer'
 
@@ -400,7 +416,7 @@ impl<'a> Parser<'a> {
             self.advance()?; // consume 'extends'
             let constraint_type = self.parse_union_type()?;
             end = constraint_type.span().end;
-            Some(Box::new(constraint_type))
+            Some(self.alloc(constraint_type))
         } else {
             None
         };
@@ -505,7 +521,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse type reference: `Foo` or `Foo.Bar` or `Foo<T>`
-    fn parse_type_reference(&mut self) -> Result<TSType, ParseError> {
+    fn parse_type_reference(&mut self) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         let type_name = self.parse_entity_name()?;
 
@@ -524,7 +540,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse import type: `import('module')` or `import('module', {with: {...}}).Foo<T>`
-    fn parse_import_type(&mut self) -> Result<TSType, ParseError> {
+    fn parse_import_type(&mut self) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.advance()?; // consume 'import'
         let import = self.parse_import_type_body(start)?;
@@ -533,7 +549,7 @@ impl<'a> Parser<'a> {
 
     /// Parse import type body after `import` keyword has been consumed.
     /// Parses: `('module')`, `('module', {options}).Qualifier<TypeArgs>`
-    fn parse_import_type_body(&mut self, start: usize) -> Result<TSImportType, ParseError> {
+    fn parse_import_type_body(&mut self, start: usize) -> Result<TSImportType<'arena>, ParseError> {
         // Expect '('
         self.expect(&TokenKind::ParenOpen)?;
 
@@ -543,18 +559,19 @@ impl<'a> Parser<'a> {
         }
 
         let (arg_start, arg_end) = self.current_pos();
-        let (content, quote) = self.extract_string_literal();
+        let cooked = self.extract_string_cooked();
         self.advance()?;
 
         let argument = Literal {
-            value: LiteralValue::String { content, quote },
+            value: LiteralValue::String(cooked),
             span: Span::new(arg_start as u32, arg_end as u32),
         };
 
         // Optional options object: `import('module', {with: {type: 'json'}})`
-        let options = if self.check(&TokenKind::Comma) {
+        let options: Option<&'arena Expression<'arena>> = if self.check(&TokenKind::Comma) {
             self.advance()?; // consume ','
-            Some(Box::new(self.parse_expression()?))
+            let expr = self.parse_expression()?;
+            Some(self.alloc(expr))
         } else {
             None
         };
@@ -589,7 +606,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse type query: `typeof x`, `typeof Foo.bar`, `typeof import("module")`
-    fn parse_type_query(&mut self) -> Result<TSType, ParseError> {
+    fn parse_type_query(&mut self) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.advance()?; // consume 'typeof'
 
@@ -598,7 +615,7 @@ impl<'a> Parser<'a> {
             let import_start = self.current_pos().0;
             self.advance()?; // consume 'import'
             let import = self.parse_import_type_body(import_start)?;
-            TSTypeQueryExprName::Import(Box::new(import))
+            TSTypeQueryExprName::Import(self.alloc(import))
         } else {
             // Parse entity name: identifier or qualified name
             let entity_name = self.parse_entity_name()?;
@@ -627,7 +644,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse entity name: `Foo` or `Foo.Bar.Baz`
-    pub(crate) fn parse_entity_name(&mut self) -> Result<TSEntityName, ParseError> {
+    pub(crate) fn parse_entity_name(&mut self) -> Result<TSEntityName<'arena>, ParseError> {
         let (id_start, id_end) = self.current_pos();
         let symbol = self.intern_identifier();
         self.advance()?;
@@ -652,7 +669,7 @@ impl<'a> Parser<'a> {
                 Span::new(right_start as u32, right_end as u32),
             );
 
-            result = TSEntityName::QualifiedName(Box::new(TSQualifiedName {
+            result = TSEntityName::QualifiedName(self.alloc(TSQualifiedName {
                 left: result,
                 right,
                 span: Span::new(id_start as u32, right_end as u32),
@@ -669,7 +686,7 @@ impl<'a> Parser<'a> {
     /// their own inline check.
     pub(in crate::parser) fn parse_optional_type_arguments(
         &mut self,
-    ) -> Result<Option<TSTypeParameterInstantiation>, ParseError> {
+    ) -> Result<Option<TSTypeParameterInstantiation<'arena>>, ParseError> {
         if self.check(&TokenKind::LessThan) {
             Ok(Some(self.parse_type_arguments()?))
         } else {
@@ -680,11 +697,11 @@ impl<'a> Parser<'a> {
     /// Parse type arguments: `<T, U>` (trailing comma allowed, but cannot be empty)
     pub(in crate::parser) fn parse_type_arguments(
         &mut self,
-    ) -> Result<TSTypeParameterInstantiation, ParseError> {
+    ) -> Result<TSTypeParameterInstantiation<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::LessThan)?;
 
-        let mut params = Vec::new();
+        let mut params = self.bvec();
         if !self.check_greater_than_in_type() {
             params.push(self.parse_type()?);
             while self.eat(TokenKind::Comma) {
@@ -704,13 +721,13 @@ impl<'a> Parser<'a> {
         let end = self.greater_than_end_in_type()?;
 
         Ok(TSTypeParameterInstantiation {
-            params,
+            params: params.into_bump_slice(),
             span: Span::new(start as u32, end),
         })
     }
 
     /// Parse parenthesized type `(T)` or function type `(x: T) => U`
-    fn parse_parenthesized_or_function_type(&mut self) -> Result<TSType, ParseError> {
+    fn parse_parenthesized_or_function_type(&mut self) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::ParenOpen)?;
 
@@ -723,13 +740,14 @@ impl<'a> Parser<'a> {
             let end = self.prev_token_end();
 
             return Ok(TSType::Parenthesized(TSParenthesizedType {
-                type_annotation: Box::new(inner_type),
+                type_annotation: self.alloc(inner_type),
                 span: Span::new(start as u32, end as u32),
             }));
         }
 
         // Try to parse as function parameters
-        let params = self.parse_function_type_params()?;
+        let params: &'arena [Expression<'arena>] =
+            self.parse_function_type_params()?.into_bump_slice();
         self.expect(&TokenKind::ParenClose)?;
 
         // Check for arrow => to determine if it's a function type
@@ -743,7 +761,7 @@ impl<'a> Parser<'a> {
             Ok(TSType::Function(TSFunctionType {
                 type_parameters: None,
                 params,
-                return_type: Box::new(return_type),
+                return_type,
                 span: Span::new(start as u32, end),
             }))
         } else if params.len() == 1 && !self.is_function_param(&params[0]) {
@@ -758,7 +776,7 @@ impl<'a> Parser<'a> {
                 // Use end of closing paren, not end of inner type
                 let end = self.prev_token_end() as u32;
                 Ok(TSType::Parenthesized(TSParenthesizedType {
-                    type_annotation: Box::new(type_ref),
+                    type_annotation: self.alloc(type_ref),
                     span: Span::new(start as u32, end),
                 }))
             } else {
@@ -770,13 +788,13 @@ impl<'a> Parser<'a> {
             Ok(TSType::Function(TSFunctionType {
                 type_parameters: None,
                 params,
-                return_type: Box::new(TSTypeAnnotation {
-                    type_annotation: Box::new(TSType::Keyword(TSKeywordType::new(
+                return_type: TSTypeAnnotation {
+                    type_annotation: self.alloc(TSType::Keyword(TSKeywordType::new(
                         TSKeywordKind::Void,
                         Span::new(end, end),
                     ))),
                     span: Span::new(end, end),
-                }),
+                },
                 span: Span::new(start as u32, end),
             }))
         }
@@ -834,7 +852,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse generic function type: `<T>() => U`, `<T, U extends V>(x: T) => U`
-    fn parse_generic_function_type(&mut self) -> Result<TSType, ParseError> {
+    fn parse_generic_function_type(&mut self) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
 
         // Parse type parameters: <T, U extends V, ...>
@@ -842,7 +860,7 @@ impl<'a> Parser<'a> {
 
         // Parse parameter list
         self.expect(&TokenKind::ParenOpen)?;
-        let params = self.parse_function_type_params()?;
+        let params = self.parse_function_type_params()?.into_bump_slice();
         self.expect(&TokenKind::ParenClose)?;
 
         // Expect arrow
@@ -856,13 +874,13 @@ impl<'a> Parser<'a> {
         Ok(TSType::Function(TSFunctionType {
             type_parameters: Some(type_parameters),
             params,
-            return_type: Box::new(return_type),
+            return_type,
             span: Span::new(start as u32, end),
         }))
     }
 
     /// Parse constructor type: `new () => T`, `new <T>() => T`, `abstract new () => T`
-    fn parse_constructor_type(&mut self, is_abstract: bool) -> Result<TSType, ParseError> {
+    fn parse_constructor_type(&mut self, is_abstract: bool) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
 
         // If abstract, consume 'abstract' keyword
@@ -878,7 +896,7 @@ impl<'a> Parser<'a> {
 
         // Parse parameter list
         self.expect(&TokenKind::ParenOpen)?;
-        let params = self.parse_function_type_params()?;
+        let params = self.parse_function_type_params()?.into_bump_slice();
         self.expect(&TokenKind::ParenClose)?;
 
         // Expect arrow
@@ -893,22 +911,24 @@ impl<'a> Parser<'a> {
             abstract_: is_abstract,
             type_parameters,
             params,
-            return_type: Box::new(return_type),
+            return_type,
             span: Span::new(start as u32, end),
         }))
     }
 
     /// Check if an expression is a function parameter (has type annotation)
-    fn is_function_param(&self, expr: &Expression) -> bool {
+    fn is_function_param(&self, expr: &Expression<'_>) -> bool {
         match expr {
-            Expression::Identifier(id) => id.type_annotation.is_some() || id.optional,
+            Expression::Identifier(id) => id.type_annotation().is_some() || id.optional,
             _ => true,
         }
     }
 
     /// Parse function type parameters
-    fn parse_function_type_params(&mut self) -> Result<Vec<Expression>, ParseError> {
-        let mut params = Vec::new();
+    fn parse_function_type_params(
+        &mut self,
+    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
+        let mut params = self.bvec();
 
         if !self.check(&TokenKind::ParenClose) {
             params.push(self.parse_function_type_param()?);
@@ -925,7 +945,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a single function type parameter
-    fn parse_function_type_param(&mut self) -> Result<Expression, ParseError> {
+    fn parse_function_type_param(&mut self) -> Result<Expression<'arena>, ParseError> {
         // Check for rest parameter: ...args
         if self.check(&TokenKind::DotDotDot) {
             let (start, _) = self.current_pos();
@@ -934,10 +954,12 @@ impl<'a> Parser<'a> {
             let end = arg.span().end;
             // Move type_annotation from Identifier to RestElement (matching acorn behavior)
             let type_annotation = if let Expression::Identifier(ref mut id) = arg {
-                if let Some(ta) = id.type_annotation.take() {
-                    // Shrink identifier span to exclude type annotation
+                if let Some(ta) = id.type_annotation().cloned() {
+                    // Shrink identifier span to exclude type annotation, and clear the
+                    // binding extra (a function-type rest param carries no decorators).
                     id.span = Span::new(id.span.start, ta.span.start);
-                    Some(Box::new(ta))
+                    id.extra = None;
+                    Some(ta)
                 } else {
                     None
                 }
@@ -945,7 +967,7 @@ impl<'a> Parser<'a> {
                 None
             };
             return Ok(Expression::RestElement(RestElement {
-                argument: Box::new(arg),
+                argument: self.alloc(arg),
                 type_annotation,
                 span: Span::new(start as u32, end),
             }));
@@ -976,17 +998,23 @@ impl<'a> Parser<'a> {
             .as_ref()
             .map_or_else(|| id_end as u32, |ta| ta.span.end);
 
+        let extra = type_annotation.map(|ta| {
+            self.alloc(IdentifierParamExtra {
+                type_annotation: Some(ta),
+                decorators: None,
+            })
+        });
+
         Ok(Expression::Identifier(Identifier {
             name: symbol,
             optional,
-            type_annotation,
-            decorators: None,
+            extra,
             span: Span::new(id_start as u32, end),
         }))
     }
 
     /// Parse object type: `{ prop: T; method(): U }` or mapped type: `{ [K in T]: V }`
-    fn parse_object_type(&mut self) -> Result<TSType, ParseError> {
+    fn parse_object_type(&mut self) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::BraceOpen)?;
 
@@ -1011,13 +1039,13 @@ impl<'a> Parser<'a> {
         self.expect(&TokenKind::BraceClose)?;
 
         Ok(TSType::TypeLiteral(TSTypeLiteral {
-            members,
+            members: members.into_bump_slice(),
             span: Span::new(start as u32, end as u32),
         }))
     }
 
     /// Parse the body of a mapped type (after '{' has been consumed)
-    fn parse_mapped_type_body(&mut self, start: usize) -> Result<TSType, ParseError> {
+    fn parse_mapped_type_body(&mut self, start: usize) -> Result<TSType<'arena>, ParseError> {
         // Parse optional readonly modifier: `readonly`, `+readonly`, `-readonly`
         let readonly = self.parse_mapped_type_readonly_modifier();
 
@@ -1049,14 +1077,16 @@ impl<'a> Parser<'a> {
         param_start: usize,
         param_name: String,
         readonly: Option<TSMappedTypeModifier>,
-    ) -> Result<TSType, ParseError> {
+    ) -> Result<TSType<'arena>, ParseError> {
+        let arena = self.arena;
+
         // Parse constraint type (e.g., `keyof T`)
         let constraint = self.parse_type()?;
         let param_end = constraint.span().end;
 
         // Check for optional `as` clause: `as NewKey`
         let name_type = if self.eat(TokenKind::Keyword(KeywordKind::As)) {
-            Some(Box::new(self.parse_type()?))
+            Some(&*arena.alloc(self.parse_type()?))
         } else {
             None
         };
@@ -1069,7 +1099,7 @@ impl<'a> Parser<'a> {
 
         // Expect `:` and parse value type
         self.expect(&TokenKind::Colon)?;
-        let type_annotation = Some(Box::new(self.parse_type()?));
+        let type_annotation = Some(&*arena.alloc(self.parse_type()?));
 
         // Consume optional separator
         self.eat(TokenKind::Semicolon);
@@ -1078,10 +1108,11 @@ impl<'a> Parser<'a> {
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
 
+        let name = self.intern(&param_name);
         Ok(TSType::Mapped(TSMappedType {
             type_parameter: TSMappedTypeParameter {
-                name: param_name,
-                constraint: Box::new(constraint),
+                name,
+                constraint: self.alloc(constraint),
                 span: Span::new(param_start as u32, param_end),
             },
             name_type,
@@ -1141,11 +1172,11 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse tuple type: `[T, U, V]`, `[...T]`, `[label: T]`, `[T?]`, `[first: string, ...rest: T]`
-    fn parse_tuple_type(&mut self) -> Result<TSType, ParseError> {
+    fn parse_tuple_type(&mut self) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::BracketOpen)?;
 
-        let mut element_types = Vec::new();
+        let mut element_types = self.bvec();
         if !self.check(&TokenKind::BracketClose) {
             element_types.push(self.parse_tuple_element()?);
             while self.eat(TokenKind::Comma) {
@@ -1160,13 +1191,13 @@ impl<'a> Parser<'a> {
         self.expect(&TokenKind::BracketClose)?;
 
         Ok(TSType::Tuple(TSTupleType {
-            element_types,
+            element_types: element_types.into_bump_slice(),
             span: Span::new(start as u32, end as u32),
         }))
     }
 
     /// Parse a single tuple element: `T`, `T?`, `...T`, `label: T`, `label?: T`, `...label: T`
-    fn parse_tuple_element(&mut self) -> Result<TSType, ParseError> {
+    fn parse_tuple_element(&mut self) -> Result<TSType<'arena>, ParseError> {
         let elem_start = self.current_pos().0;
 
         // Check for rest element: `...T` or `...label: T`
@@ -1175,7 +1206,7 @@ impl<'a> Parser<'a> {
             let inner = self.parse_tuple_element_inner()?;
             let end = inner.span().end;
             return Ok(TSType::Rest(TSRestType {
-                type_annotation: Box::new(inner),
+                type_annotation: self.alloc(inner),
                 span: Span::new(elem_start as u32, end),
             }));
         }
@@ -1184,7 +1215,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a tuple element (without leading `...`): `T`, `T?`, `label: T`, `label?: T`
-    fn parse_tuple_element_inner(&mut self) -> Result<TSType, ParseError> {
+    fn parse_tuple_element_inner(&mut self) -> Result<TSType<'arena>, ParseError> {
         let elem_start = self.current_pos().0;
 
         // Check for named tuple member: `label: T` or `label?: T`
@@ -1218,7 +1249,7 @@ impl<'a> Parser<'a> {
                         span: Span::new(label_start as u32, label_end as u32),
                     });
                     return Ok(TSType::Optional(TSOptionalType {
-                        type_annotation: Box::new(type_ref),
+                        type_annotation: self.alloc(type_ref),
                         span: Span::new(elem_start as u32, self.prev_token_end() as u32),
                     }));
                 }
@@ -1236,7 +1267,7 @@ impl<'a> Parser<'a> {
                     label_symbol,
                     Span::new(label_start as u32, label_end as u32),
                 ),
-                element_type: Box::new(element_type),
+                element_type: self.alloc(element_type),
                 optional,
                 span: Span::new(elem_start as u32, end),
             }));
@@ -1249,7 +1280,7 @@ impl<'a> Parser<'a> {
         if self.eat(TokenKind::Question) {
             let end = self.prev_token_end();
             Ok(TSType::Optional(TSOptionalType {
-                type_annotation: Box::new(inner_type),
+                type_annotation: self.alloc(inner_type),
                 span: Span::new(elem_start as u32, end as u32),
             }))
         } else {
@@ -1262,10 +1293,10 @@ impl<'a> Parser<'a> {
     /// Parallel structure to `parse_template_literal()` in expression.rs but parses
     /// types inside ${} instead of expressions. Kept separate for clarity despite
     /// duplication - the two contexts (expression vs type) rarely change together.
-    fn parse_template_literal_type(&mut self) -> Result<TemplateLiteralType, ParseError> {
+    fn parse_template_literal_type(&mut self) -> Result<TemplateLiteralType<'arena>, ParseError> {
         let (start, _) = self.current_pos();
-        let mut quasis = Vec::new();
-        let mut types = Vec::new();
+        let mut quasis = self.bvec();
+        let mut types = self.bvec();
 
         match self.current_kind() {
             TokenKind::NoSubstitutionTemplate => {
@@ -1286,7 +1317,7 @@ impl<'a> Parser<'a> {
 
                 // Decode escapes for cooked value
                 let cooked = match self.current_decoded() {
-                    Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                    Some(decoded) => TemplateCooked::Decoded(self.alloc_str_in(decoded)),
                     None => TemplateCooked::Verbatim,
                 };
 
@@ -1301,8 +1332,8 @@ impl<'a> Parser<'a> {
                 });
 
                 Ok(TemplateLiteralType {
-                    quasis,
-                    types,
+                    quasis: quasis.into_bump_slice(),
+                    types: types.into_bump_slice(),
                     span: Span::new(start as u32, elem_end as u32),
                 })
             }
@@ -1323,7 +1354,7 @@ impl<'a> Parser<'a> {
                 let has_newline = content.contains('\n');
 
                 let cooked = match self.current_decoded() {
-                    Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                    Some(decoded) => TemplateCooked::Decoded(self.alloc_str_in(decoded)),
                     None => TemplateCooked::Verbatim,
                 };
 
@@ -1375,7 +1406,9 @@ impl<'a> Parser<'a> {
                             let has_newline = tail_content.contains('\n');
 
                             let tail_cooked = match self.current_decoded() {
-                                Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                                Some(decoded) => {
+                                    TemplateCooked::Decoded(self.alloc_str_in(decoded))
+                                }
                                 None => TemplateCooked::Verbatim,
                             };
 
@@ -1390,8 +1423,8 @@ impl<'a> Parser<'a> {
                             });
 
                             return Ok(TemplateLiteralType {
-                                quasis,
-                                types,
+                                quasis: quasis.into_bump_slice(),
+                                types: types.into_bump_slice(),
                                 span: Span::new(start as u32, tail_end as u32),
                             });
                         }
@@ -1414,7 +1447,9 @@ impl<'a> Parser<'a> {
                             let has_newline = mid_content.contains('\n');
 
                             let mid_cooked = match self.current_decoded() {
-                                Some(decoded) => TemplateCooked::Decoded(decoded.to_string()),
+                                Some(decoded) => {
+                                    TemplateCooked::Decoded(self.alloc_str_in(decoded))
+                                }
                                 None => TemplateCooked::Verbatim,
                             };
 
@@ -1446,7 +1481,7 @@ impl<'a> Parser<'a> {
     /// method / construct signatures).
     pub(in crate::parser) fn parse_optional_type_parameters(
         &mut self,
-    ) -> Result<Option<TSTypeParameterDeclaration>, ParseError> {
+    ) -> Result<Option<TSTypeParameterDeclaration<'arena>>, ParseError> {
         if self.check(&TokenKind::LessThan) {
             Ok(Some(self.parse_type_parameters()?))
         } else {
@@ -1456,11 +1491,11 @@ impl<'a> Parser<'a> {
 
     pub(in crate::parser) fn parse_type_parameters(
         &mut self,
-    ) -> Result<TSTypeParameterDeclaration, ParseError> {
+    ) -> Result<TSTypeParameterDeclaration<'arena>, ParseError> {
         let start = self.current_pos().0 as u32;
         self.expect(&TokenKind::LessThan)?;
 
-        let mut params = Vec::new();
+        let mut params = self.bvec();
         let mut trailing_comma = None;
         loop {
             let param = self.parse_type_parameter()?;
@@ -1479,7 +1514,7 @@ impl<'a> Parser<'a> {
         let end = self.greater_than_end_in_type()?;
 
         Ok(TSTypeParameterDeclaration {
-            params,
+            params: params.into_bump_slice(),
             trailing_comma,
             span: Span::new(start, end),
         })
@@ -1487,7 +1522,7 @@ impl<'a> Parser<'a> {
 
     /// Parse a single type parameter: `T`, `T extends U`, or `T extends U = V`
     /// With optional modifiers: `const T`, `in T`, `out T`, `in out T`
-    fn parse_type_parameter(&mut self) -> Result<TSTypeParameter, ParseError> {
+    fn parse_type_parameter(&mut self) -> Result<TSTypeParameter<'arena>, ParseError> {
         let start = self.current_pos().0 as u32;
 
         // Parse optional modifiers: const, in, out
@@ -1535,7 +1570,7 @@ impl<'a> Parser<'a> {
             self.advance()?;
             let constraint_type = self.parse_type()?;
             end = constraint_type.span().end;
-            Some(Box::new(constraint_type))
+            Some(self.alloc(constraint_type))
         } else {
             None
         };
@@ -1544,7 +1579,7 @@ impl<'a> Parser<'a> {
         let default = if self.eat(TokenKind::Equals) {
             let default_type = self.parse_type()?;
             end = default_type.span().end;
-            Some(Box::new(default_type))
+            Some(self.alloc(default_type))
         } else {
             None
         };
@@ -1566,11 +1601,11 @@ impl<'a> Parser<'a> {
     /// Used for TSInstantiationExpression and other type argument contexts.
     pub(in crate::parser) fn parse_type_parameter_instantiation(
         &mut self,
-    ) -> Result<TSTypeParameterInstantiation, ParseError> {
+    ) -> Result<TSTypeParameterInstantiation<'arena>, ParseError> {
         let start = self.current_pos().0 as u32;
         self.expect(&TokenKind::LessThan)?;
 
-        let mut params = Vec::new();
+        let mut params = self.bvec();
         loop {
             let ts_type = self.parse_type()?;
             params.push(ts_type);
@@ -1587,7 +1622,7 @@ impl<'a> Parser<'a> {
         let end = self.greater_than_end_in_type()?;
 
         Ok(TSTypeParameterInstantiation {
-            params,
+            params: params.into_bump_slice(),
             span: Span::new(start, end),
         })
     }

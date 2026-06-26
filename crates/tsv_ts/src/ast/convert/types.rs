@@ -8,7 +8,7 @@ use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
 
 pub(in crate::ast) fn convert_type_annotation(
-    type_annotation: &internal::TSTypeAnnotation,
+    type_annotation: &internal::TSTypeAnnotation<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -20,7 +20,7 @@ pub(in crate::ast) fn convert_type_annotation(
         end: type_annotation.span.end,
         loc: create_location(type_annotation.span, loc, offset),
         type_annotation: Box::new(convert_type(
-            &type_annotation.type_annotation,
+            type_annotation.type_annotation,
             source,
             loc,
             interner,
@@ -30,7 +30,7 @@ pub(in crate::ast) fn convert_type_annotation(
 }
 
 pub(in crate::ast) fn convert_type(
-    ts_type: &internal::TSType,
+    ts_type: &internal::TSType<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -45,7 +45,7 @@ pub(in crate::ast) fn convert_type(
             end: arr.span.end,
             loc: create_location(arr.span, loc, offset),
             element_type: Box::new(convert_type(
-                &arr.element_type,
+                arr.element_type,
                 source,
                 loc,
                 interner,
@@ -162,7 +162,7 @@ pub(in crate::ast) fn convert_type(
                 end: p.span.end,
                 loc: create_location(p.span, loc, offset),
                 type_annotation: Box::new(convert_type(
-                    &p.type_annotation,
+                    p.type_annotation,
                     source,
                     loc,
                     interner,
@@ -213,16 +213,10 @@ pub(in crate::ast) fn convert_type(
                 start: c.span.start,
                 end: c.span.end,
                 loc: create_location(c.span, loc, offset),
-                check_type: Box::new(convert_type(&c.check_type, source, loc, interner, offset)),
-                extends_type: Box::new(convert_type(
-                    &c.extends_type,
-                    source,
-                    loc,
-                    interner,
-                    offset,
-                )),
-                true_type: Box::new(convert_type(&c.true_type, source, loc, interner, offset)),
-                false_type: Box::new(convert_type(&c.false_type, source, loc, interner, offset)),
+                check_type: Box::new(convert_type(c.check_type, source, loc, interner, offset)),
+                extends_type: Box::new(convert_type(c.extends_type, source, loc, interner, offset)),
+                true_type: Box::new(convert_type(c.true_type, source, loc, interner, offset)),
+                false_type: Box::new(convert_type(c.false_type, source, loc, interner, offset)),
             })
         }
         internal::TSType::Mapped(m) => public::TSType::TSMappedType(public::TSMappedType {
@@ -235,9 +229,11 @@ pub(in crate::ast) fn convert_type(
                 start: m.type_parameter.span.start,
                 end: m.type_parameter.span.end,
                 loc: create_location(m.type_parameter.span, loc, offset),
-                name: m.type_parameter.name.clone(),
+                name: interner
+                    .resolve_infallible(m.type_parameter.name)
+                    .to_string(),
                 constraint: Some(Box::new(convert_type(
-                    &m.type_parameter.constraint,
+                    m.type_parameter.constraint,
                     source,
                     loc,
                     interner,
@@ -263,7 +259,7 @@ pub(in crate::ast) fn convert_type(
                 loc: create_location(o.span, loc, offset),
                 operator: o.operator.as_str().to_string(),
                 type_annotation: Box::new(convert_type(
-                    &o.type_annotation,
+                    o.type_annotation,
                     source,
                     loc,
                     interner,
@@ -307,8 +303,8 @@ pub(in crate::ast) fn convert_type(
                 start: i.span.start,
                 end: i.span.end,
                 loc: create_location(i.span, loc, offset),
-                object_type: Box::new(convert_type(&i.object_type, source, loc, interner, offset)),
-                index_type: Box::new(convert_type(&i.index_type, source, loc, interner, offset)),
+                object_type: Box::new(convert_type(i.object_type, source, loc, interner, offset)),
+                index_type: Box::new(convert_type(i.index_type, source, loc, interner, offset)),
             })
         }
         internal::TSType::Rest(r) => public::TSType::TSRestType(public::TSRestType {
@@ -317,7 +313,7 @@ pub(in crate::ast) fn convert_type(
             end: r.span.end,
             loc: create_location(r.span, loc, offset),
             type_annotation: Box::new(convert_type(
-                &r.type_annotation,
+                r.type_annotation,
                 source,
                 loc,
                 interner,
@@ -330,7 +326,7 @@ pub(in crate::ast) fn convert_type(
             end: o.span.end,
             loc: create_location(o.span, loc, offset),
             type_annotation: Box::new(convert_type(
-                &o.type_annotation,
+                o.type_annotation,
                 source,
                 loc,
                 interner,
@@ -344,13 +340,7 @@ pub(in crate::ast) fn convert_type(
                 end: n.span.end,
                 loc: create_location(n.span, loc, offset),
                 label: super::convert_identifier(&n.label, loc, interner, offset),
-                element_type: Box::new(convert_type(
-                    &n.element_type,
-                    source,
-                    loc,
-                    interner,
-                    offset,
-                )),
+                element_type: Box::new(convert_type(n.element_type, source, loc, interner, offset)),
                 optional: n.optional,
             })
         }
@@ -380,7 +370,7 @@ pub(in crate::ast) fn convert_type(
 }
 
 fn convert_type_query_expr_name(
-    expr_name: &internal::TSTypeQueryExprName,
+    expr_name: &internal::TSTypeQueryExprName<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -426,7 +416,7 @@ fn convert_type_query_expr_name(
 }
 
 fn convert_literal_type(
-    lit: &internal::TSLiteralType,
+    lit: &internal::TSLiteralType<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -461,7 +451,7 @@ fn convert_literal_type(
         internal::TSLiteralType::UnaryExpression(unary) => {
             // Convert UnaryExpression for negative number types like `-1`
             // Get the argument literal (parser guarantees this is always a Literal)
-            let internal::Expression::Literal(arg_lit) = &*unary.argument else {
+            let internal::Expression::Literal(arg_lit) = unary.argument else {
                 unreachable!(
                     "parser only creates TSLiteralType::UnaryExpression with Literal argument"
                 )
@@ -488,7 +478,7 @@ fn convert_literal_type(
 }
 
 fn convert_template_literal_type(
-    template: &internal::TemplateLiteralType,
+    template: &internal::TemplateLiteralType<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -569,7 +559,7 @@ fn convert_keyword_type(
 
 // Entity name conversion
 pub(super) fn convert_entity_name(
-    name: &internal::TSEntityName,
+    name: &internal::TSEntityName<'_>,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
@@ -592,7 +582,7 @@ pub(super) fn convert_entity_name(
 }
 
 fn convert_type_parameter_instantiation(
-    params: &internal::TSTypeParameterInstantiation,
+    params: &internal::TSTypeParameterInstantiation<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -613,7 +603,7 @@ fn convert_type_parameter_instantiation(
 
 /// Simplified version that passes through interner but uses placeholder identifier names
 fn convert_type_parameter_declaration_simple(
-    params: &internal::TSTypeParameterDeclaration,
+    params: &internal::TSTypeParameterDeclaration<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -638,7 +628,7 @@ fn convert_type_parameter_declaration_simple(
 }
 
 fn convert_type_element(
-    elem: &internal::TSTypeElement,
+    elem: &internal::TSTypeElement<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -756,8 +746,7 @@ fn convert_type_element(
                         name: interner.resolve_infallible(p.name).to_string(),
                         optional: p.optional,
                         type_annotation: p
-                            .type_annotation
-                            .as_ref()
+                            .type_annotation()
                             .map(|ta| convert_type_annotation(ta, source, loc, interner, offset)),
                         decorators: Vec::new(),
                     })
@@ -778,7 +767,7 @@ fn convert_type_element(
 
 // Interface declaration conversion
 pub(in crate::ast) fn convert_interface_declaration(
-    iface: &internal::TSInterfaceDeclaration,
+    iface: &internal::TSInterfaceDeclaration<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -805,7 +794,7 @@ pub(in crate::ast) fn convert_interface_declaration(
 }
 
 fn convert_interface_heritage(
-    heritage: &internal::TSInterfaceHeritage,
+    heritage: &internal::TSInterfaceHeritage<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -825,7 +814,7 @@ fn convert_interface_heritage(
 }
 
 fn convert_interface_body(
-    body: &internal::TSInterfaceBody,
+    body: &internal::TSInterfaceBody<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -846,7 +835,7 @@ fn convert_interface_body(
 
 // Declare function conversion
 pub(in crate::ast) fn convert_declare_function(
-    func: &internal::TSDeclareFunction,
+    func: &internal::TSDeclareFunction<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -881,7 +870,7 @@ pub(in crate::ast) fn convert_declare_function(
 
 /// Convert TSEnumDeclaration to public AST
 pub(in crate::ast) fn convert_enum_declaration(
-    enum_decl: &internal::TSEnumDeclaration,
+    enum_decl: &internal::TSEnumDeclaration<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -905,7 +894,7 @@ pub(in crate::ast) fn convert_enum_declaration(
 
 /// Convert a single TSEnumMember
 fn convert_enum_member(
-    member: &internal::TSEnumMember,
+    member: &internal::TSEnumMember<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,

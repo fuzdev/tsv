@@ -29,7 +29,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_try_statement_doc(
         &self,
-        stmt: &internal::TryStatement,
+        stmt: &internal::TryStatement<'_>,
     ) -> DocId {
         let d = self.d();
 
@@ -145,21 +145,21 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_throw_statement_doc(
         &self,
-        stmt: &internal::ThrowStatement,
+        stmt: &internal::ThrowStatement<'_>,
     ) -> DocId {
         self.build_keyword_argument_doc("throw", stmt.span.start, stmt.span.end, &stmt.argument)
     }
 
     pub(in crate::printer::statements) fn build_break_statement_doc(
         &self,
-        stmt: &internal::BreakStatement,
+        stmt: &internal::BreakStatement<'_>,
     ) -> DocId {
         self.build_jump_statement_doc("break", stmt.span, stmt.label.as_ref())
     }
 
     pub(in crate::printer::statements) fn build_continue_statement_doc(
         &self,
-        stmt: &internal::ContinueStatement,
+        stmt: &internal::ContinueStatement<'_>,
     ) -> DocId {
         self.build_jump_statement_doc("continue", stmt.span, stmt.label.as_ref())
     }
@@ -169,7 +169,7 @@ impl<'a> Printer<'a> {
         &self,
         keyword: &'static str,
         span: tsv_lang::Span,
-        label: Option<&internal::Identifier>,
+        label: Option<&internal::Identifier<'_>>,
     ) -> DocId {
         let d = self.d();
         if let Some(label) = label {
@@ -207,7 +207,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_labeled_statement_doc(
         &self,
-        stmt: &internal::LabeledStatement,
+        stmt: &internal::LabeledStatement<'_>,
     ) -> DocId {
         let d = self.d();
         let label_end = stmt.label.span.end;
@@ -238,17 +238,17 @@ impl<'a> Printer<'a> {
             } else {
                 parts.push(d.text(" "));
             }
-            parts.push(self.build_statement_doc(&stmt.body));
+            parts.push(self.build_statement_doc(stmt.body));
             d.concat(&parts)
         } else {
             // No space before empty statement: `label:;` not `label: ;`
-            let separator = if matches!(stmt.body.as_ref(), Statement::EmptyStatement(_)) {
+            let separator = if matches!(stmt.body, Statement::EmptyStatement(_)) {
                 ":"
             } else {
                 ": "
             };
             parts.push(d.text(separator));
-            parts.push(self.build_statement_doc(&stmt.body));
+            parts.push(self.build_statement_doc(stmt.body));
             d.concat(&parts)
         }
     }

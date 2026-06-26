@@ -10,7 +10,7 @@ use tsv_lang::ParseError;
 
 use super::Parser;
 
-impl<'a> Parser<'a> {
+impl<'a, 'arena> Parser<'a, 'arena> {
     /// Convert an expression to an assignable pattern (cover grammar)
     ///
     /// This implements the ECMAScript "cover grammar" for assignment targets.
@@ -23,7 +23,10 @@ impl<'a> Parser<'a> {
     /// - SpreadElement → RestElement
     /// - BinaryExpression with = (shorthand default) → AssignmentPattern
     /// - Identifier, MemberExpression → unchanged (valid assignment targets)
-    pub(super) fn to_assignable(&self, expr: Expression) -> Result<Expression, ParseError> {
+    pub(super) fn to_assignable(
+        &self,
+        expr: Expression<'arena>,
+    ) -> Result<Expression<'arena>, ParseError> {
         match expr {
             // Identifier is already a valid assignment target
             Expression::Identifier(_) => Ok(expr),
@@ -33,14 +36,13 @@ impl<'a> Parser<'a> {
 
             // Convert ObjectExpression to ObjectPattern
             Expression::ObjectExpression(obj) => {
-                let properties = obj
-                    .properties
-                    .into_iter()
-                    .map(|prop| self.object_property_to_pattern(prop))
-                    .collect::<Result<Vec<_>, _>>()?;
+                let mut properties = self.bvec();
+                for prop in obj.properties {
+                    properties.push(self.object_property_to_pattern(prop.clone())?);
+                }
 
                 Ok(Expression::ObjectPattern(ObjectPattern {
-                    properties,
+                    properties: properties.into_bump_slice(),
                     type_annotation: None,
                     span: obj.span,
                 }))
@@ -48,14 +50,16 @@ impl<'a> Parser<'a> {
 
             // Convert ArrayExpression to ArrayPattern
             Expression::ArrayExpression(arr) => {
-                let elements = arr
-                    .elements
-                    .into_iter()
-                    .map(|elem| elem.map(|e| self.to_assignable(e)).transpose())
-                    .collect::<Result<Vec<_>, _>>()?;
+                let mut elements = self.bvec();
+                for elem in arr.elements {
+                    elements.push(match elem {
+                        Some(e) => Some(self.to_assignable(e.clone())?),
+                        None => None,
+                    });
+                }
 
                 Ok(Expression::ArrayPattern(ArrayPattern {
-                    elements,
+                    elements: elements.into_bump_slice(),
                     type_annotation: None,
                     span: arr.span,
                 }))
@@ -63,9 +67,9 @@ impl<'a> Parser<'a> {
 
             // Convert SpreadElement to RestElement
             Expression::SpreadElement(spread) => {
-                let argument = self.to_assignable(*spread.argument)?;
+                let argument = self.to_assignable(spread.argument.clone())?;
                 Ok(Expression::RestElement(RestElement {
-                    argument: Box::new(argument),
+                    argument: self.alloc(argument),
                     type_annotation: None,
                     span: spread.span,
                 }))
@@ -74,9 +78,9 @@ impl<'a> Parser<'a> {
             // AssignmentExpression in pattern context becomes AssignmentPattern
             // This handles default values like `{a = 1}` which was parsed as shorthand
             Expression::AssignmentExpression(assign) => {
-                let left = self.to_assignable(*assign.left)?;
+                let left = self.to_assignable(assign.left.clone())?;
                 Ok(Expression::AssignmentPattern(AssignmentPattern {
-                    left: Box::new(left),
+                    left: self.alloc(left),
                     right: assign.right,
                     span: assign.span,
                 }))
@@ -96,12 +100,12 @@ impl<'a> Parser<'a> {
     /// Convert an object property to a pattern property
     fn object_property_to_pattern(
         &self,
-        prop: ObjectProperty,
-    ) -> Result<ObjectPatternProperty, ParseError> {
+        prop: ObjectProperty<'arena>,
+    ) -> Result<ObjectPatternProperty<'arena>, ParseError> {
         match prop {
             ObjectProperty::Property(p) => {
                 // Convert the value to a pattern
-                let value = self.to_assignable(p.value)?;
+                let value = self.to_assignable(p.value.clone())?;
 
                 Ok(ObjectPatternProperty::Property(Property {
                     key: p.key,
@@ -115,9 +119,9 @@ impl<'a> Parser<'a> {
             }
             ObjectProperty::SpreadElement(spread) => {
                 // Convert spread to rest element
-                let argument = self.to_assignable(*spread.argument)?;
+                let argument = self.to_assignable(spread.argument.clone())?;
                 Ok(ObjectPatternProperty::RestElement(RestElement {
-                    argument: Box::new(argument),
+                    argument: self.alloc(argument),
                     type_annotation: None,
                     span: spread.span,
                 }))

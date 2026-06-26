@@ -12,27 +12,27 @@ use super::{
 
 /// Interface declaration: `interface Foo { ... }` or `interface Foo extends Bar { ... }`
 #[derive(Debug, Clone)]
-pub struct TSInterfaceDeclaration {
-    pub id: Identifier,
-    pub type_parameters: Option<TSTypeParameterDeclaration>,
-    pub extends: Vec<TSInterfaceHeritage>,
-    pub body: TSInterfaceBody,
+pub struct TSInterfaceDeclaration<'arena> {
+    pub id: Identifier<'arena>,
+    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+    pub extends: &'arena [TSInterfaceHeritage<'arena>],
+    pub body: TSInterfaceBody<'arena>,
     pub declare: bool,
     pub span: Span,
 }
 
 /// Interface heritage: `extends Foo, Bar`
 #[derive(Debug, Clone)]
-pub struct TSInterfaceHeritage {
-    pub expression: TSEntityName,
-    pub type_arguments: Option<TSTypeParameterInstantiation>,
+pub struct TSInterfaceHeritage<'arena> {
+    pub expression: TSEntityName<'arena>,
+    pub type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
     pub span: Span,
 }
 
 /// Interface body: `{ members }`
 #[derive(Debug, Clone)]
-pub struct TSInterfaceBody {
-    pub body: Vec<TSTypeElement>,
+pub struct TSInterfaceBody<'arena> {
+    pub body: &'arena [TSTypeElement<'arena>],
     pub span: Span,
 }
 
@@ -41,11 +41,11 @@ pub struct TSInterfaceBody {
 /// Also used for functions inside `declare namespace` where `declare` is implicit,
 /// and for function overload signatures (no body).
 #[derive(Debug, Clone)]
-pub struct TSDeclareFunction {
-    pub id: Identifier,
-    pub type_parameters: Option<TSTypeParameterDeclaration>,
-    pub params: Vec<Expression>,
-    pub return_type: Option<TSTypeAnnotation>,
+pub struct TSDeclareFunction<'arena> {
+    pub id: Identifier<'arena>,
+    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+    pub params: &'arena [Expression<'arena>],
+    pub return_type: Option<TSTypeAnnotation<'arena>>,
     /// Whether to print the `declare` keyword.
     /// True for top-level `declare function`, false inside `declare namespace`.
     pub declare: bool,
@@ -64,11 +64,11 @@ pub struct TSDeclareFunction {
 /// - Declare: `declare enum Foo { A, B }` (ambient declaration)
 /// - Declare const: `declare const enum Foo { A, B }`
 #[derive(Debug, Clone)]
-pub struct TSEnumDeclaration {
+pub struct TSEnumDeclaration<'arena> {
     /// Enum name
-    pub id: Identifier,
+    pub id: Identifier<'arena>,
     /// Enum members
-    pub members: Vec<TSEnumMember>,
+    pub members: &'arena [TSEnumMember<'arena>],
     /// Whether this is a const enum
     pub r#const: bool,
     /// Whether this is an ambient declaration (declare enum)
@@ -80,20 +80,20 @@ pub struct TSEnumDeclaration {
 ///
 /// Represents a single member in an enum declaration.
 #[derive(Debug, Clone)]
-pub struct TSEnumMember {
+pub struct TSEnumMember<'arena> {
     /// Member name (identifier or computed)
-    pub id: TSEnumMemberId,
+    pub id: TSEnumMemberId<'arena>,
     /// Optional initializer expression
-    pub initializer: Option<Expression>,
+    pub initializer: Option<Expression<'arena>>,
     pub span: Span,
 }
 
 /// Enum member id: can be an identifier or a string literal (for computed names)
 #[derive(Debug, Clone)]
-pub enum TSEnumMemberId {
-    Identifier(Identifier),
+pub enum TSEnumMemberId<'arena> {
+    Identifier(Identifier<'arena>),
     /// String literal for computed names like `"hello"` in `enum { "hello" = 1 }`
-    String(Literal),
+    String(Literal<'arena>),
 }
 
 /// TypeScript module/namespace declaration: `namespace Utils { ... }` or `module Utils { ... }`
@@ -102,12 +102,12 @@ pub enum TSEnumMemberId {
 /// Both produce the same AST structure. For nested namespaces like `namespace Outer.Inner`,
 /// the parser creates nested TSModuleDeclaration nodes.
 #[derive(Debug, Clone)]
-pub struct TSModuleDeclaration {
+pub struct TSModuleDeclaration<'arena> {
     /// Module/namespace name - identifier for regular namespaces, string literal for ambient modules
-    pub id: TSModuleName,
+    pub id: TSModuleName<'arena>,
     /// Module body - either a block or nested module declaration (for `A.B.C`)
     /// `None` for shorthand ambient modules: `declare module 'name';`
-    pub body: Option<TSModuleDeclarationBody>,
+    pub body: Option<TSModuleDeclarationBody<'arena>>,
     /// Whether this is an ambient declaration (`declare namespace/module`)
     pub declare: bool,
     /// The keyword used: `namespace` or `module`
@@ -119,11 +119,11 @@ pub struct TSModuleDeclaration {
 
 /// Module/namespace name - can be an identifier or a string literal
 #[derive(Debug, Clone)]
-pub enum TSModuleName {
+pub enum TSModuleName<'arena> {
     /// Regular identifier: `namespace Foo { }`
-    Identifier(Identifier),
+    Identifier(Identifier<'arena>),
     /// String literal for ambient modules: `declare module 'name' { }`
-    Literal(Literal),
+    Literal(Literal<'arena>),
 }
 
 /// The keyword used in a module/namespace declaration
@@ -137,17 +137,17 @@ pub enum TSModuleDeclarationKind {
 
 /// Body of a TypeScript module declaration
 #[derive(Debug, Clone)]
-pub enum TSModuleDeclarationBody {
+pub enum TSModuleDeclarationBody<'arena> {
     /// Block body with statements: `namespace A { ... }`
-    TSModuleBlock(TSModuleBlock),
+    TSModuleBlock(TSModuleBlock<'arena>),
     /// Nested module declaration: `namespace A.B { ... }` - the B part
-    TSModuleDeclaration(Box<TSModuleDeclaration>),
+    TSModuleDeclaration(&'arena TSModuleDeclaration<'arena>),
 }
 
 /// TypeScript module block: the `{ ... }` part of a namespace/module declaration
 #[derive(Debug, Clone)]
-pub struct TSModuleBlock {
+pub struct TSModuleBlock<'arena> {
     /// Statements inside the module block
-    pub body: Vec<Statement>,
+    pub body: &'arena [Statement<'arena>],
     pub span: Span,
 }

@@ -17,7 +17,7 @@ impl<'a> Printer<'a> {
     /// Delegates to `build_program_doc` to build the doc tree, then renders it.
     /// This is the same path used by Svelte's `<script>` formatting, ensuring
     /// consistent behavior (e.g., trailing whitespace trimming in comments).
-    pub(crate) fn print_program(&mut self, program: &internal::Program) {
+    pub(crate) fn print_program(&mut self, program: &internal::Program<'_>) {
         let doc = self.build_program_doc(program);
         self.write_arena_doc(doc);
     }
@@ -34,7 +34,7 @@ impl<'a> Printer<'a> {
     /// - Leading comments with proper spacing
     /// - Trailing same-line comments using line_suffix
     /// - Program trailing comments after the last statement
-    pub(crate) fn build_program_doc(&self, program: &internal::Program) -> DocId {
+    pub(crate) fn build_program_doc(&self, program: &internal::Program<'_>) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
         let mut prev_end = 0u32;

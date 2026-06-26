@@ -1,6 +1,6 @@
 //! Class-related types for public AST
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use super::statements::BlockStatement;
 use super::types::{
@@ -10,7 +10,7 @@ use super::{Decorator, Expression, Identifier, SourceLocation};
 
 /// Class declaration: `class Foo { ... }`
 /// For `export default class {}`, id is null.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ClassDeclaration {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -46,7 +46,7 @@ pub struct ClassDeclaration {
 }
 
 /// Class expression: `class { }` or `class Foo<T> extends Bar { }`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ClassExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -79,7 +79,7 @@ pub struct ClassExpression {
 }
 
 /// Class body: `{ constructor() {} method() {} prop = value; }`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ClassBody {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -90,7 +90,7 @@ pub struct ClassBody {
 }
 
 /// Class member - method definition, property definition, or static block
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ClassMember {
     MethodDefinition(MethodDefinition),
@@ -100,7 +100,7 @@ pub enum ClassMember {
 }
 
 /// Static initialization block in a class: `static { ... }` (ES2022)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct StaticBlock {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -111,7 +111,7 @@ pub struct StaticBlock {
 }
 
 /// Method definition in a class body
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct MethodDefinition {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -145,7 +145,7 @@ pub struct MethodDefinition {
 }
 
 /// Either a FunctionExpression (for regular methods) or TSDeclareMethod (for abstract/overload methods)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum MethodValue {
     FunctionExpression(FunctionExpression),
@@ -153,7 +153,7 @@ pub enum MethodValue {
 }
 
 /// TSDeclareMethod: abstract method or overload signature (no body)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSDeclareMethod {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -173,7 +173,7 @@ pub struct TSDeclareMethod {
 }
 
 /// Property definition in a class body: `name = value;`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PropertyDefinition {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -218,7 +218,7 @@ pub struct PropertyDefinition {
 }
 
 /// Function expression: `function() {}` or method shorthand `{ foo() {} }`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FunctionExpression {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -242,7 +242,7 @@ pub struct FunctionExpression {
 }
 
 /// Expression with type arguments for implements clause: `implements Foo<T>`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSExpressionWithTypeArguments {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -255,7 +255,7 @@ pub struct TSExpressionWithTypeArguments {
 }
 
 /// TypeScript parameter property: `constructor(public x: number)`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSParameterProperty {
     #[serde(rename = "type")]
     pub node_type: String,

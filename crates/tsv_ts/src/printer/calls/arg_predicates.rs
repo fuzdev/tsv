@@ -11,7 +11,7 @@ use tsv_lang::printing::has_newline_between_fast;
 /// - Binary expressions check both sides with depth=1
 ///
 /// Used to determine if tail args can stay inline after a function callback.
-fn is_hopefully_short_arg(expr: &Expression) -> bool {
+fn is_hopefully_short_arg(expr: &Expression<'_>) -> bool {
     match expr {
         // Prettier: if (isCallLikeExpression(node) && getCallArguments(node).length > 1) return false
         Expression::CallExpression(call) if call.arguments.len() > 1 => false,
@@ -20,7 +20,7 @@ fn is_hopefully_short_arg(expr: &Expression) -> bool {
         // Prettier: if (isBinaryish(node)) check both sides with depth=1
         // Note: Our AST uses BinaryExpression for logical ops (&&, ||, ??) too
         Expression::BinaryExpression(bin) => {
-            is_simple_call_argument(&bin.left, 1) && is_simple_call_argument(&bin.right, 1)
+            is_simple_call_argument(bin.left, 1) && is_simple_call_argument(bin.right, 1)
         }
 
         // Prettier: return isRegExpLiteral(node) || isSimpleCallArgument(node)
@@ -33,7 +33,7 @@ fn is_hopefully_short_arg(expr: &Expression) -> bool {
 
 /// Check if an expression is an object that could expand (has properties)
 /// Used for "expand last arg" pattern in import expressions
-pub(in crate::printer) fn is_expandable_object(expr: &Expression) -> bool {
+pub(in crate::printer) fn is_expandable_object(expr: &Expression<'_>) -> bool {
     matches!(expr, Expression::ObjectExpression(obj) if !obj.properties.is_empty())
 }
 
@@ -43,7 +43,7 @@ pub(in crate::printer) fn is_expandable_object(expr: &Expression) -> bool {
 /// expand-last-arg pattern from working (the expanded doc has different
 /// break characteristics). When true, the array should NOT use expand-last-arg
 /// and instead falls through to the normal inline-or-expand-all path.
-pub(in crate::printer) fn is_concise_numeric_array(expr: &Expression) -> bool {
+pub(in crate::printer) fn is_concise_numeric_array(expr: &Expression<'_>) -> bool {
     if let Expression::ArrayExpression(arr) = expr {
         !arr.elements.is_empty()
             && arr
@@ -56,14 +56,14 @@ pub(in crate::printer) fn is_concise_numeric_array(expr: &Expression) -> bool {
 }
 
 /// Check if an expression is a numeric literal (including unary +/- prefix).
-fn is_numeric_expression(expr: &Expression) -> bool {
+fn is_numeric_expression(expr: &Expression<'_>) -> bool {
     match expr {
         Expression::Literal(lit) => matches!(lit.value, internal::LiteralValue::Number(_)),
         Expression::UnaryExpression(unary) => {
             matches!(
                 unary.operator,
                 internal::UnaryOperator::Minus | internal::UnaryOperator::Plus
-            ) && is_numeric_expression(&unary.argument)
+            ) && is_numeric_expression(unary.argument)
         }
         _ => false,
     }
@@ -77,7 +77,7 @@ fn is_numeric_expression(expr: &Expression) -> bool {
 /// The `has_comments_between` closure checks for comments inside empty containers
 /// (typically `printer.has_comments_between`).
 pub(in crate::printer) fn is_short_second_arg_for_expand_first<F>(
-    arg: &Expression,
+    arg: &Expression<'_>,
     has_comments: F,
 ) -> bool
 where
@@ -112,7 +112,7 @@ where
 /// - Break: `(x) =>\n  x ? y : z,` - no parens needed, clearly arrow body
 ///
 /// Call expressions, objects, and arrays are handled by other code paths.
-pub(in crate::printer) fn is_ternary_arrow_body(body: &Expression) -> bool {
+pub(in crate::printer) fn is_ternary_arrow_body(body: &Expression<'_>) -> bool {
     matches!(body, Expression::ConditionalExpression(_))
 }
 
@@ -130,7 +130,7 @@ pub(in crate::printer) fn is_ternary_arrow_body(body: &Expression) -> bool {
 /// `arrow_token_pos` is the byte offset of `=>` in the source. Callers should obtain
 /// this via `printer.find_arrow_token_for(arrow)`.
 pub(crate) fn arrow_has_trailing_param_comments<F>(
-    arrow: &internal::ArrowFunctionExpression,
+    arrow: &internal::ArrowFunctionExpression<'_>,
     arrow_token_pos: u32,
     has_comments_between: F,
 ) -> bool
@@ -147,12 +147,12 @@ where
 
 /// Check if the last argument is an array or object expression (unwrapping type assertions)
 #[inline]
-pub(in crate::printer) fn last_arg_is_array_or_object(arguments: &[Expression]) -> bool {
+pub(in crate::printer) fn last_arg_is_array_or_object(arguments: &[Expression<'_>]) -> bool {
     arguments.last().is_some_and(is_array_or_object_unwrapped)
 }
 
 /// Check if an expression is an array or object, unwrapping TS type wrappers
-pub(in crate::printer) fn is_array_or_object_unwrapped(expr: &Expression) -> bool {
+pub(in crate::printer) fn is_array_or_object_unwrapped(expr: &Expression<'_>) -> bool {
     matches!(
         unwrap_ts_type_wrappers(expr),
         Expression::ArrayExpression(_) | Expression::ObjectExpression(_)
@@ -161,23 +161,23 @@ pub(in crate::printer) fn is_array_or_object_unwrapped(expr: &Expression) -> boo
 
 /// Unwrap TypeScript type wrappers (as, satisfies, <T>, !) to get the inner expression.
 /// Returns the innermost non-wrapper expression.
-fn unwrap_ts_type_wrappers(expr: &Expression) -> &Expression {
+fn unwrap_ts_type_wrappers<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
     match expr {
-        Expression::TSAsExpression(e) => unwrap_ts_type_wrappers(&e.expression),
-        Expression::TSSatisfiesExpression(e) => unwrap_ts_type_wrappers(&e.expression),
-        Expression::TSTypeAssertion(e) => unwrap_ts_type_wrappers(&e.expression),
-        Expression::TSNonNullExpression(e) => unwrap_ts_type_wrappers(&e.expression),
+        Expression::TSAsExpression(e) => unwrap_ts_type_wrappers(e.expression),
+        Expression::TSSatisfiesExpression(e) => unwrap_ts_type_wrappers(e.expression),
+        Expression::TSTypeAssertion(e) => unwrap_ts_type_wrappers(e.expression),
+        Expression::TSNonNullExpression(e) => unwrap_ts_type_wrappers(e.expression),
         _ => expr,
     }
 }
 
 /// Get the inner expression if this is a TS type wrapper, otherwise None.
-fn get_ts_type_wrapper_inner(expr: &Expression) -> Option<&Expression> {
+fn get_ts_type_wrapper_inner<'a>(expr: &'a Expression<'a>) -> Option<&'a Expression<'a>> {
     match expr {
-        Expression::TSAsExpression(e) => Some(&e.expression),
-        Expression::TSSatisfiesExpression(e) => Some(&e.expression),
-        Expression::TSTypeAssertion(e) => Some(&e.expression),
-        Expression::TSNonNullExpression(e) => Some(&e.expression),
+        Expression::TSAsExpression(e) => Some(e.expression),
+        Expression::TSSatisfiesExpression(e) => Some(e.expression),
+        Expression::TSTypeAssertion(e) => Some(e.expression),
+        Expression::TSNonNullExpression(e) => Some(e.expression),
         _ => None,
     }
 }
@@ -191,7 +191,7 @@ fn get_ts_type_wrapper_inner(expr: &Expression) -> Option<&Expression> {
 /// Matches Prettier's `shouldExpandLastArg` which doesn't check preceding arg complexity.
 #[inline]
 pub(in crate::printer) fn preceding_args_allow_expand_last(
-    arguments: &[Expression],
+    arguments: &[Expression<'_>],
     line_breaks: &[u32],
 ) -> bool {
     !has_multiline_object_before_last(arguments, line_breaks)
@@ -202,7 +202,7 @@ pub(in crate::printer) fn preceding_args_allow_expand_last(
 /// Matches arrow functions with block bodies (`() => { ... }`) and
 /// function expressions (`function() { ... }`). These contain hardlines.
 #[inline]
-pub(in crate::printer) fn is_block_function(expr: &Expression) -> bool {
+pub(in crate::printer) fn is_block_function(expr: &Expression<'_>) -> bool {
     matches!(
         expr,
         Expression::ArrowFunctionExpression(arrow)
@@ -216,12 +216,12 @@ pub(in crate::printer) fn is_block_function(expr: &Expression) -> bool {
 /// `!args.expandLastArg` in `shouldPrintAsChain` — curried arrows in call args
 /// should hug their body rather than chain-breaking.
 #[inline]
-pub(in crate::printer) fn is_curried_arrow(expr: &Expression) -> bool {
+pub(in crate::printer) fn is_curried_arrow(expr: &Expression<'_>) -> bool {
     matches!(
         expr,
         Expression::ArrowFunctionExpression(a)
-            if matches!(a.body, internal::ArrowFunctionBody::Expression(ref e)
-                if matches!(&**e, Expression::ArrowFunctionExpression(_)))
+            if matches!(a.body, internal::ArrowFunctionBody::Expression(e)
+                if matches!(e, Expression::ArrowFunctionExpression(_)))
     )
 }
 
@@ -240,7 +240,7 @@ pub(in crate::printer) fn is_curried_arrow(expr: &Expression) -> bool {
 /// - Unary/update expressions with simple arguments
 ///
 /// Reference: prettier/src/language-js/utils/index.js `isSimpleCallArgument`
-pub fn is_simple_call_argument(expr: &Expression, depth: usize) -> bool {
+pub fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bool {
     if depth == 0 {
         return false;
     }
@@ -304,18 +304,18 @@ pub fn is_simple_call_argument(expr: &Expression, depth: usize) -> bool {
         // Member expressions: object must be simple, property is simple if not computed
         // (or if computed with a simple expression)
         Expression::MemberExpression(member) => {
-            is_simple_call_argument(&member.object, depth)
+            is_simple_call_argument(member.object, depth)
                 && (
                     // Non-computed properties (identifiers) are always simple
                     !member.computed
                     // Computed properties must have a simple expression
-                    || is_simple_call_argument(&member.property, depth)
+                    || is_simple_call_argument(member.property, depth)
                 )
         }
 
         // Call expressions: callee must be simple, args count <= depth, all args simple
         Expression::CallExpression(call) => {
-            is_simple_call_argument(&call.callee, depth)
+            is_simple_call_argument(call.callee, depth)
                 && call.arguments.len() <= depth
                 && call
                     .arguments
@@ -325,7 +325,7 @@ pub fn is_simple_call_argument(expr: &Expression, depth: usize) -> bool {
 
         // New expressions: same logic as calls
         Expression::NewExpression(new_expr) => {
-            is_simple_call_argument(&new_expr.callee, depth)
+            is_simple_call_argument(new_expr.callee, depth)
                 && new_expr.arguments.len() <= depth
                 && new_expr
                     .arguments
@@ -343,11 +343,11 @@ pub fn is_simple_call_argument(expr: &Expression, depth: usize) -> bool {
                     | internal::UnaryOperator::Tilde
                     | internal::UnaryOperator::Typeof
                     | internal::UnaryOperator::Void
-            ) && is_simple_call_argument(&unary.argument, depth)
+            ) && is_simple_call_argument(unary.argument, depth)
         }
 
         // Update expressions (++x, x++)
-        Expression::UpdateExpression(update) => is_simple_call_argument(&update.argument, depth),
+        Expression::UpdateExpression(update) => is_simple_call_argument(update.argument, depth),
 
         // Spread elements are NOT simple (matches prettier — no SpreadElement case)
         Expression::SpreadElement(_) => false,
@@ -365,46 +365,46 @@ pub fn is_simple_call_argument(expr: &Expression, depth: usize) -> bool {
 /// than forcing expansion on the last call.
 ///
 /// Empty calls like `a.b()` don't count because they won't break.
-pub fn contains_call_expression(expr: &Expression) -> bool {
+pub fn contains_call_expression(expr: &Expression<'_>) -> bool {
     match expr {
         // A call with arguments might break - return true
         // Empty calls (no args) won't break - continue checking inside
         Expression::CallExpression(call) => {
-            !call.arguments.is_empty() || contains_call_expression(&call.callee)
+            !call.arguments.is_empty() || contains_call_expression(call.callee)
         }
         Expression::NewExpression(new_expr) => {
-            !new_expr.arguments.is_empty() || contains_call_expression(&new_expr.callee)
+            !new_expr.arguments.is_empty() || contains_call_expression(new_expr.callee)
         }
 
         // Recurse into common wrapper types
         Expression::MemberExpression(member) => {
-            contains_call_expression(&member.object)
-                || (member.computed && contains_call_expression(&member.property))
+            contains_call_expression(member.object)
+                || (member.computed && contains_call_expression(member.property))
         }
-        Expression::TSAsExpression(e) => contains_call_expression(&e.expression),
-        Expression::TSSatisfiesExpression(e) => contains_call_expression(&e.expression),
-        Expression::TSTypeAssertion(e) => contains_call_expression(&e.expression),
-        Expression::TSNonNullExpression(e) => contains_call_expression(&e.expression),
-        Expression::TSInstantiationExpression(e) => contains_call_expression(&e.expression),
-        Expression::AwaitExpression(e) => contains_call_expression(&e.argument),
-        Expression::UnaryExpression(e) => contains_call_expression(&e.argument),
-        Expression::UpdateExpression(e) => contains_call_expression(&e.argument),
-        Expression::SpreadElement(e) => contains_call_expression(&e.argument),
-        Expression::JsdocCast(cast) => contains_call_expression(&cast.inner),
+        Expression::TSAsExpression(e) => contains_call_expression(e.expression),
+        Expression::TSSatisfiesExpression(e) => contains_call_expression(e.expression),
+        Expression::TSTypeAssertion(e) => contains_call_expression(e.expression),
+        Expression::TSNonNullExpression(e) => contains_call_expression(e.expression),
+        Expression::TSInstantiationExpression(e) => contains_call_expression(e.expression),
+        Expression::AwaitExpression(e) => contains_call_expression(e.argument),
+        Expression::UnaryExpression(e) => contains_call_expression(e.argument),
+        Expression::UpdateExpression(e) => contains_call_expression(e.argument),
+        Expression::SpreadElement(e) => contains_call_expression(e.argument),
+        Expression::JsdocCast(cast) => contains_call_expression(cast.inner),
 
         // Binary expressions (includes logical operators in internal AST)
         Expression::BinaryExpression(e) => {
-            contains_call_expression(&e.left) || contains_call_expression(&e.right)
+            contains_call_expression(e.left) || contains_call_expression(e.right)
         }
         Expression::AssignmentExpression(e) => {
-            contains_call_expression(&e.left) || contains_call_expression(&e.right)
+            contains_call_expression(e.left) || contains_call_expression(e.right)
         }
 
         // Conditional expression
         Expression::ConditionalExpression(e) => {
-            contains_call_expression(&e.test)
-                || contains_call_expression(&e.consequent)
-                || contains_call_expression(&e.alternate)
+            contains_call_expression(e.test)
+                || contains_call_expression(e.consequent)
+                || contains_call_expression(e.alternate)
         }
 
         // Sequence expression
@@ -413,7 +413,7 @@ pub fn contains_call_expression(expr: &Expression) -> bool {
         // Template literal expressions
         Expression::TemplateLiteral(t) => t.expressions.iter().any(contains_call_expression),
         Expression::TaggedTemplateExpression(t) => {
-            contains_call_expression(&t.tag)
+            contains_call_expression(t.tag)
                 || t.quasi.expressions.iter().any(contains_call_expression)
         }
 
@@ -427,7 +427,7 @@ pub fn contains_call_expression(expr: &Expression) -> bool {
                 (p.computed && contains_call_expression(&p.key))
                     || contains_call_expression(&p.value)
             }
-            internal::ObjectProperty::SpreadElement(s) => contains_call_expression(&s.argument),
+            internal::ObjectProperty::SpreadElement(s) => contains_call_expression(s.argument),
         }),
 
         // Arrow/function expressions - check body for expression arrows
@@ -467,7 +467,7 @@ pub fn contains_call_expression(expr: &Expression) -> bool {
 ///   any argument is a call expression containing a function/arrow argument
 ///
 /// This triggers `allArgsBrokenOut()` in Prettier to expand all arguments.
-pub(in crate::printer) fn is_function_composition_args(arguments: &[Expression]) -> bool {
+pub(in crate::printer) fn is_function_composition_args(arguments: &[Expression<'_>]) -> bool {
     if arguments.len() <= 1 {
         return false;
     }
@@ -503,7 +503,7 @@ pub(in crate::printer) fn is_function_composition_args(arguments: &[Expression])
 ///
 /// Prettier preserves multiline object formatting and expands all call args
 /// when any preceding arg is a multiline object in source.
-pub(in crate::printer) fn is_multiline_object(expr: &Expression, line_breaks: &[u32]) -> bool {
+pub(in crate::printer) fn is_multiline_object(expr: &Expression<'_>, line_breaks: &[u32]) -> bool {
     if let Expression::ObjectExpression(obj) = expr {
         if obj.properties.is_empty() {
             return false;
@@ -520,7 +520,7 @@ pub(in crate::printer) fn is_multiline_object(expr: &Expression, line_breaks: &[
 ///
 /// When true, the call should use hard expansion instead of the hug pattern.
 pub(in crate::printer) fn has_multiline_object_before_last(
-    args: &[Expression],
+    args: &[Expression<'_>],
     line_breaks: &[u32],
 ) -> bool {
     if args.len() < 2 {
@@ -534,21 +534,23 @@ pub(in crate::printer) fn has_multiline_object_before_last(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bumpalo::Bump;
     use std::cell::RefCell;
     use std::rc::Rc;
     use string_interner::DefaultStringInterner;
 
-    /// Parse a bare expression to its internal AST node (spans index into `src`).
-    fn parse_expr(src: &str) -> Expression {
+    /// Parse a bare expression to its internal AST node (spans index into `src`),
+    /// allocated in the caller-supplied `arena`.
+    fn parse_expr<'a>(arena: &'a Bump, src: &str) -> Expression<'a> {
         let interner = Rc::new(RefCell::new(DefaultStringInterner::new()));
-        crate::parse_expression_with_comments(src, 0, interner)
+        crate::parse_expression_with_comments(src, 0, interner, arena)
             .expect("expression should parse")
             .0
     }
 
     /// Parse a call expression and return its argument list.
-    fn args_of(src: &str) -> Vec<Expression> {
-        match parse_expr(src) {
+    fn args_of<'a>(arena: &'a Bump, src: &str) -> &'a [Expression<'a>] {
+        match parse_expr(arena, src) {
             Expression::CallExpression(call) => call.arguments,
             other => panic!("expected a call expression, got: {other:?}"),
         }
@@ -556,63 +558,69 @@ mod tests {
 
     #[test]
     fn concise_numeric_array_detection() {
-        assert!(is_concise_numeric_array(&parse_expr("[1, 2, 3]")));
+        let arena = Bump::new();
+        assert!(is_concise_numeric_array(&parse_expr(&arena, "[1, 2, 3]")));
         // Unary +/- prefixes still count as numeric.
-        assert!(is_concise_numeric_array(&parse_expr("[-1, +2]")));
+        assert!(is_concise_numeric_array(&parse_expr(&arena, "[-1, +2]")));
         // Empty array is not concise-numeric.
-        assert!(!is_concise_numeric_array(&parse_expr("[]")));
+        assert!(!is_concise_numeric_array(&parse_expr(&arena, "[]")));
         // A non-numeric element disqualifies it.
-        assert!(!is_concise_numeric_array(&parse_expr("[1, 'x']")));
+        assert!(!is_concise_numeric_array(&parse_expr(&arena, "[1, 'x']")));
         // A hole is not a numeric element (unlike is_simple_call_argument).
-        assert!(!is_concise_numeric_array(&parse_expr("[1, , 2]")));
+        assert!(!is_concise_numeric_array(&parse_expr(&arena, "[1, , 2]")));
         // Non-array expressions are never concise-numeric.
-        assert!(!is_concise_numeric_array(&parse_expr("foo")));
+        assert!(!is_concise_numeric_array(&parse_expr(&arena, "foo")));
     }
 
     #[test]
     fn simple_call_argument_depth_and_shape() {
+        let arena = Bump::new();
         // Depth 0 is always "not simple".
-        assert!(!is_simple_call_argument(&parse_expr("x"), 0));
+        assert!(!is_simple_call_argument(&parse_expr(&arena, "x"), 0));
         // Literals / identifiers are simple at any positive depth.
-        assert!(is_simple_call_argument(&parse_expr("42"), 1));
-        assert!(is_simple_call_argument(&parse_expr("foo"), 1));
+        assert!(is_simple_call_argument(&parse_expr(&arena, "42"), 1));
+        assert!(is_simple_call_argument(&parse_expr(&arena, "foo"), 1));
         // Regex is simple only if the pattern width is <= 5.
-        assert!(is_simple_call_argument(&parse_expr("/abcde/"), 2));
-        assert!(!is_simple_call_argument(&parse_expr("/abcdef/"), 2));
+        assert!(is_simple_call_argument(&parse_expr(&arena, "/abcde/"), 2));
+        assert!(!is_simple_call_argument(&parse_expr(&arena, "/abcdef/"), 2));
         // A call's args must fit within the remaining depth: `f(a)` needs depth >= 2.
-        assert!(!is_simple_call_argument(&parse_expr("f(a)"), 1));
-        assert!(is_simple_call_argument(&parse_expr("f(a)"), 2));
+        assert!(!is_simple_call_argument(&parse_expr(&arena, "f(a)"), 1));
+        assert!(is_simple_call_argument(&parse_expr(&arena, "f(a)"), 2));
         // Spread elements are never simple.
-        assert!(!is_simple_call_argument(&parse_expr("[...x]"), 2));
+        assert!(!is_simple_call_argument(&parse_expr(&arena, "[...x]"), 2));
     }
 
     #[test]
     fn contains_call_expression_recursion() {
+        let arena = Bump::new();
         // An empty call does not count, but we recurse into the callee.
-        assert!(!contains_call_expression(&parse_expr("a.b()")));
+        assert!(!contains_call_expression(&parse_expr(&arena, "a.b()")));
         // A call WITH arguments counts.
-        assert!(contains_call_expression(&parse_expr("a.b(x)")));
+        assert!(contains_call_expression(&parse_expr(&arena, "a.b(x)")));
         // Recurse through a binary expression.
-        assert!(contains_call_expression(&parse_expr("a + f(x)")));
+        assert!(contains_call_expression(&parse_expr(&arena, "a + f(x)")));
         // A computed member recurses into the property.
-        assert!(contains_call_expression(&parse_expr("a[f(x)]")));
+        assert!(contains_call_expression(&parse_expr(&arena, "a[f(x)]")));
         // No call anywhere.
-        assert!(!contains_call_expression(&parse_expr("a + b")));
+        assert!(!contains_call_expression(&parse_expr(&arena, "a + b")));
     }
 
     #[test]
     fn function_composition_args_detection() {
+        let arena = Bump::new();
         // Two arrow args ⇒ composition.
-        assert!(is_function_composition_args(&args_of(
+        assert!(is_function_composition_args(args_of(
+            &arena,
             "compose(a => a, b => b)"
         )));
         // A single arg is never composition.
-        assert!(!is_function_composition_args(&args_of("f(a => a)")));
+        assert!(!is_function_composition_args(args_of(&arena, "f(a => a)")));
         // A call argument that itself wraps a callback ⇒ composition.
-        assert!(is_function_composition_args(&args_of(
+        assert!(is_function_composition_args(args_of(
+            &arena,
             "compose(x, g(() => {}))"
         )));
         // Two non-function args ⇒ not composition.
-        assert!(!is_function_composition_args(&args_of("f(a, b)")));
+        assert!(!is_function_composition_args(args_of(&arena, "f(a, b)")));
     }
 }

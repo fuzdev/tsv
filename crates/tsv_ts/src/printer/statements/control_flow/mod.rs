@@ -248,7 +248,7 @@ impl<'a> Printer<'a> {
     ///
     /// This group decides whether the condition breaks (operators go to new lines).
     /// Binary expressions use ungrouped version so this parent group controls their breaking.
-    fn build_condition_group(&self, test_expr: &Expression) -> DocId {
+    fn build_condition_group(&self, test_expr: &Expression<'_>) -> DocId {
         let d = self.d();
         let test_doc = self.build_condition_doc(test_expr);
         d.group(d.concat(&[d.indent_softline(test_doc), d.softline()]))
@@ -266,7 +266,7 @@ impl<'a> Printer<'a> {
     /// ```
     fn build_condition_group_with_comments(
         &self,
-        test_expr: &Expression,
+        test_expr: &Expression<'_>,
         open_paren_pos: u32,
         close_paren_pos: u32,
     ) -> DocId {
@@ -284,7 +284,7 @@ impl<'a> Printer<'a> {
     /// of moving comments outside the parens.
     fn build_condition_group_preserve_inline(
         &self,
-        test_expr: &Expression,
+        test_expr: &Expression<'_>,
         open_paren_pos: u32,
         close_paren_pos: u32,
     ) -> DocId {
@@ -298,7 +298,7 @@ impl<'a> Printer<'a> {
 
     fn build_condition_group_with_comments_impl(
         &self,
-        test_expr: &Expression,
+        test_expr: &Expression<'_>,
         open_paren_pos: u32,
         close_paren_pos: u32,
         preserve_inline: bool,
@@ -476,7 +476,7 @@ impl<'a> Printer<'a> {
     /// Non-logical operators (`<`, `===`, etc.) keep a sub-group for independent evaluation
     /// (e.g., `for (i = 0; i < len; i++)` — the `i < len` stays flat).
     /// Assignment expressions get double-parens for clarity: `while ((x = y))`
-    fn build_condition_doc(&self, expr: &Expression) -> DocId {
+    fn build_condition_doc(&self, expr: &Expression<'_>) -> DocId {
         let inner = match expr {
             Expression::BinaryExpression(binary) => {
                 self.build_binary_chain_doc_ungrouped_condition(binary)

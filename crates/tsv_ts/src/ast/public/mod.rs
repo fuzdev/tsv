@@ -2,7 +2,7 @@
 //!
 //! Uses u32 for positions (max 4GB file size) for memory efficiency.
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 pub mod classes;
 pub mod declarations;
@@ -125,7 +125,7 @@ where
 // Foundational Types (defined here, used everywhere)
 //
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Program {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -137,7 +137,7 @@ pub struct Program {
     pub source_type: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SourceLocation {
     pub start: Position,
     pub end: Position,
@@ -156,7 +156,7 @@ impl SourceLocation {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Position {
     pub line: usize,
     pub column: usize,
@@ -167,7 +167,7 @@ pub struct Position {
 }
 
 /// Decorator: `@expression` applied to classes and class members
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Decorator {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -178,7 +178,7 @@ pub struct Decorator {
     pub expression: Expression,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Literal {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -193,7 +193,7 @@ pub struct Literal {
     pub bigint: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Identifier {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -215,7 +215,7 @@ pub struct Identifier {
 ///
 /// Used for truly private class members (ES2022 private class fields).
 /// The name does NOT include the `#` prefix.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PrivateIdentifier {
     #[serde(rename = "type")]
     pub node_type: String,

@@ -70,27 +70,27 @@ fn find_last_top_level_as(s: &str) -> Option<usize> {
 /// Return type for parse_each_binding: (context, index, key_expr, key_span, consumed_end).
 /// `consumed_end` is the absolute source offset just past the last token the binding
 /// consumed — the caller rejects any non-whitespace between it and the closing `}`.
-type EachBindingResult = (
-    tsv_ts::Expression,
-    Option<String>,
-    Option<tsv_ts::Expression>,
+type EachBindingResult<'arena> = (
+    tsv_ts::Expression<'arena>,
+    Option<&'arena str>,
+    Option<tsv_ts::Expression<'arena>>,
     Option<Span>,
     usize,
 );
 
 /// Return type for parse_index_and_key_after_context: (index, key_expr, key_span, consumed_end).
-type IndexAndKeyResult = (
-    Option<String>,
-    Option<tsv_ts::Expression>,
+type IndexAndKeyResult<'arena> = (
+    Option<&'arena str>,
+    Option<tsv_ts::Expression<'arena>>,
     Option<Span>,
     usize,
 );
 
-impl<'a> SvelteParser<'a> {
+impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse a control flow block starting with {#
     ///
     /// Dispatches to specific block parsers based on the keyword.
-    pub(crate) fn parse_block(&mut self) -> Result<FragmentNode, ParseError> {
+    pub(crate) fn parse_block(&mut self) -> Result<FragmentNode<'arena>, ParseError> {
         let start = self.current_start;
 
         // We're at {#, consume it
@@ -112,7 +112,7 @@ impl<'a> SvelteParser<'a> {
     }
 
     /// Parse an if block: {#if test}...{:else if test}...{:else}...{/if}
-    fn parse_if_block(&mut self, start: usize) -> Result<FragmentNode, ParseError> {
+    fn parse_if_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
         self.parse_if_block_inner(start, false)
     }
 
@@ -121,7 +121,7 @@ impl<'a> SvelteParser<'a> {
         &mut self,
         start: usize,
         is_elseif: bool,
-    ) -> Result<FragmentNode, ParseError> {
+    ) -> Result<FragmentNode<'arena>, ParseError> {
         // Get the content start position (after {# or {:)
         let tag_content_start = self.current_end;
 
@@ -174,8 +174,10 @@ impl<'a> SvelteParser<'a> {
                 // {:else if} - parse as nested if block
                 let elseif_start = self.current_start;
                 let elseif_block = self.parse_if_block_inner(elseif_start, true)?;
+                let mut nodes = self.bvec();
+                nodes.push(elseif_block);
                 Some(Fragment {
-                    nodes: vec![elseif_block],
+                    nodes: nodes.into_bump_slice(),
                 })
             } else if keyword_normalized == "else" {
                 // {:else} - parse else branch
@@ -222,7 +224,7 @@ impl<'a> SvelteParser<'a> {
     }
 
     /// Parse an each block: {#each expression as context, index (key)}...{:else}...{/each}
-    fn parse_each_block(&mut self, start: usize) -> Result<FragmentNode, ParseError> {
+    fn parse_each_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
         // Get the content start position (after {#)
         let tag_content_start = self.current_end;
 
@@ -365,7 +367,7 @@ impl<'a> SvelteParser<'a> {
         &mut self,
         binding: &str,
         binding_offset: usize,
-    ) -> Result<EachBindingResult, ParseError> {
+    ) -> Result<EachBindingResult<'arena>, ParseError> {
         // Calculate leading whitespace and adjust offset accordingly
         let leading_ws = binding.len() - binding.trim_start().len();
         let trimmed = binding.trim();
@@ -392,7 +394,7 @@ impl<'a> SvelteParser<'a> {
         &mut self,
         input: &str,
         offset: usize,
-    ) -> Result<(tsv_ts::Expression, usize), ParseError> {
+    ) -> Result<(tsv_ts::Expression<'arena>, usize), ParseError> {
         let trimmed = input.trim_start();
         let ws_len = input.len() - trimmed.len();
         let adjusted = offset + ws_len;
@@ -424,9 +426,16 @@ impl<'a> SvelteParser<'a> {
                     after_ident,
                     colon_offset,
                     Rc::clone(&self.interner),
+                    self.arena,
                 )?;
                 if let tsv_ts::Expression::Identifier(id) = &mut expr {
-                    id.type_annotation = Some(ta);
+                    // Re-bind the identifier's binding extra with the parsed type
+                    // annotation, preserving any decorators already present.
+                    let decorators = id.decorators();
+                    id.extra = Some(self.alloc(tsv_ts::ast::internal::IdentifierParamExtra {
+                        type_annotation: Some(ta),
+                        decorators,
+                    }));
                 }
                 Ok((expr, type_end))
             } else {
@@ -468,7 +477,7 @@ impl<'a> SvelteParser<'a> {
         &mut self,
         remaining: &str,
         remaining_offset: usize,
-    ) -> Result<IndexAndKeyResult, ParseError> {
+    ) -> Result<IndexAndKeyResult<'arena>, ParseError> {
         let trimmed = remaining.trim_start();
         let ws_len = remaining.len() - trimmed.len();
         let offset = remaining_offset + ws_len;
@@ -499,7 +508,7 @@ impl<'a> SvelteParser<'a> {
             };
 
             if idx_end > 0 {
-                index = Some(after_comma_trimmed[..idx_end].to_string());
+                index = Some(self.alloc_str_in(&after_comma_trimmed[..idx_end]));
                 rest = &after_comma_trimmed[idx_end..];
                 rest_offset = offset + 1 + comma_ws + idx_end;
                 consumed_end = rest_offset;
@@ -541,7 +550,7 @@ impl<'a> SvelteParser<'a> {
     }
 
     /// Parse an await block: {#await expression}...{:then value}...{:catch error}...{/await}
-    fn parse_await_block(&mut self, start: usize) -> Result<FragmentNode, ParseError> {
+    fn parse_await_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
         // Get the content start position (after {#)
         let tag_content_start = self.current_end;
 
@@ -735,7 +744,7 @@ impl<'a> SvelteParser<'a> {
         &mut self,
         keyword: &str,
         stop_keywords: &[&str],
-    ) -> Result<(Option<Fragment>, Option<tsv_ts::Expression>), ParseError> {
+    ) -> Result<(Option<Fragment<'arena>>, Option<tsv_ts::Expression<'arena>>), ParseError> {
         let tag_start = self.current_end;
         let (tag_content, content_start) = self.scan_block_tag_content(tag_start)?;
         let binding_str = self
@@ -850,7 +859,7 @@ impl<'a> SvelteParser<'a> {
         &mut self,
         region: &str,
         region_offset: usize,
-    ) -> Result<tsv_ts::Expression, ParseError> {
+    ) -> Result<tsv_ts::Expression<'arena>, ParseError> {
         let lead = region.len() - region.trim_start().len();
         let value_start = region_offset + lead;
         let trimmed = region.trim();
@@ -911,7 +920,7 @@ impl<'a> SvelteParser<'a> {
     }
 
     /// Parse a key block: {#key expression}...{/key}
-    fn parse_key_block(&mut self, start: usize) -> Result<FragmentNode, ParseError> {
+    fn parse_key_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
         // Get the content start position (after {#)
         let tag_content_start = self.current_end;
 
@@ -951,7 +960,7 @@ impl<'a> SvelteParser<'a> {
 
     /// Parse a snippet block: {#snippet name(params)}...{/snippet}
     /// Also handles TypeScript generics: {#snippet name<T>(params)}
-    fn parse_snippet_block(&mut self, start: usize) -> Result<FragmentNode, ParseError> {
+    fn parse_snippet_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
         // Get the content start position (after {#)
         let tag_content_start = self.current_end;
 
@@ -992,17 +1001,18 @@ impl<'a> SvelteParser<'a> {
         // there through the matching `)`.
         let after_name = content[name_len..].trim_start();
         let head_start = content.len() - after_name.len();
-        let (after_generic, type_params_raw) = if after_name.starts_with('<') {
-            // `type_params_raw` is the raw inner text — feeds the public AST's `typeParams`
-            // string (Svelte stores it raw too) and the parse-failure fallback.
-            let close_pos = self.find_matching_angle_bracket(content, head_start)?;
-            (
-                close_pos + 1,
-                Some(content[head_start + 1..close_pos].to_string()),
-            )
-        } else {
-            (head_start, None)
-        };
+        let (after_generic, type_params_raw): (usize, Option<&'arena str>) =
+            if after_name.starts_with('<') {
+                // `type_params_raw` is the raw inner text — feeds the public AST's `typeParams`
+                // string (Svelte stores it raw too) and the parse-failure fallback.
+                let close_pos = self.find_matching_angle_bracket(content, head_start)?;
+                (
+                    close_pos + 1,
+                    Some(self.alloc_str_in(&content[head_start + 1..close_pos])),
+                )
+            } else {
+                (head_start, None)
+            };
 
         // Require `(` after only whitespace — Svelte's `allow_whitespace` then
         // `eat('(', true)`. Crucially this skips whitespace but NOT comments, so
@@ -1056,29 +1066,29 @@ impl<'a> SvelteParser<'a> {
         // `<…>` and `(…)`. Collected comments merge into the root buffer (the printer
         // locates them by position). Falls back to raw text on parse failure (e.g. a form
         // acorn-typescript rejects); the generics are already captured in `type_params_raw`.
-        let mut type_parameters = None;
-        let mut parameters = Vec::new();
-        let mut raw_parameters = None;
+        let mut type_parameters: Option<tsv_ts::TSTypeParameterDeclaration<'arena>> = None;
+        let mut parameters: &'arena [tsv_ts::Expression<'arena>] = &[];
+        let mut raw_parameters: Option<&'arena str> = None;
         if type_params_raw.is_some() || !params_str.trim().is_empty() {
             // The head runs from where the signature begins (`<` or `(`) through the `)`.
             let head_slice = &content[head_start..=close_paren];
             const WRAPPER_PREFIX: &str = "function f";
             let wrapper = format!("{WRAPPER_PREFIX}{head_slice} {{}}");
             let base = (content_offset + head_start).saturating_sub(WRAPPER_PREFIX.len());
-            match tsv_ts::parse_with_interner(&wrapper, base, Rc::clone(&self.interner)) {
+            match tsv_ts::parse_with_interner(&wrapper, base, Rc::clone(&self.interner), self.arena)
+            {
                 Ok(mut program) => {
                     self.expression_comments.append(&mut program.comments);
-                    if let Some(tsv_ts::Statement::FunctionDeclaration(func)) =
-                        program.body.into_iter().next()
+                    if let Some(tsv_ts::Statement::FunctionDeclaration(func)) = program.body.first()
                     {
-                        type_parameters = func.type_parameters;
+                        type_parameters.clone_from(&func.type_parameters);
                         parameters = func.params;
                     }
                 }
                 // Keep the raw parameter text so nothing is dropped.
                 Err(_) => {
                     if !params_str.trim().is_empty() {
-                        raw_parameters = Some(params_str.trim().to_string());
+                        raw_parameters = Some(self.alloc_str_in(params_str.trim()));
                     }
                 }
             }
@@ -1166,8 +1176,8 @@ impl<'a> SvelteParser<'a> {
         &mut self,
         stop_keywords: &[&str],
         content_start: usize,
-    ) -> Result<Fragment, ParseError> {
-        let mut nodes = Vec::new();
+    ) -> Result<Fragment<'arena>, ParseError> {
+        let mut nodes = self.bvec();
         let mut last_end = content_start;
 
         loop {
@@ -1236,6 +1246,8 @@ impl<'a> SvelteParser<'a> {
             }
         }
 
-        Ok(Fragment { nodes })
+        Ok(Fragment {
+            nodes: nodes.into_bump_slice(),
+        })
     }
 }

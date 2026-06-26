@@ -15,7 +15,7 @@ use super::{
 };
 
 pub(super) fn convert_fragment(
-    fragment: &internal::Fragment,
+    fragment: &internal::Fragment<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -31,7 +31,7 @@ pub(super) fn convert_fragment(
 }
 
 pub(super) fn convert_fragment_node(
-    node: &internal::FragmentNode,
+    node: &internal::FragmentNode<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -101,7 +101,7 @@ fn convert_comment(comment: &internal::HtmlComment, source: &str) -> public::Com
 }
 
 fn convert_element(
-    elem: &internal::Element,
+    elem: &internal::Element<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -129,7 +129,7 @@ fn convert_element(
 }
 
 pub(super) fn convert_expression_tag(
-    tag: &internal::ExpressionTag,
+    tag: &internal::ExpressionTag<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,

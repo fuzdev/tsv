@@ -13,7 +13,7 @@ use tsv_lang::{InfallibleResolve, LocationTracker, Span};
 
 /// Main expression conversion dispatcher
 pub fn convert_expression(
-    expr: &internal::Expression,
+    expr: &internal::Expression<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -28,7 +28,7 @@ pub fn convert_expression(
 /// contains optional chaining (`?.`), it gets wrapped in ChainExpression. When `in_chain`
 /// is true (we're already inside a chain), no wrapping occurs.
 pub(in crate::ast::convert) fn convert_expression_inner(
-    expr: &internal::Expression,
+    expr: &internal::Expression<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -41,7 +41,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         // `ParenthesizedExpression`). `in_chain = false` because the cast's parens
         // seal any optional chain — the inner is a fresh chain root.
         internal::Expression::JsdocCast(cast) => {
-            convert_expression_inner(&cast.inner, source, loc, interner, offset, false)
+            convert_expression_inner(cast.inner, source, loc, interner, offset, false)
         }
         internal::Expression::Literal(lit) => convert_literal_expression(lit, source, loc, offset),
         internal::Expression::Identifier(id) => {
@@ -53,12 +53,10 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 name: interner.resolve_infallible(id.name).to_string(),
                 optional: id.optional,
                 type_annotation: id
-                    .type_annotation
-                    .as_ref()
+                    .type_annotation()
                     .map(|ta| convert_type_annotation(ta, source, loc, interner, offset)),
                 decorators: id
-                    .decorators
-                    .as_ref()
+                    .decorators()
                     .map(|decs| {
                         decs.iter()
                             .map(|d| super::convert_decorator(d, source, loc, interner, offset))
@@ -114,7 +112,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 operator: unary.operator.as_str().to_string(),
                 prefix: unary.prefix,
                 argument: Box::new(convert_expression(
-                    &unary.argument,
+                    unary.argument,
                     source,
                     loc,
                     interner,
@@ -131,7 +129,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 operator: update.operator.as_str().to_string(),
                 prefix: update.prefix,
                 argument: Box::new(convert_expression(
-                    &update.argument,
+                    update.argument,
                     source,
                     loc,
                     interner,
@@ -154,7 +152,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 end: binary.span.end,
                 loc: create_location(binary.span, loc, offset),
                 left: Box::new(convert_expression(
-                    &binary.left,
+                    binary.left,
                     source,
                     loc,
                     interner,
@@ -162,7 +160,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 )),
                 operator: binary.operator.as_str().to_string(),
                 right: Box::new(convert_expression(
-                    &binary.right,
+                    binary.right,
                     source,
                     loc,
                     interner,
@@ -188,7 +186,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 end: spread.span.end,
                 loc: create_location(spread.span, loc, offset),
                 argument: Box::new(convert_expression(
-                    &spread.argument,
+                    spread.argument,
                     source,
                     loc,
                     interner,
@@ -250,11 +248,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 end: tagged.span.end,
                 loc: create_location(tagged.span, loc, offset),
                 tag: Box::new(convert_expression(
-                    &tagged.tag,
-                    source,
-                    loc,
-                    interner,
-                    offset,
+                    tagged.tag, source, loc, interner, offset,
                 )),
                 quasi: convert_template_literal(&tagged.quasi, source, loc, interner, offset),
                 type_arguments: tagged.type_arguments.as_ref().map(|ta| {
@@ -319,14 +313,14 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 loc: create_location(assign.span, loc, offset),
                 operator: assign.operator.as_str().to_string(),
                 left: Box::new(convert_expression(
-                    &assign.left,
+                    assign.left,
                     source,
                     loc,
                     interner,
                     offset,
                 )),
                 right: Box::new(convert_expression(
-                    &assign.right,
+                    assign.right,
                     source,
                     loc,
                     interner,
@@ -365,14 +359,14 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 end: pattern.span.end,
                 loc: base_loc,
                 left: Box::new(convert_expression(
-                    &pattern.left,
+                    pattern.left,
                     source,
                     loc,
                     interner,
                     offset,
                 )),
                 right: Box::new(convert_expression(
-                    &pattern.right,
+                    pattern.right,
                     source,
                     loc,
                     interner,
@@ -390,14 +384,14 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 end: type_assert.span.end,
                 loc: create_location(type_assert.span, loc, offset),
                 type_annotation: Box::new(convert_type(
-                    &type_assert.type_annotation,
+                    type_assert.type_annotation,
                     source,
                     loc,
                     interner,
                     offset,
                 )),
                 expression: Box::new(convert_expression(
-                    &type_assert.expression,
+                    type_assert.expression,
                     source,
                     loc,
                     interner,
@@ -412,14 +406,14 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 end: as_expr.span.end,
                 loc: create_location(as_expr.span, loc, offset),
                 expression: Box::new(convert_expression(
-                    &as_expr.expression,
+                    as_expr.expression,
                     source,
                     loc,
                     interner,
                     offset,
                 )),
                 type_annotation: Box::new(convert_type(
-                    &as_expr.type_annotation,
+                    as_expr.type_annotation,
                     source,
                     loc,
                     interner,
@@ -434,14 +428,14 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 end: sat_expr.span.end,
                 loc: create_location(sat_expr.span, loc, offset),
                 expression: Box::new(convert_expression(
-                    &sat_expr.expression,
+                    sat_expr.expression,
                     source,
                     loc,
                     interner,
                     offset,
                 )),
                 type_annotation: Box::new(convert_type(
-                    &sat_expr.type_annotation,
+                    sat_expr.type_annotation,
                     source,
                     loc,
                     interner,
@@ -456,7 +450,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 end: inst_expr.span.end,
                 loc: create_location(inst_expr.span, loc, offset),
                 expression: Box::new(convert_expression(
-                    &inst_expr.expression,
+                    inst_expr.expression,
                     source,
                     loc,
                     interner,
@@ -488,7 +482,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 end: non_null_expr.span.end,
                 loc: create_location(non_null_expr.span, loc, offset),
                 expression: Box::new(convert_expression_inner(
-                    &non_null_expr.expression,
+                    non_null_expr.expression,
                     source,
                     loc,
                     interner,
@@ -511,7 +505,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 end: import_expr.span.end,
                 loc: create_location(import_expr.span, loc, offset),
                 source: Box::new(convert_expression(
-                    &import_expr.source,
+                    import_expr.source,
                     source,
                     loc,
                     interner,
@@ -536,7 +530,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
         }
         internal::Expression::TSParameterProperty(param_prop) => {
             let mut parameter =
-                convert_expression(&param_prop.parameter, source, loc, interner, offset);
+                convert_expression(param_prop.parameter, source, loc, interner, offset);
             // acorn quirk: when parameter is AssignmentPattern without type annotation,
             // the span/loc includes the accessibility modifier keyword
             if let public::Expression::AssignmentPattern(ref mut ap) = parameter {
@@ -602,7 +596,7 @@ fn maybe_wrap_chain(
 }
 
 fn convert_literal_expression(
-    lit: &internal::Literal,
+    lit: &internal::Literal<'_>,
     source: &str,
     loc: &LocationTracker,
     offset: usize,
@@ -627,7 +621,7 @@ fn convert_literal_expression(
 }
 
 fn convert_object_property(
-    prop: &internal::ObjectProperty,
+    prop: &internal::ObjectProperty<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -644,11 +638,7 @@ fn convert_object_property(
                 end: s.span.end,
                 loc: create_location(s.span, loc, offset),
                 argument: Box::new(convert_expression(
-                    &s.argument,
-                    source,
-                    loc,
-                    interner,
-                    offset,
+                    s.argument, source, loc, interner, offset,
                 )),
             })
         }

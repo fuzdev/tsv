@@ -6,9 +6,9 @@ use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
 
-impl<'a> Parser<'a> {
+impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse if statement: `if (test) consequent` or `if (test) consequent else alternate`
-    pub(super) fn parse_if_statement(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_if_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'if' keyword
@@ -18,13 +18,15 @@ impl<'a> Parser<'a> {
         ));
         self.advance()?;
 
+        let arena = self.arena;
+
         // Parse condition: (test)
         self.expect(&TokenKind::ParenOpen)?;
         let test = self.parse_expression()?;
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse consequent (can be any statement, including block)
-        let consequent = Box::new(self.parse_statement()?);
+        let consequent = arena.alloc(self.parse_statement()?);
 
         // Check for optional else clause
         let (alternate, end) =
@@ -32,7 +34,7 @@ impl<'a> Parser<'a> {
                 self.advance()?; // consume 'else'
                 let alt = self.parse_statement()?;
                 let alt_end = alt.span().end;
-                (Some(Box::new(alt)), alt_end)
+                (Some(&*arena.alloc(alt)), alt_end)
             } else {
                 (None, consequent.span().end)
             };
@@ -47,7 +49,7 @@ impl<'a> Parser<'a> {
 
     /// Parse for statement: `for (init; test; update) body` or `for (left in/of right) body`
     /// Also handles `for await (left of right) body`
-    pub(super) fn parse_for_statement(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_for_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'for' keyword
@@ -176,8 +178,8 @@ impl<'a> Parser<'a> {
     fn parse_for_standard(
         &mut self,
         start: usize,
-        init: Option<ForInit>,
-    ) -> Result<Statement, ParseError> {
+        init: Option<ForInit<'arena>>,
+    ) -> Result<Statement<'arena>, ParseError> {
         // Parse test (optional)
         let test = if self.check(&TokenKind::Semicolon) {
             None
@@ -195,7 +197,7 @@ impl<'a> Parser<'a> {
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse body
-        let body = Box::new(self.parse_statement()?);
+        let body = self.arena.alloc(self.parse_statement()?);
         let end = body.span().end;
 
         Ok(Statement::ForStatement(ForStatement {
@@ -208,11 +210,15 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse for-in loop: `for (left in right) body`
-    fn parse_for_in(&mut self, start: usize, left: ForInOfLeft) -> Result<Statement, ParseError> {
+    fn parse_for_in(
+        &mut self,
+        start: usize,
+        left: ForInOfLeft<'arena>,
+    ) -> Result<Statement<'arena>, ParseError> {
         let right = self.parse_expression()?;
         self.expect(&TokenKind::ParenClose)?;
 
-        let body = Box::new(self.parse_statement()?);
+        let body = self.arena.alloc(self.parse_statement()?);
         let end = body.span().end;
 
         Ok(Statement::ForInStatement(ForInStatement {
@@ -227,13 +233,13 @@ impl<'a> Parser<'a> {
     fn parse_for_of(
         &mut self,
         start: usize,
-        left: ForInOfLeft,
+        left: ForInOfLeft<'arena>,
         r#await: bool,
-    ) -> Result<Statement, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError> {
         let right = self.parse_expression()?;
         self.expect(&TokenKind::ParenClose)?;
 
-        let body = Box::new(self.parse_statement()?);
+        let body = self.arena.alloc(self.parse_statement()?);
         let end = body.span().end;
 
         Ok(Statement::ForOfStatement(ForOfStatement {
@@ -246,7 +252,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse while statement: `while (test) body`
-    pub(super) fn parse_while_statement(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_while_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'while' keyword
@@ -262,7 +268,7 @@ impl<'a> Parser<'a> {
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse body
-        let body = Box::new(self.parse_statement()?);
+        let body = self.arena.alloc(self.parse_statement()?);
         let end = body.span().end;
 
         Ok(Statement::WhileStatement(WhileStatement {
@@ -273,7 +279,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse do-while statement: `do body while (test);`
-    pub(super) fn parse_do_while_statement(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_do_while_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'do' keyword
@@ -284,7 +290,7 @@ impl<'a> Parser<'a> {
         self.advance()?;
 
         // Parse body
-        let body = Box::new(self.parse_statement()?);
+        let body = self.arena.alloc(self.parse_statement()?);
 
         // Expect 'while'
         if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::While)) {
@@ -308,7 +314,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse switch statement: `switch (discriminant) { cases }`
-    pub(super) fn parse_switch_statement(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_switch_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'switch' keyword
@@ -325,7 +331,7 @@ impl<'a> Parser<'a> {
 
         // Parse cases: { case ... }
         self.expect(&TokenKind::BraceOpen)?;
-        let mut cases = Vec::new();
+        let mut cases = self.bvec();
 
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
             cases.push(self.parse_switch_case()?);
@@ -336,13 +342,13 @@ impl<'a> Parser<'a> {
 
         Ok(Statement::SwitchStatement(SwitchStatement {
             discriminant,
-            cases,
+            cases: cases.into_bump_slice(),
             span: Span::new(start as u32, end as u32),
         }))
     }
 
     /// Parse switch case: `case test: consequent` or `default: consequent`
-    fn parse_switch_case(&mut self) -> Result<SwitchCase, ParseError> {
+    fn parse_switch_case(&mut self) -> Result<SwitchCase<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Check for 'case' or 'default'
@@ -363,7 +369,7 @@ impl<'a> Parser<'a> {
         let colon_end = self.prev_token_end();
 
         // Parse consequent statements until next case/default or closing brace
-        let mut consequent = Vec::new();
+        let mut consequent = self.bvec();
         while !matches!(
             self.current_kind(),
             TokenKind::Keyword(KeywordKind::Case)
@@ -380,13 +386,13 @@ impl<'a> Parser<'a> {
 
         Ok(SwitchCase {
             test,
-            consequent,
+            consequent: consequent.into_bump_slice(),
             span: Span::new(start as u32, end as u32),
         })
     }
 
     /// Parse try statement: `try { block } catch (param) { handler } finally { finalizer }`
-    pub(super) fn parse_try_statement(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_try_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'try' keyword
@@ -436,7 +442,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse catch clause: `catch (param) { body }` or `catch { body }`
-    fn parse_catch_clause(&mut self) -> Result<CatchClause, ParseError> {
+    fn parse_catch_clause(&mut self) -> Result<CatchClause<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'catch' keyword
@@ -458,10 +464,15 @@ impl<'a> Parser<'a> {
                     self.advance()?;
 
                     // Check for type annotation: param: type
-                    let (type_annotation, param_end) = if self.check(&TokenKind::Colon) {
+                    let (extra, param_end) = if self.check(&TokenKind::Colon) {
                         let ta = self.parse_type_annotation()?;
                         let end = ta.span.end as usize;
-                        (Some(ta), end)
+                        let extra: Option<&'arena IdentifierParamExtra<'arena>> =
+                            Some(self.alloc(IdentifierParamExtra {
+                                type_annotation: Some(ta),
+                                decorators: None,
+                            }));
+                        (extra, end)
                     } else {
                         (None, id_end)
                     };
@@ -469,8 +480,7 @@ impl<'a> Parser<'a> {
                     Expression::Identifier(Identifier {
                         name: symbol,
                         optional: false,
-                        type_annotation,
-                        decorators: None,
+                        extra,
                         span: Span::new(id_start as u32, param_end as u32),
                     })
                 }
@@ -529,7 +539,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse throw statement: `throw expr;`
-    pub(super) fn parse_throw_statement(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_throw_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'throw' keyword
@@ -555,7 +565,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse break statement: `break;` or `break label;`
-    pub(super) fn parse_break_statement(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_break_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'break' keyword
@@ -590,7 +600,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse continue statement: `continue;` or `continue label;`
-    pub(super) fn parse_continue_statement(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_continue_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'continue' keyword
@@ -625,7 +635,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse debugger statement: `debugger;`
-    pub(super) fn parse_debugger_statement(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_debugger_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         debug_assert!(matches!(
@@ -642,7 +652,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse labeled statement: `label: statement`
-    pub(super) fn parse_labeled_statement(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_labeled_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, label_end) = self.current_pos();
 
         // Parse label identifier
@@ -656,7 +666,7 @@ impl<'a> Parser<'a> {
         self.expect(&TokenKind::Colon)?;
 
         // Parse the labeled statement
-        let body = Box::new(self.parse_statement()?);
+        let body = self.arena.alloc(self.parse_statement()?);
         let end = body.span().end;
 
         Ok(Statement::LabeledStatement(LabeledStatement {

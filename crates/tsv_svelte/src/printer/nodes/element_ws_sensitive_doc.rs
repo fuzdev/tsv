@@ -34,7 +34,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_whitespace_sensitive_element_doc(
         &self,
         tag_name: &str,
-        element: &internal::Element,
+        element: &internal::Element<'_>,
         attr_docs: DocBuf,
     ) -> DocId {
         let d = self.d();
@@ -57,7 +57,7 @@ impl<'a> Printer<'a> {
             let mut starts_with_ws = false;
             let mut has_newline = false;
             let mut last_ends_newline = true;
-            for node in &element.fragment.nodes {
+            for node in element.fragment.nodes {
                 if let FragmentNode::Text(text) = node {
                     let raw = text.raw(self.source);
                     if is_first_node {
@@ -89,7 +89,7 @@ impl<'a> Printer<'a> {
         // Attrs stay inline if short, wrap to separate lines if long.
         // Example: <pre><span attr="val"\n\t\t>text\n</span></pre>
         if is_inline && content_has_newlines {
-            let content_doc = self.build_whitespace_sensitive_content_doc(&element.fragment.nodes);
+            let content_doc = self.build_whitespace_sensitive_content_doc(element.fragment.nodes);
 
             // When content doesn't end with \n, the closing </tag> has its `>` split
             // to a new line: `line2</span\n\t>` instead of `\n</span>`
@@ -134,10 +134,10 @@ impl<'a> Printer<'a> {
         // At the boundary (e.g. 100 chars), `<tag attr>content</tag` fits but adding `>`
         // would be 101. The softline puts `>` on its own line in that case.
         if is_inline && has_content && !attr_docs.is_empty() {
-            let content_doc = self.build_whitespace_sensitive_content_doc(&element.fragment.nodes);
+            let content_doc = self.build_whitespace_sensitive_content_doc(element.fragment.nodes);
             // Rebuild as space-separated (caller passes line-separated which we can't use here)
             let space_attrs = self.build_element_attrs_doc(
-                &element.attributes,
+                element.attributes,
                 self.d().text(" "),
                 element.name_span.end,
                 element.open_tag_end,
@@ -184,7 +184,7 @@ impl<'a> Printer<'a> {
 
             if is_simple_content {
                 let content_doc =
-                    self.build_whitespace_sensitive_content_doc(&element.fragment.nodes);
+                    self.build_whitespace_sensitive_content_doc(element.fragment.nodes);
 
                 // Inner group decides if `>` needs to break to new line
                 let closing_and_content = d.group(d.concat(&[
@@ -259,7 +259,7 @@ impl<'a> Printer<'a> {
         };
 
         // Build content preserving text whitespace but formatting expressions/blocks
-        let content_doc = self.build_whitespace_sensitive_content_doc(&element.fragment.nodes);
+        let content_doc = self.build_whitespace_sensitive_content_doc(element.fragment.nodes);
 
         d.concat(&[
             opening_tag,
@@ -275,7 +275,7 @@ impl<'a> Printer<'a> {
     /// Text nodes preserve their exact whitespace (significant for pre/textarea).
     /// Expressions, blocks, and other dynamic content are formatted normally
     /// (their internal whitespace is not significant).
-    fn build_whitespace_sensitive_content_doc(&self, nodes: &[FragmentNode]) -> DocId {
+    fn build_whitespace_sensitive_content_doc(&self, nodes: &[FragmentNode<'_>]) -> DocId {
         // Whitespace is significant here (`<pre>`/`<textarea>`): a block must not
         // dangle its `}` or expand its body — that would inject rendered whitespace.
         // The dedicated ws-sensitive if/each builders already hug; this also gates
@@ -297,7 +297,7 @@ impl<'a> Printer<'a> {
     ///   body nodes formatted whitespace-sensitively).
     /// - **Expressions and other blocks**: format normally WITH indent wrapper (double-indented:
     ///   once for being inside `<pre>`, once for internal structure).
-    fn build_whitespace_sensitive_node_doc(&self, node: &FragmentNode) -> DocId {
+    fn build_whitespace_sensitive_node_doc(&self, node: &FragmentNode<'_>) -> DocId {
         let d = self.d();
         match node {
             // Text: preserve exact whitespace (significant in pre/textarea)
@@ -311,7 +311,7 @@ impl<'a> Printer<'a> {
                 let ws_is_html = element.kind == internal::ElementKind::Html;
                 // Always use whitespace-sensitive path when nested inside whitespace-sensitive elements
                 let attr_docs = self.build_element_attrs_doc(
-                    &element.attributes,
+                    element.attributes,
                     self.d().line(),
                     element.name_span.end,
                     element.open_tag_end,
@@ -383,7 +383,7 @@ impl<'a> Printer<'a> {
     /// Emits block structure inline without added whitespace. Body nodes are
     /// formatted with whitespace-sensitive content formatting to preserve
     /// significant whitespace.
-    fn build_ws_sensitive_if_block_doc(&self, block: &internal::IfBlock) -> DocId {
+    fn build_ws_sensitive_if_block_doc(&self, block: &internal::IfBlock<'_>) -> DocId {
         let d = self.d();
         // Pass false for in_multiline_context: inside whitespace-sensitive elements,
         // block expressions must not wrap (adding line breaks changes visible content)
@@ -395,7 +395,7 @@ impl<'a> Printer<'a> {
             false,
         );
 
-        let body_doc = self.build_whitespace_sensitive_content_doc(&block.consequent.nodes);
+        let body_doc = self.build_whitespace_sensitive_content_doc(block.consequent.nodes);
 
         let mut parts = vec![d.text(IF_BLOCK_OPEN), expr_doc, d.text("}"), body_doc];
 
@@ -408,14 +408,14 @@ impl<'a> Printer<'a> {
     }
 
     /// Build if alternate (else/else-if) for whitespace-sensitive context.
-    fn build_ws_sensitive_if_alternate(&self, alt: &Fragment, parts: &mut Vec<DocId>) {
+    fn build_ws_sensitive_if_alternate(&self, alt: &Fragment<'_>, parts: &mut Vec<DocId>) {
         let d = self.d();
 
         // Check if this can be flattened to {:else if ...}
         if let Some(else_if) = Self::get_flattenable_else_if(alt, self.source) {
             let expr_doc = self.build_else_if_expr_doc(else_if, false);
 
-            let body_doc = self.build_whitespace_sensitive_content_doc(&else_if.consequent.nodes);
+            let body_doc = self.build_whitespace_sensitive_content_doc(else_if.consequent.nodes);
             parts.push(d.text(ELSE_IF_BLOCK_OPEN));
             parts.push(expr_doc);
             parts.push(d.text("}"));
@@ -428,7 +428,7 @@ impl<'a> Printer<'a> {
         }
 
         // Plain {:else}
-        let body_doc = self.build_whitespace_sensitive_content_doc(&alt.nodes);
+        let body_doc = self.build_whitespace_sensitive_content_doc(alt.nodes);
         parts.push(d.text("{:else}"));
         parts.push(body_doc);
     }
@@ -437,7 +437,7 @@ impl<'a> Printer<'a> {
     ///
     /// Emits block structure inline without added whitespace. Body nodes are
     /// formatted with whitespace-sensitive content formatting.
-    fn build_ws_sensitive_each_block_doc(&self, block: &internal::EachBlock) -> DocId {
+    fn build_ws_sensitive_each_block_doc(&self, block: &internal::EachBlock<'_>) -> DocId {
         let d = self.d();
         let expr_comment_end = each_expr_comment_end(block);
         // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
@@ -455,13 +455,13 @@ impl<'a> Printer<'a> {
             opening.push(d.text(" as "));
             let pattern_doc = self.build_pattern_doc(context);
             opening.push(pattern_doc);
-            if let Some(index) = &block.index {
+            if let Some(index) = block.index {
                 opening.push(d.text(", "));
-                opening.push(d.text_owned(index.clone()));
+                opening.push(d.text_owned(index.to_string()));
             }
-        } else if let Some(index) = &block.index {
+        } else if let Some(index) = block.index {
             opening.push(d.text(", "));
-            opening.push(d.text_owned(index.clone()));
+            opening.push(d.text_owned(index.to_string()));
         }
 
         if let Some(key) = &block.key {
@@ -483,13 +483,13 @@ impl<'a> Printer<'a> {
 
         opening.push(d.text("}"));
 
-        let body_doc = self.build_whitespace_sensitive_content_doc(&block.body.nodes);
+        let body_doc = self.build_whitespace_sensitive_content_doc(block.body.nodes);
 
         let opening_concat = d.concat(&opening);
         let mut parts = vec![opening_concat, body_doc];
 
         if let Some(fallback) = &block.fallback {
-            let fallback_doc = self.build_whitespace_sensitive_content_doc(&fallback.nodes);
+            let fallback_doc = self.build_whitespace_sensitive_content_doc(fallback.nodes);
             parts.push(d.text("{:else}"));
             parts.push(fallback_doc);
         }

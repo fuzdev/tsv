@@ -25,7 +25,7 @@ use tsv_lang::doc::arena::{DocArena, DocId};
 /// Only handles untyped arrows (no type params, no return type, no param types).
 pub(crate) fn build_arrow_inline_signature(
     printer: &Printer<'_>,
-    arrow: &internal::ArrowFunctionExpression,
+    arrow: &internal::ArrowFunctionExpression<'_>,
 ) -> DocId {
     let d = printer.d();
     let mut sig_parts = DocBuf::new();
@@ -67,7 +67,7 @@ pub(crate) fn build_arrow_inline_signature(
 /// Does NOT include the ` =>` - caller adds that.
 pub(crate) fn build_arrow_sig_doc(
     printer: &Printer<'_>,
-    arrow: &internal::ArrowFunctionExpression,
+    arrow: &internal::ArrowFunctionExpression<'_>,
 ) -> DocId {
     if arrow_has_type_annotations(arrow) {
         printer.d().group(printer.build_arrow_signature_doc(arrow))
@@ -84,7 +84,7 @@ pub(crate) fn build_arrow_sig_doc(
 /// to `body_doc`, returning it unchanged if none exist.
 pub(crate) fn prepend_arrow_body_comments(
     printer: &Printer<'_>,
-    arrow: &internal::ArrowFunctionExpression,
+    arrow: &internal::ArrowFunctionExpression<'_>,
     body_start: u32,
     body_doc: DocId,
 ) -> DocId {
@@ -216,7 +216,7 @@ pub(crate) fn wrap_call_with_will_break_guard(d: &DocArena, callee: DocId, args:
 /// Conditionals (ternaries) are included because when a call's ternary argument exceeds
 /// print width, Prettier breaks after "(" and keeps the ternary on one line (if it fits),
 /// rather than keeping "(cond" hugged and breaking the ternary at ? and :.
-pub(super) fn arg_needs_soft_wrap(arg: &internal::Expression) -> bool {
+pub(super) fn arg_needs_soft_wrap(arg: &internal::Expression<'_>) -> bool {
     matches!(
         arg,
         internal::Expression::CallExpression(_)
@@ -245,7 +245,7 @@ pub(super) enum ChainArgKind {
 /// Only block-like expressions (objects, arrays, functions, classes) hug naturally,
 /// including when wrapped in TS type assertions (`{...} as T`, `[...] satisfies T`).
 /// Arrow functions are classified by their body type.
-pub(super) fn classify_chain_arg(arg: &internal::Expression) -> ChainArgKind {
+pub(super) fn classify_chain_arg(arg: &internal::Expression<'_>) -> ChainArgKind {
     match arg {
         // Block-like expressions hug the call parens naturally
         internal::Expression::ObjectExpression(_)
@@ -254,10 +254,10 @@ pub(super) fn classify_chain_arg(arg: &internal::Expression) -> ChainArgKind {
         | internal::Expression::ClassExpression(_) => ChainArgKind::HugsNaturally,
         // TS type wrappers: classify based on the inner expression
         // e.g., `{...} as any` hugs, `longExpr as T` soft-wraps
-        internal::Expression::TSAsExpression(e) => classify_chain_arg(&e.expression),
-        internal::Expression::TSSatisfiesExpression(e) => classify_chain_arg(&e.expression),
-        internal::Expression::TSTypeAssertion(e) => classify_chain_arg(&e.expression),
-        internal::Expression::TSNonNullExpression(e) => classify_chain_arg(&e.expression),
+        internal::Expression::TSAsExpression(e) => classify_chain_arg(e.expression),
+        internal::Expression::TSSatisfiesExpression(e) => classify_chain_arg(e.expression),
+        internal::Expression::TSTypeAssertion(e) => classify_chain_arg(e.expression),
+        internal::Expression::TSNonNullExpression(e) => classify_chain_arg(e.expression),
         // Arrow functions: arrows with TSTypeReference return types are NOT expandable
         // per prettier's couldExpandArg, so they need soft wrapping (default behavior).
         // Other arrows are classified by their body.
@@ -278,7 +278,7 @@ pub(super) fn classify_chain_arg(arg: &internal::Expression) -> ChainArgKind {
 ///
 /// Used to determine formatting behavior - arrows with type annotations often need
 /// different breaking strategies than untyped arrows.
-pub(crate) fn arrow_has_type_annotations(arrow: &internal::ArrowFunctionExpression) -> bool {
+pub(crate) fn arrow_has_type_annotations(arrow: &internal::ArrowFunctionExpression<'_>) -> bool {
     arrow.return_type.is_some()
         || arrow.type_parameters.is_some()
         || arrow.params.iter().any(param_has_type_annotation)
@@ -291,7 +291,9 @@ pub(crate) fn arrow_has_type_annotations(arrow: &internal::ArrowFunctionExpressi
 /// Other return types (TSTypePredicate, keyword types, unions) are fine.
 ///
 /// Prettier ref: call-arguments.js couldExpandArg (lines 222-226)
-pub(crate) fn arrow_has_type_reference_return(arrow: &internal::ArrowFunctionExpression) -> bool {
+pub(crate) fn arrow_has_type_reference_return(
+    arrow: &internal::ArrowFunctionExpression<'_>,
+) -> bool {
     if let Some(rt) = &arrow.return_type {
         matches!(*rt.type_annotation, internal::TSType::TypeReference(_))
     } else {
@@ -302,15 +304,15 @@ pub(crate) fn arrow_has_type_reference_return(arrow: &internal::ArrowFunctionExp
 /// Check if a function parameter has a type annotation.
 ///
 /// Handles all parameter patterns: Identifier, ArrayPattern, ObjectPattern, AssignmentPattern.
-fn param_has_type_annotation(param: &internal::Expression) -> bool {
+fn param_has_type_annotation(param: &internal::Expression<'_>) -> bool {
     match param {
-        internal::Expression::Identifier(id) => id.type_annotation.is_some(),
+        internal::Expression::Identifier(id) => id.type_annotation().is_some(),
         internal::Expression::ArrayPattern(arr) => arr.type_annotation.is_some(),
         internal::Expression::ObjectPattern(obj) => obj.type_annotation.is_some(),
         internal::Expression::AssignmentPattern(assign) => {
             // Assignment patterns wrap another pattern/identifier
-            match assign.left.as_ref() {
-                internal::Expression::Identifier(id) => id.type_annotation.is_some(),
+            match assign.left {
+                internal::Expression::Identifier(id) => id.type_annotation().is_some(),
                 internal::Expression::ArrayPattern(arr) => arr.type_annotation.is_some(),
                 internal::Expression::ObjectPattern(obj) => obj.type_annotation.is_some(),
                 _ => false,
@@ -321,7 +323,7 @@ fn param_has_type_annotation(param: &internal::Expression) -> bool {
 }
 
 /// Classify how an arrow function body should be formatted in chain context.
-fn classify_arrow_body(arrow: &internal::ArrowFunctionExpression) -> ChainArgKind {
+fn classify_arrow_body(arrow: &internal::ArrowFunctionExpression<'_>) -> ChainArgKind {
     match &arrow.body {
         internal::ArrowFunctionBody::BlockStatement(_) => ChainArgKind::HugsNaturally,
         internal::ArrowFunctionBody::Expression(expr) => classify_expression_body(expr),
@@ -340,7 +342,7 @@ fn classify_arrow_body(arrow: &internal::ArrowFunctionExpression) -> ChainArgKin
 /// - `() => () => [arr]` → true (array body)
 /// - `() => () => call()` → false (call in arrow chain)
 /// - `() => () => cond ? a : b` → false (conditional in arrow chain)
-pub(crate) fn could_expand_arrow_chain(arrow: &internal::ArrowFunctionExpression) -> bool {
+pub(crate) fn could_expand_arrow_chain(arrow: &internal::ArrowFunctionExpression<'_>) -> bool {
     match &arrow.body {
         internal::ArrowFunctionBody::BlockStatement(_) => true,
         internal::ArrowFunctionBody::Expression(expr) => match &**expr {
@@ -360,7 +362,7 @@ pub(crate) fn could_expand_arrow_chain(arrow: &internal::ArrowFunctionExpression
 /// are caught earlier by the conditional_group path in chain_args.rs. This
 /// HugsNaturally classification is primarily reached for arrows with
 /// TSTypeReference returns (which bypass that path) and nested arrow chains.
-fn classify_expression_body(expr: &internal::Expression) -> ChainArgKind {
+fn classify_expression_body(expr: &internal::Expression<'_>) -> ChainArgKind {
     match expr {
         // Objects and arrays hug naturally (reached mainly for typed-return arrows)
         internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_) => {
@@ -409,7 +411,7 @@ pub(super) fn wrap_huggable_arg(d: &DocArena, prefix: &'static str, arg: DocId) 
 /// - last_arg_doc: the last argument doc
 /// - all_args_broken: all args joined with comma_line() for fallback (includes inline block comments)
 pub(crate) fn build_args_split_last(
-    arguments: &[internal::Expression],
+    arguments: &[internal::Expression<'_>],
     printer: &Printer<'_>,
     paren_open: u32,
 ) -> (DocBuf, DocId, DocId) {
@@ -604,7 +606,7 @@ pub(crate) fn build_inline_or_expand_all(
 /// Prettier disables expand-last-arg hug state when `penultimateArg.type === lastArg.type`
 /// (call-arguments.js:258). This covers both arrays, both objects, and also both TSAsExpression,
 /// both TSSatisfiesExpression, etc.
-pub(crate) fn last_two_args_same_type(args: &[internal::Expression]) -> bool {
+pub(crate) fn last_two_args_same_type(args: &[internal::Expression<'_>]) -> bool {
     let last = &args[args.len() - 1];
     let penultimate = &args[args.len() - 2];
     std::mem::discriminant(last) == std::mem::discriminant(penultimate)
@@ -699,10 +701,10 @@ pub(crate) fn build_arrow_call_body_states(
 /// Trailing line comments always force a hardline regardless of this setting.
 pub(crate) fn build_args_joined_with_comments(
     printer: &Printer<'_>,
-    arguments: &[internal::Expression],
+    arguments: &[internal::Expression<'_>],
     paren_open: u32,
     use_hardline: bool,
-    build_arg: impl Fn(&Printer<'_>, &internal::Expression) -> DocId,
+    build_arg: impl Fn(&Printer<'_>, &internal::Expression<'_>) -> DocId,
 ) -> DocId {
     let d = printer.d();
     let mut parts = DocBuf::new();
@@ -751,7 +753,7 @@ pub(crate) fn build_args_joined_with_comments(
 /// - Result: first arg expands, tail args stay inline after closing `}`
 pub(super) fn should_expand_first_arg(
     printer: &Printer<'_>,
-    args: &[internal::Expression],
+    args: &[internal::Expression<'_>],
 ) -> bool {
     // Need exactly 2 args (first is function, second is short)
     if args.len() != 2 {
@@ -789,7 +791,7 @@ pub(super) fn append_type_args_with_gap_comments(
     printer: &Printer<'_>,
     callee: DocId,
     callee_end: u32,
-    type_arguments: Option<&internal::TSTypeParameterInstantiation>,
+    type_arguments: Option<&internal::TSTypeParameterInstantiation<'_>>,
 ) -> DocId {
     let d = printer.d();
     match type_arguments {
@@ -860,7 +862,7 @@ pub(super) fn build_empty_args_doc(
 pub(super) fn try_hug_multiline_template_arg(
     printer: &Printer<'_>,
     callee: DocId,
-    args: &[internal::Expression],
+    args: &[internal::Expression<'_>],
     paren_close: u32,
 ) -> Option<DocId> {
     if args.len() != 1 || !is_multiline_template_expression(&args[0]) {
@@ -889,7 +891,7 @@ pub(super) fn try_hug_multiline_template_arg(
 /// `wrap_call_with_hard_breaks`.
 pub(super) fn build_args_with_blank_lines(
     printer: &Printer<'_>,
-    args: &[internal::Expression],
+    args: &[internal::Expression<'_>],
 ) -> DocId {
     let d = printer.d();
     let mut arg_parts = DocBuf::new();

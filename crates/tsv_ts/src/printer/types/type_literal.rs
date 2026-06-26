@@ -145,8 +145,8 @@ impl<'a> Printer<'a> {
     /// so that `})` can be aligned properly (one indent level past the base).
     pub(super) fn build_type_doc_maybe_parens(
         &self,
-        ts_type: &TSType,
-        needs_parens: fn(&TSType) -> bool,
+        ts_type: &TSType<'_>,
+        needs_parens: fn(&TSType<'_>) -> bool,
     ) -> DocId {
         let d = self.d();
         if needs_parens(ts_type) {
@@ -213,8 +213,8 @@ impl<'a> Printer<'a> {
     /// the first-union-member case, which has no previous member to relocate onto.
     pub(super) fn build_parenthesized_union_doc(
         &self,
-        union: &TSUnionType,
-        paren: Option<&TSParenthesizedType>,
+        union: &TSUnionType<'_>,
+        paren: Option<&TSParenthesizedType<'_>>,
         emit_inner_leading_line_comments: bool,
     ) -> DocId {
         let d = self.d();
@@ -291,8 +291,8 @@ impl<'a> Printer<'a> {
     /// tabs — see `docs/conformance_prettier.md`.)
     fn build_parenthesized_intersection_trailing_object_doc(
         &self,
-        intersection: &TSIntersectionType,
-        trailing_obj: &TSTypeLiteral,
+        intersection: &TSIntersectionType<'_>,
+        trailing_obj: &TSTypeLiteral<'_>,
     ) -> DocId {
         let d = self.d();
         // Build opening: (A & B & {
@@ -322,7 +322,7 @@ impl<'a> Printer<'a> {
     /// for width-aware formatting.
     fn build_type_literal_members_only_doc_for_alignment(
         &self,
-        t: &TSTypeLiteral,
+        t: &TSTypeLiteral<'_>,
         force_multiline: bool,
     ) -> DocId {
         let d = self.d();
@@ -441,7 +441,7 @@ impl<'a> Printer<'a> {
     /// - Source has newline immediately after opening brace
     /// - Contains line comments or multi-line block comments
     /// - Contains block comments on their own line
-    pub(super) fn type_literal_force_multiline(&self, obj: &TSTypeLiteral) -> bool {
+    pub(super) fn type_literal_force_multiline(&self, obj: &TSTypeLiteral<'_>) -> bool {
         let source_is_multiline = super::super::is_brace_block_multiline(self.source, obj.span);
         // Prettier breaks an object type when its first member starts on a line
         // below the opening brace. `is_brace_block_multiline` only sees a newline
@@ -472,7 +472,7 @@ impl<'a> Printer<'a> {
     /// half-step as a whole tab — see `docs/conformance_prettier.md`.
     fn build_aligned_object_literal_doc(
         &self,
-        obj: &TSTypeLiteral,
+        obj: &TSTypeLiteral<'_>,
         opening: DocId,
         closing: &'static str,
     ) -> DocId {
@@ -507,7 +507,7 @@ impl<'a> Printer<'a> {
     ///     }           // single indent (aligns with "{")
     ///   | B;
     /// ```
-    pub(super) fn build_union_member_object_literal_doc(&self, obj: &TSTypeLiteral) -> DocId {
+    pub(super) fn build_union_member_object_literal_doc(&self, obj: &TSTypeLiteral<'_>) -> DocId {
         self.build_aligned_object_literal_doc(obj, self.d().text("{"), "}")
     }
 
@@ -521,7 +521,7 @@ impl<'a> Printer<'a> {
     /// - Single-line source stays single-line if it fits: `{ a: T; b: U }`
     /// - Multi-line source (newline after `{`) stays multi-line
     /// - Comments force multi-line formatting
-    pub(super) fn build_type_literal_doc(&self, t: &TSTypeLiteral) -> DocId {
+    pub(super) fn build_type_literal_doc(&self, t: &TSTypeLiteral<'_>) -> DocId {
         self.build_type_literal_doc_inner(t, TypeLiteralMode::Standard)
     }
 
@@ -530,7 +530,7 @@ impl<'a> Printer<'a> {
     /// `mode` controls formatting behavior:
     /// - `Standard`: Width-aware with softlines, wrapped in group
     /// - `NoGroup`: Width-aware with softlines, no group (parent controls breaking)
-    fn build_type_literal_doc_inner(&self, t: &TSTypeLiteral, mode: TypeLiteralMode) -> DocId {
+    fn build_type_literal_doc_inner(&self, t: &TSTypeLiteral<'_>, mode: TypeLiteralMode) -> DocId {
         let d = self.d();
         let wrap_in_group = matches!(mode, TypeLiteralMode::Standard);
         let force_multiline = self.type_literal_force_multiline(t);
@@ -675,7 +675,7 @@ impl<'a> Printer<'a> {
     ///
     /// When the function type group breaks (because line is too long), these
     /// softlines become newlines, expanding the param's object type.
-    pub(super) fn build_type_literal_doc_for_function_param(&self, t: &TSTypeLiteral) -> DocId {
+    pub(super) fn build_type_literal_doc_for_function_param(&self, t: &TSTypeLiteral<'_>) -> DocId {
         self.build_type_literal_doc_inner(t, TypeLiteralMode::NoGroup)
     }
 
@@ -685,7 +685,7 @@ impl<'a> Printer<'a> {
     /// overflows it breaks block-style (members on their own lines) rather than
     /// spilling an inner union/intersection — even inside a multi-argument list
     /// (`Map<K, { ...wide... }>`). Matches Prettier and the single-argument path.
-    pub(in crate::printer) fn build_type_doc_for_type_arg(&self, ts_type: &TSType) -> DocId {
+    pub(in crate::printer) fn build_type_doc_for_type_arg(&self, ts_type: &TSType<'_>) -> DocId {
         let d = self.d();
         match ts_type {
             TSType::TypeLiteral(t) => self.build_type_literal_doc(t),
@@ -696,7 +696,7 @@ impl<'a> Printer<'a> {
                 // the comment was dropped — a content-loss bug. A line comment defers
                 // to end-of-line and forces the type-argument list to break (via
                 // `break_parent`), matching prettier's expansion.
-                let inner = self.build_type_doc_for_type_arg(&p.type_annotation);
+                let inner = self.build_type_doc_for_type_arg(p.type_annotation);
                 let inner_start = p.type_annotation.span().start;
                 let inner_end = p.type_annotation.span().end;
                 let has_leading = self.has_comments_between(p.span.start + 1, inner_start);

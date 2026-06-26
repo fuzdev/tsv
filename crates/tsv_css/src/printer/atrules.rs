@@ -9,12 +9,26 @@
 // This module uses doc builders for width-based decisions (e.g., condition query
 // wrapping). The complex prelude and block handling remains imperative for clarity.
 
+use std::borrow::Cow;
+
 use super::Printer;
 use super::value_normalization;
 use crate::ast::internal;
 use tsv_lang::doc::{self, Mode, arena::DocId};
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 use tsv_lang::{comments_in_range, is_format_ignore_directive};
+
+/// A condition-query part with its content prepared for printing.
+///
+/// `@supports` parts are value-normalized into a fresh `String`; `@container`
+/// parts print verbatim, so they borrow the AST's `&'arena str`
+/// (`ConditionPart::content`) directly. The `Cow` carries either form without
+/// forcing an allocation on the verbatim path.
+struct NormalizedConditionPart<'c> {
+    connector: Option<internal::ConditionConnector>,
+    content: Cow<'c, str>,
+    span: tsv_lang::Span,
+}
 
 /// Convert a condition connector to its string representation
 fn connector_str(conn: internal::ConditionConnector) -> &'static str {
@@ -64,9 +78,9 @@ impl<'a> ConditionKind<'a> {
 
 impl<'a> Printer<'a> {
     /// Format a CSS at-rule (@media, @keyframes, @supports, etc.)
-    pub(super) fn print_css_atrule(&mut self, atrule: &internal::CssAtrule) {
+    pub(super) fn print_css_atrule(&mut self, atrule: &internal::CssAtrule<'_>) {
         self.write("@");
-        self.write(&atrule.name);
+        self.write(atrule.name);
 
         // Print prelude based on type
         match &atrule.prelude {
@@ -186,7 +200,7 @@ impl<'a> Printer<'a> {
                     match child {
                         internal::CssBlockChild::Declaration(_) => {
                             // Preserve blank line between consecutive declarations
-                            if self.has_blank_line_before_child(&block.children, i) {
+                            if self.has_blank_line_before_child(block.children, i) {
                                 self.write("\n");
                             }
                         }
@@ -194,7 +208,7 @@ impl<'a> Printer<'a> {
                         | internal::CssBlockChild::Atrule(_)
                         | internal::CssBlockChild::Comment(_) => {
                             let has_blank_line =
-                                self.has_blank_line_before_child(&block.children, i);
+                                self.has_blank_line_before_child(block.children, i);
 
                             // Declarations end with \n, standalone comments end with \n,
                             // but rules/at-rules end with } and inline comments end with */
@@ -227,7 +241,7 @@ impl<'a> Printer<'a> {
 
                         // Check if next child is an inline comment
                         let inline_count =
-                            self.try_print_inline_comments(&block.children, i, child.span().end);
+                            self.try_print_inline_comments(block.children, i, child.span().end);
                         i += inline_count;
                     }
                     internal::CssBlockChild::Comment(comment) => {
@@ -267,7 +281,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Format an at-rule block child (rule, declaration, or nested at-rule)
-    fn print_atrule_block_child(&mut self, child: &internal::CssBlockChild) {
+    fn print_atrule_block_child(&mut self, child: &internal::CssBlockChild<'_>) {
         match child {
             internal::CssBlockChild::Rule(rule) => {
                 // Format rule selector and opening brace
@@ -302,7 +316,7 @@ impl<'a> Printer<'a> {
                         internal::CssBlockChild::Declaration(decl) => {
                             // Preserve blank line between consecutive declarations
                             if i > start_index
-                                && self.has_blank_line_before_child(&rule.declarations, i)
+                                && self.has_blank_line_before_child(rule.declarations, i)
                             {
                                 self.write("\n");
                             }
@@ -315,7 +329,7 @@ impl<'a> Printer<'a> {
 
                             // Check for inline comments after the declaration
                             let inline_count = self.try_print_inline_comments_after_decl(
-                                &rule.declarations,
+                                rule.declarations,
                                 i,
                                 decl.span.end,
                             );
@@ -327,7 +341,7 @@ impl<'a> Printer<'a> {
                             // Standalone comment (not inline after a declaration)
                             // Check if there's a blank line before this comment in source
                             if i > start_index
-                                && self.has_blank_line_before_child(&rule.declarations, i)
+                                && self.has_blank_line_before_child(rule.declarations, i)
                             {
                                 // Source has blank line - add it
                                 // Note: Previous element already ended with \n, so one more \n gives blank line
@@ -343,7 +357,7 @@ impl<'a> Printer<'a> {
                         }
                         internal::CssBlockChild::Rule(nested_rule) => {
                             // CSS Nesting Module - format nested rule inside at-rule block rule
-                            if i > start_index && !Self::prev_is_comment(&rule.declarations, i) {
+                            if i > start_index && !Self::prev_is_comment(rule.declarations, i) {
                                 self.write("\n");
                             }
                             self.write_indent();
@@ -356,7 +370,7 @@ impl<'a> Printer<'a> {
 
                             // Check for inline comment after nested rule's closing brace
                             let inline_count = self.try_print_inline_comments(
-                                &rule.declarations,
+                                rule.declarations,
                                 i,
                                 nested_rule.span.end,
                             );
@@ -366,7 +380,7 @@ impl<'a> Printer<'a> {
                         }
                         internal::CssBlockChild::Atrule(nested_atrule) => {
                             // Nested at-rule inside rule
-                            if i > start_index && !Self::prev_is_comment(&rule.declarations, i) {
+                            if i > start_index && !Self::prev_is_comment(rule.declarations, i) {
                                 self.write("\n");
                             }
                             self.write_indent();
@@ -421,7 +435,7 @@ impl<'a> Printer<'a> {
     fn print_condition_query(
         &mut self,
         kind: ConditionKind<'_>,
-        condition: &internal::ConditionQuery,
+        condition: &internal::ConditionQuery<'_>,
         has_block: bool,
         prelude_span: Option<tsv_lang::Span>,
     ) {
@@ -438,15 +452,15 @@ impl<'a> Printer<'a> {
         // Normalize numbers in each part's content (`.5px` → `0.5px`), matching
         // the declaration-value path. Comments/strings within a part are
         // preserved; inter-part comments come from source spans, unaffected.
-        let normalized_parts: Vec<internal::ConditionPart> = condition
+        let normalized_parts: Vec<NormalizedConditionPart<'_>> = condition
             .parts
             .iter()
-            .map(|p| internal::ConditionPart {
+            .map(|p| NormalizedConditionPart {
                 connector: p.connector,
                 content: if kind.normalizes() {
-                    value_normalization::normalize_value_text(&p.content)
+                    Cow::Owned(value_normalization::normalize_value_text(p.content))
                 } else {
-                    p.content.clone()
+                    Cow::Borrowed(p.content)
                 },
                 span: p.span,
             })
@@ -590,7 +604,7 @@ impl<'a> Printer<'a> {
     fn write_condition_part_with_comments(
         &mut self,
         prev_end: u32,
-        part: &internal::ConditionPart,
+        part: &NormalizedConditionPart<'_>,
     ) {
         let (before_conn, after_conn) =
             self.extract_comments_split_by_connector(prev_end, part.span.start, part.connector);
@@ -702,7 +716,7 @@ impl<'a> Printer<'a> {
     /// Returns the index of the first part that should go on line 2.
     fn find_condition_split_index(
         &self,
-        parts: &[internal::ConditionPart],
+        parts: &[NormalizedConditionPart<'_>],
         current_col: usize,
         suffix_len: usize,
     ) -> usize {
@@ -734,7 +748,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc representation of condition query for width checking
-    fn build_condition_doc(&self, parts: &[internal::ConditionPart]) -> DocId {
+    fn build_condition_doc(&self, parts: &[NormalizedConditionPart<'_>]) -> DocId {
         let d = self.d();
         let mut docs = Vec::new();
         for (i, part) in parts.iter().enumerate() {
@@ -745,7 +759,7 @@ impl<'a> Printer<'a> {
                 docs.push(d.text(connector_str(conn)));
                 docs.push(d.text(" "));
             }
-            docs.push(d.text_owned(part.content.clone()));
+            docs.push(d.text_owned(part.content.to_string()));
         }
 
         d.concat(&docs)

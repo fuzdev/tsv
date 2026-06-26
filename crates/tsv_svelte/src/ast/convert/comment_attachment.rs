@@ -945,8 +945,9 @@ mod tests {
     fn convert_ts(body: &str) -> Value {
         let source = format!("<script lang=\"ts\">\n{body}\n</script>");
         // Test inputs are hardcoded valid sources; a parse failure should panic
+        let arena = bumpalo::Bump::new();
         #[allow(clippy::expect_used)]
-        let root = crate::parse(&source).expect("parse");
+        let root = crate::parse(&source, &arena).expect("parse");
         crate::convert_ast_json(&root, &source)
     }
 

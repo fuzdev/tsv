@@ -1,13 +1,13 @@
 //! Pattern types for public AST (destructuring)
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use super::expressions::Property;
 use super::types::TSTypeAnnotation;
 use super::{Expression, SourceLocation};
 
 /// Object pattern for destructuring: `{a, b}`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ObjectPattern {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -20,7 +20,7 @@ pub struct ObjectPattern {
 }
 
 /// Object pattern property - either a regular property or a rest element
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ObjectPatternProperty {
     Property(Property),
@@ -28,7 +28,7 @@ pub enum ObjectPatternProperty {
 }
 
 /// Array pattern for destructuring: `[a, b]`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ArrayPattern {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -41,7 +41,7 @@ pub struct ArrayPattern {
 }
 
 /// Assignment pattern for default values: `a = 1`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct AssignmentPattern {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -53,7 +53,7 @@ pub struct AssignmentPattern {
 }
 
 /// Rest element in destructuring: `...rest`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct RestElement {
     #[serde(rename = "type")]
     pub node_type: String,

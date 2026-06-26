@@ -1,5 +1,7 @@
 //! CSS escape sequence decoding.
 
+use std::borrow::Cow;
+
 /// Decode CSS escape sequences in a string.
 ///
 /// Converts CSS escape sequences to their actual character values:
@@ -8,7 +10,14 @@
 /// - `\'` → `'` (escaped quote)
 /// - `\n` → newline (escaped newline)
 /// - `\XXXXXX` → Unicode character (1-6 hex digits)
-pub fn decode_escape_sequences(source: &str) -> String {
+///
+/// Returns a borrowed `Cow` for the common escape-free string (no allocation);
+/// only an input that actually contains `\` is decoded into an owned `String`.
+pub fn decode_escape_sequences(source: &str) -> Cow<'_, str> {
+    if !source.contains('\\') {
+        return Cow::Borrowed(source);
+    }
+
     let mut result = String::with_capacity(source.len());
     let mut chars = source.chars().peekable();
 
@@ -52,7 +61,7 @@ pub fn decode_escape_sequences(source: &str) -> String {
         }
     }
 
-    result
+    Cow::Owned(result)
 }
 
 #[cfg(test)]
