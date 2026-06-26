@@ -619,10 +619,10 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
             }
 
             DocNode::Fill(range) => {
-                let parts: Vec<DocId> = range.resolve(children_vec).to_vec();
+                let parts = range.resolve(children_vec);
                 render_fill_iterative(
                     arena,
-                    &parts,
+                    parts,
                     output,
                     pos,
                     cmd.indent,
@@ -639,9 +639,9 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 let context = context.clone();
 
                 if let DocNode::Fill(fill_range) = &nodes[inner_doc.index()] {
-                    let parts: Vec<DocId> = fill_range.resolve(children_vec).to_vec();
+                    let parts = fill_range.resolve(children_vec);
                     render_fill_iterative(
-                        arena, &parts, output, pos, cmd.indent, render, embed, &context, &commands,
+                        arena, parts, output, pos, cmd.indent, render, embed, &context, &commands,
                         resolver,
                     );
                 } else {
@@ -927,7 +927,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
             }
 
             DocNode::Fill(range) => {
-                let parts: Vec<DocId> = range.resolve(children_vec).to_vec();
+                let parts = range.resolve(children_vec);
                 // Pass the remaining commands as look-ahead (like the top-level
                 // `render_doc_iterative` Fill arm), so a fill's final-segment fits check
                 // sees the content that follows it within this sub-render — e.g. the
@@ -935,7 +935,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                 // last word instead of over-shooting the print width.
                 render_fill_iterative(
                     arena,
-                    &parts,
+                    parts,
                     output,
                     pos,
                     cmd.indent,
@@ -953,11 +953,10 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
 
                 if tracking_suffix {
                     if let DocNode::Fill(fill_range) = &nodes[inner_doc.index()] {
-                        let fill_range = *fill_range;
-                        let parts: Vec<DocId> = fill_range.resolve(children_vec).to_vec();
+                        let parts = fill_range.resolve(children_vec);
                         render_fill_iterative(
                             arena,
-                            &parts,
+                            parts,
                             output,
                             pos,
                             cmd.indent,
