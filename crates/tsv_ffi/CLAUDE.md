@@ -4,7 +4,7 @@
 
 ## Architecture Position
 
-Depends on `tsv_ts`, `tsv_css`, `tsv_svelte`. Sibling binding crate: [`tsv_wasm`](../tsv_wasm/) (WebAssembly). Consumers include Deno FFI, Python `ctypes`, and any other C-FFI host. N-API is not used.
+Depends on `tsv_ts`, `tsv_css`, `tsv_svelte`. Sibling binding crates: [`tsv_wasm`](../tsv_wasm/) (WebAssembly) and [`tsv_napi`](../tsv_napi/) (N-API, the Node/Bun native path). This crate is the C-ABI path — consumers include Deno FFI, Python `ctypes`, and any other C-FFI host. Node/Bun use `tsv_napi` instead (no C-FFI glue); the per-thread `with_ast_arena` reuse below is mirrored there.
 
 The bindings hold a **per-thread reusable AST `Bump`** (`with_ast_arena`) that is `reset()` between calls rather than allocated fresh per call: the bindings are invoked once per file in tight loops, and per-call arena malloc/free churns the system allocator's heap high-water in a way that is measurable through a host FFI layer. `reset()` retains the largest chunk and rewinds, so a warm thread does no per-call malloc/free; this replaces the old per-call `with_capacity` pre-size (hence no `tsv_lang` dependency). The per-file AST is fully consumed before the next call's `reset()`, so the reuse is sound (incl. after a `catch_unwind`-caught panic).
 

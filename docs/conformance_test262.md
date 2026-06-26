@@ -210,8 +210,8 @@ cargo run -p tsv_debug test262 --emit-manifest /tmp/t262.json
 # 2. Deno consumer runs oxc-parser over the same files (parsed as a module, to
 #    mirror tsv) and buckets the agreement. Run from the repo root:
 deno run --allow-read --allow-env --allow-ffi --allow-net --allow-sys \
-  --config benches/deno/deno.json \
-  benches/deno/diagnostics/test262_compare.ts --manifest /tmp/t262.json
+  --config benches/js/deno.json \
+  benches/js/diagnostics/test262_compare.ts --manifest /tmp/t262.json
 ```
 
 **Why oxc-parser only (no biome).** test262 is a *parse*-conformance suite, and

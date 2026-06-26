@@ -36,7 +36,7 @@ pub struct Test262Command {
 
     /// emit a JSON manifest of the graded strict subset (relative path, module
     /// flag, expected verdict, tsv verdict) to this file and exit — the input
-    /// to `benches/deno/diagnostics/test262_compare.ts` (tsv vs oxc-parser)
+    /// to `benches/js/diagnostics/test262_compare.ts` (tsv vs oxc-parser)
     #[argh(option)]
     emit_manifest: Option<PathBuf>,
 

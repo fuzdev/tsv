@@ -5,7 +5,7 @@
 This doc covers the **formatting** comparison (`corpus:compare:format`, vs
 prettier). The parser-side analogue — `corpus:compare:parse`, deep-diffing
 parse ASTs against the canonical parsers — is documented in
-../benches/deno/CLAUDE.md §Parse Comparison; its diffs are triaged with the
+../benches/js/CLAUDE.md §Parse Comparison; its diffs are triaged with the
 fixture-first TDD flow rather than this file's hunk workflow.
 
 ## First Step: Load Conformance Doc
@@ -59,7 +59,7 @@ The divergence detector already identifies this pattern. Nothing to do.
 **B) Known divergence but detector misses it** → Fix the detector
 
 The diff matches a documented pattern in `conformance_prettier.md`, but the detector in
-`benches/deno/lib/divergence/patterns.ts` doesn't recognize this variant.
+`benches/js/lib/divergence/patterns.ts` doesn't recognize this variant.
 
 1. Identify which existing pattern should match (e.g., `inline_content_hug`, `fill_101_boundary`)
 2. Read the pattern's `detect()` function in `patterns.ts`

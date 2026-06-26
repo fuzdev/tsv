@@ -257,7 +257,7 @@ target-independent (heaptrack reads the same on either), but WASM *wall-time* is
 not: `@fuzdev/tsv_format_wasm` runs on dlmalloc, which memcpys on every heap
 growth, so an allocation-count win can move WASM format time even when the same
 change is a wash on native glibc. The full `deno task bench` is too coarse to
-see those single-digit-% moves; `benches/deno/diagnostics/wasm_format_probe.ts` resolves
+see those single-digit-% moves; `benches/js/diagnostics/wasm_format_probe.ts` resolves
 them.
 
 It applies the §5 paired discipline in a single invocation: interleaved pairs
@@ -274,7 +274,7 @@ cp -r crates/tsv_wasm/pkg/all/deno crates/tsv_wasm/pkg/all/deno.baseline
 # ... edit source, then rebuild and A/B:
 deno task build:wasm:all:deno
 deno run --allow-read --allow-env --allow-net --allow-sys \
-  benches/deno/diagnostics/wasm_format_probe.ts \
+  benches/js/diagnostics/wasm_format_probe.ts \
   --baseline crates/tsv_wasm/pkg/all/deno.baseline/tsv_wasm.js
 ```
 
@@ -289,7 +289,7 @@ before starting an A/B.
 
 ```bash
 deno run --allow-read --allow-env --allow-net --allow-sys \
-  benches/deno/diagnostics/wasm_format_probe.ts
+  benches/js/diagnostics/wasm_format_probe.ts
 ```
 
 ## Measurement Process
@@ -304,7 +304,7 @@ deno run --allow-read --allow-env --allow-net --allow-sys \
 
 1. **`tsv_debug profile`** — same workload, compare phase split
 2. **`deno task bench`** — measure overall corpus impact
-3. **Record results** — for regression detection, use `deno task bench:run --save-baseline` / `--compare-baseline`
+3. **Record results** — for regression detection, use `deno task bench:deno:run -- --save-baseline` / `-- --compare-baseline` (or `bench:node:run` for the Node runtime)
 
 ## WASM bundle size
 
@@ -318,7 +318,7 @@ The `tsv_wasm` crate produces three WASM binaries via the `format` +
 `binary_sizes.ts` in the bench runner reads the three
 `pkg/<variant>/deno/tsv_wasm_bg.wasm` files and reports them side-by-side, with
 gzipped wire size alongside raw on-disk size; current numbers land in the bench
-report (`benches/deno/results/report.md`).
+report (`benches/js/results/report.<runtime>.md`).
 
 Gzipped numbers come from `gzip -c` (system default level 6), matching
 npm-tarball wire reality and `scripts/patch_npm_package.ts`. The parse feature
@@ -346,7 +346,8 @@ These aren't set up yet but may be useful for specific investigations:
 ## Baselines and tracking
 
 Methodology and tooling above are evergreen; corpus benchmark results land in
-`benches/deno/results/report.{json,md}`.
+the per-runtime `benches/js/results/report.<runtime>.{json,md}` siblings
+(`report.deno.*` / `report.node.*`).
 
 Wall-clock readings vary several-fold with machine state (CPU frequency scaling
 and concurrent load) — trust only quiet-machine runs, and prefer per-byte rates

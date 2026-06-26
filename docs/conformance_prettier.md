@@ -822,7 +822,7 @@ deno task corpus:compare:format ~/dev/project --explain  # Single project (scans
 deno task divergence:audit  # Cross-refs pattern fixture lists vs this doc (no runtime)
 ```
 
-Every pattern in `benches/deno/lib/divergence/patterns.ts` links to:
+Every pattern in `benches/js/lib/divergence/patterns.ts` links to:
 
 - `conformance_sections` — Section names from this document
 - `fixtures` — Fixture paths the pattern detects (enforced by the behavioral

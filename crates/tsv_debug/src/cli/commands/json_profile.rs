@@ -55,7 +55,7 @@ use tsv_lang::{ByteToCharMap, LocationTracker};
 use super::profile::{format_duration, format_size, lang_label, median_us, resolve_profile_files};
 use crate::cli::CliError;
 
-/// Bench-corpus exclusions, mirrored from `benches/deno/lib/corpus.ts`:
+/// Bench-corpus exclusions, mirrored from `benches/js/lib/corpus.ts`:
 /// declaration files and build output add noise without exercising new
 /// code paths.
 fn is_bench_corpus_excluded(path: &Path) -> bool {

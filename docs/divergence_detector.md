@@ -7,7 +7,7 @@ The divergence detector is integrated into `corpus_compare_format.ts` and automa
 ## Architecture
 
 ```
-benches/deno/
+benches/js/
 ├── corpus_compare_format.ts          # Uses divergence detection
 ├── divergence_audit.ts        # Cross-references patterns vs docs
 ├── lib/
@@ -192,7 +192,7 @@ deno task test:deno                          # unit + behavioral tests
 
 1. Document the divergence in `docs/conformance_prettier.md`
 2. Create fixture in `tests/fixtures/.../..._prettier_divergence/`
-3. Add pattern to `benches/deno/lib/divergence/patterns.ts`:
+3. Add pattern to `benches/js/lib/divergence/patterns.ts`:
 
 ```typescript
 const new_pattern: DivergencePattern = {
@@ -224,7 +224,7 @@ const new_pattern: DivergencePattern = {
 ```
 
 4. Add positive + negative (overmatch-rejection) tests to
-   `benches/deno/lib/divergence/patterns_test.ts`. Only list a fixture in `fixtures` if the
+   `benches/js/lib/divergence/patterns_test.ts`. Only list a fixture in `fixtures` if the
    pattern genuinely detects it — the behavioral fixture-coverage audit fails otherwise, so
    don't list a divergence the pattern structurally can't claim (reassign it to the pattern
    that does, or leave it honestly uncovered).
