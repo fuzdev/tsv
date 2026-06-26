@@ -119,6 +119,11 @@ const ALLOW: &[Allow] = &[
         "css-value",
     ),
     (
+        "tsv_css/src/ast/convert.rs",
+        "let prefix = raw.find('|').map_or(0, |i| i + 1);",
+        "css-value",
+    ),
+    (
         "tsv_css/src/parser/value/mod.rs",
         "if let Some(paren_pos) = s.find('(')",
         "css-value",
