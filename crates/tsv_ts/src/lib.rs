@@ -113,13 +113,24 @@ pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Progr
 /// ```
 pub fn format(program: &Program<'_>, source: &str) -> String {
     let arena = DocArena::for_source(source);
+    format_in(program, source, &arena)
+}
+
+/// Format into a caller-provided doc arena.
+///
+/// Identical output to [`format`], but the doc IR is built into `arena` instead
+/// of a freshly allocated one, so a driver that formats many files can reuse one
+/// arena across them (`arena.reset()` between files retains the buffers). Nothing
+/// borrowed from `arena` escapes — the result is an owned `String` — so the
+/// caller may reset and reuse it the moment this returns.
+pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> String {
     let inputs = PrinterInputs {
         source,
         interner: Rc::clone(&program.interner),
         comments: &program.comments,
         line_breaks: &program.line_breaks,
     };
-    let mut printer = make_printer(&arena, &inputs, EmbedContext::default());
+    let mut printer = make_printer(arena, &inputs, EmbedContext::default());
     printer.print_program(program);
     printer.into_string()
 }

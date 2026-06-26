@@ -13,6 +13,9 @@ crate-type = ["cdylib"]
 tsv_svelte = { workspace = true }
 tsv_ts = { workspace = true }
 tsv_css = { workspace = true }
+# Only the format path needs the `DocArena` type (the per-thread reusable doc
+# arena); gated to the `format` feature so the parse-only build stays lean.
+tsv_lang = { workspace = true, optional = true }
 napi = { workspace = true }
 napi-derive = { workspace = true }
 serde_json.workspace = true
@@ -26,7 +29,7 @@ napi-build = { workspace = true }
 # the parsers plus the public-AST/JSON convert layer they serialize through. The
 # default both-features build is what the Node bench loads.
 default = ["format", "parse"]
-format = []
+format = ["dep:tsv_lang"]
 parse = ["tsv_ts/convert", "tsv_css/convert", "tsv_svelte/convert"]
 
 # N-API generates unsafe code, exactly like the FFI crate. Cargo replaces the

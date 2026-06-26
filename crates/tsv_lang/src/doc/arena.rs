@@ -265,6 +265,28 @@ impl DocArena {
         Self::with_source_size_hint(source.len())
     }
 
+    /// Reset the arena for reuse on the next document, retaining capacity.
+    ///
+    /// Clears every backing store (nodes, children, and the fitting memos) but
+    /// keeps each `Vec`'s allocated capacity, so a driver that formats many
+    /// files allocates the buffers once and rewinds between files — the doc-IR
+    /// analogue of the per-call AST `Bump::reset()` reuse in the FFI/CLI
+    /// bindings. Only the first file (and any that grow past the high-water
+    /// mark) pays a (re)allocation; the rest reuse the retained buffers.
+    ///
+    /// Sound to call only between documents: every `DocId` handed out for the
+    /// previous document is invalidated (ids restart at 0), so no `DocId` from a
+    /// prior render may be read after a reset. `&mut self` enforces this — no
+    /// borrow of the arena's contents can be live across the call.
+    pub fn reset(&mut self) {
+        self.nodes.get_mut().clear();
+        self.children.get_mut().clear();
+        self.will_break_cache.get_mut().clear();
+        self.flat_width_cache.get_mut().clear();
+        #[cfg(feature = "swallow_check")]
+        self.line_comment_ids.get_mut().clear();
+    }
+
     //
     // Internal helpers
     //

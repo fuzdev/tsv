@@ -55,8 +55,9 @@ pub(crate) struct Printer<'a> {
     pub(crate) indent_level: usize,
     /// Embedding context (layout mode, offsets)
     embed: EmbedContext,
-    /// Arena allocator for doc nodes
-    pub(crate) arena: DocArena,
+    /// Arena allocator for doc nodes (borrowed so a multi-file driver can reuse
+    /// one arena across files; see [`DocArena::reset`]).
+    pub(crate) arena: &'a DocArena,
     /// Source code (needed for preserving whitespace semantics)
     pub(crate) source: &'a str,
     /// Shared string interner for resolving symbols
@@ -91,12 +92,18 @@ pub(crate) struct Printer<'a> {
 
 impl<'a> Printer<'a> {
     /// Create a new printer with the given source, interner, and comments (standalone layout).
-    pub(crate) fn new(source: &'a str, interner: SharedInterner, comments: &'a [Comment]) -> Self {
-        Self::with_embed(source, interner, comments, EmbedContext::default())
+    pub(crate) fn new(
+        arena: &'a DocArena,
+        source: &'a str,
+        interner: SharedInterner,
+        comments: &'a [Comment],
+    ) -> Self {
+        Self::with_embed(arena, source, interner, comments, EmbedContext::default())
     }
 
     /// Create a new printer with the given source, interner, comments, and embed context.
     pub(crate) fn with_embed(
+        arena: &'a DocArena,
         source: &'a str,
         interner: SharedInterner,
         comments: &'a [Comment],
@@ -107,7 +114,7 @@ impl<'a> Printer<'a> {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
             embed,
-            arena: DocArena::for_source(source),
+            arena,
             source,
             interner,
             comments,
@@ -126,10 +133,10 @@ impl<'a> Printer<'a> {
             .contains(&node.span().start)
     }
 
-    /// Get a reference to the doc arena (convenience for `&self.arena`).
+    /// Get a reference to the doc arena (convenience for `self.arena`).
     #[inline]
     pub(crate) fn d(&self) -> &DocArena {
-        &self.arena
+        self.arena
     }
 
     /// Whether a wrapped block-tag head may dangle its `}` in the current context.
@@ -202,7 +209,7 @@ impl<'a> Printer<'a> {
         let output = {
             let interner = self.interner.borrow();
             tsv_lang::doc::arena_print_doc_with_indent_resolved_preserve_whitespace(
-                &self.arena,
+                self.arena,
                 d,
                 &self.embed,
                 col,
@@ -242,7 +249,17 @@ impl<'a> Printer<'a> {
 
 /// Format a Svelte AST back to source code
 pub(crate) fn format_svelte(root: &internal::Root<'_>, source: &str) -> String {
-    let mut printer = Printer::new(source, Rc::clone(&root.interner), &root.comments);
+    let arena = DocArena::for_source(source);
+    format_svelte_in(root, source, &arena)
+}
+
+/// Format a Svelte AST into a caller-provided doc arena (the reuse path).
+pub(crate) fn format_svelte_in(
+    root: &internal::Root<'_>,
+    source: &str,
+    arena: &DocArena,
+) -> String {
+    let mut printer = Printer::new(arena, source, Rc::clone(&root.interner), &root.comments);
     printer.print_root(root);
     printer.into_string()
 }

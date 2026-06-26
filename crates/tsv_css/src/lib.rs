@@ -87,6 +87,20 @@ pub fn format(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
     printer::format_css(stylesheet, source)
 }
 
+/// Format into a caller-provided doc arena.
+///
+/// Identical output to [`format`], but the doc IR is built into `arena` instead
+/// of a freshly allocated one, so a driver that formats many files can reuse one
+/// arena across them (`arena.reset()` between files retains the buffers). Nothing
+/// borrowed from `arena` escapes — the result is an owned `String`.
+pub fn format_in(
+    stylesheet: &CssStyleSheet<'_>,
+    source: &str,
+    arena: &tsv_lang::doc::arena::DocArena,
+) -> String {
+    printer::format_css_in(stylesheet, source, arena)
+}
+
 /// Format a CSS stylesheet embedded in another language (e.g., Svelte).
 ///
 /// Pass an [`EmbedContext`](tsv_lang::EmbedContext) with `base_indent_offset`
