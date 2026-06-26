@@ -417,6 +417,7 @@ impl<'a> Printer<'a> {
                     kind_text,
                     prop.span.start,
                     prop.key.span().start,
+                    prop.computed,
                 );
                 kw_parts.push(key_doc);
                 d.concat(&kw_parts)
@@ -457,15 +458,11 @@ impl<'a> Printer<'a> {
                     self.push_member_keyword_doc(&mut parts, "async ", &mut cursor, key_start);
                 }
                 if func.generator {
-                    self.push_generator_star_doc(&mut parts, cursor, key_start);
+                    self.push_generator_star_doc(&mut parts, cursor, key_start, prop.computed);
                 } else if func.r#async {
                     // Comments before the name (bounded at `[` for computed keys,
                     // whose inner comments the bracket builder handles)
-                    let bound = if prop.computed {
-                        self.find_opening_bracket_after(cursor, key_start)
-                    } else {
-                        key_start
-                    };
+                    let bound = self.computed_key_name_bound(cursor, key_start, prop.computed);
                     self.push_pre_name_comments_doc(&mut parts, cursor, bound);
                 }
                 parts.push(key_doc);
@@ -511,6 +508,30 @@ impl<'a> Printer<'a> {
             // to avoid double-counting comments already inside brackets
             let colon_pos = self.find_colon_after(key_region_end);
             let value_start = prop.value.span().start;
+
+            // A line comment between the key and `:` keeps the comment after the key
+            // and drops `: value` to a continuation line indented one level (prettier
+            // relocates it to end-of-line — conformance_prettier.md §Comment
+            // relocation). Bypasses the assignment layout below.
+            if self.has_line_comments_between(key_region_end, colon_pos) {
+                let value_doc = {
+                    let v = self.build_expression_doc(&prop.value);
+                    let v = if super::needs_parens(
+                        &prop.value,
+                        super::ParenContext::ObjectPropertyValue,
+                    ) {
+                        d.concat(&[d.text("("), v, d.text(")")])
+                    } else {
+                        v
+                    };
+                    self.prepend_rhs_comments(v, colon_pos + 1, value_start)
+                };
+                let tail = d.concat(&[d.text(": "), value_doc]);
+                return d.concat(&[
+                    key_doc,
+                    self.build_continuation_indent(key_region_end, colon_pos, tail),
+                ]);
+            }
 
             // Comments between key region and colon (e.g., {key /* comment */: value})
             let pre_colon_comments: Vec<_> =
@@ -865,7 +886,7 @@ impl<'a> Printer<'a> {
 
     /// Find the opening `[` bracket between two positions (for computed properties).
     /// Returns the first `[` found outside comments in the range [start, end).
-    fn find_opening_bracket_after(&self, start: u32, end: u32) -> u32 {
+    pub(in crate::printer) fn find_opening_bracket_after(&self, start: u32, end: u32) -> u32 {
         tsv_lang::source_scan::find_char_skipping_comments(
             self.source.as_bytes(),
             start as usize,

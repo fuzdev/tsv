@@ -915,7 +915,11 @@ pub(super) fn build_args_with_blank_lines(
             }
         }
 
-        arg_parts.push(printer.build_expression_doc(arg));
+        // Argument-context builder so a binary/logical chain (or conditional) keeps
+        // its continuation indent, and an assignment gets clarity parens — same as
+        // the no-blank-line path; the blank-line forced expansion is just another
+        // reason the args break.
+        arg_parts.push(printer.build_arg_expression_doc(arg));
 
         if i < args.len() - 1 {
             let arg_end = arg.span().end;

@@ -73,9 +73,8 @@ iterations: 30 (median shown)
 ```
 
 The table above is illustrative sample output — absolute wall times are
-machine-dependent (current baselines are tracked with the project's planning
-notes); compare per-byte rates across runs, not wall totals. Uses median of N
-iterations to reduce noise from OS scheduling.
+machine-dependent; compare per-byte rates across runs, not wall totals. Uses
+median of N iterations to reduce noise from OS scheduling.
 The same aggregates (including the per-language breakdown under `langs`) are in
 the `--json` output as `*_us_per_kb` / `*_us_per_file` fields.
 
@@ -346,10 +345,8 @@ These aren't set up yet but may be useful for specific investigations:
 
 ## Baselines and tracking
 
-Methodology and tooling above are evergreen. Current baselines, the hotspot
-table, the optimization tier list, and open measurement questions are tracked
-with the project's planning notes, not in this doc; corpus benchmark results
-land in `benches/deno/results/report.{json,md}`.
+Methodology and tooling above are evergreen; corpus benchmark results land in
+`benches/deno/results/report.{json,md}`.
 
 Wall-clock readings vary several-fold with machine state (CPU frequency scaling
 and concurrent load) — trust only quiet-machine runs, and prefer per-byte rates

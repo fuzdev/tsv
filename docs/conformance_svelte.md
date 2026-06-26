@@ -124,9 +124,8 @@ This is distinct from error recovery: recovery is about not letting one invalid
 construct abort an otherwise-valid _standard-CSS_ file; these dialects are input
 tsv never chases regardless.
 
-The authoritative gap-vs-intentional-rejection survey is maintained with the
-project's planning notes; non-standard `.css` is auto-classified into `expected
-errors` by the corpus comparator (`benches/deno/lib/divergence/expected_errors.ts`).
+Non-standard `.css` is auto-classified into `expected errors` by the corpus
+comparator (`benches/deno/lib/divergence/expected_errors.ts`).
 
 ### Svelte Template Corrections (corpus-enforced)
 

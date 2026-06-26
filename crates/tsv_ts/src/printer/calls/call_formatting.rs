@@ -1226,8 +1226,11 @@ fn build_call_with_arg_comments(
             }
         }
 
-        // Build the argument
-        arg_parts.push(printer.build_expression_doc(arg));
+        // Build the argument with the argument-context builder so a binary/logical
+        // chain (or conditional) keeps its continuation indent — matching the
+        // no-comment path (the single-arg comment path does the same via
+        // build_arg_expression_doc).
+        arg_parts.push(printer.build_arg_expression_doc(arg));
 
         // Check for comments after this argument (before next arg or closing paren)
         if i < call.arguments.len() - 1 {

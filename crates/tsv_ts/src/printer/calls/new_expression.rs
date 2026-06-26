@@ -391,8 +391,11 @@ impl<'a> Printer<'a> {
                     );
                 }
 
-                // Build the argument (use build_expression_doc to match calls.rs comment handling)
-                arg_parts.push(self.build_expression_doc(arg));
+                // Build the argument with the argument-context builder so a binary/
+                // logical chain (or conditional) keeps its continuation indent in this
+                // trailing-line-comment path — matching the no-comment path (the
+                // call/member-chain comment paths do the same).
+                arg_parts.push(self.build_arg_expression_doc(arg));
 
                 // Check for comments after this argument
                 if i < new_expr.arguments.len() - 1 {
@@ -719,7 +722,7 @@ impl<'a> Printer<'a> {
                     first_arg_start,
                     true,
                     #[allow(clippy::redundant_closure_for_method_calls)]
-                    |p, a| p.build_expression_doc(a),
+                    |p, a| p.build_arg_expression_doc(a),
                 ));
 
                 return d.concat(&[
@@ -740,7 +743,7 @@ impl<'a> Printer<'a> {
                 paren_open,
                 false,
                 #[allow(clippy::redundant_closure_for_method_calls)]
-                |p, a| p.build_expression_doc(a),
+                |p, a| p.build_arg_expression_doc(a),
             );
             return wrap_call_with_will_break_guard(d, callee_with_types, arg_parts);
         }

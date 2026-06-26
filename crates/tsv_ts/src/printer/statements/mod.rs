@@ -128,17 +128,16 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Handle comments before semicolon
-        // Prettier keeps comments BEFORE the semicolon in expression statements
+        // Comments between the expression and the `;`, with the `;` bound to the
+        // statement: a same-line block stays inline before it, a same-line line trails
+        // after it via `line_suffix` (`fn() // c` → `fn(); // c`), an own-line comment
+        // drops to its own line after it (emitting a line comment before the `;` would
+        // swallow it). See `split_separator_gap_comments`.
         let expr_end = stmt.expression.span().end;
         let semicolon_pos = stmt.span.end.saturating_sub(1);
-        if let Some(comments_doc) =
-            self.build_inline_comments_between_doc_opt(expr_end, semicolon_pos)
-        {
-            parts.push(comments_doc);
-        }
-
+        let after = self.split_separator_gap_comments(&mut parts, expr_end, semicolon_pos);
         parts.push(d.text(";"));
+        parts.extend(after);
         d.concat(&parts)
     }
 

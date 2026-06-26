@@ -36,13 +36,17 @@ Prettier was tsv's initial guide, and the formatter still tracks it for the comm
 
 ### Comment Position Philosophy
 
-**A formatter should not move comments to different syntactic positions.** Comment
-placement is a deliberate authoring choice — it communicates what the comment refers
-to. This is the single largest category of divergence (see [TypeScript: Comments](#typescript-comments)).
+**A formatter should not move a comment to a different syntactic position — unless
+the move is lossless and the position carries no authorship signal.** Comment
+placement is usually a deliberate authoring choice — it communicates what the comment
+refers to — so preserving it is tsv's default and its single largest category of
+divergence from Prettier (see [TypeScript: Comments](#typescript-comments)).
 
 Prettier's comment handling is its weakest area. It routinely moves comments from
 between syntactic boundaries into adjacent blocks, parens, or other positions, changing
-the apparent association. tsv treats comment position as semantic and preserves it.
+the apparent association — and frequently **losing information** (two comments merging
+onto one end-of-line, the second `//` becoming text; or reordering them). tsv treats
+comment position as semantic and preserves it wherever that distinction is real.
 
 **Principles:**
 
@@ -55,11 +59,22 @@ the apparent association. tsv treats comment position as semantic and preserves 
 4. **Both positions are valid when dual-stable.** When the user's chosen position is
    idempotent, preserve it. Don't collapse to one canonical form — that destroys the
    distinction between "comment about X" and "comment about Y".
+5. **The deciding test is information loss, not position purity.** Preserve a comment's
+   position when relocating it would lose information — the canonical case is Prettier's
+   end-of-line relocation *merging* two comments onto one line (the second `//` becomes
+   text) or reordering them; tsv keeps them distinct (the name→`=`/`:`/`?` binding
+   divergences). But where relocating is **lossless** *and* the position carries no
+   signal — a same-line line comment past a *pure separator*, e.g. a list element's
+   comma (`A // c⏎, B` → `A, // c`; the comma is structure and the comment trails the
+   element either way) — tsv trails like Prettier rather than manufacturing a divergence
+   for a meaningless distinction.
 
-**When reviewing comment-related fixes:** Default to preserving position. Only match
-Prettier's repositioning when the original position is clearly wrong (e.g., comment
-inside a token boundary). Create `_prettier_divergence` fixtures for cases where
-Prettier moves comments and we preserve position.
+**When reviewing comment-related fixes:** Default to preserving position. Match
+Prettier's repositioning only when the move is lossless *and* the position carries no
+authorship signal (a pure-separator trail), or when the original position is clearly
+wrong (e.g., comment inside a token boundary). Otherwise — and whenever relocating
+would merge, reorder, or drop a comment — preserve and create a `_prettier_divergence`
+fixture.
 
 ### Uniform Forced-Continuation Indent
 
@@ -505,6 +520,11 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Class method after `?` → Before `?` modifier — [optional_marker_comment](../tests/fixtures/typescript/declarations/class/optional_marker_comment_prettier_divergence/)
 - Optional `?` to `:` line comment (all contexts) → Trailing the member `;` — [optional_marker_line_comment](../tests/fixtures/typescript/syntax/comments/optional_marker_line_comment_prettier_divergence/)
 - Member key to `:` line comment (non-optional) → Trailing the member `;` — [key_colon_line_comment](../tests/fixtures/typescript/syntax/comments/key_colon_line_comment_prettier_divergence/)
+- Member key to optional `?` line comment (iface/type-literal/class/method) → Trailing the member `;`; tsv keeps the comment after the key and drops `?` + the rest of the member to a continuation line — [key_optional_marker_line_comment](../tests/fixtures/typescript/syntax/comments/key_optional_marker_line_comment_prettier_divergence/)
+- Enum member name to `=` line comment → After the value (`A = 1 // c`); tsv keeps it after the name + continuation indent. With a second trailing comment prettier merges both onto one line (info loss); tsv keeps them distinct — [member_before_eq_line_comment](../tests/fixtures/typescript/declarations/enum/member_before_eq_line_comment_prettier_divergence/)
+- Class property name to `=` line comment → Trailing the member `;` after the value (`a = 1; // c`); tsv keeps it in place + continuation indent. Two comments → prettier merges (info loss), tsv keeps distinct — [property_before_eq_line_comment](../tests/fixtures/typescript/declarations/class/property_before_eq_line_comment_prettier_divergence/)
+- Variable binding to `=` line comment → Trailing the statement `;` after the value (`const a = 1; // c`); tsv keeps it in place + continuation indent. Two comments → prettier merges (info loss), tsv keeps distinct — [declarator_before_eq_line_comment](../tests/fixtures/typescript/declarations/variable/declarator_before_eq_line_comment_prettier_divergence/)
+- Object property key to `:` line comment → Hoisted to its own line before the key (`// c⏎a: 1`); tsv keeps it after the key and drops `: value` to a continuation line — [property_key_colon_line_comment](../tests/fixtures/typescript/expressions/objects/property_key_colon_line_comment_prettier_divergence/)
 - Variable definite `!` → After `!` modifier — [definite_comment](../tests/fixtures/typescript/declarations/variable/definite_comment_prettier_divergence/)
 - Function param optional `?` → After `?` modifier — [param_optional_comment](../tests/fixtures/typescript/declarations/function/param_optional_comment_prettier_divergence/)
 - Computed key after `]` (object) → Inside brackets `[x /* c */]` — [computed_key_bracket_colon_comment](../tests/fixtures/typescript/expressions/objects/computed_key_bracket_colon_comment_prettier_divergence/)
@@ -513,6 +533,8 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Computed key after `]`, no annotation (iface) → Inside brackets `[k /* c */]` — [computed_key_no_annotation_comment](../tests/fixtures/typescript/types/type_members/computed_key_no_annotation_comment_prettier_divergence/)
 - Computed key after `]` (destr) → Inside brackets `[x /* c */]` — [computed_key_bracket_comment](../tests/fixtures/typescript/expressions/destructuring/computed_key_bracket_comment_prettier_divergence/)
 - `readonly` keyword to `[` (index sig) → Inside brackets before the key `[/* c */ k` — [index_signature_readonly_comment](../tests/fixtures/typescript/types/type_members/index_signature_readonly_comment_prettier_divergence/)
+- Accessor keyword (`get`/`set`) to `[` (computed key) → Inside brackets before the key `[/* c */ a` — [accessor_keyword_bracket_comment](../tests/fixtures/typescript/expressions/objects/accessor_keyword_bracket_comment_prettier_divergence/)
+- Generator `*` to `[` (computed key, incl. `async *`) → Inside brackets before the key `[/* c */ a` — [generator_star_bracket_comment](../tests/fixtures/typescript/expressions/objects/generator_star_bracket_comment_prettier_divergence/)
 - Type params to `(` (signatures) → Inside parens as leading on param — [signature_paren_in_comment](../tests/fixtures/typescript/types/type_members/signature_paren_in_comment_prettier_divergence/)
 - `new` to `(` (construct signatures) → Inside parens as leading on param (after `)` when empty) — [construct_signature_paren_in_comment](../tests/fixtures/typescript/types/interfaces/construct_signature_paren_in_comment_prettier_divergence/)
 - `new` to `(` (constructor types, incl. `abstract`) → Inside parens as leading on param (after `)` when empty) — [constructor_paren_comment](../tests/fixtures/typescript/types/function_type/constructor_paren_comment_prettier_divergence/)

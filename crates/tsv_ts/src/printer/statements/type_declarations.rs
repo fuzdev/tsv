@@ -945,30 +945,41 @@ impl<'a> Printer<'a> {
             };
             let init_start = init.span().start;
             let eq_pos = self.find_equals_position(id_end, init_start);
-            // Comments between name and `=` (e.g., `a /* c */ = 1`)
-            let id_doc = if self.has_comments_between(id_end, eq_pos) {
-                d.concat(&[
-                    id_doc,
-                    self.build_inline_comments_between_doc(id_end, eq_pos),
-                ])
-            } else {
-                id_doc
-            };
-            let rhs_comments = self.build_rhs_comments_opt(eq_pos + 1, init_start);
 
-            // For binary expressions, use assignment layout with indent for wrapping
-            // The binary expression already has a group() with line() elements.
-            // We just need to add indent around it so continuations are indented.
-            if let Some(comments) = rhs_comments {
-                if matches!(init, internal::Expression::BinaryExpression(_)) {
-                    d.concat(&[id_doc, d.text(" = "), comments, d.indent(init_doc)])
+            // The post-`=` value content (shared by the inline and the
+            // continuation forms). For binary expressions, indent so wrapped
+            // continuations align under the value; any `=`→value block comment
+            // leads it.
+            let value_doc = {
+                let init_with_indent = if matches!(init, internal::Expression::BinaryExpression(_))
+                {
+                    d.indent(init_doc)
                 } else {
-                    d.concat(&[id_doc, d.text(" = "), comments, init_doc])
-                }
-            } else if matches!(init, internal::Expression::BinaryExpression(_)) {
-                d.concat(&[id_doc, d.text(" = "), d.indent(init_doc)])
+                    init_doc
+                };
+                self.prepend_rhs_comments(init_with_indent, eq_pos + 1, init_start)
+            };
+
+            // A line comment between the name and `=` keeps the comment after the
+            // name and drops `= value` to a continuation line indented one level
+            // (preserve position — lossless when a second comment also trails the
+            // member; prettier relocates past the value and merges the two onto one
+            // line — see conformance_prettier.md §Comment relocation).
+            if let Some(cont) =
+                self.build_initializer_line_continuation(id_end, eq_pos, || value_doc)
+            {
+                d.concat(&[id_doc, cont])
             } else {
-                d.concat(&[id_doc, d.text(" = "), init_doc])
+                // Comments between name and `=` (block stays inline: `a /* c */ = 1`)
+                let id_doc = if self.has_comments_between(id_end, eq_pos) {
+                    d.concat(&[
+                        id_doc,
+                        self.build_inline_comments_between_doc(id_end, eq_pos),
+                    ])
+                } else {
+                    id_doc
+                };
+                d.concat(&[id_doc, d.text(" = "), value_doc])
             }
         } else {
             id_doc

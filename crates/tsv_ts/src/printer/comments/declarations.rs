@@ -54,21 +54,52 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The end bound for a member's pre-name comment scan: the computed key's
+    /// `[` (via [`Self::find_opening_bracket_after`]) when `computed`, else the
+    /// key's start `key_start`.
+    ///
+    /// Comments *inside* `[ … ]` belong to the computed-key bracket builder
+    /// (`build_computed_key_bracket_doc`), so a keyword/marker emitter that
+    /// scanned all the way to the key expression's start (which lies past `[`)
+    /// would emit them a second time — duplicating the comment onto the keyword
+    /// (`get /* c */ [/* c */ a]`, `*/* c */ [/* c */ a]`). A comment the author
+    /// wrote *before* `[` (`get /* c */ [a]`) still falls in the bounded range
+    /// and stays with the keyword. Shared by the accessor-keyword, generator-`*`,
+    /// and async-method pre-name emitters; the class member path inlines the same
+    /// `[`-bound directly.
+    pub(in crate::printer) fn computed_key_name_bound(
+        &self,
+        from: u32,
+        key_start: u32,
+        computed: bool,
+    ) -> u32 {
+        if computed {
+            self.find_opening_bracket_after(from, key_start)
+        } else {
+            key_start
+        }
+    }
+
     /// Emit an accessor keyword (`get ` / `set `) preserving comments between
     /// the keyword and the key (e.g., `get /* c */ a()`).
     ///
     /// Single-keyword convenience over [`Self::push_member_keyword_doc`] +
     /// [`Self::push_pre_name_comments_doc`]; `search_from` is the member's start.
+    /// The pre-name scan is bounded at `[` for a computed key
+    /// ([`Self::computed_key_name_bound`]) so an in-bracket comment isn't emitted
+    /// twice.
     pub(crate) fn push_accessor_keyword_doc(
         &self,
         parts: &mut DocBuf,
         kind_text: &'static str,
         search_from: u32,
         key_start: u32,
+        computed: bool,
     ) {
         let mut cursor = search_from;
         self.push_member_keyword_doc(parts, kind_text, &mut cursor, key_start);
-        self.push_pre_name_comments_doc(parts, cursor, key_start);
+        let name_bound = self.computed_key_name_bound(cursor, key_start, computed);
+        self.push_pre_name_comments_doc(parts, cursor, name_bound);
     }
 
     /// Emit an optional/definite modifier marker (`?` or `!`) that follows a key
@@ -96,10 +127,22 @@ impl<'a> Printer<'a> {
             marker,
         )
         .expect("modifier marker (`?`/`!`) not found") as u32;
-        if self.has_comments_between(after, pos) {
-            parts.push(self.build_inline_comments_between_doc(after, pos));
+        let marker_doc = d.text(if marker == b'?' { "?" } else { "!" });
+        // A line comment between the name and the marker keeps the comment after
+        // the name and drops the marker (and whatever the caller appends next — the
+        // `: type` / `(params)`) to a continuation line indented one level
+        // (`a // c⏎\t?: T`). Block stays inline (`a /* c */?`). Prettier relocates a
+        // such comment — a `_prettier_divergence` (conformance_prettier.md §Comment
+        // relocation). The marker is the continuation `tail`; later pushes continue
+        // mid-line after it.
+        if self.has_line_comments_between(after, pos) {
+            parts.push(self.build_continuation_indent(after, pos, marker_doc));
+        } else {
+            if self.has_comments_between(after, pos) {
+                parts.push(self.build_inline_comments_between_doc(after, pos));
+            }
+            parts.push(marker_doc);
         }
-        parts.push(d.text(if marker == b'?' { "?" } else { "!" }));
         pos + 1
     }
 
@@ -189,6 +232,38 @@ impl<'a> Printer<'a> {
     ) -> Option<DocId> {
         self.has_line_comments_between(marker_end, colon_pos)
             .then(|| self.build_continuation_indent(marker_end, colon_pos, type_doc))
+    }
+
+    /// When a **line** comment sits in the name→`=` gap of an initializer, build the
+    /// indented continuation: the comment trails the name on its line, then the `=`
+    /// and value (`value_doc`, built by the caller — the bare value, no leading
+    /// `= `) drop to a continuation line indented one level (the uniform
+    /// forced-continuation indent, `build_continuation_indent`). Returns `None` when
+    /// the gap has no line comment, leaving the caller's block / no-comment /
+    /// assignment-layout handling in place.
+    ///
+    /// `name_end` is the offset just before the `=` gap (past the binding name and
+    /// any `?`/`!`/type annotation); `eq_pos` is the `=`. `build_value` lazily builds
+    /// the bare value doc — only invoked on the (rare) line-comment path, so the
+    /// common no-comment path never builds the value twice. Unlike the `:` twin
+    /// (`build_marker_colon_line_continuation`, where prettier keeps the continuation
+    /// flush), prettier here *relocates* the comment past the value to
+    /// end-of-statement — which is **lossy when a second comment already trails the
+    /// construct** (prettier merges them onto one line, the second `//` becoming text;
+    /// tsv keeps both comments distinct). Shared by the initializer `=` sites: enum
+    /// members, class properties, variable declarators. See conformance_prettier.md
+    /// §Comment relocation.
+    pub(crate) fn build_initializer_line_continuation(
+        &self,
+        name_end: u32,
+        eq_pos: u32,
+        build_value: impl FnOnce() -> DocId,
+    ) -> Option<DocId> {
+        let d = self.d();
+        self.has_line_comments_between(name_end, eq_pos).then(|| {
+            let tail = d.concat(&[d.text("= "), build_value()]);
+            self.build_continuation_indent(name_end, eq_pos, tail)
+        })
     }
 
     /// Build a binding/identifier `: type` annotation including any before-`:`
@@ -601,11 +676,17 @@ impl<'a> Printer<'a> {
     /// (`*/* c */ m`). The `*` is located with the comment/string-skipping scan,
     /// so a `*` inside a comment (`/* a * b */`) is not mistaken for the marker.
     /// This pushes the `*` itself — call it instead of pushing `d.text("*")`.
+    ///
+    /// For a **computed** key the after-`*` scan is bounded at `[`
+    /// ([`Self::computed_key_name_bound`]): comments inside the brackets belong
+    /// to the computed-key bracket builder, so scanning to the key expression's
+    /// start (past `[`) would duplicate them onto the `*` (`*/* c */ [/* c */ a]`).
     pub(crate) fn push_generator_star_doc(
         &self,
         parts: &mut DocBuf,
         search_start: u32,
         key_start: u32,
+        computed: bool,
     ) {
         let d = self.d();
         let star = find_char(
@@ -625,9 +706,11 @@ impl<'a> Printer<'a> {
             parts.push(d.text(" "));
         }
         parts.push(d.text("*"));
-        // Comments between the `*` and the key trail it.
+        // Comments between the `*` and the key trail it (bounded at `[` for a
+        // computed key, whose in-bracket comments the bracket builder owns).
         if let Some(star) = star {
-            for comment in comments_in_range(self.comments, star + 1, key_start) {
+            let name_bound = self.computed_key_name_bound(star + 1, key_start, computed);
+            for comment in comments_in_range(self.comments, star + 1, name_bound) {
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.text(" "));
             }
